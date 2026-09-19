@@ -409,10 +409,14 @@ final class AppModel {
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers)
         do {
-            let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            _ = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
             await refreshAgents()
-            selection = id
+            await refreshProjects()
+            // Deliberately not selected. Saying what you want done is not the same as
+            // asking to watch it: the agent appears in the project's list and you stay
+            // where you were, free to say the next thing. Starting three pieces of work
+            // in a row should not mean coming back twice.
         } catch {
             problem = describe(error)
         }
