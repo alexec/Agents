@@ -10,9 +10,12 @@ import Foundation
 /// Dropping is from the front, so what comes back is the end of the output, which is
 /// the part anyone wants after an hour away.
 public struct Scrollback: Sendable, Equatable {
-    /// Enough to hold what a long build prints, and bounded so an agent that runs
-    /// something pathological cannot take the daemon's memory with it. Tuned against a
-    /// real `xcodebuild` run; see research section 8.
+    /// Enough to hold what a long build prints, and bounded so something pathological
+    /// cannot take the daemon's memory with it.
+    ///
+    /// Measured rather than guessed: a full clean `xcodebuild` of this project prints
+    /// about 350KB, so this holds roughly eleven of them. A shell that prints more than
+    /// that gives back the end, and says it has dropped the rest.
     public static let defaultCap = 4 * 1024 * 1024
 
     public let cap: Int

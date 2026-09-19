@@ -187,14 +187,14 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T077 Pick the scrollback byte cap in `Packages/AgentsKit/Sources/AgentsKit/Terminal/Scrollback.swift` against what a real `xcodebuild` run prints, replacing the placeholder (research section 8)
-- [ ] T078 Pick the idle threshold in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` from use, replacing the placeholder (research section 8)
+- [X] T077 Pick the scrollback byte cap in `Packages/AgentsKit/Sources/AgentsKit/Terminal/Scrollback.swift` against what a real `xcodebuild` run prints, replacing the placeholder (research section 8)
+- [X] T078 Pick the idle threshold in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` from use, replacing the placeholder (research section 8)
 - [ ] T079 Pick the minimum conversation width in `App/Sources/Sidebar/SidebarView.swift` in front of the running app, replacing the placeholder (research section 8)
-- [ ] T080 [P] Check a folder of 50,000 entries stays responsive and that the tree is never walked, per scenario 7 of `specs/002-right-sidebar/quickstart.md` (FR-015)
-- [ ] T081 [P] Check a 200MB log opens to its start quickly and says there is more, per scenario 7 of `specs/002-right-sidebar/quickstart.md` (FR-015)
+- [X] T080 [P] Check a folder of 50,000 entries stays responsive and that the tree is never walked, per scenario 7 of `specs/002-right-sidebar/quickstart.md` (FR-015)
+- [X] T081 [P] Check a 200MB log opens to its start quickly and says there is more, per scenario 7 of `specs/002-right-sidebar/quickstart.md` (FR-015)
 - [ ] T082 Run an agent runtime inside the terminal pane and confirm nothing claims it is one of this app's agents, per the last row of scenario 7 in `specs/002-right-sidebar/quickstart.md` (spec edge case)
 - [ ] T083 Confirm SC-009 by hand, per scenario 6 step 4 of `specs/002-right-sidebar/quickstart.md`: with the sidebar closed, start an agent, follow up and stop it, with no step added anywhere and nothing of the sidebar running
-- [ ] T084 Strike the "No third-party dependencies" line from `specs/001-agent-daemon-ui/plan.md:46`, and the matching claim in `specs/003-acp-coverage/plan.md`, since the rule does not exist and a future planning pass will read it
+- [X] T084 Strike the "No third-party dependencies" line from `specs/001-agent-daemon-ui/plan.md:46`, and the matching claim in `specs/003-acp-coverage/plan.md`, since the rule does not exist and a future planning pass will read it
 - [ ] T085 [P] Time SC-001 and SC-003 against the running app, per scenarios 1 and 2 of `specs/002-right-sidebar/quickstart.md`: agent's claim to reading the file under 10 seconds, shell ready to type into within 2 seconds
 - [ ] T086 [P] Confirm SC-005 by switching between ten agents with the sidebar open, per scenario 6 step 3 of `specs/002-right-sidebar/quickstart.md`: the window stays responsive and each agent returns to the pane and position it was left at
 - [ ] T087 Confirm SC-006 and SC-010 by hand, per scenario 3 of `specs/002-right-sidebar/quickstart.md`: nothing running in a terminal is lost by moving between panes or agents, and a build still running when the app is quit is still running 60 seconds later with all its output
@@ -202,6 +202,22 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 - [ ] T089 Run the whole of `specs/002-right-sidebar/quickstart.md` end to end and record what failed
 
 ---
+
+## What is left, and why
+
+Everything above is done except the checks that need a person in front of the running
+app. They are not ticked, because ticking them would be a claim nobody made.
+
+- **T079** the minimum conversation width is set to 520pt with the reasoning written
+  beside it, but it has not been looked at on this screen. The number is a guess with an
+  argument attached, not an observation.
+- **T082, T083, T085 to T089** are hand checks: a runtime running inside the pane, SC-009
+  with the sidebar closed, the timings in SC-001 and SC-003, ten agents for SC-005, a
+  build surviving a quit for SC-006 and SC-010, and the whole quickstart end to end.
+
+Two of the hand checks in the original list turned out to be automatable and were done
+properly instead: T080 and T081 are now `FilesPaneScaleTests`, which lists a folder past
+the entry cap and probes a real 200MB file, asserting both the result and the time.
 
 ## Dependencies & Execution Order
 

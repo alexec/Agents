@@ -114,9 +114,13 @@ public final class ShellSession: @unchecked Sendable {
         return now.timeIntervalSince(lastInputAt) >= threshold
     }
 
-    /// How long a shell may sit doing nothing before the daemon lets it go. Long enough
-    /// that stepping away from a prompt does not cost it; short enough that shells do
-    /// not accumulate for every agent ever opened. See research section 8.
+    /// How long a shell may sit doing nothing before the daemon lets it go.
+    ///
+    /// Two hours: long enough that lunch, a meeting, or an afternoon on another agent
+    /// does not cost you a prompt you were using, and short enough that shells do not
+    /// accumulate for every agent ever opened. A shell with a job running is never
+    /// idle, so this never interrupts work; it only collects prompts nobody came back
+    /// to.
     public static let idleThreshold: TimeInterval = 60 * 60 * 2
 
     public func isIdle(now: Date = Date(), threshold: TimeInterval = ShellSession.idleThreshold) -> Bool {
