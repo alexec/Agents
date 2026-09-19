@@ -10,6 +10,11 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     /// Theirs, where the request carried one, so `elicitation/complete` can withdraw it.
     public var elicitationID: String?
     public var agentID: UUID
+    /// What the agent is asking for, in its own words.
+    ///
+    /// The question itself lives here, not in the schema: a one-question form arrives
+    /// with an untitled field and the whole question in `message`.
+    public var message: String?
     public var mode: Mode
     public var scope: Scope
     public var askedAt: Date
@@ -17,7 +22,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     public enum Mode: Codable, Hashable, Sendable {
         case form(ElicitationSchema)
         /// Go and look at this, then come back and say how it went.
-        case url(String, description: String?)
+        case url(String)
     }
 
     /// Whether the answer outlives the turn that asked for it.
@@ -26,10 +31,12 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     }
 
     public init(id: UUID = UUID(), elicitationID: String? = nil, agentID: UUID,
-                mode: Mode, scope: Scope = .request, askedAt: Date = Date()) {
+                message: String? = nil, mode: Mode, scope: Scope = .request,
+                askedAt: Date = Date()) {
         self.id = id
         self.elicitationID = elicitationID
         self.agentID = agentID
+        self.message = message
         self.mode = mode
         self.scope = scope
         self.askedAt = askedAt
@@ -41,8 +48,8 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         guard let wire else { return nil }
         let mode: Mode
         if let url = wire["url"]?.stringValue {
-            mode = .url(url, description: wire["description"]?.stringValue)
-        } else if let schema = ElicitationSchema(wire: wire["schema"]) {
+            mode = .url(url)
+        } else if let schema = ElicitationSchema(wire: wire["requestedSchema"]) {
             mode = .form(schema)
         } else {
             return nil
@@ -50,13 +57,16 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         self.init(id: UUID(),
                   elicitationID: wire["elicitationId"]?.stringValue,
                   agentID: agentID,
+                  message: wire["message"]?.stringValue,
                   mode: mode,
-                  scope: wire["scope"]?.stringValue == "session" ? .session : .request)
+                  // Tied to a session, unless it names the request it belongs to —
+                  // which is how a runtime asks before there is a session at all.
+                  scope: wire["requestId"] == nil ? .session : .request)
     }
 
     public var title: String {
         switch mode {
-        case .form(let schema): return schema.title ?? "The agent needs something"
+        case .form(let schema): return schema.title ?? message ?? "The agent needs something"
         case .url: return "The agent wants you to open a page"
         }
     }
@@ -120,11 +130,15 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
         public struct Choice: Codable, Hashable, Sendable, Identifiable {
             public var value: String
             public var title: String
+            /// What picking this one means. The whole substance of a question is often
+            /// here rather than in the labels, so it is drawn rather than dropped.
+            public var description: String?
             public var id: String { value }
 
-            public init(value: String, title: String? = nil) {
+            public init(value: String, title: String? = nil, description: String? = nil) {
                 self.value = value
                 self.title = title ?? value
+                self.description = description
             }
         }
 
@@ -154,7 +168,11 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
             case "boolean":
                 kind = .boolean
             case "array":
-                guard let items = Self.choices(in: wire["items"]?["enum"] ?? wire["items"]) else { return nil }
+                // Titled choices travel under `items.anyOf`, bare ones under
+                // `items.enum`; a plain array of strings is allowed to be the items.
+                let itemsWire = wire["items"]
+                guard let items = Self.choices(in: itemsWire?["enum"] ?? itemsWire?["anyOf"] ?? itemsWire)
+                else { return nil }
                 kind = .multiSelect(items: items,
                                     minItems: wire["minItems"]?.intValue,
                                     maxItems: wire["maxItems"]?.intValue)
@@ -173,8 +191,12 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
             guard let entries = value?.arrayValue, !entries.isEmpty else { return nil }
             let choices = entries.compactMap { entry -> Choice? in
                 if let plain = entry.stringValue { return Choice(value: plain) }
-                guard let value = entry["value"]?.stringValue else { return nil }
-                return Choice(value: value, title: entry["title"]?.stringValue)
+                // A titled option names its value `const`. `value` is what the older
+                // MCP spelling used, and costs nothing to keep taking.
+                guard let value = (entry["const"] ?? entry["value"])?.stringValue else { return nil }
+                return Choice(value: value,
+                              title: entry["title"]?.stringValue,
+                              description: entry["description"]?.stringValue)
             }
             return choices.isEmpty ? nil : choices
         }
