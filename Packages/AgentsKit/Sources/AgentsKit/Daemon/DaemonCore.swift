@@ -25,12 +25,12 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var suggestionTokens: [String: UUID] = [:]
-    /// The two facts about a project that its folder cannot tell us. Everything else
-    /// about a project is derived from the agents in it.
-    lazy var projectStore = ProjectStore(locations: locations)
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
+    /// The two facts about a project that its folder cannot tell us. Everything else
+    /// about a project is derived from the agents in it.
+    lazy var projectStore = ProjectStore(locations: locations)
 
     var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
     var connectionCount = 0
