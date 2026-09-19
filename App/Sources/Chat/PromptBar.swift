@@ -19,6 +19,9 @@ struct PromptBar: View {
     /// Set when the list is dismissed, so Escape hides it until the word changes.
     @State private var dismissedCommandTerm: String?
     @State private var isPrimingDictation = false
+    @State private var isShowingRuntimeAccount = false
+    @State private var isShowingSessions = false
+    @State private var isShowingReach = false
     @FocusState private var focused: Bool
 
     private var agent: Agent? { model.selectedAgent }
@@ -50,6 +53,23 @@ struct PromptBar: View {
         }
         .padding(.horizontal, 144)
         .padding(.vertical, 20)
+        .sheet(isPresented: $isShowingRuntimeAccount) {
+            if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+                RuntimeAccountView(runtimeID: runtimeID)
+            }
+        }
+        .sheet(isPresented: $isShowingSessions) {
+            if let runtimeID = model.draftRuntimeID, let cwd = model.draftCwd {
+                SessionListView(runtimeID: runtimeID, cwd: cwd)
+            }
+        }
+        .sheet(isPresented: $isShowingReach) {
+            AgentReachView(cwd: model.draftCwd,
+                           folders: Binding(get: { model.draftFolders },
+                                            set: { model.draftFolders = $0 }),
+                           servers: Binding(get: { model.draftServers },
+                                            set: { model.draftServers = $0 }))
+        }
         .onChange(of: model.selection) { text = "" }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
@@ -99,15 +119,34 @@ struct PromptBar: View {
 
                 Spacer(minLength: 8)
 
+                // What else this runtime is holding in this folder, including work
+                // started somewhere else entirely.
+                Button {
+                    isShowingSessions = true
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .buttonStyle(.glass)
+                .font(.footnote)
+                .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
+                .help("Conversations this runtime is already holding here")
+
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
                     ForEach(model.availableRuntimes) { status in
                         SelectChoice(title: status.runtime.name,
-                                     description: nil,
+                                     description: signInNote(status.runtime.id),
                                      isChosen: status.runtime.id == model.draftRuntimeID) {
                             chooseRuntime(status.runtime.id)
                             dismiss()
                         }
+                    }
+                    Divider().padding(.vertical, 4)
+                    SelectChoice(title: "Sign in, sign out, providers…",
+                                 description: nil,
+                                 isChosen: false) {
+                        dismiss()
+                        isShowingRuntimeAccount = true
                     }
                 }
                 .disabled(model.availableRuntimes.isEmpty)
@@ -426,6 +465,25 @@ struct PromptBar: View {
             // are a few short capsules and they fit.
             HStack(spacing: 10) {
                 permissionOptions(shown)
+                if isNew {
+                    Button {
+                        isShowingReach = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(reachTitle)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.footnote)
+                    .fixedSize()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .help("Folders and MCP servers this agent may reach")
+                }
                 Spacer(minLength: 16)
                 otherOptions(shown)
             }
@@ -491,6 +549,22 @@ struct PromptBar: View {
                 await model.send(outgoing, attachments: going)
             }
         }
+    }
+
+    /// What an agent can reach beyond its own folder, said in the control itself.
+    private var reachTitle: String {
+        let folders = model.draftFolders.count
+        let servers = model.draftServers.count
+        if folders == 0 && servers == 0 { return "Reach" }
+        var parts: [String] = []
+        if folders > 0 { parts.append("\(folders + 1) folders") }
+        if servers > 0 { parts.append("\(servers) MCP") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Said in the runtime list, so a runtime that cannot be used says why there.
+    private func signInNote(_ runtimeID: String) -> String? {
+        model.accounts[runtimeID]?.state == .needsSignIn ? "Needs signing in" : nil
     }
 
     private func runtimeName(_ id: String) -> String {

@@ -15,6 +15,50 @@ extension DaemonCore {
             case DaemonAPI.Method.runtimesAccounts:
                 return .success(try JSONValue.encoding(allAccounts()))
 
+            case DaemonAPI.Method.runtimeAuthenticate:
+                let request = try require(params, as: DaemonAPI.AuthenticateRequest.self)
+                return .success(try JSONValue.encoding(
+                    try await authenticate(runtimeID: request.runtimeID, methodID: request.methodID)))
+
+            case DaemonAPI.Method.runtimeLogOut:
+                let request = try require(params, as: DaemonAPI.RuntimeRequest.self)
+                return .success(try JSONValue.encoding(try await logOut(runtimeID: request.runtimeID)))
+
+            case DaemonAPI.Method.runtimeSetProvider:
+                let request = try require(params, as: DaemonAPI.SetProviderRequest.self)
+                return .success(try JSONValue.encoding(
+                    try await setProvider(runtimeID: request.runtimeID, providerID: request.providerID)))
+
+            case DaemonAPI.Method.sessionsList:
+                let request = try require(params, as: DaemonAPI.SessionsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    try await listRuntimeSessions(runtimeID: request.runtimeID, cwd: request.cwd)))
+
+            case DaemonAPI.Method.sessionsAdopt:
+                let request = try require(params, as: DaemonAPI.AdoptRequest.self)
+                return .success(try JSONValue.encoding(
+                    try await adopt(runtimeID: request.runtimeID, sessionID: request.sessionID,
+                                    cwd: request.cwd)))
+
+            case DaemonAPI.Method.sessionsDelete:
+                let request = try require(params, as: DaemonAPI.DeleteSessionRequest.self)
+                try await deleteRuntimeSession(runtimeID: request.runtimeID,
+                                               sessionID: request.sessionID,
+                                               confirmed: request.confirmed)
+                return .success([:])
+
+            case DaemonAPI.Method.agentsFork:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                return .success(try JSONValue.encoding(try await fork(agentID: request.agentID)))
+
+            case DaemonAPI.Method.elicitationsPending:
+                return .success(try JSONValue.encoding(pendingElicitations()))
+
+            case DaemonAPI.Method.elicitationsAnswer:
+                let request = try require(params, as: DaemonAPI.AnswerElicitationRequest.self)
+                try await answerElicitation(request)
+                return .success([:])
+
             case DaemonAPI.Method.agentsList:
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
                 return .success(try JSONValue.encoding(allAgents(includeArchived: request.includeArchived)))

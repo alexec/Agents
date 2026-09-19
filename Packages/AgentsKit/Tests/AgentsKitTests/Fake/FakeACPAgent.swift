@@ -39,6 +39,8 @@ actor FakeACPAgent {
         var sessionCapabilities: [String: JSONValue] = ["close": [:], "list": [:]]
         var agentCapabilities: [String: JSONValue] = [:]
         var sessions: [JSONValue] = []
+        /// What `initialize` offers as ways to sign in.
+        var authMethods: [JSONValue] = []
     }
 
     private var script: Script
@@ -82,7 +84,7 @@ actor FakeACPAgent {
                 "protocolVersion": .int(script.protocolVersion),
                 "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
-                "authMethods": [],
+                "authMethods": .array(script.authMethods),
             ])
 
         case ACP.Method.newSession:
@@ -126,6 +128,9 @@ actor FakeACPAgent {
         case ACP.Method.prompt:
             promptContent = params?["prompt"]
             return await runTurn()
+
+        case ACP.Method.authenticate, ACP.Method.logout:
+            return .success([:])
 
         case ACP.Method.close:
             return .success([:])

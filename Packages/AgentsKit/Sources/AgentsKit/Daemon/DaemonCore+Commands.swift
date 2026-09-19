@@ -52,6 +52,7 @@ extension DaemonCore {
         try await store.save(agent)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
+        await prepareServing(session, agentID: agent.id)
 
         await session.apply(request.startOptions)
         agent = agents[agent.id] ?? agent
@@ -153,18 +154,24 @@ extension DaemonCore {
         var updated = agent
         if let sessionID = agent.runtimeSessionID {
             do {
-                try await session.continueSession(id: sessionID, cwd: agent.cwd)
+                try await session.continueSession(id: sessionID, cwd: agent.cwd,
+                                                  additionalDirectories: agent.additionalDirectories,
+                                                  mcpServers: agent.mcpServers)
                 await record(.runtimeNote("Picked the conversation back up."), for: agent.id)
             } catch {
                 // The runtime no longer has it. The agent is not lost: it carries on as
                 // the same agent, with our transcript, in a new runtime session.
                 await record(.runtimeNote("\(runtime.name) no longer has this conversation. Carrying on in a new one; everything above is kept."),
                              for: agent.id)
-                let result = try await session.newSession(cwd: agent.cwd)
+                let result = try await session.newSession(cwd: agent.cwd,
+                                                          additionalDirectories: agent.additionalDirectories,
+                                                          mcpServers: agent.mcpServers)
                 updated.runtimeSessionID = result.sessionId
             }
         } else {
-            let result = try await session.newSession(cwd: agent.cwd)
+            let result = try await session.newSession(cwd: agent.cwd,
+                                                      additionalDirectories: agent.additionalDirectories,
+                                                      mcpServers: agent.mcpServers)
             updated.runtimeSessionID = result.sessionId
         }
         updated.advertisedOptions = await session.options
@@ -173,6 +180,7 @@ extension DaemonCore {
         await session.apply(updated.startOptions)
         live[agent.id] = session
         listen(to: session, agentID: agent.id)
+        await prepareServing(session, agentID: agent.id)
         return session
     }
 
@@ -250,6 +258,14 @@ extension DaemonCore {
             pendingPermissions.removeValue(forKey: id)
             broadcast(DaemonAPI.Notification.agentPermission,
                       DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+        }
+        for (id, pending) in elicitations where pending.agentID == agentID {
+            if let session = live[agentID] {
+                await session.answerElicitation(id: pending.request.id, outcome: .cancel)
+            }
+            elicitations.removeValue(forKey: id)
+            broadcast(DaemonAPI.Notification.agentElicitation,
+                      DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
         }
         if let session = live[agentID] { await session.cancel() }
         turnTasks.removeValue(forKey: agentID)?.cancel()

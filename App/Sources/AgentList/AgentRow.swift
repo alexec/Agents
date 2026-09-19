@@ -34,6 +34,8 @@ struct AgentRow: View {
             if agent.state == .archived {
                 Button("Bring back") { Task { await model.unarchive(agent.id) } }
             } else {
+                // Branching leaves the original alone and carries the history so far.
+                Button("Branch") { Task { await model.fork(agent.id) } }
                 Button("Archive") { Task { await model.archive(agent.id) } }
             }
             Divider()

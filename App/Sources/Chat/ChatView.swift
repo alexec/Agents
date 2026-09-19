@@ -45,6 +45,10 @@ struct ChatView: View {
             if let request = model.permissionForSelection {
                 PermissionView(request: request)
             }
+            // A form waits the same way a permission question does, and floats with it.
+            if let request = model.elicitationForSelection {
+                ElicitationView(request: request)
+            }
             PromptBar()
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }

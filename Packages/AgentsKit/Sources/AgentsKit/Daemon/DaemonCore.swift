@@ -18,6 +18,11 @@ public actor DaemonCore {
     var turnTasks: [UUID: Task<Void, Never>] = [:]
     var drafts: [UUID: Draft] = [:]
     var pendingPermissions: [UUID: Pending] = [:]
+    /// Forms an agent is blocked on, held here for the same reason permissions are:
+    /// the question can arrive while no window is open.
+    var elicitations: [UUID: PendingElicitation] = [:]
+    /// The commands we are running for each agent.
+    var terminalServices: [UUID: TerminalService] = [:]
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
@@ -209,6 +214,15 @@ public actor DaemonCore {
                 await record(.planUpdated(withdrawn), for: agentID)
             }
 
+        case .elicitationRequested(let request):
+            await holdElicitation(request, agentID: agentID)
+
+        case .elicitationWithdrawn(let requestID):
+            withdrawElicitation(requestID, agentID: agentID)
+
+        case .served(let request):
+            await record(.servedRequest(request), for: agentID)
+
         case .permissionRequested(var request):
             request.agentID = agentID
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)
@@ -241,12 +255,15 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) {
         eventTasks.removeValue(forKey: agentID)?.cancel()
         live.removeValue(forKey: agentID)
+        // Nothing we started for this agent outlives it.
+        Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }
     }
 
     // MARK: Shutting down
 
     public func shutDown() async {
+        await killAllTerminals()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
         for (_, task) in eventTasks { task.cancel() }

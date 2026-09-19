@@ -42,6 +42,9 @@ final class AppModel {
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
+    /// Folders beyond the working one, and MCP servers, for the agent about to start.
+    var draftFolders: [URL] = []
+    var draftServers: [MCPServer] = []
     private(set) var isLoadingDraftOptions = false
     private var draftID: UUID?
 
@@ -265,7 +268,9 @@ final class AppModel {
                                              prompt: prompt,
                                              attachments: attachments,
                                              startOptions: StartOptions(values: draftChosen),
-                                             draftID: draftID)
+                                             draftID: draftID,
+                                             additionalDirectories: draftFolders,
+                                             mcpServers: draftServers)
         do {
             let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
@@ -323,6 +328,116 @@ final class AppModel {
             try await self.client.call(DaemonAPI.Method.agentsSetOption,
                                        DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
         }
+    }
+
+    // MARK: Runtimes
+
+    func signIn(runtimeID: String, methodID: String) async -> String? {
+        do {
+            let account = try await client.call(DaemonAPI.Method.runtimeAuthenticate,
+                                                DaemonAPI.AuthenticateRequest(runtimeID: runtimeID,
+                                                                              methodID: methodID),
+                                                returning: RuntimeAccount.self)
+            accounts[runtimeID] = account
+            await refreshRuntimes()
+            return nil
+        } catch let error as JSONRPCError {
+            // A method that needs a terminal comes back as the command to run, which is
+            // the runtime's own advice rather than ours.
+            if let command = error.data?["command"]?.stringValue { return command }
+            problem = describe(error)
+            return nil
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    func signOut(runtimeID: String) async {
+        await attempt {
+            _ = try await self.client.call(DaemonAPI.Method.runtimeLogOut,
+                                           DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
+                                           returning: [UUID].self)
+        }
+        await refreshAccounts()
+        await refreshAgents()
+    }
+
+    func setProvider(runtimeID: String, providerID: String) async {
+        await attempt {
+            _ = try await self.client.call(DaemonAPI.Method.runtimeSetProvider,
+                                           DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
+                                                                        providerID: providerID),
+                                           returning: RuntimeAccount.self)
+        }
+        await refreshAccounts()
+    }
+
+    /// Which agents a sign-out would stop, so the user is told before it happens.
+    func agentsHolding(runtimeID: String) -> [Agent] {
+        agents.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }
+    }
+
+    // MARK: Sessions the app did not start
+
+    func runtimeSessions(runtimeID: String, cwd: URL) async -> [RuntimeSession] {
+        do {
+            return try await client.call(DaemonAPI.Method.sessionsList,
+                                         DaemonAPI.SessionsListRequest(runtimeID: runtimeID, cwd: cwd),
+                                         returning: [RuntimeSession].self)
+        } catch {
+            problem = describe(error)
+            return []
+        }
+    }
+
+    func adopt(runtimeID: String, session: RuntimeSession) async {
+        do {
+            let id = try await client.call(DaemonAPI.Method.sessionsAdopt,
+                                           DaemonAPI.AdoptRequest(runtimeID: runtimeID,
+                                                                  sessionID: session.sessionID,
+                                                                  cwd: session.cwd),
+                                           returning: UUID.self)
+            await refreshAgents()
+            selection = id
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    func deleteRuntimeSession(runtimeID: String, sessionID: String) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.sessionsDelete,
+                                       DaemonAPI.DeleteSessionRequest(runtimeID: runtimeID,
+                                                                      sessionID: sessionID,
+                                                                      confirmed: true))
+        }
+    }
+
+    func fork(_ id: UUID) async {
+        do {
+            let branch = try await client.call(DaemonAPI.Method.agentsFork,
+                                               DaemonAPI.AgentRequest(agentID: id),
+                                               returning: UUID.self)
+            await refreshAgents()
+            selection = branch
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    // MARK: Forms
+
+    func answerElicitation(_ request: ElicitationRequest,
+                           action: DaemonAPI.AnswerElicitationRequest.Action,
+                           content: [String: JSONValue] = [:]) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.elicitationsAnswer,
+                                       DaemonAPI.AnswerElicitationRequest(requestID: request.id,
+                                                                          action: action,
+                                                                          content: content))
+        }
+        await refreshElicitations()
     }
 
     func dismissProblem() { problem = nil }

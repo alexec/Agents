@@ -104,9 +104,20 @@ public enum ACP {
         /// One place, so that turning a capability on is one line and a review can see
         /// it. A flag here is a promise: a runtime that takes us up on it has no
         /// fallback, so nothing is turned on before the thing behind it works.
+        /// Every flag here is a promise that the thing behind it works. Grok stops
+        /// doing its own file reads and writes the moment `fs` is true and has no
+        /// fallback if we then refuse, so each one was turned on in the same change
+        /// that made it true.
         public static let app = ClientCapabilities(
+            readTextFile: true,
+            writeTextFile: true,
+            terminal: true,
             booleanConfigOptions: true,
-            terminalAuth: true)
+            compaction: true,
+            plan: true,
+            terminalAuth: true,
+            elicitationForm: true,
+            elicitationURL: true)
 
         public var wire: JSONValue {
             var caps: [String: JSONValue] = [

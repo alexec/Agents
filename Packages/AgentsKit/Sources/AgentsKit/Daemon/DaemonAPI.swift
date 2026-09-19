@@ -7,6 +7,13 @@ public enum DaemonAPI {
     public enum Method {
         public static let runtimesList = "runtimes/list"
         public static let runtimesAccounts = "runtimes/accounts"
+        public static let runtimeAuthenticate = "runtimes/authenticate"
+        public static let runtimeLogOut = "runtimes/logout"
+        public static let runtimeSetProvider = "runtimes/setProvider"
+        public static let sessionsList = "sessions/list"
+        public static let sessionsAdopt = "sessions/adopt"
+        public static let sessionsDelete = "sessions/delete"
+        public static let agentsFork = "agents/fork"
         public static let agentsList = "agents/list"
         public static let agentsOptions = "agents/options"
         public static let agentsStart = "agents/start"
@@ -209,6 +216,70 @@ public enum DaemonAPI {
         public init(agentID: UUID, request: PermissionRequest?) {
             self.agentID = agentID
             self.request = request
+        }
+    }
+
+    public struct RuntimeRequest: Codable, Sendable {
+        public var runtimeID: String
+        public init(runtimeID: String) { self.runtimeID = runtimeID }
+    }
+
+    public struct AuthenticateRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var methodID: String
+        public init(runtimeID: String, methodID: String) {
+            self.runtimeID = runtimeID
+            self.methodID = methodID
+        }
+    }
+
+    public struct SetProviderRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var providerID: String
+        public init(runtimeID: String, providerID: String) {
+            self.runtimeID = runtimeID
+            self.providerID = providerID
+        }
+    }
+
+    public struct SessionsListRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var cwd: URL
+        public init(runtimeID: String, cwd: URL) {
+            self.runtimeID = runtimeID
+            self.cwd = cwd
+        }
+    }
+
+    public struct AdoptRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var sessionID: String
+        public var cwd: URL
+        public init(runtimeID: String, sessionID: String, cwd: URL) {
+            self.runtimeID = runtimeID
+            self.sessionID = sessionID
+            self.cwd = cwd
+        }
+    }
+
+    /// The only call in this API that cannot be undone, so it will not happen without
+    /// being told twice.
+    public struct DeleteSessionRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var sessionID: String
+        public var confirmed: Bool
+
+        public init(runtimeID: String, sessionID: String, confirmed: Bool) {
+            self.runtimeID = runtimeID
+            self.sessionID = sessionID
+            self.confirmed = confirmed
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            sessionID = try c.decode(String.self, forKey: .sessionID)
+            confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
         }
     }
 

@@ -12,6 +12,13 @@ public enum ACPSessionEvent: Sendable {
     case planRemoved(String)
     /// The agent is blocked until `answerPermission` is called with one of the options.
     case permissionRequested(PermissionRequest)
+    /// The agent is blocked until `answerElicitation` is called. A permission question
+    /// with a shape.
+    case elicitationRequested(ElicitationRequest)
+    /// Answered somewhere else, or abandoned by the agent.
+    case elicitationWithdrawn(UUID)
+    /// The agent asked us to do something: read a file, write one, run a command.
+    case served(ServedRequest)
     case processExited(status: Int32)
     case standardError(String)
     /// An update kind we do not recognise. Reported rather than silently dropped.
@@ -70,7 +77,23 @@ public actor ACPSession {
     /// again would double every line.
     private var isReplaying = false
 
+    /// Except when the conversation is one we never had. Adopting a session from the
+    /// runtime's own list is the one case where the replay is the transcript.
+    private var recordsReplay = false
+
+    public func setReplayRecorded(_ recorded: Bool) {
+        recordsReplay = recorded
+    }
+
     private var pendingPermissions: [UUID: CheckedContinuation<String?, Never>] = [:]
+    private var pendingElicitations: [UUID: CheckedContinuation<ElicitationOutcome, Never>] = [:]
+    /// Their id against ours, so `elicitation/complete` can find the form again.
+    private var elicitationIDs: [UUID: String] = [:]
+    /// Set once by the daemon so served requests can be judged against the folders the
+    /// agent was actually given.
+    private var folderScope = FolderScope(folders: [])
+    private var fileService: FileService?
+    private var terminalService: TerminalService?
     private var notificationTask: Task<Void, Never>?
 
     private let events: AsyncStream<ACPSessionEvent>
@@ -117,8 +140,11 @@ public actor ACPSession {
     /// A new conversation. The session id comes back from the runtime: the protocol has
     /// no field for one of ours, and all three ignore one offered.
     @discardableResult
-    public func newSession(cwd: URL) async throws -> ACP.NewSessionResult {
-        let params: JSONValue = ["cwd": .string(cwd.path), "mcpServers": []]
+    public func newSession(cwd: URL,
+                           additionalDirectories: [URL] = [],
+                           mcpServers: [MCPServer] = []) async throws -> ACP.NewSessionResult {
+        let params = sessionParams(cwd: cwd, additionalDirectories: additionalDirectories,
+                                   mcpServers: mcpServers)
         let result = try await connection.call(ACP.Method.newSession, params)
         let decoded = try result.decode(ACP.NewSessionResult.self)
         sessionID = decoded.sessionId
@@ -133,8 +159,15 @@ public actor ACPSession {
     /// Resume where the runtime advertises it and load where it does not, decided by
     /// what `initialize` said rather than by which runtime this is. Copilot answers
     /// `-32601` to resume, which is the advertised behaviour rather than a fault.
-    public func continueSession(id: String, cwd: URL) async throws {
-        let params: JSONValue = ["sessionId": .string(id), "cwd": .string(cwd.path), "mcpServers": []]
+    public func continueSession(id: String, cwd: URL,
+                                additionalDirectories: [URL] = [],
+                                mcpServers: [MCPServer] = []) async throws {
+        var params = sessionParams(cwd: cwd, additionalDirectories: additionalDirectories,
+                                   mcpServers: mcpServers)
+        if case .object(var object) = params {
+            object["sessionId"] = .string(id)
+            params = .object(object)
+        }
         let canResume = initializeResult?.supportsResume ?? false
         let canLoad = initializeResult?.supportsLoad ?? false
         guard canResume || canLoad else { throw ACPSessionError.cannotResumeOrLoad }
@@ -151,6 +184,96 @@ public actor ACPSession {
             throw ACPSessionError.sessionGone(error)
         }
         sessionID = id
+    }
+
+    /// What every session-making call takes. `additionalDirectories` is sent only
+    /// where the runtime advertised it, because a field a runtime does not know is a
+    /// refusal waiting to happen.
+    private func sessionParams(cwd: URL, additionalDirectories: [URL],
+                               mcpServers: [MCPServer]) -> JSONValue {
+        var params: [String: JSONValue] = ["cwd": .string(cwd.path),
+                                           "mcpServers": .array(mcpServers.map(\.wire))]
+        if !additionalDirectories.isEmpty, initializeResult?.supportsAdditionalDirectories == true {
+            params["additionalDirectories"] = .array(additionalDirectories.map { .string($0.path) })
+        }
+        return .object(params)
+    }
+
+    // MARK: Signing in, signing out, and who answers
+
+    /// Carry out one of the runtime's own sign-in methods.
+    ///
+    /// A method that needs a terminal is not run here: the runtime names the command
+    /// and the app shows it, because inventing that advice ourselves would be worse.
+    public func authenticate(methodID: String) async throws {
+        _ = try await connection.call(ACP.Method.authenticate, ["methodId": .string(methodID)])
+    }
+
+    public func logOut() async throws {
+        guard initializeResult?.supportsLogout ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.logout)
+        }
+        _ = try await connection.call(ACP.Method.logout, .object([:]))
+    }
+
+    public func providers() async throws -> ACP.ProvidersResult {
+        guard initializeResult?.supportsProviders ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.listProviders)
+        }
+        let result = try await connection.call(ACP.Method.listProviders, .object([:]))
+        return try result.decode(ACP.ProvidersResult.self)
+    }
+
+    public func setProvider(id: String) async throws {
+        guard initializeResult?.supportsProviders ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.setProvider)
+        }
+        _ = try await connection.call(ACP.Method.setProvider, ["providerId": .string(id)])
+    }
+
+    // MARK: The sessions a runtime is holding
+
+    /// Every conversation this runtime has in this folder, including ones this app did
+    /// not start. Paged, because a runtime may be holding a great many.
+    public func listSessions(cwd: URL?) async throws -> [ACP.SessionSummary] {
+        guard initializeResult?.supportsList ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.list)
+        }
+        var summaries: [ACP.SessionSummary] = []
+        var cursor: String?
+        repeat {
+            var params: [String: JSONValue] = [:]
+            if let cwd { params["cwd"] = .string(cwd.path) }
+            if let cursor { params["cursor"] = .string(cursor) }
+            let result = try await connection.call(ACP.Method.list, .object(params))
+            let page = try result.decode(ACP.SessionListResult.self)
+            summaries += page.sessions ?? []
+            cursor = page.nextCursor
+        } while cursor != nil && summaries.count < 500
+        return summaries
+    }
+
+    /// Branch this conversation. The original is untouched.
+    public func forkSession(cwd: URL, additionalDirectories: [URL] = []) async throws -> String {
+        guard let sessionID else { throw ACPSessionError.noSession }
+        guard initializeResult?.supportsFork ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.forkSession)
+        }
+        var params: [String: JSONValue] = ["sessionId": .string(sessionID), "cwd": .string(cwd.path)]
+        if !additionalDirectories.isEmpty, initializeResult?.supportsAdditionalDirectories == true {
+            params["additionalDirectories"] = .array(additionalDirectories.map { .string($0.path) })
+        }
+        let result = try await connection.call(ACP.Method.forkSession, .object(params))
+        return try result.decode(ACP.ForkSessionResult.self).sessionId
+    }
+
+    /// Remove a conversation from the runtime. The only thing here that cannot be
+    /// undone, which is why the daemon will not do it without being told twice.
+    public func deleteSession(id: String) async throws {
+        guard initializeResult?.supportsDelete ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.deleteSession)
+        }
+        _ = try await connection.call(ACP.Method.deleteSession, ["sessionId": .string(id)])
     }
 
     // MARK: Working
@@ -218,6 +341,19 @@ public actor ACPSession {
         pendingPermissions.removeValue(forKey: id)?.resume(returning: optionID)
     }
 
+    /// The user's answer to a form. Declining is an answer; the agent carries on.
+    public func answerElicitation(id: UUID, outcome: ElicitationOutcome) {
+        pendingElicitations.removeValue(forKey: id)?.resume(returning: outcome)
+    }
+
+    /// What this agent may reach, and the services that will serve it. Set by the
+    /// daemon, because the folders belong to the agent rather than to the session.
+    public func serve(scope: FolderScope, terminals: TerminalService?) {
+        folderScope = scope
+        fileService = FileService(scope: scope)
+        terminalService = terminals
+    }
+
     public var outstandingPermissionIDs: [UUID] { Array(pendingPermissions.keys) }
 
     // MARK: Ending, in pieces the extension can use
@@ -248,10 +384,21 @@ public actor ACPSession {
     }
 
     private func receive(_ method: String, _ params: JSONValue?) {
+        if method == ACP.ClientMethod.completeElicitation {
+            // Finished somewhere else. The form comes down.
+            if let id = params?["elicitationId"]?.stringValue {
+                for (requestID, continuation) in pendingElicitations where elicitationIDs[requestID] == id {
+                    continuation.resume(returning: .cancel)
+                    pendingElicitations.removeValue(forKey: requestID)
+                    eventsContinuation.yield(.elicitationWithdrawn(requestID))
+                }
+            }
+            return
+        }
         guard method == ACP.ClientMethod.sessionUpdate, let update = params?["update"] else { return }
         switch SessionUpdate.decode(update) {
         case .entry(let kind):
-            guard !isReplaying else { return }
+            guard !isReplaying || recordsReplay else { return }
             eventsContinuation.yield(.entry(kind))
         case .options(let options):
             self.options = options
@@ -277,12 +424,144 @@ public actor ACPSession {
         }
     }
 
-    /// Requests from the runtime. Only one of them matters, and everything else is
-    /// declined loudly rather than left to time out.
+    /// Requests from the runtime.
+    ///
+    /// What we answer is exactly what we advertised. Anything else is declined loudly
+    /// rather than left to time out, which is what the protocol asks for and what lets
+    /// a runtime fall back to its own tools.
     func handleIncoming(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
-        guard method == ACP.ClientMethod.requestPermission else {
+        switch method {
+        case ACP.ClientMethod.requestPermission:
+            return await askPermission(params)
+        case ACP.ClientMethod.readTextFile where capabilities.readTextFile:
+            return serveFileRead(params)
+        case ACP.ClientMethod.writeTextFile where capabilities.writeTextFile:
+            return await serveFileWrite(params)
+        case ACP.ClientMethod.createTerminal, ACP.ClientMethod.terminalOutput,
+             ACP.ClientMethod.waitForTerminalExit, ACP.ClientMethod.releaseTerminal,
+             ACP.ClientMethod.killTerminal:
+            guard capabilities.terminal, let terminalService else {
+                return .failure(.methodNotFound(method))
+            }
+            return await serveTerminal(method: method, params: params, service: terminalService)
+        case ACP.ClientMethod.createElicitation where capabilities.elicitationForm || capabilities.elicitationURL:
+            return await askElicitation(params)
+        default:
             return .failure(.methodNotFound(method))
         }
+    }
+
+    // MARK: Serving what an agent asks of us
+
+    private func serveFileRead(_ params: JSONValue?) -> Result<JSONValue, JSONRPCError> {
+        guard let fileService, let path = params?["path"]?.stringValue else {
+            return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "no path"))
+        }
+        let outcome = fileService.read(path: path,
+                                       line: params?["line"]?.intValue,
+                                       limit: params?["limit"]?.intValue)
+        // A read is recorded, not asked about: it changes nothing, and Grok issues
+        // several of them for one small edit.
+        eventsContinuation.yield(.served(ServedRequest(kind: .readFile(path: path),
+                                                       outcome: outcome.record)))
+        switch outcome {
+        case .read(let contents): return .success(["content": .string(contents)])
+        case .refused(let reason): return .failure(JSONRPCError(code: JSONRPCError.authRequired, message: reason))
+        case .failed(let message): return .failure(JSONRPCError(code: JSONRPCError.resourceNotFound, message: message))
+        }
+    }
+
+    private func serveFileWrite(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+        guard let fileService, let path = params?["path"]?.stringValue else {
+            return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "no path"))
+        }
+        let contents = params?["content"]?.stringValue ?? ""
+        if let refusal = fileService.refusal(forWriting: path) {
+            eventsContinuation.yield(.served(ServedRequest(kind: .writeFile(path: path, byteCount: contents.utf8.count),
+                                                           outcome: .refused(reason: refusal))))
+            return .failure(JSONRPCError(code: JSONRPCError.authRequired, message: refusal))
+        }
+        // A write is a change, so it goes through the same question any other change
+        // goes through, with the change itself in the question.
+        let request = PermissionRequest(agentID: UUID(),
+                                        toolCall: fileService.writeToolCall(path: path, contents: contents),
+                                        options: PermissionOption.allowOrReject)
+        let chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            pendingPermissions[request.id] = continuation
+            eventsContinuation.yield(.permissionRequested(request))
+        }
+        guard let chosen, chosen.hasPrefix("allow") else {
+            eventsContinuation.yield(.served(ServedRequest(kind: .writeFile(path: path, byteCount: contents.utf8.count),
+                                                           outcome: .refused(reason: "You said no"))))
+            return .failure(JSONRPCError(code: JSONRPCError.authRequired, message: "The user said no"))
+        }
+        let outcome = fileService.write(path: path, contents: contents)
+        eventsContinuation.yield(.served(ServedRequest(kind: .writeFile(path: path, byteCount: contents.utf8.count),
+                                                       outcome: outcome.record)))
+        if case .failed(let message) = outcome {
+            return .failure(JSONRPCError(code: JSONRPCError.internalError, message: message))
+        }
+        return .success(.object([:]))
+    }
+
+    private func serveTerminal(method: String, params: JSONValue?,
+                               service: TerminalService) async -> Result<JSONValue, JSONRPCError> {
+        do {
+            switch method {
+            case ACP.ClientMethod.createTerminal:
+                let command = params?["command"]?.stringValue ?? ""
+                let args = (params?["args"]?.arrayValue ?? []).compactMap(\.stringValue)
+                let id = try await service.create(command: command,
+                                                  args: args,
+                                                  cwd: params?["cwd"]?.stringValue,
+                                                  env: params?["env"])
+                eventsContinuation.yield(.served(ServedRequest(kind: .runCommand(command: command, args: args),
+                                                               outcome: .served)))
+                return .success(["terminalId": .string(id)])
+            case ACP.ClientMethod.terminalOutput:
+                guard let id = params?["terminalId"]?.stringValue else {
+                    return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "no terminalId"))
+                }
+                return .success(await service.output(id: id))
+            case ACP.ClientMethod.waitForTerminalExit:
+                guard let id = params?["terminalId"]?.stringValue else {
+                    return .failure(JSONRPCError(code: JSONRPCError.invalidParams, message: "no terminalId"))
+                }
+                return .success(["exitStatus": await service.waitForExit(id: id)])
+            case ACP.ClientMethod.releaseTerminal:
+                await service.release(id: params?["terminalId"]?.stringValue ?? "")
+                return .success(.object([:]))
+            case ACP.ClientMethod.killTerminal:
+                await service.kill(id: params?["terminalId"]?.stringValue ?? "")
+                return .success(.object([:]))
+            default:
+                return .failure(.methodNotFound(method))
+            }
+        } catch let error as TerminalService.Failure {
+            eventsContinuation.yield(.served(ServedRequest(kind: .runCommand(command: params?["command"]?.stringValue ?? "",
+                                                                             args: []),
+                                                           outcome: .refused(reason: error.message))))
+            return .failure(JSONRPCError(code: JSONRPCError.authRequired, message: error.message))
+        } catch {
+            return .failure(.internalError("\(error)"))
+        }
+    }
+
+    private func askElicitation(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+        guard let request = ElicitationRequest(wire: params, agentID: UUID()) else {
+            // A form we cannot draw is declined rather than half-answered.
+            return .success(["action": "decline"])
+        }
+        if let theirs = request.elicitationID { elicitationIDs[request.id] = theirs }
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<ElicitationOutcome, Never>) in
+            pendingElicitations[request.id] = continuation
+            eventsContinuation.yield(.elicitationRequested(request))
+        }
+        elicitationIDs.removeValue(forKey: request.id)
+        return .success(outcome.wire)
+    }
+
+    private func askPermission(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
         let request = permissionRequest(from: params)
         let chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
             pendingPermissions[request.id] = continuation
@@ -293,6 +572,8 @@ public actor ACPSession {
         }
         return .success(["outcome": ["outcome": "selected", "optionId": .string(chosen)]])
     }
+
+    public var outstandingElicitationIDs: [UUID] { Array(pendingElicitations.keys) }
 
     private func permissionRequest(from params: JSONValue?) -> PermissionRequest {
         let toolCallValue = params?["toolCall"]
@@ -317,6 +598,8 @@ public actor ACPSession {
     func noteExit(status: Int32) {
         for (_, continuation) in pendingPermissions { continuation.resume(returning: nil) }
         pendingPermissions.removeAll()
+        for (_, continuation) in pendingElicitations { continuation.resume(returning: .cancel) }
+        pendingElicitations.removeAll()
         eventsContinuation.yield(.processExited(status: status))
         eventsContinuation.finish()
     }
