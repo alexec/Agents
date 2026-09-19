@@ -455,10 +455,24 @@ extension DaemonCore {
         await drainQueue(after: agentID)
     }
 
+    /// Hand a runtime back.
+    ///
+    /// The order is the whole of it. `forget` takes the listener out of the table
+    /// without cancelling it, so whatever the runtime said in the last instant is
+    /// still in hand. `end` closes the session, and closing is what ends the event
+    /// stream. Only then is the listener waited on: by that point it has a finite
+    /// buffer to get through and no more can arrive, so this returns once the record
+    /// is complete and not before. A window reading the transcript the moment an
+    /// agent finishes sees all of it.
+    ///
+    /// Waiting here cannot deadlock. The listener calls back into this actor, and an
+    /// actor awaiting is an actor free to run something else; and it cannot outlast
+    /// `end`, which this already waited for.
     func releaseRuntime(for agentID: UUID) async {
         guard let session = live[agentID] else { return }
-        forget(agentID)
+        let draining = forget(agentID)
         await session.end(gracePeriod: .seconds(3))
+        await draining?.value
     }
 
     // MARK: Stopping, archiving, picking back up

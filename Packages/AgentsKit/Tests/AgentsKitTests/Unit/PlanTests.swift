@@ -29,7 +29,11 @@ struct PlanTests {
                               launcher: FakeLauncher(script: script))
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "plan it"))
-        try await Task.sleep(for: .milliseconds(300))
+        // Both updates, not just the first: the point of the test is what the second
+        // one does to the first, so waiting for either would prove nothing.
+        await eventually("both plan updates arrived") {
+            await core.agent(id)?.plans.first?.entries.count == 2
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.plans.count == 1, "the same id replaces rather than adds")
@@ -51,7 +55,9 @@ struct PlanTests {
                               launcher: FakeLauncher(script: script))
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "plan it"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the plan was withdrawn") {
+            await core.agent(id)?.plans.first?.state == .withdrawn
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.plans.count == 1, "it happened, so it stays on the record")
@@ -72,13 +78,17 @@ struct PlanTests {
                               launcher: FakeLauncher(script: script))
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "compact it"))
-        try await Task.sleep(for: .milliseconds(300))
 
-        let page = try await core.transcript(.init(agentID: id))
-        let compactions = page.entries.compactMap { entry -> (String, [ContentBlock])? in
-            if case .compaction(let status, let summary) = entry.kind { return (status, summary) }
-            return nil
+        @Sendable func compactionsSoFar() async -> [(String, [ContentBlock])] {
+            guard let page = try? await core.transcript(.init(agentID: id)) else { return [] }
+            return page.entries.compactMap { entry in
+                if case .compaction(let status, let summary) = entry.kind { return (status, summary) }
+                return nil
+            }
         }
+        await eventually("both compaction updates arrived") { await compactionsSoFar().count == 2 }
+
+        let compactions = await compactionsSoFar()
         #expect(compactions.count == 2)
         #expect(compactions.last?.0 == "completed")
         #expect(compactions.last?.1.plainText == "We did three things.")

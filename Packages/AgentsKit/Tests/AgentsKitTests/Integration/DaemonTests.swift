@@ -20,8 +20,31 @@ struct DaemonTests {
                    launcher: launcher)
     }
 
-    private func settle() async throws {
-        try await Task.sleep(for: .milliseconds(200))
+    /// Wait until this agent reads the way the caller says it should.
+    ///
+    /// Every wait in this file names the thing the assertion after it names. There is
+    /// no general "the daemon has stopped moving" to wait for: `finishTurn` takes the
+    /// turn task off the books before it records usage, moves the state or lets the
+    /// runtime go, so anything watching for quiet is told the turn is over several
+    /// awaits before the values a test reads are written.
+    private func waitFor(_ core: DaemonCore, _ id: UUID,
+                         _ description: @autoclosure @Sendable () -> String,
+                         sourceLocation: SourceLocation = #_sourceLocation,
+                         _ matches: @Sendable @escaping (Agent) -> Bool) async {
+        await eventually(description(), sourceLocation: sourceLocation) {
+            guard let agent = await core.agent(id) else { return false }
+            return matches(agent)
+        }
+    }
+
+    /// Finished, and its runtime handed back.
+    ///
+    /// Both, for the tests that prompt again afterwards: `finishTurn` moves the state
+    /// before it calls `releaseRuntime`, so a prompt sent on the state alone can land
+    /// on the session that is still open and no second runtime is ever started.
+    private func letGo(_ core: DaemonCore, _ id: UUID) async throws {
+        await waitFor(core, id, "the turn ended") { $0.state == .finished }
+        await eventually("its runtime was handed back") { await core.live[id] == nil }
     }
 
     // MARK: Starting and watching
@@ -35,7 +58,12 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "say hello"))
-        try await settle()
+        // The title too, not just the state. It comes down the session's event stream
+        // and lands after the turn has ended, so an agent read on the state alone is
+        // still wearing the placeholder made from the prompt.
+        await waitFor(core, id, "the turn ended and the runtime had named it") {
+            $0.state == .finished && $0.endedReason == .endTurn && $0.title == "Say hello"
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.state == .finished)
@@ -43,8 +71,18 @@ struct DaemonTests {
         #expect(agent?.title == "Say hello", "the runtime's own title names the agent")
         #expect(agent?.runtimeSessionID != nil)
 
-        let page = try await core.transcript(.init(agentID: id))
-        let texts = page.entries.compactMap(\.text)
+        // Chunks come down the same stream, so the last of them can still be in the
+        // air when the turn is over.
+        @Sendable func texts() async -> [String] {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.compactMap(\.text) ?? []
+        }
+        await eventually("every chunk reached the transcript") {
+            let said = await texts()
+            return said.contains("say hello") && said.contains("Working") && said.contains(" on it")
+        }
+
+        let texts = await texts()
         #expect(texts.contains("say hello"))
         #expect(texts.contains("Working"))
         #expect(texts.contains(" on it"))
@@ -58,7 +96,7 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "hello"))
-        try await settle()
+        await eventually("the daemon is holding nothing") { await core.isHoldingAgents == false }
 
         #expect(await core.isHoldingAgents == false)
         #expect(await core.shouldExit, "nothing running and nobody watching")
@@ -81,7 +119,7 @@ struct DaemonTests {
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
                                             startOptions: StartOptions(values: ["model": "b"]),
                                             draftID: offered.draftID))
-        try await settle()
+        await waitFor(core, id, "the turn ended") { $0.state == .finished }
         #expect(launcher.launchCount == 1, "the draft session is used rather than a second runtime started")
         #expect(await core.agent(id)?.state == .finished)
 
@@ -129,11 +167,17 @@ struct DaemonTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await settle()
 
-        // Read the file itself rather than the daemon's memory.
-        let lines = try String(contentsOf: locations.transcript(id), encoding: .utf8)
-            .split(separator: "\n")
+        // The file, not the daemon's memory — and the file is what has to be waited
+        // for, since it is the only thing this test reads.
+        @Sendable func linesOnDisk() -> [Substring] {
+            guard let text = try? String(contentsOf: locations.transcript(id), encoding: .utf8)
+            else { return [] }
+            return text.split(separator: "\n")
+        }
+        await eventually("everything reached the file") { linesOnDisk().count >= 22 }
+
+        let lines = linesOnDisk()
         #expect(lines.count >= 22, "the prompt, twenty chunks and the state changes are all on disk")
     }
 
@@ -149,7 +193,9 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
-        try await settle()
+        // The request is held before the state moves, so the later of the two is the
+        // one to wait on.
+        await waitFor(core, id, "the agent is waiting on its question") { $0.state == .waitingOnUser }
 
         let agent = await core.agent(id)
         #expect(agent?.state == .waitingOnUser)
@@ -163,7 +209,10 @@ struct DaemonTests {
         #expect(await core.shouldExit == false)
 
         try await core.answerPermission(.init(permissionID: waiting[0].id, optionID: "allow"))
-        try await settle()
+        await waitFor(core, id, "the turn ran on to its end") { $0.state == .finished }
+        await eventually("the question was taken down") {
+            await core.pendingPermissionRequests().isEmpty
+        }
 
         #expect(await core.agent(id)?.state == .finished)
         let outcome = await launcher.lastAgent?.permissionOutcome
@@ -180,16 +229,20 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the agent is waiting on its question") { $0.state == .waitingOnUser }
         #expect(await core.agent(id)?.state == .waitingOnUser)
 
         try await core.stop(id)
-        try await settle()
+        await waitFor(core, id, "the agent stopped, cancelled") {
+            $0.state == .stopped && $0.endedReason == .cancelled
+        }
+        let outcome = await eventuallySome("the question was answered for the agent") {
+            await launcher.lastAgent?.permissionOutcome
+        }
 
         #expect(await core.agent(id)?.state == .stopped)
         #expect(await core.agent(id)?.endedReason == .cancelled)
         #expect(await core.pendingPermissionRequests().isEmpty)
-        let outcome = await launcher.lastAgent?.permissionOutcome
         #expect(outcome?["outcome"]?["outcome"]?.stringValue == "cancelled")
     }
 
@@ -200,7 +253,7 @@ struct DaemonTests {
                              "options": [["optionId": "allow", "name": "Allow", "kind": "allow_once"]]]
         let core = try core(FakeLauncher(script: script), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the agent is waiting on its question") { $0.state == .waitingOnUser }
 
         // Waiting on a permission is not running, so a follow-up is allowed to be
         // refused for a different reason: what must not happen is silence.
@@ -218,12 +271,14 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "first"))
-        try await settle()
+        try await letGo(core, id)
         let sessionID = await core.agent(id)?.runtimeSessionID
         #expect(await core.agent(id)?.state == .finished)
 
         try await core.prompt(.init(agentID: id, text: "second"))
-        try await settle()
+        // The second launch is what the assertion is about, so it is what to wait for.
+        await eventually("the runtime was started again") { launcher.launchCount == 2 }
+        await waitFor(core, id, "the second turn ended") { $0.state == .finished }
 
         #expect(await core.allAgents().count == 1, "the same agent, not a copy")
         #expect(await core.agent(id)?.runtimeSessionID == sessionID, "the same runtime session")
@@ -244,11 +299,17 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "first"))
-        try await settle()
+        try await letGo(core, id)
         let originalSession = await core.agent(id)?.runtimeSessionID
 
         try await core.prompt(.init(agentID: id, text: "second"))
-        try await settle()
+        await waitFor(core, id, "the agent is on a new runtime session") {
+            $0.runtimeSessionID != originalSession
+        }
+        await eventually("the loss was written down") {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.contains { ($0.text ?? "").contains("no longer has this conversation") } == true
+        }
 
         let agent = await core.agent(id)
         #expect(await core.allAgents().count == 1, "still one agent")
@@ -265,12 +326,14 @@ struct DaemonTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "one"))
-        try await settle()
+        try await letGo(core, id)
         try await core.archive(id)
         #expect(await core.agent(id)?.state == .archived)
 
         try await core.prompt(.init(agentID: id, text: "two"))
-        try await settle()
+        await waitFor(core, id, "it came back and finished, unarchived") {
+            $0.state == .finished && $0.archivedReason == nil
+        }
         #expect(await core.agent(id)?.state == .finished)
         #expect(await core.agent(id)?.archivedReason == nil)
     }
@@ -281,7 +344,9 @@ struct DaemonTests {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the turn ended and nothing archived it") {
+            $0.state == .finished && $0.archivedReason == nil
+        }
         #expect(await core.agent(id)?.state == .finished, "finished, and still on the list")
         #expect(await core.agent(id)?.archivedReason == nil)
     }
@@ -292,7 +357,9 @@ struct DaemonTests {
         script.stopReason = "refusal"
         let core = try core(FakeLauncher(script: script), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the turn stopped short, refused") {
+            $0.state == .stopped && $0.endedReason == .refusal
+        }
         #expect(await core.agent(id)?.state == .stopped)
         #expect(await core.agent(id)?.endedReason == .refusal)
     }
@@ -303,7 +370,13 @@ struct DaemonTests {
         script.stopReason = "ran_out_of_biscuits"
         let core = try core(FakeLauncher(script: script), locations: locations)
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the turn ended with a reason we do not know") {
+            $0.endedReason == .unrecognised
+        }
+        await eventually("the reason was written down as given") {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.contains { ($0.text ?? "").contains("ran_out_of_biscuits") } == true
+        }
 
         #expect(await core.agent(id)?.endedReason == .unrecognised)
         let page = try await core.transcript(.init(agentID: id))
@@ -317,11 +390,12 @@ struct DaemonTests {
                              "options": [["optionId": "allow", "name": "Allow", "kind": "allow_once"]]]
         let core = try core(FakeLauncher(script: script), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await settle()
+        await waitFor(core, id, "the agent is waiting on its question") { $0.state == .waitingOnUser }
         #expect(await core.agent(id)?.state == .waitingOnUser)
 
         try await core.archive(id)
-        try await settle()
+        await waitFor(core, id, "the agent archived") { $0.state == .archived }
+        await eventually("nothing is left running behind it") { await core.isHoldingAgents == false }
         #expect(await core.agent(id)?.state == .archived)
         #expect(await core.isHoldingAgents == false, "nothing is left running behind an archived agent")
     }
@@ -355,7 +429,9 @@ struct DaemonSlashCommandTests {
         // The commands arrive with the first turn in the fake, as they do in a real
         // runtime: after the session exists rather than with it.
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("both commands arrived") {
+            await core.agent(id)?.availableCommands.map(\.name) == ["review", "add-dir"]
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.availableCommands.map(\.name) == ["review", "add-dir"])
@@ -369,10 +445,16 @@ struct DaemonSlashCommandTests {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher(script: script))
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
         #expect(await core.agent(id)?.state == .finished, "its runtime has been let go")
 
-        let reread = try await AgentStore(locations: locations).load(id)
-        #expect(reread.availableCommands.map(\.name) == ["review", "add-dir"])
+        // Read back by a store of its own, so it is the file that has to be waited on.
+        // `changed` saves on a detached task, which means the record in memory is right
+        // some way before the record on disk is.
+        let reread = await eventuallySome("the commands reached the file") {
+            let onDisk = try? await AgentStore(locations: locations).load(id)
+            return onDisk?.availableCommands.map(\.name) == ["review", "add-dir"] ? onDisk : nil
+        }
+        #expect(reread?.availableCommands.map(\.name) == ["review", "add-dir"])
     }
 }

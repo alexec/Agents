@@ -44,12 +44,20 @@ struct PTYTests {
         }
     }
 
-    private func run(_ script: String, rows: Int = 24, cols: Int = 80) async throws -> (String, Int32?) {
-        let collector = try await collect(script, rows: rows, cols: cols)
+    private func run(_ script: String, rows: Int = 24, cols: Int = 80,
+                     saying: String? = nil) async throws -> (String, Int32?) {
+        let collector = try await collect(script, rows: rows, cols: cols, saying: saying)
         return (collector.text, collector.status)
     }
 
-    private func collect(_ script: String, rows: Int = 24, cols: Int = 80) async throws -> Collector {
+    /// Run a script on a pty and gather what it said.
+    ///
+    /// `saying` is what the caller is about to assert, waited for rather than assumed.
+    /// The exit is reported when the child is reaped, and the last of its output is
+    /// read off the pty on a source of its own, so reading the text the moment the
+    /// exit arrives reads it short now and then.
+    private func collect(_ script: String, rows: Int = 24, cols: Int = 80,
+                         saying: String? = nil) async throws -> Collector {
         let collector = Collector()
         let pty = try PTY(executable: URL(filePath: "/bin/sh"),
                           arguments: ["-c", script],
@@ -61,24 +69,27 @@ struct PTYTests {
                           onExit: { collector.finish($0) })
         _ = pty
         _ = await collector.waitForExit()
+        if let saying {
+            await eventually("the program's output reached us") { collector.text.contains(saying) }
+        }
         return collector
     }
 
     @Test func theChildGetsARealControllingTerminal() async throws {
         // The whole reason this is not `Process`. A pipe would make `tty` say "not a
         // tty", and programs would switch to their batch behaviour.
-        let (output, status) = try await run("tty")
+        let (output, status) = try await run("tty", saying: "/dev/ttys")
         #expect(output.contains("/dev/ttys"))
         #expect(status == 0)
     }
 
     @Test func theWindowSizeReachesTheChild() async throws {
-        let (output, _) = try await run("stty size", rows: 40, cols: 120)
+        let (output, _) = try await run("stty size", rows: 40, cols: 120, saying: "40 120")
         #expect(output.contains("40 120"))
     }
 
     @Test func aProgramSeesATerminalOnItsOutput() async throws {
-        let (output, _) = try await run("test -t 1 && echo yes || echo no")
+        let (output, _) = try await run("test -t 1 && echo yes || echo no", saying: "yes")
         #expect(output.contains("yes"))
     }
 
@@ -95,7 +106,7 @@ struct PTYTests {
     }
 
     @Test func outputArrivesAsItIsProduced() async throws {
-        let (output, status) = try await run("echo one; echo two; echo three")
+        let (output, status) = try await run("echo one; echo two; echo three", saying: "three")
         #expect(output.contains("one"))
         #expect(output.contains("three"))
         #expect(status == 0)
@@ -110,8 +121,9 @@ struct PTYTests {
         // actor. That, and not the bytes, is what made the terminal slow.
         let lines = 5_000
         let collector = try await collect("for i in $(seq 1 \(lines)); do echo '\(String(repeating: "a", count: 100))'; done")
-
         // Each line is 100 a's, a newline, and the carriage return the tty adds.
+        await eventually("every line came back") { collector.bytes.count == lines * 102 }
+
         #expect(collector.bytes.count == lines * 102)
         #expect(collector.status == 0)
         // How many handovers this would have been before, at the 128 bytes a read
@@ -133,14 +145,68 @@ struct PTYTests {
         #expect(collector.text.contains("last"))
     }
 
+    @Test func theLastThingAProgramSaidSurvivesASlowReader() async throws {
+        // macOS throws away whatever is still sitting in a tty's queue at the last
+        // close of the slave. Letting go of our side the moment the child had been
+        // given its own made the child's exit that last close, so a program that
+        // printed and went before the reader had been scheduled had every byte it
+        // wrote discarded by the kernel — and the pty reported a clean exit with
+        // nothing in front of it. It only showed on a loaded machine, which is
+        // exactly when it matters, and it looked like a flaky test for weeks.
+        //
+        // Held rather than raced for. `onOutput` runs on the reader's own queue, so
+        // blocking in it stops the pty reading; the shell is then made to close its
+        // tty and say so, in that order, before the reader is let go again. Against
+        // the old code this reads back "BEGIN" and nothing else, every time.
+        let marker = URL(filePath: NSTemporaryDirectory())
+            .appending(path: "pty-let-go-\(UUID().uuidString.prefix(8))")
+        defer { try? FileManager.default.removeItem(at: marker) }
+
+        let collector = Collector()
+        let gate = DispatchSemaphore(value: 0)
+        let pty = try PTY(executable: URL(filePath: "/bin/sh"),
+                          arguments: ["-c", """
+                              echo BEGIN; read gate; echo one; echo two; echo three; \
+                              exec 3>/dev/null; exec 0<&3 1>&3 2>&3; : > \(marker.path)
+                              """],
+                          cwd: URL(filePath: "/tmp"),
+                          environment: ["PATH": "/usr/bin:/bin"],
+                          onOutput: {
+                              collector.append($0)
+                              // Everything after the first handover waits here, which
+                              // is what makes the reader late on purpose.
+                              gate.wait(); gate.signal()
+                          },
+                          onExit: { collector.finish($0) })
+
+        await eventually("the shell said hello") { collector.text.contains("BEGIN") }
+        // The reader is now parked inside its own callback. Nothing the shell says
+        // from here can be read until this test says so.
+        pty.write(Data("\n".utf8))
+        await eventually("the shell printed and let go of its tty") {
+            FileManager.default.fileExists(atPath: marker.path)
+        }
+        gate.signal()
+
+        _ = await collector.waitForExit()
+        await eventually("the last of the output reached us") { collector.text.contains("three") }
+        #expect(collector.text.contains("one"))
+        #expect(collector.text.contains("three"))
+        #expect(collector.status == 0)
+        withExtendedLifetime(pty) {}
+    }
+
     @Test func theBytesComeBackInTheOrderTheyWereWritten() async throws {
         // Gathering reads together must not reorder them, and a terminal is exactly
         // the place where that would show.
         let collector = try await collect("for i in $(seq 1 5000); do echo $i; done")
-        let numbers = collector.text
-            .split(whereSeparator: \.isNewline)
-            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-        #expect(numbers == Array(1...5000))
+        @Sendable func numbersSoFar() -> [Int] {
+            collector.text
+                .split(whereSeparator: \.isNewline)
+                .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        }
+        await eventually("every line came back") { numbersSoFar().count == 5000 }
+        #expect(numbersSoFar() == Array(1...5000))
     }
 
     @Test func aFolderThatIsNotThereIsNamedRatherThanBeingAGenericFailure() throws {
@@ -179,9 +245,13 @@ struct PTYTests {
                           environment: ["PATH": "/usr/bin:/bin"],
                           onOutput: { collector.append($0) },
                           onExit: { collector.finish($0) })
+        // Setup, not an assertion: give the shell time to reach its `read`. Writing
+        // earlier would not be lost — the tty buffers it — so this is belt and braces
+        // rather than a race the test depends on.
         try await Task.sleep(for: .milliseconds(200))
         pty.write(Data("hello\n".utf8))
         _ = await collector.waitForExit()
+        await eventually("the echo reached us") { collector.text.contains("got:hello") }
         #expect(collector.text.contains("got:hello"))
     }
 
@@ -194,10 +264,13 @@ struct PTYTests {
                           rows: 24, cols: 80,
                           onOutput: { collector.append($0) },
                           onExit: { collector.finish($0) })
+        // As above. The resize applies to the pty itself whether or not the child has
+        // got as far as `read`, so this only makes the intent plain.
         try await Task.sleep(for: .milliseconds(200))
         pty.resize(rows: 50, cols: 132)
         pty.write(Data("\n".utf8))
         _ = await collector.waitForExit()
+        await eventually("the size reached us") { collector.text.contains("50 132") }
         #expect(collector.text.contains("50 132"))
     }
 }

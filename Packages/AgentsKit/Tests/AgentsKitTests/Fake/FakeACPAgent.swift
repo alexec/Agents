@@ -23,7 +23,23 @@ actor FakeACPAgent {
         var sessionGoneError: JSONRPCError?
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
+        /// What the runtime says on its way out, sent while answering `session/close`.
+        /// Real ones do this — a tool call marked cancelled, a last usage line — and
+        /// it is the last thing they ever say, so there is no second chance to hear it.
+        var updatesOnClose: [JSONValue] = []
         var replayOnLoad: [JSONValue] = []
+        /// A request to make back to the client while answering `session/load`, sent
+        /// without waiting for the answer. Real runtimes do exactly this, and the
+        /// comment in `JSONRPCConnection` about replaying a conversation while
+        /// answering `session/load` is about this shape. Here it is what makes the
+        /// replay window testable rather than a coin toss: the client serves the read
+        /// on its session actor, synchronously, so everything that arrives while it is
+        /// doing so has to queue up behind it.
+        var requestDuringLoad: (method: String, params: JSONValue)?
+        /// How long to wait after that request before sending the replay, so the
+        /// client is demonstrably still serving it when the replay and the load's own
+        /// answer land.
+        var pauseBeforeReplay: Duration = .zero
 
         // MARK: Things a real agent asks of the client
 
@@ -129,6 +145,13 @@ actor FakeACPAgent {
         case ACP.Method.loadSession:
             continuedSessionParams = params
             if let error = script.sessionGoneError { return .failure(error) }
+            if let request = script.requestDuringLoad {
+                // Fired and forgotten: a runtime does not wait for the client before
+                // carrying on with the replay, and neither does this.
+                let connection = self.connection!
+                Task { _ = try? await connection.call(request.method, request.params) }
+            }
+            if script.pauseBeforeReplay > .zero { try? await Task.sleep(for: script.pauseBeforeReplay) }
             for update in script.replayOnLoad { await send(update: update) }
             return .success([:])
 
@@ -148,6 +171,7 @@ actor FakeACPAgent {
             return .success([:])
 
         case ACP.Method.close:
+            for update in script.updatesOnClose { await send(update: update) }
             return .success([:])
 
         default:

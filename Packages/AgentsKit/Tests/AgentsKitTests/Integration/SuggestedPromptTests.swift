@@ -123,6 +123,19 @@ struct SuggestedPromptTests {
         return attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
     }
 
+    /// Wait until the runtime has actually been handed its token.
+    ///
+    /// The token is minted before the agent exists and reaches the runtime in
+    /// `session/new`, so there is a moment after `start` returns in which `token` is
+    /// still the empty string. Calling the tool with that gets a refusal, which is
+    /// what the fixed sleeps here used to hit under load.
+    private func mintedToken(_ core: DaemonCore, _ launcher: FakeLauncher) async -> String {
+        await eventuallySome("the runtime was handed its token") {
+            let minted = await token(core, launcher)
+            return minted.isEmpty ? nil : minted
+        } ?? ""
+    }
+
     /// A turn long enough to call a tool in the middle of, which is when a real one is
     /// called: the daemon lets the runtime go the moment a turn ends, and with it the
     /// MCP helper that runtime started.
@@ -133,8 +146,7 @@ struct SuggestedPromptTests {
     }
 
     private func suggest(_ core: DaemonCore, _ launcher: FakeLauncher, _ labels: String...) async throws {
-        try await Task.sleep(for: .milliseconds(100))
-        _ = try await core.suggestPrompts(.init(token: await token(core, launcher),
+        _ = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher),
                                                 prompts: labels.map {
             SuggestedPrompt(label: $0, prompt: "Please: \($0)")
         }))
@@ -145,9 +157,8 @@ struct SuggestedPromptTests {
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
 
-        let note = try await core.suggestPrompts(.init(token: await token(core, launcher), prompts: [
+        let note = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher), prompts: [
             SuggestedPrompt(label: "Run the tests", prompt: "Run the tests and fix what fails"),
             SuggestedPrompt(label: "Commit it", prompt: "Commit this with a message saying why"),
         ]))
@@ -177,15 +188,14 @@ struct SuggestedPromptTests {
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
-        let stale = await token(core, launcher)
+        let stale = await mintedToken(core, launcher)
 
         // It works while the runtime is there, and not after.
         _ = try await core.suggestPrompts(.init(token: stale, prompts: [
             SuggestedPrompt(label: "While alive", prompt: "Do it"),
         ]))
         try await core.stop(id)
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the runtime was let go") { await core.live[id] == nil }
 
         await #expect(throws: JSONRPCError.self) {
             _ = try await core.suggestPrompts(.init(token: stale, prompts: [
@@ -199,9 +209,8 @@ struct SuggestedPromptTests {
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
 
-        _ = try await core.suggestPrompts(.init(token: await token(core, launcher),
+        _ = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher),
                                                 prompts: (1...9).map {
             SuggestedPrompt(label: "\($0)", prompt: "Do \($0)")
         }))
@@ -219,7 +228,9 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the prompt reached the runtime") {
+            await launcher.lastAgent?.promptContent != nil
+        }
 
         let sent = await launcher.lastAgent?.promptContent?.arrayValue ?? []
         #expect(sent.count == 2)
@@ -293,7 +304,10 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the prompt is on the record") {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.contains { if case .userMessage = $0.kind { return true } else { return false } } == true
+        }
 
         let said = try await core.transcript(.init(agentID: id)).entries.compactMap { entry -> String? in
             if case .userMessage(let text, _) = entry.kind { return text }
@@ -313,11 +327,13 @@ struct SuggestedPromptTests {
         try await suggest(core, launcher, "Run the tests")
         #expect(await core.agent(id)?.suggestedPrompts.isEmpty == false)
         // Still there once the turn has ended: this is what the chips are for.
-        try await Task.sleep(for: .milliseconds(500))
+        try await settle(core, id)
         #expect(await core.agent(id)?.suggestedPrompts.isEmpty == false)
 
         try await core.prompt(.init(agentID: id, text: "something else entirely"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the suggestions went with the new prompt") {
+            await core.agent(id)?.suggestedPrompts.isEmpty == true
+        }
         #expect(await core.agent(id)?.suggestedPrompts.isEmpty == true)
     }
 
@@ -328,7 +344,13 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
         try await suggest(core, launcher, "Run the tests")
-        try await Task.sleep(for: .milliseconds(500))
+        // The file, not the daemon's memory: every save after the first goes on a
+        // detached task, so the record in hand is right well before the record on disk
+        // is, and the record on disk is what the core below opens.
+        await eventually("the suggestions reached the file") {
+            let onDisk = try? await AgentStore(locations: locations).load(id)
+            return onDisk?.suggestedPrompts.map(\.label) == ["Run the tests"]
+        }
 
         let reopened = DaemonCore(store: try AgentStore(locations: locations),
                                   locations: locations,
@@ -357,7 +379,13 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("our own tool's question was answered for us") {
+            await launcher.lastAgent?.permissionOutcome != nil
+        }
+        // And the agent moved off the question, which is the other assertion below.
+        await eventually("the agent was not left waiting") {
+            await core.agent(id)?.state != .waitingOnUser
+        }
 
         // Nothing was ever put in front of anybody, and the agent was not left waiting.
         #expect(await core.pendingPermissionRequests().isEmpty)
@@ -378,7 +406,9 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the question reached the daemon") {
+            await core.pendingPermissionRequests().count == 1
+        }
 
         #expect(await core.pendingPermissionRequests().count == 1)
     }

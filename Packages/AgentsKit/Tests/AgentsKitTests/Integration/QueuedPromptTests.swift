@@ -44,14 +44,24 @@ struct QueuedPromptTests {
         let core = try core(slowLauncher(), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
         #expect(await core.agent(id)?.state == .running)
 
         // This used to throw. It waits now.
         try await core.prompt(.init(agentID: id, text: "two"))
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two"])
 
-        try await Task.sleep(for: .seconds(2))
+        // Both turns on the record, which is what the last assertion reads. An empty
+        // queue beside a finished state is also true of the moment `sendNextQueued`
+        // takes the prompt off the queue and before `beginTurn` records it, so waiting
+        // on those two would sometimes be waiting for a turn that has not begun.
+        await eventually("both prompts were said") {
+            (try? await texts(core, id)) == ["one", "two"]
+        }
+        await eventually("the queue drained and the second turn ended") {
+            guard let agent = await core.agent(id) else { return false }
+            return agent.queuedPrompts.isEmpty && agent.state == .finished
+        }
         #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
         #expect(await core.agent(id)?.state == .finished)
         #expect(try await texts(core, id) == ["one", "two"])
@@ -62,12 +72,14 @@ struct QueuedPromptTests {
         let core = try core(slowLauncher(.milliseconds(250)), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(60))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
         try await core.prompt(.init(agentID: id, text: "two"))
         try await core.prompt(.init(agentID: id, text: "three"))
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two", "three"])
 
-        try await Task.sleep(for: .seconds(3))
+        await eventually("all three turns ran") {
+            (try? await texts(core, id)) == ["one", "two", "three"]
+        }
         #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
         #expect(try await texts(core, id) == ["one", "two", "three"],
                 "each queued prompt is a turn of its own, in the order it was typed")
@@ -79,7 +91,7 @@ struct QueuedPromptTests {
         let core = try core(slowLauncher(), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(60))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
         try await core.prompt(.init(agentID: id, text: "two"))
         try await core.prompt(.init(agentID: id, text: "three"))
 
@@ -87,7 +99,9 @@ struct QueuedPromptTests {
         try await core.unqueue(.init(agentID: id, promptID: unwanted.id))
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["three"])
 
-        try await Task.sleep(for: .seconds(2))
+        await eventually("the remaining prompt ran and the withdrawn one did not") {
+            (try? await texts(core, id)) == ["one", "three"]
+        }
         #expect(try await texts(core, id) == ["one", "three"])
     }
 
@@ -98,10 +112,10 @@ struct QueuedPromptTests {
         let core = try core(slowLauncher(.seconds(2)), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
         try await core.prompt(.init(agentID: id, text: "two"))
         try await core.stop(id)
-        try await Task.sleep(for: .seconds(1))
+        await eventually("the agent stopped") { await core.agent(id)?.state == .stopped }
 
         #expect(await core.agent(id)?.state == .stopped)
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two"],
@@ -123,10 +137,16 @@ struct QueuedPromptTests {
         do {
             let core = try core(slowLauncher(.seconds(2)), locations: locations)
             id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-            try await Task.sleep(for: .milliseconds(100))
+            await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
             try await core.prompt(.init(agentID: id, text: "two"))
             try await core.stop(id)
-            try await Task.sleep(for: .milliseconds(300))
+            // Wait for the record on disk, not the one in memory. The other core below
+            // reads the file, and the file is written a moment after the state changes.
+            await eventually("the queue reached the file") {
+                let store = try? AgentStore(locations: locations)
+                let reread = try? await store?.load(id)
+                return reread?.queuedPrompts.map(\.text) == ["two"]
+            }
         }
 
         let reopened = try core(FakeLauncher(), locations: locations)
@@ -147,20 +167,38 @@ struct QueuedPromptTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(100))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
         // Queued rather than sent, because a turn is in flight. Stopping then leaves
         // it exactly where it is — stop means stop, and the queue stays put — which is
         // an idle agent with something waiting and nothing about to drain it.
         try await core.prompt(.init(agentID: id, text: "two"))
         try await core.stop(id)
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the agent stopped with its queue intact") {
+            await core.agent(id)?.state == .stopped
+        }
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two"])
 
         // Both callers at once, which is what the window amounts to.
         async let first: Void = core.sendNextQueued(to: id)
         async let second: Void = core.sendNextQueued(to: id)
         _ = try await (first, second)
-        try await Task.sleep(for: .milliseconds(200))
+
+        @Sendable func timesTwoWasSent() async -> Int {
+            var count = 0
+            for fake in launcher.allAgents {
+                guard let blocks = await fake.promptContent?.arrayValue else { continue }
+                if blocks.compactMap({ $0["text"]?.stringValue }).contains("two") { count += 1 }
+            }
+            return count
+        }
+
+        // Two halves, and they need different treatment. That it was sent at all is a
+        // condition, so it is waited for; that it was not *also* sent a second time is
+        // an absence, and the only way to test an absence is to give the second one
+        // time to turn up. The queue emptying is not the signal — it empties when the
+        // prompt is taken off it, which is before the prompt reaches any runtime.
+        await eventually("the waiting prompt was sent") { await timesTwoWasSent() >= 1 }
+        try await Task.sleep(for: .milliseconds(300))
 
         var sent: [[String]] = []
         for fake in launcher.allAgents {

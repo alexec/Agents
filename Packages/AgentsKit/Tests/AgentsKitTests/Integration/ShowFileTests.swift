@@ -45,6 +45,18 @@ struct ShowFileTests {
             .first?["args"]?.arrayValue?.last?.stringValue ?? ""
     }
 
+    /// Wait until the runtime has actually been handed its token.
+    ///
+    /// It reaches the runtime in `session/new`, so there is a moment after `start`
+    /// returns in which `token` is still the empty string, and a call made with that
+    /// is refused for the wrong reason.
+    private func mintedToken(_ launcher: FakeLauncher) async -> String {
+        await eventuallySome("the runtime was handed its token") {
+            let minted = await token(launcher)
+            return minted.isEmpty ? nil : minted
+        } ?? ""
+    }
+
     private func write(_ name: String, in folder: URL) throws -> URL {
         let url = folder.appendingPathComponent(name)
         try Data("one\ntwo\nthree\n".utf8).write(to: url)
@@ -57,10 +69,9 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
         let file = try write("README.md", in: work)
 
-        let note = try await core.showFile(.init(token: await token(launcher),
+        let note = try await core.showFile(.init(token: await mintedToken(launcher),
                                                  file: ShownFile(path: file.path, line: 2)))
 
         let sent = await heard.wait(for: DaemonAPI.Notification.agentShowFile)
@@ -80,7 +91,6 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
 
         let outside = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("elsewhere-\(UUID().uuidString).txt")
@@ -88,7 +98,7 @@ struct ShowFileTests {
         defer { try? FileManager.default.removeItem(at: outside) }
 
         await #expect(throws: JSONRPCError.self) {
-            _ = try await core.showFile(.init(token: await token(launcher),
+            _ = try await core.showFile(.init(token: await mintedToken(launcher),
                                               file: ShownFile(path: outside.path)))
         }
         #expect(await heard.first(DaemonAPI.Notification.agentShowFile) == nil)
@@ -100,11 +110,10 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
 
         await #expect(throws: JSONRPCError.self) {
             _ = try await core.showFile(.init(
-                token: await token(launcher),
+                token: await mintedToken(launcher),
                 file: ShownFile(path: work.appendingPathComponent("imagined.swift").path)))
         }
         #expect(await heard.first(DaemonAPI.Notification.agentShowFile) == nil)
@@ -116,10 +125,9 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
 
         await #expect(throws: JSONRPCError.self) {
-            _ = try await core.showFile(.init(token: await token(launcher),
+            _ = try await core.showFile(.init(token: await mintedToken(launcher),
                                               file: ShownFile(path: work.path)))
         }
     }
@@ -130,7 +138,6 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
         let file = try write("README.md", in: work)
 
         await #expect(throws: JSONRPCError.self) {
@@ -148,12 +155,11 @@ struct ShowFileTests {
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(100))
         let file = try write("README.md", in: work)
         await core.setConnectionCount(0)
 
         await #expect(throws: JSONRPCError.self) {
-            _ = try await core.showFile(.init(token: await token(launcher),
+            _ = try await core.showFile(.init(token: await mintedToken(launcher),
                                               file: ShownFile(path: file.path)))
         }
         #expect(await heard.first(DaemonAPI.Notification.agentShowFile) == nil)

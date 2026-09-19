@@ -85,6 +85,12 @@ public actor ACPSession {
     /// runtime's own list is the one case where the replay is the transcript.
     private var recordsReplay = false
 
+    /// Whoever is waiting for a replay to have been drained, in the order they asked.
+    /// Each marker coming back out of the notification stream lets one of them go, and
+    /// the stream ending lets them all go. A list rather than one, because a waiter
+    /// quietly dropped is a caller that never returns.
+    private var replayDrains: [CheckedContinuation<Void, Never>] = []
+
     public func setReplayRecorded(_ recorded: Bool) {
         recordsReplay = recorded
     }
@@ -180,14 +186,65 @@ public actor ACPSession {
             if canResume {
                 _ = try await connection.call(ACP.Method.resumeSession, params)
             } else {
-                isReplaying = true
-                defer { isReplaying = false }
-                _ = try await connection.call(ACP.Method.loadSession, params)
+                try await load(params)
             }
         } catch let error as JSONRPCError {
             throw ACPSessionError.sessionGone(error)
         }
         sessionID = id
+    }
+
+    /// Load, with the replay it brings suppressed until the last of it has been dealt
+    /// with rather than until the answer comes back.
+    ///
+    /// Those are not the same moment, and the difference was a bug somebody could see.
+    /// The replay arrives as notifications, handled on the reader's own task; the
+    /// answer resumes this one. Clearing the flag when the answer lands therefore
+    /// closes the window while the last chunk is still queued behind it, and that
+    /// chunk is recorded — a resumed conversation with the end of its history written
+    /// into it twice. Always the last chunk, never an earlier one, because an earlier
+    /// one is never the thing still in the queue.
+    ///
+    /// So the window closes on the replay having been drained. The marker goes into
+    /// the same stream the replay came down, once the answer is here, and the stream
+    /// keeps the reader's order: everything the answer arrived behind is ahead of the
+    /// marker, and hearing the marker is hearing that all of it has been handled.
+    /// Ordered by construction rather than by how long anything takes.
+    private func load(_ params: JSONValue) async throws {
+        isReplaying = true
+        defer { isReplaying = false }
+        do {
+            _ = try await connection.call(ACP.Method.loadSession, params)
+        } catch {
+            // Drained on the way out too: whatever the runtime managed to replay
+            // before it gave up is still in the stream, and is still not ours to keep.
+            await waitForReplayToDrain()
+            throw error
+        }
+        await waitForReplayToDrain()
+    }
+
+    /// Wait until the notification consumer has worked through everything the reader
+    /// handed it before now. Returns at once if the connection has gone, because then
+    /// nothing is coming and there is nothing to wait for.
+    private func waitForReplayToDrain() async {
+        guard connection.insertMarker() else { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            replayDrains.append(continuation)
+        }
+    }
+
+    /// A marker arrived: the waiter it was put in for can go.
+    private func releaseReplayDrain() {
+        guard !replayDrains.isEmpty else { return }
+        replayDrains.removeFirst().resume()
+    }
+
+    /// No marker will arrive again. Everybody waiting for one goes.
+    private func releaseAllReplayDrains() {
+        let waiting = replayDrains
+        replayDrains.removeAll()
+        for continuation in waiting { continuation.resume() }
     }
 
     /// What every session-making call takes. `additionalDirectories` is sent only
@@ -366,10 +423,28 @@ public actor ACPSession {
         try await connection.call(ACP.Method.close, ["sessionId": .string(sessionID)])
     }
 
+    /// Shut the connection and end the event stream.
+    ///
+    /// Three steps, in this order, and the order is the point. Closing the connection
+    /// stops anything new arriving and ends the connection's own notification stream.
+    /// Waiting on the reader then lets it turn everything already read off the wire
+    /// into events — a runtime says its last words and ends the turn in the same
+    /// breath, so at this moment that buffer holds the end of the conversation.
+    /// Finishing the event stream last tells our listener there is no more, which it
+    /// only hears after draining what it has.
+    ///
+    /// Cancelling the reader instead — which is what this used to do, first thing —
+    /// ends the stream it is reading, so anything the runtime says between here and
+    /// the connection actually closing is dropped with nothing to say it existed.
+    /// A runtime's last words are said exactly there.
+    ///
+    /// The other ending is `noteExit`, for a runtime whose process dies on its own.
+    /// Whichever comes first, `finish()` is idempotent and the second is a no-op.
     func closeConnection() async {
-        notificationTask?.cancel()
-        notificationTask = nil
         await connection.close()
+        await notificationTask?.value
+        notificationTask = nil
+        eventsContinuation.finish()
     }
 
     /// The runtime, for the extension that has to terminate it.
@@ -384,10 +459,18 @@ public actor ACPSession {
             for await notification in await self.connection.incomingNotifications() {
                 await self.receive(notification.method, notification.params)
             }
+            // Nothing more is coming, so a marker that has not arrived never will.
+            await self.releaseAllReplayDrains()
         }
     }
 
     private func receive(_ method: String, _ params: JSONValue?) {
+        if method == JSONRPCConnection.markerMethod {
+            // Our own marker, back out of the stream behind everything that was in it
+            // when we put it there. All of that has now been through here.
+            releaseReplayDrain()
+            return
+        }
         if method == ACP.ClientMethod.completeElicitation {
             // Finished somewhere else. The form comes down.
             if let id = params?["elicitationId"]?.stringValue {
@@ -615,6 +698,7 @@ public actor ACPSession {
         pendingPermissions.removeAll()
         for (_, continuation) in pendingElicitations { continuation.resume(returning: .cancel) }
         pendingElicitations.removeAll()
+        releaseAllReplayDrains()
         eventsContinuation.yield(.processExited(status: status))
         eventsContinuation.finish()
     }

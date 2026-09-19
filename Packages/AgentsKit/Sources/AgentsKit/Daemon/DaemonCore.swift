@@ -72,8 +72,32 @@ public actor DaemonCore {
         var answer: CheckedContinuation<Bool, Never>
     }
 
-    var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
+    /// Where notifications go, in a box rather than in a stored closure.
+    ///
+    /// Anything that broadcasts from off the actor — a terminal's reader, say — holds
+    /// the box and reads the door out of it as it sends, rather than copying whatever
+    /// was set when it was made. Recovery runs before the socket is open, so a
+    /// terminal made during recovery would otherwise have copied nothing and stayed
+    /// mute for the rest of the daemon's life.
+    let broadcaster = BroadcastBox()
     var connectionCount = 0
+
+    /// The daemon's one way out to the windows, settable once the socket exists and
+    /// readable from any thread.
+    public final class BroadcastBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var send: (@Sendable (String, JSONValue?) -> Void)?
+
+        var isSet: Bool { lock.withLock { send != nil } }
+
+        func set(_ send: @escaping @Sendable (String, JSONValue?) -> Void) {
+            lock.withLock { self.send = send }
+        }
+
+        func callAsFunction(_ method: String, _ params: JSONValue?) {
+            lock.withLock { send }?(method, params)
+        }
+    }
 
     /// The user's shells, one per agent. Not the agent's terminals, which are 003's.
     /// Held here so a build outlives the window that started it (FR-026).
@@ -143,7 +167,7 @@ public actor DaemonCore {
     }
 
     public func setBroadcaster(_ broadcaster: @escaping @Sendable (String, JSONValue?) -> Void) {
-        self.broadcaster = broadcaster
+        self.broadcaster.set(broadcaster)
     }
 
     public func setConnectionCount(_ count: Int) {
@@ -153,7 +177,7 @@ public actor DaemonCore {
     // MARK: Telling the windows
 
     func broadcast(_ method: String, _ value: (some Encodable)?) {
-        guard let broadcaster else { return }
+        guard broadcaster.isSet else { return }
         let params = value.flatMap { try? JSONValue.encoding($0) }
         broadcaster(method, params)
     }
@@ -350,8 +374,22 @@ public actor DaemonCore {
 
     /// Let go of a runtime. The agent is not going anywhere: its session can be picked
     /// up again whenever it is next prompted.
-    func forget(_ agentID: UUID) {
-        eventTasks.removeValue(forKey: agentID)?.cancel()
+    ///
+    /// The listener is handed back rather than cancelled, and that is the whole point
+    /// of returning anything at all. Cancelling a task reading an `AsyncStream` ends
+    /// the stream: what is already buffered still arrives, but every event yielded
+    /// afterwards is dropped on the floor with nothing to say it existed. This is
+    /// called *before* the session is closed, and closing one is a conversation of
+    /// its own — cancel the turn, close the session, wait for the process — so a
+    /// runtime with anything left to say says it into that dead stream.
+    ///
+    /// Left alone, the listener finishes on its own as soon as the session ends its
+    /// stream: `ACPSession.closeConnection` for a session being closed, `noteExit`
+    /// for a process that died. Whoever is also ending the session should wait on
+    /// what comes back; see `releaseRuntime`.
+    @discardableResult
+    func forget(_ agentID: UUID) -> Task<Void, Never>? {
+        let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
         // The MCP helper the runtime started dies with it. Its token stops working
         // here at the same moment, rather than whenever that process gets round to it.
@@ -359,6 +397,7 @@ public actor DaemonCore {
         // Nothing we started for this agent outlives it.
         Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }
+        return draining
     }
 
     // MARK: Shutting down
@@ -383,7 +422,12 @@ public actor DaemonCore {
         shells.shutDown()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
-        for (_, task) in eventTasks { task.cancel() }
+        // Waited on, not cancelled. Every session above has just been closed, which
+        // ends its event stream, so each listener is already working through the last
+        // of its buffer. The daemon going is not a reason for the final words of a
+        // conversation to go with it.
+        for (_, task) in eventTasks { await task.value }
+        eventTasks.removeAll()
         live.removeAll()
         await store.closeAll()
     }

@@ -65,7 +65,10 @@ struct TwoDaemonsTests {
         _ = try await toFirst.call(DaemonAPI.Method.agentsStart,
                                    try JSONValue.encoding(DaemonAPI.StartRequest(
                                        runtimeID: "copilot", cwd: hereWork, prompt: "mine")))
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the first daemon has its agent") {
+            (try? await toFirst.call(DaemonAPI.Method.agentsList,
+                                     ["includeArchived": true]).arrayValue?.count) == 1
+        }
 
         #expect(try await toFirst.call(DaemonAPI.Method.agentsList,
                                        ["includeArchived": true]).arrayValue?.count == 1)
@@ -77,7 +80,10 @@ struct TwoDaemonsTests {
         _ = try await toSecond.call(DaemonAPI.Method.agentsStart,
                                     try JSONValue.encoding(DaemonAPI.StartRequest(
                                         runtimeID: "copilot", cwd: thereWork, prompt: "theirs")))
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the second daemon has its own") {
+            (try? await toSecond.call(DaemonAPI.Method.agentsList,
+                                      ["includeArchived": true]).arrayValue?.count) == 1
+        }
         #expect(try await toFirst.call(DaemonAPI.Method.agentsList,
                                        ["includeArchived": true]).arrayValue?.count == 1)
         #expect(try await toSecond.call(DaemonAPI.Method.agentsList,
@@ -110,7 +116,9 @@ struct TwoDaemonsTests {
         _ = try await toFirst.call(DaemonAPI.Method.agentsStart,
                                    try JSONValue.encoding(DaemonAPI.StartRequest(
                                        runtimeID: "copilot", cwd: work, prompt: "mine")))
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the agent was written to the first root") {
+            ((try? FileManager.default.contentsOfDirectory(atPath: here.agents.path)) ?? []).count == 1
+        }
 
         let manager = FileManager.default
         let mine = (try? manager.contentsOfDirectory(atPath: here.agents.path)) ?? []

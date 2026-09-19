@@ -224,7 +224,7 @@ struct WorkflowRefusalTests {
         _ = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: work, prompt: "Start it off"))
 
-        try await waitFor { await refusal(core, work, "loop") != nil }
+        await eventually("the loop was refused") { await refusal(core, work, "loop") != nil }
 
         guard case .chainTooDeep = await refusal(core, work, "loop") else {
             Issue.record("expected chainTooDeep, got \(String(describing: await refusal(core, work, "loop")))")
@@ -312,15 +312,6 @@ struct WorkflowRefusalTests {
         }
     }
 
-    private func waitFor(_ condition: @Sendable () async -> Bool,
-                         within: Duration = .seconds(10)) async throws {
-        let deadline = ContinuousClock.now.advanced(by: within)
-        while ContinuousClock.now < deadline {
-            if await condition() { return }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        Issue.record("condition never held")
-    }
 }
 
 extension DaemonCore {

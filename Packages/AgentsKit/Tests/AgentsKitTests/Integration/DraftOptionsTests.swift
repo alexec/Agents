@@ -72,6 +72,9 @@ struct DraftOptionsTests {
         let watching = Broadcasts()
         let later = try await core(offering(["a", "b"]), locations: locations, watching: watching)
         _ = try await later.options(.init(runtimeID: "copilot", cwd: work))
+        // An absence, so there is no condition to wait for and time passing is the
+        // assertion. Generous on purpose: the notification this is proving does not
+        // arrive would arrive well inside a second if it were coming at all.
         try await Task.sleep(for: .milliseconds(700))
 
         #expect(await watching.first(DaemonAPI.Notification.draftOptions) == nil,
@@ -123,7 +126,7 @@ struct DraftOptionsTests {
         let id = try await later.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
                                              startOptions: StartOptions(values: ["model": "b"]),
                                              draftID: form.draftID))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the turn ran to its end") { await later.agent(id)?.state == .finished }
 
         #expect(launcher.launchCount == 1, "the runtime started behind the form is the one used")
         #expect(await later.agent(id)?.state == .finished)

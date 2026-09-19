@@ -51,7 +51,9 @@ struct SessionHousekeepingTests {
         let first = try core(launcher, locations: locations)
 
         let id = try await first.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the session was recorded") {
+            await first.agent(id)?.runtimeSessionID != nil
+        }
         let sessionID = try #require(await first.agent(id)?.runtimeSessionID)
 
         // The same session now comes back in the runtime's list.
@@ -72,7 +74,10 @@ struct SessionHousekeepingTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.adopt(runtimeID: "claude", sessionID: "s1", cwd: work)
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the replayed history arrived") {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.compactMap(\.text).contains("Something said yesterday") == true
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.runtimeSessionID == "s1")
@@ -96,9 +101,15 @@ struct SessionHousekeepingTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "the first thing"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the first turn is on the record") {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.compactMap(\.text).contains("the first thing") == true
+        }
         let branch = try await core.fork(agentID: id)
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the branch carries the history") {
+            let page = try? await core.transcript(.init(agentID: branch))
+            return page?.entries.compactMap(\.text).contains("the first thing") == true
+        }
 
         #expect(branch != id)
         let original = await core.agent(id)
@@ -120,7 +131,9 @@ struct SessionHousekeepingTests {
             try await core.deleteRuntimeSession(runtimeID: "claude", sessionID: "s1", confirmed: false)
         }
         try await core.deleteRuntimeSession(runtimeID: "claude", sessionID: "s1", confirmed: true)
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the delete reached the runtime") {
+            await launcher.lastAgent?.deletedSessions == ["s1"]
+        }
         #expect(await launcher.lastAgent?.deletedSessions == ["s1"])
     }
 
@@ -132,7 +145,7 @@ struct SessionHousekeepingTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the agent is up") { await core.agent(id) != nil }
 
         await #expect(throws: JSONRPCError.self) { _ = try await core.fork(agentID: id) }
         await #expect(throws: (any Error).self) {

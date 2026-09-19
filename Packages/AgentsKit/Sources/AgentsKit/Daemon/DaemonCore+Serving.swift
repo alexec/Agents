@@ -79,12 +79,14 @@ extension DaemonCore {
         if let existing = terminalServices[agentID] { return existing }
         let agent = agents[agentID]
         let scope = agent?.folderScope ?? FolderScope(folders: [])
+        // The box, not the door: a terminal made before the socket is open — during
+        // recovery, say — still finds the way out once there is one.
         let broadcaster = broadcaster
         let service = TerminalService(scope: scope,
                                       defaultCWD: agent?.cwd ?? locations.root) { terminalID, chunk in
             // Output goes straight to the windows as it arrives, so a long command
             // reads like a terminal rather than appearing all at once at the end.
-            guard let broadcaster else { return }
+            guard broadcaster.isSet else { return }
             let notification = DaemonAPI.TerminalOutputNotification(agentID: agentID,
                                                                    terminalID: terminalID,
                                                                    chunk: chunk)

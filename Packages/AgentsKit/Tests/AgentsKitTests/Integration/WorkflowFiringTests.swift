@@ -265,8 +265,13 @@ struct WorkflowFiringTests {
         // An agent nobody automated, finishing: the start of a chain, at depth zero.
         let started = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: work, prompt: "Do a thing"))
-        try await waitFor { await core.agent(started)?.state == .finished }
-        try await waitFor { await core.allAgents().count > 1 }
+        await eventually("the first agent finished") { await core.agent(started)?.state == .finished }
+        // Wait for the thing actually being asserted, not for a second agent to exist.
+        // The agent is added to the list before `startedByWorkflow` is on it, so a wait
+        // on the count could come back a moment before the field the test reads.
+        await eventually("the workflow started an agent") {
+            await core.allAgents().contains { $0.startedByWorkflow == "on-finish" }
+        }
 
         let made = await core.allAgents().first { $0.startedByWorkflow == "on-finish" }
         #expect(made != nil)
@@ -289,24 +294,14 @@ struct WorkflowFiringTests {
         await core.rescanWorkflows(in: work)
         let started = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: work, prompt: "Do a thing"))
-        try await waitFor { await core.agent(started)?.startedByWorkflow == "follow-up" }
+        await eventually("the prompt came back to the same agent") {
+            await core.agent(started)?.startedByWorkflow == "follow-up"
+        }
 
         // No second agent: the prompt went back where it came from.
         #expect(await core.allAgents().count == 1)
     }
 
-    /// Poll until a condition holds, because a workflow fires on a detached task: the
-    /// hook is called from inside the actor and must not await anything that could call
-    /// back into it.
-    private func waitFor(_ condition: @Sendable () async -> Bool,
-                         within: Duration = .seconds(5)) async throws {
-        let deadline = ContinuousClock.now.advanced(by: within)
-        while ContinuousClock.now < deadline {
-            if await condition() { return }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        Issue.record("condition never held")
-    }
 }
 
 /// Which projects are being watched, and when that starts and stops.

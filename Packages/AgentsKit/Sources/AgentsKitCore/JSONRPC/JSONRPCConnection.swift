@@ -40,6 +40,31 @@ public actor JSONRPCConnection {
         notifications
     }
 
+    /// The method a marker arrives under. Not a protocol method and never written to
+    /// the wire: it exists only to be recognised by whoever asked for it.
+    public static let markerMethod = "jsonrpc/marker"
+
+    /// Put a marker into the incoming notification stream, behind everything already
+    /// in it.
+    ///
+    /// A reply and the notifications that came before it arrive on the same wire in
+    /// that order, but they leave here by two different doors: a reply resumes the
+    /// caller, notifications go into a stream somebody else is draining. So a caller
+    /// holding a reply knows nothing about how far that draining has got, which is a
+    /// race whenever the answer depends on the notifications having been dealt with.
+    ///
+    /// A marker closes it. The reader turns lines into notifications in the order they
+    /// arrived and the stream keeps that order, so a marker put in once a reply is in
+    /// hand comes out behind every notification that preceded the reply. Waiting for
+    /// it is waiting for them, exactly, with no interval to guess at.
+    ///
+    /// False if the stream has already ended: nothing will come out of it again and
+    /// there is nothing to wait for.
+    public nonisolated func insertMarker() -> Bool {
+        if case .terminated = notificationsContinuation.yield((Self.markerMethod, nil)) { return false }
+        return true
+    }
+
     public func start() {
         guard readTask == nil else { return }
         readTask = Task { [weak self] in

@@ -60,19 +60,28 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "read it"))
-        try await Task.sleep(for: .milliseconds(300))
 
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        let answer = await eventuallySome("an answer to the read") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        }
         guard case .success(let result)? = answer else {
             Issue.record("the read was not served: \(String(describing: answer))")
             return
         }
         #expect(result["content"]?.stringValue == "inside")
 
-        let page = try await core.transcript(.init(agentID: id))
-        let served = page.entries.compactMap { entry -> ServedRequest? in
-            if case .servedRequest(let request) = entry.kind { return request } else { return nil }
+        // The record is not the answer. The reply goes straight back down the
+        // transport while the entry has to be drained off the event stream and
+        // appended, so the agent can have been served with nothing written down yet.
+        @Sendable func servedSoFar() async -> [ServedRequest] {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.compactMap { entry -> ServedRequest? in
+                if case .servedRequest(let request) = entry.kind { return request } else { return nil }
+            } ?? []
         }
+        await eventually("the read reached the record") { await servedSoFar().count == 1 }
+
+        let served = await servedSoFar()
         #expect(served.count == 1, "recorded, so the user can see what was touched")
         #expect(served.first?.outcome == .served)
     }
@@ -87,9 +96,10 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "read it"))
-        try await Task.sleep(for: .milliseconds(300))
 
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        let answer = await eventuallySome("an answer to the read") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        }
         guard case .failure(let error)? = answer else {
             Issue.record("a read outside the folders must be refused")
             return
@@ -107,7 +117,9 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "write it"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the write raised a question") {
+            await core.pendingPermissionRequests().isEmpty == false
+        }
 
         // It is waiting on us, with the change in the question.
         let pending = await core.pendingPermissionRequests()
@@ -117,14 +129,22 @@ struct ServingTests {
 
         guard let request = pending.first else { return }
         try await core.answerPermission(.init(permissionID: request.id, optionID: "allow_once"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the file was written") {
+            (try? String(contentsOf: target, encoding: .utf8)) == "from the agent"
+        }
+        // And written down, which is a beat later again: the file is written while the
+        // request is served, and the entry is appended from the event stream after.
+        @Sendable func writeIsOnTheRecord() async -> Bool {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.contains { entry in
+                if case .servedRequest(let request) = entry.kind, case .writeFile = request.kind { return true }
+                return false
+            } == true
+        }
+        await eventually("the write reached the record") { await writeIsOnTheRecord() }
 
         #expect(try String(contentsOf: target, encoding: .utf8) == "from the agent")
-        let page = try await core.transcript(.init(agentID: id))
-        #expect(page.entries.contains { entry in
-            if case .servedRequest(let request) = entry.kind, case .writeFile = request.kind { return true }
-            return false
-        })
+        #expect(await writeIsOnTheRecord())
     }
 
     @Test func aRefusedWriteLeavesTheFileAloneAndTellsTheAgent() async throws {
@@ -138,16 +158,19 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "write it"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the write raised a question") {
+            await core.pendingPermissionRequests().isEmpty == false
+        }
         guard let request = await core.pendingPermissionRequests().first else {
             Issue.record("expected to be asked")
             return
         }
         try await core.answerPermission(.init(permissionID: request.id, optionID: "reject_once"))
-        try await Task.sleep(for: .milliseconds(300))
 
+        let answer = await eventuallySome("the refusal reached the agent") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.writeTextFile)
+        }
         #expect(try String(contentsOf: target, encoding: .utf8) == "original")
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.writeTextFile)
         guard case .failure? = answer else {
             Issue.record("the agent must be told it was refused")
             return
@@ -166,9 +189,10 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "read it"))
-        try await Task.sleep(for: .milliseconds(300))
 
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        let answer = await eventuallySome("an answer to the read") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.readTextFile)
+        }
         guard case .failure(let error)? = answer else {
             Issue.record("expected a refusal")
             return
@@ -189,9 +213,10 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "plan it"))
-        try await Task.sleep(for: .milliseconds(300))
 
-        let answer = await launcher.lastAgent?.answer(to: "cursor/create_plan")
+        let answer = await eventuallySome("an answer to cursor/create_plan") {
+            await launcher.lastAgent?.answer(to: "cursor/create_plan")
+        }
         guard case .failure(let error)? = answer else {
             Issue.record("a blocking request must be answered, or the turn never ends")
             return
@@ -225,12 +250,19 @@ struct ServingTests {
         }
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
-        try await Task.sleep(for: .milliseconds(600))
 
-        let created = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createTerminal)
+        let created = await eventuallySome("the terminal was created") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createTerminal)
+        }
         guard case .success(let result)? = created, result["terminalId"]?.stringValue != nil else {
             Issue.record("the terminal was not created: \(String(describing: created))")
             return
+        }
+        // Creating the terminal and hearing from it are two separate waits. The pty
+        // gathers what it reads before handing it on, so the output lands a beat after
+        // the command is answered — which is the beat the old fixed sleep kept losing.
+        await eventually("the command's output reached the windows") {
+            heard.text.contains("probe-ran")
         }
         #expect(heard.text.contains("probe-ran"))
     }
@@ -245,9 +277,10 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
-        try await Task.sleep(for: .milliseconds(400))
 
-        let created = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createTerminal)
+        let created = await eventuallySome("an answer to the terminal request") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createTerminal)
+        }
         guard case .failure? = created else {
             Issue.record("expected a refusal")
             return
@@ -266,11 +299,11 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
-        try await Task.sleep(for: .milliseconds(500))
+        await eventually("the terminal started") { await core.terminals(for: id).runningCount == 1 }
         #expect(await core.terminals(for: id).runningCount == 1)
 
         try await core.stop(id)
-        try await Task.sleep(for: .milliseconds(400))
+        await eventually("the terminal went with it") { await core.terminals(for: id).runningCount == 0 }
         #expect(await core.terminals(for: id).runningCount == 0,
                 "a command outliving its agent is an orphan process")
     }
@@ -284,7 +317,9 @@ struct ServingTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "run it"))
-        try await Task.sleep(for: .milliseconds(400))
+        // The terminal has to be up before the shutdown means anything: shutting down
+        // before it starts would pass for the wrong reason.
+        await eventually("the terminal started") { await core.terminals(for: id).runningCount == 1 }
 
         await core.shutDown()
         #expect(await core.terminals(for: id).runningCount == 0)

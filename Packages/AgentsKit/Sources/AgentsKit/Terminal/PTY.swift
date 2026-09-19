@@ -21,10 +21,42 @@ public final class PTY: @unchecked Sendable {
 
     /// The master side. Read what the program wrote; write what the user typed.
     private var master: Int32 = -1
+
+    /// The child's side, held for as long as the child is alive.
+    ///
+    /// The parent has no use for it and the obvious thing is to close it the moment
+    /// the child has been handed its own. That silently loses output. macOS throws
+    /// away whatever is still sitting in a tty's queue at the **last** close of the
+    /// slave, so a program that prints and exits before the reader has been scheduled
+    /// — which is what a machine under load does — has everything it said discarded
+    /// by the kernel, and the master reports end of file with nothing in front of it.
+    /// Measured here: `echo one; echo two; echo three` delivered 0 of its 17 bytes,
+    /// every time, whenever the first read landed after the child let go of the tty.
+    ///
+    /// Holding it means the child's close is never the last one, so nothing is
+    /// discarded. Better than that, the kernel parks the child inside `exit` until
+    /// the queue has been drained, so its last words cannot be outrun however busy
+    /// the machine is.
+    ///
+    /// End of file still arrives on time, and for a better reason than before. The
+    /// child is the leader of its own session and the tty is its controlling
+    /// terminal, so BSD revokes the tty when it goes — which takes this descriptor
+    /// with it and wakes the master, after the child has been drained rather than
+    /// before. `finish` is reached exactly as it always was.
+    private var slave: Int32 = -1
+
     public private(set) var pid: pid_t = -1
     private let lock = NSLock()
     private var reader: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.alexecollins.agents.pty")
+    /// Watches the child so the tty is let go even in the case where the revoke above
+    /// does not come. It does not wait for the child: `finish` is the one place the
+    /// child is ever reaped, and two reapers race each other to ECHILD.
+    private var exitWatcher: DispatchSourceProcess?
+    var debugTotal = 0
+    let debugStart = Date()
+    var debugArgs = ""
+    var debugFirstReadable: Int = -1
 
     public private(set) var rows: Int
     public private(set) var cols: Int
@@ -66,11 +98,17 @@ public final class PTY: @unchecked Sendable {
             throw Failure.shellMissing(executable.path)
         }
 
-        var slave: Int32 = -1
         var size = winsize(ws_row: UInt16(rows), ws_col: UInt16(cols), ws_xpixel: 0, ws_ypixel: 0)
         guard openpty(&master, &slave, nil, nil, &size) == 0 else { throw Failure.couldNotOpen }
+        // Neither of these is ours to lend. `openpty` hands back plain descriptors,
+        // and this process spawns other things — the agent runtimes among them — that
+        // would otherwise walk off with somebody's terminal. The shell started below
+        // is given its tty by name, so marking these costs it nothing.
+        _ = fcntl(master, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(slave, F_SETFD, FD_CLOEXEC)
         guard let slaveName = ptsname(master).map({ String(cString: $0) }) else {
-            Darwin.close(master); Darwin.close(slave)
+            Darwin.close(master); master = -1
+            Darwin.close(slave); slave = -1
             throw Failure.couldNotOpen
         }
 
@@ -141,17 +179,28 @@ public final class PTY: @unchecked Sendable {
         FileManager.default.changeCurrentDirectoryPath(previous)
         PTY.spawnLock.unlock()
 
-        // The parent has no use for the slave: holding it open would keep the master
-        // from ever reporting end of file when the child goes.
-        Darwin.close(slave)
-
         guard result == 0 else {
-            Darwin.close(master)
-            master = -1
+            Darwin.close(master); master = -1
+            Darwin.close(slave); slave = -1
             throw Failure.couldNotStart(String(cString: strerror(result)))
         }
         pid = spawned
+        debugArgs = arguments.joined(separator: " ").prefix(40).replacingOccurrences(of: " ", with: "_")
+        FileHandle.standardError.write(Data("PTYDEBUG spawn pid=\(spawned) master=\(master) slave=\(slave) ms=\(Int(Date().timeIntervalSince(debugStart)*1000)) args=\(debugArgs)\n".utf8))
+        // The slave stays open here. See the note on the property: letting go of it
+        // now is what makes the child's exit the tty's last close, and the kernel
+        // discards anything still queued at a last close.
         startReading()
+        watchForExit()
+    }
+
+    deinit {
+        // A pty dropped while its child is still going would otherwise leave the
+        // child parked in `exit` for ever, waiting for a reader that has gone.
+        exitWatcher?.cancel()
+        reader?.cancel()
+        if slave >= 0 { Darwin.close(slave) }
+        if master >= 0 { Darwin.close(master) }
     }
 
     private static let spawnLock = NSLock()
@@ -162,6 +211,14 @@ public final class PTY: @unchecked Sendable {
             guard let self else { return }
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = read(self.master, &buffer, buffer.count)
+            if count <= 0 {
+                var avail: Int32 = -1
+                _ = ioctl(self.master, TIOCOUTQ, &avail)
+                FileHandle.standardError.write(Data("PTYDEBUG eof pid=\(self.pid) count=\(count) slave=\(self.slave) totalRead=\(self.debugTotal) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
+            } else {
+                self.debugTotal += count
+                FileHandle.standardError.write(Data("PTYDEBUG read pid=\(self.pid) n=\(count) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
+            }
             if count > 0 {
                 self.pending.append(contentsOf: buffer[0..<count])
                 self.gathered()
@@ -178,6 +235,34 @@ public final class PTY: @unchecked Sendable {
         }
         reader = source
         source.resume()
+    }
+
+    /// Watch the child, so the tty is never held on behalf of somebody who has gone.
+    ///
+    /// Belt and braces rather than the main path: when the child goes, BSD revokes
+    /// the controlling terminal and the master reports end of file by itself. This
+    /// covers the child that somehow leaves without that happening, where the slave
+    /// this side holds would otherwise keep the master silent for ever.
+    ///
+    /// It deliberately does not wait for the child. `finish` is the only place the
+    /// child is ever reaped: a second waiter races the first and one of the two comes
+    /// away with ECHILD and no status, which is how a shell that exited 3 was
+    /// reported as having exited for no reason anyone could name.
+    private func watchForExit() {
+        let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            FileHandle.standardError.write(Data("PTYDEBUG childexit pid=\(self.pid) totalRead=\(self.debugTotal) sinceSpawnMs=\(Int(Date().timeIntervalSince(self.debugStart)*1000))\n".utf8))
+            self.releaseSlave()
+        }
+        exitWatcher = source
+        source.resume()
+    }
+
+    private func releaseSlave() {
+        lock.lock()
+        if slave >= 0 { Darwin.close(slave); slave = -1 }
+        lock.unlock()
     }
 
     /// How long reads are gathered for before they are handed on, and how much may
@@ -245,8 +330,15 @@ public final class PTY: @unchecked Sendable {
         reader?.cancel()
         reader = nil
 
+        exitWatcher?.cancel()
+        exitWatcher = nil
+        // Nothing is reading any more, so the tty must not be held: a child part-way
+        // through its own exit waits for its last words to be taken, and with nobody
+        // to take them it would wait for ever.
+        releaseSlave()
+
         // End of file on the master does not mean the child has been reaped, so wait
-        // for it properly. Blocking is safe here: the tty is closed, so it is going.
+        // for it properly. Blocking is safe here: the tty is gone, so it is going.
         //
         // The status is only meaningful when waitpid actually returned our child. An
         // earlier version read `status` regardless, and a child killed by a signal
@@ -256,7 +348,9 @@ public final class PTY: @unchecked Sendable {
         while reaped == -1 && errno == EINTR {
             reaped = waitpid(pid, &status, 0)
         }
-        onExit(reaped == pid ? exitCode(from: status) : Self.unknownExitCode)
+        let code = reaped == pid ? exitCode(from: status) : Self.unknownExitCode
+        FileHandle.standardError.write(Data("PTYDEBUG done pid=\(pid) code=\(code) reaped=\(reaped) total=\(debugTotal) args=\(debugArgs)\n".utf8))
+        onExit(code)
     }
 
     /// Reported when the child is gone but its status could not be collected, which
@@ -347,5 +441,8 @@ public final class PTY: @unchecked Sendable {
         queue.async { [weak self] in self?.flushPending() }
         reader?.cancel()
         reader = nil
+        // And let the tty go with it. Nobody is draining the master any more, and a
+        // child on its way out waits to be drained before it can finish going.
+        releaseSlave()
     }
 }

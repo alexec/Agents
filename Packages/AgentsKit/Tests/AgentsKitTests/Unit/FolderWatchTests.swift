@@ -23,6 +23,15 @@ struct FolderWatchTests {
             lock.unlock()
         }
 
+        /// Forget what has been seen, for a test that proves the stream is up and then
+        /// needs a clean slate to prove it has gone quiet.
+        func reset() {
+            lock.lock()
+            urls.removeAll()
+            callbackCount = 0
+            lock.unlock()
+        }
+
         var all: [URL] { lock.lock(); defer { lock.unlock() }; return urls }
         /// How many times the watch called back, which is the thing coalescing is about.
         /// Counting reported paths instead would measure something else.
@@ -56,9 +65,15 @@ struct FolderWatchTests {
         defer { watch.stop() }
         #expect(watch.isWatching)
 
-        // The stream needs a moment to be listening before the write lands.
-        try await Task.sleep(for: .milliseconds(300))
-        try Data("hello".utf8).write(to: root.appending(path: "new.txt"))
+        // The stream needs a moment to be listening before the write lands, and
+        // FSEvents offers no "I am listening now" to wait on. So rather than sleeping
+        // long enough that it usually is, write again on every look until something
+        // comes back: the first write that lands after the stream is up is the one
+        // that counts, and a slow machine just takes a few more goes.
+        await eventually("a change was reported") {
+            try? Data("hello".utf8).write(to: root.appending(path: "new.txt"))
+            return !changes.all.isEmpty
+        }
 
         let reported = await changes.waitForSomething()
         #expect(!reported.isEmpty, "no event arrived")
@@ -85,9 +100,12 @@ struct FolderWatchTests {
         let watch = FolderWatch(root: root) { changes.record($0) }
         defer { watch.stop() }
 
-        try await Task.sleep(for: .milliseconds(300))
-        try FileManager.default.createDirectory(at: root.appending(path: "sub"),
-                                                withIntermediateDirectories: true)
+        await eventually("a change was reported") {
+            try? FileManager.default.createDirectory(at: root.appending(path: "sub"),
+                                                     withIntermediateDirectories: true)
+            try? Data("x".utf8).write(to: root.appending(path: "sub/file.txt"))
+            return !changes.all.isEmpty
+        }
 
         let reported = await changes.waitForSomething()
         #expect(!reported.isEmpty)
@@ -109,11 +127,22 @@ struct FolderWatchTests {
         let watch = FolderWatch(root: root) { changes.record($0) }
         defer { watch.stop() }
 
-        try await Task.sleep(for: .milliseconds(300))
+        // Get the stream up first, the same way, so the 500 writes below are all
+        // actually seen — a burst that half-missed the stream would coalesce to a
+        // flatteringly small number for the wrong reason.
+        await eventually("the stream is up") {
+            try? Data("x".utf8).write(to: root.appending(path: "warm-up.txt"))
+            return !changes.all.isEmpty
+        }
+        // The warm-up's own callbacks are not part of what is being counted.
+        changes.reset()
         for index in 0..<500 {
             try Data("x".utf8).write(to: root.appending(path: "file\(index).txt"))
         }
 
+        // An upper bound, so this one waits rather than watches: the assertion is that
+        // callbacks stay few, and giving them longer to arrive can only make the test
+        // harder to pass.
         _ = await changes.waitForSomething()
         try await Task.sleep(for: .milliseconds(600))
         // Far fewer callbacks than writes: measured at 19 for 500 on this machine. The
@@ -128,11 +157,18 @@ struct FolderWatchTests {
 
         let changes = Changes()
         let watch = FolderWatch(root: root) { changes.record($0) }
-        try await Task.sleep(for: .milliseconds(300))
+        // Up and demonstrably working before it is stopped, or the silence afterwards
+        // would prove nothing: a stream that never started is also silent.
+        await eventually("the stream is up") {
+            try? Data("x".utf8).write(to: root.appending(path: "before.txt"))
+            return !changes.all.isEmpty
+        }
         watch.stop()
         #expect(watch.isWatching == false)
+        changes.reset()
 
         try Data("x".utf8).write(to: root.appending(path: "after.txt"))
+        // An absence, so time passing is the assertion.
         try await Task.sleep(for: .milliseconds(500))
         #expect(changes.all.isEmpty)
     }

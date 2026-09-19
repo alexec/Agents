@@ -37,7 +37,9 @@ struct StartResilienceTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the readable option came through") {
+            await core.agent(id)?.advertisedOptions.isEmpty == false
+        }
 
         let agent = await core.agent(id)
         #expect(agent != nil, "the agent started")
@@ -88,7 +90,9 @@ struct StartResilienceTests {
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go",
                                             startOptions: .init(values: ["fast": .bool(true)])))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the option was set on the runtime") {
+            await launcher.lastAgent?.setOptions.isEmpty == false
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.advertisedOptions.first?.isBoolean == true)

@@ -31,16 +31,28 @@ struct TurnUsageTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        // The meter and the turn's own total come from two different places — the
+        // meter down the session's event stream, the total off the prompt's reply —
+        // so neither one arriving says anything about the other, and the turn ending
+        // says nothing about either.
+        await eventually("both the meter and the turn's total arrived") {
+            guard let agent = await core.agent(id) else { return false }
+            return agent.usage?.used == 30360 && agent.lastTurnUsage?.totalTokens == 90229
+                && agent.costToDate["USD"] == 0.244
+        }
+        @Sendable func usagesOnTheRecord() async -> Int {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.filter {
+                if case .usageRecorded = $0.kind { return true } else { return false }
+            }.count ?? 0
+        }
+        await eventually("the turn's usage reached the record") { await usagesOnTheRecord() == 1 }
 
         let agent = await core.agent(id)
         #expect(agent?.usage?.used == 30360, "the meter follows the turn")
         #expect(agent?.lastTurnUsage?.totalTokens == 90229)
         #expect(agent?.costToDate["USD"] == 0.244)
-
-        let page = try await core.transcript(.init(agentID: id))
-        let usages = page.entries.filter { if case .usageRecorded = $0.kind { return true } else { return false } }
-        #expect(usages.count == 1, "once per turn, at the end of it")
+        #expect(await usagesOnTheRecord() == 1, "once per turn, at the end of it")
     }
 
     @Test func aRuntimeThatReportsNothingShowsNothing() async throws {
@@ -49,7 +61,10 @@ struct TurnUsageTests {
         let core = try core(FakeLauncher(), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        // An absence, so there is no value to wait for. The runtime being handed back
+        // is the latest signal there is — it is the last thing `finishTurn` does, and
+        // it ends the event stream any usage would have come down.
+        await eventually("the runtime was handed back") { await core.live[id] == nil }
 
         let agent = await core.agent(id)
         #expect(agent?.usage == nil)
@@ -67,9 +82,20 @@ struct TurnUsageTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "one"))
-        try await Task.sleep(for: .milliseconds(300))
+        // Handed back as well as finished: the second script is the second runtime's,
+        // and a prompt sent while the first session is still open never starts one.
+        await eventually("the first turn ended and its runtime went") {
+            await core.agent(id)?.state == .finished
+        }
+        await eventually("the first runtime was handed back") { await core.live[id] == nil }
         try await core.prompt(.init(agentID: id, text: "two"))
-        try await Task.sleep(for: .milliseconds(300))
+        // Both at once rather than one then the other: which currency is banked first
+        // is not something this test has an opinion about, and waiting on the wrong one
+        // would be asserting an order nothing promises.
+        await eventually("both turns were costed") {
+            let costs = await core.agent(id)?.costToDate
+            return costs?["USD"] == 1.0 && costs?["GBP"] == 2.0
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.costToDate["USD"] == 1.0)

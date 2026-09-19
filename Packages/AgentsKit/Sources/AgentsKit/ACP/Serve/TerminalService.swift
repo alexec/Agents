@@ -28,17 +28,94 @@ public actor TerminalService {
     }
 
     private final class Terminal: @unchecked Sendable {
+        /// What a read took out of the pipe, and whether that was the end of it.
+        struct Drained {
+            var text: String
+            var atEOF: Bool
+        }
+
         let process: Process
         let pipe: Pipe
-        var output = ""
-        var truncated = false
+        /// Where a chunk goes as it is read. Called on whichever thread read it, in
+        /// the order the bytes came out of the pipe.
+        let onChunk: @Sendable (String) -> Void
+
+        // The exit and the waiters belong to the actor and are only touched there.
         var exitCode: Int32?
         var signal: String?
         var waiters: [CheckedContinuation<Void, Never>] = []
 
-        init(process: Process, pipe: Pipe) {
+        /// Held across read-then-append, so the two things that read the pipe — the
+        /// readability source and the drain that runs when the process exits — cannot
+        /// interleave a command's output with itself.
+        private let readLock = NSLock()
+        /// Guards the buffer alone. Separate from `readLock` so a reader that is busy
+        /// handing a chunk to the windows never holds up an agent asking for output.
+        /// Always taken inside `readLock`, never the other way round.
+        private let bufferLock = NSLock()
+        private var buffer = ""
+        private var wasTruncated = false
+
+        init(process: Process, pipe: Pipe, onChunk: @escaping @Sendable (String) -> Void = { _ in }) {
             self.process = process
             self.pipe = pipe
+            self.onChunk = onChunk
+        }
+
+        var output: String { bufferLock.withLock { buffer } }
+        var truncated: Bool { bufferLock.withLock { wasTruncated } }
+
+        func append(_ text: String) {
+            readLock.withLock { store(text) }
+        }
+
+        /// Everything the pipe has right now, without waiting for anything.
+        ///
+        /// The fd is non-blocking, so this never waits on a write end that a
+        /// backgrounded grandchild may still be holding open: it takes what is there
+        /// and says whether it saw the end. Reading and storing happen together under
+        /// the lock, so two readers cannot put their chunks in out of order.
+        @discardableResult
+        func drain() -> Drained {
+            readLock.withLock {
+                let fd = pipe.fileHandleForReading.fileDescriptor
+                guard fd >= 0 else { return Drained(text: "", atEOF: true) }
+                var bytes = Data()
+                var atEOF = false
+                var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+                loop: while true {
+                    let count = chunk.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+                    switch count {
+                    case let n where n > 0:
+                        bytes.append(contentsOf: chunk[0 ..< n])
+                    case 0:
+                        atEOF = true
+                        break loop
+                    default:
+                        // EAGAIN is the ordinary end of a drain: the pipe is empty but
+                        // still open. Anything else is a pipe we cannot read any more.
+                        if errno == EINTR { continue }
+                        if errno != EAGAIN && errno != EWOULDBLOCK { atEOF = true }
+                        break loop
+                    }
+                }
+                guard !bytes.isEmpty else { return Drained(text: "", atEOF: atEOF) }
+                let text = String(decoding: bytes, as: UTF8.self)
+                store(text)
+                return Drained(text: text, atEOF: atEOF)
+            }
+        }
+
+        /// Call with `readLock` held.
+        private func store(_ text: String) {
+            bufferLock.withLock {
+                buffer += text
+                if buffer.utf8.count > TerminalService.outputByteLimit {
+                    buffer = String(buffer.suffix(TerminalService.outputByteLimit / 2))
+                    wasTruncated = true
+                }
+            }
+            onChunk(text)
         }
     }
 
@@ -68,14 +145,24 @@ public actor TerminalService {
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
-        let terminal = Terminal(process: process, pipe: pipe)
+        let terminal = Terminal(process: process, pipe: pipe, onChunk: onChunk(for: id))
         terminals[id] = terminal
 
-        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            let text = String(decoding: data, as: UTF8.self)
-            Task { await self?.append(text, to: id) }
+        // Non-blocking, so a drain can take what is in the pipe without ever waiting.
+        let readFD = pipe.fileHandleForReading.fileDescriptor
+        let flags = fcntl(readFD, F_GETFL)
+        if flags >= 0 { _ = fcntl(readFD, F_SETFL, flags | O_NONBLOCK) }
+
+        pipe.fileHandleForReading.readabilityHandler = { [weak terminal] handle in
+            guard let terminal else {
+                handle.readabilityHandler = nil
+                return
+            }
+            // Nothing to read is the end of the pipe, and the handler retires itself
+            // there. The exit arriving first used to cancel this handler with the
+            // command's bytes still sitting unread in the buffer, which is how a
+            // command that printed something came back empty.
+            if terminal.drain().atEOF { handle.readabilityHandler = nil }
         }
         process.terminationHandler = { [weak self] process in
             Task { await self?.finished(id, code: process.terminationStatus,
@@ -90,21 +177,25 @@ public actor TerminalService {
         return id
     }
 
-    private func append(_ text: String, to id: String) {
-        guard let terminal = terminals[id] else { return }
-        terminal.output += text
-        if terminal.output.utf8.count > Self.outputByteLimit {
-            terminal.output = String(terminal.output.suffix(Self.outputByteLimit / 2))
-            terminal.truncated = true
-        }
-        onOutput(id, text)
+    /// Bound once per terminal so the reader can hand a chunk on without hopping onto
+    /// the actor, which is what put chunks out of order and let the last one arrive
+    /// after the agent had already asked for the output.
+    private nonisolated func onChunk(for id: String) -> @Sendable (String) -> Void {
+        let onOutput = onOutput
+        return { text in onOutput(id, text) }
     }
 
     private func finished(_ id: String, code: Int32, signal: String?) {
         guard let terminal = terminals[id] else { return }
+        // Read what is left before anything is told the command is over. The exit and
+        // the last of the output race each other, and a waiter woken first would go on
+        // to read a buffer those bytes had not landed in yet.
+        let drained = terminal.drain()
         terminal.exitCode = code
         terminal.signal = signal
-        terminal.pipe.fileHandleForReading.readabilityHandler = nil
+        // Only at the end of the pipe: something the command left running behind it
+        // still holds the write end, and its output is still worth having.
+        if drained.atEOF { terminal.pipe.fileHandleForReading.readabilityHandler = nil }
         for waiter in terminal.waiters { waiter.resume() }
         terminal.waiters = []
     }
@@ -131,6 +222,9 @@ public actor TerminalService {
 
     public func release(id: String) {
         guard let terminal = terminals.removeValue(forKey: id) else { return }
+        // Letting go is the last chance this output has to reach the windows, so take
+        // what is in the pipe before the handler that would have read it is gone.
+        terminal.drain()
         terminal.pipe.fileHandleForReading.readabilityHandler = nil
         if terminal.process.isRunning { terminal.process.terminate() }
         for waiter in terminal.waiters { waiter.resume() }
@@ -153,9 +247,9 @@ public actor TerminalService {
     /// command for long enough to produce a megabyte.
     func appendForTesting(_ text: String, to id: String) {
         if terminals[id] == nil {
-            terminals[id] = Terminal(process: Process(), pipe: Pipe())
+            terminals[id] = Terminal(process: Process(), pipe: Pipe(), onChunk: onChunk(for: id))
         }
-        append(text, to: id)
+        terminals[id]?.append(text)
     }
 
     public var runningCount: Int {

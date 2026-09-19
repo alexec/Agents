@@ -60,7 +60,10 @@ struct DaemonSurvivalTests {
         #expect(await heard.value == DaemonAPI.Notification.agentChanged,
                 "the window that did nothing is told too")
 
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the other window can see it too") {
+            (try? await second.call(DaemonAPI.Method.agentsList,
+                                    ["includeArchived": true]).arrayValue?.count) == 1
+        }
         let listed = try await second.call(DaemonAPI.Method.agentsList, ["includeArchived": true])
         #expect(listed.arrayValue?.count == 1)
 
@@ -96,11 +99,17 @@ struct DaemonSurvivalTests {
                                             try JSONValue.encoding(DaemonAPI.StartRequest(
                                                 runtimeID: "grok", cwd: work, prompt: "go")))
         let agentID = UUID(uuidString: started.stringValue ?? "")
-        try await Task.sleep(for: .milliseconds(250))
+        // The question has to be waiting before the window goes, or what follows is
+        // testing a daemon that was never holding anything.
+        await eventually("the agent is waiting on its question") {
+            await daemon.daemonCore.pendingPermissionRequests().count == 1
+        }
 
         // The window goes, the way it goes when the app is force quit.
         await window.close()
-        try await Task.sleep(for: .milliseconds(250))
+        await eventually("the daemon noticed the window go") {
+            await daemon.daemonCore.connectionCount == 0
+        }
 
         let core = daemon.daemonCore
         #expect(await core.isHoldingAgents, "the agent is still there with nobody watching")

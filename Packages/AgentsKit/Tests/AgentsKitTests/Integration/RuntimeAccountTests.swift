@@ -29,7 +29,9 @@ struct RuntimeAccountTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the handshake was recorded") {
+            await core.account(for: "claude").state == .ready
+        }
 
         let account = await core.account(for: "claude")
         #expect(account.state == .ready)
@@ -101,7 +103,9 @@ struct RuntimeAccountTests {
         let core = try core(FakeLauncher(script: script), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the agent is waiting on its question") {
+            await core.agent(id)?.state == .waitingOnUser
+        }
         #expect(await core.agent(id)?.state == .waitingOnUser)
 
         let stopped = try await core.logOut(runtimeID: "claude")

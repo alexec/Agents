@@ -45,16 +45,21 @@ struct CloseOnExecTests {
         let lock = try #require(DaemonLock(at: url))
         let child = spawnSleeper()
         defer { reap(child) }
-        try await Task.sleep(for: .milliseconds(100))
-
         // The daemon is killed rather than stopped, which is the case that bites:
         // `release` unlocks before it closes, and an unlock is honoured no matter how
         // many processes hold the descriptor. A kill unlocks nothing, so the lock
         // lives exactly as long as the last process holding it — the shell.
         close(lock.descriptor)
 
-        let next = DaemonLock(at: url)
-        #expect(next != nil, "the next daemon could not take the lock: something else still holds it")
+        // Polled rather than asked once. `posix_spawn` returns as soon as the child
+        // exists, and the flag is only honoured at the `exec` after that, so there is
+        // a window in which even a correctly marked descriptor is still held by a
+        // child that has not got there yet. A shell that really did inherit it holds
+        // it for its whole `sleep`, so this still fails when the bug is back — it just
+        // takes the timeout to say so.
+        let next = await eventuallySome("the next daemon could take the lock: something else still holds it") {
+            DaemonLock(at: url)
+        }
         next?.release()
     }
 
@@ -70,13 +75,17 @@ struct CloseOnExecTests {
 
         let mine = try connect(to: url)
         defer { close(mine) }
-        try await Task.sleep(for: .milliseconds(200))
+        // `connect` returns as soon as the kernel has queued it; the server counts it
+        // when its accept loop gets round to it, which is a hand-off away.
+        await eventually("the server counted the connection") { server.connectionCount == 1 }
         #expect(server.connectionCount == 1)
 
         // A terminal is started while the window is connected, which is the ordinary
         // order of events and the one that does the damage.
         let child = spawnSleeper()
         defer { reap(child) }
+        // As above: whatever the child inherited, it inherited at the spawn. This is
+        // only here so the shell is properly up before the server goes.
         try await Task.sleep(for: .milliseconds(100))
 
         server.stop()

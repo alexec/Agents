@@ -41,7 +41,11 @@ struct ElicitationTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        // The agent's state is one of the assertions below, and it is set a beat after
+        // the form is registered, so waiting on the form alone would read it too early.
+        await eventually("the agent is waiting on its form") {
+            await core.agent(id)?.state == .waitingOnUser
+        }
 
         let waiting = await core.pendingElicitations()
         #expect(waiting.count == 1)
@@ -51,9 +55,9 @@ struct ElicitationTests {
         guard let request = waiting.first else { return }
         try await core.answerElicitation(.init(requestID: request.id, action: .accept,
                                                content: ["branch": "main"]))
-        try await Task.sleep(for: .milliseconds(300))
-
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        let answer = await eventuallySome("the agent was answered") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
         guard case .success(let result)? = answer else {
             Issue.record("the agent was not answered")
             return
@@ -95,7 +99,9 @@ struct ElicitationTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the form reached the daemon") {
+            await core.pendingElicitations().isEmpty == false
+        }
 
         guard let request = await core.pendingElicitations().first else {
             Issue.record("the question never reached anybody")
@@ -119,9 +125,9 @@ struct ElicitationTests {
         try await core.answerElicitation(.init(requestID: request.id, action: .accept,
                                                content: ["question_0": "Keep them",
                                                          "question_1": .array(["Update CLAUDE.md"])]))
-        try await Task.sleep(for: .milliseconds(300))
-
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        let answer = await eventuallySome("the agent was answered") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
         guard case .success(let result)? = answer else {
             Issue.record("the agent was not answered")
             return
@@ -138,7 +144,9 @@ struct ElicitationTests {
         let core = try core(FakeLauncher(script: script, capabilities: serving), locations: locations)
 
         _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the form reached the daemon") {
+            await core.pendingElicitations().isEmpty == false
+        }
         guard let request = await core.pendingElicitations().first else {
             Issue.record("expected a form")
             return
@@ -158,15 +166,18 @@ struct ElicitationTests {
         let core = try core(launcher, locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the form reached the daemon") {
+            await core.pendingElicitations().isEmpty == false
+        }
         guard let request = await core.pendingElicitations().first else {
             Issue.record("expected a form")
             return
         }
         try await core.answerElicitation(.init(requestID: request.id, action: .decline))
-        try await Task.sleep(for: .milliseconds(300))
-
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        let answer = await eventuallySome("the agent was answered") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
+        await eventually("the turn ran on to its end") { await core.agent(id)?.state == .finished }
         guard case .success(let result)? = answer else {
             Issue.record("the agent was not answered")
             return
@@ -186,10 +197,11 @@ struct ElicitationTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        let answer = await eventuallySome("the agent was answered") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
 
         #expect(await core.pendingElicitations().isEmpty, "nobody is asked something we cannot draw")
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
         guard case .success(let result)? = answer else {
             Issue.record("the agent was not answered")
             return
@@ -204,11 +216,15 @@ struct ElicitationTests {
         let core = try core(FakeLauncher(script: script, capabilities: serving), locations: locations)
 
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
+        await eventually("the form reached the daemon") {
+            await core.pendingElicitations().isEmpty == false
+        }
         #expect(await core.pendingElicitations().count == 1)
 
         try await core.stop(id)
-        try await Task.sleep(for: .milliseconds(200))
+        await eventually("the form went with the agent") {
+            await core.pendingElicitations().isEmpty
+        }
         #expect(await core.pendingElicitations().isEmpty)
     }
 
@@ -220,9 +236,9 @@ struct ElicitationTests {
         let core = try core(launcher, locations: locations)
 
         _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
-        try await Task.sleep(for: .milliseconds(300))
-
-        let answer = await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        let answer = await eventuallySome("the agent was answered") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
         guard case .failure(let error)? = answer else {
             Issue.record("expected a refusal")
             return
