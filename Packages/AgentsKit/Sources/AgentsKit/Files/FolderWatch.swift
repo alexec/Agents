@@ -31,14 +31,25 @@ public final class FolderWatch: @unchecked Sendable {
             },
             copyDescription: nil)
 
+        // `paths` is whatever the flags below asked for. With `UseCFTypes` it is a
+        // CFArray of CFStrings, which is why this may be read as an `NSArray`.
+        //
+        // Without that flag it is a plain C `char **`, and reading it as an object
+        // sends messages to the bytes of a path. That crashed the app on the first
+        // event, with a pointer made of the ASCII in a filename. The flag and this cast
+        // belong together; changing one means changing the other.
         let callback: FSEventStreamCallback = { _, info, count, paths, _, _ in
             guard let info else { return }
             let watch = Unmanaged<FolderWatch>.fromOpaque(info).takeUnretainedValue()
-            let array = unsafeBitCast(paths, to: NSArray.self)
+            guard let array = unsafeBitCast(paths, to: NSArray.self) as? [String] else { return }
+            // One callback names the same directory many times: 500 files written into
+            // one folder arrived as 19 callbacks carrying 501 entries between them. The
+            // pane re-reads a directory once however often it is named, so the repeats
+            // are pure waste and go here rather than in every caller.
+            var seen = Set<String>()
             var changed: [URL] = []
-            changed.reserveCapacity(count)
-            for index in 0..<count {
-                guard let path = array[index] as? String else { continue }
+            changed.reserveCapacity(min(count, array.count))
+            for path in array where seen.insert(path).inserted {
                 changed.append(URL(filePath: path))
             }
             guard !changed.isEmpty else { return }
@@ -52,9 +63,14 @@ public final class FolderWatch: @unchecked Sendable {
             [root.path] as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             Self.coalescingInterval,
+            // UseCFTypes makes `paths` a CFArray of CFStrings instead of a C `char **`,
+            // which is what the callback above reads. Not optional: see the note there.
+            //
             // FileEvents would give us paths rather than directories and take the
             // coalescing away with them. Directory granularity is the point.
-            FSEventStreamCreateFlags(kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagWatchRoot))
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes
+                                     | kFSEventStreamCreateFlagNoDefer
+                                     | kFSEventStreamCreateFlagWatchRoot))
 
         guard let stream else {
             // Nothing to release: the context's retain never happened.
