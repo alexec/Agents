@@ -69,10 +69,45 @@ struct ProjectAgentsView: View {
                     .lineLimit(1)
                     .help(summary.folder.path)
             }
+            if let summary, let spent = spent(summary) {
+                Text(spent)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(spentInWords)
+                    .accessibilityLabel(spentInWords)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Self.gutter)
         .padding(.top, 28)
+    }
+
+    /// What this project has cost, or nothing at all.
+    ///
+    /// `Cost.total(of:)` returns nil when nothing has been spent, and nothing is what
+    /// is drawn then — a zero would be a claim, and the app has not made one. The
+    /// period is named because the sidebar's money line is about this sitting and this
+    /// one is about the whole life of the work; a bare figure could be mistaken for it.
+    private func spent(_ summary: DaemonAPI.ProjectSummary) -> String? {
+        guard let total = Cost.total(of: summary.costToDate) else { return nil }
+        guard summary.unmeasuredAgents > 0 else { return "\(total) all time" }
+        let chats = summary.unmeasuredAgents == 1 ? "1 chat" : "\(summary.unmeasuredAgents) chats"
+        return "\(total) all time · at least, \(chats) went unpriced"
+    }
+
+    /// Said in words, because a caption under a name is not something VoiceOver
+    /// announces as being about money at all.
+    private var spentInWords: String {
+        guard let summary, summary.unmeasuredAgents > 0 else {
+            return "What this project has cost in total, across every chat in it including archived ones."
+        }
+        let chats = summary.unmeasuredAgents == 1 ? "chat" : "chats"
+        return """
+            What this project has cost in total, across every chat in it including \
+            archived ones. It is a floor rather than the whole: \
+            \(summary.unmeasuredAgents) \(chats) ran on a runtime that reported no price.
+            """
     }
 
     /// Everything working on this project, each one a card you can go into.

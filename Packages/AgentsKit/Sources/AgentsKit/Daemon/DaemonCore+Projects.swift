@@ -36,14 +36,29 @@ extension DaemonCore {
         return projects.map { project in
             let inFolder = agentsByFolder[project.folder] ?? []
             var counts: [AgentGroup: Int] = [:]
-            for agent in inFolder { counts[agent.group, default: 0] += 1 }
+            // What the folder has cost, over the whole life of everything in it.
+            // Nothing filters by state, group or archived flag: the daemon holds every
+            // agent there has ever been, and counting all of them is exactly what makes
+            // archiving one change no total. Per currency, because adding two of them
+            // would be a number nobody could check.
+            var costToDate: [String: Decimal] = [:]
+            var unmeasured = 0
+            for agent in inFolder {
+                counts[agent.group, default: 0] += 1
+                for (currency, amount) in agent.costToDate {
+                    costToDate[currency, default: 0] += amount
+                }
+                if agent.isUnmeasured { unmeasured += 1 }
+            }
             let newest = inFolder.map(\.lastActivityAt).max() ?? project.addedAt
             return DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
                 exists: Self.isDirectory(project.folder),
                 lastActivityAt: newest,
-                counts: counts)
+                counts: counts,
+                costToDate: costToDate,
+                unmeasuredAgents: unmeasured)
         }
         .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }

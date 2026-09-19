@@ -165,20 +165,31 @@ private struct RuntimeMissingLine: View {
 /// here: two currencies read as two numbers rather than one nobody could check.
 private struct SessionSpend: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         if let spend = Cost.total(of: model.sessionCost) {
-            HStack {
-                Text("This session")
-                Spacer()
-                Text(spend).monospacedDigit()
+            // The way into Spending. A line that already shows money is the one place
+            // somebody will look for more of it, so this is a button rather than a
+            // second affordance in a column that is not about money — and `.plain`
+            // keeps it reading as the status line it was rather than growing chrome.
+            Button {
+                openWindow(id: "spending")
+            } label: {
+                HStack {
+                    Text("This session")
+                    Spacer()
+                    Text(spend).monospacedDigit()
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .buttonStyle(.plain)
             .background(.bar)
-            .help("What every agent has cost since this window opened")
+            .help("What every agent has cost since this window opened. Opens Spending.")
         }
     }
 }
