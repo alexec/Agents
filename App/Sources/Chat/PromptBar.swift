@@ -23,7 +23,7 @@ struct PromptBar: View {
                 options
             }
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 48)
         .padding(.vertical, 20)
         .onChange(of: model.selection) { text = "" }
         .onAppear { prepare() }
