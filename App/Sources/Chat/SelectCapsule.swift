@@ -2,12 +2,9 @@ import SwiftUI
 
 /// A select, drawn as a glass capsule.
 ///
-/// Closed, it reads as the chosen value, because that is what you want to see at a
-/// glance. Open, it reads as the name of the setting, because that is the question you
-/// are answering. The name is also the tooltip, for when neither is enough.
-///
-/// Built from a button and a popover rather than from `Menu`, so the label can change
-/// while it is open.
+/// It reads as the chosen value, open or closed, because that is what you want to see
+/// at a glance and a control that changes its own label is a control that moves. The
+/// name of the setting is at the top of the list, and in the tooltip.
 struct SelectCapsule<Content: View>: View {
     let name: String
     let title: String
@@ -20,7 +17,7 @@ struct SelectCapsule<Content: View>: View {
             isOpen = true
         } label: {
             HStack(spacing: 4) {
-                Text(isOpen ? name : title)
+                Text(title)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -35,6 +32,12 @@ struct SelectCapsule<Content: View>: View {
         .help(name)
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
+                Text(name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
                 choices { isOpen = false }
             }
             .padding(6)
