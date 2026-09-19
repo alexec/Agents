@@ -28,6 +28,14 @@ public actor DaemonCore {
     /// The two facts about a project that its folder cannot tell us. Everything else
     /// about a project is derived from the agents in it.
     lazy var projectStore = ProjectStore(locations: locations)
+    /// Lead tool calls waiting on the user's answer. The question is an ordinary
+    /// permission question; what is different is that we are the one waiting for it,
+    /// rather than a runtime.
+    var leadPermissionWaiters: [UUID: CheckedContinuation<String, Never>] = [:]
+    /// The "always" answers, per project and per tool, for as long as this daemon
+    /// lives. Not written down: an answer that outlives the session it was given in is
+    /// a bigger promise than the question asked for.
+    var leadAlwaysAllowed: Set<LeadAlwaysKey> = []
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]

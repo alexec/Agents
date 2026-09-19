@@ -23,6 +23,14 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(
                     allProjects(includeArchived: request.includeArchived)))
 
+            case DaemonAPI.Method.agentsIsLead:
+                let request = try require(params, as: DaemonAPI.LeadToolRequest.self)
+                return .success(["isLead": .bool(isLead(token: request.token))])
+
+            case DaemonAPI.Method.agentsLeadTool:
+                let request = try require(params, as: DaemonAPI.LeadToolRequest.self)
+                return .success(["note": .string(try await callLeadTool(request))])
+
             case DaemonAPI.Method.projectsAdd:
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await addProject(request.folder)))

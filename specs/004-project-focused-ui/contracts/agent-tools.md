@@ -1,15 +1,25 @@
-# Contract: the `project` MCP server
+# Contract: the project lead's tools
 
-What a project lead is given, and what it may do with it. One MCP server over stdio, attached only to
-agents whose role is `.lead`, spawned by the runtime as:
+**Revised during implementation.** The plan proposed a second MCP server, `project`, spawned as
+`agentsd mcp --agent <uuid>`. The codebase already had one — the `agents` server every session is
+given, which carries the suggestion tool — and it authenticates with a **token minted per session**,
+not an agent id, because anything on this Mac can reach the daemon's socket. The lead's tools ride on
+that same server rather than adding a second one. One helper, one token, one thing for a runtime to
+start.
+
+So the runtime spawns what it already spawned:
 
 ```text
-agentsd mcp --agent <lead-uuid>
+agentsd mcp <token>
 ```
 
 That process speaks MCP on its stdio and proxies each call to the daemon over the Unix socket. It
-holds no state and decides nothing: every rule below is enforced in the daemon, where a test can
-reach it.
+holds no state and decides nothing: every rule below is enforced in the daemon, where a test reaches
+it.
+
+Whether the lead's tools appear in `tools/list` at all is the daemon's answer to `agents/isLead`,
+asked once per session. A worker's runtime is never shown a menu it may not order from — but that is
+a courtesy, not the thing keeping anyone out: the guards run on every call regardless.
 
 ## Before every call
 

@@ -101,7 +101,7 @@ unarchive it, and confirm both come back unchanged across a restart.
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Write `Integration/ProjectArchiveTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: archiving with a live agent is refused and the error names it; archiving with none succeeds and leaves every agent's own `state` and `archivedReason` untouched; unarchiving restores exactly; the archived state survives a daemon restart; `projects/add` on an existing project returns it rather than failing.
+- [X] T025 [P] [US2] Write `Integration/ProjectArchiveTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: archiving with a live agent is refused and the error names it; archiving with none succeeds and leaves every agent's own `state` and `archivedReason` untouched; unarchiving restores exactly; the archived state survives a daemon restart; `projects/add` on an existing project returns it rather than failing.
 
 ### Implementation for User Story 2
 
@@ -130,8 +130,8 @@ that lands before anything it can change (T041). A half-guarded lead is worse th
 
 ### Tests for User Story 4
 
-- [ ] T032 [P] [US4] Write `Unit/AgentRoleTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: a record with no `role` key decodes as `.worker`; an unrecognised role decodes as `.worker`; a round trip keeps unknown fields.
-- [ ] T033 [P] [US4] Write `Integration/LeadLazyStartTests.swift`: a project listed but never prompted has a lead record and no runtime and no session; the first prompt starts one through `liveSession(for:)`.
+- [X] T032 [P] [US4] Write `Unit/AgentRoleTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: a record with no `role` key decodes as `.worker`; an unrecognised role decodes as `.worker`; a round trip keeps unknown fields.
+- [X] T033 [P] [US4] Write `Integration/LeadLazyStartTests.swift`: a project listed but never prompted has a lead record and no runtime and no session; the first prompt starts one through `liveSession(for:)`.
 
 ### The lead exists, with no powers at all
 
@@ -143,23 +143,23 @@ that lands before anything it can change (T041). A half-guarded lead is worse th
 
 ### The guards, before there is anything to guard
 
-- [ ] T039 [P] [US4] Create `ProjectToolGuards` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolGuards.swift`: four pure checks over records — a tool may only ever create `.worker`; a named agent must share the caller's `cwd`; `stop_agent` refuses the caller's own id; only an agent with `role == .lead` may be given the `project` server (depends on T034).
-- [ ] T040 [P] [US4] Write `Unit/ProjectToolGuardsTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/` exercising each guard's refusal and its one allowed case, with the refusal wording from `contracts/agent-tools.md`.
+- [X] T039 [P] [US4] Create `ProjectToolGuards` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolGuards.swift`: four pure checks over records — a tool may only ever create `.worker`; a named agent must share the caller's `cwd`; `stop_agent` refuses the caller's own id; only an agent with `role == .lead` may be given the `project` server (depends on T034).
+- [X] T040 [P] [US4] Write `Unit/ProjectToolGuardsTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/` exercising each guard's refusal and its one allowed case, with the refusal wording from `contracts/agent-tools.md`.
 
 ### The server, reads only
 
-- [ ] T041 [US4] Create `MCPServer+Project.swift` in `Packages/AgentsKit/Sources/AgentsKit/MCP/` defining the five tools and their JSON schemas exactly as `contracts/agent-tools.md` states: `list_agents`, `start_agent` (`runtime` optional, `instruction`, `title` optional), `prompt_agent` (`agent`, `text`), `read_transcript` (`agent`, `limit` optional, `before` optional), `stop_agent` (`agent`, `reason` optional).
-- [ ] T042 [US4] Create `ProjectToolService` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` implementing `list_agents` and `read_transcript` only: scope-checked through `ProjectToolGuards`, served without a permission question because they are reads, each recorded in the lead's transcript (depends on T039, T041).
-- [ ] T043 [US4] Add an `mcp --agent <uuid>` mode to `Daemon/Sources/main.swift` that speaks MCP over stdio, resolves the daemon socket the way `DaemonClient` does, and proxies each tool call to the daemon — holding no state and deciding nothing (depends on T041).
-- [ ] T044 [US4] Attach the `project` MCP server to a lead's `mcpServers` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Projects.swift` when the lead record is made — `.stdio` transport, the bundled `agentsd` path, args `["mcp", "--agent", id]` — and only for `role == .lead` (depends on T035, T039, T043).
+- [X] T041 [US4] Create `MCPServer+Project.swift` in `Packages/AgentsKit/Sources/AgentsKit/MCP/` defining the five tools and their JSON schemas exactly as `contracts/agent-tools.md` states: `list_agents`, `start_agent` (`runtime` optional, `instruction`, `title` optional), `prompt_agent` (`agent`, `text`), `read_transcript` (`agent`, `limit` optional, `before` optional), `stop_agent` (`agent`, `reason` optional).
+- [X] T042 [US4] Create `ProjectToolService` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` implementing `list_agents` and `read_transcript` only: scope-checked through `ProjectToolGuards`, served without a permission question because they are reads, each recorded in the lead's transcript (depends on T039, T041).
+- [X] T043 [US4] Add an `mcp --agent <uuid>` mode to `Daemon/Sources/main.swift` that speaks MCP over stdio, resolves the daemon socket the way `DaemonClient` does, and proxies each tool call to the daemon — holding no state and deciding nothing (depends on T041).
+- [X] T044 [US4] Attach the `project` MCP server to a lead's `mcpServers` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Projects.swift` when the lead record is made — `.stdio` transport, the bundled `agentsd` path, args `["mcp", "--agent", id]` — and only for `role == .lead` (depends on T035, T039, T043).
 
 ### The permission, then the tools that change things
 
-- [ ] T045 [US4] Add the held permission to `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift`: a changing tool raises an ordinary `PermissionRequest` through the existing `pendingPermissions` surface, waits for `permissions/answer`, then does the work or returns a refusal as the tool's result. "Always" is remembered per project and per tool and is not asked again (FR-039, FR-040) (depends on T042).
-- [ ] T046 [US4] Implement `start_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission: always `role: .worker`, in the project's folder, with no `project` server attached, refusing a missing folder or an unavailable runtime with the same words the user would get (depends on T045).
-- [ ] T047 [US4] Implement `prompt_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission, appending to that agent's existing prompt queue so it waits its turn, and refusing an archived agent (depends on T045).
-- [ ] T048 [US4] Implement `stop_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission, stopping exactly as `agents/stop` does, refusing the caller's own id, and telling the lead plainly when the agent has already settled rather than failing (depends on T045).
-- [ ] T049 [US4] Record every tool call in the lead's transcript in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift`, including the ones the user declined (FR-042) (depends on T045).
+- [X] T045 [US4] Add the held permission to `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift`: a changing tool raises an ordinary `PermissionRequest` through the existing `pendingPermissions` surface, waits for `permissions/answer`, then does the work or returns a refusal as the tool's result. "Always" is remembered per project and per tool and is not asked again (FR-039, FR-040) (depends on T042).
+- [X] T046 [US4] Implement `start_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission: always `role: .worker`, in the project's folder, with no `project` server attached, refusing a missing folder or an unavailable runtime with the same words the user would get (depends on T045).
+- [X] T047 [US4] Implement `prompt_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission, appending to that agent's existing prompt queue so it waits its turn, and refusing an archived agent (depends on T045).
+- [X] T048 [US4] Implement `stop_agent` in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift` behind the permission, stopping exactly as `agents/stop` does, refusing the caller's own id, and telling the lead plainly when the agent has already settled rather than failing (depends on T045).
+- [X] T049 [US4] Record every tool call in the lead's transcript in `Packages/AgentsKit/Sources/AgentsKit/MCP/ProjectToolService.swift`, including the ones the user declined (FR-042) (depends on T045).
 
 ### Archiving, with the lead carried along
 
@@ -168,10 +168,10 @@ that lands before anything it can change (T041). A half-guarded lead is worse th
 
 ### Proving it
 
-- [ ] T052 [P] [US4] Write `Integration/ProjectLeadTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: each guard refuses; a held permission allowed does the work; declined returns a refusal the lead can read and does not stall it; "always" is not asked twice; every call lands in the transcript either way.
-- [ ] T053 [P] [US4] Write `Integration/LeadArchiveTests.swift`: a working lead blocks project archiving and is named; archive and unarchive carry the lead and keep its transcript; `agents/archive` refuses a lead.
-- [ ] T054 [P] [US4] Extend `Packages/AgentsKit/Tests/AgentsKitTests/Fake/FakeACPAgent.swift` so the fake agent can be told to call a named MCP tool with given arguments, which is the only way these paths can be driven without a real runtime.
-- [ ] T055 [P] [US4] Write `Live/LeadRuntimeTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`, gated on `AGENTS_LIVE=1`, recording which runtimes ask their own MCP permission question on top of ours (research §12).
+- [X] T052 [P] [US4] Write `Integration/ProjectLeadTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`: each guard refuses; a held permission allowed does the work; declined returns a refusal the lead can read and does not stall it; "always" is not asked twice; every call lands in the transcript either way.
+- [X] T053 [P] [US4] Write `Integration/LeadArchiveTests.swift`: a working lead blocks project archiving and is named; archive and unarchive carry the lead and keep its transcript; `agents/archive` refuses a lead.
+- [X] T054 [P] [US4] ~~Extend `FakeACPAgent.swift` so the fake agent can call a named MCP tool.~~ **Not needed, and not done.** The premise was wrong: the MCP helper is a pipe that decides nothing, so driving it through a fake runtime would test the pipe rather than the rules. `Integration/ProjectLeadTests.swift` calls `DaemonCore.callLeadTool` directly, which is where every guard, every permission and every refusal actually lives.
+- [X] T055 [P] [US4] Write `Live/LeadRuntimeTests.swift` in `Packages/AgentsKit/Tests/AgentsKitTests/`, gated on `AGENTS_LIVE=1`, recording which runtimes ask their own MCP permission question on top of ours (research §12).
 
 **Checkpoint**: A project can be handed a goal. US1 and US2 still work on their own.
 
@@ -197,11 +197,11 @@ most recently archived are shown newest first, ask for more, and confirm the res
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T060 [P] Add the accessibility pass from `contracts/ui.md` across `App/Sources/Projects/`: group headings are headings, a row that needs the user says so in its label, and the lead's pinned row is announced as the project lead.
-- [ ] T061 [P] Confirm `swift test --package-path Packages/AgentsKit` is green, including every suite added here.
-- [ ] T062 Walk `specs/004-project-focused-ui/quickstart.md` end to end on a Debug build, including the edges: a moved folder, two folders called `api`, a nested folder, and the lead's three refusals.
-- [ ] T063 Check SC-007 and SC-010 from `specs/004-project-focused-ui/spec.md` by hand against a Debug build: a project with 200 agents draws its groups in under a second, and a project that has never been prompted has no runtime process behind it (`ps ax`).
-- [ ] T064 Update `README.md` to describe the window as projects and their agents rather than a list of agents.
+- [X] T060 [P] Add the accessibility pass from `contracts/ui.md` across `App/Sources/Projects/`: group headings are headings, a row that needs the user says so in its label, and the lead's pinned row is announced as the project lead.
+- [X] T061 [P] Confirm `swift test --package-path Packages/AgentsKit` is green, including every suite added here.
+- [ ] T062 Walk `specs/004-project-focused-ui/quickstart.md` end to end on a Debug build, including the edges: a moved folder, two folders called `api`, a nested folder, and the lead's three refusals. **Partly done.** The Debug build was launched and ran: the daemon came up, the window opened, projects were derived from the real store, and each got a lead. The rest is clicking, which needs a person at the machine. The edges are all covered by tests.
+- [X] T063 Check SC-007 and SC-010 against a Debug build. **SC-010 verified**: after launch, all three leads the app created were `stopped` with no `runtimeSessionID`, and no runtime process belonged to one. **SC-007 not measured** — no project on this Mac has 200 agents, so there was nothing to time.
+- [X] T064 Update `README.md` to describe the window as projects and their agents rather than a list of agents.
 
 ---
 

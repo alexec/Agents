@@ -444,7 +444,11 @@ extension DaemonCore {
                                message: "That question has already been answered.")
         }
         let name = pending.request.options.first { $0.optionID == request.optionID }?.name
-        if let session = live[pending.agentID] {
+        // A question the daemon asked on its own behalf — a lead wanting to touch
+        // another agent — is answered by letting that call go on, not by telling a
+        // runtime. Everything below still happens: the record, the state, the windows.
+        let wasOurs = resumeLeadPermission(request.permissionID, optionID: request.optionID)
+        if !wasOurs, let session = live[pending.agentID] {
             await session.answerPermission(id: pending.request.id, optionID: request.optionID)
         }
         await record(.permissionAnswered(optionID: request.optionID, optionName: name), for: pending.agentID)

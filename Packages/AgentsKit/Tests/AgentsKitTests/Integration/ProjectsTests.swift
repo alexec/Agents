@@ -180,6 +180,68 @@ struct ProjectsTests {
         }
     }
 
+    @Test func archivingIsRememberedAcrossARestart() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let before = try await core(locations, seeded: [agent(in: work, title: "Done")])
+        _ = try await before.archiveProject(work)
+
+        // A second core over the same files is what a restart is.
+        let restarted = try await core(locations)
+        let project = await restarted.allProjects().first
+        #expect(project?.project.isArchived == true)
+        #expect(project?.project.archivedAt != nil)
+    }
+
+    @Test func anArchivedProjectIsLeftOutWhenItIsNotWanted() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let core = try await core(locations, seeded: [agent(in: work, title: "Done")])
+        _ = try await core.archiveProject(work)
+
+        #expect(await core.allProjects(includeArchived: false).isEmpty)
+        #expect(await core.allProjects(includeArchived: true).count == 1)
+    }
+
+    @Test func unarchivingBringsItBackUnchanged() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Done"),
+            agent(in: work, title: "Stopped", state: .stopped),
+        ])
+
+        _ = try await core.archiveProject(work)
+        _ = try await core.unarchiveProject(work)
+
+        let project = try #require(await core.allProjects().first)
+        #expect(project.project.isArchived == false)
+        #expect(project.counts[.completed] == 2, "its agents were never touched")
+    }
+
+    @Test func unarchivingSomethingThatIsNotArchivedIsRefused() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let core = try await core(locations, seeded: [agent(in: work, title: "Done")])
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.unarchiveProject(work)
+        }
+    }
+
+    @Test func aProjectWhoseFolderWentCanStillBeUnarchived() async throws {
+        // The agents and their transcripts are the point; `exists` says the rest.
+        let (locations, root) = try temporary()
+        let work = try folder(root, "gone")
+        let core = try await core(locations, seeded: [agent(in: work, title: "Done")])
+        _ = try await core.archiveProject(work)
+        try FileManager.default.removeItem(at: work)
+
+        let back = try await core.unarchiveProject(work)
+        #expect(back.project.isArchived == false)
+        #expect(back.exists == false)
+    }
+
     @Test func aTrailingSlashDoesNotMakeASecondProject() async throws {
         let (locations, root) = try temporary()
         let work = try folder(root, "api")

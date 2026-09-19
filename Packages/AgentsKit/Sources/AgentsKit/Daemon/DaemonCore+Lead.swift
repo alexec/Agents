@@ -75,6 +75,27 @@ extension DaemonCore {
     }
 }
 
+// MARK: Seams for the tests
+
+/// The lead's paths cannot be driven by a runtime on this Mac — no runtime calls these
+/// tools unprompted — so the tests reach them directly. Both of these do what a real
+/// session does, in one step instead of several.
+extension DaemonCore {
+    /// Mint and bind a token the way making a session does.
+    func bindTokenForTesting(to agentID: UUID) -> String {
+        let token = mintSuggestionToken()
+        bindSuggestionToken(token, to: agentID)
+        return token
+    }
+
+    /// Put an agent in a state without a runtime having to get it there.
+    func setStateForTesting(_ agentID: UUID, _ state: AgentState) {
+        guard var agent = agents[agentID] else { return }
+        agent.state = state
+        agents[agentID] = agent
+    }
+}
+
 /// The four rules that keep a lead inside its own project.
 ///
 /// Pure functions over records, so they are exhaustible by a test and cannot be

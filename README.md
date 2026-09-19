@@ -2,6 +2,12 @@
 
 A Mac app, rebuilt one feature at a time against a written spec.
 
+The window is a list of the projects you work in — a project is a folder, named by that
+folder — with that project's agents beside it in three groups: what needs you, what is
+working, what is done. Each project also has a lead: one agent whose job is the project
+rather than a task, which can start the others, brief them, read how they got on, and
+stop one that has gone wrong, asking you before each move.
+
 ## Build and run
 
 ```sh
@@ -40,6 +46,7 @@ ls ~/Library/Application\ Support/Agents/
 #   daemon.log    what it has been doing
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
+#   projects.json                   only what a folder cannot tell us: archived, added
 
 # By hand, without the app
 ./build/DD/Build/Products/Debug/Agents.app/Contents/Helpers/agentsd

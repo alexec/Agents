@@ -92,12 +92,13 @@ is what makes FR-016 true in a window that is looking at a different project.
 
 ## Failure codes
 
-Two added to `DaemonAPI.Failure`, continuing the block that ends at `-32010`:
+Two added to `DaemonAPI.Failure`. The block did not end at `-32010` after all — `shellNotLive` had
+taken `-32011` — so these continue after it:
 
 | Code | Name | When |
 |---|---|---|
-| `-32011` | `noSuchProject` | A folder that is not a project, on archive or unarchive. |
-| `-32012` | `projectHasLiveAgents` | Archiving a project with a running or waiting agent. |
+| `-32012` | `noSuchProject` | A folder that is not a project, on archive or unarchive. |
+| `-32013` | `projectHasLiveAgents` | Archiving a project with a running or waiting agent. |
 
 `folderGone` (`-32004`) is reused for a missing directory rather than a new code being minted: it
 already means exactly that, and `agents/start` already throws it

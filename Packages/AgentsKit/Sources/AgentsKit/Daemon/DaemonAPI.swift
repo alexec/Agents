@@ -27,6 +27,12 @@ public enum DaemonAPI {
         /// Not the app's to call. This is how the MCP server we hand to every agent
         /// gets what the agent passed it back to the agent's own record.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
+        /// Also not the app's to call. How a project lead's tool call, arriving on the
+        /// same MCP server, reaches the agents it is allowed to work with.
+        public static let agentsLeadTool = "agents/leadTool"
+        /// Whether the agent behind a token leads a project, and so whether the helper
+        /// may offer the lead's tools at all.
+        public static let agentsIsLead = "agents/isLead"
         // A project is a folder. These four are everything that can be done to one,
         // which is to say: notice it, and put it away.
         public static let projectsList = "projects/list"
@@ -81,6 +87,38 @@ public enum DaemonAPI {
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+        }
+    }
+
+    /// What the MCP helper sends when a project lead calls one of its tools.
+    ///
+    /// The token, not an agent id, for the same reason the suggestion tool uses one:
+    /// the helper is a process the runtime started, anything on this Mac can reach the
+    /// daemon's socket, and a token minted for one session is the only thing that says
+    /// which agent is calling.
+    public struct LeadToolRequest: Codable, Sendable {
+        public var token: String
+        public var tool: String
+        /// The agent being worked with, for the tools that name one.
+        public var agentID: UUID?
+        /// The instruction for `start_agent`, or the words for `prompt_agent`.
+        public var text: String?
+        public var title: String?
+        public var runtimeID: String?
+        public var limit: Int?
+        public var before: Int?
+
+        public init(token: String, tool: String, agentID: UUID? = nil, text: String? = nil,
+                    title: String? = nil, runtimeID: String? = nil,
+                    limit: Int? = nil, before: Int? = nil) {
+            self.token = token
+            self.tool = tool
+            self.agentID = agentID
+            self.text = text
+            self.title = title
+            self.runtimeID = runtimeID
+            self.limit = limit
+            self.before = before
         }
     }
 

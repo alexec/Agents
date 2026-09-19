@@ -12,7 +12,47 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     let token = CommandLine.arguments[2]
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: DaemonCore.helperLocations)
-    let service = SuggestionService(transport: FDTransport(readFD: 0, writeFD: 1)) { prompts in
+    // Whether this session's agent leads a project, which decides whether the lead's
+    // tools are on the menu at all. Asked of the daemon, because a helper is a process
+    // anything on this Mac could start: it is told what it may offer.
+    let isLead: @Sendable () async -> Bool = {
+        do {
+            try await client.connect(startIfNeeded: false)
+            let result = try await client.call(DaemonAPI.Method.agentsIsLead,
+                                               DaemonAPI.LeadToolRequest(token: token, tool: ""))
+            await client.disconnect()
+            return result["isLead"]?.boolValue ?? false
+        } catch {
+            return false
+        }
+    }
+
+    // One of the project lead's tools. Everything it is allowed to do, and every
+    // question the person is asked first, is decided in the daemon.
+    let leadSink: SuggestionService.LeadSink = { tool, arguments in
+        do {
+            try await client.connect(startIfNeeded: false)
+            let request = DaemonAPI.LeadToolRequest(
+                token: token,
+                tool: tool,
+                agentID: arguments?["agent"]?.stringValue.flatMap(UUID.init(uuidString:)),
+                text: arguments?["text"]?.stringValue ?? arguments?["instruction"]?.stringValue,
+                title: arguments?["title"]?.stringValue,
+                runtimeID: arguments?["runtime"]?.stringValue,
+                limit: arguments?["limit"]?.intValue)
+            let result = try await client.call(DaemonAPI.Method.agentsLeadTool, request)
+            await client.disconnect()
+            return .shown(result["note"]?.stringValue ?? "Done.")
+        } catch let error as JSONRPCError {
+            return .refused(error.message)
+        } catch {
+            return .refused("The app is not running, so nothing happened.")
+        }
+    }
+
+    let service = SuggestionService(transport: FDTransport(readFD: 0, writeFD: 1),
+                                    isLead: isLead,
+                                    leadSink: leadSink) { prompts in
         do {
             // Never started here. If no daemon is answering there is no window to show
             // a suggestion in, and starting one from inside a runtime's own child
