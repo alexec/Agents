@@ -90,6 +90,7 @@ struct ProjectAgentsView: View {
                             AgentCard(id: agent.id, selection: $selection) {
                                 AgentRow(agent: agent)
                             }
+                            .swipeToArchive { await model.archive(agent.id) }
                         }
                     }
                 }
@@ -139,13 +140,17 @@ struct ProjectAgentsView: View {
                         .buttonStyle(.glass)
                 }
             }
+            // A link, not a button: putting the archive away again is an aside, and
+            // the buttons on this page are for the work.
             Button("Hide archived") { showsArchived = false }
-                .buttonStyle(.glass)
-                .padding(.top, 2)
+                .buttonStyle(.link)
+                .font(.callout)
+                .padding(.top, 6)
         } else if folder != nil, !archived.isEmpty {
             Button("Show archived (\(archived.count))") { showsArchived = true }
-                .buttonStyle(.glass)
-                .padding(.top, 8)
+                .buttonStyle(.link)
+                .font(.callout)
+                .padding(.top, 10)
         }
     }
 }
