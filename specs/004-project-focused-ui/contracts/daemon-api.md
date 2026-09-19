@@ -19,13 +19,23 @@ disambiguated across the whole returned set and `exists` stamped at call time.
     "name": "api",
     "exists": true,
     "lastActivityAt": "2026-09-18T14:02:11.004Z",
-    "counts": { "needsInput": 1, "working": 2, "completed": 7, "archived": 12 }
+    "counts": { "needsInput": 1, "working": 2, "completed": 7, "archived": 12 },
+    "leadID": "6B1C9E2A-6C1E-4E2E-9E6B-2A6C1E4E2E9E",
+    "leadNeedsInput": false
   }
 ]
 ```
 
 The list is the union of every distinct agent `cwd` and every stored record (research §1). A folder
 with agents and no record appears with `addedAt` equal to its oldest agent's `createdAt`.
+
+`counts` covers workers only; the lead is reported separately by `leadID` and `leadNeedsInput`,
+because it sits in no group (FR-043).
+
+**Side effect, and the only one in this contract**: a project with no lead gets one here — an agent
+record with `role: .lead`, no runtime session, nothing spent. This is the one call every window makes,
+so it is the one place that can promise FR-035 (research §13). It broadcasts `agent/changed` for the
+new lead like any other agent appearing.
 
 ### `projects/add`
 
@@ -47,12 +57,16 @@ the user just picked it.
 
 **Returns**: the `ProjectSummary`, now archived.
 
-**Fails**: `projectHasLiveAgents` when any agent in the folder is `running` or `waitingOnUser`. The
-message names them: *"Stop these first: Fix the parser, Write the migration."* This is deliberately
-unlike `agents/archive`, which stops the one agent it was given (research §5).
+**Fails**: `projectHasLiveAgents` when any agent in the folder is `running` or `waitingOnUser` — the
+lead included, named as "the project lead" rather than by its title. The message names them:
+*"Stop these first: the project lead, Fix the parser."* This is deliberately unlike `agents/archive`,
+which stops the one agent it was given (research §5).
 
-Archiving does not touch the agents. Their own states and `archivedReason` are untouched, so
+Archiving does not touch the workers. Their own states and `archivedReason` are untouched, so
 unarchiving restores exactly what was there (FR-011).
+
+The lead is the exception, and the only one: it is archived with the project and unarchived with it,
+because it cannot be archived alone (FR-046, FR-048). Its transcript is untouched either way.
 
 ### `projects/unarchive`
 
@@ -99,4 +113,8 @@ nothing added there — it needs the sidebar to say the folder has gone before t
 - **No paged archived-agent call.** The window already holds every archived agent (research §4).
 - **No `projects/delete`.** Archiving is how the list gets shorter, as it is for agents.
 - **No `projects/rename`.** The name is the directory's name.
-- **No per-project settings.** A project is a folder and an archived flag.
+- **No per-project settings.** A project is a folder, an archived flag and a lead.
+- **No method that archives a lead.** `agents/archive` refuses an agent whose role is `.lead`, with
+  "The project lead is archived with its project." (FR-046).
+- **No method that creates a lead.** `projects/list` makes one when a project has none, and nothing
+  else does.

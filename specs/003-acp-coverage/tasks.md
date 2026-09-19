@@ -186,7 +186,7 @@ received both.
 - [X] T073 [US5] Build the runtime sheet (state, sign in, sign out, provider) in `App/Sources/Runtimes/RuntimeAccountView.swift`
 - [X] T074 [US5] Open Terminal.app at the command a terminal auth method names, in `App/Sources/Runtimes/RuntimeAccountView.swift`
 - [X] T075 [US5] Name the agents a sign-out stops, and ask first, in `App/Sources/Runtimes/RuntimeAccountView.swift`
-- [ ] T076 [US5] Write down what a signed-out runtime actually returns, in `specs/003-acp-coverage/research.md` section 8, after signing one out deliberately. This closes the signed-out question carried over from 001, its task T085
+- [X] T076 [US5] Write down what a signed-out runtime actually returns, in `specs/003-acp-coverage/research.md` section 8, after signing one out deliberately. This closes the signed-out question carried over from 001, its task T085
 
 ---
 

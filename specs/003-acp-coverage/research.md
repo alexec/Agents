@@ -129,15 +129,42 @@ Re-run of the handshake on 2026-09-18, after the capability flags went on
   Claude adapter's `sessionCapabilities.subagents`, which is a vendor extension and is
   in the spec's Out of Scope section by name.
 
-## 9. Still not proved: the signed-out failure
+## 9. What a signed-out runtime actually does
 
-Carried over from 001 (task T085). No runtime on this Mac is signed out, so the error a runtime
-returns when it needs authentication has still not been seen. The protocol reserves `-32000` for it
-and the SDK names it `authRequired`.
+Answered on 2026-09-18, and carried over from 001's task T085, where it had been guessed
+at twice.
 
-**Decision**: map `-32000` from any session method to "needs signing in", show the runtime's own
-auth methods, and keep the existing behaviour for every other code. Prove it during implementation
-by signing a runtime out deliberately rather than by guessing.
+Nothing on this Mac is signed out and signing out for a test is a poor trade, so each
+runtime was launched with a `HOME` of its own and no credentials in the environment. The
+user's own credentials were not touched.
+
+| Runtime | `initialize` | `session/new` |
+|---|---|---|
+| Copilot | succeeds, `authMethods: [copilot-login]` with the terminal command in `_meta` | `-32000 "Authentication required"` |
+| Grok | succeeds, `authMethods: [grok.com]` and **no** `cached_token` | `-32000 "Authentication required"`, `data: "no auth method id provided"` |
+| Claude adapter | succeeds, `authMethods: []` | **succeeds**. It would not appear signed out this way |
+
+Three things follow.
+
+**The handshake is not the test.** A runtime says how to sign in whether or not it needs
+to: Copilot advertises `copilot-login` while perfectly signed in. What changes when it is
+signed out is the refusal from `session/new`, not the handshake, which is why the app
+only marks a runtime as needing sign-in when a call actually refuses.
+
+**`-32000` is the answer, on both runtimes that refuse.** `initialize` succeeding and
+`session/new` refusing is the shape to handle, so the account is recorded from the
+handshake and the refusal turns it into "needs signing in" with the runtime's own methods
+attached. This found a bug: the auth methods were recorded only after `session/new`
+succeeded, so the one case that needed them had none.
+
+**Grok drops a method rather than adding one.** Signed in it offers `cached_token` and
+`grok.com`; signed out, only `grok.com`. Worth knowing, not worth coding to: the refusal
+is the signal.
+
+The Claude adapter is the honest gap. It made a session with no credentials reachable, so
+whatever it does when genuinely signed out happens later than `session/new` and has not
+been seen. `-32000` from a prompt is handled the same way, so the app is not guessing;
+it simply has not been watched doing it.
 
 ## 10. Nobody asks for elicitation yet
 

@@ -314,8 +314,9 @@ starts, and that the lead can report what they did and stop one of them.
 - **Project**: A directory the user works in. Has a name (the directory's own name), the folder it
   points at, whether it is archived and when, and when it last saw activity. Holds many agents and
   exactly one lead. Nothing it does touches the directory — archiving one changes nothing on disk.
-- **Agent**: Unchanged. Belongs to exactly one project, by its working folder. Keeps its own state,
-  transcript, cost and archived flag.
+- **Agent**: Belongs to exactly one project, by its working folder. Keeps its own state, transcript,
+  cost and archived flag, all unchanged by this feature. Gains one thing: whether it is a worker or
+  its project's lead.
 - **Project lead**: The one agent per project that coordinates the rest. An ordinary agent in every
   way that matters — a runtime, a folder, a conversation, a state — with three differences: it is
   created with its project rather than by the user, it is served the means to act on its project's

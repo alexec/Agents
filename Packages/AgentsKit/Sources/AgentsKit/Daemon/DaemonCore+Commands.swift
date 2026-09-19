@@ -83,8 +83,11 @@ extension DaemonCore {
         do {
             let session = try launcher.launch(runtime: runtime, path: path, cwd: cwd)
             let handshake = try await session.initialize()
-            let result = try await session.newSession(cwd: cwd)
+            // Recorded here rather than after the session is made, because the reason
+            // to have it is the case where making the session fails: what comes back
+            // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
+            let result = try await session.newSession(cwd: cwd)
             return (session, result.sessionId, runtime)
         } catch let error as JSONRPCError where error.isAuthRequired {
             markNeedsSignIn(runtimeID: runtimeID)
