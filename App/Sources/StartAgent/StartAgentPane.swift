@@ -51,14 +51,12 @@ struct StartAgentPane: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             Button(action: chooseFolder) {
-                HStack(spacing: 6) {
-                    Image(systemName: "folder")
-                    Text(cwd.map { $0.path(percentEncoded: false) } ?? "Choose a folder")
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
+                Text(cwd.map { $0.path(percentEncoded: false) } ?? "Choose a folder")
+                    .lineLimit(1)
+                    .truncationMode(.head)
             }
             .buttonStyle(.glass)
+            .font(.callout)
             .help("The folder the agent works in")
 
             Spacer(minLength: 8)
@@ -71,9 +69,10 @@ struct StartAgentPane: View {
                 }
             }
             .menuStyle(.borderlessButton)
+            .font(.callout)
             .fixedSize()
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.vertical, 6)
             .glassEffect(.regular.interactive(), in: .capsule)
             .disabled(model.availableRuntimes.isEmpty)
         }
@@ -116,12 +115,19 @@ struct StartAgentPane: View {
             }
             .font(.callout)
         } else if !options.isEmpty {
-            // Worked out across the row, not one control at a time: two menus both
-            // reading "Default" say nothing.
-            let titles = options.closedTitles(chosen: chosen)
-            WrappingRow(spacing: 10, lineSpacing: 10) {
-                ForEach(options) { option in
-                    OptionMenu(option: option, title: titles[option.id] ?? option.name, chosen: $chosen)
+            // What the agent is allowed to do on the left, how well it does it on the
+            // right. They are different kinds of decision and they read better apart.
+            HStack(spacing: 10) {
+                WrappingRow(spacing: 10, lineSpacing: 10) {
+                    ForEach(options.filter(\.isAboutPermission)) { option in
+                        OptionMenu(option: option, chosen: $chosen)
+                    }
+                }
+                Spacer(minLength: 16)
+                WrappingRow(spacing: 10, lineSpacing: 10) {
+                    ForEach(options.filter { !$0.isAboutPermission }) { option in
+                        OptionMenu(option: option, chosen: $chosen)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -3,16 +3,15 @@ import SwiftUI
 
 /// One option a runtime advertises, as a menu that reads like a sentence when closed.
 ///
-/// Nothing here knows what a model or a mode is. The choices come from the runtime, the
-/// order comes from its category, and whether the option's name is shown comes from
-/// whether its choices say what they are on their own.
+/// Nothing here knows what a model or a mode is. The choices come from the runtime and
+/// the order comes from its category. The control reads as its chosen value with no
+/// label: which setting it is comes from where it sits and from opening it.
 struct OptionMenu: View {
     let option: ConfigOption
-    let title: String
     @Binding var chosen: [String: JSONValue]
 
     var body: some View {
-        Menu(title) {
+        Menu(option.closedTitle(for: chosen[option.id])) {
             ForEach(option.options ?? []) { choice in
                 Button {
                     chosen[option.id] = choice.value
@@ -28,9 +27,10 @@ struct OptionMenu: View {
             }
         }
         .menuStyle(.borderlessButton)
+        .font(.callout)
         .fixedSize()
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
         // A real control, so it reacts to the pointer.
         .glassEffect(.regular.interactive(), in: .capsule)
         .help(option.description ?? option.name)

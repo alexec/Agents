@@ -226,10 +226,11 @@ The right-hand side shows the start form when no agent is chosen, so the app ope
 one. Three rows: where it works and what runs it, what you want done, and the options that runtime
 offers.
 
-The option controls carry their own name only when their choices do not say what they are. "GPT-5.6
-Terra" needs no label; "Agent" and "Off" do, and the Claude adapter calls both its model and its
-effort level "Default", so a name that turns up twice in a row gets its label back. That rule is in
-`AgentsKit`, not in a view, because it is a decision and decisions are tested.
+An option's control reads as its chosen value and nothing else. Which setting it is comes from where
+it sits: what the agent is allowed to do on the left, how well it does it on the right. That split
+is decided by the option's own category, in `AgentsKit` rather than in a view, so it holds for a
+runtime we have not met. It does mean two controls can both read "Default", which is what the Claude
+adapter calls both its model and its effort level.
 
 Liquid Glass is used where there are controls: the prompt box, the folder and runtime buttons, the
 option capsules, the composer and the permission banner. Not on the transcript, which is content.

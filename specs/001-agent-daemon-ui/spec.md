@@ -208,9 +208,11 @@ send it a follow-up and see it answer with what it knew before.
   three runtimes advertise what they can be told.
 - **FR-005d**: The system MUST NOT prevent an agent being started with a runtime that advertises no
   options at all.
-- **FR-005e**: The system MUST show an advertised option's name only where its choices do not say
-  what they are. Where the name is needed it MUST be part of what the closed control reads, so that
-  the options are a line of settings rather than a form of captioned boxes.
+- **FR-005e**: An advertised option's control MUST read as its chosen value alone, with no name
+  beside it or inside it. Which setting it is comes from where it sits in the row and from opening
+  it. Settled on 2026-09-18 after seeing labels on screen.
+- **FR-005ei**: The system MUST put the options about what an agent is allowed to do on one side of
+  the row and the rest on the other, because they are different kinds of decision.
 - **FR-005f**: Starting an agent MUST be what the app shows when no agent is chosen, rather than a
   dialog opened from somewhere, so the app opens ready to start one.
 - **FR-006**: The system MUST record every agent's full history, and MUST keep recording while no
