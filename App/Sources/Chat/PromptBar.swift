@@ -23,7 +23,8 @@ struct PromptBar: View {
                 options
             }
         }
-        .padding(20)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 20)
         .onChange(of: model.selection) { text = "" }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
@@ -35,23 +36,25 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
-                Text(agent.cwd.path(percentEncoded: false))
+                Text(agent.cwd.lastPathComponent)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.head)
+                    .help(agent.cwd.path(percentEncoded: false))
                 Spacer(minLength: 8)
                 Text(runtimeName(agent.runtimeID))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
                 Button(action: chooseFolder) {
-                    Text(model.draftCwd.map { $0.path(percentEncoded: false) } ?? "Choose a folder")
+                    // The folder's own name. The path it sits under is rarely the
+                    // thing you are checking, and it is in the tooltip when it is.
+                    Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
                         .lineLimit(1)
-                        .truncationMode(.head)
                 }
                 .buttonStyle(.glass)
                 .font(.footnote)
+                .help(model.draftCwd?.path(percentEncoded: false) ?? "The folder the agent works in")
 
                 Spacer(minLength: 8)
 

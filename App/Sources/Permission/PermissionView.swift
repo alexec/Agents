@@ -35,7 +35,7 @@ struct PermissionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 32)
     }
 
     private func answer(_ option: PermissionOption) {
