@@ -115,6 +115,41 @@ arrive as ordinary `configOptions`, so the start form gets them for free.
   rather than doing it itself. We claimed both in the probe. Whether the app serves them or the
   agent uses its own tools is a plan decision, not a spec one.
 
+## Stopped is not the end: every one of them can be picked up again
+
+Tested by running a real turn, killing the process with no warning, starting the runtime again and
+asking for the session back. All three gave it back, with the reply from before the kill.
+
+| | Copilot | Grok | Claude adapter |
+|---|---|---|---|
+| Session survives the process being killed | yes | yes | yes |
+| `session/list` finds it afterwards | yes | yes | yes |
+| `session/load` (replays the history) | yes | yes | yes |
+| `session/resume` (no replay) | no, `-32601 Method not found` | yes | yes |
+| The runtime's own title for it | "Reply with exactly: PINEAPPLE..." | "Exact PINEAPPLE-only reply request" | "Pineapple" |
+
+`session/list` is scoped by `cwd` and returns a `sessionId`, the folder, a title the runtime wrote
+itself, and when it was last touched. `session/load` takes `sessionId`, `cwd` and `mcpServers` and
+replays the whole conversation as `session/update` notifications before returning. `session/resume`
+takes the same arguments and skips the replay, for a client that already has the history.
+
+So picking a stopped agent back up is: start the runtime again, hand it the same session id and the
+same folder, and carry on prompting. We keep our own history anyway, so `session/resume` is the
+right call where it exists and `session/load` is the fallback where it does not. One code path, one
+capability check.
+
+Two consequences worth stating plainly:
+
+- **Stopped does not have to be terminal.** An agent the user stopped, or one that died when the Mac
+  restarted, can be continued rather than only read.
+- **A finished agent does not need its process kept alive to be followed up.** The daemon can let an
+  idle agent's process go and resume the session when the user types again. That makes the daemon's
+  own exit rule cheap to honour, and it takes the churn out of the FR-012 question below: nothing is
+  lost by putting a finished agent away, because it can always be picked up.
+
+The runtimes' titles are worth taking too. Each one names its own session, which is a better row
+label than the first line of the instruction.
+
 ## The open question this research created
 
 FR-012 said an agent archives itself when it "reported its work finished and its runtime exited
@@ -127,6 +162,10 @@ prompt, should take itself off the list.
 | A | Archive as soon as a turn ends with `end_turn`. A follow-up brings it back to running | Truest to "it said it was done". Churns badly for back-and-forth work: every reply archives the agent |
 | B | Archive when a turn ends with `end_turn` and the user has not followed up for a set quiet period | Matches how the list actually gets untidy. Needs a number, and a number is a guess until you have used it |
 | C | Finished is a state of its own and nothing auto-archives. The user archives when they are done | No guessing, no churn, and the finished agents are visibly separate from the running ones. The list still needs tidying by hand |
+
+Resuming changes what is at stake here. Archiving loses nothing now, because an archived agent can
+be picked up and carried on. The question is only how tidy the list is by default, not whether work
+is thrown away.
 
 Recommendation: **C for this feature.** Finished already separates the done from the busy, which is
 most of the value, and the rule that decides when done means gone is worth writing after watching

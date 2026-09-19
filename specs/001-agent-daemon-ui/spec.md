@@ -118,6 +118,33 @@ own when it reports itself done and exits, and be findable in the archive with i
 
 ---
 
+### User Story 5 - Pick a stopped agent back up (Priority: P2)
+
+An agent was stopped: the user stopped it, or it died when the Mac restarted, or it finished and was
+put away. The user comes back to it, types the next thing, and it carries on from where it was with
+everything it already knew.
+
+**Why this priority**: Without it, stopping an agent or restarting the Mac throws the work away and
+the user starts again from an empty conversation. Every runtime supports continuing a session, so
+not doing it would be a loss this app invented.
+
+**Independent Test**: Start an agent, let it do something memorable, stop it, restart the Mac, then
+send it a follow-up and see it answer with what it knew before.
+
+**Acceptance Scenarios**:
+
+1. **Given** a stopped agent, **When** the user sends it a message, **Then** it starts working again
+   in the same folder, with its history, and does not begin a fresh conversation.
+2. **Given** an agent that was stopped when the Mac restarted, **When** the user picks it up, **Then**
+   it continues from where it was.
+3. **Given** an archived agent, **When** the user picks it up, **Then** it leaves the archive and
+   continues, rather than being copied into a new agent.
+4. **Given** a stopped agent whose runtime can no longer give its session back, **When** the user
+   tries to pick it up, **Then** the app says so and offers to start a new agent in the same folder
+   with the history still readable, rather than failing silently or losing the history.
+
+---
+
 ### Edge Cases
 
 - The chosen runtime is installed but fails to start, or exits immediately. The agent is listed as
@@ -135,6 +162,8 @@ own when it reports itself done and exits, and be findable in the archive with i
   question is the first thing the user sees when a window opens.
 - A runtime is installed but not signed in. The app says so before the user tries to start an agent,
   and says what to run.
+- The user picks up an agent whose folder has since been deleted or moved.
+- The user picks up an agent whose runtime has been uninstalled or updated past the session it kept.
 - A runtime needs something else installed before it can speak the protocol at all. It is listed as
   unavailable with what is missing, not silently absent.
 - Two windows, or two launches of the app, look at the same agent. Both show the same state, and
@@ -182,6 +211,8 @@ own when it reports itself done and exits, and be findable in the archive with i
   window is open.
 - **FR-007**: The system MUST show an agent's history and new output in the window, with new output
   appearing without the user asking for it.
+- **FR-007a**: The system MUST name an agent with the title its runtime gives the session where there
+  is one, rather than with the first line of the instruction.
 - **FR-008**: Users MUST be able to send a follow-up message to a running or waiting agent.
 - **FR-009**: Users MUST be able to stop a running agent.
 - **FR-009a**: The system MUST show the user any permission the agent asks for, with the choices the
@@ -194,7 +225,8 @@ own when it reports itself done and exits, and be findable in the archive with i
 **Lifecycle**
 
 - **FR-010**: The system MUST give every agent exactly one of these states at a time: running,
-  waiting on the user, finished, stopped, archived. Running means a turn is in flight. Finished means
+  waiting on the user, finished, stopped, archived. Only archived is a resting place, and even that
+  can be left: no state in this feature is the end of an agent. Running means a turn is in flight. Finished means
   the agent ended a turn having said all it had to say and is idle, with its process alive and able
   to take a follow-up.
 - **FR-011**: The system MUST record how each turn ended, and MUST distinguish an agent that finished
@@ -210,6 +242,15 @@ own when it reports itself done and exits, and be findable in the archive with i
   When does a finished agent archive itself? See the question in research.md.]
 - **FR-012a**: The system MUST NOT archive an agent that hit a limit, refused, crashed, or was
   stopped by the user.
+- **FR-012b**: Users MUST be able to pick up a stopped or archived agent and carry on, in the folder
+  it was working in, with its history, as the same agent rather than a copy.
+- **FR-012c**: The system MUST ask the runtime for the session back when picking an agent up, using
+  whichever way that runtime supports, and MUST NOT need the runtime's history because it keeps its
+  own.
+- **FR-012d**: The system MUST tell the user when a runtime can no longer give a session back, and
+  MUST keep the agent's history readable and offer to start again in the same folder.
+- **FR-012e**: The system MUST NOT keep a process alive only so that a finished agent can be followed
+  up, since a session can be picked up later.
 - **FR-013**: Users MUST be able to archive any agent by hand, and the system MUST stop a running
   agent before archiving it.
 - **FR-014**: The system MUST keep an archived agent's full history readable.
@@ -240,7 +281,7 @@ own when it reports itself done and exits, and be findable in the archive with i
 
 ### Key Entities
 
-- **Agent**: One run of one runtime, in one folder, with one conversation. Has a state (running,
+- **Agent**: One conversation with one runtime in one folder, whatever number of processes it takes. Has a state (running,
   stopped, archived), the folder it works in, which runtime it is, the options it was started with,
   when it started, how it ended, and why it was archived.
 - **Agent runtime**: A CLI that speaks ACP, such as claude, grok or copilot. Has a name, where it was
@@ -271,6 +312,8 @@ own when it reports itself done and exits, and be findable in the archive with i
   through one code path, with no runtime-specific handling of options.
 - **SC-010**: A permission request asked while the app is shut is still answerable when the app
   opens, with the agent still alive and still waiting.
+- **SC-011**: An agent stopped before a Mac restart answers a follow-up afterwards knowing what it
+  knew before, for all three of claude, grok and copilot.
 - **SC-006**: Ten agents running at once leave the window responsive: the list and any agent's history
   scroll without stutter.
 - **SC-007**: The user never sees two daemons, an agent listed twice, or an agent listed as running
@@ -297,9 +340,10 @@ own when it reports itself done and exits, and be findable in the archive with i
 - Finished means the agent ended its turn having said all it had to say. This feature does not look
   at git, so a finished agent may have committed nothing. A rule that reads the repository is a later
   feature, better written after watching real agents finish.
-- These runtimes are long-lived servers, not commands that run and exit, so a finished agent still
-  has a process. Whether that process is kept for a follow-up or closed is part of the open question
-  on FR-012.
+- These runtimes are long-lived servers, not commands that run and exit, so an agent mid-turn has a
+  process. A finished one need not: all three can give a session back after their process is gone, so
+  an idle agent costs nothing to let go of and picking it up is starting the runtime again with the
+  same session.
 - The daemon is only alive while there is work or a window. Nothing runs at login, so an agent cannot
   outlive a logout or a restart, and the record says so when that happens.
 - The app and the daemon are both this project's code, built and shipped together. The daemon is not
