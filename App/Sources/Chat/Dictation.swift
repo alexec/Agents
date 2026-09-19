@@ -35,15 +35,31 @@ final class Dictation {
         Task { await requestAccessThenListen() }
     }
 
-    private func requestAccessThenListen() async {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+    /// Asking for speech recognition, off the main actor.
+    ///
+    /// The answer comes back on whatever queue the privacy service feels like. A
+    /// continuation resumed from a closure that belongs to the main actor fails
+    /// Swift's isolation check and takes the app with it, which is exactly what
+    /// happened the first time the microphone button was pressed.
+    private nonisolated static func askForSpeech() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
         }
+    }
+
+    private nonisolated static func askForMicrophone() async -> Bool {
+        await AVCaptureDevice.requestAccess(for: .audio)
+    }
+
+    private func requestAccessThenListen() async {
+        let speech = await Self.askForSpeech()
         guard speech == .authorized else {
             problem = "Dictation needs permission to recognise speech. Turn it on in System Settings, under Privacy & Security."
             return
         }
-        let microphone = await AVCaptureDevice.requestAccess(for: .audio)
+        let microphone = await Self.askForMicrophone()
         guard microphone else {
             problem = "Dictation needs the microphone. Turn it on in System Settings, under Privacy & Security."
             return
@@ -78,15 +94,13 @@ final class Dictation {
         }
         isListening = true
 
-        task = recogniser.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor in
+        task = recogniser.recognitionTask(with: request) { result, error in
+            let spoken = result?.bestTranscription.formattedString
+            let finished = error != nil || (result?.isFinal ?? false)
+            Task { @MainActor [weak self] in
                 guard let self else { return }
-                if let result {
-                    self.onText?(result.bestTranscription.formattedString)
-                }
-                if error != nil || (result?.isFinal ?? false) {
-                    self.stop()
-                }
+                if let spoken { self.onText?(spoken) }
+                if finished { self.stop() }
             }
         }
     }
