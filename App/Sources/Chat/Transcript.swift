@@ -24,7 +24,7 @@ struct Transcript: View {
                     Color.clear.frame(height: 1).id(bottom)
                 }
                 // Lines up with the prompt bar below it: one left edge down the pane.
-                .padding(.horizontal, 48)
+                .padding(.horizontal, 72)
                 .padding(.vertical, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
