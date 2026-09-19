@@ -174,13 +174,81 @@ extension DaemonCore {
     func summary(for workflow: Workflow, records: WorkflowRecords? = nil) -> WorkflowSummary {
         let records = records ?? workflowStore.load()
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
-        let paused = state?.isPaused ?? false || records.isPaused(folder: workflow.folder)
+        let archived = state?.isArchived ?? false
+        let overLimit = archived ? nil : limitReached(by: workflow, records: records)
         return WorkflowSummary(
             workflow: workflow,
-            isPaused: paused,
-            nextFireAt: paused ? nil : workflow.nextDue(after: Date()),
+            isArchived: archived,
+            overLimit: overLimit,
+            nextFireAt: archived || overLimit != nil ? nil : workflow.nextDue(after: Date()),
             lastOutcome: state?.lastOutcome,
             isRunning: workflowRuns[workflow.id] != nil)
+    }
+
+    /// Every workflow this daemon will act on, in the order the ceilings are applied:
+    /// each project's first few by file name, then the first few of those overall.
+    ///
+    /// By name rather than by age, and by project path rather than by when a project
+    /// was added, because a folder has no reliable age — a checkout writes every file
+    /// at the same instant — and because two machines looking at the same work have to
+    /// come out with the same list.
+    ///
+    /// Archived workflows are not in it at all. That is the whole reason archiving is
+    /// the way to make room: it is the one move that changes this list without
+    /// deleting anybody's file.
+    func liveWorkflowIDs(records: WorkflowRecords) -> [(folder: URL, workflowID: String)] {
+        let perProject = workflows.keys.sorted { $0.path < $1.path }.flatMap { folder in
+            (workflows[folder] ?? [:]).keys
+                .filter { records.state(folder: folder, workflowID: $0)?.isArchived != true }
+                .sorted()
+                .prefix(WorkflowLimit.project.allowed)
+                .map { (folder: folder, workflowID: $0) }
+        }
+        return Array(perProject.prefix(WorkflowLimit.total.allowed))
+    }
+
+    /// The ones from a single project, which is what the tool counts before writing.
+    func liveWorkflowIDs(in folder: URL, records: WorkflowRecords) -> [String] {
+        let standardized = Project.standardize(folder)
+        return liveWorkflowIDs(records: records)
+            .filter { $0.folder == standardized }
+            .map(\.workflowID)
+    }
+
+    /// How many of a project's workflows are live — not archived — which is what the
+    /// per-project ceiling counts.
+    func liveWorkflowCount(in folder: URL, records: WorkflowRecords) -> Int {
+        let standardized = Project.standardize(folder)
+        return (workflows[standardized] ?? [:]).keys
+            .filter { records.state(folder: standardized, workflowID: $0)?.isArchived != true }
+            .count
+    }
+
+    /// How many are live everywhere, which is what the total ceiling counts. Each
+    /// project contributes at most its own allowance: ten projects holding three each
+    /// is thirty, and the point of the total is that it is not.
+    func liveWorkflowCount(records: WorkflowRecords) -> Int {
+        workflows.keys.reduce(0) { running, folder in
+            running + min(liveWorkflowCount(in: folder, records: records),
+                          WorkflowLimit.project.allowed)
+        }
+    }
+
+    /// Which ceiling, if either, this workflow is past. Archived ones are past neither:
+    /// they are out of the way, which is the point of archiving.
+    func limitReached(by workflow: Workflow, records: WorkflowRecords) -> WorkflowLimit? {
+        guard records.state(folder: workflow.folder,
+                            workflowID: workflow.workflowID)?.isArchived != true else { return nil }
+        // Its own project first. Told that this project is full, somebody knows where to
+        // look; told the machine is full when it is their fourth here, they do not.
+        let mine = (workflows[workflow.folder] ?? [:]).keys
+            .filter { records.state(folder: workflow.folder, workflowID: $0)?.isArchived != true }
+            .sorted()
+            .prefix(WorkflowLimit.project.allowed)
+        guard mine.contains(workflow.workflowID) else { return .project }
+        let live = liveWorkflowIDs(records: records)
+        let isLive = live.contains { $0.folder == workflow.folder && $0.workflowID == workflow.workflowID }
+        return isLive ? nil : .total
     }
 
     // MARK: The clock
@@ -229,6 +297,11 @@ extension DaemonCore {
         for (folder, byID) in workflows {
             for workflow in byID.values {
                 guard let due = workflow.nextDue(after: since), due <= now else { continue }
+                // Nothing is recorded against an archived one, here or on a lifecycle
+                // event. A refusal is news, and "the thing you put away did not run"
+                // is not news every half hour for as long as the file exists.
+                guard records.state(folder: folder, workflowID: workflow.workflowID)?
+                    .isArchived != true else { continue }
                 if wasAway {
                     record(.refused(.missedWhileClosed, at: now, repeats: 1), for: workflow)
                 } else {
@@ -261,10 +334,10 @@ extension DaemonCore {
         }
 
         if let refusal = workflow.refusalIfBlocked(
-            isPaused: state?.isPaused ?? false,
-            projectIsPaused: records.isPaused(folder: workflow.folder),
             isRunning: workflowRuns[workflow.id] != nil,
             depth: depth,
+            isArchived: state?.isArchived ?? false,
+            overLimit: limitReached(by: workflow, records: records),
             folderExists: Self.isDirectory(workflow.folder),
             triggeringAgentIsUsable: triggeringAgentIsUsable) {
             record(.refused(refusal, at: now, repeats: 1), for: workflow)
@@ -412,6 +485,7 @@ extension DaemonCore {
         let folder = Project.standardize(agent.cwd)
         guard let byID = workflows[folder], !byID.isEmpty else { return }
         let depth = depth ?? workflowChainDepth(causedBy: agentID)
+        let records = workflowStore.load()
 
         let trigger: WorkflowTrigger
         switch event {
@@ -421,7 +495,8 @@ extension DaemonCore {
         case .stopped: trigger = .agentStopped
         }
 
-        for workflow in byID.values where workflow.responds(to: event) {
+        for workflow in byID.values where workflow.responds(to: event)
+            && records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true {
             // Detached, because this is called from inside the actor by `move`, and
             // firing awaits things that can call back into it. The shape `beginTurn`
             // already uses for a turn.
@@ -443,7 +518,9 @@ extension DaemonCore {
 
         let folder = Project.standardize(run.folder)
         guard let byID = workflows[folder] else { return }
-        for other in byID.values where other.respondsToCompletion(of: run.workflowID) {
+        let records = workflowStore.load()
+        for other in byID.values where other.respondsToCompletion(of: run.workflowID)
+            && records.state(folder: folder, workflowID: other.workflowID)?.isArchived != true {
             Task { [weak self] in
                 await self?.fire(other, on: .workflowCompleted(id: run.workflowID),
                                  depth: run.depth + 1)
@@ -456,9 +533,9 @@ extension DaemonCore {
     /// Run now.
     ///
     /// Not a bypass. It ignores the schedule and starts a chain at zero, and it still
-    /// obeys the in-flight and paused rules — returning the refusal on the summary
-    /// rather than swallowing it. Somebody is watching when they tap this, so being
-    /// told why is more important here than anywhere else.
+    /// obeys every other rule — the run in flight, the ceilings, the archive —
+    /// returning the refusal on the summary rather than swallowing it. Somebody is
+    /// watching when they tap this, so being told why matters more here than anywhere.
     public func runWorkflow(_ request: DaemonAPI.WorkflowRequest) async throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
@@ -468,30 +545,32 @@ extension DaemonCore {
         return summary(for: workflow)
     }
 
-    public func pauseWorkflow(_ request: DaemonAPI.WorkflowPauseRequest) throws -> WorkflowSummary {
+    /// Put one away, or bring it back.
+    ///
+    /// The counterweight to an agent writing a workflow without asking first, and the
+    /// reason it can. Not a delete: the file stays in the project, where it is still a
+    /// file somebody can read, edit or commit — the app simply stops acting on it, and
+    /// says so on the row rather than making the workflow disappear.
+    ///
+    /// It is also the whole of holding a workflow. There was a pause beside this, and
+    /// it earned nothing: two switches that both mean "do not run this", one of them
+    /// reversible in exactly the same tap as the other. Archiving says the same thing
+    /// and says where the row went.
+    public func archiveWorkflow(_ request: DaemonAPI.WorkflowArchiveRequest) throws -> WorkflowSummary {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
         var records = workflowStore.load()
         records.update(folder: request.folder, workflowID: request.workflowID) {
-            $0.isPaused = request.paused
+            $0.isArchived = request.archived
+            // What it last did belonged to the life it had before. Keeping it would
+            // leave a restored workflow wearing a refusal from a fortnight ago.
+            $0.lastOutcome = nil
         }
         workflowStore.save(records)
         let summary = summary(for: workflow, records: records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         return summary
-    }
-
-    public func pauseProjectWorkflows(_ request: DaemonAPI.WorkflowPauseProjectRequest) -> [WorkflowSummary] {
-        var records = workflowStore.load()
-        records.setPaused(request.paused, folder: request.folder)
-        workflowStore.save(records)
-        let summaries = (workflows[Project.standardize(request.folder)]?.values ?? [:].values)
-            .map { summary(for: $0, records: records) }
-        for summary in summaries {
-            broadcast(DaemonAPI.Notification.workflowChanged, summary)
-        }
-        return summaries
     }
 }

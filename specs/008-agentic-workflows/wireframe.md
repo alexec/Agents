@@ -44,29 +44,24 @@ Same 144pt gutter as everything else on the page, same `GroupHeading` as the age
 │      ╰────────────────────────────────────────────────────────────────╯      │
 │                                                                              │
 │                                                                              │
-│      Workflows  4                                       Pause all ⏸          │◄── FR-024
+│      Workflows  4                                                            │
 │      ╭────────────────────────────────────────────────────────────────╮      │
-│      │ ◷  Morning build check                        [Run now] [⏸]    │      │
+│      │ ◷  Morning build check                             [▶] [🗄]    │      │
 │      │    Every weekday at 9:00am, in a new agent                     │      │
 │      │    Next at 9:00am tomorrow · Ran 20 minutes ago →              │      │
 │      ╰────────────────────────────────────────────────────────────────╯      │
 │      ╭────────────────────────────────────────────────────────────────╮      │
-│      │ ◐  Review what just finished              [Running…]  [⏸]      │      │
+│      │ ◐  Review what just finished              [Running…]  [🗄]     │      │
 │      │    When an agent finishes, in a new agent                      │      │
 │      │    Started 40 seconds ago →                                    │      │
 │      ╰────────────────────────────────────────────────────────────────╯      │
 │      ╭────────────────────────────────────────────────────────────────╮      │
-│      │ ◷  Standup notes                              [Run now] [⏸]    │      │
+│      │ ◷  Standup notes                                   [▶] [🗄]    │      │
 │      │    Every day at 5:30pm, in its own standing agent              │      │
 │      │    Next at 5:30pm today · Ran yesterday →                      │      │
 │      ╰────────────────────────────────────────────────────────────────╯      │
-│      ╭────────────────────────────────────────────────────────────────╮      │
-│      │ ⏸  Dependency advisories                      [Run now] [▶]    │      │
-│      │    Every weekday at 9:00am, in a new agent                     │      │
-│      │    Paused                                                      │      │
-│      ╰────────────────────────────────────────────────────────────────╯      │
 │                                                                              │
-│      Show archived (12)                                                      │
+│      ▸ Archived  12                                                          │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -81,7 +76,7 @@ Three lines, deliberately the same three `AgentRow` already uses, so the page ha
 | 2 | `.callout` `.secondary` | **What it is** — the trigger and mode in plain language (FR-027) |
 | 3 | `.caption` `.tertiary` | **What is happening** — next fire, and the last outcome (FR-028) |
 
-The trailing controls are real glass buttons rather than a context menu, because unlike an agent card the row is not itself a destination and the two actions are the point of it. `Run now` is always offered, on every row, including paused and unsupported ones (FR-012).
+The trailing controls are real glass buttons rather than a context menu, because unlike an agent card the row is not itself a destination and the two actions are the point of it. They are **icons carrying tooltips**, not labelled buttons: the row repeats down the page, and *Run now* set in text on every one of them is the loudest thing on the page — louder than the workflow names. The words are in the tooltips and in the context menu, which is where somebody goes when a symbol is not enough. Running it is always offered, on every row, including unsupported ones and ones over a ceiling (FR-012); an archived row offers `Restore` and nothing else, because offering to run a thing that will not run is offering a lie.
 
 `→` on the third line is the link to the agent that run started or resumed (FR-029).
 
@@ -98,63 +93,63 @@ This is the part worth arguing over, because user story 3 lives here entirely.
 ```
   RUNS ON A SCHEDULE, IDLE
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◷  Morning build check                        [Run now] [⏸]    │
+  │ ◷  Morning build check                        [▶] [🗄]         │
   │    Every weekday at 9:00am, in a new agent                     │
   │    Next at 9:00am tomorrow · Ran 20 minutes ago →              │
   ╰────────────────────────────────────────────────────────────────╯
 
   REACTS TO AGENTS, NO SCHEDULE — no "next", because there isn't one
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◷  Review what just finished                  [Run now] [⏸]    │
+  │ ◷  Review what just finished                  [▶] [🗄]         │
   │    When an agent finishes, in a new agent                      │
   │    Ran 3 times today · last 12 minutes ago →                   │
   ╰────────────────────────────────────────────────────────────────╯
 
   RUNNING NOW
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◐  Review what just finished              [Running…]  [⏸]      │
+  │ ◐  Review what just finished              [Running…]  [🗄]     │
   │    When an agent finishes, in a new agent                      │
   │    Started 40 seconds ago →                                    │
   ╰────────────────────────────────────────────────────────────────╯
 
-  PAUSED — grey, because nothing is wrong and nobody is needed
+  ARCHIVED — grey, because nothing is wrong and nobody is needed
   ╭────────────────────────────────────────────────────────────────╮
-  │ ⏸  Dependency advisories                      [Run now] [▶]    │
+  │ 🗄  Dependency advisories                          [Restore]    │
   │    Every weekday at 9:00am, in a new agent                     │
-  │    Paused                                                      │
+  │    Archived — it will not run                                  │
   ╰────────────────────────────────────────────────────────────────╯
 
   REFUSED, SELF-RESOLVING — grey. It will sort itself out.
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◷  Morning build check                        [Run now] [⏸]    │
+  │ ◷  Morning build check                        [▶] [🗄]         │
   │    Every weekday at 9:00am, in a new agent                     │
   │    Next at 9:30am · Did not run — a run is still going         │
   ╰────────────────────────────────────────────────────────────────╯
 
   REFUSED, REPEATEDLY — one line with a count, never fourteen rows (FR-030)
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◷  Standup notes                              [Run now] [⏸]    │
+  │ ◷  Standup notes                              [▶] [🗄]         │
   │    Every day at 5:30pm, in its own standing agent              │
   │    Next at 5:30pm today · Missed 14 times — the app was closed │
   ╰────────────────────────────────────────────────────────────────╯
 
   REFUSED, NEEDS A PERSON — the loop will not stop on its own next time
   ╭────────────────────────────────────────────────────────────────╮
-  │ ⚠  Review what just finished                  [Run now] [⏸]    │
+  │ ⚠  Review what just finished                  [▶] [🗄]         │
   │    When an agent finishes, in a new agent                      │
   │    Did not run 3 times — this chain is already 3 deep          │
   ╰────────────────────────────────────────────────────────────────╯
 
   CANNOT BE READ — needs a person, and says exactly where
   ╭────────────────────────────────────────────────────────────────╮
-  │ ⚠  deploy-check                               [Run now] [⏸]    │
+  │ ⚠  deploy-check                               [▶] [🗄]         │
   │    This file could not be read                                 │
   │    Line 3: mapping values are not allowed here                 │
   ╰────────────────────────────────────────────────────────────────╯
 
   FROM THE FUTURE — not broken. A file written against a later version.
   ╭────────────────────────────────────────────────────────────────╮
-  │ ◌  Watch the deploy                           [Run now] [⏸]    │
+  │ ◌  Watch the deploy                           [▶] [🗄]         │
   │    Waits for "deploys-finished", which this version does not   │
   │    know about yet                                              │
   ╰────────────────────────────────────────────────────────────────╯
@@ -166,7 +161,7 @@ The app's existing rule is that grey is everything and "the only colour in this 
 
 | Grey | Coloured |
 |---|---|
-| Paused · a run is still going · missed while closed · running · idle | The chain limit was reached · the file cannot be read · the folder is gone |
+| Archived · a run is still going · missed while closed · running · idle | The chain limit was reached · a ceiling is full · the file cannot be read · the folder is gone |
 
 A refusal that will resolve itself is information. A refusal that will keep happening until somebody does something is the only kind that earns the colour. Getting this backwards — colouring every refusal — would make the page shout about a workflow skipping one fire and would spend the colour the app reserves for agents waiting on an answer.
 
@@ -184,50 +179,51 @@ Says where the files live, because that is the one fact nobody can guess, and na
 
 ---
 
-## 3. The confirmation
+## 3. Archiving, which replaced the confirmation
 
-Raised by the daemon, not the runtime, so it looks the same whichever runtime the agent is using. Shown wherever permission requests are shown today.
+There is no confirmation. A write used to raise one — the daemon's own sheet, in front of the writing, blocking the tool call on it — and it is gone. It failed in both directions: it put a prompt nobody had asked to read in front of a decision with a quick wrong answer, and with no window open there was nobody to ask, so an agent working overnight could not write a workflow at all.
+
+The say is after the fact instead, on the row, where there is something to look at:
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                                                                      │
-│   Rewrite the settings sheet wants to add a workflow                 │
-│                                                                      │
-│   ┌──────────────────────────────────────────────────────────────┐   │
-│   │  Dependency advisories                                       │   │
-│   │                                                              │   │
-│   │  Runs every weekday at 9:00am, in a new agent.               │   │◄── FR-036
-│   │                                                              │   │
-│   │  ──────────────────────────────────────────────────────────  │   │
-│   │                                                              │   │
-│   │  Check whether any of our dependencies have security         │   │
-│   │  advisories published since yesterday. If any do, say which  │   │
-│   │  and how bad. Do not change any files.                       │   │
-│   │                                                              │   │
-│   └──────────────────────────────────────────────────────────────┘   │
-│                                                                      │
-│   .agents/workflows/dependency-advisories.md                         │
-│                                                                      │
-│                                          [ Don't ]   [ Add it ]      │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+  ╭────────────────────────────────────────────────────────────────╮
+  │ ⏱  Dependency advisories             [▶] [🗄]                 │
+  │    Every weekday at 9am, in a new agent                        │
+  │    Next tomorrow at 9:00 · Ran 2 days ago →                    │
+  ╰────────────────────────────────────────────────────────────────╯
+
+  ARCHIVED — under its own heading, folded away, and never fired.
+      ▸ Archived  2
+
+      ▾ Archived  2
+  ╭────────────────────────────────────────────────────────────────╮
+  │ 🗄  Watch the deploy                              [Restore]     │
+  │    Every day on the hour, in a new agent                       │
+  │    Archived — it will not run                                  │
+  ╰────────────────────────────────────────────────────────────────╯
 ```
 
-Three decisions in this one sheet:
+- **Archiving is not deleting.** The file stays in the project, reviewable and committable like any other file; the app simply stops acting on it. Deleting an agent's work on the strength of one tap would be the harder thing to undo.
+- **It folds away rather than disappearing.** A page that hid archived workflows entirely would leave somebody hunting for one the app had swallowed.
+- **An archived row has one control, and it is the way back.** Run now beside something that will not run is an offer the app cannot keep.
+- **An agent writing to an archived id does not un-archive it**, and is told so. A veto the agent it was aimed at can lift is not a veto.
 
-- **The trigger is stated in words, above the prompt.** *Runs every weekday at 9:00am, in a new agent* — not YAML, not a path, not a diff. It is the same string the project-page row shows, from the same renderer, so the thing you approved and the thing you later see cannot drift.
-- **The prompt is shown in full.** Approving a workflow is approving what an agent will be told, unattended, every weekday. Hiding it behind a disclosure would make the safe action the uninformed one.
-- **There is no "always allow".** Deliberately absent, and worth saying out loud: an agent with blanket approval to write workflows could write a workflow that writes workflows.
+### The ceilings
 
-The path is at the bottom, small — true, and not what the decision turns on.
+Three live workflows to a project, and ten across all of them. The agent is refused a fourth outright, naming the three in the way. A fourth written by hand is listed and inert rather than hidden:
 
-### Its other three outcomes
+```
+  ╭────────────────────────────────────────────────────────────────╮
+  │ ⚠  Watch the queue                            [▶] [🗄]        │
+  │    Every day on the hour, in a new agent                       │
+  │    This project already runs its 3 workflows. Archive another  │
+  │    in this project to let it run                               │
+  ╰────────────────────────────────────────────────────────────────╯
+```
 
-| Situation | What happens |
-|---|---|
-| No window open | Nothing is written. The agent is told: *"No window is open, so there was nobody to ask."* |
-| Two minutes, no answer | Nothing is written. *"Nobody answered, so nothing was written. You can ask again."* |
-| Changing an existing workflow | Same sheet, headed *…wants to change a workflow*, and the summary line says what it would become |
+The total ceiling reads the same way, with the one difference that matters: *10 workflows are already running, across every project. Archive one, in any project, to let it run.* A remedy in a project you are not looking at has to say so, or the row is a puzzle.
+
+They earn the colour, unlike a skipped fire: nothing resolves them on their own. And the section says the rule under the list before anybody walks into it — a ceiling nobody can see is a ceiling somebody walks into.
 
 ---
 
@@ -246,5 +242,5 @@ The path is at the bottom, small — true, and not what the decision turns on.
 ## The three things most worth arguing with
 
 1. **Workflows at the bottom of the page.** The alternative is directly under the prompt bar, which makes them impossible to miss and pushes "needs you" down. I think what is happening beats what will happen, but a project with two agents and nine workflows would read the other way.
-2. **Trailing buttons instead of a context menu.** Every other card on this page hides its actions in a context menu. Two visible buttons per row is heavier, and is what stops `Run now` — the thing you need when testing a workflow you just wrote — from being a right-click nobody finds.
+2. **Trailing icon buttons instead of a context menu.** Every other card on this page hides its actions in a context menu. Two visible buttons per row is heavier, and is what stops running a workflow by hand — the thing you need when testing one you just wrote — from being a right-click nobody finds. As icons they cost a tooltip's worth of discoverability and save the row from shouting; if the two symbols turn out not to read, labels come back and the names go quiet some other way.
 3. **Colouring only the refusals that need a person.** The conservative alternative colours every refusal. That is louder, and it spends the one signal this app reserves for "a person is needed" on a workflow skipping a single fire.

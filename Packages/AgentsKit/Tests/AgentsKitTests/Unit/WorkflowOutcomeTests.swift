@@ -16,11 +16,12 @@ struct WorkflowOutcomeTests {
                  triggers: triggers, mode: mode, prompt: "go", problem: problem)
     }
 
-    private func refusal(_ workflow: Workflow, isPaused: Bool = false, projectIsPaused: Bool = false,
-                         isRunning: Bool = false, depth: Int = 0, folderExists: Bool = true,
+    private func refusal(_ workflow: Workflow, isRunning: Bool = false, depth: Int = 0,
+                         isArchived: Bool = false, overLimit: WorkflowLimit? = nil,
+                         folderExists: Bool = true,
                          triggeringAgentIsUsable: Bool? = nil) -> WorkflowRefusal? {
-        workflow.refusalIfBlocked(isPaused: isPaused, projectIsPaused: projectIsPaused,
-                                  isRunning: isRunning, depth: depth,
+        workflow.refusalIfBlocked(isRunning: isRunning, depth: depth,
+                                  isArchived: isArchived, overLimit: overLimit,
                                   folderExists: folderExists,
                                   triggeringAgentIsUsable: triggeringAgentIsUsable)
     }
@@ -33,12 +34,19 @@ struct WorkflowOutcomeTests {
         #expect(refusal(workflow(), isRunning: true) == .runInFlight)
     }
 
-    @Test func pausingBlocksIt() {
-        #expect(refusal(workflow(), isPaused: true) == .paused)
+    @Test func archivingBlocksIt() {
+        #expect(refusal(workflow(), isArchived: true) == .archived)
     }
 
-    @Test func pausingTheProjectBlocksIt() {
-        #expect(refusal(workflow(), projectIsPaused: true) == .paused)
+    @Test func eitherCeilingBlocksIt() {
+        #expect(refusal(workflow(), overLimit: .project) == .overLimit(.project))
+        #expect(refusal(workflow(), overLimit: .total) == .overLimit(.total))
+    }
+
+    @Test func aDecisionOfThePersonsOutranksEverythingElseWrongWithIt() {
+        // Archived beats a file that cannot be read: they said they did not want it,
+        // and fixing the file would not change that.
+        #expect(refusal(workflow(problem: .unreadable("line 3")), isArchived: true) == .archived)
     }
 
     @Test func aChainDeeperThanTheLimitIsRefused() {
@@ -86,8 +94,8 @@ struct WorkflowOutcomeTests {
 
     @Test func aDifferentReasonStartsAgain() {
         let first = WorkflowOutcome.refused(.runInFlight, at: Date(), repeats: 4)
-        let second = WorkflowOutcome.refused(.paused, at: Date(), repeats: 1).following(first)
-        #expect(second == .refused(.paused, at: second.at, repeats: 1))
+        let second = WorkflowOutcome.refused(.archived, at: Date(), repeats: 1).following(first)
+        #expect(second == .refused(.archived, at: second.at, repeats: 1))
     }
 
     @Test func aRunReplacesTheCountEntirely() {
@@ -116,8 +124,12 @@ struct WorkflowOutcomeTests {
         #expect(WorkflowRefusal.chainTooDeep(depth: 3).needsAPerson)
         #expect(WorkflowRefusal.unreadable("x").needsAPerson)
         #expect(WorkflowRefusal.folderGone.needsAPerson)
+        // A ceiling is the other kind that keeps happening: nothing frees it but
+        // somebody archiving another workflow.
+        #expect(WorkflowRefusal.overLimit(.project).needsAPerson)
+        #expect(WorkflowRefusal.overLimit(.total).needsAPerson)
         #expect(!WorkflowRefusal.runInFlight.needsAPerson)
-        #expect(!WorkflowRefusal.paused.needsAPerson)
+        #expect(!WorkflowRefusal.archived.needsAPerson)
         #expect(!WorkflowRefusal.missedWhileClosed.needsAPerson)
         #expect(!WorkflowRefusal.agentUnavailable.needsAPerson)
     }

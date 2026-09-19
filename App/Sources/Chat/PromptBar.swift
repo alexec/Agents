@@ -117,6 +117,14 @@ struct PromptBar: View {
             selectedSuggestion = 0
             dismissedSuggestions = false
         }
+        // Words offered from elsewhere on the page. They land in the field, focused
+        // and unsent, the same as a suggestion taken with Tab.
+        .onChange(of: model.offeredPrompt) {
+            guard let offered = model.offeredPrompt else { return }
+            text = offered
+            focused = true
+            model.offeredPrompt = nil
+        }
         // A new set is a new turn's worth, so it starts at the first one and comes
         // back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {

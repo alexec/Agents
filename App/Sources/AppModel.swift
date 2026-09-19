@@ -42,7 +42,6 @@ final class AppModel {
     var entries: [TranscriptEntry] { work.entries }
     var transcriptHasMore: Bool { work.hasMoreBefore }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
-    var workflowConfirmation: DaemonAPI.WorkflowConfirmation? { work.workflowConfirmation }
 
     /// Which project this window is looking at.
     ///
@@ -107,6 +106,11 @@ final class AppModel {
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
+    /// Words handed to the prompt bar from elsewhere on the page — the workflows
+    /// section's example, today. Offered and then taken: the bar puts them in the
+    /// field and clears this, because the prompt itself is still the bar's own and
+    /// sending it is still the person's move.
+    var offeredPrompt: String?
     private(set) var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///
@@ -197,38 +201,21 @@ final class AppModel {
         }
     }
 
-    /// Run one now. The daemon still applies the in-flight and paused rules, and says
-    /// so on the summary, which is why nothing here second-guesses it first.
+    /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
+    /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
         try? await client.call(DaemonAPI.Method.workflowsRun,
                                DaemonAPI.WorkflowRequest(folder: summary.folder,
                                                          workflowID: summary.workflowID))
     }
 
-    func setWorkflowPaused(_ summary: WorkflowSummary, _ paused: Bool) async {
-        try? await client.call(DaemonAPI.Method.workflowsPause,
-                               DaemonAPI.WorkflowPauseRequest(folder: summary.folder,
-                                                              workflowID: summary.workflowID,
-                                                              paused: paused))
-    }
-
-    func setProjectWorkflowsPaused(_ folder: URL, _ paused: Bool) async {
-        try? await client.call(DaemonAPI.Method.workflowsPauseProject,
-                               DaemonAPI.WorkflowPauseProjectRequest(folder: folder, paused: paused))
-    }
-
-    func refreshWorkflowConfirmations() async {
-        guard let pending = try? await client.call(
-            DaemonAPI.Method.workflowsPendingConfirmations,
-            Optional<String>.none,
-            returning: [DaemonAPI.WorkflowConfirmation].self) else { return }
-        work.setWorkflowConfirmation(pending.first)
-    }
-
-    func answerWorkflowConfirmation(_ confirmation: DaemonAPI.WorkflowConfirmation, allow: Bool) async {
-        try? await client.call(DaemonAPI.Method.workflowsConfirm,
-                               DaemonAPI.WorkflowConfirmRequest(confirmationID: confirmation.id,
-                                                                allow: allow))
+    /// Put one away, or bring it back. The person's answer to a workflow an agent
+    /// wrote, which is what makes writing one not need asking first.
+    func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
+        try? await client.call(DaemonAPI.Method.workflowsArchive,
+                               DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
+                                                                workflowID: summary.workflowID,
+                                                                archived: archived))
     }
 
     func refreshProjects() async {
@@ -388,7 +375,6 @@ final class AppModel {
         await refreshRuntimes()
         await refreshAccounts()
         await refreshWorkflows()
-        await refreshWorkflowConfirmations()
         await refreshPermissions()
         await refreshElicitations()
         await refreshResuming()

@@ -83,54 +83,221 @@ struct WorkflowRefusalTests {
         #expect(await core.allAgents().count == 1)
     }
 
-    // MARK: Paused
+    // MARK: Archived
 
-    @Test func aPausedWorkflowRefusesEvenRunNow() async throws {
+    @Test func anArchivedWorkflowRefusesEvenRunNow() async throws {
+        // The counterweight to an agent writing one without asking. If archiving did
+        // not hold against Run now it would not be an answer to anything.
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write(onSchedule, as: "held", in: work)
+        try write(onSchedule, as: "unwanted", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        _ = try await core.pauseWorkflow(
-            DaemonAPI.WorkflowPauseRequest(folder: work, workflowID: "held", paused: true))
-        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "held"))
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "unwanted", archived: true))
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "unwanted"))
 
-        #expect(await refusal(core, work, "held") == .paused)
+        #expect(await refusal(core, work, "unwanted") == .archived)
         #expect(await core.allAgents().isEmpty)
     }
 
-    @Test func pausingAProjectHoldsAllOfIts() async throws {
+    @Test func anArchivedWorkflowIsNotEvenRefusedOnTheClock() async throws {
+        // The one place the "no fire is ever silent" rule gives way. A refusal is news,
+        // and a thing somebody put away failing to run is not news twice an hour for as
+        // long as the file exists.
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write(onSchedule, as: "one", in: work)
-        try write(onSchedule, as: "two", in: work)
+        try write(onSchedule, as: "unwanted", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        _ = await core.pauseProjectWorkflows(
-            DaemonAPI.WorkflowPauseProjectRequest(folder: work, paused: true))
-        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "one"))
-        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "two"))
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "unwanted", archived: true))
 
-        #expect(await refusal(core, work, "one") == .paused)
-        #expect(await refusal(core, work, "two") == .paused)
+        var when = DateComponents()
+        when.year = 2026; when.month = 9; when.day = 18; when.hour = 8; when.minute = 59
+        let before = Calendar.current.date(from: when)!
+        await core.tickWorkflows(now: before)
+        await core.tickWorkflows(now: before.addingTimeInterval(120))
+
+        #expect(await outcome(core, work, "unwanted") == nil)
+        #expect(await core.allAgents().isEmpty)
     }
 
-    @Test func pausingNeverTouchesTheFile() async throws {
-        // FR-024 is a contract, not an implementation note: this is what stops a pause
-        // from becoming a commit.
+    @Test func archivingNeverTouchesTheFile() async throws {
+        // The same contract pausing has. A workflow put away is still a file in the
+        // repository, reviewable and restorable, rather than something deleted behind
+        // the author's back.
         let (locations, root) = try temporary()
         let work = try project(root)
-        let url = try write(onSchedule, as: "held", in: work)
+        let url = try write(onSchedule, as: "unwanted", in: work)
         let before = try Data(contentsOf: url)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        _ = try await core.pauseWorkflow(
-            DaemonAPI.WorkflowPauseRequest(folder: work, workflowID: "held", paused: true))
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "unwanted", archived: true))
 
         #expect(try Data(contentsOf: url) == before)
+        #expect(await core.allWorkflows(in: work).first?.isArchived == true)
+    }
+
+    @Test func bringingOneBackMakesItRunAgain() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(onSchedule, as: "wanted-after-all", in: work)
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        for archived in [true, false] {
+            _ = try await core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+                folder: work, workflowID: "wanted-after-all", archived: archived))
+        }
+        try await core.runWorkflow(
+            DaemonAPI.WorkflowRequest(folder: work, workflowID: "wanted-after-all"))
+
+        #expect(await core.allAgents().count == 1)
+        #expect(await core.allWorkflows(in: work).first?.isArchived == false)
+    }
+
+    // MARK: The project's ceiling
+
+    @Test func afterThreeLiveOnesTheRestAreListedAndInert() async throws {
+        // The ceiling binds what runs, not what may exist: a file somebody wrote is
+        // still on the page, saying why it is not running, rather than vanishing.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        for name in ["a-one", "b-two", "c-three", "d-four"] {
+            try write(onSchedule, as: name, in: work)
+        }
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "d-four"))
+
+        let listed = await core.allWorkflows(in: work)
+        #expect(listed.count == 4, "a file past the limit must still be listed")
+        #expect(listed.filter { $0.overLimit != nil }.map(\.workflowID) == ["d-four"])
+        #expect(await refusal(core, work, "d-four") == .overLimit(.project))
+        #expect(await core.allAgents().isEmpty)
+    }
+
+    @Test func theFirstThreeStillRun() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        for name in ["a-one", "b-two", "c-three", "d-four"] {
+            try write(onSchedule, as: name, in: work)
+        }
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "c-three"))
+
+        #expect(await outcome(core, work, "c-three") != nil)
+        #expect(await core.allAgents().count == 1)
+    }
+
+    @Test func archivingOneMakesRoomForTheNextAlong() async throws {
+        // The two features are one: archiving is how somebody makes room, which is what
+        // lets an agent write a workflow without asking in the first place.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        for name in ["a-one", "b-two", "c-three", "d-four"] {
+            try write(onSchedule, as: name, in: work)
+        }
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "b-two", archived: true))
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "d-four"))
+
+        #expect(await core.allWorkflows(in: work).first { $0.workflowID == "d-four" }?
+            .overLimit == nil)
+        #expect(await core.allAgents().count == 1)
+    }
+
+    @Test func anArchivedOneIsNeverAlsoOverTheLimit() async throws {
+        // Two reasons on one row would be one reason too many, and the useful one is
+        // the decision somebody made.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        for name in ["a-one", "b-two", "c-three", "d-four"] {
+            try write(onSchedule, as: name, in: work)
+        }
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "d-four", archived: true))
+
+        let four = await core.allWorkflows(in: work).first { $0.workflowID == "d-four" }
+        #expect(four?.isArchived == true)
+        #expect(four?.overLimit == nil)
+        #expect(four?.needsAPerson == false)
+    }
+
+    @Test func tenAcrossEveryProjectIsAllThatRuns() async throws {
+        // Ten projects of three is thirty, which is the whole reason the total exists
+        // beside the per-project one.
+        let (locations, root) = try temporary()
+        var folders: [URL] = []
+        for index in 0..<4 {
+            let work = try project(root, "p\(index)")
+            folders.append(work)
+            for name in ["a", "b", "c"] { try write(onSchedule, as: name, in: work) }
+        }
+
+        let core = try await core(locations)
+        for work in folders { await core.rescanWorkflows(in: work) }
+
+        let all = await core.allWorkflows()
+        #expect(all.count == 12, "every file is listed, whatever the ceilings say")
+        #expect(all.filter { $0.overLimit == nil }.count == 10)
+        #expect(all.filter { $0.overLimit == .total }.count == 2)
+        // The last project by path is the one that loses out, and it loses its last
+        // two by name — deterministic, so two windows agree.
+        let refused = all.filter { $0.overLimit == .total }
+        #expect(refused.allSatisfy { $0.folder == folders[3] })
+        #expect(refused.map(\.workflowID).sorted() == ["b", "c"])
+    }
+
+    @Test func aWorkflowOverTheTotalRefusesSayingSo() async throws {
+        let (locations, root) = try temporary()
+        var folders: [URL] = []
+        for index in 0..<4 {
+            let work = try project(root, "p\(index)")
+            folders.append(work)
+            for name in ["a", "b", "c"] { try write(onSchedule, as: name, in: work) }
+        }
+
+        let core = try await core(locations)
+        for work in folders { await core.rescanWorkflows(in: work) }
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "c"))
+
+        #expect(await refusal(core, folders[3], "c") == .overLimit(.total))
+        #expect(await core.allAgents().isEmpty)
+    }
+
+    @Test func archivingInOneProjectMakesRoomInAnother() async throws {
+        // What the total ceiling costs: the remedy is not always in the project you are
+        // looking at, which is why the refusal says "in any project".
+        let (locations, root) = try temporary()
+        var folders: [URL] = []
+        for index in 0..<4 {
+            let work = try project(root, "p\(index)")
+            folders.append(work)
+            for name in ["a", "b", "c"] { try write(onSchedule, as: name, in: work) }
+        }
+
+        let core = try await core(locations)
+        for work in folders { await core.rescanWorkflows(in: work) }
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: folders[0], workflowID: "a", archived: true))
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "b"))
+
+        #expect(await core.allAgents().count == 1)
     }
 
     // MARK: Files that cannot run
@@ -298,8 +465,8 @@ struct WorkflowRefusalTests {
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        _ = try await core.pauseWorkflow(
-            DaemonAPI.WorkflowPauseRequest(folder: work, workflowID: "fine", paused: true))
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "fine", archived: true))
 
         for id in ["fine", "broken", "future", "follow"] {
             try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: id))

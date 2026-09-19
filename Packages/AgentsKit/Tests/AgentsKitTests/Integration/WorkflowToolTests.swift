@@ -5,10 +5,12 @@ import Testing
 
 /// What an agent may do to its project's workflows, and what it is told when it may not.
 ///
-/// The line this suite holds is between reading, which asks nobody, and writing, which
-/// asks the person and does nothing if they decline. Every refusal is checked for its
-/// words as well as its code: the agent reads these, and a refusal it cannot act on is
-/// a refusal that gets retried.
+/// Nothing here asks first: an agent told to set up a workflow writes one, and the
+/// person's say is the project page afterwards, where it can be archived.
+/// What this suite holds is everything that still refuses — a path out of the folder,
+/// front matter nobody could act on, a token that has stopped meaning an agent — and
+/// the words each refusal uses, because the agent reads them and a refusal it cannot
+/// act on is a refusal that gets retried.
 @Suite("The workflow tool", .timeLimit(.minutes(1)))
 struct WorkflowToolTests {
     private func temporary() throws -> (StoreLocations, URL) {
@@ -49,35 +51,25 @@ struct WorkflowToolTests {
             runtimeID: "claude", cwd: project, prompt: "Do a thing"))
         let token = UUID().uuidString
         await core.bindAppToken(token, to: agentID)
-        // A window is open, which is what makes there be anybody to ask.
-        await core.setConnectionCount(1)
         return (core, token, agentID)
     }
 
+    /// One tool call. `keepingAlive` binds the token again first, which a test making
+    /// several calls needs: the fake agent's turn ends when it likes, and a session
+    /// ending drops its token. What these tests are about is the tool, not how long a
+    /// token lives.
     private func call(_ core: DaemonCore, _ token: String,
                       _ action: DaemonAPI.ManageWorkflowsRequest.Action,
-                      id: String? = nil, content: String? = nil) async throws -> String {
-        try await core.manageWorkflows(DaemonAPI.ManageWorkflowsRequest(
+                      id: String? = nil, content: String? = nil,
+                      keepingAlive agentID: UUID? = nil) async throws -> String {
+        if let agentID { await core.bindAppToken(token, to: agentID) }
+        return try await core.manageWorkflows(DaemonAPI.ManageWorkflowsRequest(
             token: token, action: action, workflowID: id, content: content))
     }
 
-    /// Answer the confirmation as soon as one is raised, the way a person would.
-    private func answering(_ core: DaemonCore, _ allow: Bool) -> Task<Void, Never> {
-        Task {
-            for _ in 0..<250 {
-                if let pending = await core.pendingWorkflowConfirmations().first {
-                    await core.answerWorkflowConfirmation(
-                        DaemonAPI.WorkflowConfirmRequest(confirmationID: pending.id, allow: allow))
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(10))
-            }
-        }
-    }
+    // MARK: Reading
 
-    // MARK: Reading asks nobody
-
-    @Test func listingRaisesNoConfirmation() async throws {
+    @Test func listingAProjectWithNoneSaysWhereTheyWouldGo() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, _) = try await core(locations, in: work)
@@ -85,10 +77,10 @@ struct WorkflowToolTests {
         let answer = try await call(core, token, .list)
 
         #expect(answer.contains("no workflows yet"))
-        #expect(await core.pendingWorkflowConfirmations().isEmpty)
+        #expect(answer.contains(WorkflowFile.folderName))
     }
 
-    @Test func readingRaisesNoConfirmation() async throws {
+    @Test func readingGivesBackTheFileItself() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         try FileManager.default.createDirectory(at: WorkflowFile.folder(in: work),
@@ -99,7 +91,6 @@ struct WorkflowToolTests {
         let answer = try await call(core, token, .read, id: "advisories")
 
         #expect(answer == sample)
-        #expect(await core.pendingWorkflowConfirmations().isEmpty)
     }
 
     @Test func listingSaysWhatEachOneIsAndWhatHappenedToIt() async throws {
@@ -109,77 +100,165 @@ struct WorkflowToolTests {
                                                 withIntermediateDirectories: true)
         try Data(sample.utf8).write(to: WorkflowFile.url(for: "advisories", in: work))
         let (core, token, _) = try await core(locations, in: work)
-        _ = try await core.pauseWorkflow(DaemonAPI.WorkflowPauseRequest(
-            folder: work, workflowID: "advisories", paused: true))
 
         let answer = try await call(core, token, .list)
 
         #expect(answer.contains("advisories"))
         #expect(answer.contains("Every weekday at 9am, in a new agent"))
-        #expect(answer.contains("[paused]"))
     }
 
-    // MARK: Writing asks
+    @Test func listingSaysWhichOnesThePersonHasPutAway() async throws {
+        // The agent has to be able to tell a workflow that is running from one somebody
+        // archived, or it will keep offering to fix a thing that is not broken.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try FileManager.default.createDirectory(at: WorkflowFile.folder(in: work),
+                                                withIntermediateDirectories: true)
+        try Data(sample.utf8).write(to: WorkflowFile.url(for: "advisories", in: work))
+        let (core, token, _) = try await core(locations, in: work)
+        _ = try await core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+            folder: work, workflowID: "advisories", archived: true))
 
-    @Test func aWriteApprovedIsLiveWithNoFurtherStep() async throws {
+        let answer = try await call(core, token, .list)
+
+        #expect(answer.contains("[archived]"))
+    }
+
+    // MARK: Writing, which asks nobody either
+
+    @Test func aWriteIsLiveWithNoFurtherStep() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, _) = try await core(locations, in: work)
 
-        let answering = answering(core, true)
         let answer = try await call(core, token, .write, id: "advisories", content: sample)
-        answering.cancel()
 
         #expect(answer.contains("Created advisories"))
         #expect(try Data(contentsOf: WorkflowFile.url(for: "advisories", in: work))
                 == Data(sample.utf8))
-        // Live: no enable step follows. The confirmation was the review.
+        // Live: nothing follows. No confirmation, and no enable step either.
         #expect(await core.allWorkflows(in: work).count == 1)
     }
 
-    @Test func aWriteDeclinedWritesNothingAndSaysSo() async throws {
+    @Test func whatTheAgentIsToldNamesTheTriggerAndWhereToLook() async throws {
+        // FR-036 moved rather than went: the sentence that used to be on a confirmation
+        // is what the agent is handed, in the same words the project-page row uses, so
+        // what it reports back and what the person later sees cannot drift.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, _) = try await core(locations, in: work)
 
-        let answering = answering(core, false)
-        await #expect(throws: JSONRPCError.self) {
-            try await call(core, token, .write, id: "advisories", content: sample)
-        }
-        answering.cancel()
+        let answer = try await call(core, token, .write, id: "advisories", content: sample)
 
-        #expect(FileManager.default.fileExists(
-            atPath: WorkflowFile.url(for: "advisories", in: work).path) == false)
-        #expect(await core.allWorkflows(in: work).isEmpty)
+        #expect(answer.contains("Every weekday at 9am, in a new agent"))
+        #expect(answer.contains("project page"))
+        #expect(answer.contains("archive"))
     }
 
-    @Test func theConfirmationSaysWhatWillRunRatherThanShowingAFile() async throws {
-        // FR-036: judgeable without opening anything. The same string the project page
-        // row uses, so what was approved and what is seen later cannot drift.
+    @Test func aWriteWithNoWindowOpenStillHappens() async throws {
+        // The case asking first could not serve. An agent working at three in the
+        // morning for somebody who closed the window has nobody to ask, and the old
+        // answer — refuse — made the feature turn itself off exactly when it was most
+        // useful.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, _) = try await core(locations, in: work)
+        await core.setConnectionCount(0)
+
+        let answer = try await call(core, token, .write, id: "advisories", content: sample)
+
+        #expect(answer.contains("Created advisories"))
+        #expect(await core.allWorkflows(in: work).count == 1)
+    }
+
+    @Test func anArchivedOneWrittenToAgainStaysArchivedAndTheAgentIsTold() async throws {
+        // The person's one veto is not undone by the agent it was aimed at.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
+        _ = try await call(core, token, .write, id: "advisories", content: sample)
+        _ = try await core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+            folder: work, workflowID: "advisories", archived: true))
 
-        let writing = Task { try? await call(core, token, .write, id: "advisories", content: sample) }
-        var seen: DaemonAPI.WorkflowConfirmation?
-        for _ in 0..<250 {
-            if let pending = await core.pendingWorkflowConfirmations().first { seen = pending; break }
-            try? await Task.sleep(for: .milliseconds(10))
+        let answer = try await call(core, token, .write, id: "advisories", content: sample,
+                                    keepingAlive: agentID)
+
+        #expect(answer.contains("archived"))
+        #expect(await core.allWorkflows(in: work).first?.isArchived == true)
+    }
+
+    @Test func aFourthWorkflowIsRefusedWithTheThreeItAlreadyHas() async throws {
+        // The ceiling an agent meets. Told rather than written-and-inert: an agent that
+        // hears this now can offer to change one of the three instead.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        for name in ["one", "two", "three"] {
+            _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
         }
-        guard let confirmation = seen else {
-            Issue.record("no confirmation was raised")
-            writing.cancel()
-            return
+
+        await #expect(throws: JSONRPCError.self) {
+            try await call(core, token, .write, id: "four", content: sample, keepingAlive: agentID)
         }
 
-        #expect(confirmation.summary == "Every weekday at 9am, in a new agent")
-        #expect(confirmation.prompt == "Check the dependencies for security advisories.")
-        #expect(confirmation.agentID == agentID)
-        #expect(confirmation.action == .create)
+        #expect(FileManager.default.fileExists(
+            atPath: WorkflowFile.url(for: "four", in: work).path) == false)
+        #expect(await core.allWorkflows(in: work).count == 3)
+    }
 
-        await core.answerWorkflowConfirmation(
-            DaemonAPI.WorkflowConfirmRequest(confirmationID: confirmation.id, allow: false))
-        _ = await writing.value
+    @Test func changingOneOfTheThreeIsFineAtTheLimit() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        for name in ["one", "two", "three"] {
+            _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
+        }
+
+        let answer = try await call(core, token, .write, id: "two", content: sample,
+                                    keepingAlive: agentID)
+
+        #expect(answer.contains("Changed two"))
+    }
+
+    @Test func archivingOneLetsAnAgentWriteAnother() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        for name in ["one", "two", "three"] {
+            _ = try await call(core, token, .write, id: name, content: sample, keepingAlive: agentID)
+        }
+        _ = try await core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+            folder: work, workflowID: "two", archived: true))
+
+        let answer = try await call(core, token, .write, id: "four", content: sample,
+                                    keepingAlive: agentID)
+
+        #expect(answer.contains("Created four"))
+    }
+
+    @Test func aWorkflowTooManyAcrossEveryProjectIsRefusedTheSameWay() async throws {
+        // The ceiling an agent meets in a project of its own that is nowhere near full.
+        // The remedy is somewhere else, so the refusal has to say so.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        // Ten elsewhere, three at a time, which is all any project may run.
+        for index in 0..<4 {
+            let other = root.appendingPathComponent("full\(index)", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: WorkflowFile.folder(in: other), withIntermediateDirectories: true)
+            for name in ["a", "b", "c"] {
+                try Data(sample.utf8).write(to: WorkflowFile.url(for: name, in: other))
+            }
+            await core.rescanWorkflows(in: Project.standardize(other))
+        }
+
+        await #expect(throws: JSONRPCError.self) {
+            try await call(core, token, .write, id: "mine", content: sample, keepingAlive: agentID)
+        }
+
+        #expect(FileManager.default.fileExists(
+            atPath: WorkflowFile.url(for: "mine", in: work).path) == false)
     }
 
     @Test func changingAnExistingOneSaysSoRatherThanSayingCreate() async throws {
@@ -190,22 +269,12 @@ struct WorkflowToolTests {
         try Data(sample.utf8).write(to: WorkflowFile.url(for: "advisories", in: work))
         let (core, token, _) = try await core(locations, in: work)
 
-        let writing = Task { try? await call(core, token, .write, id: "advisories", content: sample) }
-        var action: DaemonAPI.WorkflowConfirmation.Action?
-        for _ in 0..<250 {
-            if let pending = await core.pendingWorkflowConfirmations().first {
-                action = pending.action
-                await core.answerWorkflowConfirmation(
-                    DaemonAPI.WorkflowConfirmRequest(confirmationID: pending.id, allow: true))
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        _ = await writing.value
-        #expect(action == .update)
+        let answer = try await call(core, token, .write, id: "advisories", content: sample)
+
+        #expect(answer.contains("Changed advisories"))
     }
 
-    @Test func removingAsksTheSameWayCreatingDoes() async throws {
+    @Test func removingTakesTheFileWithIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         try FileManager.default.createDirectory(at: WorkflowFile.folder(in: work),
@@ -214,9 +283,7 @@ struct WorkflowToolTests {
         let (core, token, _) = try await core(locations, in: work)
         _ = await core.allWorkflows(in: work)
 
-        let answering = answering(core, true)
         let answer = try await call(core, token, .remove, id: "advisories")
-        answering.cancel()
 
         #expect(answer.contains("is gone"))
         #expect(FileManager.default.fileExists(
@@ -225,9 +292,9 @@ struct WorkflowToolTests {
 
     // MARK: Refusals
 
-    @Test func unparseableFrontMatterIsRefusedBeforeAnybodyIsAsked() async throws {
-        // Raising a confirmation for a file that could never fire spends the one moment
-        // of the reader's attention this feature gets.
+    @Test func unparseableFrontMatterIsRefusedRatherThanWritten() async throws {
+        // Said while the agent is still there to fix it, and it keeps a row nobody can
+        // act on off the project page.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, _) = try await core(locations, in: work)
@@ -235,7 +302,6 @@ struct WorkflowToolTests {
         await #expect(throws: JSONRPCError.self) {
             try await call(core, token, .write, id: "broken", content: "---\nagent: new\n---\n\nGo.")
         }
-        #expect(await core.pendingWorkflowConfirmations().isEmpty)
         #expect(FileManager.default.fileExists(
             atPath: WorkflowFile.url(for: "broken", in: work).path) == false)
     }
@@ -250,20 +316,7 @@ struct WorkflowToolTests {
                 try await call(core, token, .write, id: escape, content: sample)
             }
         }
-        #expect(await core.pendingWorkflowConfirmations().isEmpty)
-    }
-
-    @Test func aWriteWithNoWindowOpenIsToldRatherThanSwallowed() async throws {
-        let (locations, root) = try temporary()
-        let work = try project(root)
-        let (core, token, _) = try await core(locations, in: work)
-        await core.setConnectionCount(0)
-
-        await #expect(throws: JSONRPCError.self) {
-            try await call(core, token, .write, id: "advisories", content: sample)
-        }
-        #expect(FileManager.default.fileExists(
-            atPath: WorkflowFile.url(for: "advisories", in: work).path) == false)
+        #expect(await core.allWorkflows(in: work).isEmpty)
     }
 
     @Test func aTokenThatNoLongerSpeaksForAnAgentIsRefused() async throws {
@@ -286,11 +339,13 @@ struct WorkflowToolTests {
         }
     }
 
-    // MARK: The guard on narrowing auto-allow
+    // MARK: Auto-allow
 
-    @Test func theAppAnswersForItsOwnToolsButNotForThisOne() async throws {
-        // Suggestions and show-file are questions with no information in them, asked
-        // once a turn. A file that starts agents on a timer is the opposite.
+    @Test func theAppAnswersForItsOwnToolsAndNothingElse() async throws {
+        // All three of ours, none of the agent's. A runtime that asks before every call
+        // must not be able to stall the app's own plumbing on a question nobody is
+        // there to answer — and for the workflow tool the answer is the project page,
+        // after the fact, where there is something to look at.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, _, agentID) = try await core(locations, in: work)
@@ -304,7 +359,7 @@ struct WorkflowToolTests {
 
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.suggestPrompts)")) != nil)
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.showFile)")) != nil)
-        #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.manageWorkflows)")) == nil)
+        #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.manageWorkflows)")) != nil)
         #expect(await core.autoAllowed(request(named: "Write")) == nil)
     }
 }

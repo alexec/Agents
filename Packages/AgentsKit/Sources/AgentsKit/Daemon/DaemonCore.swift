@@ -68,15 +68,6 @@ public actor DaemonCore {
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?
-    /// Writes an agent has asked for and nobody has answered yet. Held here for the
-    /// same reason permissions and forms are: the question can arrive while no window
-    /// is open, and the agent is owed an answer either way.
-    var workflowConfirmations: [UUID: PendingWorkflowConfirmation] = [:]
-
-    struct PendingWorkflowConfirmation: Sendable {
-        var confirmation: DaemonAPI.WorkflowConfirmation
-        var answer: CheckedContinuation<Bool, Never>
-    }
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -422,10 +413,6 @@ public actor DaemonCore {
         for (_, task) in workflowRescans { task.cancel() }
         workflowRescans.removeAll()
         stopWatchingAllWorkflows()
-        // Nobody is going to answer these now. An agent blocked on one is told no
-        // rather than left holding a promise the daemon cannot keep.
-        for (_, pending) in workflowConfirmations { pending.answer.resume(returning: false) }
-        workflowConfirmations.removeAll()
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this

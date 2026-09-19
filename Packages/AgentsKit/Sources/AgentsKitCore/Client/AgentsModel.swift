@@ -22,6 +22,10 @@ public final class AgentsModel {
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
 
+    /// Every project's workflows, newest state winning. Here rather than in the Mac's
+    /// own model because a workflow is about the work, and the phone will want them.
+    public private(set) var workflows: [WorkflowSummary] = []
+
     /// The transcript of the agent being read, and only that one. A client holds one
     /// page of one conversation, because an hour of transcript is not something to
     /// carry around, least of all over a mobile connection.
@@ -48,13 +52,6 @@ public final class AgentsModel {
     /// that made it, and a client that was not listening asks `agents/resuming` on
     /// connect rather than inferring it.
     public private(set) var resuming: Set<UUID> = []
-
-    /// Every project's workflows, newest state winning. Here rather than in the Mac's
-    /// own model because a workflow is about the work, and the phone will want them.
-    public private(set) var workflows: [WorkflowSummary] = []
-    /// A write an agent has asked for that nobody has answered. At most one is shown at
-    /// a time, the way a permission is.
-    public private(set) var workflowConfirmation: DaemonAPI.WorkflowConfirmation?
 
     public init() {}
 
@@ -109,10 +106,6 @@ public final class AgentsModel {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
 
-        case DaemonAPI.Notification.workflowConfirmation:
-            guard let notification = try? params?.decode(DaemonAPI.WorkflowConfirmationNotification.self) else { return true }
-            workflowConfirmation = notification.confirmation
-
         case DaemonAPI.Notification.agentShowFile:
             guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return true }
             filesToShow[notification.agentID] = notification.file
@@ -151,10 +144,6 @@ public final class AgentsModel {
         workflows.sort {
             $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
         }
-    }
-
-    public func setWorkflowConfirmation(_ confirmation: DaemonAPI.WorkflowConfirmation?) {
-        workflowConfirmation = confirmation
     }
 
     public func replaceWorkflows(_ summaries: [WorkflowSummary]) {

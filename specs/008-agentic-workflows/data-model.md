@@ -1,6 +1,6 @@
 # Phase 1 Data Model: Agentic Workflows
 
-Two halves, deliberately kept apart: what the repository holds, and what the app remembers. A workflow's *definition* is in the file and travels with the code. A workflow's *state* — paused, which agent is its standing one, what happened last — is the app's, and never written back, because writing it would raise a confirmation on every pause and fill the repository's history with state nobody wants to review.
+Two halves, deliberately kept apart: what the repository holds, and what the app remembers. A workflow's *definition* is in the file and travels with the code. A workflow's *state* — archived, which agent is its standing one, what happened last — is the app's, and never written back, because writing it would put the app's own bookkeeping into the repository's history, where nobody wants to review it.
 
 ---
 
@@ -81,7 +81,8 @@ The enumeration FR-026 requires, closed and exhaustive:
 |---|---|
 | `chainTooDeep(depth: Int)` | The fire would exceed the depth limit |
 | `runInFlight` | The previous run has not finished |
-| `paused` | This workflow, or its project, is paused |
+| `archived` | The person put it away |
+| `overLimit` | A ceiling is full: this project's three, or the ten across all projects |
 | `unreadable` | The front matter could not be read |
 | `triggerNotSupported(name: String)` | Every trigger is unrecognised |
 | `agentUnavailable` | `triggering` mode, and the agent can no longer take a prompt |
@@ -119,7 +120,8 @@ What the daemon broadcasts and the project page renders. Definition plus state, 
 | Field | Type |
 |---|---|
 | `workflow` | `Workflow` |
-| `isPaused` | `Bool` (this workflow, or its project) |
+| `isArchived` | `Bool` (put away by the person; never fires, listed under its own heading) |
+| `overLimit` | `WorkflowLimit?` (`project` past the three, `total` past the ten; listed, never fires) |
 | `nextFireAt` | `Date?` (nil when it has no schedule) |
 | `lastOutcome` | `WorkflowOutcome?` |
 | `isRunning` | `Bool` |
@@ -138,14 +140,13 @@ One JSON file at `root/workflows.json`, following `projects.json` exactly: one f
 |---|---|---|
 | `folder` | `URL` | |
 | `workflowID` | `String` | |
-| `isPaused` | `Bool` | |
+| `isArchived` | `Bool` | The person's answer to a workflow an agent wrote unasked. Decoded leniently: a file written before this field existed has no such key |
 | `standingAgentID` | `UUID?` | Adopted on first fire in `standing` mode |
 | `lastFiredAt` | `Date?` | What `nextDue` is measured against |
 | `lastOutcome` | `WorkflowOutcome?` | With its repeat count |
 
-Plus two file-level values:
+Plus one file-level value:
 
-- `pausedProjects: Set<URL>` — project-wide pause (FR-024).
 - `lastTickAt: Date?` — the heartbeat that makes `missedWhileClosed` decidable ([research.md §3](./research.md)).
 
 ### Changes to existing types
@@ -193,7 +194,7 @@ trigger matches
 
 **Ordering rule**, inherited from `record(_:for:)`: persist first, then broadcast. A daemon killed mid-fire leaves something true behind.
 
-**The check is pure.** "May it fire?" takes the workflow, its state, the project's pause set, the proposed depth and the current date, and returns an outcome. No file system, no actor, no clock of its own — which is what makes the whole of FR-021 through FR-026 a table test in `WorkflowOutcomeTests`.
+**The check is pure.** "May it fire?" takes the workflow, its state, the proposed depth and the current date, and returns an outcome. No file system, no actor, no clock of its own — which is what makes the whole of FR-021 through FR-026 a table test in `WorkflowOutcomeTests`.
 
 ---
 

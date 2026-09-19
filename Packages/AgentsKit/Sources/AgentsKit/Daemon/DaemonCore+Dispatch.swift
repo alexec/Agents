@@ -34,13 +34,9 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))
 
-            case DaemonAPI.Method.workflowsPause:
-                let request = try require(params, as: DaemonAPI.WorkflowPauseRequest.self)
-                return .success(try JSONValue.encoding(try pauseWorkflow(request)))
-
-            case DaemonAPI.Method.workflowsPauseProject:
-                let request = try require(params, as: DaemonAPI.WorkflowPauseProjectRequest.self)
-                return .success(try JSONValue.encoding(pauseProjectWorkflows(request)))
+            case DaemonAPI.Method.workflowsArchive:
+                let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
+                return .success(try JSONValue.encoding(try archiveWorkflow(request)))
 
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
@@ -154,14 +150,6 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsManageWorkflows:
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
-
-            case DaemonAPI.Method.workflowsConfirm:
-                let request = try require(params, as: DaemonAPI.WorkflowConfirmRequest.self)
-                answerWorkflowConfirmation(request)
-                return .success([:])
-
-            case DaemonAPI.Method.workflowsPendingConfirmations:
-                return .success(try JSONValue.encoding(pendingWorkflowConfirmations()))
 
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))

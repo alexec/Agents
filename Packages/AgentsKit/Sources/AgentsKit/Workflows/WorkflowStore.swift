@@ -2,14 +2,16 @@ import Foundation
 
 /// What the app remembers about a workflow that its file cannot say.
 ///
-/// Three things, and the reason each is here rather than in the repository is the same:
-/// writing it back would raise a confirmation every time an agent touched it and fill
-/// the project's history with state nobody wants to review. Pausing a workflow is not
-/// a commit.
+/// A few things, and the reason each is here rather than in the repository is the same:
+/// writing it back would put the app's own bookkeeping into the project's history,
+/// where nobody wants to review it. Archiving a workflow is not a commit.
 public struct WorkflowState: Codable, Hashable, Sendable {
     public var folder: URL
     public var workflowID: String
-    public var isPaused: Bool
+    /// Put away by the person: off the project page and never fired again, with the
+    /// file left where it is. This is the answer to an agent writing a workflow
+    /// nobody asked for, and the reason writing one no longer asks first.
+    public var isArchived: Bool
     /// The agent a `standing` workflow keeps. Adopted on its first fire, and replaced
     /// when the one it had is gone.
     public var standingAgentID: UUID?
@@ -20,12 +22,24 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     public var key: String { folder.path + "/" + workflowID }
 
-    public init(folder: URL, workflowID: String, isPaused: Bool = false,
+    /// Read leniently, because a file written before archiving existed has no such key
+    /// and losing every pause to a new field would be a poor trade.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        folder = Project.standardize(try c.decode(URL.self, forKey: .folder))
+        workflowID = try c.decode(String.self, forKey: .workflowID)
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
+        lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
+        lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
+    }
+
+    public init(folder: URL, workflowID: String, isArchived: Bool = false,
                 standingAgentID: UUID? = nil, lastFiredAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil) {
         self.folder = Project.standardize(folder)
         self.workflowID = workflowID
-        self.isPaused = isPaused
+        self.isArchived = isArchived
         self.standingAgentID = standingAgentID
         self.lastFiredAt = lastFiredAt
         self.lastOutcome = lastOutcome
@@ -36,8 +50,6 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 /// workflow.
 struct WorkflowRecords: Codable, Sendable {
     var states: [WorkflowState] = []
-    /// Projects whose workflows are all held, as one switch.
-    var pausedProjects: [URL] = []
     /// When the scheduler last looked. The heartbeat that makes a missed fire
     /// decidable: without it, "was anything listening at 9am?" has no honest answer.
     var lastTickAt: Date?
@@ -50,7 +62,7 @@ struct WorkflowRecords: Codable, Sendable {
 /// pauses something, and `cat` will show it to you.
 ///
 /// A missing or unreadable file is empty state rather than an error. Losing it loses
-/// which workflows were paused and which agent a standing workflow had — every
+/// which workflows were archived and which agent a standing workflow had — every
 /// workflow itself is still in the repository, which is the right thing to keep.
 public struct WorkflowStore: Sendable {
     private let locations: StoreLocations
@@ -100,19 +112,6 @@ extension WorkflowRecords {
         update(folder: folder, workflowID: workflowID) { state in
             state.lastOutcome = outcome.following(state.lastOutcome)
             if case .ran = outcome { state.lastFiredAt = outcome.at }
-        }
-    }
-
-    func isPaused(folder: URL) -> Bool {
-        pausedProjects.contains(Project.standardize(folder))
-    }
-
-    mutating func setPaused(_ paused: Bool, folder: URL) {
-        let standardized = Project.standardize(folder)
-        if paused {
-            if !pausedProjects.contains(standardized) { pausedProjects.append(standardized) }
-        } else {
-            pausedProjects.removeAll { $0 == standardized }
         }
     }
 }

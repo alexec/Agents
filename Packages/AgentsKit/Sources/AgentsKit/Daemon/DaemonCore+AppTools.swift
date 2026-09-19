@@ -136,15 +136,15 @@ extension DaemonCore {
     /// the app may show the app's own suggestions is a question with no information in
     /// it, and asked once a turn it would be worse than not having the feature. The
     /// same goes for opening a file in a read-only pane, in a folder the agent can
-    /// already read, in the window the person is looking at. It is allowed only where
-    /// the runtime offered allowing it, and only for those two tools.
+    /// already read, in the window the person is looking at.
     ///
-    /// Not the workflow tool, which is the app's own and is the opposite case: writing
-    /// a file that starts agents unattended is a question worth asking. Its own
-    /// confirmation is raised by the daemon rather than left to the runtime, because
-    /// Copilot asks before every tool call and the Claude adapter frequently asks
-    /// before none — waiting for them would be strict under one and wide open under
-    /// the other.
+    /// The workflow tool is here too, which it was not at first. A question in front
+    /// of the writing was answerable only by somebody willing to read a prompt they
+    /// had not asked to see, and under a runtime that asks before every call it was
+    /// also the thing that stopped an agent dead whenever nobody was looking. The
+    /// answer is after the fact instead: a workflow is written, appears on the project
+    /// page, and can be archived there by somebody who can see what it does.
+    /// Allowed only where the runtime offered allowing it, and only for these three.
     func autoAllowed(_ request: PermissionRequest) -> PermissionOption? {
         guard request.toolCall.isAutoAllowable else { return nil }
         return request.options.first { $0.kind == .allowAlways }
@@ -154,16 +154,12 @@ extension DaemonCore {
 
 /// The workflow tool: what an agent may do to its own project's standing arrangements.
 ///
-/// Reading asks nobody. Writing asks the person, and the question comes from here
-/// rather than from the runtime — see `autoAllowed` above for why that matters.
+/// Nothing here asks first. An agent told to set up a workflow sets one up, and the
+/// person's say is on the project page afterwards, where a workflow can be archived by
+/// somebody looking at what it actually does. Asking first was tried and
+/// was worse in both directions: it put a prompt nobody had asked to read in front of
+/// a decision, and it left the agent blocked whenever there was no window to read it.
 extension DaemonCore {
-    /// How long a write waits for an answer before giving up.
-    ///
-    /// A runtime blocked on a question nobody is going to answer is a conversation that
-    /// never ends. Two minutes is long enough to read a prompt and short enough that an
-    /// agent is not left holding a promise after somebody has walked away.
-    static let workflowConfirmationTimeout = Duration.seconds(120)
-
     public func manageWorkflows(_ request: DaemonAPI.ManageWorkflowsRequest) async throws -> String {
         guard let agentID = appTokens[request.token], let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -180,13 +176,13 @@ extension DaemonCore {
         case .read:
             return try readWorkflowForAgent(request.workflowID, in: project)
         case .write:
-            return try await writeWorkflowForAgent(request, in: project, agentID: agentID)
+            return try writeWorkflowForAgent(request, in: project)
         case .remove:
-            return try await removeWorkflowForAgent(request.workflowID, in: project, agentID: agentID)
+            return try removeWorkflowForAgent(request.workflowID, in: project)
         }
     }
 
-    // MARK: Reading, which asks nobody
+    // MARK: Reading
 
     private func listWorkflowsForAgent(in project: URL) -> String {
         let listed = allWorkflows(in: project)
@@ -198,7 +194,8 @@ extension DaemonCore {
         }
         let lines = listed.map { summary -> String in
             var line = "- \(summary.workflowID): \(summary.workflow.summary)"
-            if summary.isPaused { line += " [paused]" }
+            if summary.isArchived { line += " [archived]" }
+            if summary.overLimit != nil { line += " [over the limit, so it will not run]" }
             if let outcome = summary.lastOutcome { line += " — \(outcome.summary)" }
             return line
         }
@@ -215,19 +212,19 @@ extension DaemonCore {
         return text
     }
 
-    // MARK: Writing, which does not
+    // MARK: Writing
 
     private func writeWorkflowForAgent(_ request: DaemonAPI.ManageWorkflowsRequest,
-                                       in project: URL, agentID: UUID) async throws -> String {
+                                       in project: URL) throws -> String {
         let url = try workflowURL(request.workflowID, in: project)
         guard let content = request.content, !content.isEmpty else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was written: `content` has to be the whole file.")
         }
 
-        // Parsed before anybody is asked. Raising a confirmation for a file that could
-        // never fire spends the one moment of the reader's attention this feature gets,
-        // and tells the agent nothing it could act on.
+        // Parsed before anything is written. A file that could never fire is worth
+        // saying so about while the agent is still there to fix it, and it keeps a row
+        // nobody can act on off the project page.
         let workflowID = url.deletingPathExtension().lastPathComponent
         let parsed = WorkflowFile.parse(content, workflowID: workflowID, in: project)
         if case .unreadable(let why) = parsed.problem {
@@ -235,94 +232,69 @@ extension DaemonCore {
                                message: "That front matter could not be read: \(why). Nothing was written.")
         }
 
+        // A new one, in a project already holding as many as it may. Refused here
+        // rather than written and left inert, because an agent that is told now can
+        // offer to change one of the three instead — and because a file written to no
+        // effect is the kind of thing nobody finds until it matters.
         let exists = FileManager.default.fileExists(atPath: url.path)
-        let allowed = try await askAboutWorkflow(
-            DaemonAPI.WorkflowConfirmation(
-                agentID: agentID, folder: project, workflowID: workflowID,
-                action: exists ? .update : .create,
-                summary: parsed.summary, prompt: parsed.prompt))
-        guard allowed else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notConfirmed,
-                               message: "They declined, so nothing was written.")
+        if !exists {
+            adoptWorkflows(in: project)
+            let records = workflowStore.load()
+            if liveWorkflowCount(in: project, records: records) >= WorkflowLimit.project.allowed {
+                let names = liveWorkflowIDs(in: project, records: records).joined(separator: ", ")
+                throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                                   message: """
+                                    Nothing was written: a project may run \
+                                    \(WorkflowLimit.project.allowed) workflows and this one \
+                                    already has \(names). Change one of those instead, or ask \
+                                    them to archive one to make room.
+                                    """)
+            }
+            if liveWorkflowCount(records: records) >= WorkflowLimit.total.allowed {
+                throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                                   message: """
+                                    Nothing was written: \(WorkflowLimit.total.allowed) \
+                                    workflows are already running across their projects, which \
+                                    is as many as this app runs at once. Ask them to archive \
+                                    one — anywhere — to make room.
+                                    """)
+            }
         }
-
         try FileManager.default.createDirectory(at: WorkflowFile.folder(in: project),
                                                 withIntermediateDirectories: true)
         // Written whole, exactly as it was handed over. Nothing is re-serialised from
         // the parsed form, which is what makes a key this version does not know survive
         // being written by an agent running against a later one.
         try Data(content.utf8).write(to: url, options: .atomic)
+        // An archived id written to again stays archived. The one thing the person can
+        // say about a workflow they did not ask for should not be undone by the agent
+        // that wrote it.
+        let archived = workflowStore.load()
+            .state(folder: project, workflowID: workflowID)?.isArchived ?? false
         rescanWorkflows(in: project)
+        if archived {
+            return """
+                \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
+                It is archived, though, so it will not run until they bring it back \
+                from the project page. Tell them it is there.
+                """
+        }
         return """
             \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
-            It is live now; it shows on the project page, where they can run or pause it.
+            It is live now; it shows on the project page, where they can run it, pause \
+            it, or archive it if it is not what they wanted.
             """
     }
 
-    private func removeWorkflowForAgent(_ workflowID: String?, in project: URL,
-                                        agentID: UUID) async throws -> String {
+    private func removeWorkflowForAgent(_ workflowID: String?, in project: URL) throws -> String {
         let url = try workflowURL(workflowID, in: project)
         guard let workflow = workflow(url.deletingPathExtension().lastPathComponent, in: project) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(workflowID ?? "") in this project.")
         }
-        let allowed = try await askAboutWorkflow(
-            DaemonAPI.WorkflowConfirmation(
-                agentID: agentID, folder: project, workflowID: workflow.workflowID,
-                action: .remove, summary: workflow.summary, prompt: workflow.prompt))
-        guard allowed else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notConfirmed,
-                               message: "They declined, so nothing was removed.")
-        }
         try FileManager.default.removeItem(at: url)
         rescanWorkflows(in: project)
         return "\(workflow.workflowID) is gone. It will not run again."
-    }
-
-    // MARK: The question
-
-    /// Put a write to the person and wait.
-    ///
-    /// Held on the actor for the same reason a permission or a form is: the question can
-    /// arrive while no window is open, and the agent is owed an answer either way.
-    /// Deliberately not a `PermissionRequest` — that is a thing a runtime asked and is
-    /// answered back into an ACP session, whereas this begins here and is answered by
-    /// doing or not doing a file write.
-    private func askAboutWorkflow(_ confirmation: DaemonAPI.WorkflowConfirmation) async throws -> Bool {
-        guard connectionCount > 0 else {
-            // Told, not swallowed, the way `showFile` is. An agent working for somebody
-            // who closed the window an hour ago deserves to know why nothing happened.
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
-                               message: "No window is open, so there was nobody to ask. Nothing was written.")
-        }
-
-        let timeout = Task { [weak self] in
-            try? await Task.sleep(for: DaemonCore.workflowConfirmationTimeout)
-            guard !Task.isCancelled else { return }
-            await self?.answerWorkflowConfirmation(
-                DaemonAPI.WorkflowConfirmRequest(confirmationID: confirmation.id, allow: false))
-        }
-        defer { timeout.cancel() }
-
-        let allowed = await withCheckedContinuation { continuation in
-            workflowConfirmations[confirmation.id] =
-                PendingWorkflowConfirmation(confirmation: confirmation, answer: continuation)
-            broadcast(DaemonAPI.Notification.workflowConfirmation,
-                      DaemonAPI.WorkflowConfirmationNotification(confirmation: confirmation))
-        }
-        return allowed
-    }
-
-    /// The person answered, or nobody did.
-    public func answerWorkflowConfirmation(_ request: DaemonAPI.WorkflowConfirmRequest) {
-        guard let pending = workflowConfirmations.removeValue(forKey: request.confirmationID) else { return }
-        broadcast(DaemonAPI.Notification.workflowConfirmation,
-                  DaemonAPI.WorkflowConfirmationNotification(confirmation: nil))
-        pending.answer.resume(returning: request.allow)
-    }
-
-    public func pendingWorkflowConfirmations() -> [DaemonAPI.WorkflowConfirmation] {
-        workflowConfirmations.values.map(\.confirmation).sorted { $0.askedAt < $1.askedAt }
     }
 
     // MARK: The boundary

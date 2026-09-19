@@ -132,7 +132,11 @@ struct StatusIcon: View {
     }
 
     private var tint: Color {
-        state == .waitingOnUser ? .accentColor : .secondary
+        switch state {
+        case .waitingOnUser: return .orange
+        case .finished: return .green
+        default: return .secondary
+        }
     }
 
     private var description: String {

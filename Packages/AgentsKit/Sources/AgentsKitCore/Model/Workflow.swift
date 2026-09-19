@@ -101,9 +101,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     /// What it is, in one line, in the words a person would use.
     ///
-    /// One renderer, read by the project-page row and by the confirmation an agent's
-    /// write raises. Two would drift, and the thing you approved would stop being the
-    /// thing you later see.
+    /// One renderer, read by the project-page row and by what an agent's write is told
+    /// it made. Two would drift, and what the agent reports would stop being what the
+    /// person later sees.
     public var summary: String {
         if let problem { return problem.message }
         let supported = supportedTriggers
@@ -146,8 +146,13 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 /// next rather than drifting.
 public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var workflow: Workflow
-    /// This workflow, or the project it is in.
-    public var isPaused: Bool
+    /// Put away by the person. Archived workflows are still listed — under their own
+    /// heading, where they can be brought back — and never run.
+    public var isArchived: Bool
+    /// Which ceiling this one is past, if any: listed, and inert until something else
+    /// is archived. Resolved by the daemon because it is a fact about every project at
+    /// once rather than about this workflow, and two windows must not count differently.
+    public var overLimit: WorkflowLimit?
     /// When a clock will next make it run. `nil` when nothing will.
     public var nextFireAt: Date?
     /// What happened the last time it was asked to run. The only evidence a refused
@@ -159,10 +164,24 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var folder: URL { workflow.folder }
     public var workflowID: String { workflow.workflowID }
 
-    public init(workflow: Workflow, isPaused: Bool = false, nextFireAt: Date? = nil,
+    /// Lenient about `isArchived` for the same reason `WorkflowState` is: a window and
+    /// a daemon of different vintages should disagree about a flag, not fail.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        workflow = try c.decode(Workflow.self, forKey: .workflow)
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        overLimit = try c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)
+        nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
+        lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
+        isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
+    }
+
+    public init(workflow: Workflow, isArchived: Bool = false,
+                overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false) {
         self.workflow = workflow
-        self.isPaused = isPaused
+        self.isArchived = isArchived
+        self.overLimit = overLimit
         self.nextFireAt = nextFireAt
         self.lastOutcome = lastOutcome
         self.isRunning = isRunning
@@ -174,6 +193,12 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// A refusal that will resolve itself is information; a refusal that will keep
     /// happening until somebody acts is the only kind that earns it.
     public var needsAPerson: Bool {
+        // Nothing put away is anybody's problem any more, including a file that cannot
+        // be read: archiving it is how you say so.
+        if isArchived { return false }
+        // Nothing resolves this one on its own: it stays over the limit until somebody
+        // archives or removes another.
+        if overLimit != nil { return true }
         if workflow.problem?.needsAPerson == true { return true }
         if case .refused(let refusal, _, _) = lastOutcome { return refusal.needsAPerson }
         return false

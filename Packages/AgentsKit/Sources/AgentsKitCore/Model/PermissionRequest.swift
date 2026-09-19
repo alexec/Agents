@@ -128,13 +128,14 @@ public struct ToolCall: Codable, Hashable, Sendable {
 
     /// Whether the app may answer the runtime's permission question itself.
     ///
-    /// Deliberately narrower than `isTheApps`. Showing the app's own suggestions, and
-    /// opening a read-only pane on a file the agent can already read, are questions with
-    /// no information in them — asked once a turn they would be worse than not having
-    /// the feature. Writing a file that starts agents on a timer is the opposite: the
-    /// question carries everything there is to know, and it is asked by the daemon
-    /// itself rather than left to whether this particular runtime happens to ask.
-    public var isAutoAllowable: Bool { isSuggestingPrompts || isShowingFile }
+    /// All three of the app's own tools, because none of them is a question worth
+    /// putting to somebody. Suggestions and a read-only pane carry no information to
+    /// decide on; a workflow is answerable *after* it exists, on the project page,
+    /// where it can be paused or archived by somebody who has seen what it does. A
+    /// sheet in front of the writing would only make the uninformed answer the quick
+    /// one — and, under a runtime that asks before every call, would stop the writing
+    /// dead whenever nobody was looking.
+    public var isAutoAllowable: Bool { isTheApps }
 
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {

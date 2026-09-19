@@ -46,10 +46,12 @@ struct WorkflowRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
         .contextMenu {
-            Button(summary.isPaused ? "Resume" : "Pause") {
-                Task { await model.setWorkflowPaused(summary, !summary.isPaused) }
+            if summary.isArchived {
+                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+            } else {
+                Button("Run now") { Task { await model.runWorkflow(summary) } }
+                Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
-            Button("Run now") { Task { await model.runWorkflow(summary) } }
             Divider()
             Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([
@@ -66,7 +68,10 @@ struct WorkflowRow: View {
         HStack(spacing: 4) {
             if let next = nextText {
                 Text(next)
-                Text("·")
+                // Only when something follows it. A workflow that has never fired has
+                // nothing on the right of the dot, and a separator separating one thing
+                // reads as a line that got cut off.
+                if hasHappened { Text("·") }
             }
             if let agentID = ranAgentID {
                 // A run leads to the agent it started. The only thing on this row that
@@ -89,44 +94,77 @@ struct WorkflowRow: View {
         .lineLimit(1)
     }
 
+    /// Two icons, and on an archived row one word.
+    ///
+    /// Icons because this row repeats down the page and two words each would be the
+    /// loudest thing on it, and because what they do — run it, put it away — is what
+    /// those two symbols have always meant. The words are in the tooltips and in the
+    /// context menu, which is where a person goes when a symbol is not enough.
     private var controls: some View {
         HStack(spacing: 6) {
-            if summary.isRunning {
-                Text("Running…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                // Offered on every row, always — including a paused one and one whose
-                // triggers this version cannot act on. Being able to try a workflow is
-                // what makes writing one worth doing.
-                Button("Run now") { Task { await model.runWorkflow(summary) } }
+            // An archived workflow gets one control, and it is the way back. Nothing
+            // else on this row does anything while it is put away, and offering to run
+            // a thing that will not run would be offering a lie.
+            if summary.isArchived {
+                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.glass)
                     .font(.caption)
+            } else {
+                if summary.isRunning {
+                    Text("Running…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    // Offered on every row, always — including one whose triggers this
+                    // version cannot act on, and one over a ceiling. Being able to try a
+                    // workflow is what makes writing one worth doing, and a refusal says
+                    // why on the row rather than doing nothing.
+                    Button {
+                        Task { await model.runWorkflow(summary) }
+                    } label: {
+                        Image(systemName: "play")
+                    }
+                    .buttonStyle(.glass)
+                    .help("Run this workflow now")
+                }
+
+                // The only way to hold a workflow. There was a pause here too, and it
+                // said the same thing in a second place: both stop it running, both are
+                // one tap back. This one also says where the row went.
+                Button {
+                    Task { await model.setWorkflowArchived(summary, true) }
+                } label: {
+                    Image(systemName: "archivebox")
+                }
+                .buttonStyle(.glass)
+                .help("Archive this workflow: it stops running and moves under Archived")
             }
-            Button {
-                Task { await model.setWorkflowPaused(summary, !summary.isPaused) }
-            } label: {
-                Image(systemName: summary.isPaused ? "play" : "pause")
-            }
-            .buttonStyle(.glass)
-            .help(summary.isPaused ? "Resume this workflow" : "Pause this workflow")
         }
     }
 
     private var nextText: String? {
-        guard !summary.isPaused, let next = summary.nextFireAt else { return nil }
+        guard !summary.isArchived, summary.overLimit == nil,
+              let next = summary.nextFireAt else { return nil }
         return "Next \(next.formatted(.relative(presentation: .named)))"
     }
+
+    /// Whether anything is drawn after the next-fire time.
+    private var hasHappened: Bool { ranAgentID != nil || outcomeText != nil }
 
     private var ranAgentID: UUID? {
         if case .ran(let agentID, _) = summary.lastOutcome { return agentID }
         return nil
     }
 
-    /// What happened last, said plainly. A paused workflow says so instead, because
-    /// that is the more useful fact about it.
+    /// What happened last, said plainly. A workflow that is not going to run says that
+    /// instead, because it is the more useful fact about it.
     private var outcomeText: String? {
-        if summary.isPaused { return "Paused" }
+        if summary.isArchived { return "Archived — it will not run" }
+        // Ahead of the pause, because unpausing it would change nothing: what has to
+        // happen is that something else goes.
+        if let limit = summary.overLimit {
+            return "\(limit.sentence). \(limit.remedy)"
+        }
         guard let outcome = summary.lastOutcome else { return nil }
         let when = outcome.at.formatted(.relative(presentation: .named))
         switch outcome {
@@ -151,17 +189,18 @@ private struct WorkflowStatusIcon: View {
     }
 
     private var name: String {
+        if summary.isArchived { return "archivebox" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
-        if summary.isPaused { return "pause.circle" }
         if !summary.workflow.canFire { return "circle.dashed" }
         return "clock"
     }
 
     private var label: String {
+        if summary.isArchived { return "Archived" }
+        if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }
         if summary.isRunning { return "Running" }
-        if summary.isPaused { return "Paused" }
         if !summary.workflow.canFire { return "Not yet supported" }
         return "Waiting for its trigger"
     }
