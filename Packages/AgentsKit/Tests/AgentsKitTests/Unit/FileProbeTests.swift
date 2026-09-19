@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("What a file is, from its first bytes")
 struct FileProbeTests {

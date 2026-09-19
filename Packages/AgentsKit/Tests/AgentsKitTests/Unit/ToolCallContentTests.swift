@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The payloads below were captured from the real runtimes on 2026-09-18 and are
 /// written out here exactly as they arrived.

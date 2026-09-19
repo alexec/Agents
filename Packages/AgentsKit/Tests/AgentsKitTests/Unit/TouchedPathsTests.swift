@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("Which files the agent touched")
 struct TouchedPathsTests {

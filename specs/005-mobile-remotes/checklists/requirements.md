@@ -40,3 +40,21 @@
 - Three decisions carry the most weight and are the first candidates for `/speckit-clarify`: allowing
   a rendezvous in the middle that cannot read the traffic; leaving a sleeping Mac unreachable rather
   than waking it; and keeping project creation and project archiving at the Mac.
+
+## Post-plan note (2026-09-18)
+
+Planning surfaced three places where the spec's wording outran what the platform can do. They are
+recorded in `plan.md` under "Deviations from the spec" and need a decision before `/speckit-tasks`:
+
+- **FR-007** says pairing is "an exchange begun at the Mac". It is begun on the phone and confirmed
+  at the Mac. Proposed: amend to "confirmed at the Mac".
+- **SC-006** says 1 second each way. A store-and-forward channel is seconds. Proposed: amend to
+  "within 3 seconds while the remote is in front", and give the 1-second figure to FR-004.
+- **FR-004** (prefer a direct connection) is a whole second transport and is planned as the last
+  phase. If cut, it and the tighter half of SC-006 should come out of the spec.
+
+The spec has not been edited — these are the user's calls, not the plan's.
+
+One assumption in the spec also hardened into a constraint: the feature needs both devices signed
+into the same Apple Account with iCloud Drive on. That is narrower than "no account" implied and is
+called out in the plan's Constitution Check.

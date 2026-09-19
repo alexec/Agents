@@ -41,6 +41,10 @@ public final class DaemonServer: @unchecked Sendable {
 
         listenFD = socket(AF_UNIX, SOCK_STREAM, 0)
         guard listenFD >= 0 else { throw DaemonServerError.cannotCreateSocket(errno: errno) }
+        // The front door belongs to this process. A child holding a copy of it keeps
+        // the socket answering after the daemon has gone, so the window connects to
+        // nobody and waits for a reply that is never coming.
+        fcntl(listenFD, F_SETFD, FD_CLOEXEC)
 
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -71,6 +75,9 @@ public final class DaemonServer: @unchecked Sendable {
                     return
                 }
                 guard let self, !self.stopped.isSet else { close(fd); return }
+                // accept() hands back a descriptor with the flag clear however the
+                // listener was opened, so each window's connection says it again.
+                fcntl(fd, F_SETFD, FD_CLOEXEC)
                 self.accepted(fd)
             }
         }

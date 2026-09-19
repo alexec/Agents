@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// "Installed but not usable" is a state the app already detected and could not fix.
 @Suite("Signing in and out", .timeLimit(.minutes(1)))

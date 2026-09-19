@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Opt-in, against the real runtimes: `AGENTS_LIVE=1 swift test --filter Live`.
 ///

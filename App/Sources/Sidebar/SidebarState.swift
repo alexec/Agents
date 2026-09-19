@@ -114,6 +114,10 @@ final class AgentPaneState {
     /// moved does not carry a stale path around.
     var folder: URL?
     var openFile: URL?
+    /// Where in the open file to put the reader, counted from one. Set when the agent
+    /// asked for this file by line; nil whenever the user opened it themselves, which
+    /// is why it is cleared beside `openFile` rather than left to go stale.
+    var openLine: Int?
     var browserURL: URL?
     var isAttachedToShell = false
 

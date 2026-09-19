@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The daemon over its real socket, which is the part that has to survive a window.
 @Suite("Daemon survival", .timeLimit(.minutes(1)))

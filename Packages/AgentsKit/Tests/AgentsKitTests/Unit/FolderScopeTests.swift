@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The one place in this feature where a mistake writes to the wrong place on somebody's
 /// disk. Refusal is the default and every awkward case is here.

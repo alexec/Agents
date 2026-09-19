@@ -24,7 +24,7 @@ public actor DaemonCore {
     /// The commands we are running for each agent.
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
-    var suggestionTokens: [String: UUID] = [:]
+    var appTokens: [String: UUID] = [:]
     /// Agents whose next prompt carries the line asking for suggestions. Set when a
     /// conversation starts, and again only if a runtime loses one and we have to begin
     /// a new one: the ask lives in the runtime's history, so that is the only time it
@@ -56,7 +56,7 @@ public actor DaemonCore {
         /// so a draft made before the user attached one cannot be used for it.
         var mcpServers: [MCPServer]
         /// Minted with the session, bound to the agent once the start makes one.
-        var suggestionToken: String
+        var appToken: String
     }
 
     struct Pending: Sendable {
@@ -294,7 +294,7 @@ public actor DaemonCore {
         live.removeValue(forKey: agentID)
         // The MCP helper the runtime started dies with it. Its token stops working
         // here at the same moment, rather than whenever that process gets round to it.
-        dropSuggestionTokens(for: agentID)
+        dropAppTokens(for: agentID)
         // Nothing we started for this agent outlives it.
         Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }

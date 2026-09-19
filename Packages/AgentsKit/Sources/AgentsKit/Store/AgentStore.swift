@@ -95,19 +95,3 @@ public actor AgentStore {
         try TranscriptReader(url: locations.transcript(agentID)).count
     }
 }
-
-public struct TranscriptPage: Codable, Hashable, Sendable {
-    /// The index of the first entry in `entries` within the whole transcript, so the
-    /// app can ask for the page before this one.
-    public var firstIndex: Int
-    public var total: Int
-    public var entries: [TranscriptEntry]
-
-    public init(firstIndex: Int, total: Int, entries: [TranscriptEntry]) {
-        self.firstIndex = firstIndex
-        self.total = total
-        self.entries = entries
-    }
-
-    public var hasMoreBefore: Bool { firstIndex > 0 }
-}

@@ -12,25 +12,36 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     let token = CommandLine.arguments[2]
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: DaemonCore.helperLocations)
-    let service = SuggestionService(transport: FDTransport(readFD: 0, writeFD: 1)) { prompts in
+    // Both tools do the same thing with what they are given: hand it to the daemon
+    // and repeat what the daemon says back to the agent. Nothing is decided here.
+    @Sendable func relay(_ method: String, _ request: some Encodable & Sendable,
+                         fallback: String) async -> AppService.Outcome {
         do {
             // Never started here. If no daemon is answering there is no window to show
-            // a suggestion in, and starting one from inside a runtime's own child
-            // process is not this program's business.
+            // anything in, and starting one from inside a runtime's own child process
+            // is not this program's business.
             try await client.connect(startIfNeeded: false)
-            let result = try await client.call(DaemonAPI.Method.agentsSuggestPrompts,
-                                               DaemonAPI.SuggestPromptsRequest(token: token,
-                                                                               prompts: prompts))
+            let result = try await client.call(method, request)
             // Let go straight away. The daemon shuts down when nothing is in hand and
             // nobody is connected, and a helper holding a socket open for a runtime
             // that has gone quiet would be a window that is not there.
             await client.disconnect()
-            return .shown(result["note"]?.stringValue ?? "Shown above the prompt.")
+            return .shown(result["note"]?.stringValue ?? fallback)
         } catch let error as JSONRPCError {
             return .refused(error.message)
         } catch {
             return .refused("The app is not running, so nothing was shown.")
         }
+    }
+
+    let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1)) { prompts in
+        await relay(DaemonAPI.Method.agentsSuggestPrompts,
+                    DaemonAPI.SuggestPromptsRequest(token: token, prompts: prompts),
+                    fallback: "Shown above the prompt.")
+    } showFile: { file in
+        await relay(DaemonAPI.Method.agentsShowFile,
+                    DaemonAPI.ShowFileRequest(token: token, file: file),
+                    fallback: "Open in the files pane.")
     }
     let task = Task {
         await service.run()

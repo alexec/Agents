@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The idle rule is a pure function of three inputs, so it is tested as one. No pty, no
 /// daemon, no clock to wait on.

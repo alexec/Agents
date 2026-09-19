@@ -1,5 +1,6 @@
 import Foundation
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// An ACP agent that does exactly what it is told.
 ///

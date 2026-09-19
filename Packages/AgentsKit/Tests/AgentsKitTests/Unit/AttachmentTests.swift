@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// What may be attached to a prompt, and what the runtime has to have said first.
 @Suite("Attachments")

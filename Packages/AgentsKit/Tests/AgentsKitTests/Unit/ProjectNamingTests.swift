@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Names stay short until there is a reason not to, and then only the folders that
 /// collide grow.

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// A transcript that stalls on one big thing is a transcript nobody scrolls.
 ///

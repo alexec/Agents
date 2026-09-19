@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// A tool call and its updates are the same call. What the updates carry is only what
 /// changed, which is why merging replaces field by field.

@@ -93,8 +93,13 @@ public final class PTY: @unchecked Sendable {
 
         // SETSID is the piece `Process` does not expose. Without a session of its own
         // the child has no controlling terminal, and ^C has no process group to reach.
+        // CLOEXEC_DEFAULT closes everything else the daemon has open: its lock, its
+        // socket, the other shells' masters. A shell in a session of its own outlives
+        // the daemon, and whatever it inherited it goes on holding — which is how a
+        // dead daemon's lock ends up refusing to let the next one start.
         posix_spawnattr_setflags(&attributes,
-                                 Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+                                 Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
+                                       | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_CLOEXEC_DEFAULT))
 
         var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)

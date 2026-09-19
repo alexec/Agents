@@ -1,10 +1,15 @@
 import Foundation
 
-/// How the app talks to the daemon, and how the daemon gets started in the first place.
+/// How a client talks to the daemon, whatever is carrying the bytes.
 ///
-/// The app holds no agent state: it connects, asks, subscribes, and renders what
+/// The client holds no agent state: it connects, asks, subscribes, and renders what
 /// arrives. Reconnecting after the window died is the same three steps, which is why
 /// there is no special case for it.
+///
+/// It does not know what it is connected over. The Mac hands it a Unix socket and the
+/// means to start the helper; a phone hands it a mailbox. Everything below this line
+/// is the same either way, which is the whole reason a remote is not a protocol
+/// change.
 public actor DaemonClient {
     public enum ConnectError: Error, Sendable {
         case noHelper(lookedIn: [String])
@@ -12,18 +17,16 @@ public actor DaemonClient {
         case couldNotConnect
     }
 
-    private let locations: StoreLocations
-    private let helperURL: URL?
+    private let link: any DaemonLink
     private var connection: JSONRPCConnection?
 
-    public init(locations: StoreLocations = .default, helperURL: URL? = nil) {
-        self.locations = locations
-        self.helperURL = helperURL
+    public init(link: any DaemonLink) {
+        self.link = link
     }
 
     public var isConnected: Bool { connection != nil }
 
-    /// Connect, starting the daemon if nothing answers.
+    /// Connect, starting the far end if nothing answers and there is anything to start.
     public func connect(startIfNeeded: Bool = true, timeout: Duration = .seconds(8)) async throws {
         if let connection {
             // A connection that has quietly died still looks like one, so it is asked
@@ -37,7 +40,7 @@ public actor DaemonClient {
             return
         }
         guard startIfNeeded else { throw ConnectError.couldNotConnect }
-        try spawnHelper()
+        try await link.start()
 
         let deadline = ContinuousClock.now.advanced(by: timeout)
         while ContinuousClock.now < deadline {
@@ -51,90 +54,10 @@ public actor DaemonClient {
     }
 
     private func open() async throws -> JSONRPCConnection {
-        let fd = try connectSocket(path: locations.socket.path)
-        let connection = JSONRPCConnection(transport: FDTransport(socket: fd))
+        let connection = JSONRPCConnection(transport: try await link.transport())
         await connection.start()
         _ = try await connection.call(DaemonAPI.Method.ping)
         return connection
-    }
-
-    private func connectSocket(path: String) throws -> Int32 {
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw ConnectError.couldNotConnect }
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        _ = withUnsafeMutablePointer(to: &address.sun_path) { pointer in
-            path.withCString { source in
-                strncpy(UnsafeMutableRawPointer(pointer).assumingMemoryBound(to: CChar.self), source, 103)
-            }
-        }
-        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
-        let result = withUnsafePointer(to: &address) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, size) }
-        }
-        guard result == 0 else {
-            close(fd)
-            throw ConnectError.couldNotConnect
-        }
-        return fd
-    }
-
-    /// Start the helper in a session of its own.
-    ///
-    /// `POSIX_SPAWN_SETSID` is the whole trick: the helper is not in the app's process
-    /// group, so quitting, crashing or force quitting the app leaves it and its agents
-    /// alone. Its output goes to the log because nothing will be there to read it.
-    private func spawnHelper() throws {
-        let helper = try locateHelper()
-        // The helper's output goes to the log, and posix_spawn refuses the whole spawn
-        // if that file cannot be opened. On a first run the directory does not exist
-        // yet, and the daemon that would have made it is the thing being started.
-        try? locations.createDirectories()
-        var attributes: posix_spawnattr_t?
-        posix_spawnattr_init(&attributes)
-        defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSID))
-
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        defer { posix_spawn_file_actions_destroy(&actions) }
-        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_addopen(&actions, 1, locations.log.path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-        posix_spawn_file_actions_adddup2(&actions, 1, 2)
-
-        var pid: pid_t = 0
-        let arguments: [String] = [helper.path]
-        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
-        argv.append(nil)
-        defer { for pointer in argv where pointer != nil { free(pointer) } }
-
-        var environment: [UnsafeMutablePointer<CChar>?] = ProcessInfo.processInfo.environment
-            .map { strdup("\($0.key)=\($0.value)") }
-        environment.append(nil)
-        defer { for pointer in environment where pointer != nil { free(pointer) } }
-
-        let status = posix_spawn(&pid, helper.path, &actions, &attributes, &argv, &environment)
-        guard status == 0 else {
-            let reason = String(cString: strerror(status))
-            throw ConnectError.couldNotStartHelper("\(helper.path): \(reason)")
-        }
-    }
-
-    private func locateHelper() throws -> URL {
-        if let helperURL { return helperURL }
-        var candidates: [URL] = []
-        // In the app: Agents.app/Contents/Helpers/agentsd.
-        if let helpers = Bundle.main.builtInPlugInsURL?
-            .deletingLastPathComponent().appendingPathComponent("Helpers/agentsd") {
-            candidates.append(helpers)
-        }
-        candidates.append(Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/agentsd"))
-        // Beside the executable, which is where a command-line build puts it.
-        candidates.append(Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("agentsd"))
-        for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate.path) {
-            return candidate
-        }
-        throw ConnectError.noHelper(lookedIn: candidates.map(\.path))
     }
 
     // MARK: Asking

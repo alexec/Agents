@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// A project is its folder, so everything here is about one folder being one project
 /// however it was written down, and about not losing what a newer build wrote.

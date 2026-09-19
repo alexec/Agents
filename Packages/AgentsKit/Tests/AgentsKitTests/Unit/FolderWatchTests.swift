@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// These exist because the first version of `FolderWatch` had no test and crashed the
 /// app on the first event it ever received. It read FSEvents' `paths` as an `NSArray`

@@ -1,5 +1,6 @@
 import Foundation
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Hands the daemon sessions wired to fake agents, so the whole daemon runs with no
 /// CLI installed, no credentials and no network.

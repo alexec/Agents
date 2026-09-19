@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Every kind of update the protocol defines, read the way a runtime sends it.
 @Suite("Reading session updates")

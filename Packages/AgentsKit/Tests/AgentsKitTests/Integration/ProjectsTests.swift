@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// A project is a folder, and the list of them is worked out rather than kept. These
 /// are the properties that make that safe: the union is right, the names are right, and

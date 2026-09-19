@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("Plans", .timeLimit(.minutes(1)))
 struct PlanTests {

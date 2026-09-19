@@ -627,6 +627,10 @@ struct PromptBar: View {
         let going = attachments
         text = ""
         attachments = []
+        // Whatever was suggested has been answered, by being taken or by being typed
+        // past. The daemon clears it when the turn begins, but the field empties now,
+        // and an emptied field must not offer last turn's words back.
+        dismissedSuggestions = true
         Task {
             if agent == nil {
                 await model.startDraft(prompt: outgoing, attachments: going)

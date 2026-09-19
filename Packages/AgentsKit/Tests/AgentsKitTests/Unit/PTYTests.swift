@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("A program on a pseudo-terminal")
 struct PTYTests {

@@ -12,7 +12,11 @@ public final class DaemonLock: @unchecked Sendable {
     public init?(at url: URL) {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
-        descriptor = open(url.path, O_CREAT | O_RDWR, 0o644)
+        // O_CLOEXEC because the lock must die with the daemon and nothing else. A
+        // child that inherits it — a shell, which outlives the daemon by design —
+        // keeps holding the lock afterwards, and the next daemon reads that as
+        // "another one is already running" and exits without a word.
+        descriptor = open(url.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
         guard descriptor >= 0 else { return nil }
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
             close(descriptor)

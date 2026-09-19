@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The runtime's own list is the only way to find work started somewhere else: a
 /// session from a terminal yesterday, in a folder this app knows.

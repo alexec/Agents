@@ -1,21 +1,27 @@
 import Foundation
 
-/// An MCP server with one tool on it: the agent says what you might want to ask next.
+/// The MCP server the app serves every agent: the things an agent can ask of the
+/// window rather than of the machine.
 ///
-/// ACP has no way to send a suggested prompt. Every `suggest` in its schema is a code
-/// edit, and no session update carries a follow-up. What it does have is MCP servers,
-/// attached when a session is made, and all three runtimes take them. So the app
-/// offers the agent a tool, and what the agent passes to it becomes the row of chips
-/// above the prompt.
+/// ACP has no way to send a suggested prompt, and no way to say "look at this file".
+/// Every `suggest` in its schema is a code edit, no session update carries a follow-up,
+/// and a `resource_link` is a thing handed over rather than a thing opened. What ACP
+/// does have is MCP servers, attached when a session is made, and all four runtimes
+/// take them. So the app offers the agent tools of its own: what one passes to
+/// `suggest_next_prompts` becomes the row of chips above the prompt, and what it
+/// passes to `show_file` becomes the file open in the sidebar.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
-public actor SuggestionService {
-    /// The tool's name, which is also how the app knows this tool call is ours. A
-    /// runtime may prefix it — the Claude adapter shows it as
+public actor AppService {
+    /// The suggestion tool's name, which is also how the app knows a tool call is
+    /// ours. A runtime may prefix it — the Claude adapter shows it as
     /// `mcp__agents__suggest_next_prompts` — so it is matched on the end rather than
     /// whole.
-    public static let toolName = "suggest_next_prompts"
+    public static let toolName = AppTool.suggestPrompts
+
+    /// The other one: show the user a file.
+    public static let showFileToolName = AppTool.showFile
 
     /// The line the daemon sends after the user's own words, once.
     ///
@@ -50,16 +56,23 @@ public actor SuggestionService {
         case refused(String)
     }
 
-    /// Where a call goes.
+    /// Where a suggestion goes.
     public typealias Sink = @Sendable ([SuggestedPrompt]) async -> Outcome
+
+    /// Where a file to show goes.
+    public typealias FileSink = @Sendable (ShownFile) async -> Outcome
 
     private let connection: JSONRPCConnection
     private let sink: Sink
+    private let fileSink: FileSink
     private let box = ServiceBox()
 
-    public init(transport: any LineTransport, sink: @escaping Sink) {
+    public init(transport: any LineTransport,
+                sink: @escaping Sink,
+                showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") }) {
         let box = self.box
         self.sink = sink
+        self.fileSink = showFile
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -97,22 +110,35 @@ public actor SuggestionService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array([Self.tool])])
+            return .success(["tools": .array([Self.tool, Self.showFileTool])])
 
         case "tools/call":
-            guard params?["name"]?.stringValue?.hasSuffix(Self.toolName) == true else {
-                return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
-                                             message: "No tool called \(params?["name"]?.stringValue ?? "that")."))
+            let name = params?["name"]?.stringValue ?? ""
+            let arguments = params?["arguments"]
+
+            // Longest suffix wins, though nothing here shares one: a runtime is free
+            // to prefix a tool's name and none of them changes what follows it.
+            if name.hasSuffix(Self.toolName) {
+                let prompts = SuggestedPrompt.list(in: arguments?["prompts"])
+                guard !prompts.isEmpty else {
+                    return .success(Self.reply("No suggestions were sent, so none are shown.",
+                                               isError: true))
+                }
+                return .success(Self.reply(await sink(prompts)))
             }
-            let prompts = SuggestedPrompt.list(in: params?["arguments"]?["prompts"])
-            guard !prompts.isEmpty else {
-                return .success(Self.reply("No suggestions were sent, so none are shown.",
-                                           isError: true))
+
+            if name.hasSuffix(Self.showFileToolName) {
+                guard let file = ShownFile(wire: arguments) else {
+                    return .success(Self.reply("""
+                        No file was shown: `path` has to be an absolute path, \
+                        starting at `/`.
+                        """, isError: true))
+                }
+                return .success(Self.reply(await fileSink(file)))
             }
-            switch await sink(prompts) {
-            case .shown(let note): return .success(Self.reply(note))
-            case .refused(let problem): return .success(Self.reply(problem, isError: true))
-            }
+
+            return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
+                                         message: "No tool called \(name.isEmpty ? "that" : name)."))
 
         default:
             return .failure(.methodNotFound(method))
@@ -123,6 +149,13 @@ public actor SuggestionService {
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
     private static func reply(_ text: String, isError: Bool = false) -> JSONValue {
         ["content": .array([["type": "text", "text": .string(text)]]), "isError": .bool(isError)]
+    }
+
+    private static func reply(_ outcome: Outcome) -> JSONValue {
+        switch outcome {
+        case .shown(let note): return reply(note)
+        case .refused(let problem): return reply(problem, isError: true)
+        }
     }
 
     /// What the agent is told the tool is for.
@@ -170,14 +203,54 @@ public actor SuggestionService {
             "required": .array(["prompts"]),
         ],
     ]
+
+    /// Put a file in front of the person, where they are already reading.
+    ///
+    /// The description says what it is not, as well as what it is. An agent that has
+    /// just written a file will call this on every file it touched unless it is told
+    /// that the pane already marks those, and a sidebar that opens itself six times a
+    /// turn is worse than one that never does.
+    static let showFileTool: JSONValue = [
+        "name": .string(showFileToolName),
+        "title": "Show the person a file",
+        "description": """
+            Open a file in the app's files pane, beside the conversation, at the line \
+            you name. Use it when the person needs to be looking at something to \
+            follow what you are saying: the function you are about to change, the \
+            config that explains the failure, the test that is wrong.
+
+            It shows; it does not edit, select or run anything, and the pane it opens \
+            in is read-only. The file has to be inside the folders this agent was \
+            given, and has to exist.
+
+            Not for every file you touch. Files you changed are already marked in that \
+            pane, and every edit you make is already in the conversation, so calling \
+            this on each one takes the person's window away from them for nothing. \
+            One file, when there is one worth looking at.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "path": ["type": "string",
+                         "description": "The absolute path of the file to open."],
+                "line": ["type": "integer",
+                         "minimum": .int(1),
+                         "description": """
+                            The line to put them on, counted from one. Leave it out \
+                            for the top of the file.
+                            """],
+            ],
+            "required": .array(["path"]),
+        ],
+    ]
 }
 
 /// The same trick `ACPSession` uses: the connection needs a handler at init, and the
 /// actor it belongs to does not exist yet.
 private final class ServiceBox: @unchecked Sendable {
-    private weak var service: SuggestionService?
+    private weak var service: AppService?
 
-    func attach(_ service: SuggestionService) { self.service = service }
+    func attach(_ service: AppService) { self.service = service }
 
     func handle(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
         guard let service else { return .failure(.methodNotFound(method)) }

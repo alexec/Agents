@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The four real runtimes, on this Mac, with Alex's own credentials.
 ///

@@ -5,6 +5,7 @@ options:
   # taking the current SDK, and the factory has no users to leave behind.
   deploymentTarget:
     macOS: "27.0"
+    iOS: "27.0"
   xcodeVersion: "27.0"
   createIntermediateGroups: true
   groupSortPosition: top
@@ -93,6 +94,51 @@ targets:
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
+  # The remote: the same app, laid out for a phone and an iPad. It links
+  # AgentsKitCore and nothing else, which is the rule that keeps a `Process` or a PTY
+  # from ever reaching it — the compiler refuses before a reviewer has to.
+  Remote:
+    type: application
+    supportedDestinations: [iOS]
+    sources:
+      - path: Remote/Sources
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKitCore
+    info:
+      path: Remote/Info.plist
+      properties:
+        CFBundleDisplayName: Agents
+        CFBundleName: Agents
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSHumanReadableCopyright: © 2026 Alex Collins
+        ITSAppUsesNonExemptEncryption: false
+        # Scene-based from the first commit, because iOS 27 will not launch an app
+        # without the UIScene lifecycle and nothing can be judged until it launches.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations~iphone:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote
+        PRODUCT_NAME: Agents
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos iphonesimulator
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        GENERATE_INFOPLIST_FILE: NO
+
   agentsd:
     type: tool
     supportedDestinations: [macOS]
@@ -110,6 +156,12 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
+  Remote:
+    build:
+      targets:
+        Remote: all
+    run:
+      config: Debug
   Agents:
     build:
       targets:

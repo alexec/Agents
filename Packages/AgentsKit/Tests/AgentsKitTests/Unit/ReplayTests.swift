@@ -2,6 +2,7 @@ import Foundation
 import SwiftTerm
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The property `shell.attach` rests on.
 ///

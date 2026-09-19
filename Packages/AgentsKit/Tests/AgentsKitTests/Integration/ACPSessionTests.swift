@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("ACP session", .timeLimit(.minutes(1)))
 struct ACPSessionTests {

@@ -112,18 +112,20 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
 
 /// A one-way latch, so closing twice is not an error and cannot double-close a
 /// descriptor that some other process has since been given.
-final class ManagedAtomicFlag: @unchecked Sendable {
+public final class ManagedAtomicFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
 
-    var isSet: Bool {
+    public init() {}
+
+    public var isSet: Bool {
         lock.lock(); defer { lock.unlock() }
         return value
     }
 
     /// Sets the flag. Returns true only for the caller that set it.
     @discardableResult
-    func set() -> Bool {
+    public func set() -> Bool {
         lock.lock(); defer { lock.unlock() }
         if value { return false }
         value = true

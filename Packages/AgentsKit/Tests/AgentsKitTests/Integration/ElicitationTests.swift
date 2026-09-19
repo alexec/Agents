@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 @Suite("Answering an agent's form", .timeLimit(.minutes(1)))
 struct ElicitationTests {

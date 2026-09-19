@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// The one property that stops an agent disappearing: every state is in exactly one
 /// group. A state added later and not thought about fails this rather than quietly

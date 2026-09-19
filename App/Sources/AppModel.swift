@@ -11,24 +11,37 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
-    private(set) var agents: [Agent] = []
+    /// The work, as any client sees it: the agents, the projects, the questions
+    /// waiting, and the page of transcript being read.
+    ///
+    /// Held rather than copied, and shared with the phone. What each notification does
+    /// to it is written once, in `AgentsKitCore`, because two clients that disagreed
+    /// about what `agent/permission` with no request means would be two clients that
+    /// disagree about whether the user has already answered.
+    ///
+    /// Everything below this line is about the window: what it is showing, what it has
+    /// half typed, and what it has cost since it opened. None of that is the daemon's
+    /// and none of it is the phone's.
+    let work = AgentsModel()
+
     private(set) var runtimes: [RuntimeStatus] = []
-    private(set) var permissions: [PermissionRequest] = []
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
-    /// Outstanding forms, held by the daemon and answerable from any window.
-    private(set) var elicitations: [ElicitationRequest] = []
     /// What the terminals the daemon is running for an agent have printed so far.
     private(set) var terminalOutput: [String: String] = [:]
-    private(set) var entries: [TranscriptEntry] = []
-    private(set) var transcriptHasMore = false
     private(set) var isConnected = false
     private(set) var problem: String?
 
-    /// The folders the work happens in. Worked out by the daemon, so two windows agree
-    /// about which projects exist and which of them want the user.
-    private(set) var projects: [DaemonAPI.ProjectSummary] = []
+    // What the window reads, which is the shared model under another name. Forwarded
+    // rather than mirrored: a copy is a thing that can fall behind.
+    var agents: [Agent] { work.agents }
+    var projects: [DaemonAPI.ProjectSummary] { work.projects }
+    var permissions: [PermissionRequest] { work.permissions }
+    var elicitations: [ElicitationRequest] { work.elicitations }
+    var entries: [TranscriptEntry] { work.entries }
+    var transcriptHasMore: Bool { work.hasMoreBefore }
+    var filesToShow: [UUID: ShownFile] { work.filesToShow }
 
     /// Which project this window is looking at.
     ///
@@ -50,7 +63,9 @@ final class AppModel {
     var selection: UUID? {
         didSet {
             guard selection != oldValue else { return }
-            entries = []
+            // Which conversation is being read is what decides whether an arriving
+            // transcript entry is ours to keep, so the shared model is told first.
+            work.watching = selection
             Task { await loadTranscript() }
         }
     }
@@ -71,7 +86,6 @@ final class AppModel {
 
     private let client = DaemonClient()
     private var listening: Task<Void, Never>?
-    private var firstTranscriptIndex = 0
 
     /// The panes listening for shell output, one per agent in this window. Shell
     /// notifications are broadcast to every window, so each one keeps only the agents
@@ -91,20 +105,21 @@ final class AppModel {
         Cost.spent(by: agents, since: spentBeforeWeWatched)
     }
 
-    private func noteWhatWasAlreadySpent(by agent: Agent) {
-        guard spentBeforeWeWatched[agent.id] == nil else { return }
-        spentBeforeWeWatched[agent.id] = agent.costToDate
+    /// Take a note of what every agent we have not seen before had already spent.
+    ///
+    /// Swept after anything files an agent, rather than hooked into the filing itself:
+    /// it is idempotent, there are tens of agents rather than thousands, and the
+    /// alternative is a callback threaded through the shared model for the benefit of
+    /// one line in one window.
+    private func noteWhatWasAlreadySpent() {
+        for agent in work.agents where spentBeforeWeWatched[agent.id] == nil {
+            spentBeforeWeWatched[agent.id] = agent.costToDate
+        }
     }
 
-    var selectedAgent: Agent? {
-        guard let selection else { return nil }
-        return agents.first { $0.id == selection }
-    }
+    var selectedAgent: Agent? { work.agent(selection) }
 
-    var permissionForSelection: PermissionRequest? {
-        guard let selection else { return nil }
-        return permissions.first { $0.agentID == selection }
-    }
+    var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     var availableRuntimes: [RuntimeStatus] {
         runtimes.filter { $0.availability.isAvailable }
@@ -113,35 +128,22 @@ final class AppModel {
     // MARK: Projects
 
     /// The ones the sidebar lists.
-    var liveProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter { !$0.project.isArchived }
-    }
+    var liveProjects: [DaemonAPI.ProjectSummary] { work.liveProjects }
 
-    var archivedProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter { $0.project.isArchived }
-    }
+    var archivedProjects: [DaemonAPI.ProjectSummary] { work.archivedProjects }
 
-    var selectedProjectSummary: DaemonAPI.ProjectSummary? {
-        guard let selectedProject else { return nil }
-        return projects.first { $0.folder == selectedProject }
-    }
+    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
 
     /// A project's agents in one group, newest first.
-    ///
-    /// Filtered from the agents this window already holds, so no call is made and the
-    /// archived list's "show more" is a number in a view rather than a fetch.
     func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
-        guard let folder else { return [] }
-        return agents
-            .filter { Project.standardize($0.cwd) == folder && $0.group == group }
-            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+        work.agents(in: folder, group: group)
     }
 
     func refreshProjects() async {
         do {
-            projects = try await client.call(DaemonAPI.Method.projectsList,
-                                             DaemonAPI.ProjectsListRequest(),
-                                             returning: [DaemonAPI.ProjectSummary].self)
+            work.replaceProjects(try await client.call(DaemonAPI.Method.projectsList,
+                                                       DaemonAPI.ProjectsListRequest(),
+                                                       returning: [DaemonAPI.ProjectSummary].self))
             settleProjectSelection()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
@@ -196,12 +198,9 @@ final class AppModel {
     }
 
     func upsert(_ summary: DaemonAPI.ProjectSummary) {
-        if let index = projects.firstIndex(where: { $0.folder == summary.folder }) {
-            projects[index] = summary
-        } else {
-            projects.append(summary)
-        }
-        projects.sort { $0.lastActivityAt > $1.lastActivityAt }
+        work.upsert(summary)
+        // The one thing filing a project means to a window and to nothing else: the
+        // project being read may have just been archived, or may have just arrived.
         settleProjectSelection()
     }
 
@@ -246,24 +245,16 @@ final class AppModel {
     }
 
     private func received(_ method: String, _ params: JSONValue?) async {
+        // What every notification about the work means is written once, in the kit,
+        // so the window and the phone cannot drift apart. What is left here is the
+        // Mac's own: the shells and terminals a phone has no business with.
+        if work.apply(method, params) {
+            noteWhatWasAlreadySpent()
+            if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
+            return
+        }
+
         switch method {
-        case DaemonAPI.Notification.agentChanged:
-            guard let agent = try? params?.decode(Agent.self) else { return }
-            upsert(agent)
-
-        case DaemonAPI.Notification.projectChanged:
-            guard let summary = try? params?.decode(DaemonAPI.ProjectSummary.self) else { return }
-            upsert(summary)
-
-        case DaemonAPI.Notification.agentEntry:
-            guard let entry = try? params?.decode(DaemonAPI.EntryNotification.self) else { return }
-            if entry.agentID == selection { entries.append(entry.entry) }
-
-        case DaemonAPI.Notification.agentPermission:
-            guard let notification = try? params?.decode(DaemonAPI.PermissionNotification.self) else { return }
-            permissions.removeAll { $0.agentID == notification.agentID }
-            if let request = notification.request { permissions.append(request) }
-
         case DaemonAPI.Notification.shellOutput:
             guard let notification = try? params?.decode(DaemonAPI.ShellOutputNotification.self) else { return }
             shellClients[notification.agentID]?.received(notification.bytes)
@@ -279,17 +270,6 @@ final class AppModel {
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
 
-        case DaemonAPI.Notification.agentUsage:
-            guard let notification = try? params?.decode(DaemonAPI.UsageNotification.self) else { return }
-            if let index = agents.firstIndex(where: { $0.id == notification.agentID }) {
-                agents[index].usage = notification.usage
-            }
-
-        case DaemonAPI.Notification.agentElicitation:
-            guard let notification = try? params?.decode(DaemonAPI.ElicitationNotification.self) else { return }
-            elicitations.removeAll { $0.id == notification.requestID }
-            if let request = notification.request { elicitations.append(request) }
-
         case DaemonAPI.Notification.agentTerminalOutput:
             guard let notification = try? params?.decode(DaemonAPI.TerminalOutputNotification.self) else { return }
             terminalOutput[notification.terminalID, default: ""] += notification.chunk
@@ -297,16 +277,6 @@ final class AppModel {
         default:
             break
         }
-    }
-
-    private func upsert(_ agent: Agent) {
-        noteWhatWasAlreadySpent(by: agent)
-        if let index = agents.firstIndex(where: { $0.id == agent.id }) {
-            agents[index] = agent
-        } else {
-            agents.append(agent)
-        }
-        agents.sort { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     // MARK: Asking
@@ -327,25 +297,22 @@ final class AppModel {
         guard let list = try? await client.call(DaemonAPI.Method.elicitationsPending,
                                                 Optional<Int>.none,
                                                 returning: [ElicitationRequest].self) else { return }
-        elicitations = list
+        work.replaceElicitations(list)
     }
 
     /// The form waiting for this agent, if there is one. Held by the daemon, so it is
     /// here whether or not this window was open when it was asked.
-    var elicitationForSelection: ElicitationRequest? {
-        guard let selection else { return nil }
-        return elicitations.first { $0.agentID == selection }
-    }
+    var elicitationForSelection: ElicitationRequest? { work.elicitation(for: selection) }
 
     func refreshAgents() async {
         await attempt {
             let listed = try await self.client.call(DaemonAPI.Method.agentsList,
                                                     DaemonAPI.ListRequest(),
                                                     returning: [Agent].self)
+            self.work.replaceAgents(listed)
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
-            for agent in listed { self.noteWhatWasAlreadySpent(by: agent) }
-            self.agents = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            self.noteWhatWasAlreadySpent()
         }
     }
 
@@ -359,36 +326,33 @@ final class AppModel {
 
     func refreshPermissions() async {
         await attempt {
-            self.permissions = try await self.client.call(DaemonAPI.Method.permissionsPending,
-                                                          Optional<String>.none,
-                                                          returning: [PermissionRequest].self)
+            self.work.replacePermissions(
+                try await self.client.call(DaemonAPI.Method.permissionsPending,
+                                           Optional<String>.none,
+                                           returning: [PermissionRequest].self))
         }
     }
 
     func loadTranscript() async {
-        guard let selection else { entries = []; return }
+        guard let selection else { work.clearTranscript(); return }
         await attempt {
-            let page = try await self.client.call(DaemonAPI.Method.agentsTranscript,
-                                                  DaemonAPI.TranscriptRequest(agentID: selection),
-                                                  returning: TranscriptPage.self)
-            self.entries = page.entries
-            self.firstTranscriptIndex = page.firstIndex
-            self.transcriptHasMore = page.hasMoreBefore
+            self.work.replaceTranscript(
+                with: try await self.client.call(DaemonAPI.Method.agentsTranscript,
+                                                 DaemonAPI.TranscriptRequest(agentID: selection),
+                                                 returning: TranscriptPage.self))
         }
     }
 
     /// The window only ever asks for a page. A transcript that has been going for hours
     /// is not something to load whole.
     func loadEarlier() async {
-        guard let selection, transcriptHasMore else { return }
+        guard let selection, work.hasMoreBefore else { return }
         await attempt {
-            let page = try await self.client.call(
-                DaemonAPI.Method.agentsTranscript,
-                DaemonAPI.TranscriptRequest(agentID: selection, before: self.firstTranscriptIndex),
-                returning: TranscriptPage.self)
-            self.entries.insert(contentsOf: page.entries, at: 0)
-            self.firstTranscriptIndex = page.firstIndex
-            self.transcriptHasMore = page.hasMoreBefore
+            self.work.prepend(
+                try await self.client.call(
+                    DaemonAPI.Method.agentsTranscript,
+                    DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
+                    returning: TranscriptPage.self))
         }
     }
 
@@ -588,6 +552,12 @@ final class AppModel {
 
     func clearFocus() {
         focusedEntry = nil
+    }
+
+    /// What this agent last asked the user to look at, taken rather than read: a file
+    /// that has been put in front of somebody is not still waiting to be.
+    func takeFileToShow(for agentID: UUID) -> ShownFile? {
+        work.takeFileToShow(for: agentID)
     }
 
     // MARK: Runtimes

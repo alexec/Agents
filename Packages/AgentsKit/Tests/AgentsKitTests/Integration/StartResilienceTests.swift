@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Nothing a runtime sends inside its options, and no way a runtime refuses, may cost
 /// the user an agent.

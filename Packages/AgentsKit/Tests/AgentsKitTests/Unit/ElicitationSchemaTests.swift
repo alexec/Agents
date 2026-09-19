@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// No runtime on this Mac asks for a form yet. This is what "complete" means: an agent
 /// that starts using it tomorrow gets an answer instead of a refusal.

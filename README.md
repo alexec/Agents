@@ -73,6 +73,12 @@ no way to sign out, so the app shows neither.
   otherwise, and an attachment a runtime cannot take is refused before the prompt is sent.
 - **The work, shown.** Edits arrive as diffs where the runtime sends them, command output
   arrives as output, and files a tool call touched open at their line.
+- **A file, shown.** The agent can ask for a file to be put in front of you, at a line,
+  and it opens in the files pane beside the conversation. The same MCP server carries
+  this as carries the suggestions below, and the same rule applies as to everything
+  else an agent reaches for: inside the folders it was given, or refused. A request for
+  a conversation you are not reading waits until you open it rather than taking the
+  window off you.
 - **Cost and context.** A meter follows the turn, and what each turn used goes on the
   record. Cost is shown as the runtime reported it, per currency, never estimated.
 - **Serving the agent.** The app reads and writes files on an agent's behalf and runs
@@ -89,7 +95,7 @@ no way to sign out, so the app shows neither.
 - **What to ask next.** When a turn ends the agent may offer a few things you might want
   to say, shown as buttons above the prompt. Tapping one fills the prompt and leaves it
   to you to send. ACP has no way to carry a suggestion, so the app serves the agent an
-  MCP server with one tool on it and attaches that to every session. Offering the tool
+  MCP server with this and `show_file` on it, attached to every session. Offering the tool
   is not enough on its own — none of the three called it unasked — so the daemon adds a
   line to each prompt asking for them. That line goes to the runtime and not into the
   transcript, which still records what you said. Copilot has a follow-up feature of its

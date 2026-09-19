@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// FR-015 has two halves and both are measurable, so neither is left to a hand check:
 /// a folder with many thousands of entries stays responsive, and a large file is not
