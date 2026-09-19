@@ -31,7 +31,8 @@ struct ProjectAgentsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 heading
                 // Its own margins, the same as in a chat, so it is not padded twice.
-                PromptBar()
+                // The folder is this project's and not the bar's to change.
+                PromptBar(folderIsFixed: true)
                 agents
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,30 +52,27 @@ struct ProjectAgentsView: View {
         Task { await model.loadDraftOptions() }
     }
 
+    /// Just the name.
+    ///
+    /// The path used to sit under it. The prompt below carries the folder already, and
+    /// saying where the project is twice on one screen is saying it once too often.
+    /// What is left here is the one case where the folder is news: it has gone.
     private var heading: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(summary?.name ?? "Project")
                 .font(.largeTitle.weight(.semibold))
                 .lineLimit(1)
-            if let subtitle {
-                Text(subtitle)
+            if let summary, !summary.exists {
+                Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(summary?.exists == false ? Color.red : Color.secondary)
+                    .foregroundStyle(Color.red)
                     .lineLimit(1)
+                    .help(summary.folder.path)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Self.gutter)
         .padding(.top, 28)
-    }
-
-    /// Where it is, in the short form.
-    private var subtitle: String? {
-        guard let summary else { return nil }
-        guard summary.exists else { return "This folder is not there any more" }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = summary.folder.path
-        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
     /// Everything working on this project, each one a card you can go into.
