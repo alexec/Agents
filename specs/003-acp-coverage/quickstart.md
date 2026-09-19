@@ -115,6 +115,19 @@ each shape: a string with a format, a number with a range, a boolean, a multi-se
 request. Each is drawn, validated and answered. Cancelling reports declined. A form asked while no
 window is open is waiting when one opens.
 
+## What was measured
+
+Run on 2026-09-18, in `BigContentTests`, so it can be re-run rather than remembered:
+
+| Case | Measured |
+|---|---|
+| A megabyte of diff, read into lines | 31ms |
+| 4.9MB of command output through the ring buffer, a chunk at a time | 10ms, 256KB kept, truncation flagged |
+| A megabyte of text in one message | one entry, no splitting |
+
+What those numbers do not cover is the drawing, which needs a trackpad: scroll a
+transcript holding a megabyte diff and a long terminal stream and watch it, on the day.
+
 ## What "done" looks like
 
 - `swift test` passes, including the new fake-agent cases.

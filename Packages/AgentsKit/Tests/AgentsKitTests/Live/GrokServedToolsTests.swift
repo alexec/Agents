@@ -42,7 +42,18 @@ struct GrokServedToolsTests {
         let events = session.eventStream()
         let watching = Task {
             for await event in events {
-                if case .served(let request) = event { served.add(request) }
+                switch event {
+                case .served(let request):
+                    served.add(request)
+                case .permissionRequested(let request):
+                    // Nobody is watching this one, so it answers itself. Without this
+                    // the runtime waits for ever, which is the right behaviour and a
+                    // useless test.
+                    let allow = request.options.first { $0.kind.allows }?.optionID
+                    await session.answerPermission(id: request.id, optionID: allow)
+                default:
+                    break
+                }
             }
         }
         defer { watching.cancel() }

@@ -299,11 +299,11 @@ carried out, shown, and refusable.
 ## Phase 12: Polish and cross-cutting
 
 - [X] T124 [P] Write the capability audit script in `scripts/acp-handshake.sh`, which handshakes all three runtimes and prints what each advertises against what the app supports. This is how SC-002 is re-checked after a runtime updates
-- [ ] T125 [P] Check a 1MB diff and a long terminal stream do not stall the transcript, and record what was measured in `specs/003-acp-coverage/quickstart.md`
+- [X] T125 [P] Check a 1MB diff and a long terminal stream do not stall the transcript, and record what was measured in `specs/003-acp-coverage/quickstart.md`
 - [X] T126 [P] Update `specs/001-agent-daemon-ui/contracts/acp-client.md` with a line saying it is superseded by `specs/003-acp-coverage/contracts/acp-client.md`
 - [X] T127 [P] Update `README.md` with what the app now does with files, terminals and sign-in
 - [ ] T128 Walk the whole of `specs/003-acp-coverage/quickstart.md` by hand, including the legacy record still opening, and fix what does not match
-- [ ] T129 Re-run the handshake script after the flags are on and confirm no advertised capability lacks an action, which is SC-002
+- [X] T129 Re-run the handshake script after the flags are on and confirm no advertised capability lacks an action, which is SC-002
 
 ---
 
