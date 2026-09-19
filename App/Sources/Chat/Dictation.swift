@@ -3,6 +3,17 @@ import Foundation
 import Observation
 import Speech
 
+/// Carries audio to the recogniser from the realtime thread that produces it.
+///
+/// `SFSpeechAudioBufferRecognitionRequest` is not Sendable and appending to it from
+/// the audio thread is exactly what it is for, so the promise is made here in one
+/// place rather than spread through the closure that needs it.
+private final class BufferSink: @unchecked Sendable {
+    private let request: SFSpeechAudioBufferRecognitionRequest
+    init(_ request: SFSpeechAudioBufferRecognitionRequest) { self.request = request }
+    func append(_ buffer: AVAudioPCMBuffer) { request.append(buffer) }
+}
+
 /// Talking into the prompt instead of typing it.
 ///
 /// Apple's recogniser, running on the device where the device can. It asks for the
@@ -79,12 +90,20 @@ final class Dictation {
         request.requiresOnDeviceRecognition = recogniser.supportsOnDeviceRecognition
         self.request = request
 
+        // Both of these are called by somebody else's thread: the tap by the audio
+        // realtime thread, the results by the recogniser. A closure written inside a
+        // main-actor method belongs to the main actor, and Swift checks that where it
+        // runs and kills the app when it is wrong. Spelling them @Sendable is what
+        // makes them nobody's.
+        let sink = BufferSink(request)
+        let tap: @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void = { buffer, _ in
+            sink.append(buffer)
+        }
+
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
-            request.append(buffer)
-        }
+        input.installTap(onBus: 0, bufferSize: 1_024, format: format, block: tap)
         engine.prepare()
         do {
             try engine.start()
@@ -94,15 +113,16 @@ final class Dictation {
         }
         isListening = true
 
-        task = recogniser.recognitionTask(with: request) { result, error in
+        let results: @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void = { [weak self] result, error in
             let spoken = result?.bestTranscription.formattedString
             let finished = error != nil || (result?.isFinal ?? false)
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 guard let self else { return }
                 if let spoken { self.onText?(spoken) }
                 if finished { self.stop() }
             }
         }
+        task = recogniser.recognitionTask(with: request, resultHandler: results)
     }
 
     func stop() {
