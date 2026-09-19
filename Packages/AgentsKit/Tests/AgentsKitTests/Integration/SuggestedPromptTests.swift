@@ -30,6 +30,24 @@ struct SuggestedPromptTests {
         params?["mcpServers"]?.arrayValue ?? []
     }
 
+    /// Wait until the turn is over, nothing is queued, and the runtime has been let go.
+    ///
+    /// All three, because the agent reads as finished a moment before its runtime is
+    /// released, and a prompt sent in that moment goes to the session that is still
+    /// there rather than picking a new one up. A fixed sleep hits that window now and
+    /// then, which is the worst kind of test: it passes alone and fails in a full run.
+    private func settle(_ core: DaemonCore, _ id: UUID) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while ContinuousClock.now < deadline {
+            if let agent = await core.agent(id),
+               !agent.state.hasTurnInFlight, agent.queuedPrompts.isEmpty,
+               await core.live[id] == nil {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     // MARK: Attaching the server
 
     @Test func everySessionIsGivenTheSuggestionServer() async throws {
@@ -194,7 +212,7 @@ struct SuggestedPromptTests {
 
     /// The finding that made this necessary: offered the tool and nothing else, all
     /// three runtimes called it never. One line in the prompt is what changes that.
-    @Test func theRuntimeIsAskedForThemWithEveryPrompt() async throws {
+    @Test func theRuntimeIsAskedForThemWhenTheConversationStarts() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
@@ -206,6 +224,63 @@ struct SuggestedPromptTests {
         #expect(sent.count == 2)
         #expect(sent.first?["text"]?.stringValue == "do the thing")
         #expect(sent.last?["text"]?.stringValue == SuggestionService.askForSuggestions)
+    }
+
+    /// Asked once. The runtime keeps it in its own history and replays that history
+    /// when the conversation is picked back up, so sending it again every turn would
+    /// be tokens spent on something the runtime already has.
+    @Test func andNotAgainOnEveryPromptAfterThat() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        try await settle(core, id)
+        try await core.prompt(.init(agentID: id, text: "and the next thing"))
+        try await settle(core, id)
+
+        let sent = await prompts(launcher)
+        #expect(sent == [["do the thing", SuggestionService.askForSuggestions],
+                         ["and the next thing"]])
+    }
+
+    /// Every prompt that reached a runtime, in order, as lists of the text in it.
+    ///
+    /// Asked of every runtime the launcher made rather than of the last one: the
+    /// daemon starts the next runtime before it has anything to send it, so "the last
+    /// one" is sometimes a process that has not been spoken to yet.
+    private func prompts(_ launcher: FakeLauncher) async -> [[String]] {
+        var sent: [[String]] = []
+        for fake in launcher.allAgents {
+            guard let blocks = await fake.promptContent?.arrayValue else { continue }
+            sent.append(blocks.compactMap { $0["text"]?.stringValue })
+        }
+        return sent
+    }
+
+    /// Except here. A runtime that has lost the conversation is starting a new one,
+    /// and the ask went with the history it no longer has.
+    @Test func aRuntimeThatLostTheConversationIsAskedAgain() async throws {
+        let (locations, work) = try temporary()
+        var gone = FakeACPAgent.Script()
+        gone.supportsResume = true
+        gone.sessionGoneError = JSONRPCError(code: -32000, message: "no such session")
+        // The first runtime starts the agent and the second has forgotten it. The
+        // launcher hands out `then` before it falls back to the default, so the
+        // ordinary one goes there and the forgetful one is what is left.
+        let launcher = FakeLauncher(script: gone, then: [.init()])
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        try await settle(core, id)
+        try await core.prompt(.init(agentID: id, text: "carry on"))
+        try await settle(core, id)
+
+        // Two prompts, and the ask on both: the second runtime is a conversation
+        // starting again, however much of it the app still has on its own record.
+        let sent = await prompts(launcher)
+        #expect(sent == [["do the thing", SuggestionService.askForSuggestions],
+                         ["carry on", SuggestionService.askForSuggestions]])
     }
 
     /// Ours is a block of its own and not part of what was said. The transcript is a

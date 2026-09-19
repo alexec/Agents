@@ -25,6 +25,14 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var suggestionTokens: [String: UUID] = [:]
+    /// Agents whose next prompt carries the line asking for suggestions. Set when a
+    /// conversation starts, and again only if a runtime loses one and we have to begin
+    /// a new one: the ask lives in the runtime's history, so that is the only time it
+    /// is gone.
+    var needsSuggestionAsk: Set<UUID> = []
+    /// Agents whose next queued prompt is already on its way to a runtime. See
+    /// `sendNextQueued`: without this the same words can go twice.
+    var sending: Set<UUID> = []
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]

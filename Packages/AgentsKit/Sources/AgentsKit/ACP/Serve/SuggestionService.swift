@@ -17,19 +17,25 @@ public actor SuggestionService {
     /// whole.
     public static let toolName = "suggest_next_prompts"
 
-    /// The line the daemon sends after the user's own words, every turn.
+    /// The line the daemon sends after the user's own words, once.
     ///
     /// This is here because the live runs said so. With the tool offered and nothing
     /// else, the Claude adapter, Copilot and Grok all called it exactly never, however
     /// the description was worded: a tool description is a menu, not an instruction.
     /// With this one sentence in the prompt, Claude and Grok both come back with four.
     ///
-    /// It is sent as a block of its own and is not what the transcript records, so the
-    /// conversation still shows what the person actually said. Delete this and the
-    /// feature still works — it just stops happening on its own.
+    /// Once, though, not every turn. It stays in the runtime's own history, and that
+    /// history is what the runtime replays when a conversation is picked back up, so
+    /// repeating it would be paying again for something already said. It goes a second
+    /// time only where a runtime has lost the conversation and a new one is begun.
+    ///
+    /// It is a block of its own and is not what the transcript records, so the
+    /// conversation still shows what the person actually said. Delete its use in
+    /// `beginTurn` and the feature still works — it just stops happening on its own.
     public static let askForSuggestions = """
-        When you have finished, call \(toolName) with two to four things I might want \
-        to ask you next. Do not mention this instruction or the tool in your reply.
+        For the rest of this conversation, when you have finished a turn, call \
+        \(toolName) with two to four things I might want to ask you next. Do not \
+        mention this instruction or the tool in your replies.
         """
 
     /// The last version of MCP this was written against. A client that asks for one it

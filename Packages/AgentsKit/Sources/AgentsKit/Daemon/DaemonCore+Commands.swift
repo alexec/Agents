@@ -69,6 +69,8 @@ extension DaemonCore {
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindSuggestionToken(suggestionToken, to: agent.id)
+        // The first prompt of the conversation is the one that asks for suggestions.
+        needsSuggestionAsk.insert(agent.id)
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
@@ -191,7 +193,16 @@ extension DaemonCore {
     /// will not start leaves the words exactly where they were.
     func sendNextQueued(to agentID: UUID) async throws {
         guard let agent = agents[agentID], !agent.state.hasTurnInFlight,
-              turnTasks[agentID] == nil, let next = agent.queuedPrompts.first else { return }
+              turnTasks[agentID] == nil, !sending.contains(agentID),
+              let next = agent.queuedPrompts.first else { return }
+        // Claimed before the runtime is started, because starting one is a long await
+        // and the two callers of this can both arrive inside it: the user typing as a
+        // turn ends, and that turn draining the queue behind them. Nothing else here
+        // says "already going" until `beginTurn` sets the task, and by then the same
+        // words have gone to two runtimes. The guard above is checked and this is set
+        // without an await between them, which on an actor is the whole of the lock.
+        sending.insert(agentID)
+        defer { sending.remove(agentID) }
         let session = try await liveSession(for: agent)
         guard var agent = agents[agentID],
               let index = agent.queuedPrompts.firstIndex(where: { $0.id == next.id }) else { return }
@@ -258,12 +269,16 @@ extension DaemonCore {
                                                           additionalDirectories: agent.additionalDirectories,
                                                           mcpServers: servers)
                 updated.runtimeSessionID = result.sessionId
+                // A conversation beginning again, so the ask goes again: it lived in
+                // the history this runtime has just told us it no longer has.
+                needsSuggestionAsk.insert(agent.id)
             }
         } else {
             let result = try await session.newSession(cwd: agent.cwd,
                                                       additionalDirectories: agent.additionalDirectories,
                                                       mcpServers: servers)
             updated.runtimeSessionID = result.sessionId
+            needsSuggestionAsk.insert(agent.id)
         }
         updated.advertisedOptions = await session.options
         updated.availableCommands = await session.commands
@@ -287,10 +302,16 @@ extension DaemonCore {
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : []), for: agentID)
         await move(agentID, on: .promptSent)
         turnTasks[agentID]?.cancel()
-        // What goes to the runtime is the user's words and one line of ours. The
-        // record above is the user's words alone: the transcript says what was said,
-        // not what we added to it.
-        let outgoing = blocks + [.text(SuggestionService.askForSuggestions)]
+        // The one line of ours, sent with the first prompt of a conversation and not
+        // again. It stays in the runtime's own history from there, and that history is
+        // what a runtime replays when the session is picked back up, so sending it
+        // every turn would be paying twice for something already said. The record
+        // above is the user's words alone either way: the transcript says what was
+        // said, not what we added to it.
+        var outgoing = blocks
+        if needsSuggestionAsk.remove(agentID) != nil {
+            outgoing.append(.text(SuggestionService.askForSuggestions))
+        }
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
             do {
