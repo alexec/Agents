@@ -48,63 +48,124 @@ struct ProjectAgentsView: View {
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
+    /// Everything working on this project, each one a card.
+    ///
+    /// A card rather than a row because each one is a way in: tapping it opens that
+    /// agent's conversation. One `GlassEffectContainer` around the lot, so the cards
+    /// blend with each other rather than each carrying its own separate render.
     private var list: some View {
-        List(selection: $selection) {
-            if let lead = model.lead(of: folder) {
-                LeadRow(agent: lead).tag(lead.id)
-            }
-
-            ForEach(AgentGroup.live, id: \.self) { group in
-                let agents = model.workers(in: folder, group: group)
-                if !agents.isEmpty {
-                    Section(group.title) {
-                        ForEach(agents) { agent in
-                            AgentRow(agent: agent).tag(agent.id)
+        ScrollView {
+            GlassEffectContainer(spacing: Self.cardSpacing) {
+                LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
+                    if let lead = model.lead(of: folder) {
+                        AgentCard(id: lead.id, selection: $selection) {
+                            LeadRow(agent: lead)
                         }
                     }
-                }
-            }
 
-            archivedSection
+                    ForEach(AgentGroup.live, id: \.self) { group in
+                        let agents = model.workers(in: folder, group: group)
+                        if !agents.isEmpty {
+                            GroupHeading(title: group.title, count: agents.count)
+                            ForEach(agents) { agent in
+                                AgentCard(id: agent.id, selection: $selection) {
+                                    AgentRow(agent: agent)
+                                }
+                            }
+                        }
+                    }
+
+                    archivedSection
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+            }
         }
-        .listStyle(.inset)
         .animation(.default, value: model.agents.map(\.state))
-        // So the last row can be scrolled clear of the prompt floating over it.
+        // So the last card can be scrolled clear of the prompt floating over it.
         .safeAreaPadding(.bottom, formHeight)
     }
+
+    static let cardSpacing: CGFloat = 10
 
     private var archived: [Agent] {
         model.workers(in: folder, group: .archived)
     }
 
-    /// Out of the way until it is wanted. A link rather than a permanent heading,
-    /// because looking at what you archived is a rare thing to want.
+    /// Out of the way until it is wanted, because looking at what you archived is a
+    /// rare thing to want.
     @ViewBuilder
     private var archivedSection: some View {
         if showsArchived {
-            Section("Archived") {
-                if archived.isEmpty {
-                    Text("Nothing archived in this project yet.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(archived.prefix(archivedShown)) { agent in
-                        AgentRow(agent: agent).tag(agent.id)
-                    }
-                    if archived.count > archivedShown {
-                        Button("Show more") { archivedShown += Self.pageSize }
-                            .buttonStyle(.link)
+            GroupHeading(title: "Archived", count: archived.count)
+            if archived.isEmpty {
+                Text("Nothing archived in this project yet.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(archived.prefix(archivedShown)) { agent in
+                    AgentCard(id: agent.id, selection: $selection) {
+                        AgentRow(agent: agent)
                     }
                 }
-                Button("Hide archived") { showsArchived = false }
-                    .buttonStyle(.link)
-                    .foregroundStyle(.secondary)
+                if archived.count > archivedShown {
+                    Button("Show more") { archivedShown += Self.pageSize }
+                        .buttonStyle(.glass)
+                }
             }
+            Button("Hide archived") { showsArchived = false }
+                .buttonStyle(.glass)
+                .padding(.top, 2)
         } else if folder != nil {
             Button("Show archived") { showsArchived = true }
-                .buttonStyle(.link)
-                .foregroundStyle(.secondary)
+                .buttonStyle(.glass)
+                .padding(.top, 6)
         }
+    }
+}
+
+/// One agent, as a card you can go into.
+///
+/// It is a real control — the whole card opens that conversation — which is what
+/// earns it interactive glass rather than a decorated background.
+private struct AgentCard<Content: View>: View {
+    let id: UUID
+    @Binding var selection: UUID?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Button {
+            selection = id
+        } label: {
+            content
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// What the cards under it have in common, and how many there are.
+private struct GroupHeading: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text("\(count)")
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.top, 10)
+        .padding(.leading, 2)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

@@ -26,7 +26,7 @@ struct AgentRow: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 2)
+        // No padding of its own: the card it sits in owns that now.
         .contextMenu {
             if agent.state.holdsRuntime {
                 Button("Stop") { Task { await model.stop(agent.id) } }
