@@ -98,36 +98,36 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Test `PTY` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PTYTests.swift`: a shell spawns, `tty` reports a terminal device, a resize reaches the child, and the exit status is reported
-- [ ] T031 [P] [US2] Test `Scrollback` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ScrollbackTests.swift`: the cap drops from the front, the tail is what comes back, and a buffer that has dropped says so
-- [ ] T032 [P] [US2] Test the idle rule in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ShellIdleTests.swift`: a shell with a running child is never idle whatever the clock says; one with no child and no input past the threshold is
-- [ ] T033 [P] [US2] Test replay in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReplayTests.swift`: each fixture in `Fixtures/terminal/` fed one byte at a time gives the same screen as fed in one chunk. This is the property `shell.attach` rests on
+- [X] T030 [P] [US2] Test `PTY` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PTYTests.swift`: a shell spawns, `tty` reports a terminal device, a resize reaches the child, and the exit status is reported
+- [X] T031 [P] [US2] Test `Scrollback` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ScrollbackTests.swift`: the cap drops from the front, the tail is what comes back, and a buffer that has dropped says so
+- [X] T032 [P] [US2] Test the idle rule in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ShellIdleTests.swift`: a shell with a running child is never idle whatever the clock says; one with no child and no input past the threshold is
+- [X] T033 [P] [US2] Test replay in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReplayTests.swift`: each fixture in `Fixtures/terminal/` fed one byte at a time gives the same screen as fed in one chunk. This is the property `shell.attach` rests on
 
 ### Implementation for User Story 2
 
-- [ ] T034 [P] [US2] Create `PTY` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/PTY.swift` using `openpty` and `posix_spawn` with `POSIX_SPAWN_SETSID`, the child opening the slave device as its first tty so it becomes the controlling terminal; expose read, write, `TIOCSWINSZ` resize, signal, and exit status (FR-020, FR-021, research section 2)
-- [ ] T035 [P] [US2] Create `Scrollback` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/Scrollback.swift` as a ring buffer of raw bytes with a byte cap, dropping from the front and recording that it has dropped
-- [ ] T036 [P] [US2] Create `ShellState` in `Packages/AgentsKit/Sources/AgentsKit/Model/ShellState.swift` with exactly `live`, `exited(status: Int32)`, `failed(reason: String)` and `released(reason: String)`
-- [ ] T037 [US2] Create `ShellSession` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` holding one `PTY`, one `Scrollback`, a `ShellState`, `startedAt`, `lastInputAt` and an optional `title`; it MUST NOT parse bytes (depends on T034, T035, T036)
-- [ ] T038 [US2] Add `isBusy` (a child of the shell is running) and `isIdle` to `ShellSession` as pure functions of `isBusy`, `lastInputAt` and the clock, in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` (FR-027, FR-028)
-- [ ] T039 [US2] Start a shell in the agent's folder with the user's login shell (via the existing `LoginShellPath`) in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift`; a folder that no longer exists MUST become `failed` naming the folder, and a shell that will not exec MUST become `failed` (FR-020, FR-024)
-- [ ] T040 [US2] Create `ShellHost` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift` holding at most one `ShellSession` per agent, keyed by agent id, with attach, detach and reap; attach MUST start a shell if the agent has none, and detach MUST NOT kill anything (FR-023, FR-026)
-- [ ] T041 [US2] Track attached connections per agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, dropping a connection when its socket closes, so a crashed app leaves no subscriber behind
-- [ ] T042 [US2] Reap idle shells on a tick in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, setting `released(reason:)`, and count a busy shell in the work the daemon is holding so it does not shut down under one (FR-027, FR-028)
-- [ ] T043 [US2] Kill every shell before the daemon exits, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, so no pty is orphaned
-- [ ] T044 [US2] Add the `shell.*` methods and the `shell.output` and `shell.stateChanged` notifications to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`, keeping them distinct from 003's agent-owned `terminal.*` and `agent/terminalOutput` (FR-025, contract)
-- [ ] T045 [US2] Add error codes `-32010 shellWillNotStart` and `-32011 shellNotLive` to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`
-- [ ] T046 [US2] Serve `shell.attach`, `shell.detach`, `shell.input`, `shell.resize`, `shell.signal` and `shell.restart` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`; `shell.attach` MUST return the state plus the scrollback tail as raw bytes for the client to replay, and `shell.restart` MUST be refused with `shellNotLive` when the shell is still live (contract)
-- [ ] T047 [US2] Push `shell.output` as base64 bytes to every attached connection in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, never decoding to a `String` on the way through (contract)
-- [ ] T048 [US2] Mark a shell gone with its reason after a daemon restart in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, rather than handing back a new one silently (FR-029)
-- [ ] T049 [US2] Add the shell calls and notification subscriptions to `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T050 [US2] Wrap SwiftTerm's macOS `TerminalView` in `App/Sources/Sidebar/TerminalHostView.swift` as an `NSViewRepresentable`, sized to the pane and using a fixed-width font
-- [ ] T051 [US2] Own a SwiftTerm `Terminal` per agent in `App/Sources/Sidebar/TerminalPane.swift`, feeding it the scrollback tail on attach and `shell.output` bytes as they arrive (depends on T049, T050)
-- [ ] T052 [US2] Send keystrokes to `shell.input` from `App/Sources/Sidebar/TerminalPane.swift`, including single keypresses; `^C` MUST go through `shell.input` and the line discipline rather than through `shell.signal` (FR-021, contract)
-- [ ] T053 [US2] Send the pane's rows and columns to `shell.resize` on layout change in `App/Sources/Sidebar/TerminalPane.swift`, so a full-screen program reflows (FR-021)
-- [ ] T054 [US2] Show the title set by OSC 0 or 2 in `App/Sources/Sidebar/TerminalPane.swift` when a program sets one
-- [ ] T055 [US2] Draw the not-live states in `App/Sources/Sidebar/TerminalPane.swift`: say what happened for `exited`, `failed` and `released`, keep the scrollback readable, and offer to start a new shell via `shell.restart` (FR-024, FR-028, FR-029)
-- [ ] T056 [US2] Keep the attachment across pane switches and agent switches in `App/Sources/Sidebar/TerminalPane.swift`, detaching only when the window closes (FR-022, FR-026)
+- [X] T034 [P] [US2] Create `PTY` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/PTY.swift` using `openpty` and `posix_spawn` with `POSIX_SPAWN_SETSID`, the child opening the slave device as its first tty so it becomes the controlling terminal; expose read, write, `TIOCSWINSZ` resize, signal, and exit status (FR-020, FR-021, research section 2)
+- [X] T035 [P] [US2] Create `Scrollback` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/Scrollback.swift` as a ring buffer of raw bytes with a byte cap, dropping from the front and recording that it has dropped
+- [X] T036 [P] [US2] Create `ShellState` in `Packages/AgentsKit/Sources/AgentsKit/Model/ShellState.swift` with exactly `live`, `exited(status: Int32)`, `failed(reason: String)` and `released(reason: String)`
+- [X] T037 [US2] Create `ShellSession` in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` holding one `PTY`, one `Scrollback`, a `ShellState`, `startedAt`, `lastInputAt` and an optional `title`; it MUST NOT parse bytes (depends on T034, T035, T036)
+- [X] T038 [US2] Add `isBusy` (a child of the shell is running) and `isIdle` to `ShellSession` as pure functions of `isBusy`, `lastInputAt` and the clock, in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift` (FR-027, FR-028)
+- [X] T039 [US2] Start a shell in the agent's folder with the user's login shell (via the existing `LoginShellPath`) in `Packages/AgentsKit/Sources/AgentsKit/Terminal/ShellSession.swift`; a folder that no longer exists MUST become `failed` naming the folder, and a shell that will not exec MUST become `failed` (FR-020, FR-024)
+- [X] T040 [US2] Create `ShellHost` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift` holding at most one `ShellSession` per agent, keyed by agent id, with attach, detach and reap; attach MUST start a shell if the agent has none, and detach MUST NOT kill anything (FR-023, FR-026)
+- [X] T041 [US2] Track attached connections per agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, dropping a connection when its socket closes, so a crashed app leaves no subscriber behind
+- [X] T042 [US2] Reap idle shells on a tick in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, setting `released(reason:)`, and count a busy shell in the work the daemon is holding so it does not shut down under one (FR-027, FR-028)
+- [X] T043 [US2] Kill every shell before the daemon exits, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ShellHost.swift`, so no pty is orphaned
+- [X] T044 [US2] Add the `shell.*` methods and the `shell.output` and `shell.stateChanged` notifications to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`, keeping them distinct from 003's agent-owned `terminal.*` and `agent/terminalOutput` (FR-025, contract)
+- [X] T045 [US2] Add error codes `-32010 shellWillNotStart` and `-32011 shellNotLive` to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`
+- [X] T046 [US2] Serve `shell.attach`, `shell.detach`, `shell.input`, `shell.resize`, `shell.signal` and `shell.restart` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`; `shell.attach` MUST return the state plus the scrollback tail as raw bytes for the client to replay, and `shell.restart` MUST be refused with `shellNotLive` when the shell is still live (contract)
+- [X] T047 [US2] Push `shell.output` as base64 bytes to every attached connection in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, never decoding to a `String` on the way through (contract)
+- [X] T048 [US2] Mark a shell gone with its reason after a daemon restart in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, rather than handing back a new one silently (FR-029)
+- [X] T049 [US2] Add the shell calls and notification subscriptions to `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T050 [US2] Wrap SwiftTerm's macOS `TerminalView` in `App/Sources/Sidebar/TerminalHostView.swift` as an `NSViewRepresentable`, sized to the pane and using a fixed-width font
+- [X] T051 [US2] Own a SwiftTerm `Terminal` per agent in `App/Sources/Sidebar/TerminalPane.swift`, feeding it the scrollback tail on attach and `shell.output` bytes as they arrive (depends on T049, T050)
+- [X] T052 [US2] Send keystrokes to `shell.input` from `App/Sources/Sidebar/TerminalPane.swift`, including single keypresses; `^C` MUST go through `shell.input` and the line discipline rather than through `shell.signal` (FR-021, contract)
+- [X] T053 [US2] Send the pane's rows and columns to `shell.resize` on layout change in `App/Sources/Sidebar/TerminalPane.swift`, so a full-screen program reflows (FR-021)
+- [X] T054 [US2] Show the title set by OSC 0 or 2 in `App/Sources/Sidebar/TerminalPane.swift` when a program sets one
+- [X] T055 [US2] Draw the not-live states in `App/Sources/Sidebar/TerminalPane.swift`: say what happened for `exited`, `failed` and `released`, keep the scrollback readable, and offer to start a new shell via `shell.restart` (FR-024, FR-028, FR-029)
+- [X] T056 [US2] Keep the attachment across pane switches and agent switches in `App/Sources/Sidebar/TerminalPane.swift`, detaching only when the window closes (FR-022, FR-026)
 
 **Checkpoint**: quickstart scenarios 2 and 3 pass. A build survives quitting the app, and two windows on one agent see one shell.
 

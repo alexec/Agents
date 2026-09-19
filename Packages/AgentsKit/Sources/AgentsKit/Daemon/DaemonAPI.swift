@@ -18,6 +18,16 @@ public enum DaemonAPI {
         public static let permissionsPending = "permissions/pending"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
+
+        // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
+        // which is 003's and belongs to the agent. Different owner, different
+        // identifier space, different lifetime, and nothing crosses (FR-025).
+        public static let shellAttach = "shell/attach"
+        public static let shellDetach = "shell/detach"
+        public static let shellInput = "shell/input"
+        public static let shellResize = "shell/resize"
+        public static let shellSignal = "shell/signal"
+        public static let shellRestart = "shell/restart"
     }
 
     public enum Notification {
@@ -30,6 +40,10 @@ public enum DaemonAPI {
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
+        /// The user's shell printed something. Raw bytes, base64. Not the agent's
+        /// terminal, which is `agentTerminalOutput` above.
+        public static let shellOutput = "shell/output"
+        public static let shellStateChanged = "shell/stateChanged"
     }
 
     // MARK: Requests
@@ -211,6 +225,100 @@ public enum DaemonAPI {
 
     // MARK: Errors the app shows
 
+    // MARK: Shells
+
+    public struct ShellAttachRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var rows: Int
+        public var cols: Int
+
+        public init(agentID: UUID, rows: Int = 24, cols: Int = 80) {
+            self.agentID = agentID
+            self.rows = rows
+            self.cols = cols
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            rows = try c.decodeIfPresent(Int.self, forKey: .rows) ?? 24
+            cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
+        }
+    }
+
+    /// What a window gets on attach: the state, and the bytes to replay.
+    ///
+    /// Bytes, not a screen. The daemon parses nothing; the window feeds these to its
+    /// own emulator and arrives at the screen it would have had if it had been watching
+    /// all along (plan decision 2).
+    public struct ShellAttachResponse: Codable, Sendable {
+        public var state: ShellState
+        public var scrollback: Data
+        public var dropped: Int
+        public var startedAt: Date
+
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+            self.state = state
+            self.scrollback = scrollback
+            self.dropped = dropped
+            self.startedAt = startedAt
+        }
+    }
+
+    public struct ShellInputRequest: Codable, Sendable {
+        public var agentID: UUID
+        /// What the user typed, as bytes. Never a `String`: a keystroke is not always a
+        /// character, and an escape sequence is not text.
+        public var bytes: Data
+
+        public init(agentID: UUID, bytes: Data) {
+            self.agentID = agentID
+            self.bytes = bytes
+        }
+    }
+
+    public struct ShellResizeRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var rows: Int
+        public var cols: Int
+
+        public init(agentID: UUID, rows: Int, cols: Int) {
+            self.agentID = agentID
+            self.rows = rows
+            self.cols = cols
+        }
+    }
+
+    public struct ShellSignalRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var signal: Int32
+
+        public init(agentID: UUID, signal: Int32) {
+            self.agentID = agentID
+            self.signal = signal
+        }
+    }
+
+    public struct ShellOutputNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var bytes: Data
+
+        public init(agentID: UUID, bytes: Data) {
+            self.agentID = agentID
+            self.bytes = bytes
+        }
+    }
+
+    public struct ShellStateNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var state: ShellState
+
+        public init(agentID: UUID, state: ShellState) {
+            self.agentID = agentID
+            self.state = state
+        }
+    }
+
     public enum Failure {
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
@@ -218,6 +326,10 @@ public enum DaemonAPI {
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
         public static let alreadyRunning = -32006
+        /// The user's login shell is missing, or the agent's folder has gone (FR-024).
+        public static let shellWillNotStart = -32010
+        /// A restart was asked for on a shell that is still running.
+        public static let shellNotLive = -32011
         /// The runtime is installed and will not work until somebody signs in. Its own
         /// auth methods come back in the error's data, including the command Copilot
         /// names for the terminal.

@@ -91,6 +91,21 @@ pane sends its size when the sidebar is resized, and the kernel sends `SIGWINCH`
 has threads, and everything between the fork and the exec has to be async-signal-safe.
 `posix_spawn` is the same result without that window. Rejected.
 
+**Two more flags, found while building rather than while planning**: a child inherits
+both its signal dispositions and its signal mask. Resetting neither gives a shell that
+misbehaves in one host application and not another, which is the worst kind of bug to
+find later.
+
+`POSIX_SPAWN_SETSIGDEF` with a full set puts every disposition back to default, so a
+host that ignores SIGTERM or SIGPIPE does not hand that ignoring to everything the user
+runs. `POSIX_SPAWN_SETSIGMASK` with an empty set unblocks everything, which is the half
+that is easy to miss: a blocked signal is not ignored, it stays pending and never runs.
+
+This surfaced as a test watching a shell told to terminate itself exit cleanly with
+status 0. The standalone probe in this section never showed it, because the probe's own
+process blocked nothing. Both flags are now set, and the test that found it is
+`PTYTests.aSignalledChildReportsAsAShellDoes`.
+
 ---
 
 ## 3. Terminal emulation is taken, not written: SwiftTerm

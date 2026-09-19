@@ -13,12 +13,21 @@ let package = Package(
     products: [
         .library(name: "AgentsKit", targets: ["AgentsKit"]),
     ],
-    // Nothing here, deliberately. `agentsd` links AgentsKit too, and the daemon moves
-    // terminal bytes without parsing them. SwiftTerm belongs to the app, so it is
-    // declared against the app target in `project.yml` and never here.
-    dependencies: [],
+    dependencies: [
+        // Tests only. See the target below.
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
+    ],
     targets: [
+        // Nothing here, deliberately. `agentsd` links this library, and the daemon
+        // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
+        // where it is declared against the app target in `project.yml`.
         .target(name: "AgentsKit"),
-        .testTarget(name: "AgentsKitTests", dependencies: ["AgentsKit"]),
+        // The test target may have it, because a test target is not linked into any
+        // product: the daemon is still free of it. The replay test needs a real
+        // emulator to prove the property `shell.attach` rests on, which is that the
+        // same bytes in any chunking give the same screen.
+        .testTarget(
+            name: "AgentsKitTests",
+            dependencies: ["AgentsKit", .product(name: "SwiftTerm", package: "SwiftTerm")]),
     ]
 )

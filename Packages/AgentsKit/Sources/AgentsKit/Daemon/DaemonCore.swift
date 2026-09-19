@@ -25,6 +25,10 @@ public actor DaemonCore {
     var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
     var connectionCount = 0
 
+    /// The user's shells, one per agent. Not the agent's terminals, which are 003's.
+    /// Held here so a build outlives the window that started it (FR-026).
+    let shells = ShellHost()
+
     struct Draft: Sendable {
         var runtimeID: String
         var cwd: URL
@@ -218,6 +222,10 @@ public actor DaemonCore {
     // MARK: Shutting down
 
     public func shutDown() async {
+        // Every shell dies with the daemon, so no pty is left orphaned. Each one is
+        // remembered as gone with a reason, so the next window that looks is told
+        // rather than handed a new shell in silence (FR-029).
+        shells.shutDown()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
         for (_, task) in eventTasks { task.cancel() }

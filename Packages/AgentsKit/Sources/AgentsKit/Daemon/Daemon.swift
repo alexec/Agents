@@ -46,6 +46,8 @@ public final class Daemon: @unchecked Sendable {
         await core.setBroadcaster { method, params in
             server.broadcast(method, params)
         }
+        // Shell output goes out the same door as every other notification.
+        await core.connectShells()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
     }
