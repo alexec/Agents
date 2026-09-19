@@ -11,7 +11,7 @@ import Foundation
 if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     let token = CommandLine.arguments[2]
     // The daemon that started this said where it is. Anything else would be a guess.
-    let client = DaemonClient(locations: DaemonCore.helperLocations)
+    let client = DaemonClient(locations: .default)
     // Both tools do the same thing with what they are given: hand it to the daemon
     // and repeat what the daemon says back to the agent. Nothing is decided here.
     @Sendable func relay(_ method: String, _ request: some Encodable & Sendable,

@@ -16,7 +16,9 @@ public final class DaemonServer: @unchecked Sendable {
 
     private let url: URL
     private let handler: Handler
-    private var listenFD: Int32 = -1
+    /// Readable inside the module so a test can ask whether it would survive an exec.
+    /// There is no other way to see the flag: it only shows itself in a child.
+    private(set) var listenFD: Int32 = -1
     private let connections = ConnectionSet()
     private let stopped = ManagedAtomicFlag()
     private let onConnectionCountChanged: @Sendable (Int) -> Void
@@ -43,8 +45,9 @@ public final class DaemonServer: @unchecked Sendable {
         guard listenFD >= 0 else { throw DaemonServerError.cannotCreateSocket(errno: errno) }
         // The front door belongs to this process. A child holding a copy of it keeps
         // the socket answering after the daemon has gone, so the window connects to
-        // nobody and waits for a reply that is never coming.
-        fcntl(listenFD, F_SETFD, FD_CLOEXEC)
+        // nobody and waits for a reply that is never coming. Darwin has no
+        // SOCK_CLOEXEC, so it is asked for the moment there is something to ask about.
+        setCloseOnExec(listenFD)
 
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -74,10 +77,13 @@ public final class DaemonServer: @unchecked Sendable {
                     if errno == EINTR { continue }
                     return
                 }
-                guard let self, !self.stopped.isSet else { close(fd); return }
                 // accept() hands back a descriptor with the flag clear however the
                 // listener was opened, so each window's connection says it again.
-                fcntl(fd, F_SETFD, FD_CLOEXEC)
+                // This is the one a long-lived shell is most likely to be handed: a
+                // window connects, an agent starts a terminal, and the window's
+                // connection is held open by a shell that will never read it.
+                setCloseOnExec(fd)
+                guard let self, !self.stopped.isSet else { close(fd); return }
                 self.accepted(fd)
             }
         }

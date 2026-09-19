@@ -184,9 +184,15 @@ struct FilesPane: View {
 
     private func start() async {
         refreshTouched()
-        open(folder: folder)
-        // Not `open(file:)`: the file may be one the agent asked for, at a line, and
-        // opening it as though the user had picked it would throw that line away.
+        // Deliberately not `open(folder:)`, which clears the open file: the pane is
+        // arriving, not being navigated. When the agent asked for a file the sidebar
+        // was usually shut, so this is the first pass and the file it named is sitting
+        // in `state` waiting to be read. Clearing it here showed the folder instead,
+        // which looked like `show_file` having done nothing at all.
+        state.folder = folder
+        reloadListing()
+        // Not `open(file:)` either, for the same reason at one remove: that treats the
+        // file as the user's own choice and throws away the line the agent named.
         if let openFile = state.openFile { reloadFile(openFile) }
         startWatching()
     }

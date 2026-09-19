@@ -15,6 +15,9 @@ public actor DaemonClient {
         case noHelper(lookedIn: [String])
         case couldNotStartHelper(String)
         case couldNotConnect
+        /// A root so deep that the socket inside it cannot be addressed. Only ever
+        /// seen by somebody who named the root themselves.
+        case socketPathTooLong(String)
     }
 
     private let link: any DaemonLink

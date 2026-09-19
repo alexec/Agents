@@ -55,6 +55,27 @@ ls ~/Library/Application\ Support/Agents/
 Nothing is stored anywhere else, and the daemon is the only writer. To start again from
 nothing, quit the app, `pkill -f agentsd`, and delete that directory.
 
+## A second copy, beside the first
+
+That directory is also the daemon's identity: the lock it holds, the socket it answers
+on and the agents it owns all hang off it. Point a window at a different one and it is a
+different daemon, with its own agents, which is how a build from a branch is run beside
+the ordinary app without either disturbing the other.
+
+```sh
+open -n path/to/Agents.app --args --root /tmp/agents-branch
+```
+
+`--root` first, `AGENTS_ROOT` second, and the ordinary place when neither is given.
+`--root` exists because it is what survives `open`: macOS passes a second copy of a
+bundle its arguments and not its environment. The window hands the path to the daemon it
+starts, and that daemon hands it to every MCP helper it gives an agent, so the whole
+chain agrees without anybody guessing.
+
+The window says which one it is in the title of its projects column, when it is not the
+ordinary one. Keep the path short: a Unix socket may be named with 104 bytes and no
+more, and a root nested a few folders deep will say so rather than fail quietly.
+
 ## What the app does with a runtime
 
 Everything the protocol defines, decided by what each runtime advertises rather than by

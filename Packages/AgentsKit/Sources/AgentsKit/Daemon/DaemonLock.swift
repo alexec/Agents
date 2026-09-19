@@ -6,7 +6,10 @@ import Foundation
 /// the process: a daemon that crashes leaves nothing to clean up and nothing to
 /// explain to the user.
 public final class DaemonLock: @unchecked Sendable {
-    private let descriptor: Int32
+    /// Readable inside the module so a test can close it the way a kill would, which
+    /// is the case that matters: `release` unlocks first, and an unlock is honoured
+    /// however many processes hold the descriptor.
+    private(set) var descriptor: Int32
 
     /// Takes the lock, or returns nil because somebody else holds it.
     public init?(at url: URL) {

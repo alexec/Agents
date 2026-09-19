@@ -21,17 +21,7 @@ extension DaemonCore {
         MCPServer(name: "agents",
                   transport: .stdio(command: Self.helperPath,
                                     args: ["mcp", token],
-                                    env: [Self.rootVariable: locations.root.path]))
-    }
-
-    static let rootVariable = "AGENTS_ROOT"
-
-    /// Where the helper looks for the daemon that started it.
-    public static var helperLocations: StoreLocations {
-        guard let root = ProcessInfo.processInfo.environment[rootVariable], !root.isEmpty else {
-            return .default
-        }
-        return StoreLocations(root: URL(filePath: root))
+                                    env: [StoreLocations.rootVariable: locations.root.path]))
     }
 
     /// The binary the runtime is told to run. The daemon's own path: one build, one

@@ -711,6 +711,10 @@ final class AppModel {
                 return "The helper would not start: \(reason)"
             case .couldNotConnect:
                 return "Could not reach the helper that runs the agents."
+            case .socketPathTooLong(let path):
+                // Only ever seen by somebody who passed `--root`, and the fix is in
+                // their hands: a shorter path.
+                return "That folder is too deep to run a daemon in: \(path) is past the 104 bytes a socket may be named with."
             }
         }
         return String(describing: error)
