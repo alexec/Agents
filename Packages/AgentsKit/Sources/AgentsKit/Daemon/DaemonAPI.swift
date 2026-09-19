@@ -6,16 +6,27 @@ import Foundation
 public enum DaemonAPI {
     public enum Method {
         public static let runtimesList = "runtimes/list"
+        public static let runtimesAccounts = "runtimes/accounts"
+        public static let runtimeAuthenticate = "runtimes/authenticate"
+        public static let runtimeLogOut = "runtimes/logout"
+        public static let runtimeSetProvider = "runtimes/setProvider"
+        public static let sessionsList = "sessions/list"
+        public static let sessionsAdopt = "sessions/adopt"
+        public static let sessionsDelete = "sessions/delete"
+        public static let agentsFork = "agents/fork"
         public static let agentsList = "agents/list"
         public static let agentsOptions = "agents/options"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
+        public static let agentsUnqueue = "agents/unqueue"
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
         public static let permissionsPending = "permissions/pending"
+        public static let elicitationsPending = "elicitations/pending"
+        public static let elicitationsAnswer = "elicitations/answer"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
 
@@ -153,6 +164,16 @@ public enum DaemonAPI {
         }
     }
 
+    /// Take one back off the queue before its turn comes.
+    public struct UnqueueRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var promptID: UUID
+        public init(agentID: UUID, promptID: UUID) {
+            self.agentID = agentID
+            self.promptID = promptID
+        }
+    }
+
     public struct TranscriptRequest: Codable, Sendable {
         public var agentID: UUID
         public var before: Int?
@@ -220,6 +241,127 @@ public enum DaemonAPI {
         public init(agentID: UUID, request: PermissionRequest?) {
             self.agentID = agentID
             self.request = request
+        }
+    }
+
+    public struct RuntimeRequest: Codable, Sendable {
+        public var runtimeID: String
+        public init(runtimeID: String) { self.runtimeID = runtimeID }
+    }
+
+    public struct AuthenticateRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var methodID: String
+        public init(runtimeID: String, methodID: String) {
+            self.runtimeID = runtimeID
+            self.methodID = methodID
+        }
+    }
+
+    public struct SetProviderRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var providerID: String
+        public init(runtimeID: String, providerID: String) {
+            self.runtimeID = runtimeID
+            self.providerID = providerID
+        }
+    }
+
+    public struct SessionsListRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var cwd: URL
+        public init(runtimeID: String, cwd: URL) {
+            self.runtimeID = runtimeID
+            self.cwd = cwd
+        }
+    }
+
+    public struct AdoptRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var sessionID: String
+        public var cwd: URL
+        public init(runtimeID: String, sessionID: String, cwd: URL) {
+            self.runtimeID = runtimeID
+            self.sessionID = sessionID
+            self.cwd = cwd
+        }
+    }
+
+    /// The only call in this API that cannot be undone, so it will not happen without
+    /// being told twice.
+    public struct DeleteSessionRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var sessionID: String
+        public var confirmed: Bool
+
+        public init(runtimeID: String, sessionID: String, confirmed: Bool) {
+            self.runtimeID = runtimeID
+            self.sessionID = sessionID
+            self.confirmed = confirmed
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            sessionID = try c.decode(String.self, forKey: .sessionID)
+            confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+        }
+    }
+
+    public struct ElicitationNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var requestID: UUID
+        /// Nil when the form has been answered or withdrawn.
+        public var request: ElicitationRequest?
+
+        public init(agentID: UUID, requestID: UUID, request: ElicitationRequest?) {
+            self.agentID = agentID
+            self.requestID = requestID
+            self.request = request
+        }
+    }
+
+    public struct TerminalOutputNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var terminalID: String
+        public var chunk: String
+
+        public init(agentID: UUID, terminalID: String, chunk: String) {
+            self.agentID = agentID
+            self.terminalID = terminalID
+            self.chunk = chunk
+        }
+    }
+
+    public struct AnswerElicitationRequest: Codable, Sendable {
+        public var requestID: UUID
+        public var action: Action
+        public var content: [String: JSONValue]
+
+        public enum Action: String, Codable, Sendable {
+            case accept, decline, cancel
+        }
+
+        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:]) {
+            self.requestID = requestID
+            self.action = action
+            self.content = content
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            requestID = try c.decode(UUID.self, forKey: .requestID)
+            action = try c.decodeIfPresent(Action.self, forKey: .action) ?? .cancel
+            content = try c.decodeIfPresent([String: JSONValue].self, forKey: .content) ?? [:]
+        }
+    }
+
+    public struct UsageNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var usage: Usage
+        public init(agentID: UUID, usage: Usage) {
+            self.agentID = agentID
+            self.usage = usage
         }
     }
 
@@ -325,6 +467,8 @@ public enum DaemonAPI {
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
+        /// No longer raised: a prompt sent to a working agent waits its turn rather
+        /// than being refused. The number is kept so an older window still reads it.
         public static let alreadyRunning = -32006
         /// The user's login shell is missing, or the agent's folder has gone (FR-024).
         public static let shellWillNotStart = -32010

@@ -244,3 +244,40 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
         properties.compactMap { $0.problem(with: answer[$0.name]) }
     }
 }
+
+/// What the user did with a form.
+public enum ElicitationOutcome: Hashable, Sendable {
+    case accept([String: JSONValue])
+    /// Said no. An answer, not a failure: the agent carries on.
+    case decline
+    /// Closed it, or the agent withdrew it.
+    case cancel
+
+    public var wire: JSONValue {
+        switch self {
+        case .accept(let content):
+            return ["action": "accept", "content": .object(content)]
+        case .decline:
+            return ["action": "decline"]
+        case .cancel:
+            return ["action": "cancel"]
+        }
+    }
+
+    public var summary: String {
+        switch self {
+        case .accept: return "You answered the agent's form"
+        case .decline: return "You declined the agent's form"
+        case .cancel: return "The form was closed"
+        }
+    }
+}
+
+extension PermissionOption {
+    /// The two options for a question the app is asking on an agent's behalf, when the
+    /// agent gave us none of its own. Used for a served file write.
+    public static let allowOrReject: [PermissionOption] = [
+        PermissionOption(optionID: "allow_once", name: "Allow", kind: .allowOnce),
+        PermissionOption(optionID: "reject_once", name: "Refuse", kind: .rejectOnce),
+    ]
+}

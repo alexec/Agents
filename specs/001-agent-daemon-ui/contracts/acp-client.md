@@ -1,5 +1,9 @@
 # Contract: what we send the runtimes, and what we must answer
 
+> **Superseded by [`specs/003-acp-coverage/contracts/acp-client.md`](../../003-acp-coverage/contracts/acp-client.md).**
+> This one covers the subset 001 needed. In particular, 001's decision to advertise no
+> client file or terminal capabilities was reversed on 2026-09-18.
+
 **Feature**: [spec.md](../spec.md) | **Evidence**: [research.md](../research.md)
 
 Line-delimited JSON-RPC 2.0 over the runtime's stdin and stdout. One object per line, no headers.

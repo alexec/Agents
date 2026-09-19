@@ -18,6 +18,11 @@ public actor DaemonCore {
     var turnTasks: [UUID: Task<Void, Never>] = [:]
     var drafts: [UUID: Draft] = [:]
     var pendingPermissions: [UUID: Pending] = [:]
+    /// Forms an agent is blocked on, held here for the same reason permissions are:
+    /// the question can arrive while no window is open.
+    var elicitations: [UUID: PendingElicitation] = [:]
+    /// The commands we are running for each agent.
+    var terminalServices: [UUID: TerminalService] = [:]
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
@@ -73,6 +78,12 @@ public actor DaemonCore {
 
     public func account(for runtimeID: String) -> RuntimeAccount {
         accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
+    }
+
+    /// Everything known about every runtime's account, for a window that has just
+    /// connected and knows nothing yet.
+    public func allAccounts() -> [RuntimeAccount] {
+        RuntimeCatalog.builtIn.map { account(for: $0.id) }
     }
 
     public func setBroadcaster(_ broadcaster: @escaping @Sendable (String, JSONValue?) -> Void) {
@@ -184,6 +195,38 @@ public actor DaemonCore {
             agent.title = title
             changed(agent)
 
+        case .usageChanged(let usage):
+            guard var agent = agents[agentID] else { return }
+            agent.usage = usage
+            agents[agentID] = agent
+            // Usage arrives several times a turn, so it is broadcast on its own rather
+            // than as a whole agent, and the record is written at the end of the turn.
+            broadcast(DaemonAPI.Notification.agentUsage,
+                      DaemonAPI.UsageNotification(agentID: agentID, usage: usage))
+
+        case .planChanged(let plan):
+            guard var agent = agents[agentID] else { return }
+            agent.plans = Plan.applying(plan, to: agent.plans)
+            changed(agent)
+            await record(.planUpdated(plan), for: agentID)
+
+        case .planRemoved(let planID):
+            guard var agent = agents[agentID] else { return }
+            agent.plans = Plan.withdrawing(planID, in: agent.plans)
+            changed(agent)
+            if let withdrawn = agent.plans.first(where: { $0.id == planID }) {
+                await record(.planUpdated(withdrawn), for: agentID)
+            }
+
+        case .elicitationRequested(let request):
+            await holdElicitation(request, agentID: agentID)
+
+        case .elicitationWithdrawn(let requestID):
+            withdrawElicitation(requestID, agentID: agentID)
+
+        case .served(let request):
+            await record(.servedRequest(request), for: agentID)
+
         case .permissionRequested(var request):
             request.agentID = agentID
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)
@@ -216,15 +259,20 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) {
         eventTasks.removeValue(forKey: agentID)?.cancel()
         live.removeValue(forKey: agentID)
+        // Nothing we started for this agent outlives it.
+        Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }
     }
 
     // MARK: Shutting down
 
     public func shutDown() async {
-        // Every shell dies with the daemon, so no pty is left orphaned. Each one is
-        // remembered as gone with a reason, so the next window that looks is told
-        // rather than handed a new shell in silence (FR-029).
+        // Two different things, both going. The agent's terminals are 003's and are
+        // killed because the agent owning them is stopping. The user's shells are this
+        // feature's: each is remembered as gone with a reason, so the next window that
+        // looks is told rather than handed a new shell in silence (FR-029). Neither
+        // knows about the other, which is the point of keeping them apart.
+        await killAllTerminals()
         shells.shutDown()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }

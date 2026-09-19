@@ -13,6 +13,9 @@ actor FakeACPAgent {
         var configOptions: [ConfigOption] = []
         var updates: [JSONValue] = []
         var stopReason = "end_turn"
+        /// How long a turn takes. Zero for almost every test; a real duration for the
+        /// ones about what happens while the agent is still working.
+        var turnDelay: Duration = .zero
         /// Ask a permission part way through the turn and wait for the answer.
         var permission: JSONValue?
         /// Answer `session/resume` and `session/load` with this error instead.
@@ -39,6 +42,8 @@ actor FakeACPAgent {
         var sessionCapabilities: [String: JSONValue] = ["close": [:], "list": [:]]
         var agentCapabilities: [String: JSONValue] = [:]
         var sessions: [JSONValue] = []
+        /// What `initialize` offers as ways to sign in.
+        var authMethods: [JSONValue] = []
     }
 
     private var script: Script
@@ -82,7 +87,7 @@ actor FakeACPAgent {
                 "protocolVersion": .int(script.protocolVersion),
                 "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
-                "authMethods": [],
+                "authMethods": .array(script.authMethods),
             ])
 
         case ACP.Method.newSession:
@@ -127,6 +132,9 @@ actor FakeACPAgent {
             promptContent = params?["prompt"]
             return await runTurn()
 
+        case ACP.Method.authenticate, ACP.Method.logout:
+            return .success([:])
+
         case ACP.Method.close:
             return .success([:])
 
@@ -136,6 +144,7 @@ actor FakeACPAgent {
     }
 
     private func runTurn() async -> Result<JSONValue, JSONRPCError> {
+        if script.turnDelay > .zero { try? await Task.sleep(for: script.turnDelay) }
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }

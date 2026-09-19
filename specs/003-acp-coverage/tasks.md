@@ -97,22 +97,22 @@ received both.
 
 ### Tests for User Story 2
 
-- [ ] T034 [P] [US2] Test that a prompt carrying text, image, resource link and resource encodes to the shape in `contracts/acp-client.md`, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PromptContentTests.swift`
-- [ ] T035 [P] [US2] Test capability gating in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AttachmentPolicyTests.swift`: an image is refused for an agent whose runtime does not advertise `image`, and a resource link is always allowed
-- [ ] T036 [P] [US2] Test that an agent message carrying an image block is kept as a block and not flattened to an empty string, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/SessionUpdateContentTests.swift`
+- [X] T034 [P] [US2] Test that a prompt carrying text, image, resource link and resource encodes to the shape in `contracts/acp-client.md`, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PromptContentTests.swift`
+- [X] T035 [P] [US2] Test capability gating in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AttachmentPolicyTests.swift`: an image is refused for an agent whose runtime does not advertise `image`, and a resource link is always allowed
+- [X] T036 [P] [US2] Test that an agent message carrying an image block is kept as a block and not flattened to an empty string, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/SessionUpdateContentTests.swift`
 
 ### Implementation for User Story 2
 
 - [X] T037 [US2] Add `Attachment` (`id`, `block`, `displayName`, `byteCount?`) in `Packages/AgentsKit/Sources/AgentsKit/Model/Attachment.swift`, restricted to image, resourceLink and resource blocks
-- [ ] T038 [US2] Take `[ContentBlock]` in `ACPSession.prompt` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
-- [ ] T039 [US2] Read content as blocks in `SessionUpdate.decode` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing `text(in:)`, and keep the joined text alongside
+- [X] T038 [US2] Take `[ContentBlock]` in `ACPSession.prompt` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
+- [X] T039 [US2] Read content as blocks in `SessionUpdate.decode` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing `text(in:)`, and keep the joined text alongside
 - [X] T040 [US2] Add the policy that decides whether an attachment may be sent to a given agent, from `promptCapabilities`, in `Packages/AgentsKit/Sources/AgentsKit/Model/Attachment.swift`
-- [ ] T041 [US2] Carry attachments through `agent.start` and `agent.prompt` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T042 [US2] Accept a dropped file and a pasted image on the composer in `App/Sources/Chat/PromptBar.swift`
-- [ ] T043 [US2] Add the `@` file picker to the composer in `App/Sources/Chat/PromptBar.swift`, offering files from the agent's folders, reusing the slash-command list's keyboard handling
-- [ ] T044 [US2] Draw attached items above the field with a way to remove each, in `App/Sources/Chat/AttachmentStrip.swift`
-- [ ] T045 [US2] Say why an attachment cannot be sent, before sending, in `App/Sources/Chat/PromptBar.swift`
-- [ ] T046 [US2] Draw message blocks, including images, in `App/Sources/Chat/Transcript.swift` and `App/Sources/Chat/MarkdownText.swift`, with an image sized to the pane
+- [X] T041 [US2] Carry attachments through `agent.start` and `agent.prompt` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T042 [US2] Accept a dropped file and a pasted image on the composer in `App/Sources/Chat/PromptBar.swift`
+- [X] T043 [US2] Add the `@` file picker to the composer in `App/Sources/Chat/PromptBar.swift`, offering files from the agent's folders, reusing the slash-command list's keyboard handling
+- [X] T044 [US2] Draw attached items above the field with a way to remove each, in `App/Sources/Chat/AttachmentStrip.swift`
+- [X] T045 [US2] Say why an attachment cannot be sent, before sending, in `App/Sources/Chat/PromptBar.swift`
+- [X] T046 [US2] Draw message blocks, including images, in `App/Sources/Chat/Transcript.swift` and `App/Sources/Chat/MarkdownText.swift`, with an image sized to the pane
 
 **Checkpoint**: stories 1 and 2 both work, independently.
 
@@ -132,12 +132,12 @@ received both.
 ### Implementation for User Story 3
 
 - [X] T049 [US3] Add `ToolCallContent` (content, diff, terminal, unknown) and `ToolCallLocation` (`path`, `line?`) in `Packages/AgentsKit/Sources/AgentsKit/ACP/ToolCallContent.swift`
-- [ ] T050 [US3] Decode `content` and `locations` on `tool_call` and `tool_call_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
-- [ ] T051 [US3] Draw a diff as before against after with the path in `App/Sources/Chat/DiffView.swift`, wrapping long lines and scrolling horizontally for code
-- [ ] T052 [US3] Draw a `content` block through the existing markdown renderer in `App/Sources/Chat/Transcript.swift`, so the Claude adapter's console blocks read as text
-- [ ] T053 [US3] Draw a `terminal` block from the terminal the daemon is running, live, in `App/Sources/Chat/TerminalOutputView.swift`
-- [ ] T054 [US3] Offer each location and open it at its line with `NSWorkspace` in `App/Sources/Chat/Transcript.swift`
-- [ ] T055 [US3] Keep the raw view for content the app does not recognise in `App/Sources/Chat/Transcript.swift`
+- [X] T050 [US3] Decode `content` and `locations` on `tool_call` and `tool_call_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
+- [X] T051 [US3] Draw a diff as before against after with the path in `App/Sources/Chat/DiffView.swift`, wrapping long lines and scrolling horizontally for code
+- [X] T052 [US3] Draw a `content` block through the existing markdown renderer in `App/Sources/Chat/Transcript.swift`, so the Claude adapter's console blocks read as text
+- [X] T053 [US3] Draw a `terminal` block from the terminal the daemon is running, live, in `App/Sources/Chat/TerminalOutputView.swift`
+- [X] T054 [US3] Offer each location and open it at its line with `NSWorkspace` in `App/Sources/Chat/Transcript.swift`
+- [X] T055 [US3] Keep the raw view for content the app does not recognise in `App/Sources/Chat/Transcript.swift`
 
 ---
 
@@ -149,19 +149,19 @@ received both.
 
 ### Tests for User Story 4
 
-- [ ] T056 [P] [US4] Test `usage_update` decoding including `size: 0` and a missing cost, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/UsageTests.swift`; `fraction` is nil when `size` is zero and "close to full" is `fraction >= 0.85`
-- [ ] T057 [P] [US4] Test that the `usage` on a prompt response is written to the transcript once per turn, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TurnUsageTests.swift`
+- [X] T056 [P] [US4] Test `usage_update` decoding including `size: 0` and a missing cost, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/UsageTests.swift`; `fraction` is nil when `size` is zero and "close to full" is `fraction >= 0.85`
+- [X] T057 [P] [US4] Test that the `usage` on a prompt response is written to the transcript once per turn, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TurnUsageTests.swift`
 
 ### Implementation for User Story 4
 
 - [X] T058 [US4] Add `Usage`, `TurnUsage` and `Cost` in `Packages/AgentsKit/Sources/AgentsKit/Model/Usage.swift` with the fields and rules in `data-model.md`
-- [ ] T059 [US4] Decode `usage_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing the deliberate ignore
+- [X] T059 [US4] Decode `usage_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing the deliberate ignore
 - [X] T060 [US4] Decode `usage` on `PromptResult` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift` and record it against the turn in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
-- [ ] T061 [US4] Keep `usage`, `lastTurnUsage` and `costToDate` on the agent record in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift`, summing cost per currency and never across currencies
-- [ ] T062 [US4] Send `agent.usageChanged` from the daemon in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift` and receive it in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T063 [US4] Draw the context meter on the agent, updating live, in `App/Sources/Chat/ContextMeter.swift`
-- [ ] T064 [US4] Show the turn's cost on the transcript entry and the running total on the agent, in `App/Sources/Chat/Transcript.swift`, in the currency as sent
-- [ ] T065 [US4] Say when an agent is close to full, in `App/Sources/Chat/ContextMeter.swift`
+- [X] T061 [US4] Keep `usage`, `lastTurnUsage` and `costToDate` on the agent record in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift`, summing cost per currency and never across currencies
+- [X] T062 [US4] Send `agent.usageChanged` from the daemon in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift` and receive it in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T063 [US4] Draw the context meter on the agent, updating live, in `App/Sources/Chat/ContextMeter.swift`
+- [X] T064 [US4] Show the turn's cost on the transcript entry and the running total on the agent, in `App/Sources/Chat/Transcript.swift`, in the currency as sent
+- [X] T065 [US4] Say when an agent is close to full, in `App/Sources/Chat/ContextMeter.swift`
 
 ---
 
@@ -173,19 +173,19 @@ received both.
 
 ### Tests for User Story 5
 
-- [ ] T066 [P] [US5] Test the account state machine (ready, needs sign-in, unknown) against a fake agent that refuses with `-32000` and then accepts, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/RuntimeAccountTests.swift`
-- [ ] T067 [P] [US5] Test that a terminal auth method returns the command rather than running anything, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AuthMethodTests.swift`
+- [X] T066 [P] [US5] Test the account state machine (ready, needs sign-in, unknown) against a fake agent that refuses with `-32000` and then accepts, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/RuntimeAccountTests.swift`
+- [X] T067 [P] [US5] Test that a terminal auth method returns the command rather than running anything, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AuthMethodTests.swift`
 
 ### Implementation for User Story 5
 
 - [X] T068 [US5] Add `RuntimeAccount` and `Provider` in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeAccount.swift` per `data-model.md`
-- [ ] T069 [US5] Call `authenticate`, `logout`, `providers/list`, `providers/set` and `providers/disable` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, each gated on what `initialize` advertised
+- [X] T069 [US5] Call `authenticate`, `logout`, `providers/list`, `providers/set` and `providers/disable` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, each gated on what `initialize` advertised
 - [X] T070 [US5] Hold the account per runtime and refresh it on every handshake in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
-- [ ] T071 [US5] Add `runtime.account`, `runtime.authenticate`, `runtime.logout`, `runtime.setProvider` and the `runtime.accountChanged` notification to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T072 [US5] Send `auth: { terminal: true }` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
-- [ ] T073 [US5] Build the runtime sheet (state, sign in, sign out, provider) in `App/Sources/Runtimes/RuntimeAccountView.swift`
-- [ ] T074 [US5] Open Terminal.app at the command a terminal auth method names, in `App/Sources/Runtimes/RuntimeAccountView.swift`
-- [ ] T075 [US5] Name the agents a sign-out stops, and ask first, in `App/Sources/Runtimes/RuntimeAccountView.swift`
+- [X] T071 [US5] Add `runtime.account`, `runtime.authenticate`, `runtime.logout`, `runtime.setProvider` and the `runtime.accountChanged` notification to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T072 [US5] Send `auth: { terminal: true }` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
+- [X] T073 [US5] Build the runtime sheet (state, sign in, sign out, provider) in `App/Sources/Runtimes/RuntimeAccountView.swift`
+- [X] T074 [US5] Open Terminal.app at the command a terminal auth method names, in `App/Sources/Runtimes/RuntimeAccountView.swift`
+- [X] T075 [US5] Name the agents a sign-out stops, and ask first, in `App/Sources/Runtimes/RuntimeAccountView.swift`
 - [ ] T076 [US5] Write down what a signed-out runtime actually returns, in `specs/003-acp-coverage/research.md` section 8, after signing one out deliberately. This closes the signed-out question carried over from 001, its task T085
 
 ---
@@ -198,16 +198,16 @@ received both.
 
 ### Tests for User Story 6
 
-- [ ] T077 [P] [US6] Test plan, plan update and plan removal against one agent in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PlanTests.swift`: one plan on screen throughout, ending withdrawn and still on the record
-- [ ] T078 [P] [US6] Test compaction start, summary chunks and finish in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/CompactionTests.swift`
+- [X] T077 [P] [US6] Test plan, plan update and plan removal against one agent in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PlanTests.swift`: one plan on screen throughout, ending withdrawn and still on the record
+- [X] T078 [P] [US6] Test compaction start, summary chunks and finish in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/CompactionTests.swift`
 
 ### Implementation for User Story 6
 
 - [X] T079 [US6] Add `Plan` and `PlanEntry` (`priority: .high/.medium/.low`, `status: .pending/.inProgress/.completed`) in `Packages/AgentsKit/Sources/AgentsKit/Model/Plan.swift`
-- [ ] T080 [US6] Decode `plan`, `plan_update` and `plan_removed` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, applying the replace-or-add rules in `data-model.md`
-- [ ] T081 [US6] Decode `compaction_update` and `compaction_summary_chunk` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
-- [ ] T082 [US6] Send `plan: {}` and `session.compaction: {}` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
-- [ ] T083 [US6] Keep plans on the agent record and notify with `agent.planChanged` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
+- [X] T080 [US6] Decode `plan`, `plan_update` and `plan_removed` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, applying the replace-or-add rules in `data-model.md`
+- [X] T081 [US6] Decode `compaction_update` and `compaction_summary_chunk` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
+- [X] T082 [US6] Send `plan: {}` and `session.compaction: {}` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
+- [X] T083 [US6] Keep plans on the agent record and notify with `agent.planChanged` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
 - [X] T084 [US6] Draw a plan with each step's state in `App/Sources/Chat/PlanView.swift`
 - [X] T085 [US6] Draw compaction as a transcript entry with the summary it kept, in `App/Sources/Chat/Transcript.swift`
 
@@ -221,20 +221,20 @@ received both.
 
 ### Tests for User Story 7
 
-- [ ] T086 [P] [US7] Test that a session already held by an agent is not offered, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeSessionTests.swift`
-- [ ] T087 [P] [US7] Test adoption end to end against a fake agent, including the load replay being kept as content this once, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/AdoptSessionTests.swift`
-- [ ] T088 [P] [US7] Test that delete refuses without `confirmed: true`, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DeleteSessionTests.swift`
+- [X] T086 [P] [US7] Test that a session already held by an agent is not offered, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeSessionTests.swift`
+- [X] T087 [P] [US7] Test adoption end to end against a fake agent, including the load replay being kept as content this once, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/AdoptSessionTests.swift`
+- [X] T088 [P] [US7] Test that delete refuses without `confirmed: true`, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DeleteSessionTests.swift`
 
 ### Implementation for User Story 7
 
-- [ ] T089 [US7] Add `RuntimeSession` (`sessionID`, `cwd`, `additionalDirectories`, `title?`, `updatedAt?`, `isHeld`) in `Packages/AgentsKit/Sources/AgentsKit/Model/RuntimeSession.swift`
-- [ ] T090 [US7] Call `session/list` with its cursor, `session/fork` and `session/delete` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, each gated on the advertised capability
-- [ ] T091 [US7] Add `sessions.list`, `sessions.adopt`, `sessions.delete` and `agent.fork` to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T092 [US7] Implement adoption in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`: our UUID, their session id, their folder, their title, and the replay recorded as the transcript
-- [ ] T093 [US7] Implement fork in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, copying our transcript to the new agent and leaving the original untouched
-- [ ] T094 [US7] Build the session browser in `App/Sources/Sessions/SessionListView.swift`, showing title, folder and when it was last touched
-- [ ] T095 [US7] Add the delete confirmation, saying it is permanent, in `App/Sources/Sessions/SessionListView.swift`
-- [ ] T096 [US7] Add fork to the agent's context menu in `App/Sources/AgentList/AgentRow.swift`
+- [X] T089 [US7] Add `RuntimeSession` (`sessionID`, `cwd`, `additionalDirectories`, `title?`, `updatedAt?`, `isHeld`) in `Packages/AgentsKit/Sources/AgentsKit/Model/RuntimeSession.swift`
+- [X] T090 [US7] Call `session/list` with its cursor, `session/fork` and `session/delete` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, each gated on the advertised capability
+- [X] T091 [US7] Add `sessions.list`, `sessions.adopt`, `sessions.delete` and `agent.fork` to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T092 [US7] Implement adoption in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`: our UUID, their session id, their folder, their title, and the replay recorded as the transcript
+- [X] T093 [US7] Implement fork in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, copying our transcript to the new agent and leaving the original untouched
+- [X] T094 [US7] Build the session browser in `App/Sources/Sessions/SessionListView.swift`, showing title, folder and when it was last touched
+- [X] T095 [US7] Add the delete confirmation, saying it is permanent, in `App/Sources/Sessions/SessionListView.swift`
+- [X] T096 [US7] Add fork to the agent's context menu in `App/Sources/AgentList/AgentRow.swift`
 
 ---
 
@@ -249,28 +249,28 @@ carried out, shown, and refusable.
 
 ### Tests for User Story 8
 
-- [ ] T097 [P] [US8] Test `FolderScope` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FolderScopeTests.swift`: `..` escaping, a symlink pointing out of the folder, a file that does not exist yet whose parent is inside, a path that cannot be resolved. Refusal is the default
-- [ ] T098 [P] [US8] Test the file service against a fake agent in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FileServiceTests.swift`: a read is served without asking, a write asks, a refused write leaves the file alone and tells the agent
-- [ ] T099 [P] [US8] Test the terminal service in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TerminalServiceTests.swift`: create, output, wait for exit, release, the byte cap flagging truncation, and every terminal dying when the agent stops
-- [ ] T100 [P] [US8] Test that the daemon kills every terminal before it exits, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonLifetimeTests.swift`
+- [X] T097 [P] [US8] Test `FolderScope` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FolderScopeTests.swift`: `..` escaping, a symlink pointing out of the folder, a file that does not exist yet whose parent is inside, a path that cannot be resolved. Refusal is the default
+- [X] T098 [P] [US8] Test the file service against a fake agent in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FileServiceTests.swift`: a read is served without asking, a write asks, a refused write leaves the file alone and tells the agent
+- [X] T099 [P] [US8] Test the terminal service in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TerminalServiceTests.swift`: create, output, wait for exit, release, the byte cap flagging truncation, and every terminal dying when the agent stops
+- [X] T100 [P] [US8] Test that the daemon kills every terminal before it exits, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonLifetimeTests.swift`
 
 ### Implementation for User Story 8
 
 - [X] T101 [US8] Write `FolderScope` in `Packages/AgentsKit/Sources/AgentsKit/Model/FolderScope.swift`: resolve the path and the folders, follow symlinks, allow only what is inside, refuse anything unresolvable
-- [ ] T102 [US8] Write `FileService` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/FileService.swift` serving `fs/read_text_file` (honouring `line` and `limit`) and `fs/write_text_file` (atomic), both through `FolderScope`
-- [ ] T103 [US8] Write `TerminalService` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/TerminalService.swift` serving create, output, wait for exit, release and kill, with a ring buffer capped by a constant and truncation flagged
-- [ ] T104 [US8] Route these requests from `handleIncoming` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift` instead of refusing them
-- [ ] T105 [US8] Own the terminals per agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, kill them when the agent stops, and kill all of them in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLifetime.swift` before the daemon exits
-- [ ] T106 [US8] Put a served write through the existing permission question, with the change shown, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
-- [ ] T107 [US8] Add `ServedRequest` entries to the transcript in `Packages/AgentsKit/Sources/AgentsKit/Model/TranscriptEntry.swift` and record every read, write and command
-- [ ] T108 [US8] Add `agent.terminals` and the `agent.terminalOutput` notification to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T109 [US8] Add `additionalDirectories` to the agent and send it on `session/new`, `session/load`, `session/resume` and `session/fork` where advertised, in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
+- [X] T102 [US8] Write `FileService` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/FileService.swift` serving `fs/read_text_file` (honouring `line` and `limit`) and `fs/write_text_file` (atomic), both through `FolderScope`
+- [X] T103 [US8] Write `TerminalService` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/TerminalService.swift` serving create, output, wait for exit, release and kill, with a ring buffer capped by a constant and truncation flagged
+- [X] T104 [US8] Route these requests from `handleIncoming` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift` instead of refusing them
+- [X] T105 [US8] Own the terminals per agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, kill them when the agent stops, and kill all of them in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLifetime.swift` before the daemon exits
+- [X] T106 [US8] Put a served write through the existing permission question, with the change shown, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
+- [X] T107 [US8] Add `ServedRequest` entries to the transcript in `Packages/AgentsKit/Sources/AgentsKit/Model/TranscriptEntry.swift` and record every read, write and command
+- [X] T108 [US8] Add `agent.terminals` and the `agent.terminalOutput` notification to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T109 [US8] Add `additionalDirectories` to the agent and send it on `session/new`, `session/load`, `session/resume` and `session/fork` where advertised, in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
 - [X] T110 [US8] Add `MCPServer` (stdio, http, sse) in `Packages/AgentsKit/Sources/AgentsKit/Model/MCPServer.swift` and send what the user attached on `session/new`
-- [ ] T111 [US8] Report an MCP server that fails against the agent without stopping it, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
-- [ ] T112 [US8] Let the user add folders and MCP servers to an agent in `App/Sources/StartAgent/AgentReachView.swift`, and show every folder an agent may reach
-- [ ] T113 [US8] Draw served requests in the transcript in `App/Sources/Chat/Transcript.swift`, reads quietly and writes as the question they went through
-- [ ] T114 [US8] Turn on `fs.readTextFile`, `fs.writeTextFile` and `terminal` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`. This is the promise, and it goes last
-- [ ] T115 [US8] Add a live test that Grok routes its file and terminal work through us once the flags are on, in `Packages/AgentsKit/Tests/AgentsKitTests/Live/GrokServedToolsTests.swift`, opt-in under `AGENTS_LIVE=1`
+- [X] T111 [US8] Report an MCP server that fails against the agent without stopping it, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
+- [X] T112 [US8] Let the user add folders and MCP servers to an agent in `App/Sources/StartAgent/AgentReachView.swift`, and show every folder an agent may reach
+- [X] T113 [US8] Draw served requests in the transcript in `App/Sources/Chat/Transcript.swift`, reads quietly and writes as the question they went through
+- [X] T114 [US8] Turn on `fs.readTextFile`, `fs.writeTextFile` and `terminal` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`. This is the promise, and it goes last
+- [X] T115 [US8] Add a live test that Grok routes its file and terminal work through us once the flags are on, in `Packages/AgentsKit/Tests/AgentsKitTests/Live/GrokServedToolsTests.swift`, opt-in under `AGENTS_LIVE=1`
 
 ---
 
@@ -282,28 +282,28 @@ carried out, shown, and refusable.
 
 ### Tests for User Story 9
 
-- [ ] T116 [P] [US9] Test schema validation in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ElicitationSchemaTests.swift`: string formats (email, uri, date, date-time), number and integer ranges, `minItems` and `maxItems` on a multi-select, required properties, and a property kind the app cannot draw making the form undrawable
-- [ ] T117 [P] [US9] Test that a form survives no window being open and is answerable late, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ElicitationTests.swift`
+- [X] T116 [P] [US9] Test schema validation in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ElicitationSchemaTests.swift`: string formats (email, uri, date, date-time), number and integer ranges, `minItems` and `maxItems` on a multi-select, required properties, and a property kind the app cannot draw making the form undrawable
+- [X] T117 [P] [US9] Test that a form survives no window being open and is answerable late, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ElicitationTests.swift`
 
 ### Implementation for User Story 9
 
 - [X] T118 [US9] Add `ElicitationRequest` and `ElicitationSchema` in `Packages/AgentsKit/Sources/AgentsKit/Model/Elicitation.swift` per `data-model.md`, including `scope` of `.session` or `.request`
-- [ ] T119 [US9] Answer `elicitation/create` and `elicitation/complete` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, holding the request on a continuation the way permission already is, and declining a form the app cannot draw
-- [ ] T120 [US9] Hold and mirror outstanding forms in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, and add `agent.answerElicitation` plus the asked and withdrawn notifications to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`
-- [ ] T121 [US9] Send `elicitation: { form: {}, url: {} }` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
-- [ ] T122 [US9] Build the form renderer in `App/Sources/Elicitation/ElicitationView.swift`, one control per property kind, refusing to submit a value that does not validate
-- [ ] T123 [US9] Build the URL mode in `App/Sources/Elicitation/ElicitationView.swift`, showing the link and reporting back when the user has finished or given up
+- [X] T119 [US9] Answer `elicitation/create` and `elicitation/complete` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`, holding the request on a continuation the way permission already is, and declining a form the app cannot draw
+- [X] T120 [US9] Hold and mirror outstanding forms in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, and add `agent.answerElicitation` plus the asked and withdrawn notifications to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`
+- [X] T121 [US9] Send `elicitation: { form: {}, url: {} }` in `ClientCapabilities` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift`
+- [X] T122 [US9] Build the form renderer in `App/Sources/Elicitation/ElicitationView.swift`, one control per property kind, refusing to submit a value that does not validate
+- [X] T123 [US9] Build the URL mode in `App/Sources/Elicitation/ElicitationView.swift`, showing the link and reporting back when the user has finished or given up
 
 ---
 
 ## Phase 12: Polish and cross-cutting
 
-- [ ] T124 [P] Write the capability audit script in `scripts/acp-handshake.sh`, which handshakes all three runtimes and prints what each advertises against what the app supports. This is how SC-002 is re-checked after a runtime updates
-- [ ] T125 [P] Check a 1MB diff and a long terminal stream do not stall the transcript, and record what was measured in `specs/003-acp-coverage/quickstart.md`
-- [ ] T126 [P] Update `specs/001-agent-daemon-ui/contracts/acp-client.md` with a line saying it is superseded by `specs/003-acp-coverage/contracts/acp-client.md`
-- [ ] T127 [P] Update `README.md` with what the app now does with files, terminals and sign-in
+- [X] T124 [P] Write the capability audit script in `scripts/acp-handshake.sh`, which handshakes all three runtimes and prints what each advertises against what the app supports. This is how SC-002 is re-checked after a runtime updates
+- [X] T125 [P] Check a 1MB diff and a long terminal stream do not stall the transcript, and record what was measured in `specs/003-acp-coverage/quickstart.md`
+- [X] T126 [P] Update `specs/001-agent-daemon-ui/contracts/acp-client.md` with a line saying it is superseded by `specs/003-acp-coverage/contracts/acp-client.md`
+- [X] T127 [P] Update `README.md` with what the app now does with files, terminals and sign-in
 - [ ] T128 Walk the whole of `specs/003-acp-coverage/quickstart.md` by hand, including the legacy record still opening, and fix what does not match
-- [ ] T129 Re-run the handshake script after the flags are on and confirm no advertised capability lacks an action, which is SC-002
+- [X] T129 Re-run the handshake script after the flags are on and confirm no advertised capability lacks an action, which is SC-002
 
 ---
 

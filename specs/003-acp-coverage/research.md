@@ -114,7 +114,22 @@ confirmation. Archive stays local.
 **Rationale**: the runtime's list is the only way to find work started elsewhere. Delete is the
 only irreversible thing in this feature, which is why it is the only one behind a confirmation.
 
-## 8. Still not proved: the signed-out failure
+## 8. What changed in the runtimes while this was being built
+
+Re-run of the handshake on 2026-09-18, after the capability flags went on
+(`./scripts/acp-handshake.sh`):
+
+- The Claude adapter now advertises two ways to sign in, `claude-ai-login` and
+  `console-login`, where it advertised none in the first handshake. It also advertises
+  `providers` and `auth.logout`, so signing out and switching provider are reachable
+  from the app on that runtime today.
+- Every runtime still starts with all nine client capabilities advertised. That is the
+  risk the plan named, and it is checked by a live test rather than assumed.
+- The only capability any runtime advertises that the app does nothing with is the
+  Claude adapter's `sessionCapabilities.subagents`, which is a vendor extension and is
+  in the spec's Out of Scope section by name.
+
+## 9. Still not proved: the signed-out failure
 
 Carried over from 001 (task T085). No runtime on this Mac is signed out, so the error a runtime
 returns when it needs authentication has still not been seen. The protocol reserves `-32000` for it
@@ -124,7 +139,7 @@ and the SDK names it `authRequired`.
 auth methods, and keep the existing behaviour for every other code. Prove it during implementation
 by signing a runtime out deliberately rather than by guessing.
 
-## 9. Nobody asks for elicitation yet
+## 10. Nobody asks for elicitation yet
 
 No runtime sent an elicitation request in any probe, with the capability advertised. It is in scope
 because the cost of being wrong is an agent that stops working on a day we are not watching, and
@@ -133,7 +148,7 @@ because the form shapes are small and fully described by the schema.
 **Decision**: implement it, drive it from a fake agent in tests, and advertise it. No runtime
 behaviour changes on this Mac today.
 
-## 10. Plans did not arrive in these turns
+## 11. Plans did not arrive in these turns
 
 Neither the Claude adapter nor Copilot sent a `plan` update for the work the probe asked for, which
 was too small to plan. 001 recorded plans arriving from real work, and the entry kind is already
@@ -144,7 +159,7 @@ advertised, so they cannot have arrived.
 the plan already on screen. Test with a fake agent; confirm against a real one during implementation
 on a task large enough to plan.
 
-## 11. Two things in the schema that our code silently loses
+## 12. Two things in the schema that our code silently loses
 
 Both found by reading, both confirmed in captures.
 
