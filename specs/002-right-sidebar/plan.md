@@ -57,7 +57,7 @@ build that prints as fast as `xcodebuild` prints, without the pane falling behin
 daemon. The sidebar closed leaves 001 exactly as it was (FR-006, SC-009). Nothing the user types in the terminal
 reaches the agent (FR-025).
 
-**Scale/Scope**: 4 user stories, 34 functional requirements, 10 success criteria. Four panes, of
+**Scale/Scope**: 4 user stories, 38 functional requirements, 10 success criteria. Four panes, of
 which one is most of the work.
 
 ## Constitution Check

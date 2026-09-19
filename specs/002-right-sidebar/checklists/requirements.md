@@ -38,5 +38,5 @@
   transcript with nothing behind it, and it was chosen knowing that no runtime installed here sends
   those blocks yet, so the pane ships empty. The "what changed" question it might have answered goes
   to the files pane under FR-013, which already has a reliable feed.
-- All items are now complete. `/speckit-plan` ran on 2026-09-18 and produced plan.md, research.md,
-  data-model.md, contracts/ and quickstart.md. Ready for `/speckit-tasks`.
+- All items are now complete. `/speckit-plan` and `/speckit-tasks` ran on 2026-09-18, producing plan.md, research.md,
+  data-model.md, contracts/, quickstart.md and tasks.md (89 tasks). Ready for `/speckit-implement`.
