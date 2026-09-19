@@ -180,6 +180,9 @@ final class AppModel {
     /// Whether anything in this project has asked to be looked at and not been.
     func wantsEyes(in folder: URL?) -> Bool { work.wantsEyes(in: folder) }
 
+    /// Whether the daemon is bringing this chat back by itself after a restart.
+    func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
+
     // MARK: Workflows
 
     func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }
@@ -388,6 +391,7 @@ final class AppModel {
         await refreshWorkflowConfirmations()
         await refreshPermissions()
         await refreshElicitations()
+        await refreshResuming()
         await loadTranscript()
     }
 
@@ -429,6 +433,18 @@ final class AppModel {
                                            Optional<String>.none,
                                            returning: [PermissionRequest].self))
         }
+    }
+
+    /// What the daemon is still bringing back after a restart.
+    ///
+    /// Asked without `attempt`: a daemon too old to know the method answers
+    /// method-not-found, and nothing coming back is the right answer to that, not a
+    /// connection the window should report as broken.
+    func refreshResuming() async {
+        let response = try? await client.call(DaemonAPI.Method.agentsResuming,
+                                              Optional<String>.none,
+                                              returning: DaemonAPI.ResumingResponse.self)
+        work.setResuming(response?.agentIDs ?? [])
     }
 
     func loadTranscript() async {

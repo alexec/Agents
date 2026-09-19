@@ -12,7 +12,7 @@ struct AgentCard: View {
     var body: some View {
         NavigationLink(value: agent.id) {
             HStack(alignment: .top, spacing: 12) {
-                StatusIcon(state: agent.state)
+                StatusIcon(state: agent.state, isComingBack: isComingBack)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -46,8 +46,16 @@ struct AgentCard: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
+    /// Whether the Mac is bringing this chat back by itself after a restart.
+    private var isComingBack: Bool { model.isComingBack(agent) }
+
     /// What it is doing, in its own words where it has said them.
+    ///
+    /// Coming back wins over everything, including whatever step the agent last named:
+    /// that step is from the turn the daemon took with it, and saying it now would be
+    /// describing work nothing is doing.
     private var description: String {
+        if isComingBack { return AgentsModel.comingBackDescription }
         if let step = agent.currentStep { return step }
         switch agent.state {
         case .running: return "Working"
@@ -79,7 +87,9 @@ struct AgentCard: View {
 
     /// The state said in words, because the icon beside it is not one VoiceOver reads.
     private var accessibilityLabel: String {
-        [agent.title ?? "Untitled", StatusIcon.words(for: agent.state), description]
+        [agent.title ?? "Untitled",
+         isComingBack ? AgentsModel.comingBackDescription : StatusIcon.words(for: agent.state),
+         description]
             .joined(separator: ", ")
     }
 }
@@ -90,6 +100,9 @@ struct AgentCard: View {
 /// something needs a person.
 struct StatusIcon: View {
     let state: AgentState
+    /// Its own symbol rather than a spinner: nothing is running yet, and the card
+    /// stays under "Stopped" until the chat's own state moves it.
+    var isComingBack = false
 
     var body: some View {
         Group {
@@ -107,6 +120,7 @@ struct StatusIcon: View {
     }
 
     private var symbol: String {
+        if isComingBack { return AgentsModel.comingBackSymbol }
         switch state {
         case .running: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"

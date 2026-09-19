@@ -96,6 +96,12 @@ extension DaemonCore {
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
                 return .success(try JSONValue.encoding(allAgents(includeArchived: request.includeArchived)))
 
+            case DaemonAPI.Method.agentsResuming:
+                // For a window that connected part-way through the batch. Order is
+                // not meaningful: it is a set of chats, not a running order.
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.ResumingResponse(agentIDs: stillResuming())))
+
             case DaemonAPI.Method.agentsOptions:
                 let request = try require(params, as: DaemonAPI.OptionsRequest.self)
                 return .success(try JSONValue.encoding(try await options(request)))

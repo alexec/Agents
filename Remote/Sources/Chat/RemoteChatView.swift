@@ -27,6 +27,12 @@ struct RemoteChatView: View {
                     ForEach(TranscriptEntry.display(model.entries)) { item in
                         EntryView(item: item).id(item.id)
                     }
+                    // Live, and so at the foot rather than in the record: the chat
+                    // itself says what the card in the list says, and it stops saying
+                    // it the moment the prompt lands.
+                    if let agent, model.isComingBack(agent) {
+                        ComingBackLine()
+                    }
                     Color.clear.frame(height: 1).id(bottom)
                 }
                 .padding(.horizontal, 16)

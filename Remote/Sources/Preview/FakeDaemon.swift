@@ -69,6 +69,9 @@ private actor FakeState {
             case DaemonAPI.Method.elicitationsPending:
                 return .success(.array([]))
 
+            case DaemonAPI.Method.agentsResuming:
+                return .success(try JSONValue.encoding(DaemonAPI.ResumingResponse(agentIDs: [])))
+
             case DaemonAPI.Method.agentsTranscript:
                 let request = try params?.decode(DaemonAPI.TranscriptRequest.self)
                 let whole = Canned.transcript(for: request?.agentID)

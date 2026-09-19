@@ -249,14 +249,30 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        try await enqueue(request, first: false)
+    }
+
+    /// The one prompt that goes to the front of the queue: the news, after a restart,
+    /// that the turn somebody thought was still running was not.
+    ///
+    /// Everything else appends, deliberately. This is the exception because the words
+    /// already waiting were typed by somebody who believed the turn was still in
+    /// flight. Behind the restart words, the agent would act on instructions premised
+    /// on a state that never existed and only afterwards be told it had been cut off
+    /// — the exact thing telling it at all is for.
+    func promptFirst(_ request: DaemonAPI.PromptRequest) async throws {
+        try await enqueue(request, first: true)
+    }
+
+    private func enqueue(_ request: DaemonAPI.PromptRequest, first: Bool) async throws {
         guard var agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         // Everything goes on the queue, even when it is going straight out again.
         // That is what keeps the order the order it was typed in: a prompt sent while
         // three are waiting joins the back of them rather than jumping the lot.
-        agent.queuedPrompts.append(QueuedPrompt(text: request.text,
-                                                attachments: request.attachments))
+        let queued = QueuedPrompt(text: request.text, attachments: request.attachments)
+        agent.queuedPrompts.insert(queued, at: first ? 0 : agent.queuedPrompts.endIndex)
         changed(agent)
         guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else { return }
         try await sendNextQueued(to: agent.id)
@@ -491,6 +507,15 @@ extension DaemonCore {
             agent.endedReason = .cancelled
             agents[agentID] = agent
         }
+        // Withdrawn from the pick-up queue before any `await`, which on an actor is
+        // the whole of the lock. Without this, stopping a chat waiting to come back
+        // does nothing anybody can see — it holds no runtime and has no turn in
+        // flight — and the resume loop starts it seconds later. `interrupted` alone
+        // stops the pick-up, but `resuming` must go too or the daemon stays alive for
+        // a chat nobody is bringing back.
+        let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
+            || resuming.contains(agentID)
+        leaveTheQueue(agentID)
         for (id, pending) in pendingPermissions where pending.agentID == agentID {
             if let session = live[agentID] {
                 await session.answerPermission(id: pending.request.id, optionID: nil)
@@ -511,6 +536,13 @@ extension DaemonCore {
         turnTasks.removeValue(forKey: agentID)?.cancel()
         if agent.state.holdsRuntime {
             await move(agentID, on: .stoppedByUser, endedReason: .cancelled)
+        }
+        // Only when there was in fact a pick-up to withdraw. An ordinary stop should
+        // not gain a line about something that was never going to happen.
+        if hadPickUpPending {
+            await record(.runtimeNote("You stopped this agent before it was picked back up."),
+                         for: agentID)
+            DaemonLog.shared.write("withdrew the pick-up for agent \(agentID): stopped first")
         }
         // Stop means stop. What was queued is kept rather than sent on: the user says
         // when it goes, and the window keeps showing them it is there.

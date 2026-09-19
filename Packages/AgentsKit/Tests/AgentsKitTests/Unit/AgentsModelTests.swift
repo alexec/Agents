@@ -176,6 +176,50 @@ struct AgentsModelTests {
         #expect(model.agents.isEmpty)
     }
 
+    // MARK: Coming back after a restart
+
+    @Test func aChatSaidToBeComingBackIsShownAsComingBack() throws {
+        let model = AgentsModel()
+        let coming = agent(state: .stopped)
+        model.replaceAgents([coming])
+
+        let claimed = model.apply(DaemonAPI.Notification.agentResuming,
+                                  try notification(DaemonAPI.ResumingNotification(agentID: coming.id,
+                                                                                  isResuming: true)))
+        #expect(claimed, "the client knows this one")
+        #expect(model.isComingBack(coming))
+
+        model.apply(DaemonAPI.Notification.agentResuming,
+                    try notification(DaemonAPI.ResumingNotification(agentID: coming.id,
+                                                                    isResuming: false)))
+        #expect(model.isComingBack(coming) == false, "and stops saying so when it is told to")
+    }
+
+    /// A client that connected mid-batch is told the set rather than piecing it
+    /// together from notifications it was not there to hear.
+    @Test func aClientConnectingLateIsGivenTheWholeSet() {
+        let model = AgentsModel()
+        let first = agent(state: .stopped)
+        let second = agent(state: .stopped)
+        model.replaceAgents([first, second])
+        model.setResuming([second.id])
+        #expect(model.isComingBack(second))
+        #expect(model.isComingBack(first) == false)
+        model.setResuming([])
+        #expect(model.isComingBack(second) == false)
+    }
+
+    /// The existing "a notification nobody claims is skipped, never guessed at" rule,
+    /// asserted over the new one.
+    @Test func anOlderClientIgnoresTheResumingNotification() {
+        let model = AgentsModel()
+        #expect(model.apply(DaemonAPI.Notification.agentResuming, .string("not a notification")) == true,
+                "claimed, and skipped rather than guessed at")
+        #expect(model.resuming.isEmpty)
+        #expect(model.apply("agent/somethingFromNextYear", nil) == false,
+                "while a method nobody knows is still passed on")
+    }
+
     @Test func archivedProjectsAreKeptApartFromLiveOnes() {
         let model = AgentsModel()
         let live = DaemonAPI.ProjectSummary(

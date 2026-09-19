@@ -218,6 +218,15 @@ private struct ToolCallLine: View {
     }
 }
 
+/// The chat is being picked back up by the Mac, and nobody typed for it.
+struct ComingBackLine: View {
+    var body: some View {
+        Label(AgentsModel.comingBackDescription, systemImage: AgentsModel.comingBackSymbol)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
 private struct StateLine: View {
     let state: AgentState
     let reason: EndedReason?

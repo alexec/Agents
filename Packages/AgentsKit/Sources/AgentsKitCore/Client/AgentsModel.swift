@@ -43,6 +43,12 @@ public final class AgentsModel {
     /// showing another conversation.
     public private(set) var filesToShow: [UUID: ShownFile] = [:]
 
+    /// Chats the daemon is queueing to pick back up after a restart, held only while
+    /// it is doing it. Not on any record: the queue lives and dies with the daemon
+    /// that made it, and a client that was not listening asks `agents/resuming` on
+    /// connect rather than inferring it.
+    public private(set) var resuming: Set<UUID> = []
+
     /// Every project's workflows, newest state winning. Here rather than in the Mac's
     /// own model because a workflow is about the work, and the phone will want them.
     public private(set) var workflows: [WorkflowSummary] = []
@@ -110,6 +116,14 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentShowFile:
             guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return true }
             filesToShow[notification.agentID] = notification.file
+
+        case DaemonAPI.Notification.agentResuming:
+            guard let notification = try? params?.decode(DaemonAPI.ResumingNotification.self) else { return true }
+            if notification.isResuming {
+                resuming.insert(notification.agentID)
+            } else {
+                resuming.remove(notification.agentID)
+            }
 
         default:
             return false
@@ -202,6 +216,23 @@ public final class AgentsModel {
     public func takeFileToShow(for agentID: UUID) -> ShownFile? {
         filesToShow.removeValue(forKey: agentID)
     }
+
+    /// Everything the daemon said was on its way back when we connected. A window
+    /// that arrives mid-batch is told the set rather than piecing it together from
+    /// notifications it was not there to hear.
+    public func setResuming(_ ids: [UUID]) {
+        resuming = Set(ids)
+    }
+
+    /// Whether the daemon is bringing this chat back by itself.
+    public func isComingBack(_ agent: Agent) -> Bool {
+        resuming.contains(agent.id)
+    }
+
+    /// The one thing every client says about a chat on its way back, so the window
+    /// and the phone cannot drift apart saying it.
+    public static let comingBackDescription = "Coming back after a restart"
+    public static let comingBackSymbol = "arrow.clockwise.circle"
 
     // MARK: Reading it back
 

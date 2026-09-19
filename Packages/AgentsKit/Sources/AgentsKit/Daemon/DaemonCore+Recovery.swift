@@ -14,20 +14,37 @@ extension DaemonCore {
     @discardableResult
     public func recover() async -> [UUID] {
         await loadFromDisk()
+        // `agents` is a Dictionary, whose order is nobody's. Most recently active
+        // first, because pick-up is one at a time and the chat the person last left
+        // running should not wait behind every runtime ahead of it.
+        let wereWorking = agents.values
+            .filter { $0.state.holdsRuntime }
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
         var recovered: [UUID] = []
-        for (id, agent) in agents where agent.state.holdsRuntime {
+        for agent in wereWorking {
+            let id = agent.id
             var updated = agent
             updated.state = .stopped
             updated.endedReason = .daemonGone
             agents[id] = updated
             try? await store.save(updated)
+            await record(.runtimeNote("This agent was working when the daemon stopped, so it stopped too."),
+                         for: id)
+            await record(.stateChanged(.stopped, reason: .daemonGone), for: id)
+            // A chat brought back last time and cut off again before it reached the
+            // end of a turn is the likeliest reason this daemon went. It keeps the
+            // ending it actually had — `daemonGone` is what happened to it — and why
+            // it was left where it is goes in the transcript instead.
+            guard updated.mayBePickedUpAfterRestart else {
+                await record(.runtimeNote("This agent was picked back up after the last restart and did not get to the end of a turn, so it has been left alone this time. Send it a message to start it again."),
+                             for: id)
+                DaemonLog.shared.write("left agent \(id) alone: already picked back up once without finishing a turn")
+                continue
+            }
             // What it was doing, kept for as long as it takes to tell it: an agent cut
             // off mid-turn and one cut off holding a question open have different
             // things to be told.
             interrupted[id] = agent.state
-            await record(.runtimeNote("This agent was working when the daemon stopped, so it stopped too."),
-                         for: id)
-            await record(.stateChanged(.stopped, reason: .daemonGone), for: id)
             recovered.append(id)
         }
         return recovered
@@ -56,27 +73,58 @@ extension DaemonCore {
         // runtime is up there is nothing else to say these agents are work in hand —
         // an idle daemon would otherwise exit out from under the restart.
         resuming.formUnion(mine)
+        // The whole batch at once, before any of it begins, so a window shows every
+        // chat that is coming back rather than lighting them one row at a time.
+        for id in mine { sayResuming(id, true) }
         Task { await pickUpEachInTurn(mine) }
     }
 
-    /// One at a time, in the order they were found. Half a dozen runtimes starting at
-    /// once is half a dozen node processes, and a Mac that notices.
+    /// One at a time, most recently active first, which is the order `recover`
+    /// returns them in. Half a dozen runtimes starting at once is half a dozen node
+    /// processes, and a Mac that notices — and while they queue, the chat the person
+    /// was last watching is the one worth having back first.
     private func pickUpEachInTurn(_ ids: [UUID]) async {
         for id in ids {
+            // Withdrawn by `stop` while it waited its turn. Nothing to pick up, and
+            // it has already been said to have left the queue.
+            guard resuming.contains(id) else { continue }
             await pickUp(id)
-            resuming.remove(id)
+            leaveTheQueue(id)
         }
+    }
+
+    /// Out of the queue, and said to be out of it. Every `true` is followed by a
+    /// `false`, which is what the contract promises a window that is drawing a chat
+    /// as coming back.
+    func leaveTheQueue(_ id: UUID) {
+        guard resuming.remove(id) != nil else { return }
+        sayResuming(id, false)
+    }
+
+    /// Everything still queued to be picked back up. What `agents/resuming` answers.
+    public func stillResuming() -> [UUID] { Array(resuming) }
+
+    func sayResuming(_ id: UUID, _ isResuming: Bool) {
+        broadcast(DaemonAPI.Notification.agentResuming,
+                  DaemonAPI.ResumingNotification(agentID: id, isResuming: isResuming))
     }
 
     private func pickUp(_ id: UUID) async {
         guard let was = interrupted.removeValue(forKey: id) else { return }
-        // Archived since, deleted since, or already spoken to by somebody who got here
-        // first. Any of those and this is not ours to do.
-        guard let agent = agents[id], agent.state == .stopped,
-              agent.endedReason == .daemonGone, agent.queuedPrompts.isEmpty else { return }
+        // Archived since, deleted since, or started again by somebody who got here
+        // first: any turn since would have moved the state off `.stopped` or the
+        // reason off `daemonGone`. Words already queued are *not* a reason to stand
+        // down — `prompt` appends every prompt to `queuedPrompts`, so testing that
+        // once meant a chat somebody had typed at was silently never brought back.
+        guard var agent = agents[id], agent.mayBePickedUpAfterRestart else { return }
         let text = Self.wordsAboutTheRestart(was)
+        // Written down before the words go, never after. A daemon killed part-way
+        // through starting a runtime has already recorded that it tried, and the next
+        // daemon does not try the same chat again.
+        agent.restartPickUps += 1
+        changed(agent)
         do {
-            try await prompt(DaemonAPI.PromptRequest(agentID: id, text: text))
+            try await promptFirst(DaemonAPI.PromptRequest(agentID: id, text: text))
             DaemonLog.shared.write("picked agent \(id) back up after the restart")
         } catch {
             let why = (error as? JSONRPCError)?.message ?? error.localizedDescription

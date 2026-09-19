@@ -12,7 +12,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     private var agents: [FakeACPAgent] = []
     private var scripts: [FakeACPAgent.Script]
     private var defaultScript: FakeACPAgent.Script
-    private(set) var launches: [(runtime: String, cwd: URL)] = []
+    private(set) var launches: [(runtime: String, cwd: URL, at: ContinuousClock.Instant)] = []
 
     /// What the sessions it makes advertise. The capability flags decide what an agent
     /// asks of us, so a test that wants to be asked for a file turns them on here.
@@ -28,7 +28,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         lock.lock()
         let script = scripts.isEmpty ? defaultScript : scripts.removeFirst()
-        launches.append((runtime.id, cwd))
+        launches.append((runtime.id, cwd, .now))
         lock.unlock()
 
         let (mine, theirs) = PairedTransport.pair()
@@ -48,6 +48,14 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     var lastAgent: FakeACPAgent? {
         lock.lock(); defer { lock.unlock() }
         return agents.last
+    }
+
+    /// The gaps between one launch and the next. What a test asserting runtimes are
+    /// started one at a time reads: with a handshake that takes a known time, gaps
+    /// shorter than it mean two were starting at once.
+    var gapsBetweenLaunches: [Duration] {
+        lock.lock(); defer { lock.unlock() }
+        return zip(launches.dropFirst(), launches).map { $0.at - $1.at }
     }
 
     var allAgents: [FakeACPAgent] {

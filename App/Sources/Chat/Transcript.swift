@@ -50,6 +50,12 @@ struct Transcript: View {
                     ForEach(agent.queuedPrompts) { queued in
                         QueuedPromptRow(prompt: queued, agentID: agent.id)
                     }
+                    // Live, and so at the foot rather than in the record: the chat
+                    // itself says what the row in the list says, and it stops saying
+                    // it the moment the prompt lands.
+                    if model.isComingBack(agent) {
+                        ComingBackLine()
+                    }
                     Color.clear.frame(height: 1).id(bottom)
                 }
                 // Lines up with the prompt bar below it: one left edge down the pane.
@@ -543,6 +549,15 @@ private extension JSONEncoder {
         e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return e
     }()
+}
+
+/// The chat is being picked back up by the daemon, and nobody typed for it.
+private struct ComingBackLine: View {
+    var body: some View {
+        Label(AgentsModel.comingBackDescription, systemImage: AgentsModel.comingBackSymbol)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
 }
 
 private struct StateLine: View {

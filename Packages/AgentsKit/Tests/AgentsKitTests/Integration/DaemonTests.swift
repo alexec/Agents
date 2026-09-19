@@ -214,6 +214,8 @@ struct DaemonTests {
         #expect(await core.agent(wasRunning.id)?.state == .stopped)
         #expect(await core.agent(wasRunning.id)?.queuedPrompts.isEmpty == true,
                 "and the words about the restart are not left waiting to be sent next week")
+        #expect(await core.agent(wasRunning.id)?.queuedPrompts.contains { $0.text.contains("The app restarted") } != true,
+                "found and removed by what they say, not by where in the queue they were put")
     }
 
     @Test func theRecordIsWrittenAsThingsHappenNotAtTheEnd() async throws {
@@ -455,6 +457,429 @@ struct DaemonTests {
         await eventually("nothing is left running behind it") { await core.isHoldingAgents == false }
         #expect(await core.agent(id)?.state == .archived)
         #expect(await core.isHoldingAgents == false, "nothing is left running behind an archived agent")
+    }
+
+    // MARK: Coming back after a restart
+
+    /// Three at once, all of them, not just whichever the dictionary happened to
+    /// hand over first.
+    @Test func severalInterruptedAgentsAreAllPickedBackUp() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var saved: [Agent] = []
+        for _ in 0..<3 {
+            let agent = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
+            try await store.save(agent)
+            saved.append(agent)
+        }
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        for agent in saved {
+            await waitFor(core, agent.id, "it came back") { $0.state == .finished }
+        }
+        #expect(launcher.launchCount == 3, "one runtime each, and no more")
+    }
+
+    /// The chat the person was last watching should not wait behind every runtime
+    /// ahead of it, and `agents` is a dictionary with no order to trust.
+    @Test func theyComeBackMostRecentlyActiveFirst() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let now = Date()
+        // Saved oldest first, so any test that passes by accident of insertion order
+        // would report the wrong order here.
+        let oldest = Agent(runtimeID: "grok", cwd: work, title: "oldest", state: .running,
+                           runtimeSessionID: "s", lastActivityAt: now.addingTimeInterval(-300))
+        let middle = Agent(runtimeID: "copilot", cwd: work, title: "middle", state: .running,
+                           runtimeSessionID: "s", lastActivityAt: now.addingTimeInterval(-60))
+        let newest = Agent(runtimeID: "cursor", cwd: work, title: "newest", state: .running,
+                           runtimeSessionID: "s", lastActivityAt: now)
+        for agent in [oldest, middle, newest] { try await store.save(agent) }
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("all three were started") { launcher.launchCount == 3 }
+        #expect(launcher.launches.map(\.runtime) == ["cursor", "copilot", "grok"],
+                "most recently active first")
+    }
+
+    /// Nothing is running yet, and an idle daemon must not exit out from under them.
+    @Test func agentsComingBackHoldTheDaemonOpen() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        script.handshakeDelay = .milliseconds(400)
+        try await store.save(Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s"))
+
+        let core = try core(FakeLauncher(script: script), locations: locations)
+        await core.setConnectionCount(0)
+        await core.pickUpAfterRestart(await core.recover())
+
+        #expect(await core.isHoldingAgents, "a pick-up in hand is work in hand")
+        #expect(await core.shouldExit == false, "so no window is needed to keep it alive")
+    }
+
+    /// The whole batch is said to be coming back before any of it begins, and each
+    /// one is said to have left the queue as it goes.
+    @Test func anAgentOnItsWayBackUpIsBroadcastAsResuming() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let first = Agent(runtimeID: "grok", cwd: work, state: .running,
+                          runtimeSessionID: "s", lastActivityAt: Date())
+        let second = Agent(runtimeID: "grok", cwd: work, state: .running,
+                           runtimeSessionID: "s", lastActivityAt: Date().addingTimeInterval(-60))
+        for agent in [first, second] { try await store.save(agent) }
+
+        let heard = Broadcasts()
+        var script = FakeACPAgent.Script()
+        script.handshakeDelay = .milliseconds(200)
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        await core.setBroadcaster { method, params in
+            Task { await heard.record(method, params) }
+        }
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("both were said to be coming back") {
+            await heard.resuming(true).count == 2
+        }
+        #expect(launcher.launchCount <= 1,
+                "and said so before the second runtime was anywhere near being started")
+
+        await eventually("and each was said to have left the queue") {
+            await heard.resuming(false).count == 2
+        }
+        #expect(await heard.resuming(true) == [first.id, second.id])
+    }
+
+    /// A window that connects part-way through the batch asks rather than guesses.
+    @Test func aWindowConnectingLateIsToldWhatIsStillComingBack() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        script.handshakeDelay = .milliseconds(300)
+        var saved: [Agent] = []
+        for index in 0..<3 {
+            let agent = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s",
+                              lastActivityAt: Date().addingTimeInterval(Double(-index)))
+            try await store.save(agent)
+            saved.append(agent)
+        }
+
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        // Mid-batch: the first is on its way and the other two are still waiting.
+        await eventually("the first is being started") { launcher.launchCount == 1 }
+        let midway = await core.stillResuming()
+        #expect(midway.contains(saved[1].id) && midway.contains(saved[2].id),
+                "the ones not yet picked up")
+
+        await eventually("and by the end there is nothing left to say") {
+            await core.stillResuming().isEmpty
+        }
+    }
+
+    /// One runtime missing must not take the rest of the batch with it.
+    @Test func oneFailureDoesNotStopTheRest() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let now = Date()
+        let first = Agent(runtimeID: "grok", cwd: work, state: .running,
+                          runtimeSessionID: "s", lastActivityAt: now)
+        let broken = Agent(runtimeID: "copilot", cwd: work, state: .running,
+                           runtimeSessionID: "s", lastActivityAt: now.addingTimeInterval(-60))
+        let last = Agent(runtimeID: "cursor", cwd: work, state: .running,
+                         runtimeSessionID: "s", lastActivityAt: now.addingTimeInterval(-120))
+        for agent in [first, broken, last] { try await store.save(agent) }
+
+        // Everything on this Mac except Copilot, which is the middle of the three.
+        let core = DaemonCore(store: try AgentStore(locations: locations),
+                              locations: locations,
+                              discovery: RuntimeDiscovery(searchPaths: ["/fake/bin"],
+                                                          fileExists: { !$0.hasSuffix("copilot") }),
+                              launcher: FakeLauncher())
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, first.id, "the one before it came back") { $0.state == .finished }
+        await waitFor(core, last.id, "and so did the one after it") { $0.state == .finished }
+
+        let page = try await core.transcript(.init(agentID: broken.id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("Could not pick this agent back up") },
+                "and the one in the middle carries its own explanation")
+    }
+
+    /// Half a dozen runtimes starting at once is half a dozen node processes.
+    @Test func theyAreStartedOneAtATime() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        script.handshakeDelay = .milliseconds(200)
+        for _ in 0..<3 {
+            try await store.save(Agent(runtimeID: "grok", cwd: work, state: .running,
+                                       runtimeSessionID: "s", lastActivityAt: Date()))
+        }
+
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("all three were started") { launcher.launchCount == 3 }
+        // Each launch waits on the handshake of the one before it. Concurrent starts
+        // would land within a millisecond of each other rather than a handshake apart.
+        #expect(launcher.gapsBetweenLaunches.allSatisfy { $0 >= .milliseconds(150) },
+                "each one waited for the one before it: \(launcher.gapsBetweenLaunches)")
+    }
+
+    /// The loop guard. A chat cut off on the very turn it was brought back with is
+    /// the likeliest reason the daemon went, and starting it again is not recovery.
+    @Test func anAgentCutOffTwiceInARowIsNotPickedUpAThirdTime() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let tried = Agent(runtimeID: "grok", cwd: work, state: .running,
+                          runtimeSessionID: "s", restartPickUps: 1)
+        try await store.save(tried)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        // Nothing to wait for. Time passing is the assertion.
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(launcher.launchCount == 0, "it was left where it was")
+        #expect(await core.agent(tried.id)?.state == .stopped)
+        #expect(await core.agent(tried.id)?.endedReason == .daemonGone,
+                "the ending it had is still the ending it had")
+
+        let page = try await core.transcript(.init(agentID: tried.id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("has been left alone this time") },
+                "and why it was left is a line in the transcript rather than a different ending")
+    }
+
+    /// Reaching the end of a turn is the whole of what the count asks about.
+    @Test func aTurnThatEndsClearsTheCount() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
+        try await store.save(wasRunning)
+
+        let core = try core(FakeLauncher(), locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, wasRunning.id, "it came back and finished") { $0.state == .finished }
+        let after = await core.agent(wasRunning.id)
+        #expect(after?.restartPickUps == 0, "counted to one on the way out, and back to nothing")
+        #expect(after?.mayBePickedUpAfterRestart == false, "finished, so there is nothing to pick up")
+    }
+
+    /// Any ending but the daemon dying is evidence enough.
+    @Test func anEndingThatIsNotAFinishAlsoClearsTheCount() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        script.stopReason = "max_tokens"
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
+        try await store.save(wasRunning)
+
+        let core = try core(FakeLauncher(script: script), locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, wasRunning.id, "it came back and ran out of room") {
+            $0.endedReason == .maxTokens
+        }
+        let after = await core.agent(wasRunning.id)
+        #expect(after?.restartPickUps == 0,
+                "out of room is still a turn that got to its own end without taking the daemon")
+    }
+
+    /// The test that makes the guard survive a crash mid-pick-up: the count has to be
+    /// on disk while the prompt is still in flight, not written after it lands.
+    @Test func theCountIsWrittenBeforeTheWordsAreSent() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        // Long enough that the pick-up is demonstrably still going while we read.
+        script.handshakeDelay = .seconds(3)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
+        try await store.save(wasRunning)
+
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        // The record on disk, which is the only thing the next daemon will read.
+        let onDisk = try AgentStore(locations: locations)
+        await eventually("the record already says it has been tried") {
+            (try? await onDisk.load(wasRunning.id))?.restartPickUps == 1
+        }
+        #expect(await core.agent(wasRunning.id)?.state == .stopped,
+                "and the turn has not even begun, which is the point")
+    }
+
+    /// Endings somebody chose stay chosen.
+    @Test func onlyInterruptedAgentsArePickedBackUp() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let running = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s")
+        let asking = Agent(runtimeID: "grok", cwd: work, state: .waitingOnUser, runtimeSessionID: "s")
+        let finished = Agent(runtimeID: "grok", cwd: work, state: .finished,
+                             runtimeSessionID: "s", endedReason: .endTurn)
+        let stopped = Agent(runtimeID: "grok", cwd: work, state: .stopped,
+                            runtimeSessionID: "s", endedReason: .cancelled)
+        let archived = Agent(runtimeID: "grok", cwd: work, state: .archived,
+                             runtimeSessionID: "s", archivedReason: .byUser)
+        for agent in [running, asking, finished, stopped, archived] { try await store.save(agent) }
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, running.id, "the one that was working came back") { $0.state == .finished }
+        await waitFor(core, asking.id, "and the one that was asking") { $0.state == .finished }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(launcher.launchCount == 2, "and nothing else was touched")
+        #expect(await core.agent(stopped.id)?.endedReason == .cancelled,
+                "a chat somebody stopped stays stopped")
+        #expect(await core.agent(archived.id)?.state == .archived)
+    }
+
+    /// That ending was already reported to the person at the time.
+    @Test func anAgentWhoseProcessDiedIsNotPickedBackUp() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let died = Agent(runtimeID: "grok", cwd: work, state: .stopped,
+                         runtimeSessionID: "s", endedReason: .processDied)
+        try await store.save(died)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(launcher.launchCount == 0)
+        #expect(await core.agent(died.id)?.endedReason == .processDied)
+    }
+
+    /// `prompt` puts every prompt on the queue, so testing the queue was empty meant
+    /// a chat somebody had typed at was silently never brought back at all.
+    @Test func anAgentWithWordsAlreadyQueuedIsStillPickedBackUp() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running,
+                               runtimeSessionID: "s",
+                               queuedPrompts: [QueuedPrompt(text: "and then deploy it")])
+        try await store.save(wasRunning)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("it was picked back up") { launcher.launchCount == 1 }
+    }
+
+    /// The queued words were typed by somebody who believed the turn was still
+    /// running. The news that it was not has to reach the agent first.
+    @Test func theRestartWordsGoAheadOfWhatWasQueued() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running,
+                               runtimeSessionID: "s",
+                               queuedPrompts: [QueuedPrompt(text: "and then deploy it")])
+        try await store.save(wasRunning)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("both prompts went") {
+            guard let agent = await core.agent(wasRunning.id) else { return false }
+            return agent.queuedPrompts.isEmpty && agent.state != .running
+        }
+        let page = try await core.transcript(.init(agentID: wasRunning.id))
+        let prompts = page.entries.compactMap { entry -> String? in
+            guard case .userMessage(let text, _) = entry.kind else { return nil }
+            return text
+        }
+        let restart = prompts.firstIndex { $0.contains("The app restarted") }
+        let queued = prompts.firstIndex { $0.contains("and then deploy it") }
+        #expect(restart != nil && queued != nil, "both were sent: \(prompts)")
+        if let restart, let queued {
+            #expect(restart < queued, "the news first, then the instructions premised on it")
+        }
+    }
+
+    /// Stop on a chat waiting to come back was a no-op that looked like it worked.
+    @Test func stoppingAnAgentBeforeItIsPickedUpWithdrawsIt() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        var script = FakeACPAgent.Script()
+        script.handshakeDelay = .milliseconds(500)
+        let first = Agent(runtimeID: "grok", cwd: work, state: .running,
+                          runtimeSessionID: "s", lastActivityAt: Date())
+        let withdrawn = Agent(runtimeID: "grok", cwd: work, state: .running,
+                              runtimeSessionID: "s", lastActivityAt: Date().addingTimeInterval(-60))
+        for agent in [first, withdrawn] { try await store.save(agent) }
+
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        await core.setConnectionCount(0)
+        await core.pickUpAfterRestart(await core.recover())
+
+        // While the first is still starting, stop the one behind it in the queue.
+        await eventually("the first is on its way") { launcher.launchCount == 1 }
+        try await core.stop(withdrawn.id)
+
+        #expect(await core.stillResuming().contains(withdrawn.id) == false,
+                "out of the queue at once, on the actor, with no await in between")
+        let page = try await core.transcript(.init(agentID: withdrawn.id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("You stopped this agent before it was picked back up") })
+
+        await eventually("the rest of the batch finished") {
+            await core.agent(first.id)?.state == .finished
+        }
+        #expect(launcher.launchCount == 1, "and the one that was stopped never started")
+        await eventually("and it holds no daemon open") { await core.shouldExit }
+    }
+
+    /// Only when there was in fact something to withdraw.
+    @Test func anOrdinaryStopSaysNothingAboutPickingBackUp() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(400)
+        let core = try core(FakeLauncher(script: script), locations: locations)
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+
+        await waitFor(core, id, "it is working") { $0.state == .running }
+        try await core.stop(id)
+
+        let page = try await core.transcript(.init(agentID: id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("before it was picked back up") } == false,
+                "a normal stop does not gain a line about something that was never going to happen")
+    }
+
+    /// What the daemon said, for the tests that read its notifications.
+    actor Broadcasts {
+        private var sent: [(String, JSONValue?)] = []
+
+        func record(_ method: String, _ params: JSONValue?) {
+            sent.append((method, params))
+        }
+
+        /// The agents said to be joining the queue, or leaving it, in the order said.
+        func resuming(_ isResuming: Bool) -> [UUID] {
+            sent.compactMap { method, params in
+                guard method == DaemonAPI.Notification.agentResuming,
+                      let notification = try? params?.decode(DaemonAPI.ResumingNotification.self),
+                      notification.isResuming == isResuming else { return nil }
+                return notification.agentID
+            }
+        }
     }
 }
 

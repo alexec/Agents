@@ -51,6 +51,11 @@ actor FakeACPAgent {
         /// turn. A real one is Cursor's `cursor/update_todos`. Nothing is expected back,
         /// which is exactly why they used to vanish without trace.
         var extensionNotifications: [(method: String, params: JSONValue)] = []
+        /// How long the handshake takes. Zero for almost every test; a real duration
+        /// for the ones about what the daemon is doing while a runtime is still
+        /// starting — which is the only window in which "one at a time" means
+        /// anything, and the only one in which a crash mid-pick-up is reproducible.
+        var handshakeDelay: Duration = .zero
         /// The protocol version to answer the handshake with.
         var protocolVersion = 1
         /// Refuse `session/new` with this, for the signed-out case.
@@ -103,6 +108,7 @@ actor FakeACPAgent {
         received.append(method)
         switch method {
         case ACP.Method.initialize:
+            if script.handshakeDelay > .zero { try? await Task.sleep(for: script.handshakeDelay) }
             var sessionCapabilities = script.sessionCapabilities
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
             var capabilities = script.agentCapabilities

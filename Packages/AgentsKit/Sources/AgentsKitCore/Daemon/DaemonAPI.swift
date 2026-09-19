@@ -15,6 +15,10 @@ public enum DaemonAPI {
         public static let sessionsDelete = "sessions/delete"
         public static let agentsFork = "agents/fork"
         public static let agentsList = "agents/list"
+        /// Which chats are still queued to be picked back up after a restart. A
+        /// window that connects part-way through the batch asks this rather than
+        /// guessing from the notifications it was not there to hear.
+        public static let agentsResuming = "agents/resuming"
         public static let agentsOptions = "agents/options"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
@@ -78,6 +82,10 @@ public enum DaemonAPI {
         /// goes on the agent's record, this is an event: a window that is not there to
         /// hear it has missed nothing, because the moment it was about has passed.
         public static let agentShowFile = "agent/showFile"
+        /// A chat has joined or left the queue to be picked back up after a restart.
+        /// Like `agent/showFile` this is an event and not a field on the record: the
+        /// queue lives and dies with the daemon that made it.
+        public static let agentResuming = "agent/resuming"
         /// What a runtime really offers, for a start form that was drawn from what it
         /// offered last time. Carries the failure instead when the runtime being
         /// started behind that form would not start.
@@ -349,6 +357,29 @@ public enum DaemonAPI {
         public init(agentID: UUID, file: ShownFile) {
             self.agentID = agentID
             self.file = file
+        }
+    }
+
+    /// One chat, joining or leaving the pick-up queue, to every window.
+    public struct ResumingNotification: Codable, Sendable {
+        public var agentID: UUID
+        /// True when the chat has joined the queue to be picked back up, false when it
+        /// has left it — whether because its prompt went, because it could not be
+        /// sent, or because the person stopped it first.
+        public var isResuming: Bool
+
+        public init(agentID: UUID, isResuming: Bool) {
+            self.agentID = agentID
+            self.isResuming = isResuming
+        }
+    }
+
+    /// Everything still queued to be picked back up, for a window that connected late.
+    public struct ResumingResponse: Codable, Sendable {
+        public var agentIDs: [UUID]
+
+        public init(agentIDs: [UUID]) {
+            self.agentIDs = agentIDs
         }
     }
 

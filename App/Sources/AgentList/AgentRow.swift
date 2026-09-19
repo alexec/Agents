@@ -12,7 +12,7 @@ struct AgentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            StatusIcon(state: agent.state)
+            StatusIcon(state: agent.state, isComingBack: isComingBack)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -53,8 +53,16 @@ struct AgentRow: View {
         }
     }
 
+    /// Whether the daemon is bringing this chat back by itself after a restart.
+    private var isComingBack: Bool { model.isComingBack(agent) }
+
     /// What it is doing, in its own words where it has said them.
+    ///
+    /// Coming back wins over everything, including whatever step the agent last named:
+    /// that step is from the turn the daemon took with it, and saying it now would be
+    /// describing work nothing is doing.
     private var description: String {
+        if isComingBack { return AgentsModel.comingBackDescription }
         if let step = agent.currentStep { return step }
         switch agent.state {
         case .running: return "Working"
@@ -91,6 +99,9 @@ struct AgentRow: View {
 /// something needs a person.
 struct StatusIcon: View {
     let state: AgentState
+    /// Its own symbol rather than a spinner: nothing is running yet, and the row
+    /// stays under "Stopped" until the chat's own state moves it.
+    var isComingBack = false
 
     var body: some View {
         Group {
@@ -110,6 +121,7 @@ struct StatusIcon: View {
     }
 
     private var symbol: String {
+        if isComingBack { return AgentsModel.comingBackSymbol }
         switch state {
         case .running: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"
@@ -124,6 +136,7 @@ struct StatusIcon: View {
     }
 
     private var description: String {
+        if isComingBack { return AgentsModel.comingBackDescription }
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"

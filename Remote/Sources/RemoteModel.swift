@@ -60,6 +60,9 @@ final class RemoteModel {
 
     func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedProject, group: group) }
 
+    /// Whether the Mac is bringing this chat back by itself after a restart.
+    func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
+
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
@@ -150,6 +153,7 @@ final class RemoteModel {
         // After the agents, because a project's counts are worked out from them.
         await refreshProjects()
         await refreshPermissions()
+        await refreshResuming()
         await loadTranscript()
         settleSelection()
     }
@@ -174,6 +178,17 @@ final class RemoteModel {
                                                   Optional<String>.none,
                                                   returning: [PermissionRequest].self) else { return }
         work.replacePermissions(listed)
+    }
+
+    /// What the Mac is still bringing back after a restart.
+    ///
+    /// A daemon too old to know the method answers method-not-found, which is the
+    /// same as nothing coming back — not a connection that failed.
+    private func refreshResuming() async {
+        let response = try? await client.call(DaemonAPI.Method.agentsResuming,
+                                              Optional<String>.none,
+                                              returning: DaemonAPI.ResumingResponse.self)
+        work.setResuming(response?.agentIDs ?? [])
     }
 
     /// A project archived on the Mac while it is being read here moves the selection

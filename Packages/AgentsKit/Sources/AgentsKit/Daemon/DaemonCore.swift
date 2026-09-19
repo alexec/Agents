@@ -220,6 +220,14 @@ public actor DaemonCore {
         guard let next = agent.state.applying(event, endedReason: agent.endedReason) else { return }
         agent.state = next
         if let endedReason { agent.endedReason = endedReason }
+        // Any ending that is not the daemon dying — finished, out of tokens, stopped
+        // by hand — is evidence this chat can reach the end of a turn without taking
+        // the daemon with it, which is the only question the count asks. `recover`
+        // sets `daemonGone` directly rather than through here, so it can never clear
+        // the count on its way past.
+        if next == .finished || next == .stopped, agent.endedReason != .daemonGone {
+            agent.restartPickUps = 0
+        }
         if next == .archived { agent.archivedReason = .byUser }
         if next == .running { agent.archivedReason = nil }
         agent.lastActivityAt = Date()

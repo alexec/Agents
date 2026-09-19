@@ -64,6 +64,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// chain is when this agent's own events fire something further.
     public var startedByRun: UUID?
 
+    /// How many times in a row this chat has been picked back up after the daemon
+    /// went, without a turn since reaching its own end. On the record and not in
+    /// memory because the event it counts is the daemon dying.
+    public var restartPickUps: Int
+
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
     public var unknownFields: [String: JSONValue]
@@ -110,6 +115,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
+        // New in 011, and counted from nothing, so every record written before the
+        // restart guard existed opens as a chat that has never been picked back up.
+        restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
         unknownFields = whole.filter { !known.contains($0.key) }
@@ -142,6 +150,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !suggestedPrompts.isEmpty { try c.encode(suggestedPrompts, forKey: .suggestedPrompts) }
         try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
+        if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -158,6 +167,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case usage, lastTurnUsage, costToDate, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun
+        case restartPickUps
     }
 
     struct AnyKey: CodingKey {
@@ -190,6 +200,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 suggestedPrompts: [SuggestedPrompt] = [],
                 startedByWorkflow: String? = nil,
                 startedByRun: UUID? = nil,
+                restartPickUps: Int = 0,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -214,6 +225,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.suggestedPrompts = suggestedPrompts
         self.startedByWorkflow = startedByWorkflow
         self.startedByRun = startedByRun
+        self.restartPickUps = restartPickUps
         self.unknownFields = unknownFields
     }
 
@@ -225,6 +237,15 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
             .map(String.init)?
             .trimmingCharacters(in: .whitespaces) ?? "Untitled"
         return firstLine.count > 80 ? String(firstLine.prefix(79)) + "…" : firstLine
+    }
+
+    /// Whether a restarting daemon may bring this chat back by itself.
+    ///
+    /// The threshold is one. A chat cut off once was unlucky; a chat cut off again on
+    /// the very turn it was brought back with is the likeliest reason the daemon went,
+    /// and starting it a third time is a loop rather than a recovery.
+    public var mayBePickedUpAfterRestart: Bool {
+        state == .stopped && endedReason == .daemonGone && restartPickUps == 0
     }
 
     /// The invariants from the data model, in a form a test can assert.
