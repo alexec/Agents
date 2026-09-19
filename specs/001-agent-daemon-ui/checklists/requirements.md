@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,8 +31,10 @@
 
 ## Notes
 
-- Three [NEEDS CLARIFICATION] markers are open: FR-005 (how runtime options are offered), FR-012
-  (what counts as work having landed), FR-019 (what happens to running agents when the daemon stops).
-  All three change scope, so they are put to the user rather than guessed.
+- All three open questions were answered on 2026-09-18 and written into the spec: runtime options
+  come from what the runtime advertises over the protocol plus a free-text field (FR-005, FR-005a,
+  FR-005b); finished means the agent said so and exited cleanly, with no look at git (FR-012,
+  FR-012a); the daemon exits when it has no agents and no window, installs no login item, and agents
+  that die with it are recorded as stopped (FR-019, FR-019a).
 - ACP is named in FR-002 as a constraint the user set, not as a design choice made here.
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`

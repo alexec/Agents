@@ -91,24 +91,26 @@ change in its next output. Stop it and see it stop.
 
 ### User Story 4 - Getting finished work out of the way (Priority: P3)
 
-Agents accumulate. The ones that have finished and whose work has landed get out of the way on their
+Agents accumulate. The ones that said they were done and exited cleanly get out of the way on their
 own, and the user can put any agent away by hand and get it back.
 
 **Why this priority**: It matters at ten agents, not at one. The app is usable without it.
 
-**Independent Test**: Run an agent to completion under the conditions that count as landed, and see
-it leave the active list on its own and be findable in the archive with its history intact.
+**Independent Test**: Run an agent on a task it can finish, and see it leave the active list on its
+own when it reports itself done and exits, and be findable in the archive with its history intact.
 
 **Acceptance Scenarios**:
 
-1. **Given** a stopped agent whose work has landed, **When** the condition for landed is met,
-   **Then** the agent moves to archived without the user doing anything, and the user can see that
-   it was archived and why.
-2. **Given** an agent in any state, **When** the user archives it by hand, **Then** it leaves the
+1. **Given** an agent that reported its work finished, **When** its runtime exits cleanly, **Then**
+   the agent moves to archived without the user doing anything, and the user can see that it was
+   archived because it finished rather than by hand.
+2. **Given** an agent that crashed or was stopped by the user, **When** it ends, **Then** it stays in
+   stopped and is not archived.
+3. **Given** an agent in any state, **When** the user archives it by hand, **Then** it leaves the
    active list and its history stays readable in the archive.
-3. **Given** a running agent, **When** the user archives it, **Then** the app stops it first rather
+4. **Given** a running agent, **When** the user archives it, **Then** the app stops it first rather
    than leaving an unlisted process running.
-4. **Given** an archived agent, **When** the user looks for it, **Then** it is findable with its
+5. **Given** an archived agent, **When** the user looks for it, **Then** it is findable with its
    full history and the state it ended in.
 
 ---
@@ -120,8 +122,12 @@ it leave the active list on its own and be findable in the archive with its hist
 - The runtime crashes mid-task. The agent becomes stopped, the history up to the crash is kept, and
   the user is told.
 - The daemon is not running when the app opens. The app starts it and says nothing if that works.
-- The daemon stops while agents are running, including on a Mac restart. Covered by a clarification
-  below.
+- The daemon stops while agents are running, including on a Mac restart. Those agents die with it,
+  and are listed as stopped with that as the reason the next time the app opens.
+- The app is open with no agents running. There is nothing for a daemon to own, and the user still
+  sees every stopped and archived agent with its history.
+- An agent reports itself finished and then its runtime exits with an error. It is stopped, not
+  archived, because only a clean exit counts as finished.
 - Two windows, or two launches of the app, look at the same agent. Both show the same state, and
   neither starts a second daemon.
 - The agent's folder is deleted, renamed or moved while the agent is running.
@@ -147,9 +153,14 @@ it leave the active list on its own and be findable in the archive with its hist
   offer only those, naming the ones it looked for and did not find.
 - **FR-004**: Users MUST be able to start an agent by choosing a folder, a runtime, and a first
   instruction.
-- **FR-005**: The system MUST let the user set the options a chosen runtime supports when starting an
-  agent [NEEDS CLARIFICATION: is this a typed form per runtime, or one free-text field of arguments
-  passed through to the runtime?].
+- **FR-005**: The system MUST offer as real controls, when starting an agent, the options the chosen
+  runtime advertises over the protocol: the models it offers and the modes it supports. These MUST
+  come from the runtime itself rather than from a list this app keeps, so a runtime that adds a model
+  or a mode needs no change here.
+- **FR-005a**: The system MUST also offer a free-text field for anything the protocol does not
+  advertise, passed to the runtime as given when it is started.
+- **FR-005b**: The system MUST show a runtime's advertised options only where it advertises them, and
+  MUST NOT prevent an agent being started with a runtime that advertises none.
 - **FR-006**: The system MUST record every agent's full history, and MUST keep recording while no
   window is open.
 - **FR-007**: The system MUST show an agent's history and new output in the window, with new output
@@ -163,14 +174,15 @@ it leave the active list on its own and be findable in the archive with its hist
   stopped, archived.
 - **FR-011**: The system MUST move an agent to stopped when its runtime exits, whether it finished,
   failed or crashed, and MUST record which of those it was.
-- **FR-012**: The system MUST archive a stopped agent automatically when its work has landed
-  [NEEDS CLARIFICATION: what counts as landed? The agent's own report that it is done, a commit on
-  the branch, the branch merged into the default branch, or something else?].
+- **FR-012**: The system MUST archive a stopped agent automatically when the agent reported its work
+  finished and its runtime then exited cleanly.
+- **FR-012a**: The system MUST leave in stopped any agent that failed, crashed, was stopped by the
+  user, or exited without reporting itself finished.
 - **FR-013**: Users MUST be able to archive any agent by hand, and the system MUST stop a running
   agent before archiving it.
 - **FR-014**: The system MUST keep an archived agent's full history readable.
 - **FR-015**: The system MUST show why an agent was archived, distinguishing archived by the user
-  from archived because the work landed.
+  from archived because the agent finished.
 
 **The daemon**
 
@@ -180,9 +192,12 @@ it leave the active list on its own and be findable in the archive with its hist
   user being asked to do anything.
 - **FR-018**: The daemon MUST survive the app's death, and the app MUST reconnect to the running
   daemon and show current state when it opens again.
-- **FR-019**: The system MUST define what happens to running agents when the daemon itself stops
-  [NEEDS CLARIFICATION: on daemon exit or Mac restart, do running agents get killed and marked
-  stopped, or does the daemon start at login and resume ownership of agents that survived?].
+- **FR-019**: The daemon MUST exit on its own once it has no running agents and no app connected to
+  it, and MUST NOT install a login item, a background service or anything else that runs when the
+  user is not using the app.
+- **FR-019a**: The system MUST mark as stopped every agent recorded as running whose process is gone,
+  including all agents that were running when the user logged out or the Mac restarted, and MUST
+  record that they ended that way rather than by finishing.
 - **FR-020**: The system MUST keep agent state and history where it survives both the app and the
   daemon being restarted.
 - **FR-021**: The daemon MUST NOT require the user to install, configure or maintain anything by
@@ -212,8 +227,11 @@ it leave the active list on its own and be findable in the archive with its hist
 - **SC-003**: New agent output appears in the window within 1 second of the runtime producing it, for
   agents producing output continuously for 30 minutes.
 - **SC-004**: A follow-up message reaches a running agent within 2 seconds of being sent.
-- **SC-005**: A stopped agent is never lost: after the app and the Mac have both been restarted, every
-  agent ever started is still listed, in the right state, with its full history.
+- **SC-005**: No agent is ever lost: after the app and the Mac have both been restarted, every agent
+  ever started is still listed with its full history, and the ones that were running when the Mac
+  restarted are listed as stopped with that as the reason.
+- **SC-008**: Starting an agent offers every model and mode its runtime advertises, with no change to
+  this app when a runtime adds one.
 - **SC-006**: Ten agents running at once leave the window responsive: the list and any agent's history
   scroll without stutter.
 - **SC-007**: The user never sees two daemons, an agent listed twice, or an agent listed as running
@@ -236,5 +254,10 @@ it leave the active list on its own and be findable in the archive with its hist
   the folder and diffing the repository are all later features.
 - Archiving is a lifecycle state, not deletion. Nothing in this feature deletes an agent or its
   history.
+- Finished means the agent said so and exited cleanly. This feature does not look at git, so an agent
+  can be archived having committed nothing. A rule that reads the repository is a later feature, and
+  writing it is better done after watching real agents finish.
+- The daemon is only alive while there is work or a window. Nothing runs at login, so an agent cannot
+  outlive a logout or a restart, and the record says so when that happens.
 - The app and the daemon are both this project's code, built and shipped together. The daemon is not
   a separate thing the user installs.
