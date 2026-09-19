@@ -312,10 +312,15 @@ struct SuggestedPromptTests {
     @Test func theCallItselfIsNotDrawnInTheTranscript() {
         let ours = ToolCall(toolCallID: "1", title: "suggest_next_prompts",
                             name: "mcp__agents__suggest_next_prompts")
+        // What the Claude adapter sends next: the same call, finished, carrying
+        // neither the name nor the title. Alone it draws as "Tool call", which is
+        // exactly what appeared on screen the first time this shipped.
+        let oursFinished = ToolCall(toolCallID: "1", title: "Tool call", status: "completed")
         let theirs = ToolCall(toolCallID: "2", title: "Read a file", name: "read_file")
         let items = TranscriptEntry.display([
             TranscriptEntry(kind: .agentMessage(messageID: nil, text: "Done.", blocks: [])),
             TranscriptEntry(kind: .toolCall(ours)),
+            TranscriptEntry(kind: .toolCallUpdate(oursFinished)),
             TranscriptEntry(kind: .toolCall(theirs)),
         ])
         let drawn = items.compactMap { item -> [ToolCall]? in
