@@ -28,7 +28,8 @@ extension ACPSession {
     public static func launch(executable: URL,
                               arguments: [String],
                               cwd: URL,
-                              environment: [String: String] = ProcessInfo.processInfo.environment) throws -> ACPSession {
+                              environment: [String: String] = ProcessInfo.processInfo.environment,
+                              capabilities: ACP.ClientCapabilities = .none) throws -> ACPSession {
         let relay = ExitRelay()
         let process = try RuntimeProcess(
             executable: executable,
@@ -37,7 +38,8 @@ extension ACPSession {
             environment: environment,
             onStandardError: { relay.errored($0) },
             onExit: { relay.exited($0) })
-        let session = ACPSession(transport: process.transport, process: process)
+        let session = ACPSession(transport: process.transport, process: process,
+                                 capabilities: capabilities)
         relay.setHandlers(
             exit: { status in Task { await session.noteExit(status: status) } },
             error: { text in Task { await session.note(standardError: text) } })

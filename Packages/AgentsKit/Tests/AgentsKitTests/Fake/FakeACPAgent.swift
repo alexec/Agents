@@ -20,6 +20,25 @@ actor FakeACPAgent {
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
         var replayOnLoad: [JSONValue] = []
+
+        // MARK: Things a real agent asks of the client
+
+        /// Requests to make back to the client during a turn, in order. Everything the
+        /// client serves is tested through here, because only one runtime on this Mac
+        /// uses the file methods and none sends an elicitation form.
+        var clientRequests: [(method: String, params: JSONValue)] = []
+        /// The protocol version to answer the handshake with.
+        var protocolVersion = 1
+        /// Refuse `session/new` with this, for the signed-out case.
+        var newSessionError: JSONRPCError?
+        /// Options as raw JSON rather than typed, for the shapes a typed value cannot
+        /// express: groups, booleans, a choice with no value.
+        var rawConfigOptions: JSONValue?
+        /// Answer `session/prompt` with this usage block.
+        var usage: JSONValue?
+        var sessionCapabilities: [String: JSONValue] = ["close": [:], "list": [:]]
+        var agentCapabilities: [String: JSONValue] = [:]
+        var sessions: [JSONValue] = []
     }
 
     private var script: Script
@@ -30,6 +49,11 @@ actor FakeACPAgent {
     private(set) var setOptions: [(id: String, value: JSONValue)] = []
     private(set) var permissionOutcome: JSONValue?
     private(set) var sessionID = "fake-session-\(UUID().uuidString)"
+    /// What the client answered each request with, in order, so a test can assert on
+    /// what we served rather than only on what we were asked.
+    private(set) var clientAnswers: [(method: String, result: Result<JSONValue, JSONRPCError>)] = []
+    private(set) var promptContent: JSONValue?
+    private(set) var deletedSessions: [String] = []
 
     init(script: Script = Script(), transport: any LineTransport) {
         self.script = script
@@ -49,25 +73,38 @@ actor FakeACPAgent {
         received.append(method)
         switch method {
         case ACP.Method.initialize:
-            var sessionCapabilities: [String: JSONValue] = ["close": [:], "list": [:]]
+            var sessionCapabilities = script.sessionCapabilities
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
+            var capabilities = script.agentCapabilities
+            capabilities["loadSession"] = .bool(script.supportsLoad)
+            capabilities["sessionCapabilities"] = .object(sessionCapabilities)
             return .success([
-                "protocolVersion": 1,
-                "agentCapabilities": [
-                    "loadSession": .bool(script.supportsLoad),
-                    "sessionCapabilities": .object(sessionCapabilities),
-                ],
+                "protocolVersion": .int(script.protocolVersion),
+                "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
                 "authMethods": [],
             ])
 
         case ACP.Method.newSession:
-            var result: JSONValue = ["sessionId": .string(sessionID)]
-            if !script.configOptions.isEmpty,
-               let options = try? JSONValue.encoding(script.configOptions) {
-                result = ["sessionId": .string(sessionID), "configOptions": options]
+            if let error = script.newSessionError { return .failure(error) }
+            var result: [String: JSONValue] = ["sessionId": .string(sessionID)]
+            if let raw = script.rawConfigOptions {
+                result["configOptions"] = raw
+            } else if !script.configOptions.isEmpty,
+                      let options = try? JSONValue.encoding(script.configOptions) {
+                result["configOptions"] = options
             }
-            return .success(result)
+            return .success(.object(result))
+
+        case ACP.Method.list:
+            return .success(["sessions": .array(script.sessions)])
+
+        case ACP.Method.deleteSession:
+            if let id = params?["sessionId"]?.stringValue { deletedSessions.append(id) }
+            return .success([:])
+
+        case ACP.Method.forkSession:
+            return .success(["sessionId": .string("forked-" + sessionID)])
 
         case ACP.Method.resumeSession:
             if let error = script.sessionGoneError { return .failure(error) }
@@ -87,6 +124,7 @@ actor FakeACPAgent {
             return .success(["configOptions": options])
 
         case ACP.Method.prompt:
+            promptContent = params?["prompt"]
             return await runTurn()
 
         case ACP.Method.close:
@@ -102,10 +140,27 @@ actor FakeACPAgent {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }
         for update in script.updates { await send(update: update) }
+        for request in script.clientRequests {
+            var params = request.params
+            if case .object(var object) = params, object["sessionId"] == nil {
+                object["sessionId"] = .string(sessionID)
+                params = .object(object)
+            }
+            do {
+                let result = try await connection.call(request.method, params)
+                clientAnswers.append((request.method, .success(result)))
+            } catch let error as JSONRPCError {
+                clientAnswers.append((request.method, .failure(error)))
+            } catch {
+                clientAnswers.append((request.method, .failure(.internalError("\(error)"))))
+            }
+        }
         if let permission = script.permission {
             permissionOutcome = try? await connection.call(ACP.ClientMethod.requestPermission, permission)
         }
-        return .success(["stopReason": .string(script.stopReason)])
+        var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
+        if let usage = script.usage { result["usage"] = usage }
+        return .success(.object(result))
     }
 
     private func send(update: JSONValue) async {
@@ -120,6 +175,11 @@ actor FakeACPAgent {
 
     func stop() async {
         await connection.close()
+    }
+
+    /// What the client answered one method with, for a test that cares.
+    func answer(to method: String) -> Result<JSONValue, JSONRPCError>? {
+        clientAnswers.first { $0.method == method }?.result
     }
 
     static func chunk(_ text: String, messageID: String? = nil) -> JSONValue {

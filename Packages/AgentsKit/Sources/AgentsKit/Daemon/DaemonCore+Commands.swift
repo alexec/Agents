@@ -45,7 +45,9 @@ extension DaemonCore {
                           startOptions: request.startOptions,
                           advertisedOptions: await session.options,
                           availableCommands: await session.commands,
-                          endedReason: .endTurn)
+                          endedReason: .endTurn,
+                          additionalDirectories: request.additionalDirectories,
+                          mcpServers: request.mcpServers)
         agents[agent.id] = agent
         try await store.save(agent)
         live[agent.id] = session
@@ -55,7 +57,8 @@ extension DaemonCore {
         agent = agents[agent.id] ?? agent
         changed(agent)
 
-        await beginTurn(agentID: agent.id, text: request.prompt, session: session)
+        await beginTurn(agentID: agent.id, text: request.prompt,
+                        blocks: request.blocks, session: session)
         return agent.id
     }
 
@@ -78,9 +81,21 @@ extension DaemonCore {
         }
         do {
             let session = try launcher.launch(runtime: runtime, path: path, cwd: cwd)
-            _ = try await session.initialize()
+            let handshake = try await session.initialize()
             let result = try await session.newSession(cwd: cwd)
+            noteAccount(runtimeID: runtimeID, from: handshake)
             return (session, result.sessionId, runtime)
+        } catch let error as JSONRPCError where error.isAuthRequired {
+            markNeedsSignIn(runtimeID: runtimeID)
+            // Not a fault. The runtime is there and needs signing in, which is
+            // something the app can show and offer to fix.
+            throw signInNeeded(runtime: runtime, because: error.message)
+        } catch ACPSessionError.needsSignIn {
+            markNeedsSignIn(runtimeID: runtimeID)
+            throw signInNeeded(runtime: runtime, because: "it is not signed in")
+        } catch ACPSessionError.unsupportedProtocolVersion(let version) {
+            throw JSONRPCError(code: DaemonAPI.Failure.wrongProtocolVersion,
+                               message: "\(runtime.name) speaks protocol version \(version), and this app speaks \(ACP.protocolVersion).")
         } catch let error as JSONRPCError {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
                                message: "\(runtime.name) would not start a session: \(error.message)")
@@ -88,6 +103,18 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
                                message: "\(runtime.name) would not start: \(error.localizedDescription)")
         }
+    }
+
+    /// The runtime is installed and unusable until somebody signs in. Its own auth
+    /// methods go back with the error, including the command Copilot names, because
+    /// inventing that advice ourselves would be worse than repeating theirs.
+    private func signInNeeded(runtime: Runtime, because reason: String) -> JSONRPCError {
+        let account = accounts[runtime.id]
+        let methods = account?.authMethods ?? []
+        return JSONRPCError(code: DaemonAPI.Failure.needsSignIn,
+                            message: "\(runtime.name) needs signing in: \(reason)",
+                            data: ["runtimeID": .string(runtime.id),
+                                   "authMethods": (try? JSONValue.encoding(methods)) ?? .array([])])
     }
 
     // MARK: Prompting, including picking an agent back up
@@ -101,7 +128,8 @@ extension DaemonCore {
                                message: "That agent is already working. Wait for it, or stop it.")
         }
         let session = try await liveSession(for: agent)
-        await beginTurn(agentID: agent.id, text: request.text, session: session)
+        await beginTurn(agentID: agent.id, text: request.text,
+                        blocks: request.blocks, session: session)
     }
 
     /// The session an agent is using, starting its runtime again if it has none.
@@ -150,14 +178,17 @@ extension DaemonCore {
 
     // MARK: The turn itself
 
-    func beginTurn(agentID: UUID, text: String, session: ACPSession) async {
-        await record(.userMessage(text), for: agentID)
+    func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
+                   session: ACPSession) async {
+        let blocks = blocks ?? [.text(text)]
+        // The text is kept beside the blocks so the record reads the way it always has.
+        await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : []), for: agentID)
         await move(agentID, on: .promptSent)
         turnTasks[agentID]?.cancel()
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await session.prompt(text)
+                let result = try await session.prompt(blocks)
                 await self.finishTurn(agentID: agentID, result: result)
             } catch {
                 await self.turnFailed(agentID: agentID, error: error)
@@ -167,6 +198,18 @@ extension DaemonCore {
 
     private func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        if let usage = result.usage {
+            await record(.usageRecorded(usage), for: agentID)
+            if var agent = agents[agentID] {
+                agent.lastTurnUsage = usage
+                if let cost = usage.cost {
+                    // Per currency. Adding two currencies would be a number nobody
+                    // could check.
+                    agent.costToDate[cost.currency] = (agent.costToDate[cost.currency] ?? 0) + cost.amount
+                }
+                changed(agent)
+            }
+        }
         let reason: EndedReason
         if let known = result.reason {
             reason = known

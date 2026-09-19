@@ -18,10 +18,14 @@ public enum ACPSessionEvent: Sendable {
 public struct TurnResult: Sendable {
     public var reason: EndedReason?
     public var rawStopReason: String?
+    /// What this turn consumed, where the runtime reported it. The Claude adapter and
+    /// Copilot do; Grok does not, and then this is nil rather than zero.
+    public var usage: TurnUsage?
 
-    public init(reason: EndedReason?, rawStopReason: String?) {
+    public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil) {
         self.reason = reason
         self.rawStopReason = rawStopReason
+        self.usage = usage
     }
 }
 
@@ -29,6 +33,13 @@ public enum ACPSessionError: Error, Sendable {
     case noSession
     case sessionGone(JSONRPCError)
     case cannotResumeOrLoad
+    /// The agent answered the handshake with a version we do not speak. Reported
+    /// rather than carried on with: everything after this would be a guess.
+    case unsupportedProtocolVersion(Int)
+    /// The runtime is there and will not work until somebody signs in. `-32000`.
+    case needsSignIn
+    /// The runtime did not advertise the thing we were about to ask it for.
+    case notSupported(String)
 }
 
 /// One conversation with one runtime.
@@ -39,6 +50,11 @@ public actor ACPSession {
     private let connection: JSONRPCConnection
     private let process: RuntimeProcess?
     private let box = SessionBox()
+
+    /// What we tell the agent we can do. Held here because it decides what the agent
+    /// will ask of us: Grok routes every file read through the client the moment this
+    /// says we can serve one.
+    public let capabilities: ACP.ClientCapabilities
 
     public private(set) var sessionID: String?
     public private(set) var options: [ConfigOption] = []
@@ -56,8 +72,11 @@ public actor ACPSession {
     private let events: AsyncStream<ACPSessionEvent>
     private let eventsContinuation: AsyncStream<ACPSessionEvent>.Continuation
 
-    public init(transport: any LineTransport, process: RuntimeProcess? = nil) {
+    public init(transport: any LineTransport,
+                process: RuntimeProcess? = nil,
+                capabilities: ACP.ClientCapabilities = .none) {
         let box = self.box
+        self.capabilities = capabilities
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -72,22 +91,22 @@ public actor ACPSession {
 
     // MARK: Starting
 
-    /// Handshake. Advertises no client file or terminal capabilities, so each runtime
-    /// uses its own tools, which is what all three do anyway.
+    /// Handshake. What we advertise is whatever this session was built with, which is
+    /// a promise about what we will answer rather than a hint.
     @discardableResult
     public func initialize() async throws -> ACP.InitializeResult {
         await connection.start()
         startListening()
         let params: JSONValue = [
             "protocolVersion": .int(ACP.protocolVersion),
-            "clientCapabilities": [
-                "fs": ["readTextFile": false, "writeTextFile": false],
-                "terminal": false,
-            ],
+            "clientCapabilities": capabilities.wire,
         ]
         let result = try await connection.call(ACP.Method.initialize, params)
         let decoded = try result.decode(ACP.InitializeResult.self)
         initializeResult = decoded
+        guard decoded.speaksOurVersion else {
+            throw ACPSessionError.unsupportedProtocolVersion(decoded.protocolVersion ?? 0)
+        }
         return decoded
     }
 
@@ -99,7 +118,9 @@ public actor ACPSession {
         let result = try await connection.call(ACP.Method.newSession, params)
         let decoded = try result.decode(ACP.NewSessionResult.self)
         sessionID = decoded.sessionId
-        options = decoded.configOptions ?? []
+        // Read outside the decode on purpose: a shape we cannot read inside the
+        // options list costs that option, never the session.
+        options = ConfigOption.list(in: result["configOptions"])
         return decoded
     }
 
@@ -131,14 +152,30 @@ public actor ACPSession {
     // MARK: Working
 
     public func prompt(_ text: String) async throws -> TurnResult {
+        try await prompt([.text(text)])
+    }
+
+    /// A prompt is a list of blocks: the words, and whatever was attached to them.
+    public func prompt(_ blocks: [ContentBlock]) async throws -> TurnResult {
         guard let sessionID else { throw ACPSessionError.noSession }
         let params: JSONValue = [
             "sessionId": .string(sessionID),
-            "prompt": [["type": "text", "text": .string(text)]],
+            "prompt": blocks.wire,
         ]
         let result = try await connection.call(ACP.Method.prompt, params)
-        let raw = (try? result.decode(ACP.PromptResult.self))?.stopReason
-        return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)), rawStopReason: raw)
+        let decoded = try? result.decode(ACP.PromptResult.self)
+        let raw = decoded?.stopReason
+        return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
+                          rawStopReason: raw,
+                          usage: Self.turnUsage(in: result["usage"]))
+    }
+
+    /// What the turn consumed, where the runtime said. Read from the raw value rather
+    /// than decoded with the rest, so an unfamiliar field costs the usage and not the
+    /// turn's result.
+    private static func turnUsage(in value: JSONValue?) -> TurnUsage? {
+        guard let value, let usage = try? value.decode(TurnUsage.self) else { return nil }
+        return usage
     }
 
     /// A notification: the turn's own reply comes back as `cancelled` once the runtime
@@ -151,11 +188,15 @@ public actor ACPSession {
     @discardableResult
     public func setOption(id: String, value: JSONValue) async throws -> [ConfigOption] {
         guard let sessionID else { throw ACPSessionError.noSession }
-        let params: JSONValue = ["sessionId": .string(sessionID), "configId": .string(id), "value": value]
-        let result = try await connection.call(ACP.Method.setConfigOption, params)
-        if let refreshed = (try? result.decode(ACP.SetConfigOptionResult.self))?.configOptions {
-            options = refreshed
-        }
+        var params: [String: JSONValue] = ["sessionId": .string(sessionID),
+                                           "configId": .string(id),
+                                           "value": value]
+        // A boolean option is set with its type named, which is the protocol's own
+        // shape for it. Nothing sends us one unless we advertised that we take them.
+        if case .bool = value { params["type"] = "boolean" }
+        let result = try await connection.call(ACP.Method.setConfigOption, .object(params))
+        let refreshed = ConfigOption.list(in: result["configOptions"])
+        if !refreshed.isEmpty { options = refreshed }
         return options
     }
 

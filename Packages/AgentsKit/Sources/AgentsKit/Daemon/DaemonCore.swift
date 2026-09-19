@@ -18,6 +18,9 @@ public actor DaemonCore {
     var turnTasks: [UUID: Task<Void, Never>] = [:]
     var drafts: [UUID: Draft] = [:]
     var pendingPermissions: [UUID: Pending] = [:]
+    /// What each runtime last told us about itself: signed in or not, how to sign in,
+    /// which provider is answering. One per runtime, shared by every agent using it.
+    var accounts: [String: RuntimeAccount] = [:]
 
     var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
     var connectionCount = 0
@@ -42,6 +45,30 @@ public actor DaemonCore {
         self.locations = locations
         self.discovery = discovery
         self.launcher = launcher ?? ProcessSessionLauncher()
+    }
+
+    /// Record what a handshake said about a runtime, and tell the windows if it moved.
+    func noteAccount(runtimeID: String, from handshake: ACP.InitializeResult) {
+        var account = RuntimeAccount(runtimeID: runtimeID, handshake: handshake)
+        // Providers are asked for separately, so a previous answer is kept.
+        account.providers = accounts[runtimeID]?.providers ?? []
+        account.currentProviderID = accounts[runtimeID]?.currentProviderID
+        guard accounts[runtimeID] != account else { return }
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// A runtime that just refused for want of a sign-in.
+    func markNeedsSignIn(runtimeID: String) {
+        var account = accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
+        account.state = .needsSignIn
+        account.checkedAt = Date()
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    public func account(for runtimeID: String) -> RuntimeAccount {
+        accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
     }
 
     public func setBroadcaster(_ broadcaster: @escaping @Sendable (String, JSONValue?) -> Void) {
@@ -212,6 +239,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
         try ACPSession.launch(executable: URL(fileURLWithPath: path),
                               arguments: runtime.arguments,
                               cwd: cwd,
-                              environment: LoginShellPath.environment())
+                              environment: LoginShellPath.environment(),
+                              capabilities: .app)
     }
 }

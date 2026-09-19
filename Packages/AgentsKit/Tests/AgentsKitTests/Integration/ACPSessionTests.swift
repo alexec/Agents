@@ -44,7 +44,7 @@ struct ACPSessionTests {
         }
 
         #expect(result?.reason == .endTurn)
-        let texts = events.compactMap { if case .entry(let kind) = $0, case .agentMessage(_, let t) = kind { return t } else { return nil } }
+        let texts = events.compactMap { if case .entry(let kind) = $0, case .agentMessage(_, let t, _) = kind { return t } else { return nil } }
         #expect(texts == ["Pine", "apple"])
         #expect(events.contains { if case .titleChanged("Pineapple") = $0 { return true } else { return false } })
         #expect(await agent.received.contains(ACP.Method.initialize))

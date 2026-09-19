@@ -13,9 +13,15 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
     private var defaultScript: FakeACPAgent.Script
     private(set) var launches: [(runtime: String, cwd: URL)] = []
 
-    init(script: FakeACPAgent.Script = .init(), then scripts: [FakeACPAgent.Script] = []) {
+    /// What the sessions it makes advertise. The capability flags decide what an agent
+    /// asks of us, so a test that wants to be asked for a file turns them on here.
+    private let capabilities: ACP.ClientCapabilities
+
+    init(script: FakeACPAgent.Script = .init(), then scripts: [FakeACPAgent.Script] = [],
+         capabilities: ACP.ClientCapabilities = .none) {
         self.defaultScript = script
         self.scripts = scripts
+        self.capabilities = capabilities
     }
 
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
@@ -25,7 +31,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         lock.unlock()
 
         let (mine, theirs) = PairedTransport.pair()
-        let session = ACPSession(transport: mine)
+        let session = ACPSession(transport: mine, capabilities: capabilities)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()
         agents.append(agent)

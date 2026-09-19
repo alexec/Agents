@@ -286,7 +286,16 @@ final class AppModel {
     /// What a person can read. The daemon's errors are already written for someone
     /// looking at a screen, so they are shown as they are.
     private func describe(_ error: any Error) -> String {
-        if let error = error as? JSONRPCError { return error.message }
+        if let error = error as? JSONRPCError {
+            // A runtime that needs signing in says so, and says how. The command is
+            // the runtime's own, which is better advice than any we could invent.
+            if error.code == DaemonAPI.Failure.needsSignIn,
+               let methods = try? error.data?["authMethods"]?.decode([ACP.AuthMethod].self),
+               let command = methods.compactMap(\.terminalCommand).first {
+                return "\(error.message). Run: \(command)"
+            }
+            return error.message
+        }
         if let error = error as? DaemonClient.ConnectError {
             switch error {
             case .noHelper(let lookedIn):

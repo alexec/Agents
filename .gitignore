@@ -8,3 +8,6 @@ xcuserdata/
 
 # Generated from project.yml by xcodegen. Never edit or commit it.
 Agents.xcodeproj/
+
+# Another session's worktree lives here. Not ours to commit.
+.claude/worktrees/

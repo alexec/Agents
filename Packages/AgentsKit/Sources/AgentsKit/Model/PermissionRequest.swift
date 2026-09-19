@@ -55,17 +55,56 @@ public struct PermissionOption: Codable, Hashable, Sendable, Identifiable {
 public struct ToolCall: Codable, Hashable, Sendable {
     public var toolCallID: String?
     public var title: String
+    /// The runtime's own name for the tool, which is not always the title it shows.
+    public var name: String?
     public var kind: String?
     public var status: String?
+    /// What it produced: diffs, output, blocks of content. Appended as updates arrive,
+    /// because a tool call's content comes in pieces and the last piece is not the
+    /// whole story.
+    public var content: [ToolCallContent]
+    public var locations: [ToolCallLocation]
+    /// What it was called with, and what came back. Kept apart, because an update that
+    /// carries only the output must not lose the input. That was the bug.
+    public var rawInput: JSONValue?
+    public var rawOutput: JSONValue?
     /// The whole thing as it arrived, for the parts of the UI that want detail.
     public var raw: JSONValue?
 
-    public init(toolCallID: String? = nil, title: String, kind: String? = nil,
-                status: String? = nil, raw: JSONValue? = nil) {
+    public init(toolCallID: String? = nil, title: String, name: String? = nil,
+                kind: String? = nil, status: String? = nil,
+                content: [ToolCallContent] = [], locations: [ToolCallLocation] = [],
+                rawInput: JSONValue? = nil, rawOutput: JSONValue? = nil,
+                raw: JSONValue? = nil) {
         self.toolCallID = toolCallID
         self.title = title
+        self.name = name
         self.kind = kind
         self.status = status
+        self.content = content
+        self.locations = locations
+        self.rawInput = rawInput
+        self.rawOutput = rawOutput
         self.raw = raw
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        toolCallID = try c.decodeIfPresent(String.self, forKey: .toolCallID)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Tool call"
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        kind = try c.decodeIfPresent(String.self, forKey: .kind)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        // Every one of these is new in 003. A record written before it has none.
+        content = try c.decodeIfPresent([ToolCallContent].self, forKey: .content) ?? []
+        locations = try c.decodeIfPresent([ToolCallLocation].self, forKey: .locations) ?? []
+        rawInput = try c.decodeIfPresent(JSONValue.self, forKey: .rawInput)
+        rawOutput = try c.decodeIfPresent(JSONValue.self, forKey: .rawOutput)
+        raw = try c.decodeIfPresent(JSONValue.self, forKey: .raw)
+    }
+
+    /// The diffs this call carries, which is what the transcript draws first.
+    public var diffs: [ToolCallContent.Diff] {
+        content.compactMap { if case .diff(let diff) = $0 { return diff } else { return nil } }
     }
 }

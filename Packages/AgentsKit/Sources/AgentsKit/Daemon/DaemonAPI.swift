@@ -25,6 +25,11 @@ public enum DaemonAPI {
         public static let agentEntry = "agent/entry"
         public static let agentPermission = "agent/permission"
         public static let runtimeChanged = "runtime/changed"
+        public static let runtimeAccountChanged = "runtime/account"
+        public static let agentUsage = "agent/usage"
+        public static let agentPlan = "agent/plan"
+        public static let agentElicitation = "agent/elicitation"
+        public static let agentTerminalOutput = "agent/terminalOutput"
     }
 
     // MARK: Requests
@@ -62,16 +67,26 @@ public enum DaemonAPI {
         public var runtimeID: String
         public var cwd: URL
         public var prompt: String
+        /// What was attached to the prompt: pictures, references to files, the
+        /// contents of one. Empty is the ordinary case.
+        public var attachments: [Attachment]
         public var startOptions: StartOptions
         public var draftID: UUID?
+        public var additionalDirectories: [URL]
+        public var mcpServers: [MCPServer]
 
         public init(runtimeID: String, cwd: URL, prompt: String,
-                    startOptions: StartOptions = .none, draftID: UUID? = nil) {
+                    attachments: [Attachment] = [],
+                    startOptions: StartOptions = .none, draftID: UUID? = nil,
+                    additionalDirectories: [URL] = [], mcpServers: [MCPServer] = []) {
             self.runtimeID = runtimeID
             self.cwd = cwd
             self.prompt = prompt
+            self.attachments = attachments
             self.startOptions = startOptions
             self.draftID = draftID
+            self.additionalDirectories = additionalDirectories
+            self.mcpServers = mcpServers
         }
 
         /// Fields with a sensible default may be left out. A caller that wants an
@@ -82,8 +97,16 @@ public enum DaemonAPI {
             runtimeID = try c.decode(String.self, forKey: .runtimeID)
             cwd = try c.decode(URL.self, forKey: .cwd)
             prompt = try c.decode(String.self, forKey: .prompt)
+            attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
             startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
             draftID = try c.decodeIfPresent(UUID.self, forKey: .draftID)
+            additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
+            mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
+        }
+
+        /// What goes to the runtime: the words, then whatever was attached.
+        public var blocks: [ContentBlock] {
+            [.text(prompt)] + attachments.map(\.block)
         }
     }
 
@@ -95,7 +118,25 @@ public enum DaemonAPI {
     public struct PromptRequest: Codable, Sendable {
         public var agentID: UUID
         public var text: String
-        public init(agentID: UUID, text: String) { self.agentID = agentID; self.text = text }
+        public var attachments: [Attachment]
+
+        public init(agentID: UUID, text: String, attachments: [Attachment] = []) {
+            self.agentID = agentID
+            self.text = text
+            self.attachments = attachments
+        }
+
+        /// An older app sends only the text, so attachments are optional on the way in.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            text = try c.decode(String.self, forKey: .text)
+            attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
+        }
+
+        public var blocks: [ContentBlock] {
+            [.text(text)] + attachments.map(\.block)
+        }
     }
 
     public struct TranscriptRequest: Codable, Sendable {
@@ -177,5 +218,15 @@ public enum DaemonAPI {
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
         public static let alreadyRunning = -32006
+        /// The runtime is installed and will not work until somebody signs in. Its own
+        /// auth methods come back in the error's data, including the command Copilot
+        /// names for the terminal.
+        public static let needsSignIn = -32007
+        /// The runtime answered the handshake with a version we do not speak.
+        public static let wrongProtocolVersion = -32008
+        /// The runtime never said it could do the thing that was asked of it.
+        public static let notSupported = -32009
+        /// A destructive call that nobody confirmed.
+        public static let notConfirmed = -32010
     }
 }

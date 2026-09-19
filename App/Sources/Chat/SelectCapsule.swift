@@ -45,6 +45,38 @@ struct SelectCapsule<Content: View>: View {
     }
 }
 
+/// A setting that is on or off, drawn as the same capsule as a select.
+///
+/// The Claude adapter sends its fast mode as a two-item menu until the app says it
+/// takes booleans, and as this once it does. A thing with two states should look like
+/// one thing, not a list of two.
+struct BooleanCapsule: View {
+    let name: String
+    let isOn: Bool
+    let set: (Bool) -> Void
+
+    var body: some View {
+        Button {
+            set(!isOn)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                Text(name)
+            }
+        }
+        .buttonStyle(.plain)
+        .font(.footnote)
+        .fixedSize()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .help(name)
+        .accessibilityValue(isOn ? "on" : "off")
+    }
+}
+
 /// One line in an open select.
 struct SelectChoice: View {
     let title: String

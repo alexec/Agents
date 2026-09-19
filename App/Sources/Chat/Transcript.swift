@@ -60,14 +60,14 @@ private struct EntryRow: View {
 
     var body: some View {
         switch entry.kind {
-        case .userMessage(let text):
-            MarkdownText(markdown: text)
+        case .userMessage(let text, let blocks):
+            BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                 .padding(12)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-        case .agentMessage(_, let text):
-            MarkdownText(markdown: text)
+        case .agentMessage(_, let text, let blocks):
+            BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
 
         case .agentThought(_, let text):
             Text(text)
@@ -79,8 +79,36 @@ private struct EntryRow: View {
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
             Text(call.title).font(.callout).foregroundStyle(.secondary)
 
-        case .plan:
-            Text("Made a plan").font(.callout).foregroundStyle(.secondary)
+        case .plan(let raw):
+            // The shape 001 stored. Read into entries where it can be.
+            PlanView(plan: Plan(planID: nil,
+                                entries: (raw["entries"]?.arrayValue ?? []).compactMap(PlanEntry.init(wire:))))
+
+        case .planUpdated(let plan):
+            PlanView(plan: plan)
+
+        case .usageRecorded(let usage):
+            UsageLine(usage: usage)
+
+        case .servedRequest(let request):
+            ServedRequestLine(request: request)
+
+        case .elicitationAsked(let request):
+            Text("Asked: \(request.title)").font(.callout).foregroundStyle(.secondary)
+
+        case .elicitationAnswered(_, let summary):
+            Text(summary).font(.callout).foregroundStyle(.secondary)
+
+        case .compaction(let status, let summary):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(status == "completed" ? "Made room by summarising the conversation so far"
+                                           : "Summarising the conversation so far…")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if !summary.isEmpty {
+                    BlocksView(blocks: summary).foregroundStyle(.secondary)
+                }
+            }
 
         case .permissionAsked(let request):
             Text("Asked: \(request.toolCall.title)")
@@ -102,6 +130,10 @@ private struct EntryRow: View {
 
         case .runtimeNote(let text):
             Text(text).font(.caption).foregroundStyle(.secondary)
+
+        case .unrecognised:
+            // Written by a newer version of this app. Kept in the record, skipped here.
+            EmptyView()
         }
     }
 }

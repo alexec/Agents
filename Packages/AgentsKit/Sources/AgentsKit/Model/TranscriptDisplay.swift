@@ -56,12 +56,22 @@ extension TranscriptEntry {
         return items
     }
 
-    /// An update carries the new status but not always the title it started with.
-    private static func merge(_ update: ToolCall, onto existing: ToolCall) -> ToolCall {
+    /// An update is the same call further along, and it carries only what changed.
+    ///
+    /// Field by field, on purpose. A completion update carries the output and not the
+    /// input, so replacing the whole thing loses what the call was made with, which is
+    /// usually the more interesting half. Content is appended rather than replaced,
+    /// because a tool call's content arrives in pieces.
+    static func merge(_ update: ToolCall, onto existing: ToolCall) -> ToolCall {
         var merged = existing
         if !update.title.isEmpty, update.title != "Tool call" { merged.title = update.title }
+        if let name = update.name { merged.name = name }
         if let kind = update.kind { merged.kind = kind }
         if let status = update.status { merged.status = status }
+        if !update.content.isEmpty { merged.content += update.content }
+        if !update.locations.isEmpty { merged.locations = update.locations }
+        if let rawInput = update.rawInput { merged.rawInput = rawInput }
+        if let rawOutput = update.rawOutput { merged.rawOutput = rawOutput }
         if let raw = update.raw { merged.raw = raw }
         return merged
     }
