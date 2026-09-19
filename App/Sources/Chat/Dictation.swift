@@ -38,8 +38,33 @@ private final class BufferSink: @unchecked Sendable {
 @MainActor
 @Observable
 final class Dictation {
+    /// Something to tell the person, and where to send them about it.
+    struct Problem {
+        var message: String
+        /// Set only when a switch somewhere would fix it.
+        var permission: Permission?
+    }
+
+    /// The two the app asks for, and the list each one is on.
+    enum Permission {
+        case microphone
+        case speechRecognition
+
+        /// Privacy & Security, already scrolled to the list this permission is on. The
+        /// switch is somewhere most people have never been, so it is worth opening for
+        /// them rather than describing the way and wishing them luck.
+        var settings: URL {
+            switch self {
+            case .microphone:
+                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+            case .speechRecognition:
+                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")!
+            }
+        }
+    }
+
     private(set) var isListening = false
-    private(set) var problem: String?
+    private(set) var problem: Problem?
 
     private let recogniser = SFSpeechRecognizer(locale: Locale.current)
     private let engine = AVAudioEngine()
@@ -110,12 +135,14 @@ final class Dictation {
     private func requestAccessThenListen() async {
         let speech = await Self.askForSpeech()
         guard speech == .authorized else {
-            problem = "Dictation needs permission to recognise speech. Turn it on in System Settings, under Privacy & Security."
+            problem = Problem(message: "Dictation needs permission to recognise speech. Turn it on in System Settings, under Privacy & Security.",
+                              permission: .speechRecognition)
             return
         }
         let microphone = await Self.askForMicrophone()
         guard microphone else {
-            problem = "Dictation needs the microphone. Turn it on in System Settings, under Privacy & Security."
+            problem = Problem(message: "Dictation needs the microphone. Turn it on in System Settings, under Privacy & Security.",
+                              permission: .microphone)
             return
         }
         listen()
@@ -123,13 +150,13 @@ final class Dictation {
 
     private func listen() {
         guard let recogniser, recogniser.isAvailable else {
-            problem = "Speech recognition is not available for \(Locale.current.identifier)."
+            problem = Problem(message: "Speech recognition is not available for \(Locale.current.identifier).")
             return
         }
         do {
             try openMicrophone()
         } catch {
-            problem = "The microphone would not start: \(error.localizedDescription)"
+            problem = Problem(message: "The microphone would not start: \(error.localizedDescription)")
             return
         }
         isListening = true

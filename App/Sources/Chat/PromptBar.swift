@@ -337,9 +337,13 @@ struct PromptBar: View {
         .sheet(isPresented: $isPrimingDictation) { dictationPrimer }
         .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
                                                  set: { if !$0 { dictation.dismissProblem() } })) {
-            Button("OK") {}
+            // Where a switch would fix it, offer to open the switch.
+            if let permission = dictation.problem?.permission {
+                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }
+            }
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(dictation.problem ?? "")
+            Text(dictation.problem?.message ?? "")
         }
     }
 

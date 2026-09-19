@@ -49,11 +49,17 @@ targets:
   Agents:
     type: application
     supportedDestinations: [macOS]
-    entitlements:
-      path: App/Agents.entitlements
     sources:
       - path: App/Sources
       - path: App/Resources
+      # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
+      # of the file and rewrite it from this one on every generate — and with nothing
+      # under the key to write, what it writes is an empty plist. The project is not in
+      # git and `xcodegen generate` is the first thing a fresh clone runs, so the day
+      # the app needed a capability was the day that silently took it away again.
+      # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
+      - path: App/Agents.entitlements
+        buildPhase: none
     dependencies:
       - package: AgentsKit
       - package: SwiftTerm
