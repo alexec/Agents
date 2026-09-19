@@ -103,6 +103,31 @@ struct SessionUpdateTests {
         #expect(dollars.adding(Cost(amount: 0.5, currency: "GBP")) == nil)
     }
 
+    @Test func aTotalIsOneNumberPerCurrency() {
+        #expect(Cost.total(of: [:]) == nil, "nothing spent shows nothing, not a zero")
+
+        let one = Cost.total(of: ["USD": 1.5])
+        #expect(one?.contains("1.5") == true)
+
+        // Two currencies read as two numbers, in currency order, never added.
+        let two = Cost.total(of: ["USD": 1.5, "GBP": 0.5])
+        #expect(two?.contains(" · ") == true)
+        #expect(two?.firstIndex(of: "·") != nil)
+        #expect(two?.hasPrefix("£") == true, "GBP sorts before USD")
+    }
+
+    @Test func aRuntimeMayPriceATurnWithoutSayingHowBigItsWindowIs() {
+        // Then there is no meter to hang the cost off, and the cost still shows.
+        let update = SessionUpdate.decode(["sessionUpdate": "usage_update", "used": 10,
+                                           "cost": ["amount": 0.25, "currency": "USD"]])
+        guard case .usage(let usage) = update else {
+            Issue.record("expected usage")
+            return
+        }
+        #expect(usage.fraction == nil)
+        #expect(usage.cost?.amount == 0.25)
+    }
+
     // MARK: Plans
 
     @Test func aPlanIsReadAsItsSteps() {

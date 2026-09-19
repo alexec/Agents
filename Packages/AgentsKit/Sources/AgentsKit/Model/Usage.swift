@@ -92,4 +92,15 @@ public struct Cost: Codable, Hashable, Sendable {
         guard other.currency == currency else { return nil }
         return Cost(amount: amount + other.amount, currency: currency)
     }
+
+    /// A running total written out for the eye: one number per currency, in currency
+    /// order, joined rather than added. Nil when nothing has been spent, which is how
+    /// the meter knows to show no cost rather than a zero.
+    public static func total(of costToDate: [String: Decimal]) -> String? {
+        guard !costToDate.isEmpty else { return nil }
+        return costToDate
+            .sorted { $0.key < $1.key }
+            .map { $0.value.formatted(.currency(code: $0.key)) }
+            .joined(separator: " · ")
+    }
 }
