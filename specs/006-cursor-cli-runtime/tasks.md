@@ -27,8 +27,8 @@ own.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm `cursor-agent` is installed and signed in: `cursor-agent --version` reports 2026.09.10-fd3934a or later, `cursor-agent status` reports logged in, and `cursor-agent acp --help` prints its usage even though `acp` is absent from `cursor-agent --help`
-- [ ] T002 Record the baseline before anything changes: `swift test --package-path Packages/AgentsKit` is green, and `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter LiveRuntimeTests` is green over three runtimes. No source file is added by this feature, so `xcodegen generate` is not needed and `project.yml` is not touched
+- [X] T001 Confirm `cursor-agent` is installed and signed in: `cursor-agent --version` reports 2026.09.10-fd3934a or later, `cursor-agent status` reports logged in, and `cursor-agent acp --help` prints its usage even though `acp` is absent from `cursor-agent --help`
+- [X] T002 Record the baseline before anything changes: `swift test --package-path Packages/AgentsKit` is green, and `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter LiveRuntimeTests` is green over three runtimes. No source file is added by this feature, so `xcodegen generate` is not needed and `project.yml` is not touched
 
 ---
 
@@ -41,11 +41,11 @@ suite learning to count to four.
 **⚠️ T004 and T005 must land in the same change as T003.** The moment the catalog has a fourth entry,
 both tests fail. Splitting them leaves the repository red.
 
-- [ ] T003 Add the Cursor entry to `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeCatalog.swift`: `id: "cursor"`, `name: "Cursor"`, `executable: "cursor-agent"`, `arguments: ["acp"]`, and add it to `builtIn`. The executable MUST be `cursor-agent` and MUST NOT be `agent`, which on this Mac is Grok. Extend the type's doc comment, which today explains why Claude needs npm, to say that Cursor is itself and hides its `acp` subcommand from its own help
-- [ ] T004 Update `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeDiscoveryTests.swift`: the assertion `#expect(statuses.count == 3)` at line 35 becomes 4, and add a case asserting Cursor is located by its own binary name, matching the per-runtime recipe cases already at lines 24-31
-- [ ] T005 Correct the `configOptions` assertions in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` lines 39-42. `#expect(!advertised.isEmpty)` and `#expect(advertised.contains { $0.category == "model" })` must hold only for a runtime that advertises options at all. Cursor advertises none; it puts its models in `session/new`, which `ACPTypes.swift:247` deliberately does not decode for any runtime. Fix the rule for every runtime, never with a branch on Cursor's id
-- [ ] T006 [P] Update the comment at `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` lines 18-19, which reads "One code path, three runtimes", to say four. It is the standing claim this whole feature is shaped around, so it should count correctly
-- [ ] T007 [P] Add the Cursor recipe to the `RUNTIMES` dictionary in `scripts/acp-handshake.sh` lines 14-18 (`"cursor": ["cursor-agent", "acp"]`). This script keeps its own copy of the recipes, separate from `RuntimeCatalog`, so without this it cannot probe the runtime this feature adds
+- [X] T003 Add the Cursor entry to `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeCatalog.swift`: `id: "cursor"`, `name: "Cursor"`, `executable: "cursor-agent"`, `arguments: ["acp"]`, and add it to `builtIn`. The executable MUST be `cursor-agent` and MUST NOT be `agent`, which on this Mac is Grok. Extend the type's doc comment, which today explains why Claude needs npm, to say that Cursor is itself and hides its `acp` subcommand from its own help
+- [X] T004 Update `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeDiscoveryTests.swift`: the assertion `#expect(statuses.count == 3)` at line 35 becomes 4, and add a case asserting Cursor is located by its own binary name, matching the per-runtime recipe cases already at lines 24-31
+- [X] T005 Correct the `configOptions` assertions in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` lines 39-42. `#expect(!advertised.isEmpty)` and `#expect(advertised.contains { $0.category == "model" })` must hold only for a runtime that advertises options at all. Cursor advertises none; it puts its models in `session/new`, which `ACPTypes.swift:247` deliberately does not decode for any runtime. Fix the rule for every runtime, never with a branch on Cursor's id
+- [X] T006 [P] Update the comment at `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` lines 18-19, which reads "One code path, three runtimes", to say four. It is the standing claim this whole feature is shaped around, so it should count correctly
+- [X] T007 [P] Add the Cursor recipe to the `RUNTIMES` dictionary in `scripts/acp-handshake.sh` lines 14-18 (`"cursor": ["cursor-agent", "acp"]`). This script keeps its own copy of the recipes, separate from `RuntimeCatalog`, so without this it cannot probe the runtime this feature adds
 
 **Checkpoint**: Cursor is on the list, the suite is green over four runtimes, and the by-hand probe can reach it.
 
@@ -65,8 +65,8 @@ pick-up, adopt, the agent row and the session list all read `RuntimeCatalog`. Th
 mostly proving that claim rather than writing to it, and every task below that fails is a bug in the
 claim.
 
-- [ ] T008 [US1] Run the live suite over all four runtimes: `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter LiveRuntimeTests`. Cursor must start, hand back `protocolVersion == 1`, report `supportsLoad == true`, answer a prompt and be picked up again. Any `if` on a runtime id needed to make this pass means the design in plan.md decision 2 is wrong and the plan must be revisited before continuing
-- [ ] T009 [US1] Run `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter GrokServedToolsTests`, whose `everyRuntimeStillStartsWithEverythingAdvertised` case at line 74 loops over `RuntimeCatalog.builtIn`. Confirm Cursor still starts with every client capability advertised, including the file and terminal ones 003 turned on
+- [X] T008 [US1] Run the live suite over all four runtimes: `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter LiveRuntimeTests`. Cursor must start, hand back `protocolVersion == 1`, report `supportsLoad == true`, answer a prompt and be picked up again. Any `if` on a runtime id needed to make this pass means the design in plan.md decision 2 is wrong and the plan must be revisited before continuing
+- [X] T009 [US1] Run `AGENTS_LIVE=1 swift test --package-path Packages/AgentsKit --filter GrokServedToolsTests`, whose `everyRuntimeStillStartsWithEverythingAdvertised` case at line 74 loops over `RuntimeCatalog.builtIn`. Confirm Cursor still starts with every client capability advertised, including the file and terminal ones 003 turned on
 - [ ] T010 [US1] By hand in the app: start an agent on Cursor in a scratch folder, send a prompt that reads a file and edits it. Confirm the reply streams, the tool call asks permission before writing, the edit arrives as a diff, and the agent appears under its project. Quickstart steps 1 and 2
 - [ ] T011 [US1] Confirm what Cursor reports about tokens and cost reaches the record as reported, per currency, with nothing estimated, and that an agent showing no cost is because Cursor sent none rather than because the app dropped it
 - [ ] T012 [US1] Confirm no model or mode is shown for a Cursor agent, and that this is the existing gate rather than a new one: Cursor sends `models` and `modes` on `session/new`, which are not decoded for any runtime, and sends no `configOptions` and no `providers`. Quickstart step 2

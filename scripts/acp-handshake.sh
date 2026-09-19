@@ -15,6 +15,8 @@ RUNTIMES = {
     "claude": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
     "grok": ["grok", "agent", "stdio"],
     "copilot": ["copilot", "--acp"],
+    # Not "agent", which is what Cursor calls itself and what Grok installs.
+    "cursor": ["cursor-agent", "acp"],
 }
 
 # What the app advertises today. Kept beside ACP.ClientCapabilities.app on purpose:

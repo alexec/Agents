@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKit
 
-/// The three real runtimes, on this Mac, with Alex's own credentials.
+/// The four real runtimes, on this Mac, with Alex's own credentials.
 ///
 /// Off unless `AGENTS_LIVE=1`, because it costs money and needs him signed in. Every
 /// claim in research.md came from doing this by hand; this is the same thing, kept.
@@ -15,7 +15,7 @@ struct LiveRuntimeTests {
         return url
     }
 
-    /// Nothing below names a runtime except as data. One code path, three runtimes: if
+    /// Nothing below names a runtime except as data. One code path, four runtimes: if
     /// this test needs an `if` on the id, the claim in SC-009 is no longer true.
     @Test(arguments: RuntimeCatalog.builtIn)
     func aRuntimeCanBeStartedDrivenAndPickedUpAgain(runtime: Runtime) async throws {
@@ -36,10 +36,18 @@ struct LiveRuntimeTests {
         #expect(capabilities.supportsLoad, "an agent that cannot be picked up cannot be an agent here")
 
         let created = try await session.newSession(cwd: cwd)
+        // Options are a thing a runtime may offer, not a thing every runtime has. Three
+        // of them send `configOptions` and Cursor sends none at all: it puts its models
+        // and modes on the `session/new` result, which we do not decode for anyone,
+        // because those shapes disagree between runtimes and are leaving the protocol.
+        // What has to hold is that a runtime offering options offers usable ones.
         let advertised = await session.options
-        #expect(!advertised.isEmpty, "\(runtime.name) advertises its options through configOptions")
-        #expect(advertised.contains { $0.category == "model" },
-                "every one of them offers a model choice through the one list")
+        if !advertised.isEmpty {
+            #expect(advertised.contains { $0.category == "model" },
+                    "\(runtime.name) offers options, so one of them is the model choice")
+            #expect(advertised.allSatisfy { !$0.id.isEmpty && !$0.name.isEmpty },
+                    "\(runtime.name) offers nothing the start sheet cannot draw")
+        }
 
         let result = try await session.prompt("Reply with exactly: PINEAPPLE. Nothing else.")
         #expect(result.reason == .endTurn)

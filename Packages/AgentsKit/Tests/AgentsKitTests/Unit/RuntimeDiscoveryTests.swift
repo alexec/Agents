@@ -30,19 +30,30 @@ struct RuntimeDiscoveryTests {
         #expect(!discovery(["/opt/homebrew/bin/claude"]).locate(RuntimeCatalog.claude).isAvailable)
     }
 
+    @Test func cursorIsFoundByItsOwnNameAndNotByTheOneItCallsItself() {
+        // Cursor's documentation, and its own sign-in text, call the command `agent`.
+        // On this Mac `agent` is Grok, so starting what Cursor says to start would run
+        // the wrong runtime. The recipe names `cursor-agent` and nothing else.
+        #expect(RuntimeCatalog.cursor.executable == "cursor-agent")
+        #expect(RuntimeCatalog.cursor.arguments == ["acp"])
+        #expect(discovery(["/opt/homebrew/bin/cursor-agent"]).locate(RuntimeCatalog.cursor).isAvailable)
+        #expect(!discovery(["/opt/homebrew/bin/agent"]).locate(RuntimeCatalog.cursor).isAvailable)
+    }
+
     @Test func everyBuiltInRuntimeIsReportedOneWayOrTheOther() {
         let statuses = discovery(["/opt/homebrew/bin/copilot"]).statuses()
-        #expect(statuses.count == 3)
+        #expect(statuses.count == 4)
         #expect(statuses.filter { $0.availability.isAvailable }.map(\.id) == ["copilot"])
         #expect(statuses.allSatisfy { RuntimeCatalog.runtime(id: $0.id) != nil })
     }
 
     @Test func theSearchPathIncludesTheOnesAGUIAppWouldMiss() {
         // The whole point: an app launched from the Finder inherits
-        // /usr/bin:/bin:/usr/sbin:/sbin, and not one of the three lives there.
+        // /usr/bin:/bin:/usr/sbin:/sbin, and not one of the four lives there.
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let fallbacks = LoginShellPath.fallbacks
         #expect(fallbacks.contains("/opt/homebrew/bin"))
+        // Where Cursor installs itself, and where Grok keeps the `agent` that is not Cursor.
         #expect(fallbacks.contains("\(home)/.local/bin"))
         #expect(fallbacks.contains("\(home)/.grok/bin"))
     }
