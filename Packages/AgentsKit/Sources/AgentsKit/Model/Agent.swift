@@ -16,6 +16,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var state: AgentState
     public var runtimeSessionID: String?
     public var startOptions: StartOptions
+
+    /// What the runtime last said it offers, kept on the record so the controls
+    /// around the prompt are the same ones whether the agent is running or was
+    /// stopped a week ago. A finished agent has no process to ask.
+    public var advertisedOptions: [ConfigOption]
+
     public var createdAt: Date
     public var lastActivityAt: Date
     public var endedReason: EndedReason?
@@ -26,6 +32,23 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case byUser
     }
 
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        runtimeID = try c.decode(String.self, forKey: .runtimeID)
+        cwd = try c.decode(URL.self, forKey: .cwd)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        state = try c.decode(AgentState.self, forKey: .state)
+        runtimeSessionID = try c.decodeIfPresent(String.self, forKey: .runtimeSessionID)
+        startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
+        // Records written before the controls moved onto the prompt bar have none.
+        advertisedOptions = try c.decodeIfPresent([ConfigOption].self, forKey: .advertisedOptions) ?? []
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
+        endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
+        archivedReason = try c.decodeIfPresent(ArchivedReason.self, forKey: .archivedReason)
+    }
+
     public init(id: UUID = UUID(),
                 runtimeID: String,
                 cwd: URL,
@@ -33,6 +56,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 state: AgentState = .stopped,
                 runtimeSessionID: String? = nil,
                 startOptions: StartOptions = .none,
+                advertisedOptions: [ConfigOption] = [],
                 createdAt: Date = Date(),
                 lastActivityAt: Date = Date(),
                 endedReason: EndedReason? = nil,
@@ -44,6 +68,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.state = state
         self.runtimeSessionID = runtimeSessionID
         self.startOptions = startOptions
+        self.advertisedOptions = advertisedOptions
         self.createdAt = createdAt
         self.lastActivityAt = lastActivityAt
         self.endedReason = endedReason

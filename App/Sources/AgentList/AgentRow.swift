@@ -68,24 +68,36 @@ struct StateDot: View {
     let state: AgentState
 
     var body: some View {
-        Circle()
-            .fill(colour)
-            .frame(width: 8, height: 8)
-            .overlay {
-                if state == .running {
-                    Circle().stroke(colour.opacity(0.35), lineWidth: 4)
-                }
+        // Filled while there is a runtime in hand, hollow once there is not: the
+        // difference a glance needs, without a colour.
+        Group {
+            if state.holdsRuntime {
+                Circle().fill(colour)
+            } else {
+                Circle().strokeBorder(colour, lineWidth: 1.5)
             }
-            .help(description)
+        }
+        .frame(width: 8, height: 8)
+        .opacity(opacity)
+        .overlay {
+            if state == .waitingOnUser {
+                Circle().stroke(colour.opacity(0.35), lineWidth: 4)
+            }
+        }
+        .help(description)
     }
 
-    private var colour: Color {
+    /// Grey, all of it. A colour here would be decoration, and the one colour in the
+    /// app means something went wrong.
+    private var colour: Color { .secondary }
+
+    private var opacity: Double {
         switch state {
-        case .running: return .green
-        case .waitingOnUser: return .orange
-        case .finished: return .blue
-        case .stopped: return .secondary
-        case .archived: return .secondary.opacity(0.5)
+        case .running: return 1
+        case .waitingOnUser: return 1
+        case .finished: return 0.55
+        case .stopped: return 0.4
+        case .archived: return 0.25
         }
     }
 

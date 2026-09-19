@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Nothing here answers on the user's behalf, remembers an answer, or applies a rule of
 /// its own. The way to be asked less often is the runtime's own options, which the
-/// start form already offers.
+/// prompt bar already offers.
 struct PermissionView: View {
     @Environment(AppModel.self) private var model
     let request: PermissionRequest
@@ -13,11 +13,7 @@ struct PermissionView: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 10) {
-                Label {
-                    Text(request.toolCall.title).font(.headline)
-                } icon: {
-                    Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
-                }
+                Text(request.toolCall.title).font(.headline)
                 if let kind = request.toolCall.kind {
                     Text(kind).font(.caption).foregroundStyle(.secondary)
                 }
@@ -37,11 +33,9 @@ struct PermissionView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // Tinted, because a question the agent is blocked on should not read as
-            // part of the conversation behind it.
-            .glassEffect(.regular.tint(.orange.opacity(0.22)), in: RoundedRectangle(cornerRadius: 16))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(12)
+        .padding(.horizontal, 20)
     }
 
     private func answer(_ option: PermissionOption) {

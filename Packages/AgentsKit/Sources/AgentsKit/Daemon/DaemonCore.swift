@@ -137,6 +137,7 @@ public actor DaemonCore {
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }
+            agent.advertisedOptions = options
             for option in options {
                 if let value = option.currentValue { agent.startOptions.values[option.id] = value }
             }

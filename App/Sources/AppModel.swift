@@ -27,6 +27,16 @@ final class AppModel {
         }
     }
 
+    // What the prompt bar is holding before there is an agent to hold it. It lives
+    // here rather than in the view so that starting an agent does not throw it away
+    // half way through the bar moving down the pane.
+    var draftCwd: URL?
+    var draftRuntimeID: String?
+    private(set) var draftOptions: [ConfigOption] = []
+    var draftChosen: [String: JSONValue] = [:]
+    private(set) var isLoadingDraftOptions = false
+    private var draftID: UUID?
+
     private let client = DaemonClient()
     private var listening: Task<Void, Never>?
     private var firstTranscriptIndex = 0
@@ -180,20 +190,39 @@ final class AppModel {
 
     // MARK: Doing
 
-    func options(runtimeID: String, cwd: URL) async -> DaemonAPI.OptionsResponse? {
+    /// A session has to exist before its options do, so choosing a folder and a
+    /// runtime starts one. It is kept and used by the start that follows.
+    func loadDraftOptions() async {
+        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
+        isLoadingDraftOptions = true
+        draftOptions = []
+        draftChosen = [:]
+        draftID = nil
+        defer { isLoadingDraftOptions = false }
         do {
-            return try await client.call(DaemonAPI.Method.agentsOptions,
-                                         DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd),
-                                         returning: DaemonAPI.OptionsResponse.self)
+            let response = try await client.call(DaemonAPI.Method.agentsOptions,
+                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd),
+                                                 returning: DaemonAPI.OptionsResponse.self)
+            draftID = response.draftID
+            draftOptions = response.options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
+            for option in draftOptions where option.currentValue != nil {
+                draftChosen[option.id] = option.currentValue
+            }
         } catch {
             problem = describe(error)
-            return nil
         }
     }
 
-    func start(_ request: DaemonAPI.StartRequest) async {
+    func startDraft(prompt: String) async {
+        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
+        let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
+                                             cwd: cwd,
+                                             prompt: prompt,
+                                             startOptions: StartOptions(values: draftChosen),
+                                             draftID: draftID)
         do {
             let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            draftID = nil
             await refreshAgents()
             selection = id
         } catch {

@@ -15,13 +15,9 @@ struct ContentView: View {
             AgentListView(selection: $model.selection, isStarting: isStarting)
                 .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
         } detail: {
-            // Nothing chosen means ready to start one, rather than an empty pane
-            // saying so.
-            if let agent = model.selectedAgent {
-                TranscriptView(agent: agent)
-            } else {
-                StartAgentPane()
-            }
+            // One view either way: a new chat turns into the chat rather than
+            // being replaced by it.
+            ChatView()
         }
         .task { await model.connect() }
         .alert("That did not work",

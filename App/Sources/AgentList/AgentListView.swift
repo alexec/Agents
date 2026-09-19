@@ -114,7 +114,6 @@ private struct PermissionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 1) {
                 Text(model.agents.first { $0.id == request.agentID }?.title ?? "An agent")
                     .lineLimit(1)

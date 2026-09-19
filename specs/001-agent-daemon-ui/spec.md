@@ -215,12 +215,18 @@ send it a follow-up and see it answer with what it knew before.
   the row and the rest on the other, because they are different kinds of decision.
 - **FR-005f**: Starting an agent MUST be what the app shows when no agent is chosen, rather than a
   dialog opened from somewhere, so the app opens ready to start one.
+- **FR-005g**: A new chat MUST become the chat rather than being replaced by it: the same prompt and
+  the same controls around it, sitting in the middle of an empty pane and moving to the foot of it
+  when the conversation starts.
 - **FR-006**: The system MUST record every agent's full history, and MUST keep recording while no
   window is open.
 - **FR-007**: The system MUST show an agent's history and new output in the window, with new output
   appearing without the user asking for it.
 - **FR-007a**: The system MUST name an agent with the title its runtime gives the session where there
   is one, rather than with the first line of the instruction.
+- **FR-007b**: The conversation MUST use no colour except to say that something went wrong.
+- **FR-007c**: The conversation MUST show one tool call as its description alone, and a run of them
+  as the most recent with the rest a click away.
 - **FR-008**: Users MUST be able to send a follow-up message to a running or waiting agent.
 - **FR-009**: Users MUST be able to stop a running agent.
 - **FR-009a**: The system MUST show the user any permission the agent asks for, with the choices the

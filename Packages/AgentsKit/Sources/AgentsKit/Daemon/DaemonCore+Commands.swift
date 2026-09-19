@@ -33,6 +33,7 @@ extension DaemonCore {
                           state: .stopped,
                           runtimeSessionID: sessionID,
                           startOptions: request.startOptions,
+                          advertisedOptions: await session.options,
                           endedReason: .endTurn)
         agents[agent.id] = agent
         try await store.save(agent)
@@ -127,6 +128,7 @@ extension DaemonCore {
             let result = try await session.newSession(cwd: agent.cwd)
             updated.runtimeSessionID = result.sessionId
         }
+        updated.advertisedOptions = await session.options
         changed(updated)
         await session.apply(updated.startOptions)
         live[agent.id] = session
@@ -232,6 +234,11 @@ extension DaemonCore {
             return []
         }
         let options = try await session.setOption(id: request.optionID, value: request.value)
+        if var agent = agents[request.agentID] {
+            agent.advertisedOptions = options
+            agent.startOptions.values[request.optionID] = request.value
+            changed(agent)
+        }
         await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
         return options
     }
