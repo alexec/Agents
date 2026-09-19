@@ -1,17 +1,16 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, filling the page: everything working on it, and somewhere to say
-/// what you want done next.
+/// The project itself, filling the page: its name, somewhere to say what you want done,
+/// and the agents working on it.
 ///
-/// Laid out the way a chat is, because it is the same kind of page. The name is in the
-/// title bar rather than in the content, and the prompt floats at the foot of the pane
-/// with the lists scrolling underneath it — the same bar, the same glass, the same
-/// margins.
+/// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
+/// options, the folders and servers, attachments, dictation, the lot. On a project page
+/// it is in the same mode it is in for a new chat, with the folder already set to this
+/// project, so saying what you want done starts an agent here and takes you into it.
 ///
-/// What you type starts an agent on it, in this folder, which is why there is no
-/// separate button for starting one. Picking an agent goes into its conversation, and
-/// the back button comes out again.
+/// Everything sits in the same 144pt gutter the transcript and prompt bar use, so the
+/// page and a conversation are the same width.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
@@ -20,67 +19,101 @@ struct ProjectAgentsView: View {
     /// How many archived agents are shown. Raised ten at a time, in the view, because
     /// this window already holds every one of them.
     @State private var archivedShown = Self.pageSize
-    @State private var formHeight: CGFloat = 0
     static let pageSize = 10
+    static let gutter: CGFloat = 144
+    static let cardSpacing: CGFloat = 10
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            list
-            if let folder {
-                ProjectPrompt(folder: folder)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                heading
+                // Its own margins, the same as in a chat, so it is not padded twice.
+                PromptBar()
+                agents
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(summary?.name ?? "Project")
-        .navigationSubtitle(subtitle)
-        .onChange(of: folder) { archivedShown = Self.pageSize }
+        .onAppear { adopt(folder) }
+        .onChange(of: folder) { _, folder in
+            archivedShown = Self.pageSize
+            adopt(folder)
+        }
     }
 
-    /// Where it is, said the way the chat says which folder an agent is in.
-    private var subtitle: String {
-        guard let summary else { return "" }
-        guard summary.exists else { return "Folder is missing" }
+    /// Point the prompt at this project, so what you type starts an agent here.
+    private func adopt(_ folder: URL?) {
+        guard let folder, model.draftCwd != folder else { return }
+        model.draftCwd = folder
+        Task { await model.loadDraftOptions() }
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(summary?.name ?? "Project")
+                .font(.largeTitle.weight(.semibold))
+                .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.callout)
+                    .foregroundStyle(summary?.exists == false ? Color.red : Color.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.gutter)
+        .padding(.top, 28)
+    }
+
+    /// Where it is, in the short form.
+    private var subtitle: String? {
+        guard let summary else { return nil }
+        guard summary.exists else { return "This folder is not there any more" }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let path = summary.folder.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
-    /// Everything working on this project, each one a card.
+    /// Everything working on this project, each one a card you can go into.
     ///
-    /// A card rather than a row because each one is a way in: tapping it opens that
-    /// agent's conversation. One `GlassEffectContainer` around the lot, so the cards
-    /// blend with each other rather than each carrying its own separate render.
-    private var list: some View {
-        ScrollView {
-            GlassEffectContainer(spacing: Self.cardSpacing) {
-                LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                    ForEach(AgentGroup.live, id: \.self) { group in
-                        let agents = model.agents(in: folder, group: group)
-                        if !agents.isEmpty {
-                            GroupHeading(title: group.title, count: agents.count)
-                            ForEach(agents) { agent in
-                                AgentCard(id: agent.id, selection: $selection) {
-                                    AgentRow(agent: agent)
-                                }
+    /// One `GlassEffectContainer` around the lot, so the cards blend with each other
+    /// rather than each carrying its own separate render.
+    private var agents: some View {
+        GlassEffectContainer(spacing: Self.cardSpacing) {
+            LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
+                ForEach(AgentGroup.live, id: \.self) { group in
+                    let agents = model.agents(in: folder, group: group)
+                    if !agents.isEmpty {
+                        GroupHeading(title: group.title, count: agents.count)
+                        ForEach(agents) { agent in
+                            AgentCard(id: agent.id, selection: $selection) {
+                                AgentRow(agent: agent)
                             }
                         }
                     }
-
-                    archivedSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+
+                archivedSection
+
+                if isEmpty {
+                    Text("Nothing here yet. Say what you want done and an agent starts on it.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                }
             }
+            .padding(.horizontal, Self.gutter)
+            .padding(.bottom, 28)
         }
         .animation(.default, value: model.agents.map(\.state))
-        // So the last card can be scrolled clear of the prompt floating over it.
-        .safeAreaPadding(.bottom, formHeight)
     }
 
-    static let cardSpacing: CGFloat = 10
+    private var isEmpty: Bool {
+        folder != nil && AgentGroup.allCases.allSatisfy { model.agents(in: folder, group: $0).isEmpty }
+    }
 
     private var archived: [Agent] {
         model.agents(in: folder, group: .archived)
@@ -111,10 +144,10 @@ struct ProjectAgentsView: View {
             Button("Hide archived") { showsArchived = false }
                 .buttonStyle(.glass)
                 .padding(.top, 2)
-        } else if folder != nil {
-            Button("Show archived") { showsArchived = true }
+        } else if folder != nil, !archived.isEmpty {
+            Button("Show archived (\(archived.count))") { showsArchived = true }
                 .buttonStyle(.glass)
-                .padding(.top, 6)
+                .padding(.top, 8)
         }
     }
 }
@@ -133,8 +166,8 @@ private struct AgentCard<Content: View>: View {
             selection = id
         } label: {
             content
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(RoundedRectangle(cornerRadius: 14))
                 .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
@@ -157,57 +190,8 @@ private struct GroupHeading: View {
         }
         .font(.subheadline.weight(.medium))
         .foregroundStyle(.secondary)
-        .padding(.top, 10)
+        .padding(.top, 14)
         .padding(.leading, 2)
         .accessibilityAddTraits(.isHeader)
-    }
-}
-
-/// Say what you want done. It starts an agent on it.
-///
-/// The same shape as the prompt bar in a chat: one field, one send button, glass, and
-/// the same margins, so moving between a project and an agent does not move the thing
-/// you type into.
-private struct ProjectPrompt: View {
-    @Environment(AppModel.self) private var model
-    let folder: URL
-    @State private var text = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            TextField("What do you want done?", text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .lineLimit(1...8)
-                .focused($focused)
-                .onSubmit(send)
-
-            Button(action: send) {
-                Image(systemName: "arrow.up")
-                    .font(.headline)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.circle)
-            .disabled(isEmpty)
-            .keyboardShortcut(.return, modifiers: .command)
-            .help("Start an agent on this")
-        }
-        .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
-        .padding(.horizontal, 144)
-        .padding(.vertical, 20)
-    }
-
-    private var isEmpty: Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func send() {
-        guard !isEmpty else { return }
-        let words = text
-        text = ""
-        Task { await model.startAgent(in: folder, prompt: words) }
     }
 }

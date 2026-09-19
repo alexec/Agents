@@ -1,47 +1,40 @@
 import AgentsKit
 import SwiftUI
 
+/// One agent on a project page: what it is, and what it is doing.
+///
+/// An icon for the state, the name it was given, and a line saying what it is working
+/// on. The name is what it was asked; the line under it is what is happening now, which
+/// is the thing you came to find out.
 struct AgentRow: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
 
     var body: some View {
-        HStack(spacing: 8) {
-            StateDot(state: agent.state)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .top, spacing: 12) {
+            StatusIcon(state: agent.state)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(agent.title ?? "Untitled")
+                    .font(.headline)
                     .lineLimit(1)
 
-                // What it is doing now, when it has said. A title is what it was asked
-                // an hour ago; this is the thing you actually came to find out.
-                if let step = agent.currentStep {
-                    Text(step)
-                        .font(.callout)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .padding(.top, 1)
-                }
+                Text(description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 4) {
-                    // No folder here any more: the panel is one project, so saying
-                    // which folder every row is in says the same thing twenty times.
-                    Text(runtimeName)
-                    if let progress {
-                        Text("·")
-                        Text(progress)
-                    }
-                    if let ending {
-                        Text("·")
-                        Text(ending)
-                    }
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             }
             Spacer(minLength: 0)
         }
-        // No padding of its own: the card it sits in owns that now.
         .contextMenu {
             if agent.state.holdsRuntime {
                 Button("Stop") { Task { await model.stop(agent.id) } }
@@ -60,75 +53,85 @@ struct AgentRow: View {
         }
     }
 
+    /// What it is doing, in its own words where it has said them.
+    private var description: String {
+        if let step = agent.currentStep { return step }
+        switch agent.state {
+        case .running: return "Working"
+        case .waitingOnUser: return "Waiting for your answer"
+        case .finished: return "Finished"
+        case .stopped: return ending ?? "Stopped"
+        case .archived: return "Archived"
+        }
+    }
+
+    /// The runtime, and how far through its plan it is.
+    private var detail: String? {
+        var parts = [runtimeName]
+        if agent.state.holdsRuntime, let progress = agent.planProgress {
+            // Clamped, because the last step being done would read "step 6 of 5".
+            let step = min(progress.done + 1, progress.total)
+            parts.append("step \(step) of \(progress.total)")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private var runtimeName: String {
         RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID
     }
 
-    /// How far through its own plan it is. Only while that plan still means
-    /// something: a finished agent's progress is history, and reads as a claim.
-    private var progress: String? {
-        guard agent.state.holdsRuntime, let progress = agent.planProgress else { return nil }
-        // Clamped, because the last step being done would otherwise read "step 6 of 5".
-        let step = min(progress.done + 1, progress.total)
-        return "step \(step) of \(progress.total)"
-    }
-
-    /// Finished, or stopped short with the reason. Never both, and never a reason
-    /// dressed up as a finish.
-    ///
-    /// "Completed" holds both, so each row has to say which it was: a run that ended
-    /// cleanly and one the runtime crashed out of are not the same news.
+    /// Stopped short, and why. Never a reason dressed up as a finish.
     private var ending: String? {
-        if agent.state == .finished { return "finished" }
-        guard agent.state == .stopped, let reason = agent.endedReason else { return nil }
+        guard let reason = agent.endedReason else { return nil }
         switch reason {
-        case .endTurn: return "finished"
-        case .maxTokens: return "ran out of room"
-        case .maxTurnRequests: return "hit its limit"
-        case .refusal: return "refused"
-        case .cancelled: return "stopped by you"
-        case .processDied: return "the runtime crashed"
-        case .daemonGone: return "stopped with the daemon"
-        case .unrecognised: return "stopped for a reason we do not know"
+        case .endTurn: return nil
+        case .maxTokens: return "Ran out of room"
+        case .maxTurnRequests: return "Hit its limit"
+        case .refusal: return "Refused"
+        case .cancelled: return "Stopped by you"
+        case .processDied: return "The runtime crashed"
+        case .daemonGone: return "Stopped with the daemon"
+        case .unrecognised: return "Stopped for a reason we do not know"
         }
     }
 }
 
-struct StateDot: View {
+/// What state an agent is in, as one symbol.
+///
+/// Grey, all of it, except the one that wants you: the only colour in this app means
+/// something needs a person.
+struct StatusIcon: View {
     let state: AgentState
 
     var body: some View {
-        // Filled while there is a runtime in hand, hollow once there is not: the
-        // difference a glance needs, without a colour.
         Group {
-            if state.holdsRuntime {
-                Circle().fill(colour)
+            if state == .running {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.7)
             } else {
-                Circle().strokeBorder(colour, lineWidth: 1.5)
+                Image(systemName: symbol)
+                    .font(.system(size: 15))
+                    .foregroundStyle(tint)
             }
         }
-        .frame(width: 8, height: 8)
-        .opacity(opacity)
-        .overlay {
-            if state == .waitingOnUser {
-                Circle().stroke(colour.opacity(0.35), lineWidth: 4)
-            }
-        }
+        .frame(width: 18, height: 18)
         .help(description)
+        .accessibilityLabel(description)
     }
 
-    /// Grey, all of it. A colour here would be decoration, and the one colour in the
-    /// app means something went wrong.
-    private var colour: Color { .secondary }
-
-    private var opacity: Double {
+    private var symbol: String {
         switch state {
-        case .running: return 1
-        case .waitingOnUser: return 1
-        case .finished: return 0.55
-        case .stopped: return 0.4
-        case .archived: return 0.25
+        case .running: return "circle.dotted"
+        case .waitingOnUser: return "questionmark.circle.fill"
+        case .finished: return "checkmark.circle.fill"
+        case .stopped: return "stop.circle"
+        case .archived: return "archivebox"
         }
+    }
+
+    private var tint: Color {
+        state == .waitingOnUser ? .accentColor : .secondary
     }
 
     private var description: String {
