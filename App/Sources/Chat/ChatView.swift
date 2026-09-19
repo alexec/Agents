@@ -49,6 +49,12 @@ struct ChatView: View {
             if let request = model.elicitationForSelection {
                 ElicitationView(request: request)
             }
+            // And so does a workflow an agent wants to write, for the same reason: the
+            // agent is blocked on the answer.
+            if let confirmation = model.workflowConfirmation,
+               confirmation.agentID == model.selection {
+                WorkflowConfirmationView(confirmation: confirmation)
+            }
             PromptBar()
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }

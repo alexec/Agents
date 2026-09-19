@@ -139,6 +139,10 @@ public final class AgentsModel {
         }
     }
 
+    public func setWorkflowConfirmation(_ confirmation: DaemonAPI.WorkflowConfirmation?) {
+        workflowConfirmation = confirmation
+    }
+
     public func replaceWorkflows(_ summaries: [WorkflowSummary]) {
         workflows = summaries.sorted {
             $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending

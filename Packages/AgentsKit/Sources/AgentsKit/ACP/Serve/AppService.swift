@@ -23,6 +23,9 @@ public actor AppService {
     /// The other one: show the user a file.
     public static let showFileToolName = AppTool.showFile
 
+    /// And the third: read and write the project's standing arrangements.
+    public static let workflowToolName = AppTool.manageWorkflows
+
     /// The line the daemon sends after the user's own words, once.
     ///
     /// This is here because the live runs said so. With the tool offered and nothing
@@ -62,17 +65,27 @@ public actor AppService {
     /// Where a file to show goes.
     public typealias FileSink = @Sendable (ShownFile) async -> Outcome
 
+    /// Where a workflow question goes. Unlike the other two this can take a while:
+    /// a write waits on somebody answering.
+    public typealias WorkflowSink =
+        @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let sink: Sink
     private let fileSink: FileSink
+    private let workflowSink: WorkflowSink
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
                 sink: @escaping Sink,
-                showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") }) {
+                showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
+                workflows: @escaping WorkflowSink = { _, _, _ in
+                    .refused("This app cannot manage workflows.")
+                }) {
         let box = self.box
         self.sink = sink
         self.fileSink = showFile
+        self.workflowSink = workflows
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -110,7 +123,7 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array([Self.tool, Self.showFileTool])])
+            return .success(["tools": .array([Self.tool, Self.showFileTool, Self.workflowTool])])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -135,6 +148,19 @@ public actor AppService {
                         """, isError: true))
                 }
                 return .success(Self.reply(await fileSink(file)))
+            }
+
+            if name.hasSuffix(Self.workflowToolName) {
+                guard let raw = arguments?["action"]?.stringValue,
+                      let action = DaemonAPI.ManageWorkflowsRequest.Action(rawValue: raw) else {
+                    return .success(Self.reply("""
+                        Nothing was done: `action` has to be one of list, read, write \
+                        or remove.
+                        """, isError: true))
+                }
+                return .success(Self.reply(await workflowSink(action,
+                                                              arguments?["id"]?.stringValue,
+                                                              arguments?["content"]?.stringValue)))
             }
 
             return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
@@ -241,6 +267,71 @@ public actor AppService {
                             """],
             ],
             "required": .array(["path"]),
+        ],
+    ]
+
+    /// Read and write the project's workflows.
+    ///
+    /// One tool with an action rather than four, because that is how the surface reads
+    /// to a model: an agent that has found this once knows the whole of it.
+    ///
+    /// Note what is *not* here. The suggestion tool needed a sentence in the
+    /// conversation before any runtime would call it; this one gets none. An
+    /// instruction telling every agent it can schedule things would invite exactly the
+    /// behaviour the chain-depth limit exists to contain. It is called because somebody
+    /// asked for a workflow.
+    static let workflowTool: JSONValue = [
+        "name": .string(workflowToolName),
+        "title": "Manage this project's workflows",
+        "description": """
+            List, read, create, change and remove this project's agentic workflows. A \
+            workflow is a prompt that runs itself when something happens — on a \
+            schedule, or when an agent finishes, asks for permission, raises a form, \
+            or stops.
+
+            A workflow is a Markdown file with YAML front matter. The front matter says \
+            what makes it run (`on:`) and which agent runs it (`agent:` — `new`, \
+            `standing`, or `triggering`); everything under the front matter is the \
+            prompt, sent verbatim.
+
+            Listing and reading ask nobody. Creating, changing or removing one asks the \
+            person first, in plain words, and does nothing if they decline.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "action": [
+                    "type": "string",
+                    "enum": .array(["list", "read", "write", "remove"]),
+                    "description": "What to do.",
+                ],
+                "id": [
+                    "type": "string",
+                    "description": """
+                        The workflow's file name without its extension, e.g. \
+                        `morning-build-check`. Required for read, write and remove.
+                        """,
+                ],
+                "content": [
+                    "type": "string",
+                    "description": """
+                        The whole file, front matter and prompt. Required for write. \
+                        For example:
+
+                        ---
+                        on:
+                          - schedule:
+                              at: [":00"]
+                              between: "09:00-09:00"
+                              days: [mon, tue, wed, thu, fri]
+                        agent: new
+                        ---
+
+                        Check the build and say whether it is green.
+                        """,
+                ],
+            ],
+            "required": .array(["action"]),
         ],
     ]
 }

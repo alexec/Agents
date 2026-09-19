@@ -214,6 +214,14 @@ final class AppModel {
                                DaemonAPI.WorkflowPauseProjectRequest(folder: folder, paused: paused))
     }
 
+    func refreshWorkflowConfirmations() async {
+        guard let pending = try? await client.call(
+            DaemonAPI.Method.workflowsPendingConfirmations,
+            Optional<String>.none,
+            returning: [DaemonAPI.WorkflowConfirmation].self) else { return }
+        work.setWorkflowConfirmation(pending.first)
+    }
+
     func answerWorkflowConfirmation(_ confirmation: DaemonAPI.WorkflowConfirmation, allow: Bool) async {
         try? await client.call(DaemonAPI.Method.workflowsConfirm,
                                DaemonAPI.WorkflowConfirmRequest(confirmationID: confirmation.id,
@@ -377,6 +385,7 @@ final class AppModel {
         await refreshRuntimes()
         await refreshAccounts()
         await refreshWorkflows()
+        await refreshWorkflowConfirmations()
         await refreshPermissions()
         await refreshElicitations()
         await loadTranscript()

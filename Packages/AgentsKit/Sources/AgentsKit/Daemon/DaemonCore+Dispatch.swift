@@ -145,6 +145,18 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ShowFileRequest.self)
                 return .success(["note": .string(try await showFile(request))])
 
+            case DaemonAPI.Method.agentsManageWorkflows:
+                let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
+                return .success(["note": .string(try await manageWorkflows(request))])
+
+            case DaemonAPI.Method.workflowsConfirm:
+                let request = try require(params, as: DaemonAPI.WorkflowConfirmRequest.self)
+                answerWorkflowConfirmation(request)
+                return .success([:])
+
+            case DaemonAPI.Method.workflowsPendingConfirmations:
+                return .success(try JSONValue.encoding(pendingWorkflowConfirmations()))
+
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))
 

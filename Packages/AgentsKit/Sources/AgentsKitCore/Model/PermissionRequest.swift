@@ -116,8 +116,25 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.showFile)
     }
 
+    /// Whether this is the app's own workflow tool.
+    public var isManagingWorkflows: Bool {
+        (name ?? title).hasSuffix(AppTool.manageWorkflows)
+    }
+
     /// Whether this call is the app's own rather than the agent's work at all.
-    public var isTheApps: Bool { isSuggestingPrompts || isShowingFile }
+    public var isTheApps: Bool {
+        isSuggestingPrompts || isShowingFile || isManagingWorkflows
+    }
+
+    /// Whether the app may answer the runtime's permission question itself.
+    ///
+    /// Deliberately narrower than `isTheApps`. Showing the app's own suggestions, and
+    /// opening a read-only pane on a file the agent can already read, are questions with
+    /// no information in them — asked once a turn they would be worse than not having
+    /// the feature. Writing a file that starts agents on a timer is the opposite: the
+    /// question carries everything there is to know, and it is asked by the daemon
+    /// itself rather than left to whether this particular runtime happens to ask.
+    public var isAutoAllowable: Bool { isSuggestingPrompts || isShowingFile }
 
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {

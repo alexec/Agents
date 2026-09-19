@@ -43,23 +43,42 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func bothToolsAreListedWithSchemasTheAgentCanFill() async throws {
+    @Test func everyToolIsListedWithASchemaTheAgentCanFill() async throws {
         let (client, service) = await pair(sink: neverCalled())
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
         #expect(tools.compactMap { $0["name"]?.stringValue }
-            == [AppService.toolName, AppService.showFileToolName])
+            == [AppService.toolName, AppService.showFileToolName, AppService.workflowToolName])
 
         let items = tools.first?["inputSchema"]?["properties"]?["prompts"]?["items"]
         #expect(items?["properties"]?["label"] != nil)
         #expect(items?["properties"]?["prompt"] != nil)
 
-        let showFile = tools.last?["inputSchema"]
+        let showFile = tools[1]["inputSchema"]
         #expect(showFile?["properties"]?["path"] != nil)
         #expect(showFile?["properties"]?["line"] != nil)
         // The line is the optional half: an agent that only knows the file still has
         // a call it can make.
         #expect(showFile?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["path"])
+
+        let workflows = tools.last?["inputSchema"]
+        #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?
+            .compactMap { $0.stringValue } == ["list", "read", "write", "remove"])
+        // Only the action is required: `list` needs nothing else, which is the call an
+        // agent makes first.
+        #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
+        await service.close()
+    }
+
+    @Test func aWorkflowCallWithNoUsableActionIsToldRatherThanGuessedAt() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.workflowToolName),
+            "arguments": ["action": "schedule"],
+        ])
+        #expect(result["isError"]?.boolValue == true)
+        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
+            .contains("list, read, write") == true)
         await service.close()
     }
 

@@ -43,6 +43,8 @@ public enum DaemonAPI {
         public static let workflowsPause = "workflows/pause"
         public static let workflowsPauseProject = "workflows/pauseProject"
         public static let workflowsConfirm = "workflows/confirm"
+        /// What the MCP helper relays when an agent calls the workflow tool.
+        public static let agentsManageWorkflows = "agents/manageWorkflows"
         public static let workflowsPendingConfirmations = "workflows/pendingConfirmations"
 
         public static let permissionsPending = "permissions/pending"

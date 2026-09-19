@@ -42,6 +42,11 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),
                     fallback: "Open in the files pane.")
+    } workflows: { action, workflowID, content in
+        await relay(DaemonAPI.Method.agentsManageWorkflows,
+                    DaemonAPI.ManageWorkflowsRequest(token: token, action: action,
+                                                     workflowID: workflowID, content: content),
+                    fallback: "Done.")
     }
     let task = Task {
         await service.run()

@@ -156,8 +156,17 @@ extension DaemonCore {
             .sorted { $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending }
     }
 
+    /// One workflow, adopting its project first if this daemon has not seen it.
+    ///
+    /// Adoption is what reads a project's workflow folder, and every caller of this is
+    /// somebody asking about a workflow by name — which means the project is one they
+    /// are already looking at. Without this, pausing or running a workflow before
+    /// anything had listed it answered "there is no such workflow", which is true only
+    /// in the sense that nobody had looked yet.
     func workflow(_ workflowID: String, in folder: URL) -> Workflow? {
-        workflows[Project.standardize(folder)]?[workflowID]
+        let standardized = Project.standardize(folder)
+        if workflows[standardized] == nil { adoptWorkflows(in: standardized) }
+        return workflows[standardized]?[workflowID]
     }
 
     /// A workflow plus everything the app knows about it, resolved here so that two
