@@ -92,9 +92,10 @@ struct ProjectsTests {
         ])
 
         let counts = await core.allProjects().first?.counts ?? [:]
-        #expect(counts[.needsInput] == 1)
-        #expect(counts[.working] == 1)
-        #expect(counts[.completed] == 2)
+        #expect(counts[.needsAttention] == 1)
+        #expect(counts[.running] == 1)
+        #expect(counts[.finished] == 1)
+        #expect(counts[.stopped] == 1)
         #expect(counts.values.reduce(0, +) == 4)
     }
 
@@ -216,7 +217,8 @@ struct ProjectsTests {
 
         let project = try #require(await core.allProjects().first)
         #expect(project.project.isArchived == false)
-        #expect(project.counts[.completed] == 2, "its agents were never touched")
+        #expect(project.counts[.finished] == 1, "its agents were never touched")
+        #expect(project.counts[.stopped] == 1)
     }
 
     @Test func unarchivingSomethingThatIsNotArchivedIsRefused() async throws {

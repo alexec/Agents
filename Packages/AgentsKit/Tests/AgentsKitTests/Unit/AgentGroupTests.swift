@@ -17,10 +17,10 @@ struct AgentGroupTests {
 
     @Test("each state maps to the group the spec names")
     func mappingIsTheSpecs() {
-        #expect(AgentGroup(for: .waitingOnUser) == .needsInput)
-        #expect(AgentGroup(for: .running) == .working)
-        #expect(AgentGroup(for: .finished) == .completed)
-        #expect(AgentGroup(for: .stopped) == .completed)
+        #expect(AgentGroup(for: .waitingOnUser) == .needsAttention)
+        #expect(AgentGroup(for: .running) == .running)
+        #expect(AgentGroup(for: .finished) == .finished)
+        #expect(AgentGroup(for: .stopped) == .stopped)
         #expect(AgentGroup(for: .archived) == .archived)
     }
 
@@ -30,16 +30,22 @@ struct AgentGroupTests {
         #expect(reached == Set(AgentGroup.allCases))
     }
 
-    @Test("the three live groups are in the order the panel draws them")
+    @Test("the four live groups are in the order the panel draws them")
     func liveOrder() {
-        #expect(AgentGroup.live == [.needsInput, .working, .completed])
+        #expect(AgentGroup.live == [.needsAttention, .running, .finished, .stopped])
         #expect(!AgentGroup.live.contains(.archived))
     }
 
     @Test("titles are the words the spec uses")
     func titles() {
-        #expect(AgentGroup.needsInput.title == "Needs input")
-        #expect(AgentGroup.working.title == "Working")
-        #expect(AgentGroup.completed.title == "Completed")
+        #expect(AgentGroup.needsAttention.title == "Needs attention")
+        #expect(AgentGroup.running.title == "Running")
+        #expect(AgentGroup.finished.title == "Finished")
+        #expect(AgentGroup.stopped.title == "Stopped")
+    }
+
+    @Test("one group per state, so a row never needs a second reading")
+    func oneGroupPerState() {
+        #expect(AgentGroup.allCases.count == AgentState.allCases.count)
     }
 }

@@ -443,6 +443,20 @@ final class AppModel {
         }
     }
 
+    /// Say what you want done in this project.
+    ///
+    /// It goes to the project's lead, which is what the prompt at the top of a project
+    /// is for: you describe the outcome, and it starts and briefs the agents. This is
+    /// why there is no longer a button for starting one by hand.
+    func sendToLead(of folder: URL, _ text: String) async {
+        guard let lead = lead(of: folder),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+                                       DaemonAPI.PromptRequest(agentID: lead.id, text: text))
+        }
+    }
+
     /// Take something back off the queue before it goes.
     func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
         await attempt {

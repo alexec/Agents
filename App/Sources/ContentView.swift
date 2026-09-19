@@ -6,24 +6,22 @@ struct ContentView: View {
     @State private var frame = SidebarFrame()
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
-    /// Starting an agent is the detail pane, so "new" is "choose nothing".
-    private var isStarting: Binding<Bool> {
-        Binding(get: { model.selection == nil },
-                set: { if $0 { model.selection = nil } })
-    }
+    /// Which columns are showing.
+    ///
+    /// Picking a project puts the list of projects away: you chose one, so the screen
+    /// belongs to it now. The sidebar button brings it back when you want another.
+    @State private var columns = NavigationSplitViewVisibility.all
 
     var body: some View {
         @Bindable var model = model
         GeometryReader { window in
-            // Three columns: the folders, the agents in the chosen folder, and the
-            // conversation. A project and an agent stay chosen at the same time, which
-            // is what lets the panel be glanceable while work is in flight.
-            NavigationSplitView {
-                ProjectListView(selection: $model.selectedProject, isStarting: isStarting)
+            // Three columns: the folders, the project itself, and the conversation.
+            NavigationSplitView(columnVisibility: $columns) {
+                ProjectListView(selection: $model.selectedProject)
                     .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             } content: {
-                ProjectAgentsView(selection: $model.selection, isStarting: isStarting)
-                    .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 460)
+                ProjectAgentsView(selection: $model.selection)
+                    .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
             } detail: {
                 HStack(spacing: 0) {
                     // One view either way: a new chat turns into the chat rather than
@@ -48,6 +46,11 @@ struct ContentView: View {
         .environment(frame)
         .environment(sidebarStates)
         .environment(webHolders)
+        // Choosing a project is the end of needing the list of them.
+        .onChange(of: model.selectedProject) { _, folder in
+            guard folder != nil else { return }
+            withAnimation { columns = .doubleColumn }
+        }
         .task { await model.connect() }
         .alert("That did not work",
                isPresented: Binding(get: { model.problem != nil },

@@ -155,7 +155,7 @@ public enum DaemonAPI {
         public var folder: URL { project.folder }
 
         /// Whether anything in this project wants the user, the lead included.
-        public var needsInput: Bool { (counts[.needsInput] ?? 0) > 0 || leadNeedsInput }
+        public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 || leadNeedsInput }
 
         public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
                     counts: [AgentGroup: Int], leadID: UUID? = nil,

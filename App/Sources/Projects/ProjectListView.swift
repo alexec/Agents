@@ -8,7 +8,6 @@ import SwiftUI
 struct ProjectListView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: URL?
-    @Binding var isStarting: Bool
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     @State private var isChoosingFolder = false
@@ -32,28 +31,20 @@ struct ProjectListView: View {
             }
 
             if model.projects.isEmpty {
-                EmptyProjectList(isStarting: $isStarting, isChoosingFolder: $isChoosingFolder)
+                EmptyProjectList(isChoosingFolder: $isChoosingFolder)
             }
         }
         .listStyle(.sidebar)
         .navigationTitle("Projects")
         .toolbar {
-            ToolbarItem {
-                Button {
-                    isStarting = true
-                } label: {
-                    Label("New agent", systemImage: "plus")
-                }
-                .disabled(model.availableRuntimes.isEmpty)
-                .help(model.availableRuntimes.isEmpty
-                      ? "No agent runtime was found on this Mac."
-                      : "Start an agent in this project")
-            }
+            // One button. Agents are started by telling a project what you want done,
+            // so a button for starting one by hand would be a second way to do the
+            // same thing, in the column that is not even about agents.
             ToolbarItem {
                 Button {
                     isChoosingFolder = true
                 } label: {
-                    Label("Add project", systemImage: "folder.badge.plus")
+                    Label("New project", systemImage: "plus")
                 }
                 .help("Add a folder as a project")
             }
@@ -109,7 +100,6 @@ private struct ArchivedProjectRow: View {
 /// The first thing anybody sees. It says what to do, not that something is wrong.
 private struct EmptyProjectList: View {
     @Environment(AppModel.self) private var model
-    @Binding var isStarting: Bool
     @Binding var isChoosingFolder: Bool
 
     var body: some View {
@@ -129,8 +119,6 @@ private struct EmptyProjectList: View {
                     .foregroundStyle(.secondary)
                 Button("Add a project") { isChoosingFolder = true }
                     .buttonStyle(.borderedProminent)
-                Button("Start an agent") { isStarting = true }
-                    .buttonStyle(.link)
             }
         }
         .padding(.vertical, 8)

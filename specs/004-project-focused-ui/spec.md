@@ -236,6 +236,10 @@ starts, and that the lead can report what they did and stop one of them.
 #### The sidebar
 
 - **FR-014**: The sidebar MUST list projects, not agents.
+- **FR-014b**: The sidebar's only creating control MUST add a project. There MUST NOT be a control
+  for starting an agent by hand: work starts by telling a project what is wanted.
+- **FR-014c**: Selecting a project MUST put the sidebar away, leaving the project and the
+  conversation. The user MUST be able to bring it back.
 - **FR-015**: The sidebar MUST order live projects by their most recent agent activity, newest first.
 - **FR-016**: A project row MUST show its name and MUST indicate when one of its agents needs the user,
   whichever project is selected.
@@ -245,15 +249,18 @@ starts, and that the lead can report what they did and stop one of them.
 
 #### The agent panel
 
-- **FR-019**: The panel MUST group the selected project's agents under "Needs input", "Working" and
-  "Completed", in that order.
-- **FR-020**: "Needs input" MUST hold every agent with an outstanding permission request or form
+- **FR-019**: The panel MUST group the selected project's agents under "Needs attention", "Running",
+  "Finished" and "Stopped", in that order.
+- **FR-019b**: The panel MUST show the project's name at the top, and below it a prompt for saying
+  what the user wants done, above the groups.
+- **FR-019c**: What the user types into that prompt MUST go to the project's lead.
+- **FR-020**: "Needs attention" MUST hold every agent with an outstanding permission request or form
   awaiting an answer.
-- **FR-021**: "Working" MUST hold every agent with a turn in flight.
-- **FR-022**: "Completed" MUST hold every agent that has settled — finished, stopped by the user, or
-  stopped by an error — and MUST say which, per agent.
+- **FR-021**: "Running" MUST hold every agent with a turn in flight.
+- **FR-022**: "Finished" MUST hold every agent that ended cleanly, and "Stopped" every agent that was
+  stopped by the user or by an error, each row saying which it was.
 - **FR-023**: The panel MUST omit a group that has nothing in it rather than showing it empty.
-- **FR-023a**: The three groups MUST hold every agent in the project except its lead, and each agent
+- **FR-023a**: The four groups MUST hold every agent in the project except its lead, and each agent
   MUST be in exactly one of them.
 - **FR-024**: Agents MUST move between groups as their state changes, while the panel is open, without
   the user refreshing anything.
@@ -264,8 +271,8 @@ starts, and that the lead can report what they did and stop one of them.
 
 #### Archived agents
 
-- **FR-028**: Users MUST be able to turn on a list of the selected project's archived agents, shown
-  below the three live groups and separate from them.
+- **FR-028**: Users MUST be able to turn on a list of the selected project's archived agents with a
+  "Show archived" control at the bottom of the panel, shown below the live groups and separate.
 - **FR-029**: The archived list MUST show the most recently archived agents first, and MUST start with
   a limited number rather than all of them.
 - **FR-030**: The archived list MUST offer to show more while more exist, and MUST NOT offer it when
@@ -290,8 +297,8 @@ starts, and that the lead can report what they did and stop one of them.
   and MUST appear in the groups in the usual way.
 - **FR-042**: The transcript MUST record every action a lead takes on another agent, including the
   ones the user declined.
-- **FR-043**: The panel MUST show the lead pinned above the three groups, and MUST NOT show it in any
-  of them.
+- **FR-043**: The panel MUST show the lead at the top of the list, above the groups, and MUST NOT
+  show it in any of them.
 - **FR-044**: Selecting a project MUST open its lead's conversation.
 - **FR-045**: A lead that needs the user MUST mark its project's row in the sidebar, as any agent does.
 - **FR-046**: A lead MUST NOT be archived, unarchived or deleted on its own.

@@ -6,35 +6,41 @@ import Foundation
 /// agent to be in two groups or in none. The mapping is total over `AgentState`, and a
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
-    case needsInput
-    case working
-    case completed
+    case needsAttention
+    case running
+    case finished
+    case stopped
     case archived
 
     /// The heading this group is drawn under.
     public var title: String {
         switch self {
-        case .needsInput: return "Needs input"
-        case .working: return "Working"
-        case .completed: return "Completed"
+        case .needsAttention: return "Needs attention"
+        case .running: return "Running"
+        case .finished: return "Finished"
+        case .stopped: return "Stopped"
         case .archived: return "Archived"
         }
     }
 
-    /// The three the panel always shows, in the order it shows them. `archived` is not
+    /// The four the panel always shows, in the order it shows them. `archived` is not
     /// here because it is only drawn when the user asks for it.
-    public static let live: [AgentGroup] = [.needsInput, .working, .completed]
+    public static let live: [AgentGroup] = [.needsAttention, .running, .finished, .stopped]
 
     /// One state in, exactly one group out.
     ///
-    /// `waitingOnUser` is the whole of "Needs input" because both things that block an
-    /// agent on the user — a permission question and an elicitation form — already put
-    /// it in that state. There is no second condition to keep in step.
+    /// One group per state, which is the simplest thing that can be true and the
+    /// easiest to read: a run that ended cleanly and one that was stopped short are
+    /// different news, and putting them under one heading made the reader do the
+    /// sorting. `waitingOnUser` is the whole of "Needs attention" because both things
+    /// that block an agent on the user — a permission question and an elicitation form
+    /// — already put it in that state.
     public init(for state: AgentState) {
         switch state {
-        case .waitingOnUser: self = .needsInput
-        case .running: self = .working
-        case .finished, .stopped: self = .completed
+        case .waitingOnUser: self = .needsAttention
+        case .running: self = .running
+        case .finished: self = .finished
+        case .stopped: self = .stopped
         case .archived: self = .archived
         }
     }

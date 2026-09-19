@@ -41,9 +41,9 @@ struct ProjectRow: View {
 
     /// What is going on in there, in as few words as it takes.
     private var subtitle: String? {
-        let working = summary.counts[.working] ?? 0
-        let waiting = summary.counts[.needsInput] ?? 0
-        if summary.leadNeedsInput || waiting > 0 { return "Needs you" }
+        let working = summary.counts[.running] ?? 0
+        let waiting = summary.counts[.needsAttention] ?? 0
+        if summary.leadNeedsInput || waiting > 0 { return "Needs attention" }
         if working > 0 { return working == 1 ? "1 working" : "\(working) working" }
         return nil
     }
@@ -58,7 +58,7 @@ struct ProjectRow: View {
     private var accessibilityLabel: String {
         var parts = [summary.name]
         if !summary.exists { parts.append("folder is missing") }
-        if summary.needsInput { parts.append("needs you") }
+        if summary.needsInput { parts.append("needs attention") }
         return parts.joined(separator: ", ")
     }
 }
