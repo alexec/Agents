@@ -74,10 +74,23 @@ extension DaemonCore {
 
     /// Point the shell host's output at every window, the way every other notification
     /// goes out.
+    ///
+    /// Through one stream drained by one task, not a task per chunk. A shell hands
+    /// over its output on its own queue, in order, and the only way to keep that order
+    /// across the hop onto this actor is to make the hop once and queue behind it.
+    /// Tasks started per chunk arrive in whatever order the runtime chooses.
     func connectShells() {
-        shells.setBroadcaster { [weak self] agentID, event in
-            guard let self else { return }
-            Task { await self.forward(agentID, event) }
+        let (events, continuation) = AsyncStream.makeStream(
+            of: (UUID, ShellHost.ShellEvent).self, bufferingPolicy: .unbounded)
+        shellEvents = continuation
+        shellPump = Task { [weak self] in
+            for await (agentID, event) in events {
+                guard let self else { return }
+                await self.forward(agentID, event)
+            }
+        }
+        shells.setBroadcaster { [continuation] agentID, event in
+            continuation.yield((agentID, event))
         }
     }
 

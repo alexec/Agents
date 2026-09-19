@@ -46,6 +46,10 @@ public actor DaemonCore {
     /// The user's shells, one per agent. Not the agent's terminals, which are 003's.
     /// Held here so a build outlives the window that started it (FR-026).
     let shells = ShellHost()
+    /// Everything the shells have printed, in the order they printed it, on its way to
+    /// the windows. See `connectShells` for why it is a stream and not a task each.
+    var shellEvents: AsyncStream<(UUID, ShellHost.ShellEvent)>.Continuation?
+    var shellPump: Task<Void, Never>?
 
     struct Draft: Sendable {
         var runtimeID: String

@@ -150,6 +150,6 @@ private actor FakeState {
     /// Push something at whoever is connected. The far end of a `JSONRPCConnection` is
     /// an actor, so this is a hop rather than a call.
     private func tell(_ method: String, _ params: JSONValue?) async {
-        try? await connection?.notify(method, params)
+        try? connection?.notify(method, params)
     }
 }

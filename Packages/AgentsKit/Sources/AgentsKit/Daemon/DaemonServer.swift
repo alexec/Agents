@@ -107,11 +107,25 @@ public final class DaemonServer: @unchecked Sendable {
     }
 
     /// Tell every window at once.
+    ///
+    /// On one queue of its own, rather than a task per notification. A task each put
+    /// the order in the runtime's hands, and two chunks of a shell's output that
+    /// arrive the wrong way round are not slow, they are wrong; one serial queue keeps
+    /// them in the order the daemon said them. It is a queue rather than a plain call
+    /// because this is reached from inside the actor that owns every agent, and
+    /// writing to a socket blocks until the window on the other end reads. A window
+    /// that has stopped reading should cost the windows their news, not the daemon its
+    /// agents.
     public func broadcast(_ method: String, _ params: JSONValue?) {
-        for connection in connections.all {
-            Task { try? await connection.notify(method, params) }
+        let connections = connections.all
+        sending.async {
+            for connection in connections {
+                try? connection.notify(method, params)
+            }
         }
     }
+
+    private let sending = DispatchQueue(label: "com.alexecollins.agents.broadcast")
 
     public var connectionCount: Int { connections.count }
 

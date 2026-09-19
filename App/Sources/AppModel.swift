@@ -256,7 +256,10 @@ final class AppModel {
 
         switch method {
         case DaemonAPI.Notification.shellOutput:
-            guard let notification = try? params?.decode(DaemonAPI.ShellOutputNotification.self) else { return }
+            // Read rather than decoded: this one arrives whenever a shell prints, and
+            // the general path would re-encode every byte of it here on the main
+            // actor before decoding it again. See `ShellOutputNotification`.
+            guard let params, let notification = DaemonAPI.ShellOutputNotification(params: params) else { return }
             shellClients[notification.agentID]?.received(notification.bytes)
 
         case DaemonAPI.Notification.shellStateChanged:

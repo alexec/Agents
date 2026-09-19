@@ -34,6 +34,14 @@ public final class PTY: @unchecked Sendable {
     /// Called once, when the program is gone.
     private let onExit: @Sendable (Int32) -> Void
 
+    /// What has been read and not yet handed on. See `gathered`.
+    ///
+    /// Touched only on `queue`, which is serial, so it needs no lock and the bytes
+    /// cannot get out of order.
+    private var pending = Data()
+    private var flushIsScheduled = false
+    private var lastFlushAt: UInt64 = 0
+
     public init(executable: URL,
                 arguments: [String] = [],
                 cwd: URL,
@@ -155,7 +163,8 @@ public final class PTY: @unchecked Sendable {
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = read(self.master, &buffer, buffer.count)
             if count > 0 {
-                self.onOutput(Data(buffer[0..<count]))
+                self.pending.append(contentsOf: buffer[0..<count])
+                self.gathered()
             } else {
                 // End of file on the master means the child let go of the tty.
                 self.finish()
@@ -171,6 +180,55 @@ public final class PTY: @unchecked Sendable {
         source.resume()
     }
 
+    /// How long reads are gathered for before they are handed on, and how much may
+    /// pile up before the wait is cut short.
+    ///
+    /// Eight milliseconds is half a frame: too short to see, long enough that a shell
+    /// printing as fast as the kernel will let it hands over about a hundred times a
+    /// second instead of thirty thousand.
+    private static let flushInterval: UInt64 = 8_000_000
+    private static let flushThreshold = 128 * 1024
+
+    /// Something was read. Decide whether to pass it on now or let a little more
+    /// arrive first.
+    ///
+    /// A pty master does not hand back what you ask for. Measured on this Mac: a
+    /// shell printing 4.9MB came back in 38,057 reads averaging 128 bytes, because
+    /// the tty's output queue in the kernel is small and the writer refills it as
+    /// fast as it is drained. Passing each of those on by itself made 38,057
+    /// notifications, and every one of them was encoded to JSON three times, written
+    /// to a socket, decoded twice on the app's main actor and fed to the emulator.
+    /// The bytes were never the cost. The count was.
+    ///
+    /// So the first read after a quiet moment goes straight out — that is an echoed
+    /// keystroke, and it must not wait — and after that at most one handover every
+    /// `flushInterval`. Chunking is not information: feeding an emulator the same
+    /// bytes in different sized pieces gives the same screen, which is the property
+    /// the daemon's scrollback already rests on (plan decision 2).
+    private func gathered() {
+        guard !flushIsScheduled else { return }
+        let due = lastFlushAt &+ Self.flushInterval
+        if pending.count >= Self.flushThreshold || DispatchTime.now().uptimeNanoseconds >= due {
+            flushPending()
+            return
+        }
+        flushIsScheduled = true
+        queue.asyncAfter(deadline: DispatchTime(uptimeNanoseconds: due)) { [weak self] in
+            guard let self else { return }
+            self.flushIsScheduled = false
+            self.flushPending()
+        }
+    }
+
+    /// Hand over everything gathered so far. Only ever called on `queue`.
+    private func flushPending() {
+        lastFlushAt = DispatchTime.now().uptimeNanoseconds
+        guard !pending.isEmpty else { return }
+        let gathered = pending
+        pending = Data()
+        onOutput(gathered)
+    }
+
     private var hasFinished = false
 
     private func finish() {
@@ -178,6 +236,11 @@ public final class PTY: @unchecked Sendable {
         guard !hasFinished else { lock.unlock(); return }
         hasFinished = true
         lock.unlock()
+
+        // Whatever was still being gathered goes before the news that the program is
+        // over, or the last line a command printed would arrive after its own exit —
+        // or, for anyone who stops listening on exit, not at all.
+        flushPending()
 
         reader?.cancel()
         reader = nil
@@ -279,6 +342,9 @@ public final class PTY: @unchecked Sendable {
     /// Let go of the master descriptor. The program is not signalled: detaching a
     /// window must never end a build (FR-026).
     public func stopReading() {
+        // Anything gathered but not yet handed on is still worth having: a shell being
+        // let go should not take its last few lines with it.
+        queue.async { [weak self] in self?.flushPending() }
         reader?.cancel()
         reader = nil
     }
