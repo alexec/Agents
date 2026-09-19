@@ -150,6 +150,32 @@ Two consequences worth stating plainly:
 The runtimes' titles are worth taking too. Each one names its own session, which is a better row
 label than the first line of the instruction.
 
+## The session id belongs to the runtime, not to us
+
+Starting every agent with a UUID of our own and resuming that UUID does not work. `session/new`
+takes `cwd`, `mcpServers` and optionally `additionalDirectories`, and nothing else: there is no field
+for a client-supplied id in the protocol at all. The agent mints the id and returns it.
+
+Tested anyway, by sending a `sessionId` in the `session/new` params:
+
+| Runtime | Asked for | Got back |
+|---|---|---|
+| Copilot | `034290a9-…` | a different id. Ignored, no error |
+| Grok | `034290a9-…` | a different id, and not a v4 UUID at all |
+| Claude adapter | `034290a9-…` | a different id. Ignored, no error |
+
+Silently ignored by all three, so there is no version of this that works by accident either.
+
+What we do instead gets the same thing: **the agent has our id, and the runtime's session id is
+recorded against it.** Ours is the one the app shows, the one the user's history is filed under, and
+the one that never changes. The runtime's is a note we keep so we can ask for the session back.
+
+That indirection is worth having on its own. One agent can hold several runtime sessions over its
+life: when a runtime has lost a session, or has been uninstalled and replaced, picking the agent up
+starts a fresh runtime session and files the new id against the same agent, with the history we kept
+still intact. The user sees one agent throughout. Without the indirection, losing a runtime session
+would mean losing the agent.
+
 ## The open question this research created
 
 FR-012 said an agent archives itself when it "reported its work finished and its runtime exited

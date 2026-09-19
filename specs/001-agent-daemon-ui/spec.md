@@ -247,8 +247,16 @@ send it a follow-up and see it answer with what it knew before.
 - **FR-012c**: The system MUST ask the runtime for the session back when picking an agent up, using
   whichever way that runtime supports, and MUST NOT need the runtime's history because it keeps its
   own.
+- **FR-012ca**: The system MUST give every agent an identifier of its own that never changes, and
+  MUST record against it whatever identifier the runtime uses for the session. The runtime's
+  identifier is not ours to choose: the protocol has no way to supply one, and all three runtimes
+  ignore one offered.
+- **FR-012cb**: The system MUST allow one agent to have had several runtime sessions over its life,
+  so that an agent whose runtime session is gone is continued as the same agent with its history,
+  rather than becoming a new one.
 - **FR-012d**: The system MUST tell the user when a runtime can no longer give a session back, and
-  MUST keep the agent's history readable and offer to start again in the same folder.
+  MUST keep the agent's history readable and offer to carry on in the same folder as the same agent
+  with a new runtime session.
 - **FR-012e**: The system MUST NOT keep a process alive only so that a finished agent can be followed
   up, since a session can be picked up later.
 - **FR-013**: Users MUST be able to archive any agent by hand, and the system MUST stop a running
@@ -281,7 +289,9 @@ send it a follow-up and see it answer with what it knew before.
 
 ### Key Entities
 
-- **Agent**: One conversation with one runtime in one folder, whatever number of processes it takes. Has a state (running,
+- **Agent**: One conversation with one runtime in one folder, whatever number of processes or runtime
+  sessions it takes. Has an identifier of this app's own making that never changes, and the current
+  runtime session identifier recorded against it. Has a state (running,
   stopped, archived), the folder it works in, which runtime it is, the options it was started with,
   when it started, how it ended, and why it was archived.
 - **Agent runtime**: A CLI that speaks ACP, such as claude, grok or copilot. Has a name, where it was
