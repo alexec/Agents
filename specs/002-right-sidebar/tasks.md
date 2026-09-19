@@ -67,24 +67,24 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Test `FileProbe` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FileProbeTests.swift` with UTF-16 including a BOM, a PNG, an empty file, and a file that is valid UTF-8 for the whole prefix and rubbish after it
-- [ ] T016 [P] [US1] Test `DirectoryReader` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/DirectoryReaderTests.swift` for sort order, the entry cap, and a directory that disappears between listing and reading
-- [ ] T017 [P] [US1] Test the touched-paths fold in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/TouchedPathsTests.swift`: a transcript with tool call `locations` and `diff` paths yields their union, and a file changed by nobody is absent
+- [X] T015 [P] [US1] Test `FileProbe` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FileProbeTests.swift` with UTF-16 including a BOM, a PNG, an empty file, and a file that is valid UTF-8 for the whole prefix and rubbish after it
+- [X] T016 [P] [US1] Test `DirectoryReader` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/DirectoryReaderTests.swift` for sort order, the entry cap, and a directory that disappears between listing and reading
+- [X] T017 [P] [US1] Test the touched-paths fold in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/TouchedPathsTests.swift`: a transcript with tool call `locations` and `diff` paths yields their union, and a file changed by nobody is absent
 
 ### Implementation for User Story 1
 
-- [ ] T018 [P] [US1] Create `FileProbe` in `Packages/AgentsKit/Sources/AgentsKit/Files/FileProbe.swift` returning `kind` (`.text(encoding:)` or `.binary(describedAs:)`), `prefix: Data`, `isTruncated: Bool` and `size: Int`; a NUL byte in the first chunk MUST mean binary, invalid UTF-8 MUST mean binary, and `size` MUST come from the file's attributes rather than from reading it (FR-014, FR-015)
-- [ ] T019 [P] [US1] Create `DirectoryEntry` (`url`, `name`, `isDirectory`, `size: Int?` nil for a directory, `modifiedAt: Date?`, `touchedByAgent: Bool`) and `DirectoryReader` in `Packages/AgentsKit/Sources/AgentsKit/Files/DirectoryReader.swift`, reading one level only; directories MUST sort first, then files, each by name case-insensitively, and a directory over the entry cap MUST report how many more there are (FR-010, FR-015)
-- [ ] T020 [US1] Create `FolderWatch` in `Packages/AgentsKit/Sources/AgentsKit/Files/FolderWatch.swift` over `FSEventStreamCreate`, coalesced and directory-level, reporting the directories that changed rather than every file (FR-012)
-- [ ] T021 [US1] Compute the touched-path set from an agent's transcript in `Packages/AgentsKit/Sources/AgentsKit/Files/TouchedPaths.swift`: the union of every `ToolCallLocation.path` and every `ToolCallContent.Diff.path`, folded once per agent and updated as entries arrive (FR-013)
-- [ ] T022 [US1] Build the folder listing in `App/Sources/Sidebar/FilesPane.swift`, starting at the selected agent's folder, with a way into and out of directories (FR-010)
-- [ ] T023 [US1] Show a chosen text file's contents in `App/Sources/Sidebar/FilesPane.swift` from the probe's prefix, saying there is more when it is truncated (FR-011, FR-015)
-- [ ] T024 [US1] Show what a file is rather than its bytes when the probe says binary, in `App/Sources/Sidebar/FilesPane.swift` (FR-014)
-- [ ] T025 [US1] Mark every entry whose path is in the touched set, in `App/Sources/Sidebar/FilesPane.swift`, so the agent's work is findable without reading the conversation (FR-013)
-- [ ] T026 [US1] Redraw the open file and the shown directory on a `FolderWatch` event in `App/Sources/Sidebar/FilesPane.swift`, within 2 seconds of the write landing (FR-012, SC-002)
-- [ ] T027 [US1] Say what happened when the folder or the open file disappears, in `App/Sources/Sidebar/FilesPane.swift`, and clear the contents rather than leaving stale ones on screen (FR-016)
-- [ ] T028 [US1] Keep the pane read-only: no create, rename, delete or edit affordance anywhere in `App/Sources/Sidebar/FilesPane.swift` (FR-017)
-- [ ] T029 [US1] Persist the pane's folder and open file into `AgentPaneState` in `App/Sources/Sidebar/FilesPane.swift`, so returning to an agent returns to where the user left off (FR-005)
+- [X] T018 [P] [US1] Create `FileProbe` in `Packages/AgentsKit/Sources/AgentsKit/Files/FileProbe.swift` returning `kind` (`.text(encoding:)` or `.binary(describedAs:)`), `prefix: Data`, `isTruncated: Bool` and `size: Int`; a NUL byte in the first chunk MUST mean binary, invalid UTF-8 MUST mean binary, and `size` MUST come from the file's attributes rather than from reading it (FR-014, FR-015)
+- [X] T019 [P] [US1] Create `DirectoryEntry` (`url`, `name`, `isDirectory`, `size: Int?` nil for a directory, `modifiedAt: Date?`, `touchedByAgent: Bool`) and `DirectoryReader` in `Packages/AgentsKit/Sources/AgentsKit/Files/DirectoryReader.swift`, reading one level only; directories MUST sort first, then files, each by name case-insensitively, and a directory over the entry cap MUST report how many more there are (FR-010, FR-015)
+- [X] T020 [US1] Create `FolderWatch` in `Packages/AgentsKit/Sources/AgentsKit/Files/FolderWatch.swift` over `FSEventStreamCreate`, coalesced and directory-level, reporting the directories that changed rather than every file (FR-012)
+- [X] T021 [US1] Compute the touched-path set from an agent's transcript in `Packages/AgentsKit/Sources/AgentsKit/Files/TouchedPaths.swift`: the union of every `ToolCallLocation.path` and every `ToolCallContent.Diff.path`, folded once per agent and updated as entries arrive (FR-013)
+- [X] T022 [US1] Build the folder listing in `App/Sources/Sidebar/FilesPane.swift`, starting at the selected agent's folder, with a way into and out of directories (FR-010)
+- [X] T023 [US1] Show a chosen text file's contents in `App/Sources/Sidebar/FilesPane.swift` from the probe's prefix, saying there is more when it is truncated (FR-011, FR-015)
+- [X] T024 [US1] Show what a file is rather than its bytes when the probe says binary, in `App/Sources/Sidebar/FilesPane.swift` (FR-014)
+- [X] T025 [US1] Mark every entry whose path is in the touched set, in `App/Sources/Sidebar/FilesPane.swift`, so the agent's work is findable without reading the conversation (FR-013)
+- [X] T026 [US1] Redraw the open file and the shown directory on a `FolderWatch` event in `App/Sources/Sidebar/FilesPane.swift`, within 2 seconds of the write landing (FR-012, SC-002)
+- [X] T027 [US1] Say what happened when the folder or the open file disappears, in `App/Sources/Sidebar/FilesPane.swift`, and clear the contents rather than leaving stale ones on screen (FR-016)
+- [X] T028 [US1] Keep the pane read-only: no create, rename, delete or edit affordance anywhere in `App/Sources/Sidebar/FilesPane.swift` (FR-017)
+- [X] T029 [US1] Persist the pane's folder and open file into `AgentPaneState` in `App/Sources/Sidebar/FilesPane.swift`, so returning to an agent returns to where the user left off (FR-005)
 
 **Checkpoint**: User Story 1 is complete. Quickstart scenario 1 passes, and the feature is worth shipping on its own.
 
