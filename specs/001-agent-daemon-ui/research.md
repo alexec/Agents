@@ -196,3 +196,38 @@ is thrown away.
 Recommendation: **C for this feature.** Finished already separates the done from the busy, which is
 most of the value, and the rule that decides when done means gone is worth writing after watching
 real agents finish rather than before.
+
+## Design decisions taken from this research
+
+Recorded in the plan's own words in [plan.md](./plan.md); here as decisions with what was rejected.
+
+**Decision: one JSON-RPC implementation, used for both the runtimes and the app.**
+Rationale: ACP is line-delimited JSON-RPC 2.0 over stdio, and the app-to-daemon protocol needs the
+same framing, correlation and notification handling. Writing it twice means testing it twice.
+Alternatives: a bespoke Codable protocol for the app side, rejected because it would need its own
+framing and tests to do what the ACP code already does.
+
+**Decision: the daemon is a helper inside the app bundle, spawned in its own session.**
+Rationale: agents must outlive the window (FR-001) with nothing installed (FR-021) and no login item
+(FR-019). Alternatives: a launchd agent, rejected as a login item by another name; an XPC service,
+rejected because it dies with the app that hosts it.
+
+**Decision: files, not a database.**
+Rationale: one writer, one person, tens of agents, and a record that can be read with `cat` when
+something goes wrong. Alternatives: SQLite, rejected as a schema and a migration story bought for
+queries nobody has asked for yet.
+
+**Decision: let a finished agent's process go.**
+Rationale: proved above that all three hand a session back after the process is killed, so holding
+one open buys nothing and works against the daemon's exit rule. Alternatives: keeping processes warm,
+which is an optimisation available later at the cost of memory now.
+
+**Decision: ignore `_meta` entirely.**
+Rationale: every runtime sends vendor extensions there (`x.ai/hooks`, `jetbrains`, `steering`,
+`goal`). Reading any of them is how one code path becomes three. Alternatives: using Grok's richer
+model metadata, rejected for the same reason.
+
+**Decision: advertise no client file or terminal capabilities in v1.**
+Rationale: all three runtimes use their own tools when we offer nothing, so the feature loses nothing
+and avoids owning someone else's file writes. It is a capability flag, so it is one struct to change
+later.

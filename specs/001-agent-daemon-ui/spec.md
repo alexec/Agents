@@ -237,11 +237,13 @@ send it a follow-up and see it answer with what it knew before.
 - **FR-011b**: The system MUST end an agent by asking it to stop and closing its session before
   killing anything, so that a runtime that persists its own session is left in a state it can be
   asked about later.
-- **FR-012**: The system MUST archive a finished agent automatically [NEEDS CLARIFICATION: these
-  runtimes never exit when the work is done, so "finished and exited cleanly" cannot be detected.
-  When does a finished agent archive itself? See the question in research.md.]
-- **FR-012a**: The system MUST NOT archive an agent that hit a limit, refused, crashed, or was
-  stopped by the user.
+- **FR-012**: The system MUST NOT archive any agent on its own. Finished is a state of its own, which
+  separates the agents that are done from the ones that are busy, and the user archives when they are
+  done with one. Decided by default on 2026-09-18 so that planning could proceed, and cheap to
+  change: the runtimes never exit when their work is done, so the original rule was undetectable, and
+  archiving loses nothing now that an archived agent can be picked up again.
+- **FR-012a**: The system MUST show an agent that hit a limit, refused, crashed or was stopped by the
+  user as stopped short with the reason, and MUST NOT show it as finished.
 - **FR-012b**: Users MUST be able to pick up a stopped or archived agent and carry on, in the folder
   it was working in, with its history, as the same agent rather than a copy.
 - **FR-012c**: The system MUST ask the runtime for the session back when picking an agent up, using
