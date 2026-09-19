@@ -35,6 +35,16 @@
 - Validation run 1 flagged two things and both were fixed in place: an assumption that named a
   protocol error code, softened to "a request it does not know", and Success Criteria that named the
   Cursor extension methods, rewritten as user-facing outcomes.
+- Validation run 3 replaced guesses with a handshake, run on 2026-09-18 against `cursor-agent`
+  2026.09.10-fd3934a. One claim was wrong and is now corrected: the spec said the app would show which
+  model Cursor reports "as it does for the others". It does not. Cursor reports its models where the
+  app has deliberately decided not to read, and offers none of the providers the app does read, so a
+  Cursor agent shows no model at all. That is now stated, and picking a model is out of scope.
+- The same run turned three assumptions into facts, which the spec records in "What Cursor actually
+  says": it can load a session, it takes pictures but not embedded context, and it offers one way to
+  sign in and no way to sign out. It also found a hazard worth a requirement of its own. Cursor's
+  sign-in text says to run `agent login`, and `agent` on this Mac is Grok's binary, so FR-005a now
+  forbids passing a runtime's own instructions on as advice.
 - Scope is bounded by priority rather than by a clarification question. P1 puts Cursor on the list,
   P2 is the honest account state, P3 is Cursor's own extension requests. A plan may stop after P1 and
   still ship something worth having, as long as FR-008 holds.

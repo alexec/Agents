@@ -23,6 +23,34 @@ two of them block: it asks the app a question and waits for an answer. A runtime
 nobody answers is an agent that never finishes its turn. That is the work in this feature, and it is
 also the test of a claim the app already makes, that nothing a runtime sends can lose an agent.
 
+## What Cursor actually says
+
+Feature 003 promised that every capability claim would be proved by handshake rather than read from
+documentation. This one was, on 2026-09-18, against `cursor-agent` version 2026.09.10-fd3934a, signed
+in, with a handshake and a `session/new` and nothing else. What follows is what came back, and the
+requirements below are written against it rather than against Cursor's documentation.
+
+- It speaks protocol version 1, the version this app speaks.
+- It can load a session, so a conversation survives a restart.
+- It takes pictures. It does not take embedded context, so a file goes by reference or not at all.
+- It can list its sessions. It cannot fork or delete one.
+- It offers one way to sign in, `cursor_login`, and advertises no way to sign out.
+- It answers `session/new` with three modes, agent, plan and ask, and with more than twenty models.
+  It offers no providers and no configuration options. The app deliberately reads none of this: modes
+  and models from `session/new` are inconsistent between runtimes and are being retired from the
+  protocol, and the app reads configuration options instead, which Cursor does not send.
+- It sends its list of commands unprompted, about twenty of them, the moment a session exists.
+
+Two of these are traps rather than facts, and the stories below are written around them.
+
+The first is a name. Cursor's own sign-in method describes itself as "Run 'agent login' first if not
+logged in". On this Mac `agent` is Grok, and Cursor is `cursor-agent`. A runtime's instructions are
+about the runtime's idea of its own name, not about what this app runs.
+
+The second is what did not appear. Cursor's extension requests, the ones that block, only arrive
+during a turn, so a handshake cannot prove how they behave. They remain the part of this feature that
+has to be proved by running one.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Start an agent on Cursor (Priority: P1)
@@ -52,8 +80,12 @@ same shape as the same prompt run on Claude.
    Cursor reported about tokens and cost is shown as it reported it, and nothing is estimated.
 5. **Given** a Cursor agent exists, **When** the user quits the window and opens it again, **Then** the
    agent is still there and its conversation is intact, the same as for the other runtimes.
-6. **Given** Cursor advertises that it can load a session, **When** the user returns to a Cursor agent
-   after the daemon has restarted, **Then** the conversation resumes rather than starting over.
+6. **Given** Cursor says it can load a session, which it does, **When** the user returns to a Cursor
+   agent after the daemon has restarted, **Then** the conversation resumes rather than starting over.
+7. **Given** Cursor takes pictures but not embedded context, **When** the user attaches a file, **Then**
+   a picture goes by value, a file goes by reference, and neither is sent in a form Cursor refuses.
+8. **Given** Cursor sends its list of commands as soon as the session exists, **When** they arrive,
+   **Then** they are offered to the user the same way any other runtime's commands are.
 
 ---
 
@@ -78,9 +110,14 @@ in rather than repeating the missing-command message.
    advertises.
 3. **Given** the sign-in Cursor advertises can only be done in a terminal, **When** the user chooses it,
    **Then** the app offers the command to run rather than pretending it can do it in the window.
-4. **Given** the user signs in outside the app, **When** the app next shakes hands with Cursor, **Then**
+4. **Given** Cursor's sign-in method describes itself as "Run 'agent login' first", and `agent` on this
+   Mac is Grok, **When** the app offers a command to run, **Then** the command names what this app
+   actually starts, and the user is never sent to another runtime's binary.
+5. **Given** the user signs in outside the app, **When** the app next shakes hands with Cursor, **Then**
    the runtime goes back to ready without the app being restarted.
-5. **Given** Cursor is installed under a name or a path the app did not expect, **When** the runtime is
+6. **Given** Cursor advertises no way to sign out, **When** the sign-in panel draws, **Then** signing
+   out is not offered for Cursor, the same as for any runtime that does not advertise it.
+7. **Given** Cursor is installed under a name or a path the app did not expect, **When** the runtime is
    reported as missing, **Then** the message names what the app tried to run, so the user can see why.
 
 ---
@@ -130,7 +167,13 @@ waiting on something the user cannot see.
   agent ends the way any agent whose runtime died ends, and the unanswered question does not linger as
   something the user can still click.
 - What happens when a Cursor agent is sent a picture or a file it cannot take? It is refused before the
-  prompt goes, on what Cursor said it accepts, the same as every other runtime.
+  prompt goes, on what Cursor said it accepts, the same as every other runtime. In Cursor's case that
+  means a picture goes by value and a file goes by reference.
+- What happens when another runtime is installed under a name Cursor's documentation uses for itself?
+  It already is: `agent` on this Mac is Grok. The app starts what its own entry names and never what a
+  runtime's description suggests.
+- What happens when Cursor offers a model the user would rather use? Nothing, in this feature. Cursor
+  offers more than twenty and the app sets none of them, for Cursor or for anyone else.
 - What happens when Cursor's own configuration points at MCP servers? Those are Cursor's business. The
   app does not read or write that configuration.
 - What happens when two runtimes are signed in as different people? Nothing changes: an account is held
@@ -150,6 +193,11 @@ waiting on something the user cannot see.
   failed", and MUST say which one it is.
 - **FR-005**: The app MUST offer the sign-in methods Cursor advertises, including offering a command to
   run when the method needs a terminal.
+- **FR-005a**: When the app offers a command to run, that command MUST be the one this app starts. A
+  runtime's own description of how to sign in MUST NOT be passed on as an instruction when it names a
+  command the app does not use, because a runtime names itself by its own idea of its name.
+- **FR-005b**: The app MUST NOT offer signing out for a runtime that does not advertise it. Cursor does
+  not.
 - **FR-006**: The app MUST refresh what it knows about the Cursor account on every handshake, so signing
   in outside the app is picked up without a restart.
 - **FR-007**: A Cursor agent MUST be started, stopped, archived, resumed and recorded by the daemon on
@@ -167,7 +215,13 @@ waiting on something the user cannot see.
 - **FR-013**: The app MUST show what Cursor reports about tokens and cost as reported, per currency, and
   MUST NOT estimate.
 - **FR-014**: The app MUST refuse an attachment Cursor cannot take before the prompt is sent, based on
-  what Cursor said it accepts.
+  what Cursor said it accepts. Cursor takes pictures and does not take embedded context, so a file goes
+  to it by reference.
+- **FR-014a**: The app MUST offer the commands Cursor sends, which arrive unprompted as soon as a
+  session exists, the same way it offers any other runtime's commands.
+- **FR-014b**: The app MUST NOT show a model or a mode for Cursor that it cannot also set. Cursor
+  reports its models and modes in a place the app deliberately does not read, so the honest answer is
+  to show nothing rather than to show a name that cannot be changed.
 - **FR-015**: The app MUST NOT read or modify the user's Cursor configuration, credentials or MCP server
   definitions.
 
@@ -197,6 +251,8 @@ waiting on something the user cannot see.
   replies, diffs, command output, permission questions and cost.
 - **SC-006**: Adding Cursor changes no behaviour of the three existing runtimes, shown by the existing
   tests passing unchanged.
+- **SC-008**: Every command the app tells a user to run is a command that works on their Mac. No
+  instruction the app shows sends the user to a binary belonging to a different runtime.
 - **SC-007**: Nothing about a Cursor agent is lost across a restart of the window or of the daemon.
 
 ## Out of Scope
@@ -205,24 +261,31 @@ waiting on something the user cannot see.
   known runtime to a fixed list.
 - Holding a Cursor API key, or any way of signing in beyond what Cursor advertises at handshake.
 - Reading or writing Cursor's own configuration, including the MCP servers it defines.
+- Choosing which model or which of Cursor's three modes an agent runs on. The app reads no runtime's
+  models today, and changing that is a decision for all four runtimes rather than for this one.
 - Cursor on the iPhone and iPad remotes. Feature 005 decides what a remote does with the runtime list,
   and a fourth entry arrives there for free or does not, on 005's terms rather than this feature's.
 - Any change to how Claude, Grok or Copilot behave.
 
 ## Assumptions
 
-- The Cursor CLI speaks the protocol natively over standard input and output, started with its own
-  subcommand, so no adapter package is needed the way Claude needs one. Which command exactly, and under
-  what name the binary is installed, is for planning to confirm on the machine.
+- Confirmed rather than assumed: the Cursor CLI speaks the protocol natively over standard input and
+  output, so no adapter package is needed the way Claude needs one. On this Mac the binary is
+  `cursor-agent` and the subcommand is `acp`, which the command's own help does not list.
 - Cursor's blocking extension requests are the only ones that can hold a turn open. Its notifications
-  can be ignored without harm, which is why showing them is third in priority rather than first.
+  can be ignored without harm, which is why showing them is third in priority rather than first. A
+  handshake cannot prove this, because none of them arrive until a turn is running, so planning proves
+  it by running one.
 - The app already refuses a request it does not know rather than leaving it unanswered, so the "never
   stuck" half of User Story 3 is a thing to prove rather than to build. If that turns out not to hold,
   it is the first thing built.
 - Signing into Cursor happens in Cursor's own way, and what the app can offer is whatever Cursor
-  advertises at handshake.
-- Cursor's own ways of running, such as a chosen model, stay Cursor's. The app shows which provider or
-  model the runtime reports, as it does for the others, and sets nothing.
+  advertises at handshake, which is one method and no way to sign out.
+- Cursor's own ways of running stay Cursor's. It reports its models and its three modes in the one
+  place the app has decided not to read, and offers none of the providers or configuration options the
+  app does read, so a Cursor agent runs on whatever Cursor picks and the app says nothing about it.
+  Reading them would mean reopening a decision feature 003 made for all runtimes, which is a bigger
+  feature than this one.
 - Running the app's live tests against Cursor needs a signed-in Cursor CLI on the machine, the same
   condition the existing live runtime tests already carry.
 
@@ -248,8 +311,8 @@ waiting on something the user cannot see.
 - **Feature 005**, only in that it will inherit a fourth runtime. Nothing here depends on it.
 - **Feature 003, task T076**, still open: what a signed-out runtime actually returns has never been
   confirmed against any runtime, and `RuntimeDiscovery` says so in as many words. User Story 2
-  scenario 2 here cannot be proved until it is. Cursor is a fair runtime to answer it with, since
-  signing it out is cheap, so this feature may close T076 rather than wait for it.
+  scenario 2 here cannot be proved until it is. Cursor could answer it, but only by signing out of a
+  real account and back in, so that is the user's call to make and not a thing to do on the way past.
 - **The runtimes on this Mac.** Feature 003 promised that every capability claim would be proved by
   handshake against the three runtimes rather than by reading their documentation. A fourth runtime
   reopens that promise, and every claim about Cursor in this spec is to be proved the same way.
