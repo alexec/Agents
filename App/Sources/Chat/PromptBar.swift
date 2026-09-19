@@ -31,6 +31,10 @@ struct PromptBar: View {
     @State private var isShowingRuntimeAccount = false
     @State private var isShowingSessions = false
     @State private var isShowingReach = false
+    /// How wide the options row has to fill. Read from the row's own width, which the
+    /// pane sets and its contents never do — see `optionsRow` for why that direction
+    /// matters.
+    @State private var optionsWidth: CGFloat = 0
     @FocusState private var focused: Bool
 
     private var agent: Agent? { model.selectedAgent }
@@ -585,7 +589,8 @@ struct PromptBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// What the agent is allowed to do first, how well it does it after.
+    /// What the agent is allowed to do first, how well it does it after: permissions on
+    /// the left, and the model, its thinking and its speed on the right.
     ///
     /// It scrolls sideways. The row is wider than this pane at every window size the
     /// app allows below about 693 points, and a scroll view reads its content's ideal
@@ -594,9 +599,12 @@ struct PromptBar: View {
     /// the app when that loop reaches the window: first a custom Layout did it, then
     /// ViewThatFits did it intermittently.
     ///
-    /// The cost is the `Spacer` that used to push the model and effort controls to the
-    /// right edge. A spacer inside a horizontal scroll view has no width to take, so
-    /// this is a fixed gap and the row reads left to right.
+    /// A spacer inside a horizontal scroll view has no width to take, so the right-hand
+    /// controls are pushed over by giving the row a floor to fill: the width of the
+    /// scroll view itself. That is safe where measuring the content is not, because the
+    /// scroll view fills whatever the pane offers whatever is inside it, so nothing
+    /// here can change the number it was told. Narrower than the floor and the spacer
+    /// takes the slack; wider and the floor does nothing and the row scrolls as before.
     private func optionsRow(_ shown: [ConfigOption]) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
@@ -626,10 +634,12 @@ struct PromptBar: View {
             // The glass capsules are drawn to their own edge, and a scroll view clips
             // at its bounds. A point either side keeps the glass from being shaved.
             .padding(.vertical, 1)
+            .frame(minWidth: optionsWidth, alignment: .leading)
         }
         .scrollIndicators(.never)
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { optionsWidth = $0 }
     }
 
     @ViewBuilder
