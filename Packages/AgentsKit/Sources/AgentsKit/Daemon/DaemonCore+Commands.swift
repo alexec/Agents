@@ -120,17 +120,70 @@ extension DaemonCore {
 
     // MARK: Prompting, including picking an agent back up
 
+    /// A prompt is either sent now or joins the queue. It is never refused for want of
+    /// the agent being free.
+    ///
+    /// Typing the next thing while the agent is still working is how people use these:
+    /// the thought arrives when it arrives. The queue is ours rather than the
+    /// runtime's, because a `session/prompt` sent mid-turn means something different
+    /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
-        guard let agent = agents[request.agentID] else {
+        guard var agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
-        guard agent.state != .running else {
-            throw JSONRPCError(code: DaemonAPI.Failure.alreadyRunning,
-                               message: "That agent is already working. Wait for it, or stop it.")
+        // Everything goes on the queue, even when it is going straight out again.
+        // That is what keeps the order the order it was typed in: a prompt sent while
+        // three are waiting joins the back of them rather than jumping the lot.
+        agent.queuedPrompts.append(QueuedPrompt(text: request.text,
+                                                attachments: request.attachments))
+        changed(agent)
+        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else { return }
+        try await sendNextQueued(to: agent.id)
+    }
+
+    /// Taking one back before its turn comes. Something queued and then thought better
+    /// of has to be removable, or queueing is a trap.
+    public func unqueue(_ request: DaemonAPI.UnqueueRequest) async throws {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        agent.queuedPrompts.removeAll { $0.id == request.promptID }
+        changed(agent)
+    }
+
+    /// Send the next thing waiting, if the agent is free to take it.
+    ///
+    /// One at a time. Each queued prompt is a turn of its own, so the transcript reads
+    /// the way it would have if the user had waited, and the agent is free in between.
+    /// The runtime is started before the prompt leaves the queue, so a runtime that
+    /// will not start leaves the words exactly where they were.
+    func sendNextQueued(to agentID: UUID) async throws {
+        guard let agent = agents[agentID], !agent.state.hasTurnInFlight,
+              turnTasks[agentID] == nil, let next = agent.queuedPrompts.first else { return }
         let session = try await liveSession(for: agent)
-        await beginTurn(agentID: agent.id, text: request.text,
-                        blocks: request.blocks, session: session)
+        guard var agent = agents[agentID],
+              let index = agent.queuedPrompts.firstIndex(where: { $0.id == next.id }) else { return }
+        agent.queuedPrompts.remove(at: index)
+        changed(agent)
+        await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks, session: session)
+    }
+
+    /// Whatever is waiting, now that a turn has ended of its own accord.
+    ///
+    /// Not after the user stopped it: stop means stop, and the queue stays put for
+    /// them to send or throw away themselves.
+    func drainQueue(after agentID: UUID) async {
+        guard agents[agentID]?.endedReason != .cancelled else { return }
+        do {
+            try await sendNextQueued(to: agentID)
+        } catch {
+            await record(.runtimeNote("Could not send what you queued: \(reason(error)) It is still waiting."),
+                         for: agentID)
+        }
+    }
+
+    private func reason(_ error: any Error) -> String {
+        (error as? JSONRPCError)?.message ?? error.localizedDescription
     }
 
     /// The session an agent is using, starting its runtime again if it has none.
@@ -230,6 +283,7 @@ extension DaemonCore {
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
+        await drainQueue(after: agentID)
     }
 
     private func turnFailed(agentID: UUID, error: any Error) async {
@@ -237,6 +291,9 @@ extension DaemonCore {
         await record(.runtimeNote("The runtime stopped answering: \(error)."), for: agentID)
         await move(agentID, on: .processDied, endedReason: .processDied)
         await releaseRuntime(for: agentID)
+        // Picking the agent back up is what any prompt does, so what was queued still
+        // goes. A runtime that fell over is not a reason to lose what somebody typed.
+        await drainQueue(after: agentID)
     }
 
     func releaseRuntime(for agentID: UUID) async {
@@ -248,8 +305,15 @@ extension DaemonCore {
     // MARK: Stopping, archiving, picking back up
 
     public func stop(_ agentID: UUID) async throws {
-        guard let agent = agents[agentID] else {
+        guard var agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        // Written down before anything here is awaited. The turn unwinds on its own
+        // task, and whichever of the two gets there first, it has to be able to see
+        // that this was the user's doing and leave the queue alone.
+        if agent.state.hasTurnInFlight {
+            agent.endedReason = .cancelled
+            agents[agentID] = agent
         }
         for (id, pending) in pendingPermissions where pending.agentID == agentID {
             if let session = live[agentID] {
@@ -271,6 +335,15 @@ extension DaemonCore {
         turnTasks.removeValue(forKey: agentID)?.cancel()
         if agent.state.holdsRuntime {
             await move(agentID, on: .stoppedByUser, endedReason: .cancelled)
+        }
+        // Stop means stop. What was queued is kept rather than sent on: the user says
+        // when it goes, and the window keeps showing them it is there.
+        if !agent.queuedPrompts.isEmpty {
+            let count = agent.queuedPrompts.count
+            await record(.runtimeNote(count == 1
+                ? "The message you queued was not sent, because you stopped it. It is still waiting."
+                : "The \(count) messages you queued were not sent, because you stopped it. They are still waiting."),
+                         for: agentID)
         }
         await releaseRuntime(for: agentID)
     }

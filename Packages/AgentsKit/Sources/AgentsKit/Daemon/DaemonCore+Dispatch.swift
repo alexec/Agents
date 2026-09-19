@@ -76,6 +76,11 @@ extension DaemonCore {
                 try await prompt(request)
                 return .success([:])
 
+            case DaemonAPI.Method.agentsUnqueue:
+                let request = try require(params, as: DaemonAPI.UnqueueRequest.self)
+                try await unqueue(request)
+                return .success([:])
+
             case DaemonAPI.Method.agentsStop:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await stop(request.agentID)
