@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain
+- [ ] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,11 @@
 
 ## Notes
 
-- All three open questions were answered on 2026-09-18 and written into the spec: runtime options
+- Research on 2026-09-18 ([research.md](../research.md)) reopened FR-012. The three runtimes are
+  long-lived servers that never exit when their work is done, so "finished and exited cleanly" is
+  undetectable. One question is open: when a finished, idle agent should archive itself. Everything
+  else the research touched is written into the spec.
+- The earlier three open questions were answered on 2026-09-18 and written into the spec: runtime options
   come from what the runtime advertises over the protocol plus a free-text field (FR-005, FR-005a,
   FR-005b); finished means the agent said so and exited cleanly, with no look at git (FR-012,
   FR-012a); the daemon exits when it has no agents and no window, installs no login item, and agents

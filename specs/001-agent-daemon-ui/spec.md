@@ -6,6 +6,9 @@
 
 **Status**: Draft
 
+**Research**: [research.md](./research.md) — what claude, grok and copilot actually do, verified by
+handshake on 2026-09-18
+
 **Input**: User description: "The basic UI and core daemon. We use ACP as the protocol to interact with agents runtimes, which is a fancy name for "CLI". E.g. "claude", "grok", "copilot" etc. The daemon is responsible for managing the agents, so if the UI crashes, the agents continue their work. It also manages agent lifecycle, running, stopped, archived. Agents can auto-archive when their work has landed. The UI provides a basic way to start agent (with whatever config options the agents runtime supports), send follow up messages."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -126,8 +129,14 @@ own when it reports itself done and exits, and be findable in the archive with i
   and are listed as stopped with that as the reason the next time the app opens.
 - The app is open with no agents running. There is nothing for a daemon to own, and the user still
   sees every stopped and archived agent with its history.
-- An agent reports itself finished and then its runtime exits with an error. It is stopped, not
-  archived, because only a clean exit counts as finished.
+- A turn ends because a limit was hit, or the agent refused. That is not finished, and the agent is
+  shown as having stopped short with the reason.
+- The agent asks permission while no window is open. It waits, the daemon stays alive, and the
+  question is the first thing the user sees when a window opens.
+- A runtime is installed but not signed in. The app says so before the user tries to start an agent,
+  and says what to run.
+- A runtime needs something else installed before it can speak the protocol at all. It is listed as
+  unavailable with what is missing, not silently absent.
 - Two windows, or two launches of the app, look at the same agent. Both show the same state, and
   neither starts a second daemon.
 - The agent's folder is deleted, renamed or moved while the agent is running.
@@ -150,34 +159,57 @@ own when it reports itself done and exits, and be findable in the archive with i
 - **FR-002**: The system MUST speak to every agent runtime over one protocol (ACP), so that adding a
   runtime does not mean writing a second way to talk to agents.
 - **FR-003**: The system MUST discover which supported agent runtimes are available on this Mac and
-  offer only those, naming the ones it looked for and did not find.
+  offer only those, naming the ones it looked for and did not find. A runtime is whatever has to be
+  run to get an agent speaking the protocol, which for some is the tool itself and for others is a
+  separate adapter, so discovery MUST NOT assume every runtime is one installed command.
+- **FR-003a**: The system MUST tell the user when a runtime is installed but not signed in, and MUST
+  say what to run to fix it when the runtime says so itself.
 - **FR-004**: Users MUST be able to start an agent by choosing a folder, a runtime, and a first
   instruction.
-- **FR-005**: The system MUST offer as real controls, when starting an agent, the options the chosen
-  runtime advertises over the protocol: the models it offers and the modes it supports. These MUST
-  come from the runtime itself rather than from a list this app keeps, so a runtime that adds a model
-  or a mode needs no change here.
-- **FR-005a**: The system MUST also offer a free-text field for anything the protocol does not
+- **FR-005**: The system MUST build the options shown when starting an agent from the single list of
+  configurable options the session advertises, using the type and grouping the runtime gives for
+  each one. It MUST NOT keep its own list of models, modes or efforts for any runtime, so a runtime
+  that adds one needs no change here.
+- **FR-005a**: The system MUST NOT rely on the older separate model and mode fields, which the three
+  runtimes send inconsistently. Whatever a runtime offers is taken from the one list.
+- **FR-005b**: The system MUST apply an option change during a session when the user makes one, and
+  MUST follow the advertised options changing mid-session.
+- **FR-005c**: The system MUST also offer a free-text field for anything the protocol does not
   advertise, passed to the runtime as given when it is started.
-- **FR-005b**: The system MUST show a runtime's advertised options only where it advertises them, and
-  MUST NOT prevent an agent being started with a runtime that advertises none.
+- **FR-005d**: The system MUST NOT prevent an agent being started with a runtime that advertises no
+  options at all.
 - **FR-006**: The system MUST record every agent's full history, and MUST keep recording while no
   window is open.
 - **FR-007**: The system MUST show an agent's history and new output in the window, with new output
   appearing without the user asking for it.
 - **FR-008**: Users MUST be able to send a follow-up message to a running or waiting agent.
 - **FR-009**: Users MUST be able to stop a running agent.
+- **FR-009a**: The system MUST show the user any permission the agent asks for, with the choices the
+  agent offered, and MUST send back the one the user picks. A permission request is a question the
+  agent waits on, and a typed message is not an answer to it.
+- **FR-009b**: The system MUST hold a permission request that arrives while no window is open,
+  keeping the agent alive and waiting, and MUST present it when a window opens. It MUST NOT answer
+  on the user's behalf.
 
 **Lifecycle**
 
 - **FR-010**: The system MUST give every agent exactly one of these states at a time: running,
-  stopped, archived.
-- **FR-011**: The system MUST move an agent to stopped when its runtime exits, whether it finished,
-  failed or crashed, and MUST record which of those it was.
-- **FR-012**: The system MUST archive a stopped agent automatically when the agent reported its work
-  finished and its runtime then exited cleanly.
-- **FR-012a**: The system MUST leave in stopped any agent that failed, crashed, was stopped by the
-  user, or exited without reporting itself finished.
+  waiting on the user, finished, stopped, archived. Running means a turn is in flight. Finished means
+  the agent ended a turn having said all it had to say and is idle, with its process alive and able
+  to take a follow-up.
+- **FR-011**: The system MUST record how each turn ended, and MUST distinguish an agent that finished
+  what it was asked from one that hit a limit, refused, or was cancelled.
+- **FR-011a**: The system MUST move an agent to stopped when the user stops it or its process dies,
+  and MUST record which of those happened. A process dying on its own is a crash, not a finish,
+  because these runtimes do not exit when their work is done.
+- **FR-011b**: The system MUST end an agent by asking it to stop and closing its session before
+  killing anything, so that a runtime that persists its own session is left in a state it can be
+  asked about later.
+- **FR-012**: The system MUST archive a finished agent automatically [NEEDS CLARIFICATION: these
+  runtimes never exit when the work is done, so "finished and exited cleanly" cannot be detected.
+  When does a finished agent archive itself? See the question in research.md.]
+- **FR-012a**: The system MUST NOT archive an agent that hit a limit, refused, crashed, or was
+  stopped by the user.
 - **FR-013**: Users MUST be able to archive any agent by hand, and the system MUST stop a running
   agent before archiving it.
 - **FR-014**: The system MUST keep an archived agent's full history readable.
@@ -192,12 +224,15 @@ own when it reports itself done and exits, and be findable in the archive with i
   user being asked to do anything.
 - **FR-018**: The daemon MUST survive the app's death, and the app MUST reconnect to the running
   daemon and show current state when it opens again.
-- **FR-019**: The daemon MUST exit on its own once it has no running agents and no app connected to
+- **FR-019**: The daemon MUST exit on its own once it is holding no agents and no app is connected to
   it, and MUST NOT install a login item, a background service or anything else that runs when the
   user is not using the app.
-- **FR-019a**: The system MUST mark as stopped every agent recorded as running whose process is gone,
-  including all agents that were running when the user logged out or the Mac restarted, and MUST
-  record that they ended that way rather than by finishing.
+- **FR-019a**: The daemon MUST count an agent that is running, waiting on a permission answer, or
+  finished with its process still alive as an agent it is holding, and MUST NOT exit while it holds
+  one.
+- **FR-019b**: The system MUST mark as stopped every agent whose process is gone, including all
+  agents that were alive when the user logged out or the Mac restarted, and MUST record that they
+  ended that way rather than by finishing.
 - **FR-020**: The system MUST keep agent state and history where it survives both the app and the
   daemon being restarted.
 - **FR-021**: The daemon MUST NOT require the user to install, configure or maintain anything by
@@ -230,8 +265,12 @@ own when it reports itself done and exits, and be findable in the archive with i
 - **SC-005**: No agent is ever lost: after the app and the Mac have both been restarted, every agent
   ever started is still listed with its full history, and the ones that were running when the Mac
   restarted are listed as stopped with that as the reason.
-- **SC-008**: Starting an agent offers every model and mode its runtime advertises, with no change to
-  this app when a runtime adds one.
+- **SC-008**: Starting an agent offers every option its runtime advertises, with no change to this
+  app when a runtime adds a model, a mode or an effort level.
+- **SC-009**: All three of claude, grok and copilot can be started, driven, followed up and stopped
+  through one code path, with no runtime-specific handling of options.
+- **SC-010**: A permission request asked while the app is shut is still answerable when the app
+  opens, with the agent still alive and still waiting.
 - **SC-006**: Ten agents running at once leave the window responsive: the list and any agent's history
   scroll without stutter.
 - **SC-007**: The user never sees two daemons, an agent listed twice, or an agent listed as running
@@ -247,16 +286,20 @@ own when it reports itself done and exits, and be findable in the archive with i
   of what a folder is beyond a path are out of scope for this feature.
 - An agent runs one conversation. Branching, forking or resuming an archived agent as a new one is
   out of scope.
-- Agents run with whatever permissions the runtime is configured with. This feature does not add a
-  permission or approval system of its own; an agent that stops to ask is shown as waiting and is
-  answered with a follow-up message.
+- The app answers permission requests, because the protocol requires the client to: the agent asks a
+  question with a set of answers and waits for one. This feature shows the question and sends back
+  the user's choice. It adds no rules or remembered allowances of its own, and the way to be asked
+  less often is the runtime's own options, which the start form already offers.
 - The window shows the agent's conversation and its state. Cost, resource limits, capacity, browsing
   the folder and diffing the repository are all later features.
 - Archiving is a lifecycle state, not deletion. Nothing in this feature deletes an agent or its
   history.
-- Finished means the agent said so and exited cleanly. This feature does not look at git, so an agent
-  can be archived having committed nothing. A rule that reads the repository is a later feature, and
-  writing it is better done after watching real agents finish.
+- Finished means the agent ended its turn having said all it had to say. This feature does not look
+  at git, so a finished agent may have committed nothing. A rule that reads the repository is a later
+  feature, better written after watching real agents finish.
+- These runtimes are long-lived servers, not commands that run and exit, so a finished agent still
+  has a process. Whether that process is kept for a follow-up or closed is part of the open question
+  on FR-012.
 - The daemon is only alive while there is work or a window. Nothing runs at login, so an agent cannot
   outlive a logout or a restart, and the record says so when that happens.
 - The app and the daemon are both this project's code, built and shipped together. The daemon is not
