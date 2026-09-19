@@ -80,20 +80,9 @@ struct AgentRow: View {
         RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID
     }
 
-    /// Stopped short, and why. Never a reason dressed up as a finish.
-    private var ending: String? {
-        guard let reason = agent.endedReason else { return nil }
-        switch reason {
-        case .endTurn: return nil
-        case .maxTokens: return "Ran out of room"
-        case .maxTurnRequests: return "Hit its limit"
-        case .refusal: return "Refused"
-        case .cancelled: return "Stopped by you"
-        case .processDied: return "The runtime crashed"
-        case .daemonGone: return "Stopped with the daemon"
-        case .unrecognised: return "Stopped for a reason we do not know"
-        }
-    }
+    /// Stopped short, and why. The words live on `EndedReason`, so this row and the
+    /// phone's card say the same thing about the same agent.
+    private var ending: String? { agent.endedReason?.summary }
 }
 
 /// What state an agent is in, as one symbol.

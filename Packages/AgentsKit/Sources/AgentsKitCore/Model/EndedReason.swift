@@ -27,6 +27,24 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// reason we do recognise.
     case unrecognised
 
+    /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
+    /// turn that simply ended — there is nothing to say about that.
+    ///
+    /// Here rather than in a view because the phone and the window have to say the same
+    /// words about the same agent, and two copies of a switch are two chances to drift.
+    public var summary: String? {
+        switch self {
+        case .endTurn: return nil
+        case .maxTokens: return "Ran out of room"
+        case .maxTurnRequests: return "Hit its limit"
+        case .refusal: return "Refused"
+        case .cancelled: return "Stopped by you"
+        case .processDied: return "The runtime crashed"
+        case .daemonGone: return "Stopped with the daemon"
+        case .unrecognised: return "Stopped for a reason we do not know"
+        }
+    }
+
     /// The protocol's own spelling, which is what arrives on the wire.
     public init?(stopReason: String) {
         switch stopReason {
