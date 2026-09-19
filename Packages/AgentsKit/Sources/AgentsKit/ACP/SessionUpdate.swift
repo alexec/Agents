@@ -57,9 +57,10 @@ public enum SessionUpdate: Sendable {
             let listed = update["availableCommands"]?.arrayValue ?? []
             return .commands(listed.compactMap(SlashCommand.init(wire:)))
         case "usage_update":
-            guard let used = update["used"]?.intValue, let size = update["size"]?.intValue else {
-                return .ignored(kind)
-            }
+            guard let used = update["used"]?.intValue else { return .ignored(kind) }
+            // No size is a window we do not know, which the meter hides itself for. It
+            // is not a reason to drop the update: the cost rides in on it.
+            let size = update["size"]?.intValue ?? 0
             return .usage(Usage(used: used, size: size, cost: Cost(wire: update["cost"])))
         case "compaction_update":
             return .entry(.compaction(status: update["status"]?.stringValue ?? "in_progress",

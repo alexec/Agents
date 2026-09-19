@@ -103,6 +103,62 @@ struct SessionUpdateTests {
         #expect(dollars.adding(Cost(amount: 0.5, currency: "GBP")) == nil)
     }
 
+    @Test func aTotalIsOneNumberPerCurrency() {
+        #expect(Cost.total(of: [:]) == nil, "nothing spent shows nothing, not a zero")
+
+        let one = Cost.total(of: ["USD": 1.5])
+        #expect(one?.contains("1.5") == true)
+
+        // Two currencies read as two numbers, in currency order, never added.
+        let two = Cost.total(of: ["USD": 1.5, "GBP": 0.5])
+        #expect(two?.contains(" · ") == true)
+        #expect(two?.firstIndex(of: "·") != nil)
+        #expect(two?.hasPrefix("£") == true, "GBP sorts before USD")
+    }
+
+    @Test func theSessionTotalIsWhatWasSpentWhileSomebodyWasWatching() {
+        let old = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"),
+                        costToDate: ["USD": 5.0])
+        let new = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"),
+                        costToDate: ["USD": 2.0])
+        // The window opened on an agent that had already spent five.
+        let before: [UUID: [String: Decimal]] = [old.id: ["USD": 5.0], new.id: [:]]
+
+        let spend = Cost.spent(by: [old, new], since: before)
+        #expect(spend["USD"] == 2.0, "the five was spent before we were watching")
+
+        // It goes up as that agent spends more, and only by what it spent.
+        var later = old
+        later.costToDate["USD"] = 7.5
+        #expect(Cost.spent(by: [later, new], since: before)["USD"] == 4.5)
+    }
+
+    @Test func theSessionTotalKeepsCurrenciesApartAndShowsNoZeroes() {
+        let dollars = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"),
+                            costToDate: ["USD": 1.0])
+        let pounds = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"),
+                           costToDate: ["GBP": 2.0])
+        let quiet = Agent(runtimeID: "grok", cwd: URL(fileURLWithPath: "/tmp"))
+
+        let spend = Cost.spent(by: [dollars, pounds, quiet], since: [:])
+        #expect(spend["USD"] == 1.0)
+        #expect(spend["GBP"] == 2.0)
+        #expect(spend.count == 2, "an agent that spent nothing adds nothing, not a zero")
+        #expect(Cost.spent(by: [quiet], since: [:]).isEmpty)
+    }
+
+    @Test func aRuntimeMayPriceATurnWithoutSayingHowBigItsWindowIs() {
+        // Then there is no meter to hang the cost off, and the cost still shows.
+        let update = SessionUpdate.decode(["sessionUpdate": "usage_update", "used": 10,
+                                           "cost": ["amount": 0.25, "currency": "USD"]])
+        guard case .usage(let usage) = update else {
+            Issue.record("expected usage")
+            return
+        }
+        #expect(usage.fraction == nil)
+        #expect(usage.cost?.amount == 0.25)
+    }
+
     // MARK: Plans
 
     @Test func aPlanIsReadAsItsSteps() {
