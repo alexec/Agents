@@ -25,11 +25,11 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var appTokens: [String: UUID] = [:]
-    /// Agents whose next prompt carries the line asking for suggestions. Set when a
-    /// conversation starts, and again only if a runtime loses one and we have to begin
-    /// a new one: the ask lives in the runtime's history, so that is the only time it
-    /// is gone.
-    var needsSuggestionAsk: Set<UUID> = []
+    /// Agents whose next prompt carries the `Briefing`: the few things about this app
+    /// an agent is told in words. Set when a conversation starts, and again only if a
+    /// runtime loses one and we have to begin a new one — the briefing lives in the
+    /// runtime's history, so that is the only time it is gone.
+    var needsBriefing: Set<UUID> = []
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]

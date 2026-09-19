@@ -149,8 +149,8 @@ extension DaemonCore {
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindAppToken(appToken, to: agent.id)
-        // The first prompt of the conversation is the one that asks for suggestions.
-        needsSuggestionAsk.insert(agent.id)
+        // The first prompt of the conversation is the one that carries the briefing.
+        needsBriefing.insert(agent.id)
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
@@ -372,16 +372,16 @@ extension DaemonCore {
                                                           additionalDirectories: agent.additionalDirectories,
                                                           mcpServers: servers)
                 updated.runtimeSessionID = result.sessionId
-                // A conversation beginning again, so the ask goes again: it lived in
-                // the history this runtime has just told us it no longer has.
-                needsSuggestionAsk.insert(agent.id)
+                // A conversation beginning again, so the briefing goes again: it
+                // lived in the history this runtime has just told us it no longer has.
+                needsBriefing.insert(agent.id)
             }
         } else {
             let result = try await session.newSession(cwd: agent.cwd,
                                                       additionalDirectories: agent.additionalDirectories,
                                                       mcpServers: servers)
             updated.runtimeSessionID = result.sessionId
-            needsSuggestionAsk.insert(agent.id)
+            needsBriefing.insert(agent.id)
         }
         // Empty is not an answer, for either of them. A runtime that sends its options
         // or its commands as a `session/update` rather than on the `session/new` result
@@ -414,15 +414,15 @@ extension DaemonCore {
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : []), for: agentID)
         await move(agentID, on: .promptSent)
         turnTasks[agentID]?.cancel()
-        // The one line of ours, sent with the first prompt of a conversation and not
-        // again. It stays in the runtime's own history from there, and that history is
-        // what a runtime replays when the session is picked back up, so sending it
+        // The words of ours, sent with the first prompt of a conversation and not
+        // again. They stay in the runtime's own history from there, and that history is
+        // what a runtime replays when the session is picked back up, so sending them
         // every turn would be paying twice for something already said. The record
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
-        if needsSuggestionAsk.remove(agentID) != nil {
-            outgoing.append(.text(AppService.askForSuggestions))
+        if needsBriefing.remove(agentID) != nil {
+            outgoing.append(.text(Briefing.text))
         }
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }

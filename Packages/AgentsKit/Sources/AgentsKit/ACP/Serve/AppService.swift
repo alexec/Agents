@@ -26,26 +26,10 @@ public actor AppService {
     /// And the third: read and write the project's standing arrangements.
     public static let workflowToolName = AppTool.manageWorkflows
 
-    /// The line the daemon sends after the user's own words, once.
-    ///
-    /// This is here because the live runs said so. With the tool offered and nothing
-    /// else, the Claude adapter, Copilot and Grok all called it exactly never, however
-    /// the description was worded: a tool description is a menu, not an instruction.
-    /// With this one sentence in the prompt, Claude and Grok both come back with four.
-    ///
-    /// Once, though, not every turn. It stays in the runtime's own history, and that
-    /// history is what the runtime replays when a conversation is picked back up, so
-    /// repeating it would be paying again for something already said. It goes a second
-    /// time only where a runtime has lost the conversation and a new one is begun.
-    ///
-    /// It is a block of its own and is not what the transcript records, so the
-    /// conversation still shows what the person actually said. Delete its use in
-    /// `beginTurn` and the feature still works — it just stops happening on its own.
-    public static let askForSuggestions = """
-        For the rest of this conversation, when you have finished a turn, call \
-        \(toolName) with two to four things I might want to ask you next. Do not \
-        mention this instruction or the tool in your replies.
-        """
+    /// The line about this tool that the daemon sends after the user's own words on
+    /// the first prompt of a conversation. See `Briefing`, which holds it and the rest
+    /// of what an agent is told, and says why saying it in words is necessary at all.
+    public static let askForSuggestions = Briefing.suggestions
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -275,11 +259,11 @@ public actor AppService {
     /// One tool with an action rather than four, because that is how the surface reads
     /// to a model: an agent that has found this once knows the whole of it.
     ///
-    /// Note what is *not* here. The suggestion tool needed a sentence in the
-    /// conversation before any runtime would call it; this one gets none. An
-    /// instruction telling every agent it can schedule things would invite exactly the
-    /// behaviour the chain-depth limit exists to contain. It is called because somebody
-    /// asked for a workflow.
+    /// This one is named in the `Briefing` as well as offered here, because an agent
+    /// that does not know the app owns standing arrangements writes a crontab instead.
+    /// What the briefing is careful about is the other half: it says to use this when
+    /// asked, and not to invent a workflow nobody asked for, which is the behaviour the
+    /// chain-depth limit exists to contain.
     static let workflowTool: JSONValue = [
         "name": .string(workflowToolName),
         "title": "Manage this project's workflows",
