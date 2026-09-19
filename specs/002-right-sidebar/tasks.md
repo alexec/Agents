@@ -31,11 +31,11 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ## Phase 1: Setup
 
-- [ ] T001 Add SwiftTerm to `Packages/AgentsKit/Package.swift` as a package dependency (`https://github.com/migueldeicaza/SwiftTerm`, `from: "1.2.0"`), and confirm `swift build` resolves it on this toolchain
-- [ ] T002 Add SwiftTerm to the `Agents` app target in `project.yml` at the repository root, under `packages:` and `dependencies:`, leaving the `agentsd` target untouched (the daemon parses nothing and MUST NOT link it), then run `xcodegen generate`
-- [ ] T003 [P] Confirm `project.yml` picks up the new source folders (`App/Sources/Sidebar/`, `Packages/AgentsKit/Sources/AgentsKit/Terminal/`, `Packages/AgentsKit/Sources/AgentsKit/Files/`) without an XcodeGen change, and regenerate if it does not
-- [ ] T004 [P] Capture byte streams from real `vim`, `htop` and `less` sessions into `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/terminal/` (use `script -q` against a pty), for the replay tests
-- [ ] T005 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/terminal/README.md` saying which program and which terminal size produced each capture, so a failing replay test can be read
+- [X] T001 Leave `Packages/AgentsKit/Package.swift` without SwiftTerm: AgentsKit is linked by `agentsd` as well as the app, so a dependency there would reach the daemon, which parses nothing and MUST NOT link it (plan decision 2). Record the reason in a comment beside the empty `dependencies:` array
+- [X] T002 Add SwiftTerm to `project.yml` at the repository root: a `packages:` entry (`url: https://github.com/migueldeicaza/SwiftTerm`, `from: 1.2.0`) and a `dependencies: - package: SwiftTerm` on the `Agents` target only, leaving `agentsd` untouched, then run `xcodegen generate`
+- [X] T003 [P] Confirm `project.yml` picks up the new source folders (`App/Sources/Sidebar/`, `Packages/AgentsKit/Sources/AgentsKit/Terminal/`, `Packages/AgentsKit/Sources/AgentsKit/Files/`) without an XcodeGen change, and regenerate if it does not
+- [X] T004 [P] Capture byte streams from real `vim`, `htop` and `less` sessions into `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/terminal/` (use `script -q` against a pty), for the replay tests
+- [X] T005 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/terminal/README.md` saying which program and which terminal size produced each capture, so a failing replay test can be read
 
 ---
 
@@ -45,15 +45,15 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 **⚠️ CRITICAL**: no user story work can begin until this phase is complete
 
-- [ ] T006 Create `SidebarFrame` (`isOpen: Bool` defaulting to false, `width: Double`, `pane: Pane` with cases `.files`, `.terminal`, `.browser`, `.artifacts`) persisted in `UserDefaults`, in `App/Sources/Sidebar/SidebarState.swift`
-- [ ] T007 Clamp `width` in `App/Sources/Sidebar/SidebarState.swift` on read as well as on write, so a value stored on a larger screen that would leave no room for the conversation is brought back into range rather than honoured (FR-003, FR-004)
-- [ ] T008 Create `AgentPaneState` (`agentID: UUID`, `folder: URL?`, `openFile: URL?`, `browserURL: URL?`, `attachedShell: Bool`) held in memory for the window's life and keyed by agent, in `App/Sources/Sidebar/SidebarState.swift` (FR-005)
-- [ ] T009 Build the column in `App/Sources/Sidebar/SidebarView.swift`: one pane visible at a time, a picker for the four, a draggable width, and a close control (FR-001, FR-003)
-- [ ] T010 Place the sidebar as a sibling of the conversation in `App/Sources/ContentView.swift`, so the conversation keeps the rest of the window (FR-003)
-- [ ] T011 Enforce the minimum conversation width in `App/Sources/Sidebar/SidebarView.swift`: below it the sidebar cannot be opened and the control says why, rather than doing nothing (spec edge case: the narrow window)
-- [ ] T012 Draw the no-agent empty state in `App/Sources/Sidebar/SidebarView.swift`, naming why there is nothing to show, rather than four blank panes (FR-007)
-- [ ] T013 Make the closed sidebar cost nothing in `App/Sources/Sidebar/SidebarView.swift`: no folder watch, no web view, no shell attach is created while `isOpen` is false (FR-006, SC-009)
-- [ ] T014 Rebuild per-agent pane state on agent switch in `App/Sources/Sidebar/SidebarView.swift`, keeping hidden panes alive rather than tearing them down on a pane switch; what the sidebar shows MUST follow the selected agent (FR-002, FR-005)
+- [X] T006 Create `SidebarFrame` (`isOpen: Bool` defaulting to false, `width: Double`, `pane: Pane` with cases `.files`, `.terminal`, `.browser`, `.artifacts`) persisted in `UserDefaults`, in `App/Sources/Sidebar/SidebarState.swift`
+- [X] T007 Clamp `width` in `App/Sources/Sidebar/SidebarState.swift` on read as well as on write, so a value stored on a larger screen that would leave no room for the conversation is brought back into range rather than honoured (FR-003, FR-004)
+- [X] T008 Create `AgentPaneState` (`agentID: UUID`, `folder: URL?`, `openFile: URL?`, `browserURL: URL?`, `attachedShell: Bool`) held in memory for the window's life and keyed by agent, in `App/Sources/Sidebar/SidebarState.swift` (FR-005)
+- [X] T009 Build the column in `App/Sources/Sidebar/SidebarView.swift`: one pane visible at a time, a picker for the four, a draggable width, and a close control (FR-001, FR-003)
+- [X] T010 Place the sidebar as a sibling of the conversation in `App/Sources/ContentView.swift`, so the conversation keeps the rest of the window (FR-003)
+- [X] T011 Enforce the minimum conversation width in `App/Sources/Sidebar/SidebarView.swift`: below it the sidebar cannot be opened and the control says why, rather than doing nothing (spec edge case: the narrow window)
+- [X] T012 Draw the no-agent empty state in `App/Sources/Sidebar/SidebarView.swift`, naming why there is nothing to show, rather than four blank panes (FR-007)
+- [X] T013 Make the closed sidebar cost nothing in `App/Sources/Sidebar/SidebarView.swift`: no folder watch, no web view, no shell attach is created while `isOpen` is false (FR-006, SC-009)
+- [X] T014 Rebuild per-agent pane state on agent switch in `App/Sources/Sidebar/SidebarView.swift`, keeping hidden panes alive rather than tearing them down on a pane switch; what the sidebar shows MUST follow the selected agent (FR-002, FR-005)
 
 **Checkpoint**: the column opens, closes, resizes and remembers itself across a restart. Every pane is a placeholder. 001 is untouched with it closed.
 

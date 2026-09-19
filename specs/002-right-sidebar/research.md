@@ -148,6 +148,15 @@ What each line settles:
 `LocalProcess` and `Pty` for spawning, a search service, and selection. This feature uses
 the first two.
 
+**One cost the probe missed, found at implementation time**: the version that resolves
+today, 1.20.0, ships a build-tool plugin (`SwiftTermBuildInfoPlugin`). Xcode refuses to
+run an unvalidated package plugin in a non-interactive build, so `xcodebuild` fails with
+"Validate plug-in ... in package swiftterm" until it is passed
+`-skipPackagePluginValidation`. `swift build` does not enforce this, which is why the
+probe in this section passed and the first app build did not. Every `xcodebuild`
+invocation for this project now carries the flag; `quickstart.md` has it. Worth knowing
+that the probe was run with the wrong build system to catch it.
+
 **Alternatives considered**: writing one, which is what the previous draft chose and which
 is now recorded above as a mistake rooted in a rule that does not exist. Beyond that there
 is no serious third option on this platform.

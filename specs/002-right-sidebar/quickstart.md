@@ -37,8 +37,14 @@ Build the app:
 
 ```bash
 xcodegen generate
-xcodebuild -scheme Agents -configuration Debug build
+xcodebuild -scheme Agents -configuration Debug -skipPackagePluginValidation build
 ```
+
+`-skipPackagePluginValidation` is not optional. SwiftTerm ships a build-tool plugin and
+Xcode refuses to run an unvalidated one outside the IDE, so the build fails without it.
+Run `xcodegen generate` after adding any new source folder: `project.yml` globs
+directories at generation time, so a folder created since the last run is not in the
+target.
 
 ## Scenario 1: read what the agent changed (SC-001, SC-002)
 

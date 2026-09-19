@@ -13,6 +13,10 @@ let package = Package(
     products: [
         .library(name: "AgentsKit", targets: ["AgentsKit"]),
     ],
+    // Nothing here, deliberately. `agentsd` links AgentsKit too, and the daemon moves
+    // terminal bytes without parsing them. SwiftTerm belongs to the app, so it is
+    // declared against the app target in `project.yml` and never here.
+    dependencies: [],
     targets: [
         .target(name: "AgentsKit"),
         .testTarget(name: "AgentsKitTests", dependencies: ["AgentsKit"]),

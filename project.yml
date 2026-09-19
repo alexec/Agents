@@ -39,6 +39,11 @@ settings:
 packages:
   AgentsKit:
     path: Packages/AgentsKit
+  # The terminal emulator and its view. The app links this; agentsd does not,
+  # because the daemon moves bytes and parses none of them.
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    from: 1.2.0
 targets:
   Agents:
     type: application
@@ -50,6 +55,7 @@ targets:
       - path: App/Resources
     dependencies:
       - package: AgentsKit
+      - package: SwiftTerm
       # The helper goes in the bundle, so there is one thing to build, one thing to
       # sign, and nothing for anyone to install.
       - target: agentsd
