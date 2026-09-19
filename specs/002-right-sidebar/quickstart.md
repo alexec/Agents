@@ -12,6 +12,7 @@ that looks right is the only proof that a terminal is right.
 - `xcodegen` on the path, for `project.yml`
 - At least one runtime installed and working from 001
 - A folder with a git repo and a few thousand files in it, for the responsiveness checks
+- A network connection for the first build only, to resolve SwiftTerm
 
 ## Build and run the tests
 
@@ -24,7 +25,8 @@ Everything in the kit runs here with no app and no simulator. What this covers:
 
 | Area | What is asserted |
 |---|---|
-| `VTParser` + `Screen` | Recorded byte streams from real `vim`, `htop` and `less` sessions produce the expected grid. UTF-8 and escape sequences split across chunk boundaries still parse. An unknown sequence is consumed, not printed |
+| Replay | Recorded byte streams from real `vim`, `htop` and `less` sessions give the same screen fed one byte at a time as fed in one chunk. This is the property `shell.attach` rests on. Emulation itself is SwiftTerm's and is not retested here |
+| `Scrollback` | The cap drops from the front, the tail is what comes back, and a buffer that has dropped says so |
 | `FileProbe` | UTF-16 with a BOM, a PNG, an empty file, and a file valid for its whole prefix and rubbish after, are each classified correctly |
 | `DirectoryReader` | Sorting, the entry cap, and a directory that disappears between listing and reading |
 | Artifact filter | A transcript with `resource_link`, embedded `resource`, tool calls with `locations` and `diff`, and plain messages yields exactly the two resource blocks, newest first. Annotations with an audience that is not `user` are excluded |
@@ -70,7 +72,8 @@ another application (SC-004).
 3. Run `vim`, move around, `:q`. Run `htop`, quit it. Run `less` on a long file, page through it.
 
 **Expect**: each draws correctly, takes single keypresses, and leaves the screen as it found it
-(FR-021). This is what the parser is for and the only honest way to test it.
+(FR-021). SwiftTerm does the drawing, so this checks our wiring of it, and it is still the only
+honest way to check a terminal.
 
 4. Resize the sidebar while `htop` is running.
 

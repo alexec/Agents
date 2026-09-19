@@ -52,8 +52,7 @@ The spec's "Terminal session". Owned by the daemon, one per agent (FR-023).
 |---|---|---|
 | `agentID` | `UUID` | The key. One shell per agent, addressed by the agent |
 | `pty` | `PTY` | The master descriptor, the child pid, the current size |
-| `screen` | `Screen` | What is on screen now, rebuilt from bytes by the parser |
-| `scrollback` | `Scrollback` | A ring buffer with a byte cap |
+| `scrollback` | `Scrollback` | A ring buffer of raw pty bytes with a byte cap. The daemon parses nothing |
 | `state` | `ShellState` | Below |
 | `startedAt` | `Date` | |
 | `lastInputAt` | `Date` | One of the three inputs to the idle rule |
@@ -82,25 +81,19 @@ released(reason: String)    // reaped for being idle (FR-028), or died with the 
 - Nothing about a shell is written to disk. A daemon restart loses every shell, and each becomes
   `released` with the reason so the pane can say so rather than showing a dead one as live.
 
-### `Screen`
+### The screen is not an entity here
 
-The grid, and the only thing the view needs.
+There is no `Screen` type in this project. The screen is SwiftTerm's `Terminal`, held by the app, and
+it is derived rather than stored: bytes are the truth, and the screen is what the emulator made of
+them.
 
-| Field | Type | Notes |
-|---|---|---|
-| `rows`, `cols` | `Int` | Set by the pane, pushed to the pty with `TIOCSWINSZ` |
-| `cells` | `[[Cell]]` | Character, foreground, background, and the attribute set |
-| `cursor` | `(row: Int, col: Int, visible: Bool)` | |
-| `scrollRegion` | `Range<Int>` | Default the whole screen |
-| `alternate` | `Bool` | True while a full-screen program has the alternate buffer |
+This rests on a property proved in research section 3: feeding the same bytes one at a time gives the
+same screen as feeding them in one chunk. So the daemon can store bytes and the app can rebuild the
+screen from them on attach, and there is exactly one emulator in the system.
 
-A `Cell` is a character, a foreground colour, a background colour, and a set of attributes (bold,
-dim, italic, underline, inverse). A wide character occupies two cells, the second marked as a
-continuation so the view does not draw it twice.
-
-**Rule**: the screen is derived. Bytes are the truth, the screen is what the parser made of them, and
-feeding the same bytes to a new parser produces the same screen. This is what makes it testable and
-what makes rebuilding on attach correct.
+`Scrollback` is therefore the only terminal state the kit defines: a ring buffer of raw bytes with a
+byte cap, which drops from the front and reports that it has done so. Its capping and its tail are
+what `swift test` covers.
 
 ---
 
@@ -189,12 +182,13 @@ Window
                                    │
                                    │ addresses by agentID
                                    ▼
-Daemon
- └── ShellHost
-      └── ShellSession       (0..1 per agent, live, never persisted)
-           ├── PTY
-           ├── Screen        (derived from bytes)
-           └── Scrollback    (ring buffer, capped)
+Daemon                                      App
+ └── ShellHost                               └── TerminalPane
+      └── ShellSession  (0..1 per agent)          └── SwiftTerm.Terminal
+           ├── PTY                                     (the screen, rebuilt
+           └── Scrollback  (raw bytes, capped)          by replaying the bytes)
+                      │                                        ▲
+                      └────── shell.attach / shell.output ─────┘
 
 Agent
  ├── folder on disk  ──────▶ DirectoryEntry, FileProbe   (read, never stored)

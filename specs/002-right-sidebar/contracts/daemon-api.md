@@ -11,7 +11,7 @@ Only the shell needs the daemon, because only the shell has to outlive the windo
 
 | Method | Params | Result |
 |---|---|---|
-| `shell.attach` | `agentID`, `rows`, `cols` | The shell's state, its title, the current screen, and the tail of its scrollback. Starts the shell if the agent has none |
+| `shell.attach` | `agentID`, `rows`, `cols` | The shell's state, and the tail of its scrollback as raw bytes for the client to replay. Starts the shell if the agent has none |
 | `shell.detach` | `agentID` | Nothing. Stops the output going to this connection. Never kills |
 | `shell.input` | `agentID`, `bytes` (base64) | Nothing. Written to the pty as sent |
 | `shell.resize` | `agentID`, `rows`, `cols` | Nothing. `TIOCSWINSZ`, and the kernel sends `SIGWINCH` |
@@ -36,11 +36,14 @@ Only the shell needs the daemon, because only the shell has to outlive the windo
 - **Detach is per connection.** The daemon tracks which connections are attached to which agent's
   shell, and drops them when the socket closes, so a crashed app does not leave a subscriber behind.
 - **Output is bytes, not text.** The pty produces bytes, which may split a UTF-8 sequence or an
-  escape sequence at any boundary. They are carried base64 and reassembled by the parser, which
-  holds partial sequences across chunks. Nothing decodes them to a `String` on the way through.
-- **The screen comes back on attach.** A window that attaches to a shell that has been printing for
-  an hour gets the current screen and the tail of the scrollback, capped, rather than an hour of
-  bytes (SC-006).
+  escape sequence at any boundary. They are carried base64 and reassembled by the client's emulator,
+  which holds partial sequences across chunks. Nothing decodes them to a `String` on the way
+  through, and the daemon never parses them at all.
+- **The screen is rebuilt on attach, not sent.** The daemon parses nothing. A window that attaches to
+  a shell that has been printing for an hour gets the capped tail of its bytes and replays them into
+  its own emulator, which gives the same screen as having watched all along (SC-006). Replaying a
+  buffer emitted at a different width does not always reproduce the wrapping, which affects
+  scrollback after a resize while detached, not the live screen.
 - **These are the user's shells.** They are `shell.*`, separate from 003's `terminal.*`, which are
   the agent's. The two share the pty code and nothing else: different owners, different identifier
   spaces, different lifetimes. Nothing sent to `shell.input` reaches the agent (FR-025).

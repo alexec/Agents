@@ -93,41 +93,96 @@ has threads, and everything between the fork and the exec has to be async-signal
 
 ---
 
-## 3. Terminal emulation is written here, not taken
+## 3. Terminal emulation is taken, not written: SwiftTerm
 
-**Decision**: write a VT parser and screen model in `AgentsKit`. No dependency.
+**Decision**: depend on [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT) for the
+emulator and the view. Do not write a VT parser.
 
-**Rationale**: the rule in force since 001 is no third-party dependencies, and
-`Package.swift` still has none. The rationale 001 recorded was cost against benefit, not
-purity: JSON-RPC was "a small amount of code and not worth a dependency". A terminal
-emulator is not a small amount of code, so the rule and its reasoning point different
-ways, and this is the one place in the feature where that happens. It is written here
-anyway, for two reasons that are specific rather than dogmatic.
+**Correcting the record**: an earlier draft of this document wrote the opposite, on the
+strength of a line in `specs/001-agent-daemon-ui/plan.md:46` saying "No third-party
+dependencies". The user says that rule is not real: dependencies are allowed and
+encouraged. That line should be struck from 001's plan, because a future planning pass
+will read it the same way this one did.
 
-First, it is exactly the shape this project puts in the kit: bytes in, a grid of cells
-out, no I/O, no UI, no timing. `swift test` can feed it a recorded stream from a real
-`vim` session and assert the screen. Almost nothing else in this feature tests that
-cleanly.
+With the rule gone the decision is not close. A VT emulator is thousands of lines of
+exacting work that has been done well already, and writing one would have been the largest
+piece of this feature by a distance, for no gain.
 
-Second, the subset that matters is bounded, and the boundary can be drawn honestly:
+**Proved today**, resolved and built against this toolchain, Swift 6 with
+`-strict-concurrency=complete`, macOS 27, then run:
 
-- CSI cursor moves, erase in line and display, insert and delete lines and characters
-- SGR: bold, dim, italic, underline, inverse, and colour in 16, 256 and truecolour forms
-- Scroll regions, and the alternate screen buffer, which is what `vim` and `less` use
-- OSC 0 and 2 for the title, which the pane shows, and OSC 8 hyperlinks ignored safely
-- UTF-8 decoding across chunk boundaries, and wide characters taking two cells
+```
+row 0: hello
+row 2:          worldRED
+cursor: (x: 17, y: 2)
+size: 80 x 24
+fg attribute at the R of RED: ansi256(code: 1)
+byte-at-a-time gives the same screen: true
+on alt screen, row 0:
+after leaving alt, row 0: hello
+title from OSC 2: a build
+utf8 split across chunks: £12
+nonisolated: this ran off the main actor without a single await
+```
 
-What is out: sixel and other graphics, mouse reporting, bracketed paste in this feature,
-and every private mode not listed. An escape sequence that is not understood is consumed
-and dropped rather than printed, so an unknown sequence costs its own effect and nothing
-else.
+What each line settles:
 
-**Alternatives considered**: SwiftTerm is MIT, complete, and would save most of this
-work. It was rejected because the no-dependency rule is explicit, twice affirmed, and the
-user has not been asked to reverse it. That reversal is available: 003 reversed a 001
-decision the same way, with evidence and the user's approval on the record. If the parser
-turns out to be the thing holding this feature up, that is the moment to ask, and the
-grid model behind the view is the same either way. This is risk 1 in the plan.
+- **It builds.** SwiftTerm compiles under Swift 6 strict concurrency on this toolchain.
+  This was the real risk in taking it and it is now answered.
+- **`Terminal` is not actor-bound.** The probe ran it from an ordinary function off the
+  main actor. It was worth checking: a first attempt reported main-actor isolation, which
+  turned out to be Swift 6 making top-level code implicitly `@MainActor`, not anything
+  about SwiftTerm. So the daemon could hold one if it wanted to. Decision 3a says it does
+  not have to.
+- **Cursor addressing and SGR work**, and colour arrives as an attribute on the cell
+  rather than as text.
+- **Byte-at-a-time gives the same screen as one chunk.** This is the important one. A pty
+  splits its output wherever it likes, and this says the emulator's state depends only on
+  the bytes, not on how they arrived. That is what makes replay-on-attach correct.
+- **The alternate buffer enters and leaves cleanly**, restoring what was underneath. That
+  is `vim` and `less` working.
+- **OSC 2 sets a title**, which the pane shows.
+- **UTF-8 split across a chunk boundary reassembles.**
+
+**What comes with it**: `Terminal` (headless emulator), `TerminalView` for macOS (AppKit),
+`LocalProcess` and `Pty` for spawning, a search service, and selection. This feature uses
+the first two.
+
+**Alternatives considered**: writing one, which is what the previous draft chose and which
+is now recorded above as a mistake rooted in a rule that does not exist. Beyond that there
+is no serious third option on this platform.
+
+---
+
+## 3a. The daemon keeps bytes; the app keeps the emulator
+
+**Decision**: the daemon stores a capped ring buffer of raw pty bytes and nothing else. The
+app owns the `Terminal` and the `TerminalView`. On attach, the app is handed the buffer and
+replays it into a fresh `Terminal`.
+
+**Rationale**: the probe proved that feeding the same bytes in any chunking gives the same
+screen, so a byte buffer is a complete description of the screen. Storing bytes rather than
+a parsed grid means the daemon does no emulation at all: it reads a descriptor, appends to a
+buffer, and forwards. That is a smaller daemon, a simpler contract (bytes on the wire, not a
+serialised grid), and one emulator in the system rather than two that could disagree.
+
+It also means the dependency does not reach the daemon. `agentsd` links nothing new; only
+the app does.
+
+**Why not hold a `Terminal` in the daemon**: it would let the daemon send a ready-made
+screen instead of a replay, saving the app a little work on attach. It costs a serialised
+grid format in the contract, a second emulator instance per shell, and a dependency in the
+daemon. Not worth it, and the replay is cheap because the buffer is capped.
+
+**The honest limitation**: replaying a buffer emitted at one width into a terminal of
+another width does not always reproduce what the user saw, because the program wrapped its
+own lines. Every terminal multiplexer has this. It affects scrollback after a resize while
+detached, not the live screen, and the alternative is worse.
+
+**`LocalProcess` is not used.** SwiftTerm can spawn the process itself, but it hops to the
+main actor to deliver output (`LocalProcess.swift:467`, `:480`), which is the wrong shape
+for a daemon whose job is to keep running with no UI. The pty in section 2 is proved, is
+ours, and stays in the daemon.
 
 ---
 
@@ -276,7 +331,8 @@ the same rule as the transcript, which both windows also show.
 |---|---|---|
 | 1 | An artifact is a `resource_link` or embedded `resource`, and nothing else | Settled by the user. Pane ships empty against today's runtimes, knowingly |
 | 2 | `openpty` + `posix_spawn(POSIX_SPAWN_SETSID)` for the shell | Proved on this Mac today |
-| 3 | The VT parser is written here, in the kit, under test | Settled, and the largest risk in the feature |
+| 3 | SwiftTerm supplies the emulator and the view | Settled. Resolved, built under Swift 6 strict concurrency, and exercised today |
+| 3a | The daemon keeps raw bytes; the app owns the emulator and replays on attach | Settled. Rests on the byte-at-a-time result above |
 | 4 | The daemon owns shells, keyed by agent, separate from 003's agent terminals | Settled |
 | 5 | FSEvents, one directory level at a time, prefix reads | Settled |
 | 6 | `WKWebView` with its own data store, refuse-by-default delegates | Settled. FR-033 is free |
