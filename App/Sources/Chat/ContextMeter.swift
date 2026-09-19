@@ -5,64 +5,63 @@ import SwiftUI
 ///
 /// The runtimes send this several times a turn and 001 dropped every one. A full
 /// context is the most common reason an agent starts behaving oddly, and there is no
-/// other way to see it coming. A runtime that sends no size shows no meter, and one
-/// that sends no cost shows no cost: nothing here is estimated.
+/// other way to see it coming. A runtime that sends no size shows no ring: the size is
+/// as reported and never estimated.
 ///
-/// The two are separate facts and a runtime may send either, so they are drawn
-/// separately. Cost used to sit inside the meter, which hid it from a runtime that
-/// prices a turn without saying how big its window is, and hid it for the whole of
-/// the first turn, because a total only lands once a turn has ended.
+/// The cost is the other way about. It is always shown, because a figure that comes
+/// and goes is one you stop trusting, and the row it sits in is the only place to look
+/// for it. Every number in it is the runtime's own; the only thing the app supplies is
+/// the zero before anything has been priced.
 struct ContextMeter: View {
     let agent: Agent
 
     var body: some View {
-        if agent.usage?.fraction != nil || cost != nil {
-            HStack(spacing: 6) {
-                if let usage = agent.usage, let fraction = usage.fraction {
-                    meter(usage, fraction)
-                        .help(helpText(usage))
-                }
-                if let cost {
-                    Text(cost)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    /// A ring that fills as the window does, going round from the top.
-    private func meter(_ usage: Usage, _ fraction: Double) -> some View {
         HStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .stroke(.quaternary, lineWidth: 2)
-                Circle()
-                    .trim(from: 0, to: fraction)
-                    .stroke(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary),
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+            if let usage = agent.usage, let fraction = usage.fraction {
+                meter(usage, fraction)
+                    .help(helpText(usage))
             }
-            .frame(width: 12, height: 12)
-            .animation(.default, value: fraction)
-            Text(usage.isCloseToFull ? "Context nearly full" : "\(Int(fraction * 100))%")
+            Text(cost)
                 .font(.footnote)
-                .foregroundStyle(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .help("What this agent has cost so far")
         }
     }
 
-    /// What to show beside the meter. The running total, per currency: two currencies
-    /// are two numbers rather than one nobody could check.
+    /// A ring that fills as the window does, going round from the top, and turns red
+    /// as it nears full. The ring alone: a percentage beside it said the same thing
+    /// twice, and the exact numbers are a hover away.
+    private func meter(_ usage: Usage, _ fraction: Double) -> some View {
+        ZStack {
+            Circle()
+                .stroke(.quaternary, lineWidth: 2)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .frame(width: 12, height: 12)
+        .animation(.default, value: fraction)
+        .accessibilityLabel(helpText(usage))
+    }
+
+    /// The session's running total, per currency: two currencies are two numbers
+    /// rather than one nobody could check.
     ///
-    /// Until the first turn ends there is no total, so the figure the runtime quotes
-    /// mid-turn stands in. Still the runtime's own number, still unconverted.
-    private var cost: String? {
+    /// Always shown, so the figure never disappears mid-session and leaves the row
+    /// shuffling about. Until the first turn ends there is no total, so the figure the
+    /// runtime quotes mid-turn stands in — still the runtime's own number, still
+    /// unconverted — and before anything has been priced at all, a plain zero.
+    private var cost: String {
         if let total = Cost.total(of: agent.costToDate) { return total }
-        guard let live = agent.usage?.cost else { return nil }
-        return live.amount.formatted(.currency(code: live.currency))
+        let live = agent.usage?.cost
+        return (live?.amount ?? 0).formatted(.currency(code: live?.currency ?? "USD"))
     }
 
     private func helpText(_ usage: Usage) -> String {
-        "\(usage.used.formatted()) of \(usage.size.formatted()) tokens"
+        let tokens = "\(usage.used.formatted()) of \(usage.size.formatted()) tokens"
+        return usage.isCloseToFull ? "Context nearly full — \(tokens)" : tokens
     }
 }
