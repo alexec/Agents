@@ -57,6 +57,24 @@ final class AppModel {
     /// it is actually showing and ignores the rest.
     @ObservationIgnored private var shellClients: [UUID: ShellClient] = [:]
 
+    /// What each agent had already spent when this window first laid eyes on it.
+    ///
+    /// An agent's `costToDate` is its whole life, and agents outlive the window, so
+    /// adding them up would be an all-time figure wearing the word "session". Taking
+    /// away what was spent before we were watching leaves what this sitting cost.
+    @ObservationIgnored private var spentBeforeWeWatched: [UUID: [String: Decimal]] = [:]
+
+    /// What this sitting has cost, per currency. Empty until something has been spent,
+    /// which is how the sidebar knows to show nothing rather than a zero.
+    var sessionCost: [String: Decimal] {
+        Cost.spent(by: agents, since: spentBeforeWeWatched)
+    }
+
+    private func noteWhatWasAlreadySpent(by agent: Agent) {
+        guard spentBeforeWeWatched[agent.id] == nil else { return }
+        spentBeforeWeWatched[agent.id] = agent.costToDate
+    }
+
     var selectedAgent: Agent? {
         guard let selection else { return nil }
         return agents.first { $0.id == selection }
@@ -162,6 +180,7 @@ final class AppModel {
     }
 
     private func upsert(_ agent: Agent) {
+        noteWhatWasAlreadySpent(by: agent)
         if let index = agents.firstIndex(where: { $0.id == agent.id }) {
             agents[index] = agent
         } else {
@@ -197,10 +216,13 @@ final class AppModel {
 
     func refreshAgents() async {
         await attempt {
-            self.agents = try await self.client.call(DaemonAPI.Method.agentsList,
-                                                     DaemonAPI.ListRequest(),
-                                                     returning: [Agent].self)
-                .sorted { $0.lastActivityAt > $1.lastActivityAt }
+            let listed = try await self.client.call(DaemonAPI.Method.agentsList,
+                                                    DaemonAPI.ListRequest(),
+                                                    returning: [Agent].self)
+            // Whatever the list already shows was spent before this window opened, so
+            // the session total starts from here rather than from the beginning of time.
+            for agent in listed { self.noteWhatWasAlreadySpent(by: agent) }
+            self.agents = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
         }
     }
 

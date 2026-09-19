@@ -31,16 +31,20 @@ struct ContextMeter: View {
         }
     }
 
+    /// A ring that fills as the window does, going round from the top.
     private func meter(_ usage: Usage, _ fraction: Double) -> some View {
         HStack(spacing: 6) {
-            Capsule()
-                .fill(.quaternary)
-                .frame(width: 44, height: 4)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                        .frame(width: 44 * fraction, height: 4)
-                }
+            ZStack {
+                Circle()
+                    .stroke(.quaternary, lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: fraction)
+                    .stroke(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 12, height: 12)
+            .animation(.default, value: fraction)
             Text(usage.isCloseToFull ? "Context nearly full" : "\(Int(fraction * 100))%")
                 .font(.footnote)
                 .foregroundStyle(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))

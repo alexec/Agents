@@ -39,6 +39,7 @@ struct AgentListView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) { SessionSpend() }
         .navigationTitle("Agents")
         .toolbar {
             ToolbarItem {
@@ -52,6 +53,32 @@ struct AgentListView: View {
                       ? "No agent runtime was found on this Mac."
                       : "Start an agent in a folder")
             }
+        }
+    }
+}
+
+/// What every agent between them has cost since the window opened.
+///
+/// The meter in the chat says what one agent cost. Running four of them, that is four
+/// numbers to add up in your head, which is the sort of thing you only do after the
+/// bill. Per currency, like every other total here: two currencies read as two
+/// numbers rather than one nobody could check.
+private struct SessionSpend: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let spend = Cost.total(of: model.sessionCost) {
+            HStack {
+                Text("This session")
+                Spacer()
+                Text(spend).monospacedDigit()
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.bar)
+            .help("What every agent has cost since this window opened")
         }
     }
 }

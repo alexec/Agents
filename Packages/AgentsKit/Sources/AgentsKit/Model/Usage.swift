@@ -93,6 +93,26 @@ public struct Cost: Codable, Hashable, Sendable {
         return Cost(amount: amount + other.amount, currency: currency)
     }
 
+    /// What a set of agents has spent since somebody started watching: each agent's
+    /// running total, less whatever it had already spent when it was first seen,
+    /// added up per currency.
+    ///
+    /// An agent's total is its whole life and agents outlive a window, so adding them
+    /// up whole would be an all-time figure wearing the word "session". An agent that
+    /// has spent nothing new contributes nothing rather than a zero.
+    public static func spent(by agents: [Agent],
+                             since before: [UUID: [String: Decimal]]) -> [String: Decimal] {
+        var total: [String: Decimal] = [:]
+        for agent in agents {
+            let baseline = before[agent.id] ?? [:]
+            for (currency, amount) in agent.costToDate {
+                let spent = amount - (baseline[currency] ?? 0)
+                if spent > 0 { total[currency, default: 0] += spent }
+            }
+        }
+        return total
+    }
+
     /// A running total written out for the eye: one number per currency, in currency
     /// order, joined rather than added. Nil when nothing has been spent, which is how
     /// the meter knows to show no cost rather than a zero.
