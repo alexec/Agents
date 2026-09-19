@@ -2,7 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Empty on purpose. The first feature that needs a capability adds it, and
-	     says in its spec why. -->
+	<!-- Added by dictation. The hardened runtime is on, and under it the microphone
+	     is refused outright without this: macOS never asks, and the request comes
+	     back denied. See specs/ for why dictation is here at all. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 </dict>
 </plist>

@@ -332,7 +332,7 @@ struct PromptBar: View {
         }
         .sheet(isPresented: $isPrimingDictation) { dictationPrimer }
         .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
-                                                 set: { if !$0 { dictation.stop() } })) {
+                                                 set: { if !$0 { dictation.dismissProblem() } })) {
             Button("OK") {}
         } message: {
             Text(dictation.problem ?? "")
