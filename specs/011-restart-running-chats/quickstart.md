@@ -27,8 +27,14 @@ open Agents.app --args --root /tmp/agents-restart-test
 To interrupt the daemon the way a crash does — no shutdown, no cleanup:
 
 ```sh
-pkill -9 -f 'Agents.*daemon'     # or: kill -9 $(pgrep -f AgentsDaemon)
+kill -9 "$(cat /tmp/agents-restart-test/daemon.lock)"
 ```
+
+The throwaway root's own `daemon.lock` holds that daemon's pid and nobody else's, which is what
+makes this safe to run. **Do not** reach for a pattern kill such as `pkill -9 -f 'Agents.*daemon'`:
+the ordinary daemon is the same `agentsd` binary under a different root, so a pattern wide enough
+to find this one is wide enough to find that one, and you will take down the chats you were
+actually working in along with the ones you meant to interrupt.
 
 Anything gentler lets the daemon shut down cleanly, which is a different code path and will not
 reproduce any of this.
