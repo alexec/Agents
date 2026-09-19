@@ -1,15 +1,17 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, filling the page: its name, somewhere to say what you want done,
-/// and everything working on it.
+/// The project itself, filling the page: everything working on it, and somewhere to say
+/// what you want done next.
 ///
-/// The prompt is at the top because it is how work starts here. You describe the
-/// outcome, the project's lead takes it, and the agents it starts appear in the lists
-/// below. That is why there is no button for starting one by hand any more.
+/// Laid out the way a chat is, because it is the same kind of page. The name is in the
+/// title bar rather than in the content, and the prompt floats at the foot of the pane
+/// with the lists scrolling underneath it — the same bar, the same glass, the same
+/// margins.
 ///
-/// Picking an agent goes into its conversation, and the back button comes out again. A
-/// chat is somewhere you visit from a project rather than a column beside it.
+/// What you type goes to the project's lead, which is why there is no button for
+/// starting an agent by hand. Picking an agent goes into its conversation, and the back
+/// button comes out again.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
@@ -18,22 +20,32 @@ struct ProjectAgentsView: View {
     /// How many archived agents are shown. Raised ten at a time, in the view, because
     /// this window already holds every one of them.
     @State private var archivedShown = Self.pageSize
+    @State private var formHeight: CGFloat = 0
     static let pageSize = 10
 
     private var folder: URL? { model.selectedProject }
+    private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let summary = model.selectedProjectSummary {
-                ProjectHeader(summary: summary)
-                Divider()
-                ProjectPrompt(folder: summary.folder)
-                Divider()
-            }
+        ZStack(alignment: .bottom) {
             list
+            if let folder {
+                ProjectPrompt(folder: folder)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+            }
         }
-        .navigationTitle(model.selectedProjectSummary?.name ?? "Project")
+        .navigationTitle(summary?.name ?? "Project")
+        .navigationSubtitle(subtitle)
         .onChange(of: folder) { archivedShown = Self.pageSize }
+    }
+
+    /// Where it is, said the way the chat says which folder an agent is in.
+    private var subtitle: String {
+        guard let summary else { return "" }
+        guard summary.exists else { return "Folder is missing" }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = summary.folder.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
     private var list: some View {
@@ -57,13 +69,15 @@ struct ProjectAgentsView: View {
         }
         .listStyle(.inset)
         .animation(.default, value: model.agents.map(\.state))
+        // So the last row can be scrolled clear of the prompt floating over it.
+        .safeAreaPadding(.bottom, formHeight)
     }
 
     private var archived: [Agent] {
         model.workers(in: folder, group: .archived)
     }
 
-    /// Out of the way until it is wanted. A button rather than a permanent heading,
+    /// Out of the way until it is wanted. A link rather than a permanent heading,
     /// because looking at what you archived is a rare thing to want.
     @ViewBuilder
     private var archivedSection: some View {
@@ -94,35 +108,11 @@ struct ProjectAgentsView: View {
     }
 }
 
-/// What this project is, at the top of it.
-private struct ProjectHeader: View {
-    let summary: DaemonAPI.ProjectSummary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(summary.name)
-                .font(.title3.weight(.semibold))
-                .lineLimit(1)
-            Text(abbreviatedPath)
-                .font(.caption)
-                .foregroundStyle(summary.exists ? Color.secondary : Color.red)
-                .lineLimit(1)
-                .help(summary.exists ? summary.folder.path : "This folder is not there any more.")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    private var abbreviatedPath: String {
-        guard summary.exists else { return "Folder is missing" }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = summary.folder.path
-        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
-    }
-}
-
 /// Say what you want done. It goes to the project's lead.
+///
+/// The same shape as the prompt bar in a chat: one field, one send button, glass, and
+/// the same margins, so moving between a project and an agent does not move the thing
+/// you type into.
 private struct ProjectPrompt: View {
     @Environment(AppModel.self) private var model
     let folder: URL
@@ -130,22 +120,29 @@ private struct ProjectPrompt: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .bottom, spacing: 10) {
             TextField("What do you want done?", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .lineLimit(1...6)
+                .font(.body)
+                .lineLimit(1...8)
                 .focused($focused)
                 .onSubmit(send)
+
             Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title3)
+                Image(systemName: "arrow.up")
+                    .font(.headline)
+                    .frame(width: 22, height: 22)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
             .disabled(isEmpty)
+            .keyboardShortcut(.return, modifiers: .command)
             .help("Send this to the project lead")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(14)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 144)
+        .padding(.vertical, 20)
     }
 
     private var isEmpty: Bool {
