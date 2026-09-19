@@ -13,6 +13,9 @@ actor FakeACPAgent {
         var configOptions: [ConfigOption] = []
         var updates: [JSONValue] = []
         var stopReason = "end_turn"
+        /// How long a turn takes. Zero for almost every test; a real duration for the
+        /// ones about what happens while the agent is still working.
+        var turnDelay: Duration = .zero
         /// Ask a permission part way through the turn and wait for the answer.
         var permission: JSONValue?
         /// Answer `session/resume` and `session/load` with this error instead.
@@ -136,6 +139,7 @@ actor FakeACPAgent {
     }
 
     private func runTurn() async -> Result<JSONValue, JSONRPCError> {
+        if script.turnDelay > .zero { try? await Task.sleep(for: script.turnDelay) }
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }

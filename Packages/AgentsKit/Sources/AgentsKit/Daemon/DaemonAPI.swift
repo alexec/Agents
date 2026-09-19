@@ -11,6 +11,7 @@ public enum DaemonAPI {
         public static let agentsOptions = "agents/options"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
+        public static let agentsUnqueue = "agents/unqueue"
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
@@ -139,6 +140,16 @@ public enum DaemonAPI {
 
         public var blocks: [ContentBlock] {
             [.text(text)] + attachments.map(\.block)
+        }
+    }
+
+    /// Take one back off the queue before its turn comes.
+    public struct UnqueueRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var promptID: UUID
+        public init(agentID: UUID, promptID: UUID) {
+            self.agentID = agentID
+            self.promptID = promptID
         }
     }
 
@@ -277,6 +288,8 @@ public enum DaemonAPI {
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
+        /// No longer raised: a prompt sent to a working agent waits its turn rather
+        /// than being refused. The number is kept so an older window still reads it.
         public static let alreadyRunning = -32006
         /// The runtime is installed and will not work until somebody signs in. Its own
         /// auth methods come back in the error's data, including the command Copilot

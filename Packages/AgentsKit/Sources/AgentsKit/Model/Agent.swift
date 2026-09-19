@@ -43,6 +43,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// MCP servers attached to this agent, sent when its session is made.
     public var mcpServers: [MCPServer]
 
+    /// What was typed while it was working, in the order it was typed. Sent one at a
+    /// time as each turn ends.
+    public var queuedPrompts: [QueuedPrompt]
+
     public var createdAt: Date
     public var lastActivityAt: Date
     public var endedReason: EndedReason?
@@ -84,6 +88,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         plans = try c.decodeIfPresent([Plan].self, forKey: .plans) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
+        // New in 004. A record written before it has nothing waiting.
+        queuedPrompts = try c.decodeIfPresent([QueuedPrompt].self, forKey: .queuedPrompts) ?? []
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
         unknownFields = whole.filter { !known.contains($0.key) }
@@ -112,6 +118,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
             try c.encode(additionalDirectories, forKey: .additionalDirectories)
         }
         if !mcpServers.isEmpty { try c.encode(mcpServers, forKey: .mcpServers) }
+        if !queuedPrompts.isEmpty { try c.encode(queuedPrompts, forKey: .queuedPrompts) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -126,6 +133,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case advertisedOptions, availableCommands, createdAt, lastActivityAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, plans, additionalDirectories, mcpServers
+        case queuedPrompts
     }
 
     struct AnyKey: CodingKey {
@@ -154,6 +162,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 plans: [Plan] = [],
                 additionalDirectories: [URL] = [],
                 mcpServers: [MCPServer] = [],
+                queuedPrompts: [QueuedPrompt] = [],
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -174,6 +183,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.plans = plans
         self.additionalDirectories = additionalDirectories
         self.mcpServers = mcpServers
+        self.queuedPrompts = queuedPrompts
         self.unknownFields = unknownFields
     }
 

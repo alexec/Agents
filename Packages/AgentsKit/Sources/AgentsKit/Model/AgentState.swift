@@ -23,6 +23,20 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
         case .finished, .stopped, .archived: return false
         }
     }
+
+    /// Whether a turn is already in flight, so a prompt has to wait rather than start
+    /// one of its own.
+    ///
+    /// The same two states as `holdsRuntime` today, and a different question: that one
+    /// is about a process being alive, this one is about the conversation being busy.
+    /// `waitingOnUser` is in here because a permission question is asked in the middle
+    /// of a turn, not between two of them.
+    public var hasTurnInFlight: Bool {
+        switch self {
+        case .running, .waitingOnUser: return true
+        case .finished, .stopped, .archived: return false
+        }
+    }
 }
 
 /// The things that happen to an agent.

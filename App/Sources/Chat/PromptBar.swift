@@ -203,7 +203,7 @@ struct PromptBar: View {
             .help(dictation.isListening ? "Stop dictating" : "Dictate")
 
             Button(action: send) {
-                Image(systemName: "arrow.up")
+                Image(systemName: willQueue ? "arrow.up.to.line" : "arrow.up")
                     .font(.headline)
                     .frame(width: 22, height: 22)
             }
@@ -211,6 +211,7 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
+            .help(willQueue ? "Queue this, to go when the turn ends" : "Send")
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
@@ -397,9 +398,11 @@ struct PromptBar: View {
 
     private var placeholder: String {
         guard let agent else { return "Say what you want done" }
+        // While it works, the field says what happens to what you type rather than
+        // what the agent is doing. The state line in the transcript says that.
+        if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
         switch agent.state {
-        case .running: return "Working…"
-        case .waitingOnUser: return "Answer the question above, or stop it"
+        case .running, .waitingOnUser: return "Say what next"
         case .finished, .stopped: return "Say what next"
         case .archived: return "Say what next, and this comes back"
         }
@@ -466,10 +469,19 @@ struct PromptBar: View {
 
     // MARK: Doing it
 
+    /// An agent that is working is not a reason to refuse. The daemon holds what is
+    /// typed and sends it when the turn ends, which is what the queue below the
+    /// prompt is showing.
     private var canSend: Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        if let agent { return agent.state != .running }
+        if agent != nil { return true }
         return model.draftCwd != nil && model.draftRuntimeID != nil
+    }
+
+    /// Whether what is typed now will wait rather than go.
+    private var willQueue: Bool {
+        guard let agent else { return false }
+        return agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
     }
 
     private func send() {

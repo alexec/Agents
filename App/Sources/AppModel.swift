@@ -276,12 +276,23 @@ final class AppModel {
         }
     }
 
+    /// Sent now if the agent is free, and queued by the daemon if it is not. Either
+    /// way this is the same call: whether there is room for it is not the window's
+    /// question to answer.
     func send(_ text: String, attachments: [Attachment] = []) async {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         await attempt {
             try await self.client.call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
+        }
+    }
+
+    /// Take something back off the queue before it goes.
+    func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.agentsUnqueue,
+                                       DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
         }
     }
 
