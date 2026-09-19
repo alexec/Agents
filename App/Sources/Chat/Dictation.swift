@@ -31,6 +31,16 @@ final class Dictation {
     private var task: SFSpeechRecognitionTask?
     private var onText: ((String) -> Void)?
 
+    /// What was in the field when this run of dictation started. Speaking adds to it
+    /// rather than replacing it, so stopping and starting again carries on from where
+    /// it left off.
+    private var base = ""
+
+    /// Which run of dictation we are on. The recogniser can deliver a last result
+    /// after it has been stopped, and that result belongs to the run that is over: it
+    /// must not be written over what has been said since.
+    private var run = 0
+
     var isAvailable: Bool { recogniser?.isAvailable ?? false }
 
     /// Whether the system has been asked yet. Used to put our own words in front of
@@ -39,9 +49,11 @@ final class Dictation {
         SFSpeechRecognizer.authorizationStatus() != .notDetermined
     }
 
-    func start(onText: @escaping (String) -> Void) {
+    func start(appendingTo base: String, onText: @escaping (String) -> Void) {
         guard !isListening else { return }
+        self.base = base
         self.onText = onText
+        run += 1
         problem = nil
         Task { await requestAccessThenListen() }
     }
@@ -113,12 +125,15 @@ final class Dictation {
         }
         isListening = true
 
+        let thisRun = run
         let results: @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void = { [weak self] result, error in
             let spoken = result?.bestTranscription.formattedString
             let finished = error != nil || (result?.isFinal ?? false)
             Task { @MainActor in
-                guard let self else { return }
-                if let spoken { self.onText?(spoken) }
+                guard let self, thisRun == self.run else { return }
+                if let spoken, !spoken.isEmpty {
+                    self.onText?(self.base.isEmpty ? spoken : self.base + " " + spoken)
+                }
                 if finished { self.stop() }
             }
         }
@@ -136,7 +151,7 @@ final class Dictation {
         isListening = false
     }
 
-    func toggle(onText: @escaping (String) -> Void) {
-        if isListening { stop() } else { start(onText: onText) }
+    func toggle(appendingTo base: String, onText: @escaping (String) -> Void) {
+        if isListening { stop() } else { start(appendingTo: base, onText: onText) }
     }
 }

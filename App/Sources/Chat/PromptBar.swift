@@ -10,7 +10,6 @@ struct PromptBar: View {
     @Environment(AppModel.self) private var model
     @State private var text = ""
     @State private var dictation = Dictation()
-    @State private var textBeforeDictation = ""
     @State private var isPrimingDictation = false
     @FocusState private var focused: Bool
 
@@ -162,11 +161,12 @@ struct PromptBar: View {
     }
 
     private func beginDictation() {
-        textBeforeDictation = text
         focused = true
-        dictation.start { spoken in
-            let prefix = textBeforeDictation.isEmpty ? "" : textBeforeDictation + " "
-            text = prefix + spoken
+        // What is already in the field is the start of the sentence, not something to
+        // be spoken over. Dictation keeps hold of it so that stopping and starting
+        // again carries on rather than beginning afresh.
+        dictation.start(appendingTo: text.trimmingCharacters(in: .whitespacesAndNewlines)) { combined in
+            text = combined
         }
     }
 
