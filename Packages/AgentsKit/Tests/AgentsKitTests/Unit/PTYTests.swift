@@ -11,12 +11,28 @@ struct PTYTests {
         private let lock = NSLock()
         private var data = Data()
         private var exitStatus: Int32?
+        /// How many times output was handed over, as against how many bytes came. The
+        /// difference between the two is what `gathered` exists for.
+        private var handovers = 0
+        /// Bytes that arrived after the program was said to be over. Should be none:
+        /// output that lands after its own exit is output a listener has stopped
+        /// listening for.
+        private var bytesAfterExit = 0
 
-        func append(_ new: Data) { lock.lock(); data.append(new); lock.unlock() }
+        func append(_ new: Data) {
+            lock.lock()
+            data.append(new)
+            handovers += 1
+            if exitStatus != nil { bytesAfterExit += new.count }
+            lock.unlock()
+        }
         func finish(_ status: Int32) { lock.lock(); exitStatus = status; lock.unlock() }
 
         var text: String { lock.lock(); defer { lock.unlock() }; return String(decoding: data, as: UTF8.self) }
+        var bytes: Data { lock.lock(); defer { lock.unlock() }; return data }
         var status: Int32? { lock.lock(); defer { lock.unlock() }; return exitStatus }
+        var handoverCount: Int { lock.lock(); defer { lock.unlock() }; return handovers }
+        var lateBytes: Int { lock.lock(); defer { lock.unlock() }; return bytesAfterExit }
 
         func waitForExit(within seconds: TimeInterval = 10) async -> Int32? {
             let deadline = Date().addingTimeInterval(seconds)
@@ -29,6 +45,11 @@ struct PTYTests {
     }
 
     private func run(_ script: String, rows: Int = 24, cols: Int = 80) async throws -> (String, Int32?) {
+        let collector = try await collect(script, rows: rows, cols: cols)
+        return (collector.text, collector.status)
+    }
+
+    private func collect(_ script: String, rows: Int = 24, cols: Int = 80) async throws -> Collector {
         let collector = Collector()
         let pty = try PTY(executable: URL(filePath: "/bin/sh"),
                           arguments: ["-c", script],
@@ -39,8 +60,8 @@ struct PTYTests {
                           onOutput: { collector.append($0) },
                           onExit: { collector.finish($0) })
         _ = pty
-        let status = await collector.waitForExit()
-        return (collector.text, status)
+        _ = await collector.waitForExit()
+        return collector
     }
 
     @Test func theChildGetsARealControllingTerminal() async throws {
@@ -78,6 +99,48 @@ struct PTYTests {
         #expect(output.contains("one"))
         #expect(output.contains("three"))
         #expect(status == 0)
+    }
+
+    @Test func aTorrentOfOutputIsHandedOverInArmfuls() async throws {
+        // A pty master does not hand back what you ask for. Measured on this Mac, a
+        // shell printing 4.9MB came back in 38,057 reads averaging 128 bytes, because
+        // the kernel's tty queue is small and the shell refills it as fast as it
+        // drains. Every one of those used to become its own notification: encoded to
+        // JSON three times, sent over a socket, and decoded twice on the app's main
+        // actor. That, and not the bytes, is what made the terminal slow.
+        let lines = 5_000
+        let collector = try await collect("for i in $(seq 1 \(lines)); do echo '\(String(repeating: "a", count: 100))'; done")
+
+        // Each line is 100 a's, a newline, and the carriage return the tty adds.
+        #expect(collector.bytes.count == lines * 102)
+        #expect(collector.status == 0)
+        // How many handovers this would have been before, at the 128 bytes a read
+        // actually comes back with. How fast the machine is decides where in between
+        // the real number lands, so the bar is set an order of magnitude away from the
+        // old behaviour rather than at any particular count.
+        let readByRead = collector.bytes.count / 128
+        #expect(collector.handoverCount * 10 < readByRead,
+                "handed over \(collector.handoverCount) times where reading alone would have been \(readByRead)")
+    }
+
+    @Test func nothingIsStillBeingGatheredWhenTheProgramIsSaidToBeOver() async throws {
+        // Output that lands after its own exit lands on nobody: a pane that has been
+        // told the shell is gone has stopped feeding its emulator. So whatever is
+        // gathered goes first, and the last line a command printed is the last line
+        // anyone sees.
+        let collector = try await collect("echo first; echo last")
+        #expect(collector.lateBytes == 0)
+        #expect(collector.text.contains("last"))
+    }
+
+    @Test func theBytesComeBackInTheOrderTheyWereWritten() async throws {
+        // Gathering reads together must not reorder them, and a terminal is exactly
+        // the place where that would show.
+        let collector = try await collect("for i in $(seq 1 5000); do echo $i; done")
+        let numbers = collector.text
+            .split(whereSeparator: \.isNewline)
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        #expect(numbers == Array(1...5000))
     }
 
     @Test func aFolderThatIsNotThereIsNamedRatherThanBeingAGenericFailure() throws {

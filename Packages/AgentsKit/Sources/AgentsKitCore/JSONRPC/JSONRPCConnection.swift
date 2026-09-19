@@ -14,7 +14,9 @@ public actor JSONRPCConnection {
     private var nextID = 0
     private var pending: [JSONRPCID: CheckedContinuation<JSONValue, any Error>] = [:]
     private var readTask: Task<Void, Never>?
-    private var isClosed = false
+    /// Not a plain `Bool`, because `notify` reads it from outside this actor. See
+    /// there for why a notification does not go through the actor at all.
+    private nonisolated let closed = ManagedAtomicFlag()
 
     private let notifications: AsyncStream<(method: String, params: JSONValue?)>
     private let notificationsContinuation: AsyncStream<(method: String, params: JSONValue?)>.Continuation
@@ -86,22 +88,21 @@ public actor JSONRPCConnection {
     }
 
     private func finish(with error: any Error) {
-        guard !isClosed else { return }
-        isClosed = true
+        guard closed.set() else { return }
         for (_, continuation) in pending { continuation.resume(throwing: error) }
         pending.removeAll()
         notificationsContinuation.finish()
     }
 
-    private func send(_ message: JSONRPCMessage) throws {
-        guard !isClosed else { throw JSONRPCTransportError.closed }
+    private nonisolated func send(_ message: JSONRPCMessage) throws {
+        guard !closed.isSet else { throw JSONRPCTransportError.closed }
         try transport.write(line: try JSONRPCCodec.encode(message))
     }
 
     /// Call the other side and wait for its answer.
     @discardableResult
     public func call(_ method: String, _ params: JSONValue? = nil) async throws -> JSONValue {
-        guard !isClosed else { throw JSONRPCTransportError.closed }
+        guard !closed.isSet else { throw JSONRPCTransportError.closed }
         guard readTask != nil else { throw JSONRPCTransportError.notStarted }
         nextID += 1
         let id = JSONRPCID.number(nextID)
@@ -116,7 +117,15 @@ public actor JSONRPCConnection {
         }
     }
 
-    public func notify(_ method: String, _ params: JSONValue? = nil) throws {
+    /// Tell the other side something, without waiting and without the actor.
+    ///
+    /// Nothing about a notification needs this connection's state: it is a line
+    /// written to a transport that serialises its own writes. Going through the actor
+    /// looked tidier and was wrong. Each call had to be started as its own task, and
+    /// two tasks reach an actor in whatever order the runtime picks, so a shell
+    /// printing a build log could arrive scrambled. Written straight out, lines leave
+    /// in the order they were handed over, which for terminal output is not a nicety.
+    public nonisolated func notify(_ method: String, _ params: JSONValue? = nil) throws {
         try send(.notification(method: method, params: params))
     }
 

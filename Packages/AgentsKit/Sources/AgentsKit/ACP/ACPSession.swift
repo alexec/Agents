@@ -313,7 +313,7 @@ public actor ACPSession {
     /// has stopped what it was doing.
     public func cancel() async {
         guard let sessionID else { return }
-        try? await connection.notify(ACP.Method.cancel, ["sessionId": .string(sessionID)])
+        try? connection.notify(ACP.Method.cancel, ["sessionId": .string(sessionID)])
     }
 
     @discardableResult

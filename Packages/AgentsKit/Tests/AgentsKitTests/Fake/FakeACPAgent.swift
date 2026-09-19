@@ -162,7 +162,7 @@ actor FakeACPAgent {
         }
         for update in script.updates { await send(update: update) }
         for notification in script.extensionNotifications {
-            try? await connection.notify(notification.method, notification.params)
+            try? connection.notify(notification.method, notification.params)
         }
         for request in script.clientRequests {
             var params = request.params
@@ -188,7 +188,7 @@ actor FakeACPAgent {
     }
 
     private func send(update: JSONValue) async {
-        try? await connection.notify(ACP.ClientMethod.sessionUpdate,
+        try? connection.notify(ACP.ClientMethod.sessionUpdate,
                                      ["sessionId": .string(sessionID), "update": update])
     }
 
@@ -196,7 +196,7 @@ actor FakeACPAgent {
     /// extension does. Nothing comes back, so the only question is whether the client
     /// noticed.
     func emitNotification(_ method: String, _ params: JSONValue = [:]) async {
-        try? await connection.notify(method, params)
+        try? connection.notify(method, params)
     }
 
     /// Send an update outside a turn, for tests that want one to arrive unprompted.

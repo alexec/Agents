@@ -625,6 +625,25 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.bytes = bytes
         }
+
+        /// Read straight off the value that came in, without the round trip.
+        ///
+        /// `JSONValue.decode` encodes the value back to JSON and decodes it again.
+        /// That is a fair price for a thing that arrives when an agent changes, and
+        /// the wrong one for the thing that arrives whenever a shell prints a line,
+        /// on the main actor, with a window waiting. This is the only notification on
+        /// that path, so it is the only one that reads its own two fields.
+        ///
+        /// The names and the encodings are the ones `Codable` uses above — a UUID as
+        /// its string, `Data` as base64 — and `ShellOutputTests` holds the two to each
+        /// other so this cannot quietly drift from the type it is reading.
+        public init?(params: JSONValue) {
+            guard let agentID = params["agentID"]?.stringValue.flatMap(UUID.init(uuidString:)),
+                  let encoded = params["bytes"]?.stringValue,
+                  let bytes = Data(base64Encoded: encoded) else { return nil }
+            self.agentID = agentID
+            self.bytes = bytes
+        }
     }
 
     public struct ShellStateNotification: Codable, Sendable {
