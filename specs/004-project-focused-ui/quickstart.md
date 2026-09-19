@@ -83,6 +83,45 @@ Quit and reopen the app. The archived list is still open, and the same project i
 **By hand**: turn the disclosure on in a project with nothing archived. It says so in a sentence
 rather than showing an empty box.
 
+## 4. Hand the project to its lead (P2)
+
+**By hand**: pick a project you have never opened. Its lead's conversation opens, empty. Check that
+nothing started:
+
+```bash
+ps ax | grep -c "[c]laude\|[c]opilot\|[g]rok"   # no higher than before you clicked
+```
+
+Tell the lead: *"Add a README and a licence file, one agent each."* It asks to start an agent. Allow
+it once. An agent appears under "Working" in the panel, in this project's folder, with its own
+instruction. It asks again for the second; answer "always". The third time it starts one, it does not
+ask, and the transcript shows what it did.
+
+Ask the lead how they are getting on. It reads their transcripts and tells you. Tell it to stop one:
+it asks first, and on approval that agent stops exactly as though you had stopped it — it moves to
+"Completed", saying it was stopped.
+
+Decline one of its requests. The lead is told, and carries on rather than hanging.
+
+Open an agent the lead started: it is an ordinary agent, with the usual controls, indistinguishable
+from one you started yourself.
+
+**By hand, the guards**: tell the lead to start another project lead — it cannot, there is no tool for
+it. Tell it to stop itself — it refuses and says to ask you. Tell it to touch an agent in another
+project by name — it refuses and says which project it can reach.
+
+**By hand, archiving**: while the lead is working, try to archive the project. It is refused, and the
+lead is named among the things to stop. Stop the lead from its own conversation, archive, unarchive:
+the lead is back with the whole conversation it had.
+
+**By test**: `swift test --filter ProjectLead`. The cases that matter are the four guards — a lead
+cannot be created by the tool, cannot reach another project, cannot stop itself, and only a lead gets
+the server — plus a declined permission returning a refusal the lead can read, and every call landing
+in the transcript whether allowed or declined.
+
+**By test**: `swift test --filter LeadLazyStart`. A project listed but never prompted has a lead record
+and no runtime. The first prompt starts one.
+
 ## The edges worth doing by hand
 
 ```bash
@@ -118,4 +157,9 @@ New test files, all in `Packages/AgentsKit/Tests/AgentsKitTests/`:
 | `Unit/ProjectNamingTests.swift` | Collisions, nesting, root folders, case. |
 | `Unit/ProjectTests.swift` | Folder standardisation, identity, unknown-field round trip. |
 | `Integration/ProjectsTests.swift` | list, add, archive, unarchive, the refusal, notifications, restart. |
-| `Integration/ProjectMigrationTests.swift` | Agents written before this feature appear under a project with nothing to run. |
+| `Integration/ProjectMigrationTests.swift` | Agents written before this feature appear under a project with nothing to run, and decode as `.worker`. |
+| `Unit/AgentRoleTests.swift` | Records without a role decode as `.worker`; round trip keeps unknown fields. |
+| `Integration/ProjectLeadTests.swift` | The four guards, permission held then allowed, declined returning a refusal, "always" not asked twice, every call in the transcript. |
+| `Integration/LeadLazyStartTests.swift` | Listed but never prompted: a record, no runtime. First prompt starts one. |
+| `Integration/LeadArchiveTests.swift` | A working lead blocks archiving; archive and unarchive carry the lead and keep its transcript; `agents/archive` refuses a lead. |
+| `Live/LeadRuntimeTests.swift` | Which runtimes ask their own MCP permission question on top of ours (research §12), recorded rather than designed around. |
