@@ -39,6 +39,10 @@ public actor DaemonCore {
     /// The two facts about a project that its folder cannot tell us. Everything else
     /// about a project is derived from the agents in it.
     lazy var projectStore = ProjectStore(locations: locations)
+    /// What each runtime last advertised, so a start form does not wait for a runtime
+    /// to say what it said last time. Read from disk the first time it is wanted.
+    lazy var optionCache = OptionCache(locations: locations)
+    var rememberedOptions: [String: OptionCache.Entry]?
 
     // MARK: Workflows
 
@@ -78,13 +82,15 @@ public actor DaemonCore {
     struct Draft: Sendable {
         var runtimeID: String
         var cwd: URL
-        var session: ACPSession
-        var sessionID: String
         /// What this session was made with. MCP servers are only read at `session/new`,
         /// so a draft made before the user attached one cannot be used for it.
         var mcpServers: [MCPServer]
-        /// Minted with the session, bound to the agent once the start makes one.
-        var appToken: String
+        /// The session being made, which may not exist yet.
+        ///
+        /// A draft is handed out the moment it is asked for, because a remembered form
+        /// is shown while its runtime is still starting. Whoever needs the session —
+        /// the start, or the refresh behind the form — waits here for it.
+        var pending: Task<MadeSession, any Error>
     }
 
     struct Pending: Sendable {

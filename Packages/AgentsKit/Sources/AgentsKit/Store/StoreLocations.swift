@@ -90,6 +90,9 @@ public struct StoreLocations: Sendable {
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
+    /// What each runtime last advertised. A cache: safe to delete, and deleting it
+    /// costs the next start form the wait it used to have every time.
+    public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

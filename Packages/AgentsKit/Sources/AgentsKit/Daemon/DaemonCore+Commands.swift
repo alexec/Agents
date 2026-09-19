@@ -8,14 +8,45 @@ extension DaemonCore {
     /// The options only exist once `session/new` has answered, so a session is created
     /// before the user has chosen anything. It is kept as a draft and used by the
     /// start that follows, so the runtime is started once and the user sees one dialog.
+    ///
+    /// Starting one takes seconds, and a runtime nearly always offers what it offered
+    /// last time, so a remembered answer goes back at once and the session carries on
+    /// being made behind it. What the runtime actually says is broadcast when it says
+    /// it, and is what the start applies the user's choices to either way.
     public func options(_ request: DaemonAPI.OptionsRequest) async throws -> DaemonAPI.OptionsResponse {
-        let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
-                                          mcpServers: request.mcpServers)
         let draftID = UUID()
+        let pending = Task { [self] in
+            try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
+                                   mcpServers: request.mcpServers)
+        }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
-                                session: made.session, sessionID: made.sessionID,
-                                mcpServers: request.mcpServers, appToken: made.appToken)
-        let session = made.session
+                                mcpServers: request.mcpServers, pending: pending)
+        let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
+                                  mcpServers: request.mcpServers)
+        if let remembered = rememberedOptions(for: key) {
+            Task { [self] in await settleDraft(draftID, key: key, shown: remembered) }
+            return DaemonAPI.OptionsResponse(draftID: draftID,
+                                             options: remembered.options,
+                                             commands: remembered.commands)
+        }
+        let advertised: OptionCache.Entry
+        do {
+            advertised = try await whatItOffers(pending)
+        } catch {
+            // A draft whose runtime never started is not a draft. Left in the map it
+            // would hold the daemon open for a session that will never exist.
+            drafts.removeValue(forKey: draftID)
+            throw error
+        }
+        remember(advertised, for: key)
+        return DaemonAPI.OptionsResponse(draftID: draftID,
+                                         options: advertised.options,
+                                         commands: advertised.commands)
+    }
+
+    /// Everything a made session advertises, once it is made.
+    private func whatItOffers(_ pending: Task<MadeSession, any Error>) async throws -> OptionCache.Entry {
+        let session = try await pending.value.session
         // The commands arrive as an update a moment after the session exists rather
         // than with it, so a new chat waits briefly for them. Half a second is the
         // difference between a prompt that knows what it takes and one that learns
@@ -24,9 +55,51 @@ extension DaemonCore {
         while await session.commands.isEmpty, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(25))
         }
-        return DaemonAPI.OptionsResponse(draftID: draftID,
-                                         options: await session.options,
-                                         commands: await session.commands)
+        return OptionCache.Entry(options: await session.options, commands: await session.commands)
+    }
+
+    /// A form was answered from memory. Wait for the runtime starting behind it, and
+    /// put the window right if what it offers has moved.
+    private func settleDraft(_ draftID: UUID, key: String, shown: OptionCache.Entry) async {
+        guard let pending = drafts[draftID]?.pending else { return }
+        do {
+            let advertised = try await whatItOffers(pending)
+            remember(advertised, for: key)
+            // Started already: the agent carries what the session really said, and the
+            // draft form it was chosen in has gone.
+            guard drafts[draftID] != nil else { return }
+            guard advertised.offers != shown.offers else { return }
+            broadcast(DaemonAPI.Notification.draftOptions,
+                      DaemonAPI.DraftOptionsNotification(draftID: draftID,
+                                                         options: advertised.options,
+                                                         commands: advertised.commands))
+        } catch {
+            drafts.removeValue(forKey: draftID)
+            // The form was shown before we knew the runtime would not start, so this is
+            // the only chance to say so. Without it the news arrives when the user
+            // presses send, having typed a prompt first.
+            broadcast(DaemonAPI.Notification.draftOptions,
+                      DaemonAPI.DraftOptionsNotification(draftID: draftID,
+                                                         failure: describeForWindow(error)))
+        }
+    }
+
+    private func describeForWindow(_ error: any Error) -> String {
+        (error as? JSONRPCError)?.message ?? error.localizedDescription
+    }
+
+    /// What this runtime and folder last advertised, if anything worth showing.
+    func rememberedOptions(for key: String) -> OptionCache.Entry? {
+        if rememberedOptions == nil { rememberedOptions = optionCache.load() }
+        guard let entry = rememberedOptions?[key], entry.isWorthKeeping else { return nil }
+        return entry
+    }
+
+    func remember(_ entry: OptionCache.Entry, for key: String) {
+        guard entry.isWorthKeeping else { return }
+        if rememberedOptions == nil { rememberedOptions = optionCache.load() }
+        rememberedOptions?[key] = entry
+        try? optionCache.save(rememberedOptions ?? [:])
     }
 
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
@@ -37,14 +110,21 @@ extension DaemonCore {
         // They are read once, when the session is made, so reusing a session that
         // never heard about a server would attach it in name only.
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
-        if let draft, draft.runtimeID == request.runtimeID, draft.cwd == request.cwd,
-           draft.mcpServers == request.mcpServers {
-            session = draft.session
-            sessionID = draft.sessionID
-            appToken = draft.appToken
+        let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == request.cwd
+                                     && $0.mcpServers == request.mcpServers ? $0 : nil }
+        if let usable {
+            // The session may still be being made: a form shown from memory is quicker
+            // than the runtime behind it. Waiting here is waiting for the start that
+            // would otherwise have happened before the form appeared.
+            let made = try await usable.pending.value
+            session = made.session
+            sessionID = made.sessionID
+            appToken = made.appToken
         } else {
-            // A draft we cannot use is a runtime nobody is going to talk to.
-            if let draft { await draft.session.end(gracePeriod: .seconds(2)) }
+            // A draft we cannot use is a runtime nobody is going to talk to. Let go of
+            // in its own time: it may still be starting, and this start is not waiting
+            // on a session it has already decided against.
+            if let draft { Task { [self] in await endDraft(draft) } }
             let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
                                               mcpServers: request.mcpServers)
             session = made.session
@@ -88,6 +168,13 @@ extension DaemonCore {
         var sessionID: String
         var runtime: Runtime
         var appToken: String
+    }
+
+    /// Let go of a draft nobody is going to use. Its session may still be being made,
+    /// so the runtime is ended when it arrives rather than left running unowned.
+    func endDraft(_ draft: Draft) async {
+        guard let made = try? await draft.pending.value else { return }
+        await made.session.end(gracePeriod: .seconds(2))
     }
 
     /// A folder, a runtime, and a handshake. Everything that can go wrong here is

@@ -344,6 +344,10 @@ final class AppModel {
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
             shellClients[notification.agentID]?.received(notification.state)
 
+        case DaemonAPI.Notification.draftOptions:
+            guard let notification = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
+            settleDraft(notification)
+
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()
 
@@ -461,18 +465,7 @@ final class AppModel {
             // not an answer to the question now being asked.
             guard generation == draftOptionsGeneration else { return }
             draftID = response.draftID
-            draftOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: response.options)
-            draftCommands = response.commands
-            for option in draftOptions where option.currentValue != nil {
-                draftChosen[option.id] = option.currentValue
-            }
-            // The mode you chose last time for this runtime, if it still offers it.
-            // Seeding the draft is enough: `startDraft` sends these as `StartOptions`
-            // and the daemon applies each one to the session before the first prompt.
-            if let mode = ModeMemory.modeOption(in: draftOptions) {
-                draftChosen[mode.id] = ModeMemory.startingValue(
-                    remembered: rememberedMode(for: runtimeID), for: mode)
-            }
+            show(options: response.options, commands: response.commands, opening: true)
         } catch {
             guard generation == draftOptionsGeneration else { return }
             // Said in the row rather than only in the banner, because the row is where
@@ -482,6 +475,56 @@ final class AppModel {
         if generation == draftOptionsGeneration { isLoadingDraftOptions = false }
     }
 
+    /// Draw the form.
+    ///
+    /// The first answer may be what the runtime offered last time, with what it
+    /// actually offers arriving a few seconds later, so this runs more than once for
+    /// one draft and keeps every choice already made that is still on offer.
+    private func show(options: [ConfigOption], commands: [SlashCommand], opening: Bool) {
+        draftOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
+        draftCommands = commands
+        for option in draftOptions {
+            // A choice already made stands, as long as it is still one of the choices.
+            if let chosen = draftChosen[option.id],
+               option.isBoolean || (option.options ?? []).contains(where: { $0.value == chosen }) {
+                continue
+            }
+            draftChosen[option.id] = option.currentValue
+        }
+        // Options that have gone are not choices anybody can unmake.
+        let offered = Set(draftOptions.map(\.id))
+        draftChosen = draftChosen.filter { offered.contains($0.key) }
+        // The mode you chose last time for this runtime, if it still offers it.
+        // Seeding the draft is enough: `startDraft` sends these as `StartOptions`
+        // and the daemon applies each one to the session before the first prompt.
+        //
+        // What the control opens on, so only on the first draw: a correction arriving
+        // behind a form drawn from memory must not undo a mode chosen since.
+        if opening, let runtimeID = draftRuntimeID,
+           let mode = ModeMemory.modeOption(in: draftOptions) {
+            draftChosen[mode.id] = ModeMemory.startingValue(
+                remembered: rememberedMode(for: runtimeID), for: mode)
+        }
+    }
+
+    /// The runtime starting behind a form drawn from memory has answered at last, and
+    /// either offers something else or will not start at all.
+    private func settleDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
+        guard notification.draftID == draftID else { return }
+        if let failure = notification.failure {
+            // Said in the row rather than the banner, the same as a form that failed to
+            // load, because the row is where the person is looking and where the retry
+            // lives. The controls go with it: they were what this runtime offered last
+            // time, and there is no runtime this time.
+            draftOptionsFailure = failure
+            draftOptions = []
+            draftCommands = []
+            draftChosen = [:]
+            draftID = nil
+            return
+        }
+        show(options: notification.options, commands: notification.commands, opening: false)
+    }
 
     func startDraft(prompt: String, attachments: [Attachment] = []) async {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
