@@ -199,6 +199,16 @@ waiting on something the user cannot see.
   tests passing unchanged.
 - **SC-007**: Nothing about a Cursor agent is lost across a restart of the window or of the daemon.
 
+## Out of Scope
+
+- A runtime the user defines themselves, with their own command and arguments. This feature adds one
+  known runtime to a fixed list.
+- Holding a Cursor API key, or any way of signing in beyond what Cursor advertises at handshake.
+- Reading or writing Cursor's own configuration, including the MCP servers it defines.
+- Cursor on the iPhone and iPad remotes. Feature 005 decides what a remote does with the runtime list,
+  and a fourth entry arrives there for free or does not, on 005's terms rather than this feature's.
+- Any change to how Claude, Grok or Copilot behave.
+
 ## Assumptions
 
 - The Cursor CLI speaks the protocol natively over standard input and output, started with its own
@@ -209,11 +219,37 @@ waiting on something the user cannot see.
 - The app already refuses a request it does not know rather than leaving it unanswered, so the "never
   stuck" half of User Story 3 is a thing to prove rather than to build. If that turns out not to hold,
   it is the first thing built.
-- Signing into Cursor happens in Cursor's own way. The app does not hold a Cursor API key, and asking
-  the user for one is out of scope.
-- This feature adds one known runtime. Letting the user define a runtime of their own, with their own
-  command and arguments, is a separate feature and is not included.
-- Cursor's own ways of running, such as a chosen model or its MCP configuration, stay Cursor's. The app
-  shows which provider or model the runtime reports, as it does for the others, and sets nothing.
+- Signing into Cursor happens in Cursor's own way, and what the app can offer is whatever Cursor
+  advertises at handshake.
+- Cursor's own ways of running, such as a chosen model, stay Cursor's. The app shows which provider or
+  model the runtime reports, as it does for the others, and sets nothing.
 - Running the app's live tests against Cursor needs a signed-in Cursor CLI on the machine, the same
   condition the existing live runtime tests already carry.
+
+## Dependencies
+
+- **Feature 001**, which owns the daemon, the agent record, the transcript and the permission
+  question. FR-007 asks for nothing new from it: a Cursor agent is an agent.
+- **Feature 003**, which owns almost everything this feature leans on and should be read first:
+  - User Story 1 and FR-001 onward decide what an agent can do from what its runtime advertises.
+    FR-002 here is that rule applied to a fourth runtime, not a new rule.
+  - User Story 5 owns signing in, signing out and who is answering. FR-004 to FR-006 here are its
+    behaviour with Cursor's account in it.
+  - User Story 6 owns the plan. FR-011 here adds nothing but Cursor's way of sending one.
+  - User Story 7 owns picking up a session the app did not start. User Story 1 scenario 6 here is
+    that, for Cursor.
+  - User Story 9 owns answering a structured question from an agent, and was written for exactly this
+    moment: "no runtime we support asks for this yet". Cursor is the runtime that asks. The catch is
+    that it asks by a name of its own rather than by the protocol's, so the form User Story 9 builds
+    will not recognise it by shape. Planning must decide whether Cursor's questions are translated
+    into that form or answered separately, and doing it twice would be the wrong answer.
+- **Feature 004**, which owns the group that means an agent is waiting on the user. User Story 3
+  scenario 2 here puts a Cursor agent in it and adds nothing to how the group works.
+- **Feature 005**, only in that it will inherit a fourth runtime. Nothing here depends on it.
+- **Feature 003, task T076**, still open: what a signed-out runtime actually returns has never been
+  confirmed against any runtime, and `RuntimeDiscovery` says so in as many words. User Story 2
+  scenario 2 here cannot be proved until it is. Cursor is a fair runtime to answer it with, since
+  signing it out is cheap, so this feature may close T076 rather than wait for it.
+- **The runtimes on this Mac.** Feature 003 promised that every capability claim would be proved by
+  handshake against the three runtimes rather than by reading their documentation. A fourth runtime
+  reopens that promise, and every claim about Cursor in this spec is to be proved the same way.

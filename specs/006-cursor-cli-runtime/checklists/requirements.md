@@ -38,8 +38,14 @@
 - Scope is bounded by priority rather than by a clarification question. P1 puts Cursor on the list,
   P2 is the honest account state, P3 is Cursor's own extension requests. A plan may stop after P1 and
   still ship something worth having, as long as FR-008 holds.
-- Two things are deliberately out of scope and recorded as assumptions: user-defined runtimes, and the
-  app holding a Cursor API key.
+- Out of Scope and Dependencies were added after the first pass, which had neither. Most of what this
+  feature needs is owned by 003, and saying so is what stops it being rebuilt: capability-driven
+  behaviour (US1), sign-in state (US5), the plan (US6), adopting a session (US7) and answering a
+  structured question (US9). 004 owns the group that means an agent needs the user.
+- Two open questions carried from elsewhere, both recorded under Dependencies rather than as markers
+  here. 003 task T076, what a signed-out runtime actually returns, is unproved and User Story 2
+  scenario 2 rests on it. And 003 User Story 9 builds a form for the protocol's way of asking, while
+  Cursor asks by a name of its own, so planning has to decide whether the two meet.
 - One thing planning must confirm on the machine rather than from documentation: the name of the
   installed binary and the exact subcommand that starts it in protocol mode. Cursor's documentation
   writes it as `agent acp`, while the installer is widely reported to place `cursor-agent`.
