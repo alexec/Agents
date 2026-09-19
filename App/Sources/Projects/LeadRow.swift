@@ -19,9 +19,9 @@ struct LeadRow: View {
                 Text("Project lead")
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .font(agent.currentStep == nil ? .caption : .callout)
+                    .foregroundStyle(agent.currentStep == nil ? .secondary : .primary)
+                    .lineLimit(2)
             }
             Spacer(minLength: 4)
             if agent.state == .waitingOnUser {
@@ -41,7 +41,11 @@ struct LeadRow: View {
     }
 
     /// What it is doing, or what it is for when it has not been asked anything yet.
+    ///
+    /// Its own words when it has said them: the lead's plan is the nearest thing there
+    /// is to a description of what is happening in this project.
     private var subtitle: String {
+        if let step = agent.currentStep { return step }
         switch agent.state {
         case .running: return "Working"
         case .waitingOnUser: return "Needs you"

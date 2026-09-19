@@ -68,4 +68,34 @@ public extension Agent {
     /// Which of the four this agent falls in. Leads are asked this too, but the panel
     /// never asks: it pins them above the groups instead.
     var group: AgentGroup { AgentGroup(for: state) }
+
+    /// The plan it is working to, if it still stands.
+    ///
+    /// The last current one: a plan replaced by a newer one is history, and a
+    /// withdrawn one is something the agent said it was no longer doing.
+    var currentPlan: Plan? {
+        plans.last { $0.state == .current }
+    }
+
+    /// What it is working on, in its own words.
+    ///
+    /// The step of its own plan it says it is on. This is the most useful line about a
+    /// working agent that exists anywhere: a title is what it was asked three hours
+    /// ago, and this is what it is doing now.
+    ///
+    /// Nil when it has no plan, or when nothing in the plan is in progress — an agent
+    /// between steps is not working on any of them, and inventing one would be worse
+    /// than saying nothing.
+    var currentStep: String? {
+        guard let entry = currentPlan?.entries.first(where: { $0.status == .inProgress })
+        else { return nil }
+        let trimmed = entry.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// How far through its plan it is: steps done, and steps in total.
+    var planProgress: (done: Int, total: Int)? {
+        guard let plan = currentPlan, !plan.entries.isEmpty else { return nil }
+        return (plan.entries.count { $0.status == .completed }, plan.entries.count)
+    }
 }

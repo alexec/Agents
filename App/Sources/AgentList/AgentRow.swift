@@ -8,13 +8,28 @@ struct AgentRow: View {
     var body: some View {
         HStack(spacing: 8) {
             StateDot(state: agent.state)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(agent.title ?? "Untitled")
                     .lineLimit(1)
+
+                // What it is doing now, when it has said. A title is what it was asked
+                // an hour ago; this is the thing you actually came to find out.
+                if let step = agent.currentStep {
+                    Text(step)
+                        .font(.callout)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .padding(.top, 1)
+                }
+
                 HStack(spacing: 4) {
                     // No folder here any more: the panel is one project, so saying
                     // which folder every row is in says the same thing twenty times.
                     Text(runtimeName)
+                    if let progress {
+                        Text("·")
+                        Text(progress)
+                    }
                     if let ending {
                         Text("·")
                         Text(ending)
@@ -47,6 +62,15 @@ struct AgentRow: View {
 
     private var runtimeName: String {
         RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID
+    }
+
+    /// How far through its own plan it is. Only while that plan still means
+    /// something: a finished agent's progress is history, and reads as a claim.
+    private var progress: String? {
+        guard agent.state.holdsRuntime, let progress = agent.planProgress else { return nil }
+        // Clamped, because the last step being done would otherwise read "step 6 of 5".
+        let step = min(progress.done + 1, progress.total)
+        return "step \(step) of \(progress.total)"
     }
 
     /// Finished, or stopped short with the reason. Never both, and never a reason
