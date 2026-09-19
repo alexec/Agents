@@ -27,10 +27,10 @@ struct OptionMenu: View {
             }
         }
         .menuStyle(.borderlessButton)
-        .font(.subheadline)
+        .font(.footnote)
         .fixedSize()
-        .padding(.horizontal, 11)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
         // A real control, so it reacts to the pointer.
         .glassEffect(.regular.interactive(), in: .capsule)
         .help(option.description ?? option.name)

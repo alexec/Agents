@@ -36,13 +36,13 @@ struct PromptBar: View {
         HStack(spacing: 12) {
             if let agent {
                 Text(agent.cwd.path(percentEncoded: false))
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.head)
                 Spacer(minLength: 8)
                 Text(runtimeName(agent.runtimeID))
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
                 Button(action: chooseFolder) {
@@ -51,7 +51,7 @@ struct PromptBar: View {
                         .truncationMode(.head)
                 }
                 .buttonStyle(.glass)
-                .font(.subheadline)
+                .font(.footnote)
 
                 Spacer(minLength: 8)
 
@@ -61,10 +61,10 @@ struct PromptBar: View {
                     }
                 }
                 .menuStyle(.borderlessButton)
-                .font(.subheadline)
+                .font(.footnote)
                 .fixedSize()
-                .padding(.horizontal, 11)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .disabled(model.availableRuntimes.isEmpty)
             }
@@ -113,7 +113,7 @@ struct PromptBar: View {
             ?? model.draftOptions
         if model.isLoadingDraftOptions {
             Text("Asking \(model.draftRuntimeID.map(runtimeName) ?? "the runtime") what it offers…")
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
         } else if !shown.isEmpty {
             // What the agent is allowed to do on the left, how well it does it on the
