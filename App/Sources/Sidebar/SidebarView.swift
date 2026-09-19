@@ -54,14 +54,8 @@ struct SidebarView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-
-            Button {
-                frame.isOpen = false
-            } label: {
-                Image(systemName: "sidebar.trailing")
-            }
-            .buttonStyle(.borderless)
-            .help("Close the sidebar")
+            // No close button here. The toolbar's toggle already closes it, and two
+            // identical icons a few inches apart are one too many.
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -95,7 +89,9 @@ struct SidebarView: View {
 private struct NoAgent: View {
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "sidebar.trailing")
+            // Deliberately not the sidebar glyph: that one means the control in the
+            // toolbar, and repeating it here reads as a button that does nothing.
+            Image(systemName: "square.dashed")
                 .font(.largeTitle)
                 .foregroundStyle(.tertiary)
             Text("No agent chosen")
