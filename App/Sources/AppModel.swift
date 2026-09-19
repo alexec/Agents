@@ -52,6 +52,11 @@ final class AppModel {
     private var listening: Task<Void, Never>?
     private var firstTranscriptIndex = 0
 
+    /// The panes listening for shell output, one per agent in this window. Shell
+    /// notifications are broadcast to every window, so each one keeps only the agents
+    /// it is actually showing and ignores the rest.
+    @ObservationIgnored private var shellClients: [UUID: ShellClient] = [:]
+
     var selectedAgent: Agent? {
         guard let selection else { return nil }
         return agents.first { $0.id == selection }
@@ -120,6 +125,14 @@ final class AppModel {
             guard let notification = try? params?.decode(DaemonAPI.PermissionNotification.self) else { return }
             permissions.removeAll { $0.agentID == notification.agentID }
             if let request = notification.request { permissions.append(request) }
+
+        case DaemonAPI.Notification.shellOutput:
+            guard let notification = try? params?.decode(DaemonAPI.ShellOutputNotification.self) else { return }
+            shellClients[notification.agentID]?.received(notification.bytes)
+
+        case DaemonAPI.Notification.shellStateChanged:
+            guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
+            shellClients[notification.agentID]?.received(notification.state)
 
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()
@@ -340,6 +353,64 @@ final class AppModel {
             try await self.client.call(DaemonAPI.Method.agentsSetOption,
                                        DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
         }
+    }
+
+    // MARK: The user's shells
+
+    /// The pane's end of one agent's shell, made once per agent per window.
+    func shellClient(for agentID: UUID) -> ShellClient {
+        if let existing = shellClients[agentID] { return existing }
+        let fresh = ShellClient(agentID: agentID, model: self)
+        shellClients[agentID] = fresh
+        return fresh
+    }
+
+    func attachShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
+        try await client.call(DaemonAPI.Method.shellAttach,
+                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
+                              returning: DaemonAPI.ShellAttachResponse.self)
+    }
+
+    func restartShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
+        try await client.call(DaemonAPI.Method.shellRestart,
+                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
+                              returning: DaemonAPI.ShellAttachResponse.self)
+    }
+
+    /// Detaching never stops anything. A build carries on (FR-026).
+    func detachShell(agentID: UUID) async {
+        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.AgentRequest(agentID: agentID))
+    }
+
+    func sendToShell(agentID: UUID, bytes: Data) async {
+        try? await client.call(DaemonAPI.Method.shellInput,
+                               DaemonAPI.ShellInputRequest(agentID: agentID, bytes: bytes))
+    }
+
+    func resizeShell(agentID: UUID, rows: Int, cols: Int) async {
+        try? await client.call(DaemonAPI.Method.shellResize,
+                               DaemonAPI.ShellResizeRequest(agentID: agentID, rows: rows, cols: cols))
+    }
+
+    /// A shell that will not start is shown inside the pane, not in the window's alert:
+    /// it is about that pane, and an alert over the whole window would be out of
+    /// proportion to it.
+    func describeForShell(_ error: any Error) -> String {
+        describe(error)
+    }
+
+    /// Which transcript entry the conversation should bring into view.
+    ///
+    /// Set by the artifacts pane so that getting from a thing back to the message it
+    /// came from is one tap (FR-042). Cleared once the transcript has scrolled to it.
+    var focusedEntry: UUID?
+
+    func focusEntry(_ id: UUID) {
+        focusedEntry = id
+    }
+
+    func clearFocus() {
+        focusedEntry = nil
     }
 
     // MARK: Runtimes

@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-18
 
-**Status**: Draft
+**Status**: Planned. FR-046 answered 2026-09-18; see [plan.md](./plan.md) and [research.md](./research.md).
 
 **Research**: what ACP gives a client to follow along with, verified against the v1
 schema and this app's own stored transcripts on 2026-09-18. See the note under Artifacts.
@@ -231,8 +231,12 @@ one of them without scrolling the conversation.
   agent.
 - **FR-045**: The pane MUST say so when an artifact points at something that has since changed or gone,
   rather than showing what is no longer there.
-- **FR-046**: [NEEDS CLARIFICATION: what counts as an artifact? Every file the agent created or
-  changed, only the things the runtime itself marks, or things the user keeps by hand?]
+- **FR-046**: An artifact is something the runtime itself marked: a `resource_link` content block, or
+  an embedded `resource` content block. Nothing else is one. A file a tool call merely touched is not
+  an artifact, and belongs to the files pane's marks under FR-013 instead. Answered by the user on
+  2026-09-18, with the consequence accepted: no runtime on this Mac sends these blocks today, so the
+  pane ships empty against every runtime currently installed, and FR-043's empty state is the screen
+  the user will ordinarily see. See research section 1.
 
 What the protocol offers here, checked against the v1 schema and this app's own transcripts on
 2026-09-18:

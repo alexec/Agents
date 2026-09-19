@@ -42,7 +42,7 @@ struct BlocksView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-        case .resourceLink(let uri, let name, _, _):
+        case .resourceLink(let uri, let name, _, _, _):
             Button {
                 if let url = URL(string: uri) { NSWorkspace.shared.open(url) }
             } label: {
@@ -51,7 +51,7 @@ struct BlocksView: View {
             }
             .buttonStyle(.link)
 
-        case .resource(let uri, let text, _, _):
+        case .resource(let uri, let text, _, _, _):
             VStack(alignment: .leading, spacing: 4) {
                 Text(URL(string: uri)?.lastPathComponent ?? uri)
                     .font(.caption)

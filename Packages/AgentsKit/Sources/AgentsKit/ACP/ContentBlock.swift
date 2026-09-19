@@ -13,9 +13,64 @@ public enum ContentBlock: Codable, Hashable, Sendable {
     case text(String)
     case image(data: Data, mimeType: String, uri: String?)
     case audio(data: Data, mimeType: String)
-    case resourceLink(uri: String, name: String, mimeType: String?, size: Int?)
-    case resource(uri: String, text: String?, blob: Data?, mimeType: String?)
+    case resourceLink(uri: String, name: String, mimeType: String?, size: Int?,
+                      annotations: Annotations? = nil)
+    case resource(uri: String, text: String?, blob: Data?, mimeType: String?,
+                  annotations: Annotations? = nil)
     case unknown(JSONValue)
+
+    /// What an agent says about who a thing is for and how much it matters.
+    ///
+    /// The protocol allows these on any block and puts them to most use on the two
+    /// that hand something over. The artifacts pane reads `audience`: a block marked
+    /// for someone other than the user is not the user's artifact.
+    public struct Annotations: Codable, Hashable, Sendable {
+        public var audience: [String]?
+        public var priority: Double?
+
+        public init(audience: [String]? = nil, priority: Double? = nil) {
+            self.audience = audience
+            self.priority = priority
+        }
+
+        /// Whether this is for the person at the screen.
+        ///
+        /// No annotations at all means yes. An agent that bothered to send a resource
+        /// link meant it, and the protocol does not require it to say so twice.
+        public var isForUser: Bool {
+            guard let audience else { return true }
+            return audience.contains("user")
+        }
+
+        init?(wire: JSONValue?) {
+            guard let wire, wire.objectValue != nil else { return nil }
+            let audience = wire["audience"]?.arrayValue?.compactMap(\.stringValue)
+            let priority: Double? = switch wire["priority"] {
+            case .double(let value): value
+            case .int(let value): Double(value)
+            default: nil
+            }
+            guard audience != nil || priority != nil else { return nil }
+            self.audience = audience
+            self.priority = priority
+        }
+
+        var wire: JSONValue {
+            var object: [String: JSONValue] = [:]
+            if let audience { object["audience"] = .array(audience.map { .string($0) }) }
+            if let priority { object["priority"] = .double(priority) }
+            return .object(object)
+        }
+    }
+
+    /// The annotations on this block, when it carries any.
+    public var annotations: Annotations? {
+        switch self {
+        case .resourceLink(_, _, _, _, let annotations): return annotations
+        case .resource(_, _, _, _, let annotations): return annotations
+        default: return nil
+        }
+    }
 
     /// What a runtime has to advertise before we may send this. Nil means baseline:
     /// text and resource links need nothing, which is the protocol's own rule.
@@ -36,7 +91,7 @@ public enum ContentBlock: Codable, Hashable, Sendable {
     public var text: String? {
         switch self {
         case .text(let text): return text
-        case .resource(_, let text, _, _): return text
+        case .resource(_, let text, _, _, _): return text
         default: return nil
         }
     }
@@ -59,14 +114,18 @@ public enum ContentBlock: Codable, Hashable, Sendable {
             self = .resourceLink(uri: uri,
                                  name: wire["name"]?.stringValue ?? Self.lastComponent(of: uri),
                                  mimeType: wire["mimeType"]?.stringValue,
-                                 size: wire["size"]?.intValue)
+                                 size: wire["size"]?.intValue,
+                                 annotations: Annotations(wire: wire["annotations"]))
         case "resource":
             let resource = wire["resource"] ?? wire
             guard let uri = resource["uri"]?.stringValue else { self = .unknown(wire); return }
             self = .resource(uri: uri,
                              text: resource["text"]?.stringValue,
                              blob: resource["blob"]?.stringValue.flatMap { Data(base64Encoded: $0) },
-                             mimeType: resource["mimeType"]?.stringValue)
+                             mimeType: resource["mimeType"]?.stringValue,
+                             // On the block, not inside the resource: that is where
+                             // the schema puts them.
+                             annotations: Annotations(wire: wire["annotations"]))
         default:
             self = .unknown(wire)
         }
@@ -85,19 +144,22 @@ public enum ContentBlock: Codable, Hashable, Sendable {
         case .audio(let data, let mimeType):
             return ["type": "audio", "mimeType": .string(mimeType),
                     "data": .string(data.base64EncodedString())]
-        case .resourceLink(let uri, let name, let mimeType, let size):
+        case .resourceLink(let uri, let name, let mimeType, let size, let annotations):
             var object: [String: JSONValue] = ["type": "resource_link",
                                                "uri": .string(uri),
                                                "name": .string(name)]
             if let mimeType { object["mimeType"] = .string(mimeType) }
             if let size { object["size"] = .int(size) }
+            if let annotations { object["annotations"] = annotations.wire }
             return .object(object)
-        case .resource(let uri, let text, let blob, let mimeType):
+        case .resource(let uri, let text, let blob, let mimeType, let annotations):
             var resource: [String: JSONValue] = ["uri": .string(uri)]
             if let text { resource["text"] = .string(text) }
             if let blob { resource["blob"] = .string(blob.base64EncodedString()) }
             if let mimeType { resource["mimeType"] = .string(mimeType) }
-            return ["type": "resource", "resource": .object(resource)]
+            var object: [String: JSONValue] = ["type": "resource", "resource": .object(resource)]
+            if let annotations { object["annotations"] = annotations.wire }
+            return .object(object)
         case .unknown(let value):
             return value
         }

@@ -1,0 +1,106 @@
+import Foundation
+
+/// What the files pane learns about a file before it shows anything.
+///
+/// The pane reads a prefix, never the file. A 200MB log opens as fast as a small one
+/// because the same number of bytes is read either way, which is FR-015. The size comes
+/// from the file's attributes rather than from counting what was read.
+public struct FileProbe: Sendable, Equatable {
+    public enum Kind: Sendable, Equatable {
+        case text
+        /// What it is, said in words, because its bytes are not worth showing (FR-014).
+        case binary(describedAs: String)
+
+        public var isText: Bool { if case .text = self { return true }; return false }
+    }
+
+    /// How much is read to decide, and to show. Enough for a screenful of any file and
+    /// small enough that a huge one costs nothing.
+    public static let prefixLimit = 128 * 1024
+
+    /// How much is looked at to decide text or binary. The whole prefix would do; this
+    /// is the conventional window and it keeps the decision cheap.
+    static let sniffLimit = 8 * 1024
+
+    public let kind: Kind
+    public let prefix: Data
+    public let isTruncated: Bool
+    public let size: Int
+
+    public var text: String? {
+        guard kind.isText else { return nil }
+        return String(decoding: prefix, as: UTF8.self)
+    }
+
+    public init(kind: Kind, prefix: Data, isTruncated: Bool, size: Int) {
+        self.kind = kind
+        self.prefix = prefix
+        self.isTruncated = isTruncated
+        self.size = size
+    }
+
+    public enum Failure: Error, Equatable {
+        case gone
+        case notReadable
+        case isDirectory
+    }
+
+    /// Read enough of a file to show its start, and decide what it is.
+    public static func read(_ url: URL, limit: Int = prefixLimit) throws -> FileProbe {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey, .isRegularFileKey])
+        if values?.isDirectory == true { throw Failure.isDirectory }
+        guard let values, values.isRegularFile == true else { throw Failure.gone }
+        let size = values.fileSize ?? 0
+
+        guard let handle = try? FileHandle(forReadingFrom: url) else { throw Failure.notReadable }
+        defer { try? handle.close() }
+        let prefix = (try? handle.read(upToCount: limit)) ?? Data()
+
+        return FileProbe(kind: classify(prefix, filename: url.lastPathComponent, size: size),
+                         prefix: prefix,
+                         isTruncated: size > prefix.count,
+                         size: size)
+    }
+
+    /// Text or not, from the first bytes and the name.
+    ///
+    /// A NUL byte means binary: no text encoding this app shows puts one in the middle
+    /// of a document, and every binary format has them early. Invalid UTF-8 means
+    /// binary too, which catches UTF-16 (its ASCII is NUL-padded anyway) and every
+    /// compressed or compiled format.
+    ///
+    /// An empty file is text. There is nothing in it to be binary.
+    public static func classify(_ prefix: Data, filename: String, size: Int) -> Kind {
+        let window = prefix.prefix(sniffLimit)
+        if window.contains(0) { return .binary(describedAs: describe(filename, size: size)) }
+        if window.isEmpty { return .text }
+
+        // A prefix cut mid-character is not a reason to call a file binary, so the last
+        // few bytes of a truncated read are allowed to be an incomplete sequence.
+        if String(data: window, encoding: .utf8) == nil {
+            let trimmed = window.dropLast(min(3, window.count))
+            if String(data: trimmed, encoding: .utf8) == nil {
+                return .binary(describedAs: describe(filename, size: size))
+            }
+        }
+        return .text
+    }
+
+    /// What to say about a file instead of showing it.
+    static func describe(_ filename: String, size: Int) -> String {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        let kind = knownKinds[ext] ?? (ext.isEmpty ? "Binary file" : "\(ext.uppercased()) file")
+        return "\(kind), \(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))"
+    }
+
+    private static let knownKinds: [String: String] = [
+        "png": "PNG image", "jpg": "JPEG image", "jpeg": "JPEG image", "gif": "GIF image",
+        "heic": "HEIC image", "webp": "WebP image", "tiff": "TIFF image", "icns": "Icon",
+        "pdf": "PDF document", "zip": "Zip archive", "gz": "Gzip archive", "tar": "Tar archive",
+        "mp3": "Audio", "wav": "Audio", "m4a": "Audio", "mp4": "Video", "mov": "Video",
+        "o": "Object file", "a": "Static library", "dylib": "Dynamic library",
+        "so": "Shared library", "class": "Java class", "wasm": "WebAssembly",
+        "sqlite": "SQLite database", "db": "Database", "bin": "Binary file",
+        "ttf": "Font", "otf": "Font", "woff": "Font", "woff2": "Font",
+    ]
+}

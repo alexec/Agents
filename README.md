@@ -12,9 +12,14 @@ open Agents.xcodeproj
 From the command line:
 
 ```sh
-xcodebuild -scheme Agents -destination 'platform=macOS' build
+xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
 ```
+
+`-skipPackagePluginValidation` is needed because SwiftTerm ships a build-tool plug-in,
+and Xcode will not run one from the command line until it has been trusted. Xcode itself
+asks once and remembers; `xcodebuild` has nobody to ask, and fails with three unexplained
+build commands instead.
 
 ## The daemon
 

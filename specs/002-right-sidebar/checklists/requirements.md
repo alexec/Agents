@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain (1 open: FR-046, what counts as an artifact)
+- [x] No [NEEDS CLARIFICATION] markers remain (FR-046 answered 2026-09-18)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -33,6 +33,10 @@
 
 - FR-026 answered on 2026-09-18: a shell outlives the window, the way an agent does. The daemon owns
   shells, which added FR-027 to FR-029 and SC-010.
-- FR-046 is still open, and it changes scope rather than detail: how much of the agent's output the
-  artifacts pane is responsible for. Answer it before `/speckit-plan`.
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
+- FR-046 answered on 2026-09-18: an artifact is only what the runtime marks, meaning a
+  `resource_link` or an embedded `resource` block. This narrows the pane to a filter over the
+  transcript with nothing behind it, and it was chosen knowing that no runtime installed here sends
+  those blocks yet, so the pane ships empty. The "what changed" question it might have answered goes
+  to the files pane under FR-013, which already has a reliable feed.
+- All items are now complete. `/speckit-plan` and `/speckit-tasks` ran on 2026-09-18, producing plan.md, research.md,
+  data-model.md, contracts/, quickstart.md and tasks.md (89 tasks). Ready for `/speckit-implement`.

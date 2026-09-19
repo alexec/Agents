@@ -116,6 +116,34 @@ extension DaemonCore {
                 try await answerPermission(request)
                 return .success([:])
 
+            case DaemonAPI.Method.shellAttach:
+                let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
+                return .success(try JSONValue.encoding(try attachShell(request)))
+
+            case DaemonAPI.Method.shellDetach:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                detachShell(request.agentID)
+                return .success([:])
+
+            case DaemonAPI.Method.shellInput:
+                let request = try require(params, as: DaemonAPI.ShellInputRequest.self)
+                try writeToShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellResize:
+                let request = try require(params, as: DaemonAPI.ShellResizeRequest.self)
+                resizeShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellSignal:
+                let request = try require(params, as: DaemonAPI.ShellSignalRequest.self)
+                try signalShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellRestart:
+                let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
+                return .success(try JSONValue.encoding(try restartShell(request)))
+
             default:
                 return .failure(.methodNotFound(method))
             }
