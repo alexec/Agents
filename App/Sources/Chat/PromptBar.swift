@@ -54,21 +54,21 @@ struct PromptBar: View {
                 }
                 .buttonStyle(.glass)
                 .font(.footnote)
-                .help(model.draftCwd?.path(percentEncoded: false) ?? "The folder the agent works in")
+                .help(model.draftCwd.map { "Folder: \($0.path(percentEncoded: false))" } ?? "Folder")
 
                 Spacer(minLength: 8)
 
-                Menu(model.draftRuntimeID.map(runtimeName) ?? "Runtime") {
+                SelectCapsule(name: "Runtime",
+                              title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
                     ForEach(model.availableRuntimes) { status in
-                        Button(status.runtime.name) { chooseRuntime(status.runtime.id) }
+                        SelectChoice(title: status.runtime.name,
+                                     description: nil,
+                                     isChosen: status.runtime.id == model.draftRuntimeID) {
+                            chooseRuntime(status.runtime.id)
+                            dismiss()
+                        }
                     }
                 }
-                .menuStyle(.borderlessButton)
-                .font(.footnote)
-                .fixedSize()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .glassEffect(.regular.interactive(), in: .capsule)
                 .disabled(model.availableRuntimes.isEmpty)
             }
         }
@@ -121,20 +121,32 @@ struct PromptBar: View {
         } else if !shown.isEmpty {
             // What the agent is allowed to do on the left, how well it does it on the
             // right. Different kinds of decision, so they sit apart.
+            //
+            // One arrangement, deliberately. Anything that measures the width and
+            // picks a layout from it can end up re-measuring what it just changed,
+            // and AppKit kills the app when that loop reaches the window: first a
+            // custom Layout did it, then ViewThatFits did it intermittently. These
+            // are a few short capsules and they fit.
             HStack(spacing: 10) {
-                WrappingRow(spacing: 10, lineSpacing: 10) {
-                    ForEach(shown.filter(\.isAboutPermission)) { option in
-                        OptionMenu(option: option, chosen: binding(for: option))
-                    }
-                }
+                permissionOptions(shown)
                 Spacer(minLength: 16)
-                WrappingRow(spacing: 10, lineSpacing: 10) {
-                    ForEach(shown.filter { !$0.isAboutPermission }) { option in
-                        OptionMenu(option: option, chosen: binding(for: option))
-                    }
-                }
+                otherOptions(shown)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func permissionOptions(_ shown: [ConfigOption]) -> some View {
+        ForEach(shown.filter(\.isAboutPermission)) { option in
+            OptionMenu(option: option, chosen: binding(for: option))
+        }
+    }
+
+    @ViewBuilder
+    private func otherOptions(_ shown: [ConfigOption]) -> some View {
+        ForEach(shown.filter { !$0.isAboutPermission }) { option in
+            OptionMenu(option: option, chosen: binding(for: option))
         }
     }
 
