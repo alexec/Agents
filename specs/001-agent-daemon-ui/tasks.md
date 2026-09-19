@@ -26,11 +26,11 @@ rather than an option.
 
 **Purpose**: Make the bundle the design assumes buildable before any of it is written
 
-- [ ] T001 Add the `agentsd` target to `project.yml`: type `tool`, macOS, depends on the `AgentsKit` package, sources `Daemon/Sources`
-- [ ] T002 Add a copy-files build phase to the `Agents` target in `project.yml` putting the built `agentsd` into `Contents/Helpers`, and confirm with `xcodegen generate && xcodebuild -scheme Agents build` that the helper lands in the bundle
-- [ ] T003 [P] Create `Daemon/Sources/main.swift` as a placeholder that prints its version and exits, so the copy phase has something real to carry
-- [ ] T004 [P] Delete the scaffold placeholder `Packages/AgentsKit/Sources/AgentsKit/Agents.swift` and `Packages/AgentsKit/Tests/AgentsKitTests/AgentsTests.swift`
-- [ ] T005 [P] Confirm `App/Agents.entitlements` has no `com.apple.security.app-sandbox` key and that `ENABLE_HARDENED_RUNTIME: YES` is set in `project.yml`, per the plan's Constraints
+- [X] T001 Add the `agentsd` target to `project.yml`: type `tool`, macOS, depends on the `AgentsKit` package, sources `Daemon/Sources`
+- [X] T002 Add a copy-files build phase to the `Agents` target in `project.yml` putting the built `agentsd` into `Contents/Helpers`, and confirm with `xcodegen generate && xcodebuild -scheme Agents build` that the helper lands in the bundle
+- [X] T003 [P] Create `Daemon/Sources/main.swift` as a placeholder that prints its version and exits, so the copy phase has something real to carry
+- [X] T004 [P] Delete the scaffold placeholder `Packages/AgentsKit/Sources/AgentsKit/Agents.swift` and `Packages/AgentsKit/Tests/AgentsKitTests/AgentsTests.swift`
+- [X] T005 [P] Confirm `App/Agents.entitlements` has no `com.apple.security.app-sandbox` key and that `ENABLE_HARDENED_RUNTIME: YES` is set in `project.yml`, per the plan's Constraints
 
 ---
 
@@ -42,26 +42,26 @@ rather than an option.
 
 ### The wire
 
-- [ ] T006 Implement line-delimited JSON-RPC 2.0 framing in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCCodec.swift`: one object per line, no headers, requests, responses, notifications and errors
-- [ ] T007 Implement `JSONRPCConnection` as an actor in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCConnection.swift` over any pair of byte streams: request/response correlation by id, an `AsyncStream` of incoming notifications, and an incoming-request handler the owner supplies
-- [ ] T008 [P] Map JSON-RPC errors to a Swift error type in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCError.swift`, keeping `code`, `message` and `data`, with `-32601 Method not found` distinguishable because resume-versus-load depends on recognising it
-- [ ] T009 [P] Unit-test the codec and the connection in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/JSONRPCTests.swift`: split lines, concatenated lines, a reply arriving out of order, an unknown incoming method, a malformed line not killing the connection
+- [X] T006 Implement line-delimited JSON-RPC 2.0 framing in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCCodec.swift`: one object per line, no headers, requests, responses, notifications and errors
+- [X] T007 Implement `JSONRPCConnection` as an actor in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCConnection.swift` over any pair of byte streams: request/response correlation by id, an `AsyncStream` of incoming notifications, and an incoming-request handler the owner supplies
+- [X] T008 [P] Map JSON-RPC errors to a Swift error type in `Packages/AgentsKit/Sources/AgentsKit/JSONRPC/JSONRPCError.swift`, keeping `code`, `message` and `data`, with `-32601 Method not found` distinguishable because resume-versus-load depends on recognising it
+- [X] T009 [P] Unit-test the codec and the connection in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/JSONRPCTests.swift`: split lines, concatenated lines, a reply arriving out of order, an unknown incoming method, a malformed line not killing the connection
 
 ### The types
 
-- [ ] T010 [P] Create `Agent` in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift` with the fields and invariants in data-model.md: `id` UUID ours and never changing, `runtimeId`, `cwd` absolute URL, `title` optional, `state`, `runtimeSessionId` optional in any state, `startOptions`, `createdAt`, `lastActivityAt`, `endedReason` optional, `archivedReason` optional
-- [ ] T011 [P] Create `AgentState` and its transition function in `Packages/AgentsKit/Sources/AgentsKit/Model/AgentState.swift`: exactly one of `running`, `waitingOnUser`, `finished`, `stopped`, `archived`; `finished` reachable only by `endTurn`; nothing reaching `archived` without the user; a prompt from any non-running state starting a turn
-- [ ] T012 [P] Create `EndedReason` in `Packages/AgentsKit/Sources/AgentsKit/Model/EndedReason.swift` with exactly `endTurn`, `maxTokens`, `maxTurnRequests`, `refusal`, `cancelled`, `processDied`, `daemonGone`
-- [ ] T013 [P] Create `TranscriptEntry` in `Packages/AgentsKit/Sources/AgentsKit/Model/TranscriptEntry.swift`: `id`, `at`, `kind`, payload, with the eleven kinds in data-model.md including `runtimeNote`
-- [ ] T014 [P] Create `ConfigOption`, `StartOptions` and `PermissionRequest` in `Packages/AgentsKit/Sources/AgentsKit/Model/Options.swift` and `.../Model/PermissionRequest.swift`, keeping `configOptions` exactly as advertised and never interpreting a field beyond `id`, `name`, `description`, `category`, `type`, `currentValue`, `options`
-- [ ] T015 [P] Unit-test the state machine in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentStateTests.swift`, including the transitions that must be refused
+- [X] T010 [P] Create `Agent` in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift` with the fields and invariants in data-model.md: `id` UUID ours and never changing, `runtimeId`, `cwd` absolute URL, `title` optional, `state`, `runtimeSessionId` optional in any state, `startOptions`, `createdAt`, `lastActivityAt`, `endedReason` optional, `archivedReason` optional
+- [X] T011 [P] Create `AgentState` and its transition function in `Packages/AgentsKit/Sources/AgentsKit/Model/AgentState.swift`: exactly one of `running`, `waitingOnUser`, `finished`, `stopped`, `archived`; `finished` reachable only by `endTurn`; nothing reaching `archived` without the user; a prompt from any non-running state starting a turn
+- [X] T012 [P] Create `EndedReason` in `Packages/AgentsKit/Sources/AgentsKit/Model/EndedReason.swift` with exactly `endTurn`, `maxTokens`, `maxTurnRequests`, `refusal`, `cancelled`, `processDied`, `daemonGone`
+- [X] T013 [P] Create `TranscriptEntry` in `Packages/AgentsKit/Sources/AgentsKit/Model/TranscriptEntry.swift`: `id`, `at`, `kind`, payload, with the eleven kinds in data-model.md including `runtimeNote`
+- [X] T014 [P] Create `ConfigOption`, `StartOptions` and `PermissionRequest` in `Packages/AgentsKit/Sources/AgentsKit/Model/Options.swift` and `.../Model/PermissionRequest.swift`, keeping `configOptions` exactly as advertised and never interpreting a field beyond `id`, `name`, `description`, `category`, `type`, `currentValue`, `options`
+- [X] T015 [P] Unit-test the state machine in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentStateTests.swift`, including the transitions that must be refused
 
 ### The record
 
-- [ ] T016 Implement `AgentStore` in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore.swift`: the layout in data-model.md under `~/Library/Application Support/Agents/`, `agent.json` written whole and atomically on every change, `transcript.jsonl` appended and never rewritten, a single writer, and a root that is injectable so tests use a temporary directory
+- [X] T016 Implement `AgentStore` in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore.swift`: the layout in data-model.md under `~/Library/Application Support/Agents/`, `agent.json` written whole and atomically on every change, `transcript.jsonl` appended and never rewritten, a single writer, and a root that is injectable so tests use a temporary directory
 - [ ] T017 Implement recovery in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore+Recovery.swift`: read every agent record on start, tolerate a half-written last line in a transcript, and return the agents whose processes must be checked
-- [ ] T018 [P] Implement paged transcript reads in `Packages/AgentsKit/Sources/AgentsKit/Store/TranscriptReader.swift`, newest last, by range, so nothing ever loads a whole transcript
-- [ ] T019 [P] Unit-test the store in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentStoreTests.swift`: append, reread in order, a truncated final line, an atomic record write surviving a simulated crash mid-write
+- [X] T018 [P] Implement paged transcript reads in `Packages/AgentsKit/Sources/AgentsKit/Store/TranscriptReader.swift`, newest last, by range, so nothing ever loads a whole transcript
+- [X] T019 [P] Unit-test the store in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentStoreTests.swift`: append, reread in order, a truncated final line, an atomic record write surviving a simulated crash mid-write
 
 ### Talking to a runtime
 

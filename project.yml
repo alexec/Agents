@@ -50,6 +50,12 @@ targets:
       - path: App/Resources
     dependencies:
       - package: AgentsKit
+      # The helper goes in the bundle, so there is one thing to build, one thing to
+      # sign, and nothing for anyone to install.
+      - target: agentsd
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     info:
       path: App/Info.plist
       properties:
@@ -73,6 +79,22 @@ targets:
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
+  agentsd:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Daemon/Sources
+    dependencies:
+      - package: AgentsKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.daemon
+        PRODUCT_NAME: agentsd
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+
 schemes:
   Agents:
     build:
