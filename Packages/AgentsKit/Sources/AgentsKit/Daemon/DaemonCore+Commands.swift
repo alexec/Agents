@@ -13,7 +13,17 @@ extension DaemonCore {
         let draftID = UUID()
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
                                 session: session, sessionID: sessionID)
-        return DaemonAPI.OptionsResponse(draftID: draftID, options: await session.options)
+        // The commands arrive as an update a moment after the session exists rather
+        // than with it, so a new chat waits briefly for them. Half a second is the
+        // difference between a prompt that knows what it takes and one that learns
+        // after the first thing is typed into it.
+        let deadline = ContinuousClock.now.advanced(by: .milliseconds(500))
+        while await session.commands.isEmpty, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return DaemonAPI.OptionsResponse(draftID: draftID,
+                                         options: await session.options,
+                                         commands: await session.commands)
     }
 
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
@@ -34,6 +44,7 @@ extension DaemonCore {
                           runtimeSessionID: sessionID,
                           startOptions: request.startOptions,
                           advertisedOptions: await session.options,
+                          availableCommands: await session.commands,
                           endedReason: .endTurn)
         agents[agent.id] = agent
         try await store.save(agent)
@@ -129,6 +140,7 @@ extension DaemonCore {
             updated.runtimeSessionID = result.sessionId
         }
         updated.advertisedOptions = await session.options
+        updated.availableCommands = await session.commands
         changed(updated)
         await session.apply(updated.startOptions)
         live[agent.id] = session

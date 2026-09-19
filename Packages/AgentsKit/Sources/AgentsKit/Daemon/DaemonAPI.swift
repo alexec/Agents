@@ -42,9 +42,19 @@ public enum DaemonAPI {
     public struct OptionsResponse: Codable, Sendable {
         public var draftID: UUID
         public var options: [ConfigOption]
-        public init(draftID: UUID, options: [ConfigOption]) {
+        public var commands: [SlashCommand]
+
+        public init(draftID: UUID, options: [ConfigOption], commands: [SlashCommand] = []) {
             self.draftID = draftID
             self.options = options
+            self.commands = commands
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            draftID = try c.decode(UUID.self, forKey: .draftID)
+            options = try c.decodeIfPresent([ConfigOption].self, forKey: .options) ?? []
+            commands = try c.decodeIfPresent([SlashCommand].self, forKey: .commands) ?? []
         }
     }
 

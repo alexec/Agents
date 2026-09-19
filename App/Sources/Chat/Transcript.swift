@@ -58,16 +58,13 @@ private struct EntryRow: View {
     var body: some View {
         switch entry.kind {
         case .userMessage(let text):
-            Text(text)
-                .textSelection(.enabled)
+            MarkdownText(markdown: text)
                 .padding(12)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .agentMessage(_, let text):
-            Text(text)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            MarkdownText(markdown: text)
 
         case .agentThought(_, let text):
             Text(text)
@@ -134,15 +131,54 @@ private struct ToolRunRow: View {
     }
 }
 
+/// One tool call: what it is doing, and its detail only when asked for.
 private struct ToolCallLine: View {
     let call: ToolCall
+    @State private var isShowingDetail = false
 
     var body: some View {
-        Text(call.title)
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(call.title)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                if detail != nil {
+                    Button(isShowingDetail ? "Less" : "More") { isShowingDetail.toggle() }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                }
+            }
+            if isShowingDetail, let detail {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Text(detail)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                        .padding(10)
+                }
+                .frame(maxHeight: 260)
+                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
     }
+
+    /// What the runtime sent, as it sent it. Every runtime describes its tools
+    /// differently and none of that is ours to tidy.
+    private var detail: String? {
+        guard let raw = call.raw else { return nil }
+        let interesting = raw["rawInput"] ?? raw["content"] ?? raw
+        if let text = interesting.stringValue { return text }
+        guard let data = try? JSONEncoder.pretty.encode(interesting) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+}
+
+private extension JSONEncoder {
+    static let pretty: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return e
+    }()
 }
 
 private struct StateLine: View {

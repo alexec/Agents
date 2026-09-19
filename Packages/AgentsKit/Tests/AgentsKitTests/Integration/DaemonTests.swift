@@ -325,3 +325,53 @@ struct DaemonTests {
         #expect(await core.isHoldingAgents == false, "nothing is left running behind an archived agent")
     }
 }
+
+@Suite("Slash commands, end to end", .timeLimit(.minutes(1)))
+struct DaemonSlashCommandTests {
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsSlashTests-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), work)
+    }
+
+    private var commandsUpdate: JSONValue {
+        ["sessionUpdate": "available_commands_update",
+         "availableCommands": [["name": "review", "description": "Run code review"],
+                               ["name": "add-dir", "description": "Allow a directory",
+                                "input": ["hint": "directory"]]]]
+    }
+
+    @Test func aNewChatKnowsWhatTheRuntimeTakes() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.updates = [commandsUpdate]
+        let launcher = FakeLauncher(script: script)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher)
+
+        // The commands arrive with the first turn in the fake, as they do in a real
+        // runtime: after the session exists rather than with it.
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(200))
+
+        let agent = await core.agent(id)
+        #expect(agent?.availableCommands.map(\.name) == ["review", "add-dir"])
+        #expect(agent?.availableCommands.last?.inputHint == "directory")
+    }
+
+    @Test func theyAreKeptOnTheRecordForAnAgentWithNoProcessLeft() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.updates = [commandsUpdate]
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher(script: script))
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(await core.agent(id)?.state == .finished, "its runtime has been let go")
+
+        let reread = try await AgentStore(locations: locations).load(id)
+        #expect(reread.availableCommands.map(\.name) == ["review", "add-dir"])
+    }
+}

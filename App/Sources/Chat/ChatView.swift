@@ -30,19 +30,5 @@ struct ChatView: View {
         .animation(.snappy(duration: 0.28), value: model.selection)
         .navigationTitle(agent?.title ?? "New agent")
         .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
-        .toolbar {
-            if let agent {
-                ToolbarItemGroup {
-                    if agent.state.holdsRuntime {
-                        Button("Stop") { Task { await model.stop(agent.id) } }
-                    }
-                    if agent.state == .archived {
-                        Button("Bring back") { Task { await model.unarchive(agent.id) } }
-                    } else {
-                        Button("Archive") { Task { await model.archive(agent.id) } }
-                    }
-                }
-            }
-        }
     }
 }

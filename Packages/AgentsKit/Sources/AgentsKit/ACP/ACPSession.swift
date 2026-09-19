@@ -4,6 +4,7 @@ import Foundation
 public enum ACPSessionEvent: Sendable {
     case entry(TranscriptEntry.Kind)
     case optionsChanged([ConfigOption])
+    case commandsChanged([SlashCommand])
     case titleChanged(String)
     /// The agent is blocked until `answerPermission` is called with one of the options.
     case permissionRequested(PermissionRequest)
@@ -41,6 +42,7 @@ public actor ACPSession {
 
     public private(set) var sessionID: String?
     public private(set) var options: [ConfigOption] = []
+    public private(set) var commands: [SlashCommand] = []
     public private(set) var initializeResult: ACP.InitializeResult?
 
     /// True while a `session/load` replay is arriving. The replayed conversation is
@@ -209,6 +211,9 @@ public actor ACPSession {
         case .options(let options):
             self.options = options
             eventsContinuation.yield(.optionsChanged(options))
+        case .commands(let commands):
+            self.commands = commands
+            eventsContinuation.yield(.commandsChanged(commands))
         case .modeChanged(let mode):
             eventsContinuation.yield(.entry(.optionChanged(id: "mode", value: .string(mode))))
         case .title(let title):

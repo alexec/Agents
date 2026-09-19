@@ -33,6 +33,7 @@ final class AppModel {
     var draftCwd: URL?
     var draftRuntimeID: String?
     private(set) var draftOptions: [ConfigOption] = []
+    private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
     private(set) var isLoadingDraftOptions = false
     private var draftID: UUID?
@@ -196,6 +197,7 @@ final class AppModel {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
         isLoadingDraftOptions = true
         draftOptions = []
+        draftCommands = []
         draftChosen = [:]
         draftID = nil
         defer { isLoadingDraftOptions = false }
@@ -205,6 +207,7 @@ final class AppModel {
                                                  returning: DaemonAPI.OptionsResponse.self)
             draftID = response.draftID
             draftOptions = response.options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
+            draftCommands = response.commands
             for option in draftOptions where option.currentValue != nil {
                 draftChosen[option.id] = option.currentValue
             }

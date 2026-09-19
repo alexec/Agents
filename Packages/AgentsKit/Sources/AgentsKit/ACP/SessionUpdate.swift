@@ -8,6 +8,7 @@ import Foundation
 public enum SessionUpdate: Sendable {
     case entry(TranscriptEntry.Kind)
     case options([ConfigOption])
+    case commands([SlashCommand])
     case modeChanged(String)
     case title(String)
     case ignored(String)
@@ -39,9 +40,12 @@ public enum SessionUpdate: Sendable {
         case "session_info_update":
             guard let title = update["title"]?.stringValue else { return .ignored(kind) }
             return .title(title)
-        case "available_commands_update", "usage_update":
-            // Slash commands and token counts are later features. Named here so that
-            // "ignored on purpose" and "not recognised" stay different things.
+        case "available_commands_update":
+            let listed = update["availableCommands"]?.arrayValue ?? []
+            return .commands(listed.compactMap(SlashCommand.init(wire:)))
+        case "usage_update":
+            // Token counts are a later feature. Named here so that "ignored on
+            // purpose" and "not recognised" stay different things.
             return .ignored(kind)
         default:
             return .unknown(kind)

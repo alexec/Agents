@@ -22,6 +22,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// stopped a week ago. A finished agent has no process to ask.
     public var advertisedOptions: [ConfigOption]
 
+    /// What the runtime says it takes after a slash. Kept for the same reason as the
+    /// options: a finished agent has no process to ask.
+    public var availableCommands: [SlashCommand]
+
     public var createdAt: Date
     public var lastActivityAt: Date
     public var endedReason: EndedReason?
@@ -43,6 +47,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
         // Records written before the controls moved onto the prompt bar have none.
         advertisedOptions = try c.decodeIfPresent([ConfigOption].self, forKey: .advertisedOptions) ?? []
+        availableCommands = try c.decodeIfPresent([SlashCommand].self, forKey: .availableCommands) ?? []
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
@@ -57,6 +62,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 runtimeSessionID: String? = nil,
                 startOptions: StartOptions = .none,
                 advertisedOptions: [ConfigOption] = [],
+                availableCommands: [SlashCommand] = [],
                 createdAt: Date = Date(),
                 lastActivityAt: Date = Date(),
                 endedReason: EndedReason? = nil,
@@ -69,6 +75,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.runtimeSessionID = runtimeSessionID
         self.startOptions = startOptions
         self.advertisedOptions = advertisedOptions
+        self.availableCommands = availableCommands
         self.createdAt = createdAt
         self.lastActivityAt = lastActivityAt
         self.endedReason = endedReason

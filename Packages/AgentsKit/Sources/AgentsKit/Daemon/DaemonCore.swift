@@ -143,6 +143,11 @@ public actor DaemonCore {
             }
             changed(agent)
 
+        case .commandsChanged(let commands):
+            guard var agent = agents[agentID] else { return }
+            agent.availableCommands = commands
+            changed(agent)
+
         case .titleChanged(let title):
             guard var agent = agents[agentID] else { return }
             agent.title = title

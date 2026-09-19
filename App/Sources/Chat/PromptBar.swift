@@ -10,6 +10,9 @@ struct PromptBar: View {
     @Environment(AppModel.self) private var model
     @State private var text = ""
     @State private var dictation = Dictation()
+    @State private var selectedCommand = 0
+    /// Set when the list is dismissed, so Escape hides it until the word changes.
+    @State private var dismissedCommandTerm: String?
     @State private var isPrimingDictation = false
     @FocusState private var focused: Bool
 
@@ -20,6 +23,11 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
+                if isCompleting {
+                    CommandList(commands: matchingCommands, selected: selectedCommand,
+                                choose: accept)
+                        .transition(.opacity)
+                }
                 field
                 options
             }
@@ -91,8 +99,38 @@ struct PromptBar: View {
                 // editor inserts a line break the way it does everywhere else.
                 .onKeyPress(.return, phases: .down) { press in
                     guard !press.modifiers.contains(.option) else { return .ignored }
-                    send()
+                    // While the list is up, Return takes the command rather than
+                    // sending a half-typed one.
+                    if isCompleting {
+                        acceptSelected()
+                    } else {
+                        send()
+                    }
                     return .handled
+                }
+                .onKeyPress(.tab) {
+                    guard isCompleting else { return .ignored }
+                    acceptSelected()
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    guard isCompleting else { return .ignored }
+                    selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    guard isCompleting else { return .ignored }
+                    selectedCommand = max(selectedCommand - 1, 0)
+                    return .handled
+                }
+                .onKeyPress(.escape) {
+                    guard isCompleting else { return .ignored }
+                    dismissedCommandTerm = commandQuery?.term
+                    return .handled
+                }
+                .onChange(of: text) {
+                    selectedCommand = 0
+                    if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
                 }
 
             Button(action: toggleDictation) {
@@ -168,6 +206,37 @@ struct PromptBar: View {
         dictation.start(appendingTo: text.trimmingCharacters(in: .whitespacesAndNewlines)) { combined in
             text = combined
         }
+    }
+
+    // MARK: What the runtime takes after a slash
+
+    private var availableCommands: [SlashCommand] {
+        agent?.availableCommands ?? model.draftCommands
+    }
+
+    private var commandQuery: SlashQuery? {
+        SlashCommand.query(in: text)
+    }
+
+    private var matchingCommands: [SlashCommand] {
+        guard let commandQuery else { return [] }
+        return SlashCommand.matching(commandQuery.term, in: availableCommands)
+    }
+
+    private var isCompleting: Bool {
+        guard commandQuery != nil, !matchingCommands.isEmpty else { return false }
+        return dismissedCommandTerm != commandQuery?.term
+    }
+
+    private func acceptSelected() {
+        guard matchingCommands.indices.contains(selectedCommand) else { return }
+        accept(matchingCommands[selectedCommand])
+    }
+
+    private func accept(_ command: SlashCommand) {
+        guard let commandQuery else { return }
+        text = command.completing(commandQuery, in: text)
+        selectedCommand = 0
     }
 
     private var placeholder: String {
