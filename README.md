@@ -2,6 +2,12 @@
 
 A Mac app, rebuilt one feature at a time against a written spec.
 
+The window is a list of the projects you work in — a project is a folder, named by that
+folder — with that project's agents beside it in three groups: what needs you, what is
+working, what is done. Each project also has a lead: one agent whose job is the project
+rather than a task, which can start the others, brief them, read how they got on, and
+stop one that has gone wrong, asking you before each move.
+
 ## Build and run
 
 ```sh
@@ -12,9 +18,14 @@ open Agents.xcodeproj
 From the command line:
 
 ```sh
-xcodebuild -scheme Agents -destination 'platform=macOS' build
+xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
 ```
+
+`-skipPackagePluginValidation` is needed because SwiftTerm ships a build-tool plug-in,
+and Xcode will not run one from the command line until it has been trusted. Xcode itself
+asks once and remembers; `xcodebuild` has nobody to ask, and fails with three unexplained
+build commands instead.
 
 ## The daemon
 
@@ -35,6 +46,7 @@ ls ~/Library/Application\ Support/Agents/
 #   daemon.log    what it has been doing
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
+#   projects.json                   only what a folder cannot tell us: archived, added
 
 # By hand, without the app
 ./build/DD/Build/Products/Debug/Agents.app/Contents/Helpers/agentsd
@@ -74,6 +86,14 @@ no way to sign out, so the app shows neither.
   run `agent login`, and `agent` here is Grok.
 - **Conversations the app did not start.** The runtime's own list, ready to be picked up,
   branched, or deleted with a confirmation.
+- **What to ask next.** When a turn ends the agent may offer a few things you might want
+  to say, shown as buttons above the prompt. Tapping one fills the prompt and leaves it
+  to you to send. ACP has no way to carry a suggestion, so the app serves the agent an
+  MCP server with one tool on it and attaches that to every session. Offering the tool
+  is not enough on its own — none of the three called it unasked — so the daemon adds a
+  line to each prompt asking for them. That line goes to the runtime and not into the
+  transcript, which still records what you said. Copilot has a follow-up feature of its
+  own and uses that instead.
 
 To check what each runtime advertises against what the app does with it:
 

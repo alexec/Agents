@@ -63,6 +63,10 @@ actor FakeACPAgent {
     private(set) var clientAnswers: [(method: String, result: Result<JSONValue, JSONRPCError>)] = []
     private(set) var promptContent: JSONValue?
     private(set) var deletedSessions: [String] = []
+    /// What `session/new` was asked for, so a test can see what we attached to a
+    /// session rather than only what we recorded against the agent.
+    private(set) var newSessionParams: JSONValue?
+    private(set) var continuedSessionParams: JSONValue?
 
     init(script: Script = Script(), transport: any LineTransport) {
         self.script = script
@@ -95,6 +99,7 @@ actor FakeACPAgent {
             ])
 
         case ACP.Method.newSession:
+            newSessionParams = params
             if let error = script.newSessionError { return .failure(error) }
             var result: [String: JSONValue] = ["sessionId": .string(sessionID)]
             if let raw = script.rawConfigOptions {
@@ -116,10 +121,12 @@ actor FakeACPAgent {
             return .success(["sessionId": .string("forked-" + sessionID)])
 
         case ACP.Method.resumeSession:
+            continuedSessionParams = params
             if let error = script.sessionGoneError { return .failure(error) }
             return .success([:])
 
         case ACP.Method.loadSession:
+            continuedSessionParams = params
             if let error = script.sessionGoneError { return .failure(error) }
             for update in script.replayOnLoad { await send(update: update) }
             return .success([:])

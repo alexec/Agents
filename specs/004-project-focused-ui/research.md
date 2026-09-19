@@ -35,7 +35,8 @@ including the one into `.archived` (`Daemon/DaemonCore.swift:131`). For an agent
 `lastActivityAt` *is* when it was archived: nothing else can move it, because an archived agent holds
 no runtime (`AgentState.holdsRuntime`) and so receives no updates.
 
-**Decision**: order the archived list by `lastActivityAt` descending. No new field, no migration.
+**Decision**: order the archived list by `lastActivityAt` descending. No timestamp field is added for
+this, and nothing needs migrating.
 
 **Rationale**: adding `archivedAt` would be a second timestamp that has to be kept true, and would be
 absent on every agent archived before this feature — the exact agents the list is for.
@@ -147,3 +148,118 @@ job is to be glanceable while work is in flight.
 
 **Rationale**: the daemon owns what is true about agents. Which of them a window happens to be looking
 at is not that. This also keeps two windows independent, which they are today.
+
+---
+
+## Clarification session 2026-09-18: the project lead
+
+> **The project lead was removed on 2026-09-19.** Sections below that describe a lead agent, its
+> tools, its guards or its permission handling record a design that was built and then taken out
+> again, before the layout it sat on had settled. They are kept as the reasoning for when it comes
+> back. Nothing they describe is in the code.
+
+Five answers turned a layout feature into one that also lets an agent act on other agents. Five more
+findings, checked the same way.
+
+## 10. Lazy start is already built, by someone else, today
+
+**Question**: FR-036 says a lead spends nothing until it is first prompted. Today `agents/start`
+makes a session and sends a prompt in one call. Does a record with no runtime even work?
+
+**Finding**: it does now. The queued-prompts work that landed on `main` on 2026-09-18 added
+`liveSession(for:)` (`Daemon/DaemonCore+Commands.swift:193`), which returns the live session or
+starts the runtime, and creates a new runtime session when the agent has no `runtimeSessionID`
+(`:224`). `sendNextQueued` calls it before a prompt leaves the queue, with the comment "The runtime is
+started before the prompt leaves the queue, so a runtime that will not start leaves the words exactly
+where they were." `Agent` also gained `queuedPrompts` and `AgentState` gained `hasTurnInFlight`.
+
+**Decision**: a lead is created as an ordinary agent record with no `runtimeSessionID`,
+`state: .stopped`, `endedReason: .endTurn` — the same shape `agents/start` already writes — and its
+runtime starts on the first prompt through the path that already exists.
+
+**Rationale**: FR-036 costs one guard rather than a feature. The lead is created by
+`projects/list` when a project first appears, which is a file write and nothing else.
+
+**Consequence**: this feature now depends on that work being on `main`. It is.
+
+## 11. The lead's powers are an MCP server the daemon provides
+
+**Question**: how does a runtime call into us to start an agent? ACP has no client method for it, and
+inventing one means no runtime would ever call it.
+
+**Finding**: `Agent.mcpServers` already exists, is sent at `session/new` and `session/load`
+(`DaemonCore+Commands.swift:212, 226`), and `MCPServer` supports stdio, http and sse, "advertised by
+all three" runtimes (`Model/MCPServer.swift`). The app already ships a helper executable at
+`Agents.app/Contents/Helpers/agentsd` (`Client/DaemonClient.swift:128`), whose source is
+`Daemon/Sources/main.swift`.
+
+**Decision**: the daemon offers the lead one MCP server, named `project`, over stdio:
+`agentsd mcp --agent <uuid>`. That process speaks MCP on its stdio and proxies each tool call to the
+daemon over the Unix socket it already knows how to find. Its tools are `list_agents`, `start_agent`,
+`prompt_agent`, `read_transcript` and `stop_agent`.
+
+**Rationale**: MCP is the one way a runtime will call code we wrote, and all three runtimes take MCP
+servers today. stdio needs no port, no token and no listener — the runtime spawns the helper, and the
+helper is already in the bundle. It also makes the spec's assumption true for free: the powers are
+*offered*, so a runtime that ignores MCP still gives a working conversation about the project.
+
+**Alternatives considered**: an HTTP or SSE server in the daemon. Rejected: a port and a shared secret
+on a single-user Mac, to solve a problem stdio does not have. Extending the ACP client surface with
+custom methods. Rejected: no runtime would call them.
+
+## 12. The approval has to be ours, not the runtime's
+
+**Question**: FR-039 says every action goes through the same permission question as any tool call, and
+FR-040 says "always" is remembered. A runtime asking its own MCP permission question would seem to
+satisfy that.
+
+**Finding**: it would not, and we cannot rely on it. Whether a runtime asks before calling an MCP
+tool is the runtime's decision, it differs between the three, and an answer the user gives inside the
+runtime is invisible to us — so FR-040's "always" would live somewhere we cannot read, per runtime,
+and FR-042's transcript record would be missing the ones the user declined.
+
+**Decision**: the MCP tool call is held by the daemon, which raises an ordinary `PermissionRequest`
+through the surface that already exists, waits for the answer, and then either does the work or
+returns a refusal to the lead as the tool's result. Our question is the authoritative one.
+
+**Rationale**: this is the only design where FR-039, FR-040 and FR-042 are properties of our code
+rather than hopes about someone else's. It reuses `pendingPermissions`, `permissions/pending`,
+`permissions/answer` and the existing question UI, and it works when no window is open, which the
+permission surface already handles.
+
+**Known wrinkle**: a runtime that also asks its own question means two prompts for one action. We
+cannot suppress the runtime's. The live suite gets a case per runtime to find out which do it, and
+the answer is documented rather than designed around, because ours is the one that decides.
+
+## 13. A lead is an agent with a role, not a new kind of thing
+
+**Question**: is the lead a field on `Project`, a second record type, or an `Agent`?
+
+**Decision**: `Agent` gains `role: AgentRole` — `.worker` or `.lead` — optional on read, defaulting to
+`.worker`, so every record written before this feature loads unchanged. A project's lead is the agent
+whose `cwd` is the project folder and whose `role` is `.lead`.
+
+**Rationale**: the lead has a runtime, a folder, a conversation, a state, a transcript, a cost and a
+context meter. It *is* an agent, and making it one means the chat view, the transcript, the prompt bar,
+the permission flow and the store all work on it with no special case. The three differences the spec
+names — created with its project, served the `project` MCP server, not archivable alone — are three
+guards, not a second type.
+
+**Consequence**: `Project` still stores nothing about its lead, so the union in §1 is unchanged and
+`projects.json` keeps holding only archived state.
+
+## 14. The guards are where the danger is
+
+**Question**: what stops a lead starting a lead, reaching another project, or stopping itself?
+
+**Decision**: four checks, in `AgentsKit`, each with its own test:
+
+1. `start_agent` always creates a `.worker`. A lead cannot be made through the tool at all.
+2. Every tool that names an agent checks that agent's `cwd` equals the calling lead's `cwd`, and
+   refuses otherwise. The lead is told why.
+3. `stop_agent` refuses the caller's own id.
+4. The `project` MCP server is attached only to agents whose `role` is `.lead`.
+
+**Rationale**: this is the part of the feature where a mistake reaches somebody's work rather than
+their window, so the rules are pure functions over the records, tested first, in the kit — the same
+treatment path confinement got in 003 for the same reason.

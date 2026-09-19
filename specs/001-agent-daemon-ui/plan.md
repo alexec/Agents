@@ -43,7 +43,12 @@ transcript scrolling smoothly (SC-006).
 
 **Constraints**: No app sandbox: the app exists to run other people's CLIs in arbitrary folders, and
 a sandbox makes that impossible. Hardened runtime on, signed with Alex's team. No login item and
-nothing installed (FR-019, FR-021). No third-party dependencies.
+nothing installed (FR-019, FR-021). No third-party dependencies were needed for this feature.
+
+> Corrected on 2026-09-18: this was read by a later planning pass as a project rule banning
+> dependencies, and it is not one. Dependencies are allowed. 001 simply did not need any. See
+> `specs/002-right-sidebar/research.md` section 3, where the mistake cost a plan to hand-write a
+> terminal emulator before it was caught.
 
 **Scale/Scope**: Tens of agents over the app's life, a handful running at once. A long agent's
 transcript can reach tens of megabytes, so the transcript is streamed and windowed rather than

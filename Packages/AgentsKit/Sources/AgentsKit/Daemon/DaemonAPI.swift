@@ -24,11 +24,31 @@ public enum DaemonAPI {
         public static let agentsUnarchive = "agents/unarchive"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
+        /// Not the app's to call. This is how the MCP server we hand to every agent
+        /// gets what the agent passed it back to the agent's own record.
+        public static let agentsSuggestPrompts = "agents/suggestPrompts"
+        // A project is a folder. These four are everything that can be done to one,
+        // which is to say: notice it, and put it away.
+        public static let projectsList = "projects/list"
+        public static let projectsAdd = "projects/add"
+        public static let projectsArchive = "projects/archive"
+        public static let projectsUnarchive = "projects/unarchive"
+
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
         public static let elicitationsAnswer = "elicitations/answer"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
+
+        // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
+        // which is 003's and belongs to the agent. Different owner, different
+        // identifier space, different lifetime, and nothing crosses (FR-025).
+        public static let shellAttach = "shell/attach"
+        public static let shellDetach = "shell/detach"
+        public static let shellInput = "shell/input"
+        public static let shellResize = "shell/resize"
+        public static let shellSignal = "shell/signal"
+        public static let shellRestart = "shell/restart"
     }
 
     public enum Notification {
@@ -41,14 +61,87 @@ public enum DaemonAPI {
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
+        /// A project appeared, was archived, or its counts moved. Windows upsert by
+        /// folder, the way they upsert agents by id.
+        public static let projectChanged = "project/changed"
+        /// The user's shell printed something. Raw bytes, base64. Not the agent's
+        /// terminal, which is `agentTerminalOutput` above.
+        public static let shellOutput = "shell/output"
+        public static let shellStateChanged = "shell/stateChanged"
     }
 
     // MARK: Requests
 
+    /// Which projects to list. Archived ones come back too by default, the same way
+    /// archived agents do: the window decides what to draw, not us.
+    public struct ProjectsListRequest: Codable, Sendable {
+        public var includeArchived: Bool
+        public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+        }
+    }
+
+    /// One project, named by its folder, because the folder is the identity.
+    public struct ProjectRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    /// A project, plus the parts only the daemon can know.
+    ///
+    /// The name and the counts are worked out here rather than in the window, so that
+    /// two windows cannot disagree and so a sidebar row can say a project needs you
+    /// without that window having looked at the project's agents at all.
+    public struct ProjectSummary: Codable, Hashable, Sendable, Identifiable {
+        public var project: Project
+        /// Disambiguated against every project in the same response.
+        public var name: String
+        /// Whether the directory is there, stamped when this was made.
+        public var exists: Bool
+        /// The newest activity of any agent in it, or `addedAt` when it has none.
+        public var lastActivityAt: Date
+        /// How many agents are in each group.
+        public var counts: [AgentGroup: Int]
+
+        public var id: URL { project.folder }
+        public var folder: URL { project.folder }
+
+        /// Whether anything in this project wants the user.
+        public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 }
+
+        public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
+                    counts: [AgentGroup: Int]) {
+            self.project = project
+            self.name = name
+            self.exists = exists
+            self.lastActivityAt = lastActivityAt
+            self.counts = counts
+        }
+    }
+
     public struct OptionsRequest: Codable, Sendable {
         public var runtimeID: String
         public var cwd: URL
-        public init(runtimeID: String, cwd: URL) { self.runtimeID = runtimeID; self.cwd = cwd }
+        /// The servers chosen so far. The draft session this makes is the one the
+        /// start that follows uses, and a server named after it was made would never
+        /// reach the runtime, so they are sent now and checked again at the start.
+        public var mcpServers: [MCPServer]
+
+        public init(runtimeID: String, cwd: URL, mcpServers: [MCPServer] = []) {
+            self.runtimeID = runtimeID
+            self.cwd = cwd
+            self.mcpServers = mcpServers
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            cwd = try c.decode(URL.self, forKey: .cwd)
+            mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
+        }
     }
 
     /// A session exists before the user has chosen anything, because the options are
@@ -157,6 +250,22 @@ public enum DaemonAPI {
         public init(agentID: UUID, promptID: UUID) {
             self.agentID = agentID
             self.promptID = promptID
+        }
+    }
+
+    /// What the MCP helper sends when an agent calls the suggestion tool.
+    ///
+    /// The token, not an agent id: the helper is a process the runtime started, and
+    /// anything on this Mac can reach the daemon's socket. A token the daemon minted
+    /// for one session is the only thing that says which agent this is, and it is
+    /// refused the moment that session is over.
+    public struct SuggestPromptsRequest: Codable, Sendable {
+        public var token: String
+        public var prompts: [SuggestedPrompt]
+
+        public init(token: String, prompts: [SuggestedPrompt]) {
+            self.token = token
+            self.prompts = prompts
         }
     }
 
@@ -353,6 +462,100 @@ public enum DaemonAPI {
 
     // MARK: Errors the app shows
 
+    // MARK: Shells
+
+    public struct ShellAttachRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var rows: Int
+        public var cols: Int
+
+        public init(agentID: UUID, rows: Int = 24, cols: Int = 80) {
+            self.agentID = agentID
+            self.rows = rows
+            self.cols = cols
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            rows = try c.decodeIfPresent(Int.self, forKey: .rows) ?? 24
+            cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
+        }
+    }
+
+    /// What a window gets on attach: the state, and the bytes to replay.
+    ///
+    /// Bytes, not a screen. The daemon parses nothing; the window feeds these to its
+    /// own emulator and arrives at the screen it would have had if it had been watching
+    /// all along (plan decision 2).
+    public struct ShellAttachResponse: Codable, Sendable {
+        public var state: ShellState
+        public var scrollback: Data
+        public var dropped: Int
+        public var startedAt: Date
+
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+            self.state = state
+            self.scrollback = scrollback
+            self.dropped = dropped
+            self.startedAt = startedAt
+        }
+    }
+
+    public struct ShellInputRequest: Codable, Sendable {
+        public var agentID: UUID
+        /// What the user typed, as bytes. Never a `String`: a keystroke is not always a
+        /// character, and an escape sequence is not text.
+        public var bytes: Data
+
+        public init(agentID: UUID, bytes: Data) {
+            self.agentID = agentID
+            self.bytes = bytes
+        }
+    }
+
+    public struct ShellResizeRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var rows: Int
+        public var cols: Int
+
+        public init(agentID: UUID, rows: Int, cols: Int) {
+            self.agentID = agentID
+            self.rows = rows
+            self.cols = cols
+        }
+    }
+
+    public struct ShellSignalRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var signal: Int32
+
+        public init(agentID: UUID, signal: Int32) {
+            self.agentID = agentID
+            self.signal = signal
+        }
+    }
+
+    public struct ShellOutputNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var bytes: Data
+
+        public init(agentID: UUID, bytes: Data) {
+            self.agentID = agentID
+            self.bytes = bytes
+        }
+    }
+
+    public struct ShellStateNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var state: ShellState
+
+        public init(agentID: UUID, state: ShellState) {
+            self.agentID = agentID
+            self.state = state
+        }
+    }
+
     public enum Failure {
         public static let runtimeNotFound = -32001
         public static let runtimeWillNotStart = -32002
@@ -362,6 +565,10 @@ public enum DaemonAPI {
         /// No longer raised: a prompt sent to a working agent waits its turn rather
         /// than being refused. The number is kept so an older window still reads it.
         public static let alreadyRunning = -32006
+        /// The user's login shell is missing, or the agent's folder has gone (FR-024).
+        public static let shellWillNotStart = -32010
+        /// A restart was asked for on a shell that is still running.
+        public static let shellNotLive = -32011
         /// The runtime is installed and will not work until somebody signs in. Its own
         /// auth methods come back in the error's data, including the command Copilot
         /// names for the terminal.
@@ -372,5 +579,12 @@ public enum DaemonAPI {
         public static let notSupported = -32009
         /// A destructive call that nobody confirmed.
         public static let notConfirmed = -32010
+        /// A folder that is not a project, on archive or unarchive.
+        public static let noSuchProject = -32012
+        /// Archiving a project while one of its agents is still working. Deliberately
+        /// unlike archiving an agent, which stops the one it was given: cancelling
+        /// several turns because somebody tidied their sidebar is not a small thing,
+        /// so this refuses and names them.
+        public static let projectHasLiveAgents = -32013
     }
 }

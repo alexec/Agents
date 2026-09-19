@@ -9,6 +9,10 @@ extension DaemonCore {
         if !live.isEmpty { return true }
         if !pendingPermissions.isEmpty { return true }
         if !drafts.isEmpty { return true }
+        // A shell with a build running in it is work, the same as an agent mid-turn.
+        // Exiting under one would kill the build, which is the whole thing FR-026
+        // promises will not happen (FR-027).
+        if shells.busyCount > 0 { return true }
         return agents.values.contains { $0.state.holdsRuntime }
     }
 
@@ -25,6 +29,9 @@ extension DaemonCore {
                              checkEvery: Duration = .milliseconds(500)) async {
         var idleSince: ContinuousClock.Instant?
         while !Task.isCancelled {
+            // The same tick that asks whether to exit also lets go of shells nobody
+            // has touched for hours (FR-028).
+            reapIdleShells()
             if shouldExit {
                 let start = idleSince ?? ContinuousClock.now
                 idleSince = start

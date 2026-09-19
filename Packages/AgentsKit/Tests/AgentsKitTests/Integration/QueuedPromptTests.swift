@@ -132,4 +132,41 @@ struct QueuedPromptTests {
         await reopened.loadFromDisk()
         #expect(await reopened.agent(id)?.queuedPrompts.map(\.text) == ["two"])
     }
+
+    /// Two callers want to send the same waiting prompt: the user, typing as a turn
+    /// ends, and the turn itself, draining the queue behind them.
+    ///
+    /// Starting a runtime is a long await, and nothing said "already going" until the
+    /// turn task existed, so both could get inside it and the same words went to two
+    /// runtimes — two turns, twice the cost, and an answer to a question asked once.
+    /// Found by a test that queued a prompt in exactly that window.
+    @Test func theSameWaitingPromptIsNotSentTwice() async throws {
+        let (locations, work) = try temporary()
+        let launcher = slowLauncher(.milliseconds(600))
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
+        try await Task.sleep(for: .milliseconds(100))
+        // Queued rather than sent, because a turn is in flight. Stopping then leaves
+        // it exactly where it is — stop means stop, and the queue stays put — which is
+        // an idle agent with something waiting and nothing about to drain it.
+        try await core.prompt(.init(agentID: id, text: "two"))
+        try await core.stop(id)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two"])
+
+        // Both callers at once, which is what the window amounts to.
+        async let first: Void = core.sendNextQueued(to: id)
+        async let second: Void = core.sendNextQueued(to: id)
+        _ = try await (first, second)
+        try await Task.sleep(for: .milliseconds(200))
+
+        var sent: [[String]] = []
+        for fake in launcher.allAgents {
+            guard let blocks = await fake.promptContent?.arrayValue else { continue }
+            sent.append(blocks.compactMap { $0["text"]?.stringValue })
+        }
+        #expect(sent.filter { $0.contains("two") }.count == 1)
+        #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
+    }
 }

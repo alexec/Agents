@@ -69,6 +69,14 @@ struct Transcript: View {
                 withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
             }
             .task(id: model.selection) { await settle(scroller) }
+            // The artifacts pane asked for the message something came from
+            // (FR-042). A message entry is drawn with its own id, so this lands
+            // on it.
+            .onChange(of: model.focusedEntry) {
+                guard let focused = model.focusedEntry else { return }
+                withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(focused, anchor: .center) }
+                model.clearFocus()
+            }
         }
     }
 

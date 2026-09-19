@@ -9,6 +9,11 @@ import UniformTypeIdentifiers
 /// it, which is why this is one view rather than a start form and a composer.
 struct PromptBar: View {
     @Environment(AppModel.self) private var model
+    /// Whether the folder is the caller's to decide rather than this bar's.
+    ///
+    /// Set on a project page, where the folder is the project and changing it would
+    /// start the agent under a different one.
+    var folderIsFixed = false
     @State private var text = ""
     @State private var dictation = Dictation()
     @State private var selectedCommand = 0
@@ -18,6 +23,10 @@ struct PromptBar: View {
     @State private var dismissedMentionTerm: String?
     /// Set when the list is dismissed, so Escape hides it until the word changes.
     @State private var dismissedCommandTerm: String?
+    /// Which of the agent's suggestions is showing, and whether Escape has put them
+    /// away for this turn.
+    @State private var selectedSuggestion = 0
+    @State private var dismissedSuggestions = false
     @State private var isPrimingDictation = false
     @State private var isShowingRuntimeAccount = false
     @State private var isShowingSessions = false
@@ -26,6 +35,35 @@ struct PromptBar: View {
 
     private var agent: Agent? { model.selectedAgent }
     private var isNew: Bool { agent == nil }
+
+    // MARK: What the agent thinks you might ask
+
+    /// The one being offered, of the few the agent sent.
+    ///
+    /// Only while the field is empty: half a typed thought is already the answer to
+    /// what was suggested, and a suggestion sitting behind it would be noise. Only
+    /// while no list is up, because Tab and the arrows belong to the list then.
+    private var suggestion: SuggestedPrompt? {
+        guard let agent, !dismissedSuggestions, text.isEmpty, !isCompleting, !isMentioning else {
+            return nil
+        }
+        let prompts = agent.suggestedPrompts
+        guard !prompts.isEmpty else { return nil }
+        return prompts[min(selectedSuggestion, prompts.count - 1)]
+    }
+
+    /// Take the words. They land in the field rather than going: the agent wrote
+    /// them, and sending them is still the user's move.
+    private func takeSuggestion() {
+        guard let suggestion else { return }
+        text = suggestion.prompt
+        focused = true
+    }
+
+    private func cycleSuggestion(by step: Int) {
+        guard let count = agent?.suggestedPrompts.count, count > 0 else { return }
+        selectedSuggestion = (selectedSuggestion + step + count) % count
+    }
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
@@ -70,7 +108,17 @@ struct PromptBar: View {
                            servers: Binding(get: { model.draftServers },
                                             set: { model.draftServers = $0 }))
         }
-        .onChange(of: model.selection) { text = "" }
+        .onChange(of: model.selection) {
+            text = ""
+            selectedSuggestion = 0
+            dismissedSuggestions = false
+        }
+        // A new set is a new turn's worth, so it starts at the first one and comes
+        // back from having been dismissed.
+        .onChange(of: agent?.suggestedPrompts ?? []) {
+            selectedSuggestion = 0
+            dismissedSuggestions = false
+        }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
         .onChange(of: model.agents.count) { prepare() }
@@ -106,7 +154,7 @@ struct PromptBar: View {
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
-                        Image(systemName: "folder")
+                        Image(systemName: folderIsFixed ? "folder.fill" : "folder")
                         // The folder's own name. The path it sits under is rarely the
                         // thing you are checking, and it is in the tooltip when it is.
                         Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
@@ -115,7 +163,11 @@ struct PromptBar: View {
                 }
                 .buttonStyle(.glass)
                 .font(.footnote)
-                .help(model.draftCwd.map { "Folder: \($0.path(percentEncoded: false))" } ?? "Folder")
+                // On a project page the folder is the project. Changing it there would
+                // start the agent somewhere else and file it under a different project,
+                // which is not something a prompt on this page should be able to do.
+                .disabled(folderIsFixed)
+                .help(folderHelp)
 
                 Spacer(minLength: 8)
 
@@ -177,8 +229,14 @@ struct PromptBar: View {
                     return .handled
                 }
                 .onKeyPress(.tab) {
-                    guard isCompleting || isMentioning else { return .ignored }
-                    acceptSelected()
+                    if isCompleting || isMentioning {
+                        acceptSelected()
+                        return .handled
+                    }
+                    // Tab takes what is being offered, the way it does everywhere else
+                    // something is written ahead of you.
+                    guard suggestion != nil else { return .ignored }
+                    takeSuggestion()
                     return .handled
                 }
                 .onKeyPress(.downArrow) {
@@ -190,7 +248,12 @@ struct PromptBar: View {
                         selectedMention = min(selectedMention + 1, mentions.count - 1)
                         return .handled
                     }
-                    return .ignored
+                    // Nothing typed and something offered: the arrows are how you see
+                    // the rest of what the agent thought of. There is no caret to move
+                    // in an empty field, so nothing is taken away by this.
+                    guard suggestion != nil else { return .ignored }
+                    cycleSuggestion(by: 1)
+                    return .handled
                 }
                 .onKeyPress(.upArrow) {
                     if isCompleting {
@@ -201,7 +264,9 @@ struct PromptBar: View {
                         selectedMention = max(selectedMention - 1, 0)
                         return .handled
                     }
-                    return .ignored
+                    guard suggestion != nil else { return .ignored }
+                    cycleSuggestion(by: -1)
+                    return .handled
                 }
                 .onKeyPress(.escape) {
                     if isCompleting {
@@ -212,7 +277,10 @@ struct PromptBar: View {
                         dismissedMentionTerm = mentionQuery?.term
                         return .handled
                     }
-                    return .ignored
+                    // Put them away, and they stay away until the next turn ends.
+                    guard suggestion != nil else { return .ignored }
+                    dismissedSuggestions = true
+                    return .handled
                 }
                 .onChange(of: text) {
                     selectedCommand = 0
@@ -436,6 +504,11 @@ struct PromptBar: View {
     }
 
     private var placeholder: String {
+        // What the agent thinks you might ask, written where the answer goes. It is
+        // the placeholder rather than anything drawn over the field: the field has
+        // one text style and one origin, and this way the words sit in it exactly as
+        // the typed ones will.
+        if let suggestion { return suggestion.prompt }
         guard let agent else { return "Say what you want done" }
         // While it works, the field says what happens to what you type rather than
         // what the agent is doing. The state line in the transcript says that.
@@ -561,6 +634,14 @@ struct PromptBar: View {
                 await model.send(outgoing, attachments: going)
             }
         }
+    }
+
+    /// What the folder chip says when you hover it. On a project page it says why it
+    /// cannot be pressed, rather than looking broken.
+    private var folderHelp: String {
+        guard let cwd = model.draftCwd else { return "Folder" }
+        let path = cwd.path(percentEncoded: false)
+        return folderIsFixed ? "This project's folder: \(path)" : "Folder: \(path)"
     }
 
     /// What an agent can reach beyond its own folder, said in the control itself.

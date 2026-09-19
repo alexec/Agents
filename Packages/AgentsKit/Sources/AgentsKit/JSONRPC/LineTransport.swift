@@ -25,7 +25,18 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
     private let closed = ManagedAtomicFlag()
 
+    /// Writing to a pipe whose other end has gone raises `SIGPIPE`, and the default
+    /// disposition for that is to kill the process. Every descriptor this class writes
+    /// to belongs to something that gets killed, so without this a runtime exiting at
+    /// the wrong moment takes the daemon down and every agent with it. Ignored once,
+    /// process-wide: `write` then returns `EPIPE`, which the loop below already knows
+    /// what to do with.
+    private static let ignoreBrokenPipes: Void = {
+        signal(SIGPIPE, SIG_IGN)
+    }()
+
     public init(readFD: Int32, writeFD: Int32) {
+        _ = Self.ignoreBrokenPipes
         self.readFD = readFD
         self.writeFD = writeFD
         var c: AsyncThrowingStream<String, any Error>.Continuation!

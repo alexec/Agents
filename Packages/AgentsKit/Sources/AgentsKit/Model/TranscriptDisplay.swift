@@ -29,6 +29,10 @@ extension TranscriptEntry {
         var items: [TranscriptItem] = []
         var run: [ToolCall] = []
         var runID = UUID()
+        /// The suggestion calls we are not drawing. Kept by id because the update that
+        /// follows one carries neither the name nor the title: on its own it reads as
+        /// an anonymous "Tool call", and that is what would end up on screen.
+        var suppressed: Set<String> = []
 
         func closeRun() {
             guard !run.isEmpty else { return }
@@ -40,6 +44,14 @@ extension TranscriptEntry {
         for entry in coalesced(entries) {
             switch entry.kind {
             case .toolCall(let call), .toolCallUpdate(let call):
+                // The app's own suggestion tool is not drawn. It is not hidden work:
+                // what it did is the row above the prompt, and a line here saying so
+                // would be the same thing said twice.
+                if call.isSuggestingPrompts {
+                    if let id = call.toolCallID { suppressed.insert(id) }
+                    continue
+                }
+                if let id = call.toolCallID, suppressed.contains(id) { continue }
                 // An update is the same call further along, so it replaces the one
                 // already in the run rather than adding a line to it.
                 if let id = call.toolCallID, let existing = run.firstIndex(where: { $0.toolCallID == id }) {

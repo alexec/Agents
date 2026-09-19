@@ -9,6 +9,23 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.projectsList:
+                let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    allProjects(includeArchived: request.includeArchived)))
+
+            case DaemonAPI.Method.projectsAdd:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await addProject(request.folder)))
+
+            case DaemonAPI.Method.projectsArchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await archiveProject(request.folder)))
+
+            case DaemonAPI.Method.projectsUnarchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
@@ -104,6 +121,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
 
+            case DaemonAPI.Method.agentsSuggestPrompts:
+                let request = try require(params, as: DaemonAPI.SuggestPromptsRequest.self)
+                return .success(["note": .string(try await suggestPrompts(request))])
+
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))
 
@@ -111,6 +132,34 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.AnswerRequest.self)
                 try await answerPermission(request)
                 return .success([:])
+
+            case DaemonAPI.Method.shellAttach:
+                let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
+                return .success(try JSONValue.encoding(try attachShell(request)))
+
+            case DaemonAPI.Method.shellDetach:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                detachShell(request.agentID)
+                return .success([:])
+
+            case DaemonAPI.Method.shellInput:
+                let request = try require(params, as: DaemonAPI.ShellInputRequest.self)
+                try writeToShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellResize:
+                let request = try require(params, as: DaemonAPI.ShellResizeRequest.self)
+                resizeShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellSignal:
+                let request = try require(params, as: DaemonAPI.ShellSignalRequest.self)
+                try signalShell(request)
+                return .success([:])
+
+            case DaemonAPI.Method.shellRestart:
+                let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
+                return .success(try JSONValue.encoding(try restartShell(request)))
 
             default:
                 return .failure(.methodNotFound(method))

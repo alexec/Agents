@@ -1,5 +1,10 @@
 # Data Model: Projects, not agents
 
+> **The project lead was removed on 2026-09-19.** Sections below that describe a lead agent, its
+> tools, its guards or its permission handling record a design that was built and then taken out
+> again, before the layout it sat on had settled. They are kept as the reasoning for when it comes
+> back. Nothing they describe is in the code.
+
 ## Project
 
 A directory the user works in. Lives in `AgentsKit/Model/Project.swift`.
@@ -24,6 +29,8 @@ Derived, never stored:
 ### Invariants
 
 - Exactly one project per distinct folder. Two records for one folder is a bug, not a state.
+- Exactly one agent with `role == .lead` per project. Zero means one has not been made yet, which
+  `projects/list` fixes on sight; two is a bug.
 - A project record exists only when there is something to remember: it is archived, or it was added
   before any agent ran in it. Every other project is derived from its agents.
 - Archiving never touches the directory. Nothing in this feature creates, moves, renames or deletes
@@ -46,6 +53,19 @@ A derived project that is archived gains a record at that moment. A record whose
 unarchived and which has agents could be dropped; it is kept, because `addedAt` is cheap and losing
 it would reorder a sidebar for no gain.
 
+### The lead's own lifecycle
+
+```text
+   project appears in projects/list ──▶ lead record written (no runtime, nothing spent)
+   first prompt to the lead         ──▶ runtime starts via liveSession(for:)   [research §10]
+   project archived                 ──▶ lead's state becomes .archived with the project
+   project unarchived               ──▶ lead's state restored, transcript intact
+```
+
+The lead is created by `projects/list`, because that is the one call every window makes and the one
+place a project is known to exist. Writing a record is a file write: no process, no tokens (FR-036).
+A lead is never created by `start_agent`, and there is no other route to `.lead`.
+
 ## Storage
 
 One file: `~/Library/Application Support/Agents/projects.json`, a JSON array of project records,
@@ -59,6 +79,9 @@ written whole on every change. Added to `StoreLocations` as `projects`.
 ]
 ```
 
+The lead is not in this file. It is an agent, found by `cwd` and `role`, so `projects.json` keeps
+holding only what cannot be derived (research §13).
+
 Whole-file writes are right here: the list is tens of entries for one person, it changes when a user
 archives something, and one file that can be read with `cat` matches how agents are stored. A missing
 or unreadable file is an empty list — every live project still appears, derived from its agents, and
@@ -66,7 +89,29 @@ only archived state is lost. That is the failure worth having.
 
 ## Agent
 
-Unchanged. No new field, no migration. Two existing fields do new work:
+One new field, optional on read, so no migration:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `role` | `AgentRole` | `.worker` (the default, and what every existing record decodes as) or `.lead`. |
+
+```swift
+public enum AgentRole: String, Codable, Hashable, Sendable, CaseIterable {
+    case worker
+    case lead
+}
+```
+
+A lead is an agent in every other respect — runtime, folder, conversation, state, transcript, cost,
+context meter — which is what lets the chat view, the prompt bar, the permission flow and the store
+work on it with no special case (research §13). Three guards make it a lead, and they are the whole
+difference:
+
+1. It is created with its project, never by the user, and never by `start_agent`.
+2. It alone is given the `project` MCP server.
+3. It cannot be archived, unarchived or deleted apart from its project.
+
+Two existing fields do new work:
 
 - **`cwd`** decides which project the agent belongs to. Matched exactly, after the same
   standardisation the project folder gets. `additionalDirectories` is ignored for this: a folder an
@@ -85,8 +130,11 @@ Derived, never stored. Lives in `AgentsKit/Model/AgentGroup.swift` so `swift tes
 | `completed` | `state == .finished`, `state == .stopped` | Third, each row saying which and why. |
 | `archived` | `state == .archived` | Only when the user turns the list on, below the rest. |
 
+The lead is in none of them. It is pinned above the groups, and `AgentGroup(for:)` is only ever asked
+about workers.
+
 `AgentGroup(for: AgentState) -> AgentGroup` is total: every case of `AgentState` maps to exactly one
-group, and a test asserts that over `AgentState.allCases`. An agent is therefore never in two groups
+group, and a test asserts that over `AgentState.allCases`. A worker is therefore never in two groups
 and never in none.
 
 Within a group, agents are ordered by `lastActivityAt` descending.
@@ -114,7 +162,9 @@ What the daemon sends the app. A project plus the parts only the daemon can know
 | `name` | `String` | Disambiguated against the whole list the daemon is returning. |
 | `exists` | `Bool` | Whether the directory is there now. |
 | `lastActivityAt` | `Date` | Newest agent activity, or `addedAt`. |
-| `counts` | `[AgentGroup: Int]` | How many agents in each group, so a sidebar row can say "needs you" without the app re-deriving it. |
+| `counts` | `[AgentGroup: Int]` | How many workers in each group, so a sidebar row can say "needs you" without the app re-deriving it. |
+| `leadID` | `UUID` | The project's lead, so the panel can pin it and selecting a project can open it. |
+| `leadNeedsInput` | `Bool` | Whether the lead is waiting on the user. Counted into the sidebar's mark even though the lead is in no group (FR-045). |
 
 `counts` is what lets FR-016 work for a project that is not selected, and it is the daemon's answer
 rather than the app's so that every window agrees.

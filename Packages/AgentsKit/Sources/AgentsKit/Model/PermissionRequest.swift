@@ -103,6 +103,14 @@ public struct ToolCall: Codable, Hashable, Sendable {
         raw = try c.decodeIfPresent(JSONValue.self, forKey: .raw)
     }
 
+    /// Whether this is the app's own suggestion tool rather than the agent's work.
+    ///
+    /// Matched on the end of the name because a runtime is free to prefix it: the
+    /// Claude adapter shows it as `mcp__agents__suggest_next_prompts`.
+    public var isSuggestingPrompts: Bool {
+        (name ?? title).hasSuffix(SuggestionService.toolName)
+    }
+
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {
         content.compactMap { if case .diff(let diff) = $0 { return diff } else { return nil } }

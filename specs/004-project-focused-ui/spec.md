@@ -19,15 +19,14 @@ A project is the folder. Put the folders in the sidebar and the agents beside th
 they are waiting on the user, and the window answers the question the user actually arrives with:
 what needs me, and where.
 
-And once a project is a thing rather than a filter, it can be handed a goal rather than a task. Each
-project has a lead: one agent whose job is the project itself, which starts the others, gives them
-their work and reports how they got on. The user describes what they want done once, to one
-conversation, and approves the lead's moves as they come. That is the difference between a window
-that organises work and one that takes it on.
 
 ## Clarifications
 
 ### Session 2026-09-18
+
+**Reverted on 2026-09-19.** Everything agreed in this session was built and then taken out again,
+before the layout it sat on had settled. The answers are kept because they were given and are still
+the answers, not because the feature is in. See the last assumption for where it stands.
 
 - Q: What is the project lead agent allowed to do to the other agents in its project? → A: Delegate and supervise — start agents in the project, prompt them, read their transcripts and states, stop them. Archiving stays with the user.
 - Q: How does a project's lead agent come to exist? → A: Always there, started lazily — every project has a lead, visible from the start, but no process runs and nothing is spent until it is first prompted.
@@ -129,46 +128,6 @@ most recently archived are shown newest first, ask for more, and confirm the res
 
 ---
 
-### User Story 4 - Hand the project to its lead (Priority: P2)
-
-Every project has a lead agent: one conversation that is about the project rather than about a task.
-The user picks a project and the lead is what opens. They describe what they want done, and the lead
-starts the agents to do it, gives each one its work, watches how they get on, and stops one that has
-gone wrong. The user answers a permission question each time it does, until they say "always".
-
-**Why this priority**: tied with Story 2, and both depend on Story 1. This is the largest piece of
-work in the feature and the reason the window is organised by project at all — a project that can be
-handed a goal rather than a task is worth more than a project that is only a filter.
-
-**Independent Test**: open a project, tell its lead to get two things done, and confirm it starts two
-agents in that project, that each gets its own instruction, that the user is asked before each one
-starts, and that the lead can report what they did and stop one of them.
-
-**Acceptance Scenarios**:
-
-1. **Given** a project that has never been opened, **When** the user selects it, **Then** the lead's
-   conversation opens, and no runtime has been started for it.
-2. **Given** the lead has never been prompted, **When** the user sends it a first prompt, **Then** its
-   runtime starts at that moment and not before.
-3. **Given** a lead with work to hand out, **When** it starts an agent, **Then** the user is asked to
-   allow it, the same way any tool call asks, and the agent starts in the project's folder.
-4. **Given** the user answered "always" to starting agents, **When** the lead starts another, **Then**
-   it is not asked again and the transcript records what it did.
-5. **Given** agents the lead started, **When** it asks how they are getting on, **Then** it can read
-   their states and their transcripts, and can prompt them again.
-6. **Given** an agent that has gone wrong, **When** the lead stops it, **Then** the user is asked
-   first, and on approval the agent stops as though the user had stopped it.
-7. **Given** the lead is working, **When** the user tries to archive the project, **Then** it is
-   refused and the lead is named among the agents to stop.
-8. **Given** an archived project, **When** the user unarchives it, **Then** its lead is there with the
-   whole conversation it had before.
-9. **Given** any project, **When** the user looks at the panel, **Then** the lead is pinned above
-   "Needs input" and appears in none of the three groups.
-10. **Given** a lead that is waiting on a permission answer, **When** its project is not selected,
-    **Then** that project's row in the sidebar says it needs the user.
-
----
-
 ### Edge Cases
 
 - **Two folders with the same name.** `~/work/api` and `~/side/api` are two projects both called
@@ -189,17 +148,6 @@ starts, and that the lead can report what they did and stop one of them.
   none of its agents is live — but a runtime that asks anyway must not resurrect the project silently.
   The request is held and the project's archived state is unchanged.
 - **Nothing is selected.** The panel offers to start an agent, as the window does today.
-- **The lead is asked to touch an agent in another project.** Refused. A lead reaches only the agents
-  in its own project, and the refusal says so rather than failing silently.
-- **The lead asks to start an agent and the user declines.** The lead is told, in the same way a
-  declined tool call tells it, and carries on rather than stalling.
-- **The lead's runtime is not installed or not signed in.** The project still opens and its agents
-  still work. The lead's prompt bar says what is wrong, as an agent's does.
-- **The lead stops an agent that has already finished.** Nothing happens, and the lead is told so.
-- **The lead is asked to stop itself.** Refused. Stopping the lead is the user's, from its own
-  conversation.
-- **The project folder is missing and the lead is asked to start an agent.** Refused with the folder
-  named, the same refusal the user gets.
 
 ## Requirements *(mandatory)*
 
@@ -236,6 +184,8 @@ starts, and that the lead can report what they did and stop one of them.
 #### The sidebar
 
 - **FR-014**: The sidebar MUST list projects, not agents.
+- **FR-014b**: The sidebar's only creating control MUST add a project. There MUST NOT be a control
+  for starting an agent by hand: work starts by telling a project what is wanted.
 - **FR-015**: The sidebar MUST order live projects by their most recent agent activity, newest first.
 - **FR-016**: A project row MUST show its name and MUST indicate when one of its agents needs the user,
   whichever project is selected.
@@ -245,16 +195,18 @@ starts, and that the lead can report what they did and stop one of them.
 
 #### The agent panel
 
-- **FR-019**: The panel MUST group the selected project's agents under "Needs input", "Working" and
-  "Completed", in that order.
-- **FR-020**: "Needs input" MUST hold every agent with an outstanding permission request or form
+- **FR-019**: The panel MUST group the selected project's agents under "Needs attention", "Running",
+  "Finished" and "Stopped", in that order.
+- **FR-019b**: The panel MUST show the project's name at the top, and below it a prompt for saying
+  what the user wants done, above the groups.
+- **FR-019c**: What the user types into that prompt MUST start an agent on it, in that folder.
+- **FR-020**: "Needs attention" MUST hold every agent with an outstanding permission request or form
   awaiting an answer.
-- **FR-021**: "Working" MUST hold every agent with a turn in flight.
-- **FR-022**: "Completed" MUST hold every agent that has settled — finished, stopped by the user, or
-  stopped by an error — and MUST say which, per agent.
+- **FR-021**: "Running" MUST hold every agent with a turn in flight.
+- **FR-022**: "Finished" MUST hold every agent that ended cleanly, and "Stopped" every agent that was
+  stopped by the user or by an error, each row saying which it was.
 - **FR-023**: The panel MUST omit a group that has nothing in it rather than showing it empty.
-- **FR-023a**: The three groups MUST hold every agent in the project except its lead, and each agent
-  MUST be in exactly one of them.
+- **FR-023a**: The four groups MUST hold every agent in the project, each in exactly one of them.
 - **FR-024**: Agents MUST move between groups as their state changes, while the panel is open, without
   the user refreshing anything.
 - **FR-025**: Within each group, agents MUST be ordered by most recent activity, newest first.
@@ -264,43 +216,14 @@ starts, and that the lead can report what they did and stop one of them.
 
 #### Archived agents
 
-- **FR-028**: Users MUST be able to turn on a list of the selected project's archived agents, shown
-  below the three live groups and separate from them.
+- **FR-028**: Users MUST be able to turn on a list of the selected project's archived agents with a
+  "Show archived" control at the bottom of the panel, shown below the live groups and separate.
 - **FR-029**: The archived list MUST show the most recently archived agents first, and MUST start with
   a limited number rather than all of them.
 - **FR-030**: The archived list MUST offer to show more while more exist, and MUST NOT offer it when
   every archived agent in the project is already listed.
 - **FR-031**: An archived agent MUST be selectable and its conversation readable.
 - **FR-032**: The system MUST remember whether the archived list is on, across launches.
-
-#### The project lead
-
-- **FR-035**: Every project MUST have exactly one lead agent, which the user does not have to create.
-- **FR-036**: A lead MUST NOT start a runtime, spend tokens or hold a process until it is first
-  prompted.
-- **FR-037**: A lead MUST be able to start agents in its own project, prompt them, read their states
-  and transcripts, and stop them.
-- **FR-038**: A lead MUST NOT reach any agent outside its own project, and MUST NOT archive or
-  unarchive anything.
-- **FR-039**: Each of a lead's actions on another agent MUST go through the same permission question
-  as any other tool call, with the same allow-once and allow-always answers.
-- **FR-040**: A permission the user answers "always" MUST NOT be asked again for that action in that
-  project.
-- **FR-041**: An agent a lead starts MUST be indistinguishable afterwards from one the user started,
-  and MUST appear in the groups in the usual way.
-- **FR-042**: The transcript MUST record every action a lead takes on another agent, including the
-  ones the user declined.
-- **FR-043**: The panel MUST show the lead pinned above the three groups, and MUST NOT show it in any
-  of them.
-- **FR-044**: Selecting a project MUST open its lead's conversation.
-- **FR-045**: A lead that needs the user MUST mark its project's row in the sidebar, as any agent does.
-- **FR-046**: A lead MUST NOT be archived, unarchived or deleted on its own.
-- **FR-047**: Archiving a project MUST be refused while its lead has a turn in flight, and the refusal
-  MUST name the lead among the agents to stop.
-- **FR-048**: Archiving a project MUST hide its lead with it, and unarchiving MUST restore that lead's
-  conversation exactly.
-- **FR-049**: A lead MUST be stoppable by the user from its own conversation, and MUST NOT be able to
-  stop itself.
 
 #### Carried over
 
@@ -312,17 +235,12 @@ starts, and that the lead can report what they did and stop one of them.
 ### Key Entities
 
 - **Project**: A directory the user works in. Has a name (the directory's own name), the folder it
-  points at, whether it is archived and when, and when it last saw activity. Holds many agents and
-  exactly one lead. Nothing it does touches the directory — archiving one changes nothing on disk.
+  points at, whether it is archived and when, and when it last saw activity. Holds many agents.
+  Nothing it does touches the directory — archiving one changes nothing on disk.
 - **Agent**: Unchanged. Belongs to exactly one project, by its working folder. Keeps its own state,
   transcript, cost and archived flag.
-- **Project lead**: The one agent per project that coordinates the rest. An ordinary agent in every
-  way that matters — a runtime, a folder, a conversation, a state — with three differences: it is
-  created with its project rather than by the user, it is served the means to act on its project's
-  agents, and it cannot be archived apart from its project.
 - **Agent group**: A view over a project's agents — "Needs input", "Working", "Completed", and the
-  archived list. Derived, never stored, so an agent is never in two groups or none. The lead sits
-  outside all four.
+  archived list. Derived, never stored, so an agent is never in two groups or none.
 
 ## Success Criteria *(mandatory)*
 
@@ -341,14 +259,6 @@ starts, and that the lead can report what they did and stop one of them.
   before, verified across a restart.
 - **SC-007**: Selecting a project with 200 agents shows its grouped agents in under 1 second.
 - **SC-008**: No archive or unarchive, of a project or an agent, changes any file in the directory.
-- **SC-009**: A user can get two independent pieces of work started from one conversation, without
-  opening the start-an-agent flow once.
-- **SC-010**: A project that has never been prompted costs nothing: no process, no tokens, verified by
-  there being no runtime for it.
-- **SC-011**: 100% of a lead's actions on other agents are either approved by the user or covered by an
-  approval the user gave earlier, and all of them appear in the transcript.
-- **SC-012**: An agent started by a lead is indistinguishable from one started by hand: same groups,
-  same controls, same record.
 
 ## Assumptions
 
@@ -373,16 +283,11 @@ Decisions taken where the description did not say. Each is a candidate for `/spe
   matches how far back people look in practice.
 - **Renaming a project is out of scope**: the name is the directory's name, and renaming the project
   would mean renaming the folder.
-- **Per-project settings are out of scope**, beyond the lead. A project is a folder, an archived flag
-  and a lead. Default runtimes or MCP servers per project can come later.
-- **The lead's runtime is chosen the way any agent's is**, and can be changed. Nothing here says which
-  runtime coordinates best, and one runtime being better at it is a reason to choose, not to hard-code.
-- **The lead has the project's folder and no more.** Its folder scope is the project's directory, the
-  same as an agent started there by hand.
-- **A lead that cannot coordinate is still a lead.** Its powers are offered to the runtime, not
-  required of it, so a runtime that ignores them leaves a working conversation about the project
-  rather than a broken one.
-- **Leads do not coordinate each other.** A lead reaches its own project's agents. Nothing in this
-  feature lets one lead talk to another, or to another project's agents.
+- **Per-project settings are out of scope.** A project is a folder and an archived flag. Default
+  runtimes or MCP servers per project can come later.
+- **A coordinating agent is out of scope, for now.** A "project lead" — one agent per project that
+  starts and briefs the others — was specified, built and then removed on 2026-09-19, before the
+  layout had settled. It is a good idea resting on a UX that was still moving; it comes back when
+  the shape of a project page is decided. See the clarification session below for what was agreed.
 - **Projects are held centrally**, as agents already are, so two open windows agree and the list
   survives every window being closed.

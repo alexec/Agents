@@ -1,0 +1,34 @@
+^DProcesses: 1123 total, 5 running, 1 stuck, 1117 sleeping, 4662 threads 
+2026/09/18 21:27:48
+Load Avg: 1.31, 2.04, 2.48 
+CPU usage: 4.96% user, 10.56% sys, 84.48% idle 
+SharedLibs: 505M resident, 97M data, 91M linkedit.
+MemRegions: 425827 total, 3813M resident, 305M private, 1215M shared.
+PhysMem: 14G used (2776M wired, 4052M compressor), 1022M unused.
+VM: 535T vsize, 57G framework vsize, 883078(0) swapins, 1657004(0) swapouts.
+Networks: packets: 43936303/37G in, 39120339/46G out.
+Disks: 101308749/3037G read, 34959932/882G written.
+
+PID    COMMAND          %CPU TIME     #TH #WQ #PORTS MEM   PURG CMPRS PGRP  PPID STATE    BOOSTS %CPU_ME %CPU_OTHRS UID FAULTS COW MSGSENT MSGRECV SYSBSD SYSMACH CSW  PAGEINS IDLEW POWER INSTRS CYCLES JETPRI USER              #MREGS RPRVT VPRVT VSIZE KPRVT KSHRD
+97479  ContactThumbnail 0.0  00:00.11 5   4/1 55     4320K 0B   4000K 97479 1    sleeping *0[1]  0.00000 0.00000    501 1553   116 275     134     2324   546     1545 40      1     0.0   0      0      0      alexcollins       N/A    N/A   N/A   N/A   N/A   N/A  
+96546  shazameventsd    0.0  00:00.37 3   1   70     7665K 0B   6416K 96546 1    sleeping *0[1]  0.00000 0.00000    501 6449   168 992     678     11090  2612    3178 697     325   0.0   0      0      0      alexcollins       N/A    N/A   N/A   N/A   N/A   N/A  
+96103  wifivelocityd    0.0  00:00.22 2   1   73     4432K 0B   4096K 96103 1    sleeping *0[15] 0.00000 0.00000    0   7149   116 913     541     6391   2142    2329 238     49    0.0   0      0      40     root              N/A    N/A   N/A   N/A   N/A   N/A  
+94936  UARPAssetManager 0.0  00:00.04 2   1   31     2880K 0B   2576K 94936 1    sleeping  0[0]  0.00000 0.00000    278 676    78  142     63      518    268     568  8       0     0.0   0      0      0      _accessoryupdater N/A    N/A   N/A   N/A   N/A   N/A  
+94935  UARPAssetManager 0.0  00:00.04 2   1   31     3104K 0B   2784K 94935 1    sleeping  0[0]  0.00000 0.00000    278 710    85  142     63      522    268     538  16      0     0.0   0      0      0      _accessoryupdater N/A    N/A   N/A   N/A   N/A   N/A  
+Processes: 1123 total, 4 running, 1119 sleeping, 4664 threads 
+2026/09/18 21:27:49
+Load Avg: 1.31, 2.04, 2.48 
+CPU usage: 3.36% user, 2.32% sys, 94.31% idle 
+SharedLibs: 505M resident, 97M data, 91M linkedit.
+MemRegions: 0 total, 0B resident, 305M private, 1215M shared.
+PhysMem: 14G used (2777M wired, 4052M compressor), 1022M unused.
+VM: 535T vsize, 57G framework vsize, 883078(0) swapins, 1657004(0) swapouts.
+Networks: packets: 43936333/37G in, 39120376/46G out.
+Disks: 101308751/3037G read, 34959933/882G written.
+
+PID    COMMAND          %CPU TIME     #TH  #WQ #PORTS MEM    PURG CMPRS PGRP  PPID  STATE    BOOSTS %CPU_ME %CPU_OTHRS UID FAULTS    COW   MSGSENT    MSGRECV    SYSBSD     SYSMACH    CSW        PAGEINS IDLEW    POWER INSTRS    CYCLES    JETPRI USER              #MREGS RPRVT VPRVT VSIZE KPRVT KSHRD
+30882  top              9.4  00:00.78 1/1  0   27+    6704K+ 0B   0B    30882 30881 running  *0[1]  0.06993 0.00000    0   2849+     78    949872+    474931+    11467+     491108+    32+        6       1+       9.4   614236102 345098536 180    root              N/A    N/A   N/A   N/A   N/A   N/A  
+615    WindowServer     3.9  03:47:03 22/1 4   22179- 740M-  18M  335M  615   1     running  *0[1]  0.00000 0.29587    88  20124217+ 41110 150049745+ 117855176+ 197962177+ 482938276+ 113693034+ 70110   8174080+ 6.7   93415664  90533645  170    _windowserver     N/A    N/A   N/A   N/A   N/A   N/A  
+19635  2.1.278          3.5  02:05.53 23   1   85     320M-  0B   44M-  19635 19574 sleeping *0[4]  0.00000 0.00000    501 122052+   84    158403+    107243+    1896680+   240465+    845800+    462     48717+   4.6   125317119 115816248 180    alexcollins       N/A    N/A   N/A   N/A   N/A   N/A  
+27198  2.1.278          3.1  00:20.88 23   1   89     276M-  0B   22M   27198 27187 sleeping *0[1]  0.00000 0.00000    501 50202+    84    27458+     17554+     363553+    47801+     141573+    1065    9175+    4.0   62024076  82517782  180    alexcollins       N/A    N/A   N/A   N/A   N/A   N/A  
+25394  2.1.278          2.8  00:48.90 23   1   86     313M+  0B   33M   25394 25383 sleeping *0[2]  0.00000 0.00000    501 72060+    84    46236+     31250+     721039+    107334+    291905+    383     19164+   4.1   60604261  69840293  180    alexcollins       N/A    N/A   N/A   N/A   N/A   N/A  

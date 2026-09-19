@@ -23,18 +23,40 @@ public actor DaemonCore {
     var elicitations: [UUID: PendingElicitation] = [:]
     /// The commands we are running for each agent.
     var terminalServices: [UUID: TerminalService] = [:]
+    /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
+    var suggestionTokens: [String: UUID] = [:]
+    /// Agents whose next prompt carries the line asking for suggestions. Set when a
+    /// conversation starts, and again only if a runtime loses one and we have to begin
+    /// a new one: the ask lives in the runtime's history, so that is the only time it
+    /// is gone.
+    var needsSuggestionAsk: Set<UUID> = []
+    /// Agents whose next queued prompt is already on its way to a runtime. See
+    /// `sendNextQueued`: without this the same words can go twice.
+    var sending: Set<UUID> = []
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
+    /// The two facts about a project that its folder cannot tell us. Everything else
+    /// about a project is derived from the agents in it.
+    lazy var projectStore = ProjectStore(locations: locations)
 
     var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
     var connectionCount = 0
+
+    /// The user's shells, one per agent. Not the agent's terminals, which are 003's.
+    /// Held here so a build outlives the window that started it (FR-026).
+    let shells = ShellHost()
 
     struct Draft: Sendable {
         var runtimeID: String
         var cwd: URL
         var session: ACPSession
         var sessionID: String
+        /// What this session was made with. MCP servers are only read at `session/new`,
+        /// so a draft made before the user attached one cannot be used for it.
+        var mcpServers: [MCPServer]
+        /// Minted with the session, bound to the agent once the start makes one.
+        var suggestionToken: String
     }
 
     struct Pending: Sendable {
@@ -102,6 +124,10 @@ public actor DaemonCore {
         agents[agent.id] = agent
         try? saveQuietly(agent)
         broadcast(DaemonAPI.Notification.agentChanged, agent)
+        // An agent changing state is what moves its project's counts. Sending the
+        // project after the agent is what lets a sidebar row say a project needs you
+        // in a window that is looking at a different one.
+        projectChanged(forAgentIn: agent.cwd)
     }
 
     private func saveQuietly(_ agent: Agent) throws {
@@ -225,6 +251,12 @@ public actor DaemonCore {
 
         case .permissionRequested(var request):
             request.agentID = agentID
+            // Our own tool, answered by us. Nobody is asked whether the app may show
+            // the app's own suggestions.
+            if let option = autoAllowed(request) {
+                await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
+                return
+            }
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)
             await record(.permissionAsked(request), for: agentID)
             await move(agentID, on: .permissionAsked)
@@ -260,6 +292,9 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) {
         eventTasks.removeValue(forKey: agentID)?.cancel()
         live.removeValue(forKey: agentID)
+        // The MCP helper the runtime started dies with it. Its token stops working
+        // here at the same moment, rather than whenever that process gets round to it.
+        dropSuggestionTokens(for: agentID)
         // Nothing we started for this agent outlives it.
         Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }
@@ -268,7 +303,13 @@ public actor DaemonCore {
     // MARK: Shutting down
 
     public func shutDown() async {
+        // Two different things, both going. The agent's terminals are 003's and are
+        // killed because the agent owning them is stopping. The user's shells are this
+        // feature's: each is remembered as gone with a reason, so the next window that
+        // looks is told rather than handed a new shell in silence (FR-029). Neither
+        // knows about the other, which is the point of keeping them apart.
         await killAllTerminals()
+        shells.shutDown()
         for (_, task) in turnTasks { task.cancel() }
         for (_, session) in live { await session.end(gracePeriod: .seconds(2)) }
         for (_, task) in eventTasks { task.cancel() }
