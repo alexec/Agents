@@ -236,7 +236,7 @@ it in the archive with its history, and bring it back.
 - [X] T084 [P] Assert in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` that nothing under test branches on a runtime's name, which is the one-code-path claim in SC-009
 - [ ] T085 Pin down how a signed-out runtime actually fails, against a logged-out runtime, and make `needsSignIn` real in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeDiscovery.swift`. The error is not documented and was not confirmed during planning
 - [ ] T086 [P] Check the ten-agent case by hand for SC-006 and fix what stutters, most likely in `App/Sources/Transcript/TranscriptView.swift`
-- [ ] T087 [P] Make the window's first-run empty state read the way the spec asks in `App/Sources/AgentList/AgentListView.swift`: how to start the first agent, not an error, and no instructional text on a working screen
+- [X] T087 [P] Make the window's first-run empty state read the way the spec asks in `App/Sources/AgentList/AgentListView.swift`: how to start the first agent, not an error, and no instructional text on a working screen
 - [ ] T088 Walk [quickstart.md](./quickstart.md) end to end on this Mac, including the force-quit and the Mac restart, and record what actually happened
 - [X] T089 [P] Update `README.md` with how to run the daemon by hand and where its log and state live, for the next person debugging it
 

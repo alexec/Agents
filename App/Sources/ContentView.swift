@@ -25,7 +25,7 @@ struct ContentView: View {
         .sheet(isPresented: $isStarting) {
             StartAgentView()
         }
-        .alert("Something went wrong",
+        .alert("That did not work",
                isPresented: Binding(get: { model.problem != nil },
                                     set: { if !$0 { model.dismissProblem() } })) {
             Button("OK") { model.dismissProblem() }

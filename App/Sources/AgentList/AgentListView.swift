@@ -66,6 +66,8 @@ private struct EmptyAgentList: View {
             if model.availableRuntimes.isEmpty {
                 Text("No agent runtime found")
                     .font(.headline)
+                Text("Agents runs the coding CLIs you already have. Install one and it appears here.")
+                    .foregroundStyle(.secondary)
                 ForEach(model.runtimes) { status in
                     RuntimeMissingLine(status: status)
                 }

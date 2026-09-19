@@ -37,7 +37,7 @@ struct AgentRow: View {
                 Button("Archive") { Task { await model.archive(agent.id) } }
             }
             Divider()
-            Button("Show folder in Finder") {
+            Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
             }
         }

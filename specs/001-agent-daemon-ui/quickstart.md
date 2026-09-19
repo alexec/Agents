@@ -85,3 +85,20 @@ exactly that reason.
 
 Every acceptance scenario in [spec.md](./spec.md) has something above that exercises it, section 1
 and 2 pass with no network, and sections 3 to 5 have been done by hand at least once on this Mac.
+
+## What was actually run, and when
+
+**2026-09-18.** Sections 1 and 2 pass: 63 tests, no network, no credentials, no Xcode.
+
+Section 3 was done by hand on this Mac. The app found all three runtimes, started a real
+Copilot agent in `/tmp/agent-demo`, asked permission twice, was answered in the window, wrote
+`hello.txt` with the right contents, and finished. 213 entries in its transcript.
+
+Still to do, and why:
+
+- **Section 4, the live suite.** Written and building, off unless `AGENTS_LIVE=1`. Not run
+  in full, because it spends real credit on three accounts.
+- **Section 5, ten agents at once (SC-006).** Needs a hand on the trackpad.
+- **Section 5, the Mac restart (SC-011).** Needs a Mac restart.
+- **A signed-out runtime.** How one fails is not documented, and finding out means signing
+  out of something Alex is signed in to.
