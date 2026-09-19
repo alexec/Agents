@@ -90,6 +90,7 @@ Taken from the turn's stop reason, plus the two endings the protocol does not re
 | `cancelled` | `stopReason: cancelled`, after the user stopped it |
 | `processDied` | The process went without a stop reason: a crash |
 | `daemonGone` | Found dead on daemon start: logout, restart, or the daemon was killed (FR-019b) |
+| `unrecognised` | A stop reason this app has never heard of. Added during implementation: a runtime shipping a new one must be recorded rather than rounded to the nearest reason we know, and the raw string goes in a `runtimeNote` beside it |
 
 ## TranscriptEntry
 

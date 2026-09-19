@@ -21,6 +21,12 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// Found dead when the daemon started: a logout, a restart, or the daemon killed.
     case daemonGone
 
+    /// A turn ended with a stop reason this app has never heard of. Not in the
+    /// protocol's list and not one of ours: it is what happens when a runtime ships a
+    /// new one, and it belongs in the record rather than being rounded to the nearest
+    /// reason we do recognise.
+    case unrecognised
+
     /// The protocol's own spelling, which is what arrives on the wire.
     public init?(stopReason: String) {
         switch stopReason {

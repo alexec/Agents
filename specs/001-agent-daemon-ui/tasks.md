@@ -59,7 +59,7 @@ rather than an option.
 ### The record
 
 - [X] T016 Implement `AgentStore` in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore.swift`: the layout in data-model.md under `~/Library/Application Support/Agents/`, `agent.json` written whole and atomically on every change, `transcript.jsonl` appended and never rewritten, a single writer, and a root that is injectable so tests use a temporary directory
-- [ ] T017 Implement recovery in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore+Recovery.swift`: read every agent record on start, tolerate a half-written last line in a transcript, and return the agents whose processes must be checked
+- [X] T017 Implement recovery in `Packages/AgentsKit/Sources/AgentsKit/Store/AgentStore+Recovery.swift`: read every agent record on start, tolerate a half-written last line in a transcript, and return the agents whose processes must be checked
 - [X] T018 [P] Implement paged transcript reads in `Packages/AgentsKit/Sources/AgentsKit/Store/TranscriptReader.swift`, newest last, by range, so nothing ever loads a whole transcript
 - [X] T019 [P] Unit-test the store in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentStoreTests.swift`: append, reread in order, a truncated final line, an atomic record write surviving a simulated crash mid-write
 
@@ -78,21 +78,21 @@ rather than an option.
 
 ### Finding the runtimes
 
-- [ ] T027 Implement the runtime catalogue in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeCatalog.swift` with exactly the three recipes from data-model.md: `claude` → `npx -y @agentclientprotocol/claude-agent-acp`, `grok` → `grok agent stdio`, `copilot` → `copilot --acp`
-- [ ] T028 Implement PATH resolution in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/LoginShellPath.swift`: read the user's login-shell PATH once, cache it, and fall back to a short list of usual places. This is the plan's first-thing-that-breaks risk and none of the three is on a GUI app's inherited PATH
-- [ ] T029 Implement discovery in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeDiscovery.swift` returning `available(URL)`, `missing(lookedIn:)` or `needsSignIn(authMethods:fixCommand:)`, reading `sessionCapabilities.resume` from `initialize` rather than assuming it, and never treating the presence of `authMethods` as proof of being signed out
-- [ ] T030 [P] Test discovery in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeDiscoveryTests.swift` with a stubbed PATH: found, missing with where it looked, and a runtime whose `initialize` fails
+- [X] T027 Implement the runtime catalogue in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeCatalog.swift` with exactly the three recipes from data-model.md: `claude` → `npx -y @agentclientprotocol/claude-agent-acp`, `grok` → `grok agent stdio`, `copilot` → `copilot --acp`
+- [X] T028 Implement PATH resolution in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/LoginShellPath.swift`: read the user's login-shell PATH once, cache it, and fall back to a short list of usual places. This is the plan's first-thing-that-breaks risk and none of the three is on a GUI app's inherited PATH
+- [X] T029 Implement discovery in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeDiscovery.swift` returning `available(URL)`, `missing(lookedIn:)` or `needsSignIn(authMethods:fixCommand:)`, reading `sessionCapabilities.resume` from `initialize` rather than assuming it, and never treating the presence of `authMethods` as proof of being signed out
+- [X] T030 [P] Test discovery in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RuntimeDiscoveryTests.swift` with a stubbed PATH: found, missing with where it looked, and a runtime whose `initialize` fails
 
 ### The daemon, and the app's way in
 
-- [ ] T031 Implement single-instance and paths in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLock.swift`: an exclusive `flock` on `daemon.lock`, a daemon that loses it exiting silently and touching nothing
-- [ ] T032 Implement the Unix socket server in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift` at `~/Library/Application Support/Agents/daemon.sock`, serving several connections at once over the same `JSONRPCConnection` code, with every notification going to all of them
-- [ ] T033 Implement the app-facing method and notification types in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`, matching `contracts/daemon-api.md` exactly
-- [ ] T034 Implement `DaemonCore` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`: owns an `AgentSession` per live agent, writes through `AgentStore`, and fans changes out as `agent/changed`, `agent/entry`, `agent/permission` and `runtime/changed`
-- [ ] T035 Implement the exit rule in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Lifetime.swift`: exit when holding no agents and no client is connected after a short grace period, where running, waiting on a permission, and finished-with-a-live-process all count as holding
-- [ ] T036 Replace `Daemon/Sources/main.swift` with the real twenty lines: take the lock, start `DaemonCore`, serve, exit when it says to
-- [ ] T037 Implement `DaemonClient` in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`: connect to the socket, and when nothing answers spawn `Contents/Helpers/agentsd` with `posix_spawn` and `POSIX_SPAWN_SETSID` so it is not in the app's process group, then retry with backoff for a few seconds
-- [ ] T038 [P] Test the daemon end to end against fake agents in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonTests.swift`: two clients seeing the same state, a second daemon losing the lock and exiting, and the exit rule firing and not firing
+- [X] T031 Implement single-instance and paths in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLock.swift`: an exclusive `flock` on `daemon.lock`, a daemon that loses it exiting silently and touching nothing
+- [X] T032 Implement the Unix socket server in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift` at `~/Library/Application Support/Agents/daemon.sock`, serving several connections at once over the same `JSONRPCConnection` code, with every notification going to all of them
+- [X] T033 Implement the app-facing method and notification types in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift`, matching `contracts/daemon-api.md` exactly
+- [X] T034 Implement `DaemonCore` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`: owns an `AgentSession` per live agent, writes through `AgentStore`, and fans changes out as `agent/changed`, `agent/entry`, `agent/permission` and `runtime/changed`
+- [X] T035 Implement the exit rule in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Lifetime.swift`: exit when holding no agents and no client is connected after a short grace period, where running, waiting on a permission, and finished-with-a-live-process all count as holding
+- [X] T036 Replace `Daemon/Sources/main.swift` with the real twenty lines: take the lock, start `DaemonCore`, serve, exit when it says to
+- [X] T037 Implement `DaemonClient` in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`: connect to the socket, and when nothing answers spawn `Contents/Helpers/agentsd` with `posix_spawn` and `POSIX_SPAWN_SETSID` so it is not in the app's process group, then retry with backoff for a few seconds
+- [X] T038 [P] Test the daemon end to end against fake agents in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonTests.swift`: two clients seeing the same state, a second daemon losing the lock and exiting, and the exit rule firing and not firing
 
 **Checkpoint**: A daemon that runs agents and an API to drive it, all of it testable with `swift test`
 
@@ -108,14 +108,14 @@ watch the work appear in the window and the change appear on disk.
 
 ### Tests for User Story 1
 
-- [ ] T039 [P] [US1] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/StartAgentTests.swift`: `agents/options` then `agents/start` against the fake creates one session, applies the chosen options, sends the prompt, and the agent is `running` with entries arriving
-- [ ] T040 [P] [US1] Test the two-step start in the same file: options are advertised by `session/new`, so the session exists before the user has chosen, and `agents/start` reuses the session `agents/options` created rather than making a second one
+- [X] T039 [P] [US1] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/StartAgentTests.swift`: `agents/options` then `agents/start` against the fake creates one session, applies the chosen options, sends the prompt, and the agent is `running` with entries arriving
+- [X] T040 [P] [US1] Test the two-step start in the same file: options are advertised by `session/new`, so the session exists before the user has chosen, and `agents/start` reuses the session `agents/options` created rather than making a second one
 
 ### Implementation for User Story 1
 
-- [ ] T041 [US1] Implement `runtimes/list` and `agents/options` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift`
-- [ ] T042 [US1] Implement `agents/start` in the same file: create the agent record with our UUID, create the session, record the runtime's `sessionId` against it, apply `startOptions` with the set-option call, then send the first prompt
-- [ ] T043 [US1] Take the agent's title from the runtime's own session title where there is one, and the first line of the instruction where there is not, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift` (FR-007a)
+- [X] T041 [US1] Implement `runtimes/list` and `agents/options` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift`
+- [X] T042 [US1] Implement `agents/start` in the same file: create the agent record with our UUID, create the session, record the runtime's `sessionId` against it, apply `startOptions` with the set-option call, then send the first prompt
+- [X] T043 [US1] Take the agent's title from the runtime's own session title where there is one, and the first line of the instruction where there is not, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift` (FR-007a)
 - [ ] T044 [P] [US1] Build the agent list in `App/Sources/AgentList/AgentListView.swift`: every agent with its state, title, folder and runtime, grouped so running is not mixed with finished, and an empty state that says how to start the first one rather than showing an error
 - [ ] T045 [P] [US1] Build the transcript view in `App/Sources/Transcript/TranscriptView.swift`, rendering each entry kind, appending live from `agent/entry`, windowed so a long transcript never loads whole
 - [ ] T046 [US1] Build the start sheet in `App/Sources/StartAgent/StartAgentView.swift`: folder picker, runtime picker listing what was found and saying where we looked for what was not, instruction field, and a start button that does nothing while the instruction is empty
@@ -137,16 +137,16 @@ folder still changing, reopen and see everything produced while the app was gone
 
 ### Tests for User Story 2
 
-- [ ] T050 [P] [US2] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonSurvivalTests.swift`: kill the client connection mid-turn, the agent keeps running and keeps recording, a new client sees everything produced while nothing was connected
-- [ ] T051 [P] [US2] Test recovery in the same file: agent records left as `running` with no live process become `stopped` with `daemonGone`, before the daemon accepts a connection
+- [X] T050 [P] [US2] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/DaemonSurvivalTests.swift`: kill the client connection mid-turn, the agent keeps running and keeps recording, a new client sees everything produced while nothing was connected
+- [X] T051 [P] [US2] Test recovery in the same file: agent records left as `running` with no live process become `stopped` with `daemonGone`, before the daemon accepts a connection
 
 ### Implementation for User Story 2
 
 - [ ] T052 [US2] Make the spawned daemon genuinely detached in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`: its own session, no inherited pipes that die with the app, stdout and stderr to `daemon.log`
-- [ ] T053 [US2] Implement start-up recovery in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Recovery.swift`, running before the socket accepts anything so no client ever sees a state known to be a lie (FR-019b)
-- [ ] T054 [US2] Append transcript entries as updates arrive rather than at turn end, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, so a daemon that dies mid-turn still leaves an honest record
+- [X] T053 [US2] Implement start-up recovery in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Recovery.swift`, running before the socket accepts anything so no client ever sees a state known to be a lie (FR-019b)
+- [X] T054 [US2] Append transcript entries as updates arrive rather than at turn end, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, so a daemon that dies mid-turn still leaves an honest record
 - [ ] T055 [US2] Implement reconnect in `App/Sources/AppModel.swift`: on connect, list, ask for the recent transcript of whatever is open, and subscribe, with no special case for "the app crashed"
-- [ ] T056 [US2] Roll `daemon.log` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLog.swift` so a long-lived daemon cannot fill the disk
+- [X] T056 [US2] Roll `daemon.log` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLog.swift` so a long-lived daemon cannot fill the disk
 
 **Checkpoint**: The daemon earns its existence
 
@@ -161,16 +161,16 @@ a permission question; stop the agent and see it stop.
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FollowUpTests.swift`: a follow-up to a running agent reaches it and is recorded, and a follow-up to a stopped agent is refused with something the app can show rather than silently dropped
-- [ ] T058 [P] [US3] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/PermissionTests.swift`: a permission asked with no client connected is held, the agent stays alive, the daemon does not exit, and the question is delivered when a client connects
-- [ ] T059 [P] [US3] Test in the same file that stopping an agent that is waiting answers the outstanding request `{"outcome": {"outcome": "cancelled"}}` rather than leaving it hanging
+- [X] T057 [P] [US3] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FollowUpTests.swift`: a follow-up to a running agent reaches it and is recorded, and a follow-up to a stopped agent is refused with something the app can show rather than silently dropped
+- [X] T058 [P] [US3] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/PermissionTests.swift`: a permission asked with no client connected is held, the agent stays alive, the daemon does not exit, and the question is delivered when a client connects
+- [X] T059 [P] [US3] Test in the same file that stopping an agent that is waiting answers the outstanding request `{"outcome": {"outcome": "cancelled"}}` rather than leaving it hanging
 
 ### Implementation for User Story 3
 
-- [ ] T060 [US3] Implement `agents/prompt` for a running agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Prompt.swift`
-- [ ] T061 [US3] Implement `agents/stop` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Stop.swift` using the cancel-close-terminate order, recording `cancelled`
-- [ ] T062 [US3] Implement `permissions/pending` and `permissions/answer` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Permissions.swift`: at most one outstanding request per agent, never answered by us, and `waitingOnUser` while it waits
-- [ ] T063 [US3] Implement `agents/setOption` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Options.swift`, and follow a `config_option_update` or a mode change the runtime makes itself
+- [X] T060 [US3] Implement `agents/prompt` for a running agent in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Prompt.swift`
+- [X] T061 [US3] Implement `agents/stop` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Stop.swift` using the cancel-close-terminate order, recording `cancelled`
+- [X] T062 [US3] Implement `permissions/pending` and `permissions/answer` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Permissions.swift`: at most one outstanding request per agent, never answered by us, and `waitingOnUser` while it waits
+- [X] T063 [US3] Implement `agents/setOption` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Options.swift`, and follow a `config_option_update` or a mode change the runtime makes itself
 - [ ] T064 [P] [US3] Build the composer in `App/Sources/Transcript/Composer.swift`, which says the agent is stopped rather than discarding what was typed
 - [ ] T065 [P] [US3] Build the permission view in `App/Sources/Permission/PermissionView.swift`: the tool call, the agent's own options as buttons, and nothing that answers on the user's behalf
 - [ ] T066 [US3] Put pending permissions at the top of the window on connect in `App/Sources/AgentList/AgentListView.swift`, so a question asked while the app was shut is the first thing seen
@@ -189,16 +189,16 @@ see it answer knowing what it knew.
 
 ### Tests for User Story 5
 
-- [ ] T068 [P] [US5] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ResumeTests.swift` against a fake that advertises `resume`: the session is resumed, no replay is recorded, and the transcript is not duplicated
-- [ ] T069 [P] [US5] Test in the same file against a fake that advertises only `loadSession`: `session/load` is used, its replayed updates are discarded, and the transcript still matches what was there before
-- [ ] T070 [P] [US5] Test in the same file that a runtime which no longer has the session produces a `runtimeNote`, a new runtime session recorded against the same agent id, and no new agent
+- [X] T068 [P] [US5] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ResumeTests.swift` against a fake that advertises `resume`: the session is resumed, no replay is recorded, and the transcript is not duplicated
+- [X] T069 [P] [US5] Test in the same file against a fake that advertises only `loadSession`: `session/load` is used, its replayed updates are discarded, and the transcript still matches what was there before
+- [X] T070 [P] [US5] Test in the same file that a runtime which no longer has the session produces a `runtimeNote`, a new runtime session recorded against the same agent id, and no new agent
 
 ### Implementation for User Story 5
 
-- [ ] T071 [US5] Implement pick-up in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Resume.swift`: a prompt to a stopped, finished or archived agent starts the runtime, resumes where `sessionCapabilities.resume` is advertised and loads where it is not, and unarchives on the way through
-- [ ] T072 [US5] Discard a `session/load` replay in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift` by treating updates during a load as confirmation rather than content
-- [ ] T073 [US5] Handle the session being gone in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Resume.swift`: record a `runtimeNote`, start a fresh runtime session for the same agent, keep the history, and tell the app (FR-012d)
-- [ ] T074 [US5] Release a finished agent's process in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Lifetime.swift` when a turn ends with `endTurn`, since the session can be picked up later (FR-012e)
+- [X] T071 [US5] Implement pick-up in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Resume.swift`: a prompt to a stopped, finished or archived agent starts the runtime, resumes where `sessionCapabilities.resume` is advertised and loads where it is not, and unarchives on the way through
+- [X] T072 [US5] Discard a `session/load` replay in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift` by treating updates during a load as confirmation rather than content
+- [X] T073 [US5] Handle the session being gone in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Resume.swift`: record a `runtimeNote`, start a fresh runtime session for the same agent, keep the history, and tell the app (FR-012d)
+- [X] T074 [US5] Release a finished agent's process in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Lifetime.swift` when a turn ends with `endTurn`, since the session can be picked up later (FR-012e)
 - [ ] T075 [P] [US5] Show picking up as its own moment in `App/Sources/Transcript/TranscriptView.swift`, rendering `runtimeNote` entries plainly so the gaps in an agent's life are visible
 
 **Checkpoint**: Stopping something is no longer throwing it away
@@ -215,13 +215,13 @@ it in the archive with its history, and bring it back.
 
 ### Tests for User Story 4
 
-- [ ] T076 [P] [US4] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ArchiveTests.swift`: a turn ending `end_turn` becomes `finished` and nothing archives itself, and every other stop reason becomes `stopped` with its reason
-- [ ] T077 [P] [US4] Test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ArchiveTests.swift` that archiving a running agent stops it first, and that an archived agent's transcript is still readable
+- [X] T076 [P] [US4] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ArchiveTests.swift`: a turn ending `end_turn` becomes `finished` and nothing archives itself, and every other stop reason becomes `stopped` with its reason
+- [X] T077 [P] [US4] Test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ArchiveTests.swift` that archiving a running agent stops it first, and that an archived agent's transcript is still readable
 
 ### Implementation for User Story 4
 
-- [ ] T078 [US4] Implement `agents/archive` and `agents/unarchive` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Archive.swift`, stopping a live agent first and recording `archivedReason: byUser`
-- [ ] T079 [US4] Implement `agents/list` with `includeArchived` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+List.swift`
+- [X] T078 [US4] Implement `agents/archive` and `agents/unarchive` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Archive.swift`, stopping a live agent first and recording `archivedReason: byUser`
+- [X] T079 [US4] Implement `agents/list` with `includeArchived` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+List.swift`
 - [ ] T080 [P] [US4] Group the list by state in `App/Sources/AgentList/AgentListView.swift` with archived folded away at the foot
 - [ ] T081 [P] [US4] Show why an agent ended in `App/Sources/AgentList/AgentRow.swift`: finished, or stopped short with the reason, never both
 - [ ] T082 [US4] Add archive and unarchive to the row and the transcript header in `App/Sources/AgentList/AgentRow.swift`
