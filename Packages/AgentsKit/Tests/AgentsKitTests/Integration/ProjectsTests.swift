@@ -26,10 +26,9 @@ struct ProjectsTests {
     }
 
     private func agent(in folder: URL, title: String, state: AgentState = .finished,
-                       role: AgentRole = .worker, activity: Date = Date(),
-                       created: Date = Date()) -> Agent {
+                       activity: Date = Date(), created: Date = Date()) -> Agent {
         Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
-              createdAt: created, lastActivityAt: activity, endedReason: .endTurn, role: role)
+              createdAt: created, lastActivityAt: activity, endedReason: .endTurn)
     }
 
     /// A core holding these agents, arrived at the way a restart arrives at them.

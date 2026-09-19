@@ -6,10 +6,9 @@ struct ContentView: View {
     @State private var frame = SidebarFrame()
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
-    /// Which columns are showing.
-    ///
-    /// Picking a project puts the list of projects away: you chose one, so the screen
-    /// belongs to it now. The sidebar button brings it back when you want another.
+    /// Which columns are showing. The projects stay put: moving between them is the
+    /// ordinary thing to do here, and a list that hides itself when used is a list you
+    /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
 
     /// The agent being read, as a path of nothing or one.
@@ -56,11 +55,6 @@ struct ContentView: View {
         .environment(frame)
         .environment(sidebarStates)
         .environment(webHolders)
-        // Choosing a project is the end of needing the list of them.
-        .onChange(of: model.selectedProject) { _, folder in
-            guard folder != nil else { return }
-            withAnimation { columns = .detailOnly }
-        }
         .task { await model.connect() }
         .alert("That did not work",
                isPresented: Binding(get: { model.problem != nil },

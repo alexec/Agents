@@ -35,19 +35,15 @@ extension DaemonCore {
         let names = ProjectNaming.displayNames(for: projects.map(\.folder))
         return projects.map { project in
             let inFolder = agentsByFolder[project.folder] ?? []
-            let lead = inFolder.first { $0.role == .lead }
-            let workers = inFolder.filter { $0.role == .worker }
             var counts: [AgentGroup: Int] = [:]
-            for worker in workers { counts[worker.group, default: 0] += 1 }
+            for agent in inFolder { counts[agent.group, default: 0] += 1 }
             let newest = inFolder.map(\.lastActivityAt).max() ?? project.addedAt
             return DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
                 exists: Self.isDirectory(project.folder),
                 lastActivityAt: newest,
-                counts: counts,
-                leadID: lead?.id,
-                leadNeedsInput: lead?.state == .waitingOnUser)
+                counts: counts)
         }
         .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
@@ -102,7 +98,6 @@ extension DaemonCore {
             records[standardized] = Project(folder: standardized)
             saveProjectRecords(records)
         }
-        await ensureLead(for: standardized)
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) could not be added.")
@@ -127,7 +122,7 @@ extension DaemonCore {
             .filter { Project.standardize($0.cwd) == standardized && $0.state.holdsRuntime }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
         if !live.isEmpty {
-            let names = live.map { $0.role == .lead ? "the project lead" : ($0.title ?? "an agent") }
+            let names = live.map { $0.title ?? "an agent" }
             throw JSONRPCError(code: DaemonAPI.Failure.projectHasLiveAgents,
                                message: "Stop these first: \(names.joined(separator: ", ")).")
         }
@@ -138,11 +133,8 @@ extension DaemonCore {
         records[standardized] = record
         saveProjectRecords(records)
 
-        // The workers are left exactly as they are, so unarchiving restores what was
-        // there. The lead is the one exception: it cannot be archived on its own, so
-        // it goes away with its project and comes back with it.
-        await archiveLead(in: standardized)
-
+        // The agents are left exactly as they are. Their own states and archived flags
+        // are what unarchiving restores, so nothing here touches them.
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) is not a project.")
@@ -163,8 +155,6 @@ extension DaemonCore {
         record.archivedAt = nil
         records[standardized] = record
         saveProjectRecords(records)
-
-        await unarchiveLead(in: standardized)
 
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,

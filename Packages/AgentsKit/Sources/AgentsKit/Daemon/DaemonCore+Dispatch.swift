@@ -11,25 +11,8 @@ extension DaemonCore {
 
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
-                // Listing is also where a project that has no lead gets one. It is the
-                // one call every window makes, so it is the one place that can promise
-                // every project has a lead.
-                for folder in Set(agents.values.map { Project.standardize($0.cwd) }) {
-                    await ensureLead(for: folder)
-                }
-                for folder in projectRecords().keys {
-                    await ensureLead(for: folder)
-                }
                 return .success(try JSONValue.encoding(
                     allProjects(includeArchived: request.includeArchived)))
-
-            case DaemonAPI.Method.agentsIsLead:
-                let request = try require(params, as: DaemonAPI.LeadToolRequest.self)
-                return .success(["isLead": .bool(isLead(token: request.token))])
-
-            case DaemonAPI.Method.agentsLeadTool:
-                let request = try require(params, as: DaemonAPI.LeadToolRequest.self)
-                return .success(["note": .string(try await callLeadTool(request))])
 
             case DaemonAPI.Method.projectsAdd:
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)

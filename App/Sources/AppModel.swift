@@ -108,29 +108,15 @@ final class AppModel {
         return projects.first { $0.folder == selectedProject }
     }
 
-    /// The project's lead, which is pinned above the groups rather than in one.
-    func lead(of folder: URL?) -> Agent? {
-        guard let folder, let id = projects.first(where: { $0.folder == folder })?.leadID else {
-            return nil
-        }
-        return agents.first { $0.id == id }
-    }
-
-    /// A project's workers in one group, newest first.
+    /// A project's agents in one group, newest first.
     ///
     /// Filtered from the agents this window already holds, so no call is made and the
     /// archived list's "show more" is a number in a view rather than a fetch.
-    func workers(in folder: URL?, group: AgentGroup) -> [Agent] {
+    func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         return agents
-            .filter { $0.role == .worker && Project.standardize($0.cwd) == folder && $0.group == group }
+            .filter { Project.standardize($0.cwd) == folder && $0.group == group }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
-    }
-
-    /// Everything in the selected project, lead included, for deciding what to select
-    /// when the current selection goes away.
-    private func agents(in folder: URL) -> [Agent] {
-        agents.filter { Project.standardize($0.cwd) == folder }
     }
 
     func refreshProjects() async {
@@ -444,18 +430,32 @@ final class AppModel {
         }
     }
 
-    /// Say what you want done in this project.
+    /// Start an agent on this, in this project's folder.
     ///
-    /// It goes to the project's lead, which is what the prompt at the top of a project
-    /// is for: you describe the outcome, and it starts and briefs the agents. This is
-    /// why there is no longer a button for starting one by hand.
-    func sendToLead(of folder: URL, _ text: String) async {
-        guard let lead = lead(of: folder),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    /// What the prompt at the top of a project does. There is no separate button for
+    /// it because there is nothing else the prompt could mean: you are looking at a
+    /// folder and saying what you want done in it.
+    func startAgent(in folder: URL, prompt: String) async {
+        let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty, let runtimeID = defaultRuntimeID else { return }
         await attempt {
-            try await self.client.call(DaemonAPI.Method.agentsPrompt,
-                                       DaemonAPI.PromptRequest(agentID: lead.id, text: text))
+            let id = try await self.client.call(
+                DaemonAPI.Method.agentsStart,
+                DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words),
+                returning: UUID.self)
+            self.selection = id
         }
+    }
+
+    /// Which runtime a new agent gets when nobody has said.
+    ///
+    /// Whatever the last agent used, when it is still available, because that is the
+    /// one already chosen in every other sense. It can be changed from the chat.
+    var defaultRuntimeID: String? {
+        let available = Set(availableRuntimes.map(\.runtime.id))
+        let recent = agents.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            .first { available.contains($0.runtimeID) }?.runtimeID
+        return recent ?? available.first
     }
 
     /// Take something back off the queue before it goes.

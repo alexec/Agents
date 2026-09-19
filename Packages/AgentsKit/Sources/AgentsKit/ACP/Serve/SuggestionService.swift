@@ -47,33 +47,13 @@ public actor SuggestionService {
     /// Where a call goes.
     public typealias Sink = @Sendable ([SuggestedPrompt]) async -> Outcome
 
-    /// Where a project lead's tool call goes.
-    ///
-    /// The lead's tools ride on this same server rather than a second one: one helper,
-    /// one token, one thing for a runtime to start. Whether they are offered at all is
-    /// the daemon's answer, not ours — it knows which agent this token belongs to and
-    /// whether that agent leads a project.
-    public typealias LeadSink = @Sendable (_ tool: String, _ arguments: JSONValue?) async -> Outcome
-
-    /// Whether this session's agent is a project lead. Asked once, lazily, because the
-    /// answer cannot change for the life of a session.
-    public typealias LeadCheck = @Sendable () async -> Bool
-
     private let connection: JSONRPCConnection
     private let sink: Sink
-    private let leadSink: LeadSink?
-    private let isLead: LeadCheck?
-    private var leadTools: Bool?
     private let box = ServiceBox()
 
-    public init(transport: any LineTransport,
-                isLead: LeadCheck? = nil,
-                leadSink: LeadSink? = nil,
-                sink: @escaping Sink) {
+    public init(transport: any LineTransport, sink: @escaping Sink) {
         let box = self.box
         self.sink = sink
-        self.leadSink = leadSink
-        self.isLead = isLead
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -111,21 +91,9 @@ public actor SuggestionService {
             return .success([:])
 
         case "tools/list":
-            var tools: [JSONValue] = [Self.tool]
-            if await offersLeadTools() { tools.append(contentsOf: ProjectTools.all) }
-            return .success(["tools": .array(tools)])
+            return .success(["tools": .array([Self.tool])])
 
         case "tools/call":
-            // A project lead's tool, if this session belongs to one. Asked of the
-            // daemon rather than decided here: a helper is a process anything on this
-            // Mac could start, so it is told what it may offer, never the other way.
-            if let leadSink, let tool = ProjectTools.matches(params?["name"]?.stringValue),
-               await offersLeadTools() {
-                switch await leadSink(tool, params?["arguments"]) {
-                case .shown(let note): return .success(Self.reply(note))
-                case .refused(let problem): return .success(Self.reply(problem, isError: true))
-                }
-            }
             guard params?["name"]?.stringValue?.hasSuffix(Self.toolName) == true else {
                 return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
                                              message: "No tool called \(params?["name"]?.stringValue ?? "that")."))
@@ -143,18 +111,6 @@ public actor SuggestionService {
         default:
             return .failure(.methodNotFound(method))
         }
-    }
-
-    /// Whether this session's agent leads a project, asked once and kept.
-    private func offersLeadTools() async -> Bool {
-        if let leadTools { return leadTools }
-        guard let isLead else {
-            leadTools = false
-            return false
-        }
-        let answer = await isLead()
-        leadTools = answer
-        return answer
     }
 
     /// A tool result is content plus a flag, and a failure inside the tool is reported

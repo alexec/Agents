@@ -9,9 +9,9 @@ import SwiftUI
 /// with the lists scrolling underneath it — the same bar, the same glass, the same
 /// margins.
 ///
-/// What you type goes to the project's lead, which is why there is no button for
-/// starting an agent by hand. Picking an agent goes into its conversation, and the back
-/// button comes out again.
+/// What you type starts an agent on it, in this folder, which is why there is no
+/// separate button for starting one. Picking an agent goes into its conversation, and
+/// the back button comes out again.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
@@ -57,14 +57,8 @@ struct ProjectAgentsView: View {
         ScrollView {
             GlassEffectContainer(spacing: Self.cardSpacing) {
                 LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                    if let lead = model.lead(of: folder) {
-                        AgentCard(id: lead.id, selection: $selection) {
-                            LeadRow(agent: lead)
-                        }
-                    }
-
                     ForEach(AgentGroup.live, id: \.self) { group in
-                        let agents = model.workers(in: folder, group: group)
+                        let agents = model.agents(in: folder, group: group)
                         if !agents.isEmpty {
                             GroupHeading(title: group.title, count: agents.count)
                             ForEach(agents) { agent in
@@ -89,7 +83,7 @@ struct ProjectAgentsView: View {
     static let cardSpacing: CGFloat = 10
 
     private var archived: [Agent] {
-        model.workers(in: folder, group: .archived)
+        model.agents(in: folder, group: .archived)
     }
 
     /// Out of the way until it is wanted, because looking at what you archived is a
@@ -169,7 +163,7 @@ private struct GroupHeading: View {
     }
 }
 
-/// Say what you want done. It goes to the project's lead.
+/// Say what you want done. It starts an agent on it.
 ///
 /// The same shape as the prompt bar in a chat: one field, one send button, glass, and
 /// the same margins, so moving between a project and an agent does not move the thing
@@ -198,7 +192,7 @@ private struct ProjectPrompt: View {
             .buttonBorderShape(.circle)
             .disabled(isEmpty)
             .keyboardShortcut(.return, modifiers: .command)
-            .help("Send this to the project lead")
+            .help("Start an agent on this")
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
@@ -214,6 +208,6 @@ private struct ProjectPrompt: View {
         guard !isEmpty else { return }
         let words = text
         text = ""
-        Task { await model.sendToLead(of: folder, words) }
+        Task { await model.startAgent(in: folder, prompt: words) }
     }
 }

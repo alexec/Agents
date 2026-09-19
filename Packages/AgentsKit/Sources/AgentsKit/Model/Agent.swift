@@ -52,10 +52,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// from, and a stale one is worse than none.
     public var suggestedPrompts: [SuggestedPrompt]
 
-    /// Whether this agent does the work or coordinates it. Every record written before
-    /// projects arrived is a worker, and decodes as one without being changed.
-    public var role: AgentRole
-
     public var createdAt: Date
     public var lastActivityAt: Date
     public var endedReason: EndedReason?
@@ -103,10 +99,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // the chips are still there when the app is opened again on a turn that ended
         // last night.
         suggestedPrompts = try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? []
-        // Arrived with projects. Everything written before is a worker, and so is a
-        // role we do not recognise: a record from a newer build must still open, and
-        // opening it as a worker is the reading that takes no powers with it.
-        role = (try? c.decodeIfPresent(AgentRole.self, forKey: .role)) .flatMap { $0 } ?? .worker
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
         unknownFields = whole.filter { !known.contains($0.key) }
@@ -137,8 +129,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !mcpServers.isEmpty { try c.encode(mcpServers, forKey: .mcpServers) }
         if !queuedPrompts.isEmpty { try c.encode(queuedPrompts, forKey: .queuedPrompts) }
         if !suggestedPrompts.isEmpty { try c.encode(suggestedPrompts, forKey: .suggestedPrompts) }
-        // Only written when it says something. A worker is the default everywhere.
-        if role != .worker { try c.encode(role, forKey: .role) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -153,7 +143,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case advertisedOptions, availableCommands, createdAt, lastActivityAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, plans, additionalDirectories, mcpServers
-        case queuedPrompts, suggestedPrompts, role
+        case queuedPrompts, suggestedPrompts
     }
 
     struct AnyKey: CodingKey {
@@ -184,9 +174,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 mcpServers: [MCPServer] = [],
                 queuedPrompts: [QueuedPrompt] = [],
                 suggestedPrompts: [SuggestedPrompt] = [],
-                role: AgentRole = .worker,
                 unknownFields: [String: JSONValue] = [:]) {
-        self.role = role
         self.id = id
         self.runtimeID = runtimeID
         self.cwd = cwd

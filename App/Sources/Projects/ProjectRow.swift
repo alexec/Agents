@@ -43,7 +43,7 @@ struct ProjectRow: View {
     private var subtitle: String? {
         let working = summary.counts[.running] ?? 0
         let waiting = summary.counts[.needsAttention] ?? 0
-        if summary.leadNeedsInput || waiting > 0 { return "Needs attention" }
+        if waiting > 0 { return "Needs attention" }
         if working > 0 { return working == 1 ? "1 working" : "\(working) working" }
         return nil
     }

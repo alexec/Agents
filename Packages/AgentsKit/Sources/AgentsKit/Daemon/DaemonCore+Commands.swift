@@ -397,12 +397,6 @@ extension DaemonCore {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
-        // A lead is not archivable on its own. Every project has one, so archiving it
-        // by itself would leave a project without the thing it is promised to have.
-        guard agent.role != .lead else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
-                               message: "The project lead is archived with its project.")
-        }
         if agent.state.holdsRuntime { try await stop(agentID) }
         await move(agentID, on: .archivedByUser)
     }
@@ -444,11 +438,7 @@ extension DaemonCore {
                                message: "That question has already been answered.")
         }
         let name = pending.request.options.first { $0.optionID == request.optionID }?.name
-        // A question the daemon asked on its own behalf — a lead wanting to touch
-        // another agent — is answered by letting that call go on, not by telling a
-        // runtime. Everything below still happens: the record, the state, the windows.
-        let wasOurs = resumeLeadPermission(request.permissionID, optionID: request.optionID)
-        if !wasOurs, let session = live[pending.agentID] {
+        if let session = live[pending.agentID] {
             await session.answerPermission(id: pending.request.id, optionID: request.optionID)
         }
         await record(.permissionAnswered(optionID: request.optionID, optionName: name), for: pending.agentID)

@@ -116,10 +116,11 @@ unarchive it, and confirm both come back unchanged across a restart.
 
 ---
 
-## Phase 5: User Story 4 - Hand the project to its lead (Priority: P2)
+## Phase 5: User Story 4 - Hand the project to its lead (Priority: P2) — REVERTED 2026-09-19
 
-**Goal**: Every project has a lead agent that starts, briefs, watches and stops the project's workers,
-with the user approving each move.
+**Goal**: ~~Every project has a lead agent.~~ **Built, then removed on 2026-09-19** — the UX it sat
+on had not settled, and the user asked for it out until the shape of a project page is decided. Every
+task below was completed and then reverted; they are the plan for when it comes back.
 
 **Independent Test**: Open a project, tell its lead to get two things done, and confirm it starts two
 agents in that project, each with its own instruction, that the user is asked before each one starts,

@@ -27,12 +27,6 @@ public enum DaemonAPI {
         /// Not the app's to call. This is how the MCP server we hand to every agent
         /// gets what the agent passed it back to the agent's own record.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
-        /// Also not the app's to call. How a project lead's tool call, arriving on the
-        /// same MCP server, reaches the agents it is allowed to work with.
-        public static let agentsLeadTool = "agents/leadTool"
-        /// Whether the agent behind a token leads a project, and so whether the helper
-        /// may offer the lead's tools at all.
-        public static let agentsIsLead = "agents/isLead"
         // A project is a folder. These four are everything that can be done to one,
         // which is to say: notice it, and put it away.
         public static let projectsList = "projects/list"
@@ -90,38 +84,6 @@ public enum DaemonAPI {
         }
     }
 
-    /// What the MCP helper sends when a project lead calls one of its tools.
-    ///
-    /// The token, not an agent id, for the same reason the suggestion tool uses one:
-    /// the helper is a process the runtime started, anything on this Mac can reach the
-    /// daemon's socket, and a token minted for one session is the only thing that says
-    /// which agent is calling.
-    public struct LeadToolRequest: Codable, Sendable {
-        public var token: String
-        public var tool: String
-        /// The agent being worked with, for the tools that name one.
-        public var agentID: UUID?
-        /// The instruction for `start_agent`, or the words for `prompt_agent`.
-        public var text: String?
-        public var title: String?
-        public var runtimeID: String?
-        public var limit: Int?
-        public var before: Int?
-
-        public init(token: String, tool: String, agentID: UUID? = nil, text: String? = nil,
-                    title: String? = nil, runtimeID: String? = nil,
-                    limit: Int? = nil, before: Int? = nil) {
-            self.token = token
-            self.tool = tool
-            self.agentID = agentID
-            self.text = text
-            self.title = title
-            self.runtimeID = runtimeID
-            self.limit = limit
-            self.before = before
-        }
-    }
-
     /// One project, named by its folder, because the folder is the identity.
     public struct ProjectRequest: Codable, Sendable {
         public var folder: URL
@@ -141,32 +103,22 @@ public enum DaemonAPI {
         public var exists: Bool
         /// The newest activity of any agent in it, or `addedAt` when it has none.
         public var lastActivityAt: Date
-        /// How many workers are in each group. The lead is in none of them, so it is
-        /// not counted here.
+        /// How many agents are in each group.
         public var counts: [AgentGroup: Int]
-        /// The project's lead, so the panel can pin it and selecting a project can
-        /// open its conversation.
-        public var leadID: UUID?
-        /// Whether the lead is waiting on the user. Marked in the sidebar even though
-        /// the lead sits in no group.
-        public var leadNeedsInput: Bool
 
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
 
-        /// Whether anything in this project wants the user, the lead included.
-        public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 || leadNeedsInput }
+        /// Whether anything in this project wants the user.
+        public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
         public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
-                    counts: [AgentGroup: Int], leadID: UUID? = nil,
-                    leadNeedsInput: Bool = false) {
+                    counts: [AgentGroup: Int]) {
             self.project = project
             self.name = name
             self.exists = exists
             self.lastActivityAt = lastActivityAt
             self.counts = counts
-            self.leadID = leadID
-            self.leadNeedsInput = leadNeedsInput
         }
     }
 
