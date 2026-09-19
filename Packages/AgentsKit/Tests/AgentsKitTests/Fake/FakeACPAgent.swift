@@ -30,6 +30,10 @@ actor FakeACPAgent {
         /// client serves is tested through here, because only one runtime on this Mac
         /// uses the file methods and none sends an elicitation form.
         var clientRequests: [(method: String, params: JSONValue)] = []
+        /// Notifications under a method of the runtime's own invention, sent during the
+        /// turn. A real one is Cursor's `cursor/update_todos`. Nothing is expected back,
+        /// which is exactly why they used to vanish without trace.
+        var extensionNotifications: [(method: String, params: JSONValue)] = []
         /// The protocol version to answer the handshake with.
         var protocolVersion = 1
         /// Refuse `session/new` with this, for the signed-out case.
@@ -149,6 +153,9 @@ actor FakeACPAgent {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }
         for update in script.updates { await send(update: update) }
+        for notification in script.extensionNotifications {
+            try? await connection.notify(notification.method, notification.params)
+        }
         for request in script.clientRequests {
             var params = request.params
             if case .object(var object) = params, object["sessionId"] == nil {
@@ -175,6 +182,13 @@ actor FakeACPAgent {
     private func send(update: JSONValue) async {
         try? await connection.notify(ACP.ClientMethod.sessionUpdate,
                                      ["sessionId": .string(sessionID), "update": update])
+    }
+
+    /// Send a notification under any method at all, the way a runtime speaking its own
+    /// extension does. Nothing comes back, so the only question is whether the client
+    /// noticed.
+    func emitNotification(_ method: String, _ params: JSONValue = [:]) async {
+        try? await connection.notify(method, params)
     }
 
     /// Send an update outside a turn, for tests that want one to arrive unprompted.

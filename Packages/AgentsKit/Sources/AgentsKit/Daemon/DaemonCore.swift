@@ -247,6 +247,11 @@ public actor DaemonCore {
 
         case .unknownUpdate(let kind):
             DaemonLog.shared.write("agent \(agentID) sent an update we do not know: \(kind)")
+
+        // A runtime's own extension. Not the user's conversation, so it stays out of the
+        // transcript and out of agent.json, exactly like an update kind we do not know.
+        case .unknownNotification(let method):
+            DaemonLog.shared.write("agent \(agentID) sent a notification we do not know: \(method)")
         }
     }
 

@@ -32,8 +32,11 @@ struct RuntimeAccountView: View {
                                                                         methodID: method.id) }
                         }
                         .buttonStyle(.glassProminent)
-                        if let description = method.description {
-                            Text(description).font(.caption).foregroundStyle(.secondary)
+                        // What the runtime says, minus anything telling the user to run a
+                        // command. See ACP.AuthMethod.guidance: Cursor's advice names a
+                        // binary that on this Mac belongs to Grok.
+                        if let guidance = method.guidance {
+                            Text(guidance).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }

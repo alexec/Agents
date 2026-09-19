@@ -68,6 +68,39 @@ struct GrokServedToolsTests {
                 "Grok read through the client")
     }
 
+    /// The finding that decided User Story 3 of 006, kept the same way Grok's was.
+    ///
+    /// Cursor sends `cursor/create_plan` as a blocking request. We answer every method we
+    /// do not know with `-32601`, and the question was whether that ends the turn or kills
+    /// it. By hand: answered, the turn reaches `end_turn`; left unanswered, it never
+    /// finishes. So the refusal is load-bearing. Nothing in the client knows this method
+    /// exists, which is the point, and this test is here to notice the day that stops
+    /// being enough.
+    @Test func cursorFinishesItsTurnEvenThoughWeDeclineItsOwnMethod() async throws {
+        let work = try workspace()
+        let session = try launch(RuntimeCatalog.cursor, cwd: work, capabilities: .app)
+        _ = try await session.initialize()
+        _ = try await session.newSession(cwd: work)
+
+        let events = session.eventStream()
+        let watching = Task { () -> [String] in
+            var seen: [String] = []
+            for await event in events {
+                if case .unknownNotification(let method) = event { seen.append(method) }
+            }
+            return seen
+        }
+
+        let result = try await session.prompt(
+            "Plan the work first, then do it: add a comment to notes.txt, then a second line.")
+        #expect(result.reason == .endTurn, "a declined request must not leave the turn open")
+
+        await session.end()
+        // Not asserted as present: the notifications only appear when Cursor chooses to
+        // send them. What matters is that whatever did arrive was named rather than lost.
+        _ = await watching.value
+    }
+
     @Test func everyRuntimeStillStartsWithEverythingAdvertised() async throws {
         // The flags are a promise. If one of them makes a runtime refuse to start, this
         // is where it shows up rather than in somebody's window.

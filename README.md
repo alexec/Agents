@@ -48,6 +48,14 @@ nothing, quit the app, `pkill -f agentsd`, and delete that directory.
 Everything the protocol defines, decided by what each runtime advertises rather than by
 which runtime it is.
 
+Four runtimes are known: Claude, Grok, Copilot and Cursor. Three are commands of their own
+and Claude is an npm package run through your Node, because `claude` has no ACP flag. What
+the app starts for Cursor is `cursor-agent`, not `agent`, which belongs to Grok.
+
+No code in the app asks which runtime it is talking to. A runtime that advertises a thing
+gets that thing, and one that does not, does not: Cursor offers no options to pick from and
+no way to sign out, so the app shows neither.
+
 - **Attachments.** Drag a file onto the prompt, paste a screenshot, or type `@` and pick
   a file. A picture goes by value where the runtime takes pictures and by reference
   otherwise, and an attachment a runtime cannot take is refused before the prompt is sent.
@@ -61,6 +69,9 @@ which runtime it is.
   the runtime that uses this today, and only because the app says it can.
 - **Signing in.** A runtime that is installed and not signed in can be signed into from
   the app, or, where the runtime insists on a terminal, it hands over the exact command.
+  A command the app puts in front of you is one it knows it would start. What a runtime
+  says about itself in prose is shown, but never followed: Cursor's sign-in text says to
+  run `agent login`, and `agent` here is Grok.
 - **Conversations the app did not start.** The runtime's own list, ready to be picked up,
   branched, or deleted with a confirmation.
 

@@ -192,6 +192,26 @@ struct ACPSessionTests {
         #expect(unknown == ["something_new_next_year"], "ignored-on-purpose and unrecognised are different things")
     }
 
+    @Test func aNotificationUnderAMethodWeDoNotKnowIsReportedRatherThanDropped() async throws {
+        // Cursor sends three of these, under `cursor/`. Before this they returned at the
+        // guard in `receive` and left nothing behind at all, so an agent could be quietly
+        // poorer for what it was sent and nobody could tell.
+        let (session, agent) = pair()
+        let events = try await collect(session) {
+            try await session.initialize()
+            try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
+            await agent.emitNotification("cursor/update_todos", ["todos": ["one", "two"]])
+            await agent.emitNotification("something/inventedNextYear")
+            await agent.emit(["sessionUpdate": "usage_update", "used": 10, "size": 100])
+        }
+        let unknown = events.compactMap {
+            if case .unknownNotification(let m) = $0 { return m } else { return nil }
+        }
+        #expect(unknown == ["cursor/update_todos", "something/inventedNextYear"])
+        // The known traffic either side of it is untouched.
+        #expect(events.contains { if case .usageChanged = $0 { return true } else { return false } })
+    }
+
     @Test func anUnknownIncomingMethodIsDeclinedLoudly() async throws {
         let (mine, theirs) = PairedTransport.pair()
         let session = ACPSession(transport: mine)

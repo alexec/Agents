@@ -23,6 +23,10 @@ public enum ACPSessionEvent: Sendable {
     case standardError(String)
     /// An update kind we do not recognise. Reported rather than silently dropped.
     case unknownUpdate(String)
+    /// A notification whose method we do not recognise, which is a runtime speaking an
+    /// extension of its own. Nothing to act on, but reported for the same reason as
+    /// `unknownUpdate`: an agent is never quietly poorer for what it was sent.
+    case unknownNotification(String)
 }
 
 /// How a turn came to an end, including the case where a runtime invents a stop reason.
@@ -395,7 +399,18 @@ public actor ACPSession {
             }
             return
         }
-        guard method == ACP.ClientMethod.sessionUpdate, let update = params?["update"] else { return }
+        // A notification is a method we know or a method we do not, and until now the
+        // second kind left no trace at all. Cursor sends `cursor/update_todos` and two
+        // others; something else will send something else next year. Nothing to act on,
+        // but it is said out loud, the way an unrecognised update kind already is.
+        guard method == ACP.ClientMethod.sessionUpdate else {
+            eventsContinuation.yield(.unknownNotification(method))
+            return
+        }
+        guard let update = params?["update"] else {
+            eventsContinuation.yield(.unknownNotification("\(method) with no update"))
+            return
+        }
         switch SessionUpdate.decode(update) {
         case .entry(let kind):
             guard !isReplaying || recordsReplay else { return }

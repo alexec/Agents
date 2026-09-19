@@ -238,6 +238,36 @@ public enum ACP {
             guard let command else { return nil }
             return ([command] + args).joined(separator: " ")
         }
+
+        /// What the runtime says about this method, minus any sentence telling the user
+        /// to run something.
+        ///
+        /// A runtime names itself by its own idea of its name, which is not a fact about
+        /// this Mac. Cursor's `cursor_login` describes itself as "Run 'agent login' first
+        /// if not logged in", and `agent` here is Grok, so a user who follows that advice
+        /// signs into the wrong runtime. A command the app puts in front of someone comes
+        /// from the catalog entry or from `terminalCommand`, where we know what will
+        /// actually be started. Never from prose.
+        public var guidance: String? {
+            guard let description else { return nil }
+            let kept = description
+                .split(separator: ".", omittingEmptySubsequences: true)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && !Self.tellsYouToRunSomething($0) }
+            guard !kept.isEmpty else { return nil }
+            return kept.joined(separator: ". ") + "."
+        }
+
+        /// A sentence both saying "run" and carrying something shaped like a command.
+        /// "This runs in your browser" keeps its place; "Run `foo login` first" does not.
+        static func tellsYouToRunSomething(_ sentence: String) -> Bool {
+            let lower = sentence.lowercased()
+            guard lower.range(of: #"\brun\b"#, options: .regularExpression) != nil else { return false }
+            let quoted = #"['"`][^'"`]+['"`]"#
+            let hyphenated = #"\b[a-z0-9]+-[a-z0-9]+\b"#
+            return lower.range(of: quoted, options: .regularExpression) != nil
+                || lower.range(of: hyphenated, options: .regularExpression) != nil
+        }
     }
 
     // MARK: session/new

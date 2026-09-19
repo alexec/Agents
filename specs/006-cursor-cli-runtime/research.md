@@ -111,11 +111,19 @@ claim about this codebase.
 **Caveat**: one run each. The difference is stark and the mechanism is obvious, but it is two data
 points, not a study.
 
-## 4. `cursor/ask_question` did not appear
+## 4. `cursor/ask_question` did not appear, in three attempts
 
-Cursor's documentation lists it as a blocking request. It did not fire in either turn, including one
-written specifically to force a question ("Ask me a multiple choice question to find out which symbol
-I mean, then stop"). That turn produced only `session/update` and ended normally.
+Cursor's documentation lists it as a blocking request. It did not fire in any of three turns, two of
+them written specifically to force a question:
+
+1. "Ask me a multiple choice question to find out which symbol I mean, then stop."
+2. "Rename one of them for me. Do not guess which one, you must ask me to choose before you touch
+   anything."
+
+Both produced only `session/update`, asked their question as ordinary message text, and ended with
+`end_turn`. On this version, Cursor asks in prose.
+
+**Implementation confirmed this**: a third attempt during T028 behaved the same way.
 
 **Decision**: do not build for it. If it appears during implementation, map it onto the elicitation
 stack 003 already finished (T116 to T123, all done: `Model/Elicitation.swift`,
@@ -125,6 +133,19 @@ runtime. Do not build that speculatively.
 **Alternatives considered**: advertising something in `clientCapabilities._meta` to opt into Cursor's
 extensions. Rejected for this feature: it is an invitation to receive traffic the app has no use for,
 and the plan it would unlock already arrives.
+
+## 4a. Cursor reports no usage and no cost
+
+Every `session/prompt` result across all three turns was exactly
+`{"stopReason": "end_turn"}`. No `usage`, no token counts, no cost, and no `usage_update`
+notification during the turn either.
+
+**Decision**: nothing to build, and nothing to fix. A Cursor agent shows no cost because Cursor sends
+none. The rule that cost is shown as reported and never estimated (FR-013) holds here by having
+nothing to show, and the context meter stays empty for Cursor the same way it would for any runtime
+that says nothing about what it used.
+
+Worth re-checking when Cursor updates, because this is a claim about somebody else's software.
 
 ## 5. What Cursor does not send that a live test demands
 

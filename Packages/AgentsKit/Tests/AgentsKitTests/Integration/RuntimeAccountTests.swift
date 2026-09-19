@@ -109,6 +109,49 @@ struct RuntimeAccountTests {
     }
 }
 
+/// A runtime's description of how to sign in is prose written by somebody else, about a
+/// machine they have never seen. It is shown, but never followed.
+@Suite("What a runtime says about signing in")
+struct AuthMethodGuidanceTests {
+    private func method(_ description: String?, meta: JSONValue? = nil) -> ACP.AuthMethod {
+        var fields: [String: JSONValue] = ["id": "x", "name": "X"]
+        if let description { fields["description"] = .string(description) }
+        if let meta { fields["_meta"] = meta }
+        return try! JSONValue.object(fields).decode(ACP.AuthMethod.self)
+    }
+
+    @Test func aSentenceTellingYouToRunSomethingIsNotPassedOn() {
+        // Cursor's own words, verbatim. `agent` on this Mac is Grok, so this sentence
+        // sends the user to the wrong runtime entirely.
+        let cursor = method("Authenticate using existing Cursor login credentials. "
+                            + "Run 'agent login' first if not logged in.")
+        let guidance = cursor.guidance
+        #expect(guidance == "Authenticate using existing Cursor login credentials.")
+        #expect(guidance?.contains("agent login") == false)
+        #expect(guidance?.lowercased().contains("run") == false)
+    }
+
+    @Test func proseThatMerelyMentionsRunningIsKept() {
+        let benign = method("Sign in with your browser. This runs entirely on your machine.")
+        #expect(benign.guidance == "Sign in with your browser. This runs entirely on your machine.")
+    }
+
+    @Test func aDescriptionThatIsOnlyAnInstructionSaysNothingAtAll() {
+        #expect(method("Run `some-cli login` first.").guidance == nil)
+        #expect(method(nil).guidance == nil)
+    }
+
+    @Test func aCommandTheRuntimeDeclaresProperlyIsStillOffered() {
+        // The structured field is a different thing from prose: it names a command and
+        // its arguments, so the app knows what it would be starting.
+        let copilot = method("Log in with the Copilot CLI.",
+                             meta: ["terminal-auth": ["command": "/opt/homebrew/bin/copilot",
+                                                      "args": ["login"]]])
+        #expect(copilot.terminalCommand == "/opt/homebrew/bin/copilot login")
+        #expect(copilot.guidance == "Log in with the Copilot CLI.")
+    }
+}
+
 /// A launcher whose agent advertises Copilot's terminal sign-in method.
 final class FakeLauncherWithAuth: SessionLauncher, @unchecked Sendable {
     private let lock = NSLock()

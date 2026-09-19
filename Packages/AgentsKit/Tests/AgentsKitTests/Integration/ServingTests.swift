@@ -175,6 +175,29 @@ struct ServingTests {
         #expect(error.isMethodNotFound, "declined loudly, so the runtime can fall back")
     }
 
+    @Test func aRuntimesOwnBlockingMethodIsDeclinedAtOnceRatherThanLeftOpen() async throws {
+        // Cursor's `cursor/create_plan` is a request, not a notification, so it waits for
+        // an answer. Answered, the turn runs to its end; unanswered, it does not finish at
+        // all. So the refusal is not a fallback here, it is what lets the turn complete.
+        // The method name is data: nothing in the client knows which runtime sent it.
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.clientRequests = [("cursor/create_plan",
+                                  ["name": "A plan", "plan": "# Do the thing"])]
+        let launcher = FakeLauncher(script: script, capabilities: .app)
+        let core = try core(launcher, locations: locations)
+
+        _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "plan it"))
+        try await Task.sleep(for: .milliseconds(300))
+
+        let answer = await launcher.lastAgent?.answer(to: "cursor/create_plan")
+        guard case .failure(let error)? = answer else {
+            Issue.record("a blocking request must be answered, or the turn never ends")
+            return
+        }
+        #expect(error.isMethodNotFound)
+    }
+
     // MARK: Terminals
 
     @Test func aCommandRunsAndItsOutputComesBack() async throws {
