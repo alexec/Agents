@@ -263,6 +263,10 @@ final class AppModel {
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
             shellClients[notification.agentID]?.received(notification.state)
 
+        case DaemonAPI.Notification.draftOptions:
+            guard let notification = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
+            settleDraft(notification)
+
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()
 
@@ -374,14 +378,43 @@ final class AppModel {
                                                                           mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
             draftID = response.draftID
-            draftOptions = response.options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
-            draftCommands = response.commands
-            for option in draftOptions where option.currentValue != nil {
-                draftChosen[option.id] = option.currentValue
-            }
+            show(options: response.options, commands: response.commands)
         } catch {
             problem = describe(error)
         }
+    }
+
+    /// Draw the form. The first answer may be what the runtime said last time, with the
+    /// real one arriving a few seconds later, so this runs more than once for one draft
+    /// and keeps every choice the runtime still offers.
+    private func show(options: [ConfigOption], commands: [SlashCommand]) {
+        draftOptions = options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
+        draftCommands = commands
+        for option in draftOptions {
+            // A choice the user made stands, as long as it is still one of the choices.
+            if let chosen = draftChosen[option.id],
+               option.isBoolean || option.options?.contains(where: { $0.value == chosen }) == true {
+                continue
+            }
+            draftChosen[option.id] = option.currentValue
+        }
+        // Options that have gone are not choices anybody can unmake.
+        let offered = Set(draftOptions.map(\.id))
+        draftChosen = draftChosen.filter { offered.contains($0.key) }
+    }
+
+    /// The runtime behind a remembered form has finished starting and either says
+    /// something different or will not start at all.
+    private func settleDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
+        guard notification.draftID == draftID else { return }
+        if let failure = notification.failure {
+            problem = failure
+            // There is no session to start from. The next attempt makes its own, and
+            // fails the same way with the prompt still in the bar.
+            draftID = nil
+            return
+        }
+        show(options: notification.options, commands: notification.commands)
     }
 
     func startDraft(prompt: String, attachments: [Attachment] = []) async {

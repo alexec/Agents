@@ -82,6 +82,9 @@ public struct StoreLocations: Sendable {
     /// are the two a project's folder cannot tell us: that it is archived, and that it
     /// was added before anything ran in it.
     public var projects: URL { root.appendingPathComponent("projects.json") }
+    /// What each runtime last advertised. A cache: safe to delete, and deleting it
+    /// costs the next start form the wait it used to have every time.
+    public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

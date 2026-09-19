@@ -68,6 +68,10 @@ public enum DaemonAPI {
         /// goes on the agent's record, this is an event: a window that is not there to
         /// hear it has missed nothing, because the moment it was about has passed.
         public static let agentShowFile = "agent/showFile"
+        /// What a runtime really offers, for a start form that was drawn from what it
+        /// offered last time. Carries the failure instead when the runtime being
+        /// started behind that form would not start.
+        public static let draftOptions = "agents/draftOptions"
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
@@ -171,6 +175,35 @@ public enum DaemonAPI {
             draftID = try c.decode(UUID.self, forKey: .draftID)
             options = try c.decodeIfPresent([ConfigOption].self, forKey: .options) ?? []
             commands = try c.decodeIfPresent([SlashCommand].self, forKey: .commands) ?? []
+        }
+    }
+
+    /// The correction to a start form that was answered from memory.
+    ///
+    /// A window holding this draft replaces what it is showing, keeping what the user
+    /// has chosen where the runtime still offers it. A window holding a different one
+    /// ignores this.
+    public struct DraftOptionsNotification: Codable, Sendable {
+        public var draftID: UUID
+        public var options: [ConfigOption]
+        public var commands: [SlashCommand]
+        /// Why there will be no runtime, when there will be none.
+        public var failure: String?
+
+        public init(draftID: UUID, options: [ConfigOption] = [], commands: [SlashCommand] = [],
+                    failure: String? = nil) {
+            self.draftID = draftID
+            self.options = options
+            self.commands = commands
+            self.failure = failure
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            draftID = try c.decode(UUID.self, forKey: .draftID)
+            options = try c.decodeIfPresent([ConfigOption].self, forKey: .options) ?? []
+            commands = try c.decodeIfPresent([SlashCommand].self, forKey: .commands) ?? []
+            failure = try c.decodeIfPresent(String.self, forKey: .failure)
         }
     }
 
