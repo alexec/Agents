@@ -65,16 +65,16 @@ rather than an option.
 
 ### Talking to a runtime
 
-- [ ] T020 Create the ACP wire types in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift` for the calls in `contracts/acp-client.md`, with `_meta` decoded but never read
-- [ ] T021 Implement `ACPSession` as an actor in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`: spawn the runtime, `initialize` advertising `fs.readTextFile false`, `fs.writeTextFile false` and `terminal false`, `session/new` with `cwd` and `mcpServers: []` and no `sessionId`, `session/prompt`, `session/cancel`, `session/close`, and the set-option call
-- [ ] T022 Implement the incoming-request side in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession+Server.swift`: `session/request_permission` surfaced to the owner and held until answered, everything else answered `-32601`
-- [ ] T023 Implement `session/update` decoding in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift` mapping each update to a `TranscriptEntry`, joining message chunks by the runtime's message id, updating a tool call already recorded, and logging-then-skipping an unknown update type
-- [ ] T024 Implement ending an agent in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession+End.swift` in the order FR-011b requires: cancel a running turn, wait for the `cancelled` reply, `session/close`, terminate, and `SIGKILL` only after a few seconds
+- [X] T020 Create the ACP wire types in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift` for the calls in `contracts/acp-client.md`, with `_meta` decoded but never read
+- [X] T021 Implement `ACPSession` as an actor in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`: spawn the runtime, `initialize` advertising `fs.readTextFile false`, `fs.writeTextFile false` and `terminal false`, `session/new` with `cwd` and `mcpServers: []` and no `sessionId`, `session/prompt`, `session/cancel`, `session/close`, and the set-option call
+- [X] T022 Implement the incoming-request side in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession+Server.swift`: `session/request_permission` surfaced to the owner and held until answered, everything else answered `-32601`
+- [X] T023 Implement `session/update` decoding in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift` mapping each update to a `TranscriptEntry`, joining message chunks by the runtime's message id, updating a tool call already recorded, and logging-then-skipping an unknown update type
+- [X] T024 Implement ending an agent in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession+End.swift` in the order FR-011b requires: cancel a running turn, wait for the `cancelled` reply, `session/close`, terminate, and `SIGKILL` only after a few seconds
 
 ### A runtime to talk to, in tests
 
-- [ ] T025 Build `FakeACPAgent` in `Packages/AgentsKit/Tests/AgentsKitTests/Fake/FakeACPAgent.swift`: an in-process ACP agent that is deterministic and scriptable — advertises chosen `sessionCapabilities` and `configOptions`, emits chosen updates, ends a turn with a chosen stop reason, can ask a permission, and can be told to die mid-turn
-- [ ] T026 [P] Test `ACPSession` against the fake in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ACPSessionTests.swift`: a whole turn, an unknown update, an unknown incoming method answered `-32601`, and a process that dies mid-turn becoming `processDied`
+- [X] T025 Build `FakeACPAgent` in `Packages/AgentsKit/Tests/AgentsKitTests/Fake/FakeACPAgent.swift`: an in-process ACP agent that is deterministic and scriptable — advertises chosen `sessionCapabilities` and `configOptions`, emits chosen updates, ends a turn with a chosen stop reason, can ask a permission, and can be told to die mid-turn
+- [X] T026 [P] Test `ACPSession` against the fake in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ACPSessionTests.swift`: a whole turn, an unknown update, an unknown incoming method answered `-32601`, and a process that dies mid-turn becoming `processDied`
 
 ### Finding the runtimes
 

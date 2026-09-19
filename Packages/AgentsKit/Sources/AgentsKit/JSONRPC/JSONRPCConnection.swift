@@ -69,7 +69,13 @@ public actor JSONRPCConnection {
         case .notification(let method, let params):
             notificationsContinuation.yield((method, params))
         case .request(let id, let method, let params):
-            Task { [handler] in
+            // Detached on purpose. An unstructured `Task` started here would inherit
+            // this actor's isolation, so a handler that sends anything back down the
+            // same connection while it works would be queued behind itself and the
+            // whole connection would stop. That is not hypothetical: it is what a
+            // runtime does when it replays a conversation while answering
+            // `session/load`.
+            Task.detached { [handler] in
                 let outcome = await handler(method, params)
                 switch outcome {
                 case .success(let result): try? await self.send(.success(id: id, result: result))

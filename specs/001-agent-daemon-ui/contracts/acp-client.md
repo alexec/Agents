@@ -73,10 +73,15 @@ Returns sessions for a `cwd`, each with `sessionId`, `cwd`, `title` and `updated
 pick an agent up, since we keep the id. Used to tell "the runtime has lost this session" from "the
 runtime is broken", which is the difference between FR-012d and an error.
 
-### Setting an option
+### `session/set_config_option`
 
-The set-option call carries the option `id` and the new value, and the reply is the refreshed option
-list. Used at start, once the session exists, and whenever the user changes something mid-session.
+```json
+{"sessionId": "...", "configId": "model", "value": "gpt-5.6-terra"}
+```
+
+The reply is the refreshed option list. Used at start, once the session exists, and whenever the
+user changes something mid-session. The spelling was confirmed against Copilot and the Claude
+adapter: `session/setConfigOption` and `session/set_option` are both method-not-found.
 
 ## What we must answer
 
@@ -118,7 +123,9 @@ that a daemon that dies mid-turn still leaves an honest record:
 | plan | Append |
 | current mode change | Update the agent's options |
 | config option update | Update the agent's options |
-| usage / tokens | Ignored in this feature. It is what a cost feature will read later |
+| `session_info_update` | The runtime's own title for the session, which is what names the agent |
+| `usage_update` | Ignored in this feature. It is what a cost feature will read later |
+| `available_commands_update` | Ignored in this feature. Slash commands are a later one |
 
 Unknown update types are logged once and skipped. A new update type in a runtime must never stop an
 agent working.
