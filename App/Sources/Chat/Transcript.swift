@@ -166,13 +166,19 @@ private struct ToolRunRow: View {
     }
 }
 
-/// One tool call: what it is doing, and its detail only when asked for.
+/// One tool call: what it is doing, what it produced, and the raw detail only when
+/// asked for.
+///
+/// Copilot and Grok send a structured diff for an edit; the Claude adapter shells out
+/// and sends console text. Both are drawn as what they are. Nothing is invented for the
+/// runtime that sends neither.
 private struct ToolCallLine: View {
+    @Environment(AppModel.self) private var model
     let call: ToolCall
     @State private var isShowingDetail = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(call.title)
                     .font(.callout)
@@ -184,6 +190,26 @@ private struct ToolCallLine: View {
                         .font(.caption)
                 }
             }
+
+            ForEach(Array(call.content.enumerated()), id: \.offset) { _, piece in
+                view(for: piece)
+            }
+
+            if !call.locations.isEmpty {
+                // Where it did its work, openable at the line.
+                HStack(spacing: 10) {
+                    ForEach(call.locations) { location in
+                        Button {
+                            open(location)
+                        } label: {
+                            Text(location.line.map { "\(location.fileName):\($0)" } ?? location.fileName)
+                                .font(.caption)
+                        }
+                        .buttonStyle(.link)
+                    }
+                }
+            }
+
             if isShowingDetail, let detail {
                 ScrollView(.horizontal, showsIndicators: false) {
                     Text(detail)
@@ -197,13 +223,42 @@ private struct ToolCallLine: View {
         }
     }
 
+    @ViewBuilder
+    private func view(for piece: ToolCallContent) -> some View {
+        switch piece {
+        case .diff(let diff):
+            DiffView(diff: diff)
+        case .content(let block):
+            BlocksView(blocks: [block])
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        case .terminal(let id):
+            TerminalOutputView(text: model.terminalOutput[id] ?? "")
+        case .unknown(let raw):
+            // Kept rather than dropped: shown as what the runtime sent.
+            Text(Self.pretty(raw))
+                .font(.caption.monospaced())
+                .foregroundStyle(.tertiary)
+                .lineLimit(6)
+        }
+    }
+
+    private func open(_ location: ToolCallLocation) {
+        // The editor the Mac opens that file with, which is the one the user chose.
+        NSWorkspace.shared.open(URL(filePath: location.path))
+    }
+
     /// What the runtime sent, as it sent it. Every runtime describes its tools
     /// differently and none of that is ours to tidy.
     private var detail: String? {
-        guard let raw = call.raw else { return nil }
-        let interesting = raw["rawInput"] ?? raw["content"] ?? raw
+        let interesting = call.rawInput ?? call.raw?["rawInput"] ?? call.rawOutput ?? call.raw
+        guard let interesting else { return nil }
         if let text = interesting.stringValue { return text }
-        guard let data = try? JSONEncoder.pretty.encode(interesting) else { return nil }
+        return Self.pretty(interesting)
+    }
+
+    private static func pretty(_ value: JSONValue) -> String {
+        guard let data = try? JSONEncoder.pretty.encode(value) else { return "" }
         return String(decoding: data, as: UTF8.self)
     }
 }

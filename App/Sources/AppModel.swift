@@ -14,6 +14,13 @@ final class AppModel {
     private(set) var agents: [Agent] = []
     private(set) var runtimes: [RuntimeStatus] = []
     private(set) var permissions: [PermissionRequest] = []
+    /// What each runtime last said about itself: signed in or not, what it takes in a
+    /// prompt, which provider is answering.
+    private(set) var accounts: [String: RuntimeAccount] = [:]
+    /// Outstanding forms, held by the daemon and answerable from any window.
+    private(set) var elicitations: [ElicitationRequest] = []
+    /// What the terminals the daemon is running for an agent have printed so far.
+    private(set) var terminalOutput: [String: String] = [:]
     private(set) var entries: [TranscriptEntry] = []
     private(set) var transcriptHasMore = false
     private(set) var isConnected = false
@@ -114,6 +121,25 @@ final class AppModel {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()
 
+        case DaemonAPI.Notification.runtimeAccountChanged:
+            guard let account = try? params?.decode(RuntimeAccount.self) else { return }
+            accounts[account.runtimeID] = account
+
+        case DaemonAPI.Notification.agentUsage:
+            guard let notification = try? params?.decode(DaemonAPI.UsageNotification.self) else { return }
+            if let index = agents.firstIndex(where: { $0.id == notification.agentID }) {
+                agents[index].usage = notification.usage
+            }
+
+        case DaemonAPI.Notification.agentElicitation:
+            guard let notification = try? params?.decode(DaemonAPI.ElicitationNotification.self) else { return }
+            elicitations.removeAll { $0.id == notification.requestID }
+            if let request = notification.request { elicitations.append(request) }
+
+        case DaemonAPI.Notification.agentTerminalOutput:
+            guard let notification = try? params?.decode(DaemonAPI.TerminalOutputNotification.self) else { return }
+            terminalOutput[notification.terminalID, default: ""] += notification.chunk
+
         default:
             break
         }
@@ -133,8 +159,24 @@ final class AppModel {
     func refreshEverything() async {
         await refreshAgents()
         await refreshRuntimes()
+        await refreshAccounts()
         await refreshPermissions()
+        await refreshElicitations()
         await loadTranscript()
+    }
+
+    func refreshElicitations() async {
+        guard let list = try? await client.call(DaemonAPI.Method.elicitationsPending,
+                                                Optional<Int>.none,
+                                                returning: [ElicitationRequest].self) else { return }
+        elicitations = list
+    }
+
+    /// The form waiting for this agent, if there is one. Held by the daemon, so it is
+    /// here whether or not this window was open when it was asked.
+    var elicitationForSelection: ElicitationRequest? {
+        guard let selection else { return nil }
+        return elicitations.first { $0.agentID == selection }
     }
 
     func refreshAgents() async {
@@ -216,11 +258,12 @@ final class AppModel {
         }
     }
 
-    func startDraft(prompt: String) async {
+    func startDraft(prompt: String, attachments: [Attachment] = []) async {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
         let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
                                              cwd: cwd,
                                              prompt: prompt,
+                                             attachments: attachments,
                                              startOptions: StartOptions(values: draftChosen),
                                              draftID: draftID)
         do {
@@ -233,12 +276,27 @@ final class AppModel {
         }
     }
 
-    func send(_ text: String) async {
+    func send(_ text: String, attachments: [Attachment] = []) async {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         await attempt {
             try await self.client.call(DaemonAPI.Method.agentsPrompt,
-                                       DaemonAPI.PromptRequest(agentID: selection, text: text))
+                                       DaemonAPI.PromptRequest(agentID: selection, text: text,
+                                                               attachments: attachments))
         }
+    }
+
+    /// What the runtime behind the current agent, or the draft, says it will take.
+    /// Nothing is refused on a guess: this is what the runtime advertised.
+    var promptCapabilities: ACP.PromptCapabilities {
+        let runtimeID = selectedAgent?.runtimeID ?? draftRuntimeID
+        return runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+    }
+
+    func refreshAccounts() async {
+        guard let list = try? await client.call(DaemonAPI.Method.runtimesAccounts,
+                                                Optional<Int>.none,
+                                                returning: [RuntimeAccount].self) else { return }
+        accounts = Dictionary(uniqueKeysWithValues: list.map { ($0.runtimeID, $0) })
     }
 
     func stop(_ id: UUID) async {
@@ -268,6 +326,10 @@ final class AppModel {
     }
 
     func dismissProblem() { problem = nil }
+
+    /// Something the window worked out for itself, said the same way as anything the
+    /// daemon says.
+    func show(problem: String) { self.problem = problem }
 
     private func attempt(_ work: () async throws -> Void) async {
         do {

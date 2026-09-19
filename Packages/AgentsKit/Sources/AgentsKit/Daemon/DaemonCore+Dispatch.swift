@@ -12,6 +12,9 @@ extension DaemonCore {
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
+            case DaemonAPI.Method.runtimesAccounts:
+                return .success(try JSONValue.encoding(allAccounts()))
+
             case DaemonAPI.Method.agentsList:
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
                 return .success(try JSONValue.encoding(allAgents(includeArchived: request.includeArchived)))

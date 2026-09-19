@@ -6,6 +6,10 @@ public enum ACPSessionEvent: Sendable {
     case optionsChanged([ConfigOption])
     case commandsChanged([SlashCommand])
     case titleChanged(String)
+    /// How full the context is, sent several times a turn.
+    case usageChanged(Usage)
+    case planChanged(Plan)
+    case planRemoved(String)
     /// The agent is blocked until `answerPermission` is called with one of the options.
     case permissionRequested(PermissionRequest)
     case processExited(status: Int32)
@@ -257,6 +261,13 @@ public actor ACPSession {
             eventsContinuation.yield(.commandsChanged(commands))
         case .modeChanged(let mode):
             eventsContinuation.yield(.entry(.optionChanged(id: "mode", value: .string(mode))))
+        case .usage(let usage):
+            eventsContinuation.yield(.usageChanged(usage))
+        case .plan(let plan):
+            guard !isReplaying else { return }
+            eventsContinuation.yield(.planChanged(plan))
+        case .planRemoved(let id):
+            eventsContinuation.yield(.planRemoved(id))
         case .title(let title):
             eventsContinuation.yield(.titleChanged(title))
         case .ignored:

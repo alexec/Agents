@@ -97,22 +97,22 @@ received both.
 
 ### Tests for User Story 2
 
-- [ ] T034 [P] [US2] Test that a prompt carrying text, image, resource link and resource encodes to the shape in `contracts/acp-client.md`, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PromptContentTests.swift`
-- [ ] T035 [P] [US2] Test capability gating in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AttachmentPolicyTests.swift`: an image is refused for an agent whose runtime does not advertise `image`, and a resource link is always allowed
-- [ ] T036 [P] [US2] Test that an agent message carrying an image block is kept as a block and not flattened to an empty string, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/SessionUpdateContentTests.swift`
+- [X] T034 [P] [US2] Test that a prompt carrying text, image, resource link and resource encodes to the shape in `contracts/acp-client.md`, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PromptContentTests.swift`
+- [X] T035 [P] [US2] Test capability gating in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AttachmentPolicyTests.swift`: an image is refused for an agent whose runtime does not advertise `image`, and a resource link is always allowed
+- [X] T036 [P] [US2] Test that an agent message carrying an image block is kept as a block and not flattened to an empty string, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/SessionUpdateContentTests.swift`
 
 ### Implementation for User Story 2
 
 - [X] T037 [US2] Add `Attachment` (`id`, `block`, `displayName`, `byteCount?`) in `Packages/AgentsKit/Sources/AgentsKit/Model/Attachment.swift`, restricted to image, resourceLink and resource blocks
-- [ ] T038 [US2] Take `[ContentBlock]` in `ACPSession.prompt` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
-- [ ] T039 [US2] Read content as blocks in `SessionUpdate.decode` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing `text(in:)`, and keep the joined text alongside
+- [X] T038 [US2] Take `[ContentBlock]` in `ACPSession.prompt` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift`
+- [X] T039 [US2] Read content as blocks in `SessionUpdate.decode` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing `text(in:)`, and keep the joined text alongside
 - [X] T040 [US2] Add the policy that decides whether an attachment may be sent to a given agent, from `promptCapabilities`, in `Packages/AgentsKit/Sources/AgentsKit/Model/Attachment.swift`
-- [ ] T041 [US2] Carry attachments through `agent.start` and `agent.prompt` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T042 [US2] Accept a dropped file and a pasted image on the composer in `App/Sources/Chat/PromptBar.swift`
-- [ ] T043 [US2] Add the `@` file picker to the composer in `App/Sources/Chat/PromptBar.swift`, offering files from the agent's folders, reusing the slash-command list's keyboard handling
-- [ ] T044 [US2] Draw attached items above the field with a way to remove each, in `App/Sources/Chat/AttachmentStrip.swift`
-- [ ] T045 [US2] Say why an attachment cannot be sent, before sending, in `App/Sources/Chat/PromptBar.swift`
-- [ ] T046 [US2] Draw message blocks, including images, in `App/Sources/Chat/Transcript.swift` and `App/Sources/Chat/MarkdownText.swift`, with an image sized to the pane
+- [X] T041 [US2] Carry attachments through `agent.start` and `agent.prompt` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonAPI.swift` and `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T042 [US2] Accept a dropped file and a pasted image on the composer in `App/Sources/Chat/PromptBar.swift`
+- [X] T043 [US2] Add the `@` file picker to the composer in `App/Sources/Chat/PromptBar.swift`, offering files from the agent's folders, reusing the slash-command list's keyboard handling
+- [X] T044 [US2] Draw attached items above the field with a way to remove each, in `App/Sources/Chat/AttachmentStrip.swift`
+- [X] T045 [US2] Say why an attachment cannot be sent, before sending, in `App/Sources/Chat/PromptBar.swift`
+- [X] T046 [US2] Draw message blocks, including images, in `App/Sources/Chat/Transcript.swift` and `App/Sources/Chat/MarkdownText.swift`, with an image sized to the pane
 
 **Checkpoint**: stories 1 and 2 both work, independently.
 
@@ -132,12 +132,12 @@ received both.
 ### Implementation for User Story 3
 
 - [X] T049 [US3] Add `ToolCallContent` (content, diff, terminal, unknown) and `ToolCallLocation` (`path`, `line?`) in `Packages/AgentsKit/Sources/AgentsKit/ACP/ToolCallContent.swift`
-- [ ] T050 [US3] Decode `content` and `locations` on `tool_call` and `tool_call_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
-- [ ] T051 [US3] Draw a diff as before against after with the path in `App/Sources/Chat/DiffView.swift`, wrapping long lines and scrolling horizontally for code
-- [ ] T052 [US3] Draw a `content` block through the existing markdown renderer in `App/Sources/Chat/Transcript.swift`, so the Claude adapter's console blocks read as text
-- [ ] T053 [US3] Draw a `terminal` block from the terminal the daemon is running, live, in `App/Sources/Chat/TerminalOutputView.swift`
-- [ ] T054 [US3] Offer each location and open it at its line with `NSWorkspace` in `App/Sources/Chat/Transcript.swift`
-- [ ] T055 [US3] Keep the raw view for content the app does not recognise in `App/Sources/Chat/Transcript.swift`
+- [X] T050 [US3] Decode `content` and `locations` on `tool_call` and `tool_call_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`
+- [X] T051 [US3] Draw a diff as before against after with the path in `App/Sources/Chat/DiffView.swift`, wrapping long lines and scrolling horizontally for code
+- [X] T052 [US3] Draw a `content` block through the existing markdown renderer in `App/Sources/Chat/Transcript.swift`, so the Claude adapter's console blocks read as text
+- [X] T053 [US3] Draw a `terminal` block from the terminal the daemon is running, live, in `App/Sources/Chat/TerminalOutputView.swift`
+- [X] T054 [US3] Offer each location and open it at its line with `NSWorkspace` in `App/Sources/Chat/Transcript.swift`
+- [X] T055 [US3] Keep the raw view for content the app does not recognise in `App/Sources/Chat/Transcript.swift`
 
 ---
 
@@ -149,19 +149,19 @@ received both.
 
 ### Tests for User Story 4
 
-- [ ] T056 [P] [US4] Test `usage_update` decoding including `size: 0` and a missing cost, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/UsageTests.swift`; `fraction` is nil when `size` is zero and "close to full" is `fraction >= 0.85`
-- [ ] T057 [P] [US4] Test that the `usage` on a prompt response is written to the transcript once per turn, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TurnUsageTests.swift`
+- [X] T056 [P] [US4] Test `usage_update` decoding including `size: 0` and a missing cost, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/UsageTests.swift`; `fraction` is nil when `size` is zero and "close to full" is `fraction >= 0.85`
+- [X] T057 [P] [US4] Test that the `usage` on a prompt response is written to the transcript once per turn, in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/TurnUsageTests.swift`
 
 ### Implementation for User Story 4
 
 - [X] T058 [US4] Add `Usage`, `TurnUsage` and `Cost` in `Packages/AgentsKit/Sources/AgentsKit/Model/Usage.swift` with the fields and rules in `data-model.md`
-- [ ] T059 [US4] Decode `usage_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing the deliberate ignore
+- [X] T059 [US4] Decode `usage_update` in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift`, replacing the deliberate ignore
 - [X] T060 [US4] Decode `usage` on `PromptResult` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ACPTypes.swift` and record it against the turn in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`
-- [ ] T061 [US4] Keep `usage`, `lastTurnUsage` and `costToDate` on the agent record in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift`, summing cost per currency and never across currencies
-- [ ] T062 [US4] Send `agent.usageChanged` from the daemon in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift` and receive it in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
-- [ ] T063 [US4] Draw the context meter on the agent, updating live, in `App/Sources/Chat/ContextMeter.swift`
-- [ ] T064 [US4] Show the turn's cost on the transcript entry and the running total on the agent, in `App/Sources/Chat/Transcript.swift`, in the currency as sent
-- [ ] T065 [US4] Say when an agent is close to full, in `App/Sources/Chat/ContextMeter.swift`
+- [X] T061 [US4] Keep `usage`, `lastTurnUsage` and `costToDate` on the agent record in `Packages/AgentsKit/Sources/AgentsKit/Model/Agent.swift`, summing cost per currency and never across currencies
+- [X] T062 [US4] Send `agent.usageChanged` from the daemon in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift` and receive it in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`
+- [X] T063 [US4] Draw the context meter on the agent, updating live, in `App/Sources/Chat/ContextMeter.swift`
+- [X] T064 [US4] Show the turn's cost on the transcript entry and the running total on the agent, in `App/Sources/Chat/Transcript.swift`, in the currency as sent
+- [X] T065 [US4] Say when an agent is close to full, in `App/Sources/Chat/ContextMeter.swift`
 
 ---
 

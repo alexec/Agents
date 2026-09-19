@@ -1,5 +1,6 @@
 import AgentsKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The prompt, and the controls around it.
 ///
@@ -11,6 +12,10 @@ struct PromptBar: View {
     @State private var text = ""
     @State private var dictation = Dictation()
     @State private var selectedCommand = 0
+    @State private var attachments: [Attachment] = []
+    @State private var mentions: [FileMention] = []
+    @State private var selectedMention = 0
+    @State private var dismissedMentionTerm: String?
     /// Set when the list is dismissed, so Escape hides it until the word changes.
     @State private var dismissedCommandTerm: String?
     @State private var isPrimingDictation = false
@@ -23,9 +28,20 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
+                if !attachments.isEmpty {
+                    AttachmentStrip(attachments: attachments,
+                                    refusal: { $0.refusal(from: model.promptCapabilities) },
+                                    remove: { attachment in
+                                        attachments.removeAll { $0.id == attachment.id }
+                                    })
+                }
                 if isCompleting {
                     CommandList(commands: matchingCommands, selected: selectedCommand,
                                 choose: accept)
+                        .transition(.opacity)
+                }
+                if isMentioning {
+                    MentionList(mentions: mentions, selected: selectedMention, choose: accept)
                         .transition(.opacity)
                 }
                 field
@@ -57,6 +73,10 @@ struct PromptBar: View {
                     .glassEffect(.regular, in: Capsule())
                     .help(agent.cwd.path(percentEncoded: false))
                 Spacer(minLength: 8)
+                ContextMeter(agent: agent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassEffect(.regular, in: Capsule())
                 Text(runtimeName(agent.runtimeID))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -110,7 +130,7 @@ struct PromptBar: View {
                     guard !press.modifiers.contains(.option) else { return .ignored }
                     // While the list is up, Return takes the command rather than
                     // sending a half-typed one.
-                    if isCompleting {
+                    if isCompleting || isMentioning {
                         acceptSelected()
                     } else {
                         send()
@@ -118,29 +138,59 @@ struct PromptBar: View {
                     return .handled
                 }
                 .onKeyPress(.tab) {
-                    guard isCompleting else { return .ignored }
+                    guard isCompleting || isMentioning else { return .ignored }
                     acceptSelected()
                     return .handled
                 }
                 .onKeyPress(.downArrow) {
-                    guard isCompleting else { return .ignored }
-                    selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
-                    return .handled
+                    if isCompleting {
+                        selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                        return .handled
+                    }
+                    if isMentioning {
+                        selectedMention = min(selectedMention + 1, mentions.count - 1)
+                        return .handled
+                    }
+                    return .ignored
                 }
                 .onKeyPress(.upArrow) {
-                    guard isCompleting else { return .ignored }
-                    selectedCommand = max(selectedCommand - 1, 0)
-                    return .handled
+                    if isCompleting {
+                        selectedCommand = max(selectedCommand - 1, 0)
+                        return .handled
+                    }
+                    if isMentioning {
+                        selectedMention = max(selectedMention - 1, 0)
+                        return .handled
+                    }
+                    return .ignored
                 }
                 .onKeyPress(.escape) {
-                    guard isCompleting else { return .ignored }
-                    dismissedCommandTerm = commandQuery?.term
-                    return .handled
+                    if isCompleting {
+                        dismissedCommandTerm = commandQuery?.term
+                        return .handled
+                    }
+                    if isMentioning {
+                        dismissedMentionTerm = mentionQuery?.term
+                        return .handled
+                    }
+                    return .ignored
                 }
                 .onChange(of: text) {
                     selectedCommand = 0
+                    selectedMention = 0
                     if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
+                    if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
+                    updateMentions()
                 }
+
+            Button(action: chooseAttachment) {
+                Image(systemName: "paperclip")
+                    .font(.headline)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .help("Attach a file or a picture")
 
             Button(action: toggleDictation) {
                 Image(systemName: dictation.isListening ? "waveform" : "microphone")
@@ -164,6 +214,14 @@ struct PromptBar: View {
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        // A file dragged onto the prompt is a file you are talking about.
+        .dropDestination(for: URL.self) { urls, _ in
+            for url in urls { attach(url) }
+            return !urls.isEmpty
+        }
+        .onPasteCommand(of: [.png, .tiff, .fileURL]) { providers in
+            for provider in providers { paste(provider) }
+        }
         .sheet(isPresented: $isPrimingDictation) { dictationPrimer }
         .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
                                                  set: { if !$0 { dictation.stop() } })) {
@@ -217,6 +275,91 @@ struct PromptBar: View {
         }
     }
 
+    // MARK: What goes with the words
+
+    private func chooseAttachment() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Attach"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { attach(url) }
+    }
+
+    /// A picture goes by value where the runtime takes pictures; everything else goes
+    /// as a reference, which every runtime takes.
+    private func attach(_ url: URL) {
+        let isImage = ["png", "jpg", "jpeg", "gif", "heic", "webp"].contains(url.pathExtension.lowercased())
+        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {
+            attachments.append(.image(data, mimeType: mimeType(for: url), name: url.lastPathComponent))
+        } else {
+            attachments.append(.file(url))
+        }
+    }
+
+    private func paste(_ provider: NSItemProvider) {
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                Task { @MainActor in attach(url) }
+            }
+            return
+        }
+        for type in [UTType.png, UTType.tiff] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+            provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in
+                guard let data else { return }
+                Task { @MainActor in
+                    attachments.append(.image(data, mimeType: type == .png ? "image/png" : "image/tiff",
+                                              name: "Screenshot"))
+                }
+            }
+            return
+        }
+    }
+
+    private func mimeType(for url: URL) -> String {
+        UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+    }
+
+    // MARK: Files named with an @
+
+    private var mentionFolders: [URL] {
+        if let agent { return [agent.cwd] + agent.additionalDirectories }
+        return model.draftCwd.map { [$0] } ?? []
+    }
+
+    private var mentionQuery: MentionQuery? {
+        FileMention.query(in: text)
+    }
+
+    private var isMentioning: Bool {
+        guard let mentionQuery, !mentions.isEmpty else { return false }
+        return dismissedMentionTerm != mentionQuery.term
+    }
+
+    private func updateMentions() {
+        guard let mentionQuery, !mentionFolders.isEmpty else {
+            mentions = []
+            return
+        }
+        // Walking a repository on every keystroke is the thing to avoid, so this is
+        // capped in the kit and only runs once there is something to match on.
+        guard mentionQuery.term.count >= 1 else {
+            mentions = []
+            return
+        }
+        mentions = FileMention.matching(mentionQuery.term, in: mentionFolders)
+    }
+
+    private func accept(_ mention: FileMention) {
+        guard let mentionQuery else { return }
+        text = mention.completing(mentionQuery, in: text)
+        attachments.append(.file(mention.url))
+        mentions = []
+        selectedMention = 0
+    }
+
     // MARK: What the runtime takes after a slash
 
     private var availableCommands: [SlashCommand] {
@@ -238,6 +381,10 @@ struct PromptBar: View {
     }
 
     private func acceptSelected() {
+        if isMentioning, mentions.indices.contains(selectedMention) {
+            accept(mentions[selectedMention])
+            return
+        }
         guard matchingCommands.indices.contains(selectedCommand) else { return }
         accept(matchingCommands[selectedCommand])
     }
@@ -327,14 +474,21 @@ struct PromptBar: View {
 
     private func send() {
         guard canSend else { return }
+        // Nothing the runtime cannot take is sent, and the prompt is not lost.
+        if let refused = attachments.compactMap({ $0.refusal(from: model.promptCapabilities) }).first {
+            model.show(problem: refused)
+            return
+        }
         dictation.stop()
         let outgoing = text
+        let going = attachments
         text = ""
+        attachments = []
         Task {
             if agent == nil {
-                await model.startDraft(prompt: outgoing)
+                await model.startDraft(prompt: outgoing, attachments: going)
             } else {
-                await model.send(outgoing)
+                await model.send(outgoing, attachments: going)
             }
         }
     }

@@ -6,6 +6,7 @@ import Foundation
 public enum DaemonAPI {
     public enum Method {
         public static let runtimesList = "runtimes/list"
+        public static let runtimesAccounts = "runtimes/accounts"
         public static let agentsList = "agents/list"
         public static let agentsOptions = "agents/options"
         public static let agentsStart = "agents/start"
@@ -16,6 +17,8 @@ public enum DaemonAPI {
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
         public static let permissionsPending = "permissions/pending"
+        public static let elicitationsPending = "elicitations/pending"
+        public static let elicitationsAnswer = "elicitations/answer"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
     }
@@ -206,6 +209,63 @@ public enum DaemonAPI {
         public init(agentID: UUID, request: PermissionRequest?) {
             self.agentID = agentID
             self.request = request
+        }
+    }
+
+    public struct ElicitationNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var requestID: UUID
+        /// Nil when the form has been answered or withdrawn.
+        public var request: ElicitationRequest?
+
+        public init(agentID: UUID, requestID: UUID, request: ElicitationRequest?) {
+            self.agentID = agentID
+            self.requestID = requestID
+            self.request = request
+        }
+    }
+
+    public struct TerminalOutputNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var terminalID: String
+        public var chunk: String
+
+        public init(agentID: UUID, terminalID: String, chunk: String) {
+            self.agentID = agentID
+            self.terminalID = terminalID
+            self.chunk = chunk
+        }
+    }
+
+    public struct AnswerElicitationRequest: Codable, Sendable {
+        public var requestID: UUID
+        public var action: Action
+        public var content: [String: JSONValue]
+
+        public enum Action: String, Codable, Sendable {
+            case accept, decline, cancel
+        }
+
+        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:]) {
+            self.requestID = requestID
+            self.action = action
+            self.content = content
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            requestID = try c.decode(UUID.self, forKey: .requestID)
+            action = try c.decodeIfPresent(Action.self, forKey: .action) ?? .cancel
+            content = try c.decodeIfPresent([String: JSONValue].self, forKey: .content) ?? [:]
+        }
+    }
+
+    public struct UsageNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var usage: Usage
+        public init(agentID: UUID, usage: Usage) {
+            self.agentID = agentID
+            self.usage = usage
         }
     }
 

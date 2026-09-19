@@ -71,6 +71,12 @@ public actor DaemonCore {
         accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
     }
 
+    /// Everything known about every runtime's account, for a window that has just
+    /// connected and knows nothing yet.
+    public func allAccounts() -> [RuntimeAccount] {
+        RuntimeCatalog.builtIn.map { account(for: $0.id) }
+    }
+
     public func setBroadcaster(_ broadcaster: @escaping @Sendable (String, JSONValue?) -> Void) {
         self.broadcaster = broadcaster
     }
@@ -179,6 +185,29 @@ public actor DaemonCore {
             guard var agent = agents[agentID] else { return }
             agent.title = title
             changed(agent)
+
+        case .usageChanged(let usage):
+            guard var agent = agents[agentID] else { return }
+            agent.usage = usage
+            agents[agentID] = agent
+            // Usage arrives several times a turn, so it is broadcast on its own rather
+            // than as a whole agent, and the record is written at the end of the turn.
+            broadcast(DaemonAPI.Notification.agentUsage,
+                      DaemonAPI.UsageNotification(agentID: agentID, usage: usage))
+
+        case .planChanged(let plan):
+            guard var agent = agents[agentID] else { return }
+            agent.plans = Plan.applying(plan, to: agent.plans)
+            changed(agent)
+            await record(.planUpdated(plan), for: agentID)
+
+        case .planRemoved(let planID):
+            guard var agent = agents[agentID] else { return }
+            agent.plans = Plan.withdrawing(planID, in: agent.plans)
+            changed(agent)
+            if let withdrawn = agent.plans.first(where: { $0.id == planID }) {
+                await record(.planUpdated(withdrawn), for: agentID)
+            }
 
         case .permissionRequested(var request):
             request.agentID = agentID

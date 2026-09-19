@@ -165,7 +165,7 @@ public enum ACP {
 
     /// The protocol's own rule: text and resource links are baseline, everything else
     /// is opted in to.
-    public struct PromptCapabilities: Decodable, Sendable {
+    public struct PromptCapabilities: Codable, Hashable, Sendable {
         public var image: Bool?
         public var audio: Bool?
         public var embeddedContext: Bool?
