@@ -114,6 +114,12 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSHumanReadableCopyright: © 2026 Alex Collins
         ITSAppUsesNonExemptEncryption: false
+        # Shown in the system's own alert the first time the app looks for the Mac.
+        NSLocalNetworkUsageDescription: >-
+          So this can find your Mac on the network you are both on, and show you what
+          your agents are doing.
+        NSBonjourServices:
+          - _agents._tcp
         # Scene-based from the first commit, because iOS 27 will not launch an app
         # without the UIScene lifecycle and nothing can be judged until it launches.
         UIApplicationSceneManifest:
@@ -139,6 +145,23 @@ targets:
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
 
+  # The Mac end of the direct connection: a door onto the daemon for a device on the
+  # same network. Started by hand — it has no pairing and no encryption yet.
+  agents-bridge:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Bridge/Sources
+    dependencies:
+      - package: AgentsKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
+        PRODUCT_NAME: agents-bridge
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+
   agentsd:
     type: tool
     supportedDestinations: [macOS]
@@ -156,6 +179,12 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
+  agents-bridge:
+    build:
+      targets:
+        agents-bridge: all
+    run:
+      config: Debug
   Remote:
     build:
       targets:

@@ -78,12 +78,29 @@ public struct FileProbe: Sendable, Equatable {
         // A prefix cut mid-character is not a reason to call a file binary, so the last
         // few bytes of a truncated read are allowed to be an incomplete sequence.
         if String(data: window, encoding: .utf8) == nil {
-            let trimmed = window.dropLast(min(3, window.count))
+            let trimmed = withoutTrailingPartialCharacter(window)
             if String(data: trimmed, encoding: .utf8) == nil {
                 return .binary(describedAs: describe(filename, size: size))
             }
         }
         return .text
+    }
+
+    /// The window without the character its cut left half of.
+    ///
+    /// Dropping a fixed three bytes is not enough. In a run of three-byte characters —
+    /// box drawing, say — dropping three lands on another lead byte and the window is
+    /// still invalid, so a perfectly good text file reads as binary. This walks back
+    /// over continuation bytes to the character that was cut and drops from there.
+    static func withoutTrailingPartialCharacter(_ window: Data) -> Data {
+        var index = window.endIndex
+        // At most four bytes to a character, so at most three continuations to walk.
+        for _ in 0..<3 {
+            guard index > window.startIndex else { return window }
+            index = window.index(before: index)
+            if window[index] & 0xC0 != 0x80 { return window[..<index] }
+        }
+        return window
     }
 
     /// What to say about a file instead of showing it.

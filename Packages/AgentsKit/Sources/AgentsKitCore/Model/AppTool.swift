@@ -16,4 +16,8 @@ public enum AppTool {
 
     /// And what one passes to this becomes the file open in the sidebar.
     public static let showFile = "show_file"
+
+    /// And this one reads and writes the project's standing arrangements: the prompts
+    /// that run themselves when something happens.
+    public static let manageWorkflows = "manage_workflows"
 }

@@ -40,13 +40,45 @@ struct AgentGroupTests {
     @Test("titles are the words the spec uses")
     func titles() {
         #expect(AgentGroup.needsAttention.title == "Needs attention")
-        #expect(AgentGroup.running.title == "Running")
-        #expect(AgentGroup.finished.title == "Finished")
+        #expect(AgentGroup.running.title == "Working")
+        #expect(AgentGroup.finished.title == "Complete")
         #expect(AgentGroup.stopped.title == "Stopped")
     }
 
     @Test("one group per state, so a row never needs a second reading")
     func oneGroupPerState() {
         #expect(AgentGroup.allCases.count == AgentState.allCases.count)
+    }
+
+    /// An agent that has asked to be looked at, which is a mark and not a state.
+    ///
+    /// The property is the same one the rest of this suite holds: exactly one group
+    /// per agent, never none. Widened to both inputs rather than relaxed.
+    @Test func wantingToBeLookedAtIsStillExactlyOneGroup() {
+        for state in AgentState.allCases {
+            for wantsEyes in [true, false] {
+                let group = AgentGroup(for: state, wantsEyes: wantsEyes)
+                #expect(AgentGroup.allCases.contains(group))
+            }
+        }
+    }
+
+    /// A working agent that has asked for a file goes where the person will see it.
+    @Test func aWorkingAgentThatAskedToBeLookedAtNeedsAttention() {
+        #expect(AgentGroup(for: .running, wantsEyes: true) == .needsAttention)
+        #expect(AgentGroup(for: .finished, wantsEyes: true) == .needsAttention)
+    }
+
+    /// An agent that is not going anywhere is not waiting on you.
+    @Test func aSettledAgentIsNotDraggedIntoNeedsAttention() {
+        #expect(AgentGroup(for: .stopped, wantsEyes: true) == .stopped)
+        #expect(AgentGroup(for: .archived, wantsEyes: true) == .archived)
+    }
+
+    /// The old initialiser still means what it meant.
+    @Test func theOlderInitialiserIsTheNoEyesCase() {
+        for state in AgentState.allCases {
+            #expect(AgentGroup(for: state) == AgentGroup(for: state, wantsEyes: false))
+        }
     }
 }

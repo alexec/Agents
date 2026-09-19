@@ -129,7 +129,13 @@ extension DaemonCore {
         try await session.continueSession(id: sessionID, cwd: cwd)
         await session.setReplayRecorded(false)
         agent = agents[agent.id] ?? agent
-        agent.advertisedOptions = await session.options
+        // Empty is not an answer. A runtime that sends its options as a
+        // `session/update` rather than on the `session/new` result has none at this
+        // instant, and writing that over a record that already had some leaves the row
+        // under the prompt with nothing to draw until the notification lands.
+        // `ACPSession.setOption` already guards the same assignment the same way.
+        let refreshed = await session.options
+        if !refreshed.isEmpty { agent.advertisedOptions = refreshed }
         agent.availableCommands = await session.commands
         changed(agent)
         await releaseRuntime(for: agent.id)

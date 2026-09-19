@@ -42,6 +42,7 @@ final class AppModel {
     var entries: [TranscriptEntry] { work.entries }
     var transcriptHasMore: Bool { work.hasMoreBefore }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
+    var workflowConfirmation: DaemonAPI.WorkflowConfirmation? { work.workflowConfirmation }
 
     /// Which project this window is looking at.
     ///
@@ -59,6 +60,31 @@ final class AppModel {
     }
 
     static let selectedProjectKey = "selectedProjectFolder"
+
+    /// Go to a project's page, whether or not it was already the selected one.
+    ///
+    /// `selectedProject`'s `didSet` says the rule — picking a project shows the
+    /// project, not a conversation — but it can only fire on a change, and macOS drives
+    /// a `List` selection binding from a selection-*changed* notification. Clicking the
+    /// row that is already highlighted never calls the setter at all. From inside a
+    /// conversation the highlighted row is that conversation's own project, so the one
+    /// click a person would make to go back up was the one the framework discarded.
+    ///
+    /// This is that rule as something callable. It touches no agent: `selection` only
+    /// decides which transcript this window is watching, and the turn belongs to the
+    /// daemon.
+    func showProject(_ folder: URL) {
+        selectedProject = folder
+        selection = nil
+    }
+
+    /// Bumped when something asks the conversation to go to its end.
+    ///
+    /// A counter rather than a flag, so two asks in a row both land. The end of a
+    /// transcript is not an entry, which is why this is not `focusedEntry`.
+    private(set) var scrollToEndToken = 0
+
+    func scrollToEnd() { scrollToEndToken += 1 }
 
     var selection: UUID? {
         didSet {
@@ -82,6 +108,18 @@ final class AppModel {
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
     private(set) var isLoadingDraftOptions = false
+    /// Why the last fetch of a runtime's options failed, if it did.
+    ///
+    /// Its own thing rather than the global `problem` banner: the row under the prompt
+    /// has to say this, and offer to try again, and a modal alert can be dismissed
+    /// leaving the row looking like a runtime with nothing to adjust.
+    private(set) var draftOptionsFailure: String?
+    /// Which fetch is the current one.
+    ///
+    /// Changing the folder and then the runtime issues two calls, and without this the
+    /// first to answer wins and is shown as settled while the right one is still in
+    /// flight.
+    private var draftOptionsGeneration = 0
     private var draftID: UUID?
 
     private let client = DaemonClient()
@@ -137,6 +175,49 @@ final class AppModel {
     /// A project's agents in one group, newest first.
     func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         work.agents(in: folder, group: group)
+    }
+
+    /// Whether anything in this project has asked to be looked at and not been.
+    func wantsEyes(in folder: URL?) -> Bool { work.wantsEyes(in: folder) }
+
+    // MARK: Workflows
+
+    func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }
+
+    func refreshWorkflows() async {
+        do {
+            work.replaceWorkflows(try await client.call(DaemonAPI.Method.workflowsList,
+                                                        DaemonAPI.WorkflowsListRequest(),
+                                                        returning: [WorkflowSummary].self))
+        } catch {
+            // Same as the projects above: the next notification brings it back.
+        }
+    }
+
+    /// Run one now. The daemon still applies the in-flight and paused rules, and says
+    /// so on the summary, which is why nothing here second-guesses it first.
+    func runWorkflow(_ summary: WorkflowSummary) async {
+        try? await client.call(DaemonAPI.Method.workflowsRun,
+                               DaemonAPI.WorkflowRequest(folder: summary.folder,
+                                                         workflowID: summary.workflowID))
+    }
+
+    func setWorkflowPaused(_ summary: WorkflowSummary, _ paused: Bool) async {
+        try? await client.call(DaemonAPI.Method.workflowsPause,
+                               DaemonAPI.WorkflowPauseRequest(folder: summary.folder,
+                                                              workflowID: summary.workflowID,
+                                                              paused: paused))
+    }
+
+    func setProjectWorkflowsPaused(_ folder: URL, _ paused: Bool) async {
+        try? await client.call(DaemonAPI.Method.workflowsPauseProject,
+                               DaemonAPI.WorkflowPauseProjectRequest(folder: folder, paused: paused))
+    }
+
+    func answerWorkflowConfirmation(_ confirmation: DaemonAPI.WorkflowConfirmation, allow: Bool) async {
+        try? await client.call(DaemonAPI.Method.workflowsConfirm,
+                               DaemonAPI.WorkflowConfirmRequest(confirmationID: confirmation.id,
+                                                                allow: allow))
     }
 
     func refreshProjects() async {
@@ -288,6 +369,7 @@ final class AppModel {
         await refreshProjects()
         await refreshRuntimes()
         await refreshAccounts()
+        await refreshWorkflows()
         await refreshPermissions()
         await refreshElicitations()
         await loadTranscript()
@@ -362,27 +444,44 @@ final class AppModel {
     /// runtime starts one. It is kept and used by the start that follows.
     func loadDraftOptions() async {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
+        draftOptionsGeneration += 1
+        let generation = draftOptionsGeneration
         isLoadingDraftOptions = true
+        draftOptionsFailure = nil
         draftOptions = []
         draftCommands = []
         draftChosen = [:]
         draftID = nil
-        defer { isLoadingDraftOptions = false }
         do {
             let response = try await client.call(DaemonAPI.Method.agentsOptions,
                                                  DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
                                                                           mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
+            // An answer for a folder or runtime the user has since moved away from is
+            // not an answer to the question now being asked.
+            guard generation == draftOptionsGeneration else { return }
             draftID = response.draftID
-            draftOptions = response.options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
+            draftOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: response.options)
             draftCommands = response.commands
             for option in draftOptions where option.currentValue != nil {
                 draftChosen[option.id] = option.currentValue
             }
+            // The mode you chose last time for this runtime, if it still offers it.
+            // Seeding the draft is enough: `startDraft` sends these as `StartOptions`
+            // and the daemon applies each one to the session before the first prompt.
+            if let mode = ModeMemory.modeOption(in: draftOptions) {
+                draftChosen[mode.id] = ModeMemory.startingValue(
+                    remembered: rememberedMode(for: runtimeID), for: mode)
+            }
         } catch {
-            problem = describe(error)
+            guard generation == draftOptionsGeneration else { return }
+            // Said in the row rather than only in the banner, because the row is where
+            // the person is looking and where the retry lives.
+            draftOptionsFailure = describe(error)
         }
+        if generation == draftOptionsGeneration { isLoadingDraftOptions = false }
     }
+
 
     func startDraft(prompt: String, attachments: [Attachment] = []) async {
         guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
@@ -489,11 +588,80 @@ final class AppModel {
         }
     }
 
-    func setOption(agentID: UUID, optionID: String, value: JSONValue) async {
+    /// A choice the person has made and the runtime has not yet confirmed.
+    ///
+    /// The sequence is which write this was. A call that completes clears the entry
+    /// only if it is still the one it wrote, so two clicks in a row settle on the
+    /// later choice whatever order the answers come back in.
+    struct PendingOption: Equatable {
+        var value: JSONValue
+        var sequence: Int
+    }
+
+    /// Held only while the change is in flight, and never written into
+    /// `agent.startOptions`: that is the daemon's record mirrored here, and a client
+    /// that edits it is a client that can disagree with the daemon with no way to
+    /// notice.
+    private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
+    private var pendingOptionSequence = 0
+
+    /// What an option control should read: the choice just made, else what is in
+    /// force, else what the runtime says is current.
+    func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
+        pendingOptions[agent.id]?[optionID]?.value
+            ?? agent.startOptions.values[optionID]
+            ?? advertised.currentValue
+    }
+
+    /// Set an option on a live agent, and show the choice at once.
+    ///
+    /// The control used to read `agent.startOptions` while this wrote only to a
+    /// `Task`, so the menu closed over the old value and stayed there for a JSON-RPC
+    /// hop, an ACP call to a separate process, a broadcast and a client apply. The
+    /// optimistic value closes that gap; it is dropped when the answer arrives, so a
+    /// runtime that refuses settles the control on what is really in force.
+    /// Deliberately not `async`. The optimistic value has to be written on the same
+    /// turn as the click, and the body of a `Task` does not start until the next one.
+    func setOption(agentID: UUID, optionID: String, value: JSONValue) {
+        pendingOptionSequence += 1
+        let sequence = pendingOptionSequence
+        pendingOptions[agentID, default: [:]][optionID] = PendingOption(value: value, sequence: sequence)
+        Task { await send(option: optionID, value: value, to: agentID, sequence: sequence) }
+    }
+
+    private func send(option optionID: String, value: JSONValue,
+                      to agentID: UUID, sequence: Int) async {
         await attempt {
             try await self.client.call(DaemonAPI.Method.agentsSetOption,
                                        DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
         }
+        // Dropped whether it succeeded or threw: the record is what is in force, and
+        // a refusal must settle the control on that rather than on what was asked
+        // for. Only if this call is still the last word — a slower earlier call
+        // finishing must not drop a later choice.
+        guard pendingOptions[agentID]?[optionID]?.sequence == sequence else { return }
+        pendingOptions[agentID]?[optionID] = nil
+        if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
+    }
+
+    // MARK: The mode you keep choosing
+
+    /// What was last chosen for this runtime, if it is still readable.
+    ///
+    /// A stored value we cannot decode is treated as nothing remembered, and the key
+    /// is left where it is: a later version may understand it, and throwing away
+    /// something we merely do not recognise is not ours to do.
+    func rememberedMode(for runtimeID: String) -> JSONValue? {
+        guard let data = UserDefaults.standard.data(forKey: ModeMemory.defaultsKey(runtimeID: runtimeID))
+        else { return nil }
+        return try? JSONDecoder().decode(JSONValue.self, from: data)
+    }
+
+    /// Remember it, for chats after this one. Called for a draft and for a live agent
+    /// alike: changing the mode on a conversation says what you want next time too.
+    func rememberMode(_ value: JSONValue, for runtimeID: String) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        UserDefaults.standard.set(data, forKey: ModeMemory.defaultsKey(runtimeID: runtimeID))
     }
 
     // MARK: The user's shells

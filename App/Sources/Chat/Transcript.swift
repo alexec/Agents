@@ -19,6 +19,14 @@ struct Transcript: View {
     /// Whether the reader is at the end. The conversation follows itself only while
     /// they are: someone reading back through an hour of it is left where they are.
     @State private var isAtEnd = true
+    /// Whether anything has arrived since they scrolled away from the end.
+    ///
+    /// The pane must not move while they are reading (FR-010), so the arrival is said
+    /// rather than shown. Cleared the moment they are back at the end, by either route.
+    @State private var hasNewBelow = false
+    /// Whether there is more conversation than pane. No point offering a way to the
+    /// end of something already wholly on screen.
+    @State private var canScroll = false
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -52,6 +60,8 @@ struct Transcript: View {
                       canScroll: geometry.contentSize.height > geometry.containerSize.height)
             } action: { _, edges in
                 isAtEnd = edges.fromBottom < 160
+                canScroll = edges.canScroll
+                if isAtEnd { hasNewBelow = false }
                 // A page is 200 entries, and a run of tool calls is one line however
                 // many entries it took, so a page can come back shorter than the
                 // pane. Nothing to scroll means nothing would ever ask for the rest,
@@ -60,8 +70,13 @@ struct Transcript: View {
             }
             .onChange(of: model.entries.count) { before, after in
                 // Only new lines at the end move the pane. Loading earlier adds to
-                // the top, and that must not throw the reader back down to the foot.
-                guard after > before, !isLoadingEarlier, isAtEnd else { return }
+                // the top, and that must not throw the reader back down to the foot —
+                // nor read as something new having arrived.
+                guard after > before, !isLoadingEarlier else { return }
+                guard isAtEnd else {
+                    hasNewBelow = true
+                    return
+                }
                 withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
             }
             .onChange(of: agent.queuedPrompts.count) {
@@ -77,7 +92,26 @@ struct Transcript: View {
                 withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(focused, anchor: .center) }
                 model.clearFocus()
             }
+            // Somebody asked for the end: the prompt was sent, or the menu command
+            // was used. A counter rather than a flag, so two asks in a row both land.
+            .onChange(of: model.scrollToEndToken) { goToEnd(scroller) }
+            .overlay(alignment: .bottom) {
+                if canScroll, !isAtEnd {
+                    JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
+                        // Clear of the floating prompt, which ChatView has already
+                        // measured for the transcript's own bottom inset.
+                        .padding(.bottom, bottomInset + 12)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: canScroll && !isAtEnd)
         }
+    }
+
+    private func goToEnd(_ scroller: ScrollViewProxy) {
+        hasNewBelow = false
+        isAtEnd = true
+        withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
     }
 
     /// How far the pane is from either end of the conversation.
@@ -93,6 +127,7 @@ struct Transcript: View {
         expandedRuns = []
         hasSettled = false
         isAtEnd = true
+        hasNewBelow = false
         // The first page arrives a moment after the selection does. Waiting for it
         // rather than guessing at a delay is what keeps a big transcript from
         // opening halfway up itself.
@@ -465,7 +500,7 @@ private struct StateLine: View {
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Finished"
+        case .finished: return "Complete"
         case .stopped:
             switch reason {
             case .cancelled: return "You stopped it"

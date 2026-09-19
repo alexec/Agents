@@ -42,6 +42,8 @@ final class RemoteModel {
 
     private let client: DaemonClient
     private var listening: Task<Void, Never>?
+    /// The loop looking for the Mac, so two of them never run at once.
+    private var reconnecting: Task<Void, Never>?
     private var isLoadingEarlier = false
 
     init(link: any DaemonLink) {
@@ -75,18 +77,50 @@ final class RemoteModel {
 
     // MARK: Staying in touch
 
+    /// Keep trying until the Mac answers.
+    ///
+    /// It retries rather than giving up because the ordinary first run fails: iOS will
+    /// not let an app look at the local network until the user has said yes, and the
+    /// asking happens after the first attempt has already been refused. Giving up there
+    /// would mean tapping Allow and then having to quit the app to use it.
+    ///
+    /// It is also the right behaviour afterwards. A Mac that is asleep, or on another
+    /// network, is a thing that comes back, and the screens say "last heard from" in
+    /// the meantime rather than looking broken.
     func connect() async {
+        guard reconnecting == nil else { return }
+        reconnecting = Task { [weak self] in
+            var wait = Duration.seconds(1)
+            while !Task.isCancelled {
+                guard let self else { return }
+                if await self.tryOnce() { break }
+                try? await Task.sleep(for: wait)
+                // Backing off to half a minute, so a phone in a pocket with no Mac to
+                // find is not holding the radio open every second all afternoon.
+                wait = min(wait * 2, .seconds(30))
+            }
+            await self?.finishedReconnecting()
+        }
+        await reconnecting?.value
+    }
+
+    private func tryOnce() async -> Bool {
         do {
-            try await client.connect()
+            try await client.connect(startIfNeeded: false)
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
             listen()
             await refreshEverything()
+            return true
         } catch {
             isConnected = false
-            problem = "Could not reach your Mac."
+            return false
         }
+    }
+
+    private func finishedReconnecting() {
+        reconnecting = nil
     }
 
     private func listen() {
@@ -108,8 +142,6 @@ final class RemoteModel {
     private func lostTouch() async {
         isConnected = false
         listening = nil
-        try? await Task.sleep(for: .seconds(2))
-        guard !isConnected else { return }
         await connect()
     }
 

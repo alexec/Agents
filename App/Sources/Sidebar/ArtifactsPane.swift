@@ -110,7 +110,7 @@ private struct Nothing: View {
                 .foregroundStyle(.tertiary)
             Text("Nothing handed over yet")
                 .font(.headline)
-            Text("When an agent finishes something and hands it over by name, it appears here, so you can find it again without scrolling back through the conversation.")
+            Text("When an agent completes something and hands it over by name, it appears here, so you can find it again without scrolling back through the conversation.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

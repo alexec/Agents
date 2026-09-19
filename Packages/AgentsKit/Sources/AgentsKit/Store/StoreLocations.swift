@@ -82,6 +82,14 @@ public struct StoreLocations: Sendable {
     /// are the two a project's folder cannot tell us: that it is archived, and that it
     /// was added before anything ran in it.
     public var projects: URL { root.appendingPathComponent("projects.json") }
+    /// What the app remembers about workflows, which is everything their files cannot
+    /// say: that one is paused, which agent is a standing workflow's, and what happened
+    /// the last time each fired. One file, for the same reason `projects` is one.
+    ///
+    /// Deliberately not in the repository. Writing a pause back to the project would
+    /// raise a confirmation every time and fill its history with state nobody wants to
+    /// review.
+    public var workflows: URL { root.appendingPathComponent("workflows.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

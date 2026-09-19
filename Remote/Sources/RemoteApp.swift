@@ -8,9 +8,17 @@ import SwiftUI
 /// layout can be judged until it launches.
 @main
 struct RemoteApp: App {
-    /// A fake Mac, until the bridge lands. Everything above this line is the real
-    /// client over the real protocol; only what carries the bytes is pretend.
-    @State private var model = RemoteModel(link: FakeDaemon())
+    /// The real Mac, found on the network it is on, unless `-fake` says otherwise.
+    ///
+    /// Nothing above this line knows which it got. That was the point of making the
+    /// fake a `DaemonLink` rather than a fake model: the whole app moved from canned
+    /// data to a live daemon by changing what it is handed.
+    ///
+    /// The fake is kept for the layout work — it holds a question waiting and a
+    /// conversation long enough to page, neither of which a real Mac reliably has when
+    /// somebody wants to look at a screen.
+    @State private var model = RemoteModel(
+        link: ProcessInfo.processInfo.arguments.contains("-fake") ? FakeDaemon() : NetworkLink())
 
     var body: some Scene {
         WindowGroup {

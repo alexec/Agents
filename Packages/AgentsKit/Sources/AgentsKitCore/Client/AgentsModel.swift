@@ -43,6 +43,13 @@ public final class AgentsModel {
     /// showing another conversation.
     public private(set) var filesToShow: [UUID: ShownFile] = [:]
 
+    /// Every project's workflows, newest state winning. Here rather than in the Mac's
+    /// own model because a workflow is about the work, and the phone will want them.
+    public private(set) var workflows: [WorkflowSummary] = []
+    /// A write an agent has asked for that nobody has answered. At most one is shown at
+    /// a time, the way a permission is.
+    public private(set) var workflowConfirmation: DaemonAPI.WorkflowConfirmation?
+
     public init() {}
 
     // MARK: What each notification means
@@ -85,6 +92,21 @@ public final class AgentsModel {
                 agents[index].usage = notification.usage
             }
 
+        case DaemonAPI.Notification.workflowChanged:
+            guard let summary = try? params?.decode(WorkflowSummary.self) else { return true }
+            upsert(summary)
+
+        case DaemonAPI.Notification.workflowRemoved:
+            guard let notification = try? params?.decode(DaemonAPI.WorkflowRemovedNotification.self) else { return true }
+            let folder = Project.standardize(notification.folder)
+            workflows.removeAll {
+                $0.folder == folder && $0.workflowID == notification.workflowID
+            }
+
+        case DaemonAPI.Notification.workflowConfirmation:
+            guard let notification = try? params?.decode(DaemonAPI.WorkflowConfirmationNotification.self) else { return true }
+            workflowConfirmation = notification.confirmation
+
         case DaemonAPI.Notification.agentShowFile:
             guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return true }
             filesToShow[notification.agentID] = notification.file
@@ -104,6 +126,30 @@ public final class AgentsModel {
             agents.append(agent)
         }
         agents.sort { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    public func upsert(_ summary: WorkflowSummary) {
+        if let index = workflows.firstIndex(where: { $0.id == summary.id }) {
+            workflows[index] = summary
+        } else {
+            workflows.append(summary)
+        }
+        workflows.sort {
+            $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
+        }
+    }
+
+    public func replaceWorkflows(_ summaries: [WorkflowSummary]) {
+        workflows = summaries.sorted {
+            $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
+        }
+    }
+
+    /// The workflows of one project, which is what a project page shows.
+    public func workflows(in folder: URL?) -> [WorkflowSummary] {
+        guard let folder else { return [] }
+        let standardized = Project.standardize(folder)
+        return workflows.filter { $0.folder == standardized }
     }
 
     public func upsert(_ summary: DaemonAPI.ProjectSummary) {
@@ -186,7 +232,25 @@ public final class AgentsModel {
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         let wanted = Project.standardize(folder)
-        return agents.filter { Project.standardize($0.cwd) == wanted && $0.group == group }
+        return agents.filter { Project.standardize($0.cwd) == wanted && self.group(of: $0) == group }
+    }
+
+    /// Where an agent sits, counting a file it has asked the person to look at.
+    ///
+    /// `filesToShow` is the unseen flag already: it is keyed by agent, it is put there
+    /// when the agent asks, and `takeFileToShow` removes it when that conversation is
+    /// opened. Nothing new is stored, and nothing outlives the window — which matches
+    /// the daemon, which stores nothing for this and refuses to show a file when no
+    /// window is open.
+    public func group(of agent: Agent) -> AgentGroup {
+        AgentGroup(for: agent.state, wantsEyes: filesToShow[agent.id] != nil)
+    }
+
+    /// Whether any agent in this folder has asked to be looked at and not been.
+    public func wantsEyes(in folder: URL?) -> Bool {
+        guard let folder, !filesToShow.isEmpty else { return false }
+        let wanted = Project.standardize(folder)
+        return agents.contains { Project.standardize($0.cwd) == wanted && filesToShow[$0.id] != nil }
     }
 
     /// The question this agent is blocked on, if it still is.

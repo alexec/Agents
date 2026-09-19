@@ -16,8 +16,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     public var title: String {
         switch self {
         case .needsAttention: return "Needs attention"
-        case .running: return "Running"
-        case .finished: return "Finished"
+        case .running: return "Working"
+        case .finished: return "Complete"
         case .stopped: return "Stopped"
         case .archived: return "Archived"
         }
@@ -36,10 +36,25 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// that block an agent on the user — a permission question and an elicitation form
     /// — already put it in that state.
     public init(for state: AgentState) {
+        self.init(for: state, wantsEyes: false)
+    }
+
+    /// The same, for an agent that has asked the person to look at something.
+    ///
+    /// `wantsEyes` is not a state and must never become one. `waitingOnUser` carries
+    /// `holdsRuntime` and `hasTurnInFlight` with it, so an agent put there for showing
+    /// a file would start queueing prompts, and the transition table has no way back
+    /// out of it except answering a permission. Showing a file blocks nothing: the
+    /// agent asked and carried on working.
+    ///
+    /// Still total over `(AgentState, Bool)`, so an agent is in exactly one group and
+    /// never in none. An agent that is not going anywhere is not waiting on you, so
+    /// the settled states ignore it.
+    public init(for state: AgentState, wantsEyes: Bool) {
         switch state {
         case .waitingOnUser: self = .needsAttention
-        case .running: self = .running
-        case .finished: self = .finished
+        case .running: self = wantsEyes ? .needsAttention : .running
+        case .finished: self = wantsEyes ? .needsAttention : .finished
         case .stopped: self = .stopped
         case .archived: self = .archived
         }

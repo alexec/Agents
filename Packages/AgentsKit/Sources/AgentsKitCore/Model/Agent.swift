@@ -57,6 +57,13 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var endedReason: EndedReason?
     public var archivedReason: ArchivedReason?
 
+    /// The workflow that started or resumed this agent, if one did. What lets the agent
+    /// list say where an agent nobody typed for came from.
+    public var startedByWorkflow: String?
+    /// The workflow run that caused this agent, if one did. Read to work out how deep a
+    /// chain is when this agent's own events fire something further.
+    public var startedByRun: UUID?
+
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
     public var unknownFields: [String: JSONValue]
@@ -99,6 +106,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // the chips are still there when the app is opened again on a turn that ended
         // last night.
         suggestedPrompts = try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? []
+        // New in 008, and optional, so every record written before workflows existed
+        // opens unchanged and needs nothing migrating.
+        startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
+        startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
         unknownFields = whole.filter { !known.contains($0.key) }
@@ -129,6 +140,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !mcpServers.isEmpty { try c.encode(mcpServers, forKey: .mcpServers) }
         if !queuedPrompts.isEmpty { try c.encode(queuedPrompts, forKey: .queuedPrompts) }
         if !suggestedPrompts.isEmpty { try c.encode(suggestedPrompts, forKey: .suggestedPrompts) }
+        try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
+        try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -144,6 +157,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
+        case startedByWorkflow, startedByRun
     }
 
     struct AnyKey: CodingKey {
@@ -174,6 +188,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 mcpServers: [MCPServer] = [],
                 queuedPrompts: [QueuedPrompt] = [],
                 suggestedPrompts: [SuggestedPrompt] = [],
+                startedByWorkflow: String? = nil,
+                startedByRun: UUID? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -196,6 +212,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.mcpServers = mcpServers
         self.queuedPrompts = queuedPrompts
         self.suggestedPrompts = suggestedPrompts
+        self.startedByWorkflow = startedByWorkflow
+        self.startedByRun = startedByRun
         self.unknownFields = unknownFields
     }
 

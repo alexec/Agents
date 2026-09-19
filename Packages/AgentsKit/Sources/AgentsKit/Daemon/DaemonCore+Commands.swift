@@ -280,7 +280,13 @@ extension DaemonCore {
             updated.runtimeSessionID = result.sessionId
             needsSuggestionAsk.insert(agent.id)
         }
-        updated.advertisedOptions = await session.options
+        // Empty is not an answer. A runtime that sends its options as a
+        // `session/update` rather than on the `session/new` result has none at this
+        // instant, and writing that over a record that already had some leaves the row
+        // under the prompt with nothing to draw until the notification lands.
+        // `ACPSession.setOption` already guards the same assignment the same way.
+        let refreshed = await session.options
+        if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         updated.availableCommands = await session.commands
         changed(updated)
         await session.apply(updated.startOptions)

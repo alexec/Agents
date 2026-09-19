@@ -48,6 +48,10 @@ public final class Daemon: @unchecked Sendable {
         }
         // Shell output goes out the same door as every other notification.
         await core.connectShells()
+        // Read every project's workflows, watch their folders, start the clock. After
+        // recovery, so a workflow is never fired at an agent the daemon has not yet
+        // worked out is dead.
+        await core.startWorkflows()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
     }

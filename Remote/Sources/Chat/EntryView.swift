@@ -235,7 +235,7 @@ private struct StateLine: View {
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Finished"
+        case .finished: return "Complete"
         case .stopped:
             switch reason {
             case .cancelled: return "You stopped it"

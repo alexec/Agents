@@ -40,6 +40,34 @@ public actor DaemonCore {
     /// about a project is derived from the agents in it.
     lazy var projectStore = ProjectStore(locations: locations)
 
+    // MARK: Workflows
+
+    /// What the app remembers about workflows, which is nothing their files can say.
+    lazy var workflowStore = WorkflowStore(locations: locations)
+    /// Every project's workflows, by folder and then by id. Read from disk, kept here
+    /// so a tick does not touch the file system once per workflow per fifteen seconds.
+    var workflows: [URL: [String: Workflow]] = [:]
+    /// One watcher per live project. What makes a file written by hand appear without
+    /// the app being restarted.
+    var workflowWatchers: [URL: FolderWatch] = [:]
+    /// Rescans waiting out their debounce, by project folder.
+    var workflowRescans: [URL: Task<Void, Never>] = [:]
+    /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,
+    /// and what a fired agent's own events read to work out how deep they are.
+    var workflowRuns: [String: WorkflowRun] = [:]
+    /// The single ticker. One for the daemon, not one per workflow: see
+    /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
+    var workflowTicker: Task<Void, Never>?
+    /// Writes an agent has asked for and nobody has answered yet. Held here for the
+    /// same reason permissions and forms are: the question can arrive while no window
+    /// is open, and the agent is owed an answer either way.
+    var workflowConfirmations: [UUID: PendingWorkflowConfirmation] = [:]
+
+    struct PendingWorkflowConfirmation: Sendable {
+        var confirmation: DaemonAPI.WorkflowConfirmation
+        var answer: CheckedContinuation<Bool, Never>
+    }
+
     var broadcaster: (@Sendable (String, JSONValue?) -> Void)?
     var connectionCount = 0
 
@@ -157,6 +185,25 @@ public actor DaemonCore {
         agent.lastActivityAt = Date()
         changed(agent)
         await record(.stateChanged(next, reason: endedReason), for: agentID)
+
+        // The whole of the lifecycle trigger surface, in the one place every state
+        // change already passes through. `applying` returns nil for a transition that
+        // must not happen, so nothing here can fire on a non-event.
+        //
+        // The run is released before anything is told, so a workflow chained off this
+        // one does not collide with a run that has in fact finished.
+        switch next {
+        case .finished, .stopped:
+            // Read the depth before the run is released: releasing it is what makes a
+            // finished agent's depth unfindable, and a depth that quietly resets to
+            // zero is a loop the limit never stops.
+            let depth = workflowChainDepth(causedBy: agentID)
+            workflowRunFinished(agentID: agentID)
+            workflowsRespond(to: next == .finished ? .finished : .stopped,
+                             agentID: agentID, depth: depth)
+        case .waitingOnUser, .running, .archived:
+            break
+        }
     }
 
     // MARK: Reading
@@ -242,6 +289,7 @@ public actor DaemonCore {
 
         case .elicitationRequested(let request):
             await holdElicitation(request, agentID: agentID)
+            workflowsRespond(to: .askedForm, agentID: agentID)
 
         case .elicitationWithdrawn(let requestID):
             withdrawElicitation(requestID, agentID: agentID)
@@ -262,6 +310,9 @@ public actor DaemonCore {
             await move(agentID, on: .permissionAsked)
             broadcast(DaemonAPI.Notification.agentPermission,
                       DaemonAPI.PermissionNotification(agentID: agentID, request: request))
+            // After the request is held and broadcast, so a workflow that fires on this
+            // runs while the question is still outstanding.
+            workflowsRespond(to: .askedPermission, agentID: agentID)
 
         case .processExited:
             for (id, pending) in pendingPermissions where pending.agentID == agentID {
@@ -303,6 +354,16 @@ public actor DaemonCore {
     // MARK: Shutting down
 
     public func shutDown() async {
+        workflowTicker?.cancel()
+        workflowTicker = nil
+        for (_, task) in workflowRescans { task.cancel() }
+        workflowRescans.removeAll()
+        stopWatchingAllWorkflows()
+        // Nobody is going to answer these now. An agent blocked on one is told no
+        // rather than left holding a promise the daemon cannot keep.
+        for (_, pending) in workflowConfirmations { pending.answer.resume(returning: false) }
+        workflowConfirmations.removeAll()
+
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this
         // feature's: each is remembered as gone with a reason, so the next window that

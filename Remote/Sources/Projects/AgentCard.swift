@@ -52,7 +52,7 @@ struct AgentCard: View {
         switch agent.state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting for your answer"
-        case .finished: return "Finished"
+        case .finished: return "Complete"
         case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
         }
@@ -135,7 +135,7 @@ struct StatusIcon: View {
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Finished"
+        case .finished: return "Complete"
         case .stopped: return "Stopped"
         case .archived: return "Archived"
         }

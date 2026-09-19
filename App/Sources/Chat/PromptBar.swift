@@ -522,23 +522,83 @@ struct PromptBar: View {
 
     // MARK: Whatever this runtime offers
 
+    /// What the area under the prompt is showing, which is never nothing.
+    ///
+    /// Six ways to have no controls, and each one now says which it is. This used to be
+    /// an `if` with no `else`, so a runtime that advertises nothing, a fetch that
+    /// failed and a folder not yet chosen were all the same silent gap.
     @ViewBuilder
     private var options: some View {
-        let shown = agent?.advertisedOptions.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }
-            ?? model.draftOptions
-        if model.isLoadingDraftOptions {
-            Text("Asking \(model.draftRuntimeID.map(runtimeName) ?? "the runtime") what it offers…")
+        switch controlsState {
+        case .needsFolder:
+            note("Choose a folder to see what this runtime offers.")
+        case .needsRuntime:
+            note("Choose a runtime to see what it offers.")
+        case .loading(let name):
+            note("Asking \(name) what it offers…")
+        case .nothingOffered(let name):
+            note("\(name) has nothing to adjust.")
+        case .failed(let reason):
+            optionsFailure(reason)
+        case .controls(let shown):
+            optionsRow(shown)
+        }
+    }
+
+    /// What the window knows, turned into the one thing the row shows.
+    private var controlsState: PromptControlsState {
+        PromptControlsState.resolve(
+            agentOptions: agent.map(\.advertisedOptions),
+            draftOptions: model.draftOptions,
+            // Both are settled facts about an agent that exists, which is why
+            // `whereAndWhat` draws them as labels rather than controls.
+            hasFolder: agent != nil || model.draftCwd != nil,
+            hasRuntime: agent != nil || model.draftRuntimeID != nil,
+            runtimeName: (agent?.runtimeID ?? model.draftRuntimeID).map(runtimeName),
+            // Only a draft fetches. An agent's options came with it.
+            isLoading: agent == nil && model.isLoadingDraftOptions,
+            failure: agent == nil ? model.draftOptionsFailure : nil)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The one case that may carry the app's error treatment, and the only one with
+    /// something to press.
+    private func optionsFailure(_ reason: String) -> some View {
+        HStack(spacing: 8) {
+            Text(reason)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-        } else if !shown.isEmpty {
-            // What the agent is allowed to do on the left, how well it does it on the
-            // right. Different kinds of decision, so they sit apart.
-            //
-            // One arrangement, deliberately. Anything that measures the width and
-            // picks a layout from it can end up re-measuring what it just changed,
-            // and AppKit kills the app when that loop reaches the window: first a
-            // custom Layout did it, then ViewThatFits did it intermittently. These
-            // are a few short capsules and they fit.
+                .lineLimit(2)
+            Button("Try again") {
+                Task { await model.loadDraftOptions() }
+            }
+            .buttonStyle(.glass)
+            .font(.footnote)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// What the agent is allowed to do first, how well it does it after.
+    ///
+    /// It scrolls sideways. The row is wider than this pane at every window size the
+    /// app allows below about 693 points, and a scroll view reads its content's ideal
+    /// width without feeding a decision back into it. Anything that measures the width
+    /// and picks a layout from it can re-measure what it just changed, and AppKit kills
+    /// the app when that loop reaches the window: first a custom Layout did it, then
+    /// ViewThatFits did it intermittently.
+    ///
+    /// The cost is the `Spacer` that used to push the model and effort controls to the
+    /// right edge. A spacer inside a horizontal scroll view has no width to take, so
+    /// this is a fixed gap and the row reads left to right.
+    private func optionsRow(_ shown: [ConfigOption]) -> some View {
+        ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 permissionOptions(shown)
                 if isNew {
@@ -563,8 +623,13 @@ struct PromptBar: View {
                 Spacer(minLength: 16)
                 otherOptions(shown)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // The glass capsules are drawn to their own edge, and a scroll view clips
+            // at its bounds. A point either side keeps the glass from being shaved.
+            .padding(.vertical, 1)
         }
+        .scrollIndicators(.never)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -581,17 +646,35 @@ struct PromptBar: View {
         }
     }
 
+    /// Which advertised option is the mode, for the runtime in play.
+    private var modeOptionID: String? {
+        ModeMemory.modeOption(in: agent?.advertisedOptions ?? model.draftOptions)?.id
+    }
+
     /// A choice goes to the draft before there is an agent, and to the daemon after.
+    ///
+    /// Both branches now write somewhere the getter reads. The draft one always did,
+    /// which is why a new chat was already instant; the agent one wrote only to a
+    /// `Task`, so the control kept showing the old value for the whole round trip.
     private func binding(for option: ConfigOption) -> Binding<JSONValue?> {
         Binding(
             get: {
-                if let agent { return agent.startOptions.values[option.id] ?? option.currentValue }
+                if let agent {
+                    return model.chosenOption(option.id, for: agent, advertised: option)
+                }
                 return model.draftChosen[option.id] ?? option.currentValue
             },
             set: { value in
                 guard let value else { return }
+                // Above the split, so one line covers a new chat and a live one.
+                if option.id == modeOptionID,
+                   let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+                    model.rememberMode(value, for: runtimeID)
+                }
                 if let agent {
-                    Task { await model.setOption(agentID: agent.id, optionID: option.id, value: value) }
+                    // Synchronous: it writes the optimistic value now and sends in the
+                    // background, so the control changes as the menu closes.
+                    model.setOption(agentID: agent.id, optionID: option.id, value: value)
                 } else {
                     model.draftChosen[option.id] = value
                 }
@@ -631,6 +714,9 @@ struct PromptBar: View {
         // past. The daemon clears it when the turn begins, but the field empties now,
         // and an emptied field must not offer last turn's words back.
         dismissedSuggestions = true
+        // What you just sent is the thing you want to see, so the conversation comes
+        // back to its end even if you were reading three screens up.
+        model.scrollToEnd()
         Task {
             if agent == nil {
                 await model.startDraft(prompt: outgoing, attachments: going)

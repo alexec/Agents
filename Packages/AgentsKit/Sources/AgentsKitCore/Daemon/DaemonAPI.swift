@@ -37,6 +37,14 @@ public enum DaemonAPI {
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
 
+        // Workflows: the prompts a project keeps that run themselves.
+        public static let workflowsList = "workflows/list"
+        public static let workflowsRun = "workflows/run"
+        public static let workflowsPause = "workflows/pause"
+        public static let workflowsPauseProject = "workflows/pauseProject"
+        public static let workflowsConfirm = "workflows/confirm"
+        public static let workflowsPendingConfirmations = "workflows/pendingConfirmations"
+
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
         public static let elicitationsAnswer = "elicitations/answer"
@@ -71,6 +79,15 @@ public enum DaemonAPI {
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
+
+        /// A workflow appeared, changed, ran, was refused, or was paused. Carries the
+        /// whole resolved summary rather than a delta, for the reason `project/changed`
+        /// does: two windows cannot then disagree, and one that missed a notification
+        /// is put right by the next rather than drifting.
+        public static let workflowChanged = "workflow/changed"
+        public static let workflowRemoved = "workflow/removed"
+        /// A write is waiting on the user, or has been answered (nil).
+        public static let workflowConfirmation = "workflow/confirmation"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -617,5 +634,134 @@ public enum DaemonAPI {
         /// several turns because somebody tidied their sidebar is not a small thing,
         /// so this refuses and names them.
         public static let projectHasLiveAgents = -32013
+        /// A workflow id that is not one of this project's.
+        public static let noSuchWorkflow = -32014
+        /// Front matter that could not be read, on a write. Refused before anybody is
+        /// asked to approve it: a confirmation for a file that could never fire spends
+        /// the one moment of the reader's attention this feature gets.
+        public static let workflowUnreadable = -32015
+        /// A path outside the calling agent's own workflow folder.
+        public static let notInWorkflowFolder = -32016
+        /// Nobody answered a write confirmation in time.
+        public static let confirmationTimedOut = -32017
+    }
+
+    // MARK: Workflows
+
+    public struct WorkflowsListRequest: Codable, Sendable {
+        /// Nil lists every project's.
+        public var folder: URL?
+        public init(folder: URL? = nil) { self.folder = folder }
+    }
+
+    public struct WorkflowRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public init(folder: URL, workflowID: String) {
+            self.folder = folder
+            self.workflowID = workflowID
+        }
+    }
+
+    public struct WorkflowPauseRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var paused: Bool
+        public init(folder: URL, workflowID: String, paused: Bool) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.paused = paused
+        }
+    }
+
+    public struct WorkflowPauseProjectRequest: Codable, Sendable {
+        public var folder: URL
+        public var paused: Bool
+        public init(folder: URL, paused: Bool) {
+            self.folder = folder
+            self.paused = paused
+        }
+    }
+
+    public struct WorkflowRemovedNotification: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public init(folder: URL, workflowID: String) {
+            self.folder = folder
+            self.workflowID = workflowID
+        }
+    }
+
+    /// What an agent wants to write, put to the person in words rather than as a diff.
+    ///
+    /// The daemon raises this rather than waiting for the runtime to, because the
+    /// runtimes disagree about whether they ask at all: Copilot asks before every tool
+    /// call and the Claude adapter frequently asks before none. Waiting for them would
+    /// be strict under one and wide open under another.
+    public struct WorkflowConfirmation: Codable, Hashable, Sendable, Identifiable {
+        public enum Action: String, Codable, Hashable, Sendable {
+            case create, update, remove
+        }
+
+        public var id: UUID
+        /// Who asked.
+        public var agentID: UUID
+        public var folder: URL
+        public var workflowID: String
+        public var action: Action
+        /// "Runs every weekday at 9am, in a new agent." The same renderer the project
+        /// page row uses, so what you approve and what you later see cannot drift.
+        public var summary: String
+        /// The body, in full. Approving a workflow is approving what an agent will be
+        /// told, unattended, so hiding it behind a disclosure would make the safe
+        /// action the uninformed one.
+        public var prompt: String
+        public var askedAt: Date
+
+        public init(id: UUID = UUID(), agentID: UUID, folder: URL, workflowID: String,
+                    action: Action, summary: String, prompt: String, askedAt: Date = Date()) {
+            self.id = id
+            self.agentID = agentID
+            self.folder = folder
+            self.workflowID = workflowID
+            self.action = action
+            self.summary = summary
+            self.prompt = prompt
+            self.askedAt = askedAt
+        }
+    }
+
+    public struct WorkflowConfirmRequest: Codable, Sendable {
+        public var confirmationID: UUID
+        public var allow: Bool
+        public init(confirmationID: UUID, allow: Bool) {
+            self.confirmationID = confirmationID
+            self.allow = allow
+        }
+    }
+
+    public struct WorkflowConfirmationNotification: Codable, Sendable {
+        public var confirmation: WorkflowConfirmation?
+        public init(confirmation: WorkflowConfirmation?) { self.confirmation = confirmation }
+    }
+
+    /// What an agent passes to the workflow tool.
+    public struct ManageWorkflowsRequest: Codable, Sendable {
+        public enum Action: String, Codable, Sendable {
+            case list, read, write, remove
+        }
+
+        public var token: String
+        public var action: Action
+        public var workflowID: String?
+        public var content: String?
+
+        public init(token: String, action: Action, workflowID: String? = nil,
+                    content: String? = nil) {
+            self.token = token
+            self.action = action
+            self.workflowID = workflowID
+            self.content = content
+        }
     }
 }

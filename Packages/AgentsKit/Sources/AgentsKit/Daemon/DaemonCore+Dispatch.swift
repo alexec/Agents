@@ -26,6 +26,22 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
 
+            case DaemonAPI.Method.workflowsList:
+                let request = try decode(params, as: DaemonAPI.WorkflowsListRequest.self) ?? .init()
+                return .success(try JSONValue.encoding(allWorkflows(in: request.folder)))
+
+            case DaemonAPI.Method.workflowsRun:
+                let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
+                return .success(try JSONValue.encoding(try await runWorkflow(request)))
+
+            case DaemonAPI.Method.workflowsPause:
+                let request = try require(params, as: DaemonAPI.WorkflowPauseRequest.self)
+                return .success(try JSONValue.encoding(try pauseWorkflow(request)))
+
+            case DaemonAPI.Method.workflowsPauseProject:
+                let request = try require(params, as: DaemonAPI.WorkflowPauseProjectRequest.self)
+                return .success(try JSONValue.encoding(pauseProjectWorkflows(request)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 

@@ -87,6 +87,40 @@ struct FileProbeTests {
         #expect(FileProbe.classify(bytes, filename: "x.txt", size: bytes.count) == .text)
     }
 
+    @Test("A run of multi-byte characters cut at the sniff limit is not binary",
+          arguments: ["é", "─", "😀"])
+    func aRunOfMultiByteCharactersCutAtTheLimitIsNotBinary(_ character: String) throws {
+        // The shape that broke: dropping a fixed three bytes to forgive the cut lands on
+        // another lead byte when the window is a *run* of multi-byte characters. Found by
+        // a wireframe full of box drawing opening as "MD file, 21 KB".
+        let unit = Array(character.utf8)
+        for cut in 1..<unit.count {
+            var bytes = Data()
+            while bytes.count + unit.count <= FileProbe.sniffLimit - cut {
+                bytes.append(contentsOf: unit)
+            }
+            bytes.append(Data(repeating: UInt8(ascii: "a"),
+                              count: FileProbe.sniffLimit - cut - bytes.count))
+            bytes.append(contentsOf: unit.prefix(cut))
+            #expect(bytes.count == FileProbe.sniffLimit)
+            #expect(FileProbe.classify(bytes, filename: "notes.md", size: bytes.count) == .text,
+                    "\(character) cut after \(cut) byte(s)")
+        }
+    }
+
+    @Test func aFileOfBoxDrawingOpensAsText() throws {
+        // The whole path, not just the classifier: the wireframe that started this is
+        // box drawing past the sniff limit and well under the read limit.
+        let line = String(repeating: "─", count: 64) + "\n"
+        var content = ""
+        while content.utf8.count < FileProbe.sniffLimit * 2 { content += line }
+        let url = try write(Data(content.utf8), named: "wireframe.md")
+        let probe = try FileProbe.read(url)
+        #expect(probe.kind == .text)
+        #expect(probe.isTruncated == false)
+        #expect(probe.text == content)
+    }
+
     @Test func aMissingFileSaysSoRatherThanReadingEmpty() throws {
         let url = URL.temporaryDirectory.appending(path: "no-such-\(UUID().uuidString).txt")
         #expect(throws: FileProbe.Failure.gone) { try FileProbe.read(url) }

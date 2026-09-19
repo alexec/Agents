@@ -22,6 +22,12 @@ struct ElicitationView: View {
                 }
 
                 switch request.mode {
+                case .form(let schema) where schema.singleChoice != nil:
+                    if let description = schema.description {
+                        Text(description).font(.callout).foregroundStyle(.secondary)
+                    }
+                    oneClick(schema)
+
                 case .form(let schema):
                     if let description = schema.description {
                         Text(description).font(.callout).foregroundStyle(.secondary)
@@ -68,6 +74,81 @@ struct ElicitationView: View {
         }
         .padding(.horizontal, 144)
         .onAppear { fillInDefaults() }
+    }
+
+    /// A question whose whole answer is one choice, answered by clicking the choice.
+    ///
+    /// Drawn the way `PermissionView` draws a permission question, because that is
+    /// what this is: the agent's own wording, on buttons, answered outright. The
+    /// description stays under each title — what separates two choices is usually
+    /// there rather than in the labels, and dropping it would make the buttons a row
+    /// of bare words.
+    ///
+    /// It scrolls sideways for the same reason the prompt bar's option row does: these
+    /// are the agent's words in a 144pt gutter, so there is no bound on how wide the
+    /// row wants to be, and a layout that measures its own width and picks a layout
+    /// from that has crashed this app through AppKit before.
+    @ViewBuilder
+    private func oneClick(_ schema: ElicitationSchema) -> some View {
+        if let single = schema.singleChoice {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(single.choices) { choice in
+                        answerButton(title: choice.title, description: choice.description,
+                                     prominent: true) {
+                            answer(single.property.name, with: .string(choice.value))
+                        }
+                    }
+                    // Picking nothing is an answer too, where the agent said the
+                    // question may go unanswered. Still one click (FR-040).
+                    if !single.property.isRequired {
+                        answerButton(title: "No answer", description: nil, prominent: false) {
+                            answer(single.property.name, with: .string(""))
+                        }
+                    }
+                    // Not the same thing as answering with nothing, and the daemon
+                    // already tells the two apart.
+                    answerButton(title: "No thanks", description: nil, prominent: false) {
+                        Task { await model.answerElicitation(request, action: .decline) }
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollIndicators(.never)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    /// Prominent for a real answer, plain for the two ways of not giving one — the
+    /// same split `PermissionView` makes between an option that allows and one that
+    /// does not.
+    @ViewBuilder
+    private func answerButton(title: String, description: String?,
+                              prominent: Bool, choose: @escaping () -> Void) -> some View {
+        if prominent {
+            Button(action: choose) { answerLabel(title, description) }
+                .buttonStyle(.glassProminent)
+        } else {
+            Button(action: choose) { answerLabel(title, description) }
+                .buttonStyle(.glass)
+        }
+    }
+
+    private func answerLabel(_ title: String, _ description: String?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+            if let description, !description.isEmpty {
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: 240, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func answer(_ name: String, with value: JSONValue) {
+        Task { await model.answerElicitation(request, action: .accept, content: [name: value]) }
     }
 
     @ViewBuilder

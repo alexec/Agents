@@ -95,6 +95,10 @@ struct ProjectAgentsView: View {
                     }
                 }
 
+                // Under the agents, above the archive: what will happen, after what is
+                // happening. See `WorkflowsSection` for why that order.
+                WorkflowsSection(folder: folder, selection: $selection)
+
                 archivedSection
 
                 if isEmpty {
@@ -112,6 +116,7 @@ struct ProjectAgentsView: View {
 
     private var isEmpty: Bool {
         folder != nil && AgentGroup.allCases.allSatisfy { model.agents(in: folder, group: $0).isEmpty }
+            && model.workflows(in: folder).isEmpty
     }
 
     private var archived: [Agent] {

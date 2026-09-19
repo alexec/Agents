@@ -102,6 +102,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) could not be added.")
         }
+        adoptWorkflows(in: standardized)
         broadcast(DaemonAPI.Notification.projectChanged, summary)
         return summary
     }
@@ -133,6 +134,11 @@ extension DaemonCore {
         records[standardized] = record
         saveProjectRecords(records)
 
+        // Its workflows stop being watched and stop being scheduled. Their files are
+        // untouched — putting a project away is not editing it — and unarchiving reads
+        // them straight back.
+        forgetWorkflows(in: standardized)
+
         // The agents are left exactly as they are. Their own states and archived flags
         // are what unarchiving restores, so nothing here touches them.
         guard let summary = projectSummary(for: standardized) else {
@@ -155,6 +161,7 @@ extension DaemonCore {
         record.archivedAt = nil
         records[standardized] = record
         saveProjectRecords(records)
+        adoptWorkflows(in: standardized)
 
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,

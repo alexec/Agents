@@ -104,6 +104,23 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
                   properties: properties)
     }
 
+    /// The single choice this whole form is asking for, when that is all it asks.
+    ///
+    /// A form like this is a permission question wearing a schema, and the app already
+    /// answers permission questions in one click: the agent's own wording, on buttons.
+    /// A radio group plus a Send button asks for two clicks to say one word.
+    ///
+    /// Nil for anything else. Two properties, free text, a number or a multi-select
+    /// cannot be answered by one click, so they keep the form and its Send — a partial
+    /// answer must not become sendable.
+    public var singleChoice: (property: Property, choices: [Property.Choice])? {
+        guard properties.count == 1, let only = properties.first,
+              case .string(_, _, _, let choices) = only.kind,
+              let choices, !choices.isEmpty
+        else { return nil }
+        return (only, choices)
+    }
+
     public struct Property: Codable, Hashable, Sendable, Identifiable {
         public var name: String
         public var title: String?
