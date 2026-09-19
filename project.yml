@@ -66,6 +66,14 @@ targets:
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © 2026 Alex Collins
+        # Shown in the system's own alert, so written for the person reading it at
+        # that moment. Both are asked for the first time dictation is used, never at
+        # launch.
+        NSMicrophoneUsageDescription: >-
+          So you can say what you want done instead of typing it.
+        NSSpeechRecognitionUsageDescription: >-
+          So what you say becomes the words in the prompt. It is recognised on this Mac
+          where this Mac can do it.
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

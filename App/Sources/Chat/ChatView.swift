@@ -20,12 +20,9 @@ struct ChatView: View {
                 }
             } else {
                 Spacer(minLength: 0)
-                // The app's own icon rather than a copy of it, so it can never drift
-                // from what is on the Dock.
-                Image(nsImage: NSApplication.shared.applicationIconImage)
-                    .resizable()
-                    .frame(width: 148, height: 148)
-                    .padding(.bottom, 20)
+                CrowdMark()
+                    .frame(width: 220)
+                    .padding(.bottom, 28)
             }
             PromptBar()
             if agent == nil { Spacer(minLength: 0) }

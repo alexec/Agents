@@ -28,5 +28,9 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Alex Collins</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>So you can say what you want done instead of typing it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>So what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.</string>
 </dict>
 </plist>

@@ -9,7 +9,9 @@ import SwiftUI
 struct PromptBar: View {
     @Environment(AppModel.self) private var model
     @State private var text = ""
-    @State private var showFolderPicker = false
+    @State private var dictation = Dictation()
+    @State private var textBeforeDictation = ""
+    @State private var isPrimingDictation = false
     @FocusState private var focused: Bool
 
     private var agent: Agent? { model.selectedAgent }
@@ -23,7 +25,7 @@ struct PromptBar: View {
                 options
             }
         }
-        .padding(.horizontal, 104)
+        .padding(.horizontal, 144)
         .padding(.vertical, 20)
         .onChange(of: model.selection) { text = "" }
         .onAppear { prepare() }
@@ -36,7 +38,7 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
-                Text(agent.cwd.lastPathComponent)
+                Label(agent.cwd.lastPathComponent, systemImage: "folder")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -47,10 +49,13 @@ struct PromptBar: View {
                     .foregroundStyle(.secondary)
             } else {
                 Button(action: chooseFolder) {
-                    // The folder's own name. The path it sits under is rarely the
-                    // thing you are checking, and it is in the tooltip when it is.
-                    Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Image(systemName: "folder")
+                        // The folder's own name. The path it sits under is rarely the
+                        // thing you are checking, and it is in the tooltip when it is.
+                        Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
+                            .lineLimit(1)
+                    }
                 }
                 .buttonStyle(.glass)
                 .font(.footnote)
@@ -91,6 +96,16 @@ struct PromptBar: View {
                     return .handled
                 }
 
+            Button(action: toggleDictation) {
+                Image(systemName: dictation.isListening ? "waveform" : "microphone")
+                    .font(.headline)
+                    .frame(width: 22, height: 22)
+                    .symbolEffect(.variableColor, isActive: dictation.isListening)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .help(dictation.isListening ? "Stop dictating" : "Dictate")
+
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.headline)
@@ -103,6 +118,56 @@ struct PromptBar: View {
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .sheet(isPresented: $isPrimingDictation) { dictationPrimer }
+        .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
+                                                 set: { if !$0 { dictation.stop() } })) {
+            Button("OK") {}
+        } message: {
+            Text(dictation.problem ?? "")
+        }
+    }
+
+    /// Our own words before the system's alert, the first time only.
+    private var dictationPrimer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Say it instead of typing it").font(.headline)
+            Text("The Mac listens while you hold the button on, and what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.")
+                .foregroundStyle(.secondary)
+            Text("macOS will ask for the microphone and for speech recognition next.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Not now") { isPrimingDictation = false }
+                Button("Continue") {
+                    isPrimingDictation = false
+                    beginDictation()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+    }
+
+    private func toggleDictation() {
+        if dictation.isListening {
+            dictation.stop()
+        } else if dictation.hasBeenAsked {
+            beginDictation()
+        } else {
+            isPrimingDictation = true
+        }
+    }
+
+    private func beginDictation() {
+        textBeforeDictation = text
+        focused = true
+        dictation.start { spoken in
+            let prefix = textBeforeDictation.isEmpty ? "" : textBeforeDictation + " "
+            text = prefix + spoken
+        }
     }
 
     private var placeholder: String {
@@ -184,6 +249,7 @@ struct PromptBar: View {
 
     private func send() {
         guard canSend else { return }
+        dictation.stop()
         let outgoing = text
         text = ""
         Task {
