@@ -128,7 +128,8 @@ What the user chose in the start form, kept so a pick-up can start the runtime t
 | Field | Type | Notes |
 |---|---|---|
 | `values` | [String: String] | Keyed by the advertised option `id`, e.g. `model` → `gpt-5.6-terra` |
-| `extraArguments` | [String] | The free-text field, split as a shell would (FR-005c) |
+
+There is nothing else: the free-text argument field was dropped (FR-005c).
 
 Options are applied to a live session by the set-option call rather than passed at launch, because
 they are advertised by `session/new` and not before (plan, decision 7).

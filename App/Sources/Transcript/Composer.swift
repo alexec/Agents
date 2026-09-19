@@ -9,6 +9,13 @@ struct Composer: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        GlassEffectContainer(spacing: 10) {
+            content
+        }
+        .padding(12)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 6) {
             if agent.state != .running, let note = pickUpNote {
                 Text(note).font(.caption).foregroundStyle(.secondary)
@@ -20,16 +27,18 @@ struct Composer: View {
                     .focused($focused)
                     .onSubmit(send)
                 Button(action: send) {
-                    Image(systemName: "arrow.up.circle.fill").font(.title2)
+                    Image(systemName: "arrow.up")
+                        .font(.headline)
+                        .frame(width: 20, height: 20)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
                 .disabled(!canSend)
                 .keyboardShortcut(.return, modifiers: .command)
             }
-            .padding(10)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            .padding(12)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(12)
     }
 
     private var canSend: Bool {

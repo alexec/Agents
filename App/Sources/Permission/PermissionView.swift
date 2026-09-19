@@ -11,34 +11,40 @@ struct PermissionView: View {
     let request: PermissionRequest
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label {
-                Text(request.toolCall.title).font(.headline)
-            } icon: {
-                Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
-            }
-            if let kind = request.toolCall.kind {
-                Text(kind).font(.caption).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 8) {
-                ForEach(request.options) { option in
-                    // The agent's own wording, on the agent's own options.
-                    if option.kind.allows {
-                        Button(option.name) {
-                            Task { await model.answer(request, optionID: option.optionID) }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    } else {
-                        Button(option.name) {
-                            Task { await model.answer(request, optionID: option.optionID) }
-                        }
-                        .buttonStyle(.bordered)
-                    }
+        GlassEffectContainer(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label {
+                    Text(request.toolCall.title).font(.headline)
+                } icon: {
+                    Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
                 }
-                Spacer()
+                if let kind = request.toolCall.kind {
+                    Text(kind).font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 8) {
+                    // The agent's own wording, on the agent's own options.
+                    ForEach(request.options) { option in
+                        if option.kind.allows {
+                            Button(option.name) { answer(option) }
+                                .buttonStyle(.glassProminent)
+                        } else {
+                            Button(option.name) { answer(option) }
+                                .buttonStyle(.glass)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Tinted, because a question the agent is blocked on should not read as
+            // part of the conversation behind it.
+            .glassEffect(.regular.tint(.orange.opacity(0.22)), in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(14)
-        .background(.orange.opacity(0.08))
+        .padding(12)
+    }
+
+    private func answer(_ option: PermissionOption) {
+        Task { await model.answer(request, optionID: option.optionID) }
     }
 }

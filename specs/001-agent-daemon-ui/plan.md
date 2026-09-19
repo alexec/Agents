@@ -220,6 +220,24 @@ running their shell as a login shell, and falls back to a short list of usual pl
 cannot be resolved is listed as not found with where we looked, which is FR-003 doing its job rather
 than a silent empty list.
 
+### 10. Starting an agent is a pane, not a dialog, and the controls are glass
+
+The right-hand side shows the start form when no agent is chosen, so the app opens ready to start
+one. Three rows: where it works and what runs it, what you want done, and the options that runtime
+offers.
+
+The option controls carry their own name only when their choices do not say what they are. "GPT-5.6
+Terra" needs no label; "Agent" and "Off" do, and the Claude adapter calls both its model and its
+effort level "Default", so a name that turns up twice in a row gets its label back. That rule is in
+`AgentsKit`, not in a view, because it is a decision and decisions are tested.
+
+Liquid Glass is used where there are controls: the prompt box, the folder and runtime buttons, the
+option capsules, the composer and the permission banner. Not on the transcript, which is content.
+The minimum is macOS 27, so nothing is gated.
+
+There is no free-text argument field. A box of flags nobody validates is a way to fail at launch
+with a typo, and all three runtimes advertise what they can be told.
+
 ## Risks
 
 | Risk | What it looks like | What we do about it |

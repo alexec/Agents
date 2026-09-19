@@ -41,6 +41,70 @@ public struct ConfigOption: Codable, Hashable, Sendable, Identifiable {
         }
         return i
     }
+
+    /// Whether the choices say what they are without being told.
+    ///
+    /// "GPT-5.6 Terra" and "High Effort" need no label in front of them. "Agent" and
+    /// "off" do, or the row reads as a set of unattached words. Anything unfamiliar
+    /// gets a label, because a wrong guess here is a control nobody can read.
+    public var choicesNameThemselves: Bool {
+        guard let category else { return false }
+        return ["model", "thought_level"].contains(category)
+    }
+
+    /// Words that name no setting. A control reading "Default" could be anything, and
+    /// the Claude adapter calls both its model and its effort level exactly that.
+    static let unrevealingNames: Set<String> = [
+        "default", "auto", "automatic", "on", "off", "none", "normal", "standard", "custom",
+    ]
+
+    func choiceName(for value: JSONValue?) -> String? {
+        let chosen = value ?? currentValue
+        return (options ?? []).first { $0.value == chosen }?.name
+    }
+
+    /// Whether a choice's own name is enough to say which setting it belongs to.
+    static func isRevealing(_ choiceName: String) -> Bool {
+        let firstWord = choiceName
+            .lowercased()
+            .split(whereSeparator: { !$0.isLetter })
+            .first
+            .map(String.init) ?? ""
+        return !unrevealingNames.contains(firstWord)
+    }
+
+    /// What one control reads when it is closed, on its own.
+    ///
+    /// The label lives in here rather than beside the control: a row of pickers each
+    /// with a caption above it is a form, and this is meant to be a line of settings.
+    public func closedTitle(for value: JSONValue?) -> String {
+        guard let choiceName = choiceName(for: value) else { return name }
+        guard choicesNameThemselves, Self.isRevealing(choiceName) else {
+            return "\(name): \(choiceName)"
+        }
+        return choiceName
+    }
+}
+
+extension Array where Element == ConfigOption {
+    /// What the whole row reads, which is not just each control in turn.
+    ///
+    /// Two controls that both say "Default" tell the reader nothing, however sensible
+    /// each looked on its own, so a name that turns up twice gets its label back.
+    public func closedTitles(chosen: [String: JSONValue]) -> [String: String] {
+        var titles: [String: String] = [:]
+        for option in self {
+            titles[option.id] = option.closedTitle(for: chosen[option.id])
+        }
+        var counts: [String: Int] = [:]
+        for title in titles.values { counts[title, default: 0] += 1 }
+        for option in self where (counts[titles[option.id] ?? ""] ?? 0) > 1 {
+            if let choiceName = option.choiceName(for: chosen[option.id]) {
+                titles[option.id] = "\(option.name): \(choiceName)"
+            }
+        }
+        return titles
+    }
 }
 
 public struct ConfigChoice: Codable, Hashable, Sendable, Identifiable {

@@ -203,10 +203,16 @@ send it a follow-up and see it answer with what it knew before.
   runtimes send inconsistently. Whatever a runtime offers is taken from the one list.
 - **FR-005b**: The system MUST apply an option change during a session when the user makes one, and
   MUST follow the advertised options changing mid-session.
-- **FR-005c**: The system MUST also offer a free-text field for anything the protocol does not
-  advertise, passed to the runtime as given when it is started.
+- **FR-005c**: The system MUST NOT offer a free-text argument field. Dropped on 2026-09-18 after
+  seeing the form: a box of flags nobody validates is a way to fail at launch with a typo, and all
+  three runtimes advertise what they can be told.
 - **FR-005d**: The system MUST NOT prevent an agent being started with a runtime that advertises no
   options at all.
+- **FR-005e**: The system MUST show an advertised option's name only where its choices do not say
+  what they are. Where the name is needed it MUST be part of what the closed control reads, so that
+  the options are a line of settings rather than a form of captioned boxes.
+- **FR-005f**: Starting an agent MUST be what the app shows when no agent is chosen, rather than a
+  dialog opened from somewhere, so the app opens ready to start one.
 - **FR-006**: The system MUST record every agent's full history, and MUST keep recording while no
   window is open.
 - **FR-007**: The system MUST show an agent's history and new output in the window, with new output
