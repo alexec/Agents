@@ -140,6 +140,15 @@ public enum DaemonAPI {
         public var lastActivityAt: Date
         /// How many agents are in each group.
         public var counts: [AgentGroup: Int]
+        /// What every agent in this folder has spent over its whole life, per currency.
+        /// **Empty when nothing has been spent**, which is how a view knows to show no
+        /// figure rather than a zero. Like `counts`, recomputed on every call and never
+        /// stored.
+        public var costToDate: [String: Decimal]
+        /// How many agents here finished a turn the runtime would not price. **Zero in
+        /// the ordinary case; non-zero means `costToDate` is a floor rather than the
+        /// whole.** Like `counts`, recomputed on every call and never stored.
+        public var unmeasuredAgents: Int
 
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
@@ -148,12 +157,30 @@ public enum DaemonAPI {
         public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
         public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
-                    counts: [AgentGroup: Int]) {
+                    counts: [AgentGroup: Int],
+                    costToDate: [String: Decimal] = [:],
+                    unmeasuredAgents: Int = 0) {
             self.project = project
             self.name = name
             self.exists = exists
             self.lastActivityAt = lastActivityAt
             self.counts = counts
+            self.costToDate = costToDate
+            self.unmeasuredAgents = unmeasuredAgents
+        }
+
+        /// An older daemon sends neither new field. Both default rather than fail, so
+        /// the response degrades to silence — no figure at all — never to a wrong
+        /// number.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            project = try c.decode(Project.self, forKey: .project)
+            name = try c.decode(String.self, forKey: .name)
+            exists = try c.decode(Bool.self, forKey: .exists)
+            lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
+            counts = try c.decode([AgentGroup: Int].self, forKey: .counts)
+            costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
+            unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
         }
     }
 

@@ -27,9 +27,19 @@ struct ProjectsTests {
     }
 
     private func agent(in folder: URL, title: String, state: AgentState = .finished,
-                       activity: Date = Date(), created: Date = Date()) -> Agent {
+                       activity: Date = Date(), created: Date = Date(),
+                       lastTurnUsage: TurnUsage? = nil,
+                       costToDate: [String: Decimal] = [:]) -> Agent {
         Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
-              createdAt: created, lastActivityAt: activity, endedReason: .endTurn)
+              createdAt: created, lastActivityAt: activity, endedReason: .endTurn,
+              lastTurnUsage: lastTurnUsage, costToDate: costToDate)
+    }
+
+    /// An agent that ran a turn the runtime priced. The record a finished, costed turn
+    /// leaves behind, which is the only part of the turn a total reads.
+    private func spent(_ amount: Decimal, _ currency: String = "USD") -> (TurnUsage, [String: Decimal]) {
+        (TurnUsage(totalTokens: 10, cost: Cost(amount: amount, currency: currency)),
+         [currency: amount])
     }
 
     /// A core holding these agents, arrived at the way a restart arrives at them.
@@ -251,5 +261,191 @@ struct ProjectsTests {
         _ = try await core.addProject(URL(filePath: work.path + "/"))
 
         #expect(await core.allProjects().count == 1)
+    }
+
+    // MARK: What it has cost
+
+    @Test func aFoldersTotalIsEveryAgentInItAddedUp() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let (oneUsage, oneCost) = spent(0.25)
+        let (twoUsage, twoCost) = spent(0.75)
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "One", lastTurnUsage: oneUsage, costToDate: oneCost),
+            agent(in: work, title: "Two", lastTurnUsage: twoUsage, costToDate: twoCost),
+        ])
+
+        let project = try #require(await core.allProjects().first)
+        #expect(project.costToDate["USD"] == 1.0)
+        #expect(project.unmeasuredAgents == 0)
+    }
+
+    @Test func archivingAnAgentLeavesTheTotalWhereItWas() async throws {
+        // The assertion most likely to catch a future regression: archiving is the one
+        // operation that visibly removes an agent from a page, and the money it spent
+        // was still spent.
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let (usage, cost) = spent(0.40)
+        let one = agent(in: work, title: "Archive me", lastTurnUsage: usage, costToDate: cost)
+        let (otherUsage, otherCost) = spent(0.60)
+        let core = try await core(locations, seeded: [
+            one,
+            agent(in: work, title: "Keep me", lastTurnUsage: otherUsage, costToDate: otherCost),
+        ])
+
+        let before = try #require(await core.allProjects().first).costToDate
+        try await core.archive(one.id)
+        let after = try #require(await core.allProjects().first).costToDate
+
+        #expect(before["USD"] == 1.0)
+        #expect(after == before, "archiving spends nothing and unspends nothing")
+    }
+
+    @Test func anEndedAgentIsStillCounted() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let (usage, cost) = spent(0.30)
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Finished", state: .finished,
+                  lastTurnUsage: usage, costToDate: cost),
+            agent(in: work, title: "Stopped", state: .stopped,
+                  lastTurnUsage: usage, costToDate: cost),
+        ])
+
+        #expect(await core.allProjects().first?.costToDate["USD"] == 0.60)
+    }
+
+    @Test func twoCurrenciesStayTwoFigures() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let (dollars, dollarCost) = spent(1.0, "USD")
+        let (pounds, poundCost) = spent(2.0, "GBP")
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Priced in dollars", lastTurnUsage: dollars, costToDate: dollarCost),
+            agent(in: work, title: "Priced in pounds", lastTurnUsage: pounds, costToDate: poundCost),
+        ])
+
+        let total = try #require(await core.allProjects().first).costToDate
+        #expect(total.count == 2, "nothing converted, nothing combined")
+        #expect(total["USD"] == 1.0)
+        #expect(total["GBP"] == 2.0)
+    }
+
+    @Test func aTurnTheRuntimeWouldNotPriceIsCountedRatherThanZeroed() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Ran, never priced",
+                  lastTurnUsage: TurnUsage(totalTokens: 10)),
+        ])
+
+        let project = try #require(await core.allProjects().first)
+        #expect(project.unmeasuredAgents == 1)
+        #expect(project.costToDate.isEmpty, "unmeasurable is not free, and not a zero")
+    }
+
+    @Test func aProjectWhereNothingHasFinishedHasNoTotalAndNoWarning() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Started, nothing finished", state: .running),
+        ])
+
+        let project = try #require(await core.allProjects().first)
+        #expect(project.costToDate.isEmpty)
+        #expect(project.unmeasuredAgents == 0, "nothing has happened yet is not unmeasured")
+    }
+
+    @Test func theTotalRidesTheNotificationThatAlreadyFires() async throws {
+        // FR-005, and the assertion that documents why this feature needs no
+        // notification of its own: if it ever fails, somebody has moved the cost
+        // banking out from under `changed(_:)`.
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        var script = FakeACPAgent.Script()
+        script.usage = ["totalTokens": 10, "cost": ["amount": 0.5, "currency": "USD"]]
+        let store = try AgentStore(locations: locations)
+        let core = DaemonCore(store: store,
+                              locations: locations,
+                              discovery: .findsEverything,
+                              launcher: FakeLauncher(script: script))
+
+        let seen = Broadcasts()
+        await core.setBroadcaster { method, params in
+            guard method == DaemonAPI.Notification.projectChanged else { return }
+            guard let params,
+                  let summary = try? params.decode(DaemonAPI.ProjectSummary.self)
+            else { return }
+            seen.append(summary)
+        }
+
+        _ = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("a project/changed carried the total") {
+            seen.all.contains { $0.costToDate["USD"] == 0.5 }
+        }
+    }
+
+    @Test func archivingAWholeProjectLeavesItsTotalAndItsPlaceInTheList() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let (usage, cost) = spent(1.25)
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Done", lastTurnUsage: usage, costToDate: cost),
+        ])
+
+        _ = try await core.archiveProject(work)
+        let project = try #require(await core.allProjects(includeArchived: true).first)
+        #expect(project.project.isArchived == true)
+        #expect(project.costToDate["USD"] == 1.25, "putting a project away unspends nothing")
+    }
+
+    @Test func spendInAFolderNobodyAddedIsStillInsideAProject() async throws {
+        // FR-012 discharged: there is no folder an agent can be in that is not a
+        // project, so no penny falls outside the union and no "Other" row can ever be
+        // populated. Anything that starts filtering this list before totalling would
+        // lose money silently.
+        let (locations, root) = try temporary()
+        let never = try folder(root, "never-added")
+        let (usage, cost) = spent(3.0)
+        let core = try await core(locations, seeded: [
+            agent(in: never, title: "Ran where nobody looked", lastTurnUsage: usage, costToDate: cost),
+        ])
+
+        #expect(ProjectStore(locations: locations).load().isEmpty, "derived, not kept")
+        let project = try #require(await core.allProjects().first)
+        #expect(project.folder == never)
+        #expect(project.costToDate["USD"] == 3.0)
+    }
+
+    @Test func aProjectWhoseFolderWentStillReportsItsSpend() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "gone")
+        let (usage, cost) = spent(0.99)
+        let core = try await core(locations, seeded: [
+            agent(in: work, title: "Its folder went", lastTurnUsage: usage, costToDate: cost),
+        ])
+        try FileManager.default.removeItem(at: work)
+
+        let project = try #require(await core.allProjects().first)
+        #expect(project.exists == false)
+        #expect(project.costToDate["USD"] == 0.99)
+    }
+}
+
+/// The notifications a test watched go by. `setBroadcaster` is called from whatever
+/// context the daemon happens to be on, so what it writes into needs a lock of its own.
+private final class Broadcasts: @unchecked Sendable {
+    private let lock = NSLock()
+    private var summaries: [DaemonAPI.ProjectSummary] = []
+
+    func append(_ summary: DaemonAPI.ProjectSummary) {
+        lock.lock(); defer { lock.unlock() }
+        summaries.append(summary)
+    }
+
+    var all: [DaemonAPI.ProjectSummary] {
+        lock.lock(); defer { lock.unlock() }
+        return summaries
     }
 }
