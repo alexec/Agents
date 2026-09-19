@@ -5,6 +5,7 @@ struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var frame = SidebarFrame()
     @State private var sidebarStates = SidebarStates()
+    @State private var webHolders = WebHolders()
     /// Starting an agent is the detail pane, so "new" is "choose nothing".
     private var isStarting: Binding<Bool> {
         Binding(get: { model.selection == nil },
@@ -40,6 +41,7 @@ struct ContentView: View {
         }
         .environment(frame)
         .environment(sidebarStates)
+        .environment(webHolders)
         .task { await model.connect() }
         .alert("That did not work",
                isPresented: Binding(get: { model.problem != nil },

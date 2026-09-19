@@ -324,6 +324,20 @@ final class AppModel {
         describe(error)
     }
 
+    /// Which transcript entry the conversation should bring into view.
+    ///
+    /// Set by the artifacts pane so that getting from a thing back to the message it
+    /// came from is one tap (FR-042). Cleared once the transcript has scrolled to it.
+    var focusedEntry: UUID?
+
+    func focusEntry(_ id: UUID) {
+        focusedEntry = id
+    }
+
+    func clearFocus() {
+        focusedEntry = nil
+    }
+
     func dismissProblem() { problem = nil }
 
     private func attempt(_ work: () async throws -> Void) async {

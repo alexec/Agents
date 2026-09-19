@@ -141,18 +141,18 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Test the navigation policy in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/BrowserPolicyTests.swift`: `http`, `https`, `about` and `file` are allowed and every other scheme is refused, written as a pure function over a URL so it is testable without a web view
+- [X] T057 [P] [US3] Test the navigation policy in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/BrowserPolicyTests.swift`: `http`, `https`, `about` and `file` are allowed and every other scheme is refused, written as a pure function over a URL so it is testable without a web view
 
 ### Implementation for User Story 3
 
-- [ ] T058 [P] [US3] Create the scheme policy as a pure function in `Packages/AgentsKit/Sources/AgentsKit/Files/BrowserPolicy.swift`, allowing only `http`, `https`, `about` and `file` and refusing by default (FR-034)
-- [ ] T059 [US3] Create `App/Sources/Sidebar/BrowserPane.swift` wrapping a `WKWebView` with its own non-default `WKWebsiteDataStore`, held per agent outside the view tree so it is not recreated when the pane is hidden; nothing in the app MUST be able to navigate it on an agent's behalf (FR-031, FR-033, FR-035)
-- [ ] T060 [US3] Add an address field and back, forward and reload controls in `App/Sources/Sidebar/BrowserPane.swift` (FR-030)
-- [ ] T061 [US3] Refuse window creation in `App/Sources/Sidebar/BrowserPane.swift` by returning nil from `WKUIDelegate.webView(_:createWebViewWith:for:windowFeatures:)` (FR-034)
-- [ ] T062 [US3] Apply `BrowserPolicy` in `decidePolicyFor navigationAction` in `App/Sources/Sidebar/BrowserPane.swift`, refusing visibly rather than silently (FR-034)
-- [ ] T063 [US3] Refuse downloads in `App/Sources/Sidebar/BrowserPane.swift`, and ask the user before granting camera or microphone via `requestMediaCapturePermissionFor` (FR-034)
-- [ ] T064 [US3] Say what failed on `didFailProvisionalNavigation` in `App/Sources/Sidebar/BrowserPane.swift`, naming connection refused, host not found and timeout in plain words and offering reload, rather than showing a blank panel (FR-032)
-- [ ] T065 [US3] Keep the current URL in `AgentPaneState` in `App/Sources/Sidebar/BrowserPane.swift`, so switching agents and coming back shows the same page (FR-031)
+- [X] T058 [P] [US3] Create the scheme policy as a pure function in `Packages/AgentsKit/Sources/AgentsKit/Files/BrowserPolicy.swift`, allowing only `http`, `https`, `about` and `file` and refusing by default (FR-034)
+- [X] T059 [US3] Create `App/Sources/Sidebar/BrowserPane.swift` wrapping a `WKWebView` with its own non-default `WKWebsiteDataStore`, held per agent outside the view tree so it is not recreated when the pane is hidden; nothing in the app MUST be able to navigate it on an agent's behalf (FR-031, FR-033, FR-035)
+- [X] T060 [US3] Add an address field and back, forward and reload controls in `App/Sources/Sidebar/BrowserPane.swift` (FR-030)
+- [X] T061 [US3] Refuse window creation in `App/Sources/Sidebar/BrowserPane.swift` by returning nil from `WKUIDelegate.webView(_:createWebViewWith:for:windowFeatures:)` (FR-034)
+- [X] T062 [US3] Apply `BrowserPolicy` in `decidePolicyFor navigationAction` in `App/Sources/Sidebar/BrowserPane.swift`, refusing visibly rather than silently (FR-034)
+- [X] T063 [US3] Refuse downloads in `App/Sources/Sidebar/BrowserPane.swift`, and ask the user before granting camera or microphone via `requestMediaCapturePermissionFor` (FR-034)
+- [X] T064 [US3] Say what failed on `didFailProvisionalNavigation` in `App/Sources/Sidebar/BrowserPane.swift`, naming connection refused, host not found and timeout in plain words and offering reload, rather than showing a blank panel (FR-032)
+- [X] T065 [US3] Keep the current URL in `AgentPaneState` in `App/Sources/Sidebar/BrowserPane.swift`, so switching agents and coming back shows the same page (FR-031)
 
 **Checkpoint**: quickstart scenario 4 passes.
 
@@ -166,20 +166,20 @@ US1 rather than stand alone. US1 is still the MVP and still delivers the spec's 
 
 ### Tests for User Story 4
 
-- [ ] T066 [P] [US4] Test annotation decoding in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ContentBlockTests.swift`: `annotations` with `audience` and `priority` survive a round trip, and a block without annotations still decodes
-- [ ] T067 [P] [US4] Test the artifact filter in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ArtifactTests.swift`: a transcript holding `resource_link` blocks, embedded `resource` blocks, tool calls with `locations` and `diff`, and plain messages yields exactly the resource blocks, newest first; a block whose `annotations.audience` is present and does not include `user` is excluded; a block with no annotations is included
+- [X] T066 [P] [US4] Test annotation decoding in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ContentBlockTests.swift`: `annotations` with `audience` and `priority` survive a round trip, and a block without annotations still decodes
+- [X] T067 [P] [US4] Test the artifact filter in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ArtifactTests.swift`: a transcript holding `resource_link` blocks, embedded `resource` blocks, tool calls with `locations` and `diff`, and plain messages yields exactly the resource blocks, newest first; a block whose `annotations.audience` is present and does not include `user` is excluded; a block with no annotations is included
 
 ### Implementation for User Story 4
 
-- [ ] T068 [US4] Decode `annotations` (`audience`, `priority`) on `resourceLink` and `resource` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ContentBlock.swift`, keeping them on the round trip out (research section 1)
-- [ ] T069 [US4] Create `Artifact` (`id`, `uri`, `name`, `mimeType: String?`, `size: Int?`, `arrivedAt`, `entryID`, `embedded: Bool`) in `Packages/AgentsKit/Sources/AgentsKit/Model/Artifact.swift`; `name` MUST fall back to the uri's last path component when the agent sent none (depends on T068)
-- [ ] T070 [US4] Write the filter over transcript entries in `Packages/AgentsKit/Sources/AgentsKit/Model/Artifact.swift` as a pure function: a `resource_link` or embedded `resource` block is an artifact and nothing else is; a file a tool call touched MUST NOT be listed. Deriving on read is what makes FR-044 free: nothing is stored, so artifacts last as long as the transcript does, across restarts and for a stopped or archived agent (FR-044, FR-046)
-- [ ] T071 [US4] Build the list in `App/Sources/Sidebar/ArtifactsPane.swift`, newest first, each showing what it is and when it arrived (FR-040)
-- [ ] T072 [US4] Write the empty state in `App/Sources/Sidebar/ArtifactsPane.swift` saying what will appear there, in the app's own voice, reading as a fact rather than an apology or an error; this is the pane's ordinary screen against every runtime installed today (FR-043, research section 1)
-- [ ] T073 [US4] Update the list on the existing `agent/entry` notification in `App/Sources/Sidebar/ArtifactsPane.swift`, with no new push added to the daemon (FR-041)
-- [ ] T074 [US4] Open a chosen artifact in `App/Sources/Sidebar/ArtifactsPane.swift`: a `file:` uri in the files pane, an `http(s)` uri in the browser, and an embedded `resource` read in place (FR-042)
-- [ ] T075 [US4] Offer a way from an artifact to the message it came from, by `entryID`, in `App/Sources/Sidebar/ArtifactsPane.swift` (FR-042)
-- [ ] T076 [US4] Keep an artifact in the list and say it has gone when its uri no longer resolves, in `App/Sources/Sidebar/ArtifactsPane.swift`, rather than hiding it (FR-045)
+- [X] T068 [US4] Decode `annotations` (`audience`, `priority`) on `resourceLink` and `resource` in `Packages/AgentsKit/Sources/AgentsKit/ACP/ContentBlock.swift`, keeping them on the round trip out (research section 1)
+- [X] T069 [US4] Create `Artifact` (`id`, `uri`, `name`, `mimeType: String?`, `size: Int?`, `arrivedAt`, `entryID`, `embedded: Bool`) in `Packages/AgentsKit/Sources/AgentsKit/Model/Artifact.swift`; `name` MUST fall back to the uri's last path component when the agent sent none (depends on T068)
+- [X] T070 [US4] Write the filter over transcript entries in `Packages/AgentsKit/Sources/AgentsKit/Model/Artifact.swift` as a pure function: a `resource_link` or embedded `resource` block is an artifact and nothing else is; a file a tool call touched MUST NOT be listed. Deriving on read is what makes FR-044 free: nothing is stored, so artifacts last as long as the transcript does, across restarts and for a stopped or archived agent (FR-044, FR-046)
+- [X] T071 [US4] Build the list in `App/Sources/Sidebar/ArtifactsPane.swift`, newest first, each showing what it is and when it arrived (FR-040)
+- [X] T072 [US4] Write the empty state in `App/Sources/Sidebar/ArtifactsPane.swift` saying what will appear there, in the app's own voice, reading as a fact rather than an apology or an error; this is the pane's ordinary screen against every runtime installed today (FR-043, research section 1)
+- [X] T073 [US4] Update the list on the existing `agent/entry` notification in `App/Sources/Sidebar/ArtifactsPane.swift`, with no new push added to the daemon (FR-041)
+- [X] T074 [US4] Open a chosen artifact in `App/Sources/Sidebar/ArtifactsPane.swift`: a `file:` uri in the files pane, an `http(s)` uri in the browser, and an embedded `resource` read in place (FR-042)
+- [X] T075 [US4] Offer a way from an artifact to the message it came from, by `entryID`, in `App/Sources/Sidebar/ArtifactsPane.swift` (FR-042)
+- [X] T076 [US4] Keep an artifact in the list and say it has gone when its uri no longer resolves, in `App/Sources/Sidebar/ArtifactsPane.swift`, rather than hiding it (FR-045)
 
 **Checkpoint**: quickstart scenario 5 passes. Expect the empty state against real runtimes; the fake agent proves the rest.
 
