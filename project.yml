@@ -1,0 +1,87 @@
+name: Agents
+options:
+  bundleIdPrefix: com.alexecollins
+  # This app runs on one Mac: Alex's, which is on 27.0. Nothing is stranded by
+  # taking the current SDK, and the factory has no users to leave behind.
+  deploymentTarget:
+    macOS: "27.0"
+  xcodeVersion: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: 6T4RVD5724
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Xcode warns on every build without this. There are no user headers to search.
+    ALWAYS_SEARCH_USER_PATHS: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+  # This xcodegen install has no bundled setting presets, so the per-configuration
+  # settings are spelled out. Without them DEBUG is never defined.
+  configs:
+    Debug:
+      DEBUG_INFORMATION_FORMAT: dwarf
+      ENABLE_TESTABILITY: YES
+      GCC_OPTIMIZATION_LEVEL: 0
+      GCC_PREPROCESSOR_DEFINITIONS: ["DEBUG=1", "$(inherited)"]
+      ONLY_ACTIVE_ARCH: YES
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      SWIFT_OPTIMIZATION_LEVEL: -Onone
+    Release:
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      ENABLE_NS_ASSERTIONS: NO
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: -O
+      VALIDATE_PRODUCT: YES
+packages:
+  AgentsKit:
+    path: Packages/AgentsKit
+targets:
+  Agents:
+    type: application
+    supportedDestinations: [macOS]
+    entitlements:
+      path: App/Agents.entitlements
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    dependencies:
+      - package: AgentsKit
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Agents
+        CFBundleName: Agents
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: © 2026 Alex Collins
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents
+        CODE_SIGN_ENTITLEMENTS: App/Agents.entitlements
+        PRODUCT_NAME: Agents
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+schemes:
+  Agents:
+    build:
+      targets:
+        Agents: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        # These also run with plain `swift test` from Packages/AgentsKit.
+        - package: AgentsKit/AgentsKitTests
