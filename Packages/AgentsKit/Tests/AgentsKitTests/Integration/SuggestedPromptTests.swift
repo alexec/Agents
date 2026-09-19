@@ -1,0 +1,327 @@
+import Foundation
+import Testing
+@testable import AgentsKit
+
+/// An agent saying what you might want to ask next.
+///
+/// ACP has no way to send one, so the app serves an MCP server with a single tool on
+/// it and attaches that server to every session. These are the tests for the daemon's
+/// half of that: that the server is attached at all, that only the session it was
+/// minted for can post through it, and that a suggestion stops being shown the moment
+/// the turn it belonged to is over.
+@Suite("Suggesting what to ask next", .timeLimit(.minutes(1)))
+struct SuggestedPromptTests {
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsSuggestTests-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), work)
+    }
+
+    private func core(_ launcher: FakeLauncher, locations: StoreLocations) throws -> DaemonCore {
+        DaemonCore(store: try AgentStore(locations: locations),
+                   locations: locations,
+                   discovery: .findsEverything,
+                   launcher: launcher)
+    }
+
+    private func servers(in params: JSONValue?) -> [JSONValue] {
+        params?["mcpServers"]?.arrayValue ?? []
+    }
+
+    // MARK: Attaching the server
+
+    @Test func everySessionIsGivenTheSuggestionServer() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        let attached = servers(in: await launcher.lastAgent?.newSessionParams)
+        #expect(attached.count == 1)
+        #expect(attached.first?["name"]?.stringValue == "agents")
+        // Stdio, because it is the only transport every runtime takes: the acp
+        // transport is unstable and none of the three advertise it.
+        #expect(attached.first?["command"]?.stringValue != nil)
+        #expect(attached.first?["args"]?.arrayValue?.first?.stringValue == "mcp")
+    }
+
+    /// The gap this found: servers the user attached were recorded against the agent
+    /// and never sent, because `session/new` was called without them.
+    @Test func theServersTheUserAttachedGoWithIt() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
+
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+                                       mcpServers: [theirs]))
+
+        let names = servers(in: await launcher.lastAgent?.newSessionParams)
+            .compactMap { $0["name"]?.stringValue }
+        #expect(names == ["theirs", "agents"])
+    }
+
+    /// A draft session was made before the user chose a server, so it cannot be the
+    /// session that server is attached to.
+    @Test func aDraftMadeWithoutAServerIsNotReusedForOneThatHasIt() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
+
+        let draft = try await core.options(.init(runtimeID: "copilot", cwd: work))
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+                                       draftID: draft.draftID, mcpServers: [theirs]))
+
+        #expect(launcher.launchCount == 2)
+        let names = servers(in: await launcher.lastAgent?.newSessionParams)
+            .compactMap { $0["name"]?.stringValue }
+        #expect(names == ["theirs", "agents"])
+    }
+
+    @Test func aDraftMadeWithTheSameServersIsUsedAsItIs() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
+
+        let draft = try await core.options(.init(runtimeID: "copilot", cwd: work, mcpServers: [theirs]))
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+                                       draftID: draft.draftID, mcpServers: [theirs]))
+
+        #expect(launcher.launchCount == 1)
+    }
+
+    // MARK: What a call does
+
+    /// The token the runtime was given is minted before the agent exists, and means
+    /// something only once the start has made one.
+    private func token(_ core: DaemonCore, _ launcher: FakeLauncher) async -> String {
+        let attached = servers(in: await launcher.lastAgent?.newSessionParams)
+        return attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+    }
+
+    /// A turn long enough to call a tool in the middle of, which is when a real one is
+    /// called: the daemon lets the runtime go the moment a turn ends, and with it the
+    /// MCP helper that runtime started.
+    private func midTurn() -> FakeLauncher {
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(400)
+        return FakeLauncher(script: script)
+    }
+
+    private func suggest(_ core: DaemonCore, _ launcher: FakeLauncher, _ labels: String...) async throws {
+        try await Task.sleep(for: .milliseconds(100))
+        _ = try await core.suggestPrompts(.init(token: await token(core, launcher),
+                                                prompts: labels.map {
+            SuggestedPrompt(label: $0, prompt: "Please: \($0)")
+        }))
+    }
+
+    @Test func whatTheAgentPassesTheToolEndsUpOnTheAgent() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(100))
+
+        let note = try await core.suggestPrompts(.init(token: await token(core, launcher), prompts: [
+            SuggestedPrompt(label: "Run the tests", prompt: "Run the tests and fix what fails"),
+            SuggestedPrompt(label: "Commit it", prompt: "Commit this with a message saying why"),
+        ]))
+
+        #expect(await core.agent(id)?.suggestedPrompts.map(\.label) == ["Run the tests", "Commit it"])
+        // The agent is told what became of them, because it asked.
+        #expect(note.contains("2"))
+    }
+
+    @Test func aTokenTheDaemonDoesNotKnowIsRefused() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.suggestPrompts(.init(token: "not-a-token", prompts: [
+                SuggestedPrompt(label: "Anything", prompt: "Do anything"),
+            ]))
+        }
+    }
+
+    /// Anything on this Mac can reach the daemon's socket, so a token that has been
+    /// retired must not still speak for the agent it once did.
+    @Test func aTokenStopsWorkingWhenItsRuntimeIsGone() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(100))
+        let stale = await token(core, launcher)
+
+        // It works while the runtime is there, and not after.
+        _ = try await core.suggestPrompts(.init(token: stale, prompts: [
+            SuggestedPrompt(label: "While alive", prompt: "Do it"),
+        ]))
+        try await core.stop(id)
+        try await Task.sleep(for: .milliseconds(100))
+
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.suggestPrompts(.init(token: stale, prompts: [
+                SuggestedPrompt(label: "Anything", prompt: "Do anything"),
+            ]))
+        }
+    }
+
+    @Test func fourIsTheMostThatAreKept() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(100))
+
+        _ = try await core.suggestPrompts(.init(token: await token(core, launcher),
+                                                prompts: (1...9).map {
+            SuggestedPrompt(label: "\($0)", prompt: "Do \($0)")
+        }))
+
+        #expect(await core.agent(id)?.suggestedPrompts.count == SuggestedPrompt.limit)
+    }
+
+    // MARK: Asking for them
+
+    /// The finding that made this necessary: offered the tool and nothing else, all
+    /// three runtimes called it never. One line in the prompt is what changes that.
+    @Test func theRuntimeIsAskedForThemWithEveryPrompt() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        try await Task.sleep(for: .milliseconds(100))
+
+        let sent = await launcher.lastAgent?.promptContent?.arrayValue ?? []
+        #expect(sent.count == 2)
+        #expect(sent.first?["text"]?.stringValue == "do the thing")
+        #expect(sent.last?["text"]?.stringValue == SuggestionService.askForSuggestions)
+    }
+
+    /// Ours is a block of its own and not part of what was said. The transcript is a
+    /// record of the conversation, and putting our words in the user's mouth would
+    /// make it a record of something that did not happen.
+    @Test func whatWeAddIsNotWhatTheRecordSays() async throws {
+        let (locations, work) = try temporary()
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        try await Task.sleep(for: .milliseconds(100))
+
+        let said = try await core.transcript(.init(agentID: id)).entries.compactMap { entry -> String? in
+            if case .userMessage(let text, _) = entry.kind { return text }
+            return nil
+        }
+        #expect(said == ["do the thing"])
+    }
+
+    // MARK: When they stop being shown
+
+    @Test func theyGoWhenTheNextPromptGoes() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        try await suggest(core, launcher, "Run the tests")
+        #expect(await core.agent(id)?.suggestedPrompts.isEmpty == false)
+        // Still there once the turn has ended: this is what the chips are for.
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await core.agent(id)?.suggestedPrompts.isEmpty == false)
+
+        try await core.prompt(.init(agentID: id, text: "something else entirely"))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await core.agent(id)?.suggestedPrompts.isEmpty == true)
+    }
+
+    /// They outlive the daemon, because the turn they came from does.
+    @Test func theyAreStillThereWhenTheRecordIsOpenedAgain() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await suggest(core, launcher, "Run the tests")
+        try await Task.sleep(for: .milliseconds(500))
+
+        let reopened = DaemonCore(store: try AgentStore(locations: locations),
+                                  locations: locations,
+                                  discovery: .findsEverything,
+                                  launcher: FakeLauncher())
+        await reopened.loadFromDisk()
+        #expect(await reopened.agent(id)?.suggestedPrompts.map(\.label) == ["Run the tests"])
+    }
+
+    // MARK: What it looks like in the app
+
+    /// Copilot asks permission before every tool call. Asking whether the app may show
+    /// the app's own suggestions is a question with nothing in it.
+    @Test func thePermissionForOurOwnToolIsAnsweredForYou() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.permission = [
+            "toolCall": ["toolCallId": "call-1", "title": "suggest_next_prompts",
+                         "name": "mcp__agents__suggest_next_prompts"],
+            "options": .array([
+                ["optionId": "allow", "name": "Allow", "kind": "allow_once"],
+                ["optionId": "reject", "name": "Reject", "kind": "reject_once"],
+            ]),
+        ]
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(300))
+
+        // Nothing was ever put in front of anybody, and the agent was not left waiting.
+        #expect(await core.pendingPermissionRequests().isEmpty)
+        #expect(await core.agent(id)?.state != .waitingOnUser)
+        let outcome = await launcher.lastAgent?.permissionOutcome
+        #expect(outcome?["outcome"]?["optionId"]?.stringValue == "allow")
+    }
+
+    /// Any other tool is still the user's to allow.
+    @Test func everyOtherToolIsStillAsked() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.permission = [
+            "toolCall": ["toolCallId": "call-1", "title": "Delete everything", "name": "rm_rf"],
+            "options": .array([["optionId": "allow", "name": "Allow", "kind": "allow_once"]]),
+        ]
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(await core.pendingPermissionRequests().count == 1)
+    }
+
+    /// The row above the prompt is what the call looks like. A line in the transcript
+    /// saying it happened would be the same thing twice.
+    @Test func theCallItselfIsNotDrawnInTheTranscript() {
+        let ours = ToolCall(toolCallID: "1", title: "suggest_next_prompts",
+                            name: "mcp__agents__suggest_next_prompts")
+        let theirs = ToolCall(toolCallID: "2", title: "Read a file", name: "read_file")
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .agentMessage(messageID: nil, text: "Done.", blocks: [])),
+            TranscriptEntry(kind: .toolCall(ours)),
+            TranscriptEntry(kind: .toolCall(theirs)),
+        ])
+        let drawn = items.compactMap { item -> [ToolCall]? in
+            if case .toolRun(_, let calls) = item { return calls }
+            return nil
+        }.flatMap { $0 }
+        #expect(drawn.map(\.name) == ["read_file"])
+    }
+}

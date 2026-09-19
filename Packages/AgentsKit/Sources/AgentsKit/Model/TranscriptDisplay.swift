@@ -40,6 +40,10 @@ extension TranscriptEntry {
         for entry in coalesced(entries) {
             switch entry.kind {
             case .toolCall(let call), .toolCallUpdate(let call):
+                // The app's own suggestion tool is not drawn. It is not hidden work:
+                // what it did is the row above the prompt, and a line here saying so
+                // would be the same thing said twice.
+                if call.isSuggestingPrompts { continue }
                 // An update is the same call further along, so it replaces the one
                 // already in the run rather than adding a line to it.
                 if let id = call.toolCallID, let existing = run.firstIndex(where: { $0.toolCallID == id }) {

@@ -248,7 +248,8 @@ final class AppModel {
         defer { isLoadingDraftOptions = false }
         do {
             let response = try await client.call(DaemonAPI.Method.agentsOptions,
-                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd),
+                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
+                                                                          mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
             draftID = response.draftID
             draftOptions = response.options.filter(\.isRenderable).sorted { $0.categoryRank < $1.categoryRank }

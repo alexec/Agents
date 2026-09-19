@@ -47,6 +47,13 @@ struct PromptBar: View {
                     MentionList(mentions: mentions, selected: selectedMention, choose: accept)
                         .transition(.opacity)
                 }
+                // Only while the field is empty. Half a typed thought is the answer to
+                // what was suggested, and shoving words in around it would be rude.
+                if let agent, !agent.suggestedPrompts.isEmpty, text.isEmpty,
+                   !isCompleting, !isMentioning {
+                    SuggestedPromptRow(prompts: agent.suggestedPrompts, choose: take)
+                        .transition(.opacity)
+                }
                 field
                 options
             }
@@ -540,6 +547,13 @@ struct PromptBar: View {
     private var willQueue: Bool {
         guard let agent else { return false }
         return agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
+    }
+
+    /// A suggestion goes into the field, not down the wire. The cursor lands after it
+    /// so the next thing typed carries on from the agent's words.
+    private func take(_ suggestion: SuggestedPrompt) {
+        text = suggestion.prompt
+        focused = true
     }
 
     private func send() {

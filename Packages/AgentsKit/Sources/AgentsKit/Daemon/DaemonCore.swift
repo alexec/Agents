@@ -23,6 +23,8 @@ public actor DaemonCore {
     var elicitations: [UUID: PendingElicitation] = [:]
     /// The commands we are running for each agent.
     var terminalServices: [UUID: TerminalService] = [:]
+    /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
+    var suggestionTokens: [String: UUID] = [:]
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
@@ -35,6 +37,11 @@ public actor DaemonCore {
         var cwd: URL
         var session: ACPSession
         var sessionID: String
+        /// What this session was made with. MCP servers are only read at `session/new`,
+        /// so a draft made before the user attached one cannot be used for it.
+        var mcpServers: [MCPServer]
+        /// Minted with the session, bound to the agent once the start makes one.
+        var suggestionToken: String
     }
 
     struct Pending: Sendable {
@@ -225,6 +232,12 @@ public actor DaemonCore {
 
         case .permissionRequested(var request):
             request.agentID = agentID
+            // Our own tool, answered by us. Nobody is asked whether the app may show
+            // the app's own suggestions.
+            if let option = autoAllowed(request) {
+                await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
+                return
+            }
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)
             await record(.permissionAsked(request), for: agentID)
             await move(agentID, on: .permissionAsked)
@@ -255,6 +268,9 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) {
         eventTasks.removeValue(forKey: agentID)?.cancel()
         live.removeValue(forKey: agentID)
+        // The MCP helper the runtime started dies with it. Its token stops working
+        // here at the same moment, rather than whenever that process gets round to it.
+        dropSuggestionTokens(for: agentID)
         // Nothing we started for this agent outlives it.
         Task { [weak self] in await self?.killTerminals(for: agentID) }
         Task { [store] in await store.closeTranscript(for: agentID) }

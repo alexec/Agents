@@ -24,6 +24,9 @@ public enum DaemonAPI {
         public static let agentsUnarchive = "agents/unarchive"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
+        /// Not the app's to call. This is how the MCP server we hand to every agent
+        /// gets what the agent passed it back to the agent's own record.
+        public static let agentsSuggestPrompts = "agents/suggestPrompts"
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
         public static let elicitationsAnswer = "elicitations/answer"
@@ -48,7 +51,23 @@ public enum DaemonAPI {
     public struct OptionsRequest: Codable, Sendable {
         public var runtimeID: String
         public var cwd: URL
-        public init(runtimeID: String, cwd: URL) { self.runtimeID = runtimeID; self.cwd = cwd }
+        /// The servers chosen so far. The draft session this makes is the one the
+        /// start that follows uses, and a server named after it was made would never
+        /// reach the runtime, so they are sent now and checked again at the start.
+        public var mcpServers: [MCPServer]
+
+        public init(runtimeID: String, cwd: URL, mcpServers: [MCPServer] = []) {
+            self.runtimeID = runtimeID
+            self.cwd = cwd
+            self.mcpServers = mcpServers
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            cwd = try c.decode(URL.self, forKey: .cwd)
+            mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
+        }
     }
 
     /// A session exists before the user has chosen anything, because the options are
@@ -157,6 +176,22 @@ public enum DaemonAPI {
         public init(agentID: UUID, promptID: UUID) {
             self.agentID = agentID
             self.promptID = promptID
+        }
+    }
+
+    /// What the MCP helper sends when an agent calls the suggestion tool.
+    ///
+    /// The token, not an agent id: the helper is a process the runtime started, and
+    /// anything on this Mac can reach the daemon's socket. A token the daemon minted
+    /// for one session is the only thing that says which agent this is, and it is
+    /// refused the moment that session is over.
+    public struct SuggestPromptsRequest: Codable, Sendable {
+        public var token: String
+        public var prompts: [SuggestedPrompt]
+
+        public init(token: String, prompts: [SuggestedPrompt]) {
+            self.token = token
+            self.prompts = prompts
         }
     }
 

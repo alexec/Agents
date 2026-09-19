@@ -63,6 +63,14 @@ which runtime it is.
   the app, or, where the runtime insists on a terminal, it hands over the exact command.
 - **Conversations the app did not start.** The runtime's own list, ready to be picked up,
   branched, or deleted with a confirmation.
+- **What to ask next.** When a turn ends the agent may offer a few things you might want
+  to say, shown as buttons above the prompt. Tapping one fills the prompt and leaves it
+  to you to send. ACP has no way to carry a suggestion, so the app serves the agent an
+  MCP server with one tool on it and attaches that to every session. Offering the tool
+  is not enough on its own — none of the three called it unasked — so the daemon adds a
+  line to each prompt asking for them. That line goes to the runtime and not into the
+  transcript, which still records what you said. Copilot has a follow-up feature of its
+  own and uses that instead.
 
 To check what each runtime advertises against what the app does with it:
 

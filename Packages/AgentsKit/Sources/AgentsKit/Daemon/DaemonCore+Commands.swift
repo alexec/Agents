@@ -9,10 +9,13 @@ extension DaemonCore {
     /// before the user has chosen anything. It is kept as a draft and used by the
     /// start that follows, so the runtime is started once and the user sees one dialog.
     public func options(_ request: DaemonAPI.OptionsRequest) async throws -> DaemonAPI.OptionsResponse {
-        let (session, sessionID, _) = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd)
+        let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
+                                          mcpServers: request.mcpServers)
         let draftID = UUID()
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
-                                session: session, sessionID: sessionID)
+                                session: made.session, sessionID: made.sessionID,
+                                mcpServers: request.mcpServers, suggestionToken: made.suggestionToken)
+        let session = made.session
         // The commands arrive as an update a moment after the session exists rather
         // than with it, so a new chat waits briefly for them. Half a second is the
         // difference between a prompt that knows what it takes and one that learns
@@ -29,12 +32,24 @@ extension DaemonCore {
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
         let session: ACPSession
         let sessionID: String
-        if let draftID = request.draftID, let draft = drafts.removeValue(forKey: draftID),
-           draft.runtimeID == request.runtimeID, draft.cwd == request.cwd {
+        let suggestionToken: String
+        // A draft is only usable if it was made with the servers this start names.
+        // They are read once, when the session is made, so reusing a session that
+        // never heard about a server would attach it in name only.
+        let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
+        if let draft, draft.runtimeID == request.runtimeID, draft.cwd == request.cwd,
+           draft.mcpServers == request.mcpServers {
             session = draft.session
             sessionID = draft.sessionID
+            suggestionToken = draft.suggestionToken
         } else {
-            (session, sessionID, _) = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd)
+            // A draft we cannot use is a runtime nobody is going to talk to.
+            if let draft { await draft.session.end(gracePeriod: .seconds(2)) }
+            let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
+                                              mcpServers: request.mcpServers)
+            session = made.session
+            sessionID = made.sessionID
+            suggestionToken = made.suggestionToken
         }
 
         var agent = Agent(runtimeID: request.runtimeID,
@@ -51,6 +66,9 @@ extension DaemonCore {
         agents[agent.id] = agent
         try await store.save(agent)
         live[agent.id] = session
+        // The runtime was given this token before the agent existed. Now it means
+        // something, and until this line a call carrying it is refused.
+        bindSuggestionToken(suggestionToken, to: agent.id)
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
@@ -63,9 +81,17 @@ extension DaemonCore {
         return agent.id
     }
 
+    struct MadeSession: Sendable {
+        var session: ACPSession
+        var sessionID: String
+        var runtime: Runtime
+        var suggestionToken: String
+    }
+
     /// A folder, a runtime, and a handshake. Everything that can go wrong here is
     /// something the user needs told rather than a log line.
-    private func freshSession(runtimeID: String, cwd: URL) async throws -> (ACPSession, String, Runtime) {
+    private func freshSession(runtimeID: String, cwd: URL,
+                              mcpServers: [MCPServer] = []) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -87,8 +113,11 @@ extension DaemonCore {
             // to have it is the case where making the session fails: what comes back
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
-            let result = try await session.newSession(cwd: cwd)
-            return (session, result.sessionId, runtime)
+            let token = mintSuggestionToken()
+            let result = try await session.newSession(cwd: cwd,
+                                                      mcpServers: mcpServers + [suggestionServer(token: token)])
+            return MadeSession(session: session, sessionID: result.sessionId,
+                               runtime: runtime, suggestionToken: token)
         } catch let error as JSONRPCError where error.isAuthRequired {
             markNeedsSignIn(runtimeID: runtimeID)
             // Not a fault. The runtime is there and needs signing in, which is
@@ -207,12 +236,18 @@ extension DaemonCore {
         let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         _ = try await session.initialize()
 
+        // A new process is a new MCP server, so a new token. The old one stopped
+        // working when the last process died.
+        let token = mintSuggestionToken()
+        let servers = agent.mcpServers + [suggestionServer(token: token)]
+        bindSuggestionToken(token, to: agent.id)
+
         var updated = agent
         if let sessionID = agent.runtimeSessionID {
             do {
                 try await session.continueSession(id: sessionID, cwd: agent.cwd,
                                                   additionalDirectories: agent.additionalDirectories,
-                                                  mcpServers: agent.mcpServers)
+                                                  mcpServers: servers)
                 await record(.runtimeNote("Picked the conversation back up."), for: agent.id)
             } catch {
                 // The runtime no longer has it. The agent is not lost: it carries on as
@@ -221,13 +256,13 @@ extension DaemonCore {
                              for: agent.id)
                 let result = try await session.newSession(cwd: agent.cwd,
                                                           additionalDirectories: agent.additionalDirectories,
-                                                          mcpServers: agent.mcpServers)
+                                                          mcpServers: servers)
                 updated.runtimeSessionID = result.sessionId
             }
         } else {
             let result = try await session.newSession(cwd: agent.cwd,
                                                       additionalDirectories: agent.additionalDirectories,
-                                                      mcpServers: agent.mcpServers)
+                                                      mcpServers: servers)
             updated.runtimeSessionID = result.sessionId
         }
         updated.advertisedOptions = await session.options
@@ -245,14 +280,21 @@ extension DaemonCore {
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
                    session: ACPSession) async {
         let blocks = blocks ?? [.text(text)]
+        // Whatever was suggested has been answered now, by being taken or by being
+        // typed past. Either way it is about the turn before this one.
+        clearSuggestions(for: agentID)
         // The text is kept beside the blocks so the record reads the way it always has.
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : []), for: agentID)
         await move(agentID, on: .promptSent)
         turnTasks[agentID]?.cancel()
+        // What goes to the runtime is the user's words and one line of ours. The
+        // record above is the user's words alone: the transcript says what was said,
+        // not what we added to it.
+        let outgoing = blocks + [.text(SuggestionService.askForSuggestions)]
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await session.prompt(blocks)
+                let result = try await session.prompt(outgoing)
                 await self.finishTurn(agentID: agentID, result: result)
             } catch {
                 await self.turnFailed(agentID: agentID, error: error)

@@ -104,6 +104,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
 
+            case DaemonAPI.Method.agentsSuggestPrompts:
+                let request = try require(params, as: DaemonAPI.SuggestPromptsRequest.self)
+                return .success(["note": .string(try await suggestPrompts(request))])
+
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))
 
