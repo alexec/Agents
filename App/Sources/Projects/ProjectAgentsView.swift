@@ -1,0 +1,195 @@
+import AgentsKit
+import SwiftUI
+
+/// The project itself, filling the page: its name, somewhere to say what you want done,
+/// and the agents working on it.
+///
+/// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
+/// options, the folders and servers, attachments, dictation, the lot. On a project page
+/// it is in the same mode it is in for a new chat, with the folder already set to this
+/// project, so saying what you want done starts an agent here and takes you into it.
+///
+/// Everything sits in the same 144pt gutter the transcript and prompt bar use, so the
+/// page and a conversation are the same width.
+struct ProjectAgentsView: View {
+    @Environment(AppModel.self) private var model
+    @Binding var selection: UUID?
+
+    @AppStorage("showsArchivedAgents") private var showsArchived = false
+    /// How many archived agents are shown. Raised ten at a time, in the view, because
+    /// this window already holds every one of them.
+    @State private var archivedShown = Self.pageSize
+    static let pageSize = 10
+    static let gutter: CGFloat = 144
+    static let cardSpacing: CGFloat = 10
+
+    private var folder: URL? { model.selectedProject }
+    private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                heading
+                // Its own margins, the same as in a chat, so it is not padded twice.
+                // The folder is this project's and not the bar's to change.
+                PromptBar(folderIsFixed: true)
+                agents
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .navigationTitle(summary?.name ?? "Project")
+        .onAppear { adopt(folder) }
+        .onChange(of: folder) { _, folder in
+            archivedShown = Self.pageSize
+            adopt(folder)
+        }
+    }
+
+    /// Point the prompt at this project, so what you type starts an agent here.
+    private func adopt(_ folder: URL?) {
+        guard let folder, model.draftCwd != folder else { return }
+        model.draftCwd = folder
+        Task { await model.loadDraftOptions() }
+    }
+
+    /// Just the name.
+    ///
+    /// The path used to sit under it. The prompt below carries the folder already, and
+    /// saying where the project is twice on one screen is saying it once too often.
+    /// What is left here is the one case where the folder is news: it has gone.
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(summary?.name ?? "Project")
+                .font(.largeTitle.weight(.semibold))
+                .lineLimit(1)
+            if let summary, !summary.exists {
+                Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(Color.red)
+                    .lineLimit(1)
+                    .help(summary.folder.path)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.gutter)
+        .padding(.top, 28)
+    }
+
+    /// Everything working on this project, each one a card you can go into.
+    ///
+    /// One `GlassEffectContainer` around the lot, so the cards blend with each other
+    /// rather than each carrying its own separate render.
+    private var agents: some View {
+        GlassEffectContainer(spacing: Self.cardSpacing) {
+            LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
+                ForEach(AgentGroup.live, id: \.self) { group in
+                    let agents = model.agents(in: folder, group: group)
+                    if !agents.isEmpty {
+                        GroupHeading(title: group.title, count: agents.count)
+                        ForEach(agents) { agent in
+                            AgentCard(id: agent.id, selection: $selection) {
+                                AgentRow(agent: agent)
+                            }
+                        }
+                    }
+                }
+
+                archivedSection
+
+                if isEmpty {
+                    Text("Nothing here yet. Say what you want done and an agent starts on it.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                }
+            }
+            .padding(.horizontal, Self.gutter)
+            .padding(.bottom, 28)
+        }
+        .animation(.default, value: model.agents.map(\.state))
+    }
+
+    private var isEmpty: Bool {
+        folder != nil && AgentGroup.allCases.allSatisfy { model.agents(in: folder, group: $0).isEmpty }
+    }
+
+    private var archived: [Agent] {
+        model.agents(in: folder, group: .archived)
+    }
+
+    /// Out of the way until it is wanted, because looking at what you archived is a
+    /// rare thing to want.
+    @ViewBuilder
+    private var archivedSection: some View {
+        if showsArchived {
+            GroupHeading(title: "Archived", count: archived.count)
+            if archived.isEmpty {
+                Text("Nothing archived in this project yet.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(archived.prefix(archivedShown)) { agent in
+                    AgentCard(id: agent.id, selection: $selection) {
+                        AgentRow(agent: agent)
+                    }
+                }
+                if archived.count > archivedShown {
+                    Button("Show more") { archivedShown += Self.pageSize }
+                        .buttonStyle(.glass)
+                }
+            }
+            Button("Hide archived") { showsArchived = false }
+                .buttonStyle(.glass)
+                .padding(.top, 2)
+        } else if folder != nil, !archived.isEmpty {
+            Button("Show archived (\(archived.count))") { showsArchived = true }
+                .buttonStyle(.glass)
+                .padding(.top, 8)
+        }
+    }
+}
+
+/// One agent, as a card you can go into.
+///
+/// It is a real control — the whole card opens that conversation — which is what
+/// earns it interactive glass rather than a decorated background.
+private struct AgentCard<Content: View>: View {
+    let id: UUID
+    @Binding var selection: UUID?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Button {
+            selection = id
+        } label: {
+            content
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// What the cards under it have in common, and how many there are.
+private struct GroupHeading: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text("\(count)")
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.top, 14)
+        .padding(.leading, 2)
+        .accessibilityAddTraits(.isHeader)
+    }
+}

@@ -1,5 +1,10 @@
 # Quickstart: proving Projects, not agents
 
+> **The project lead was removed on 2026-09-19.** Sections below that describe a lead agent, its
+> tools, its guards or its permission handling record a design that was built and then taken out
+> again, before the layout it sat on had settled. They are kept as the reasoning for when it comes
+> back. Nothing they describe is in the code.
+
 Three scenarios, one per user story, in priority order. Each is a thing to do with your hands and
 what should happen. The tests that carry the parts hands cannot reach are named where they belong.
 

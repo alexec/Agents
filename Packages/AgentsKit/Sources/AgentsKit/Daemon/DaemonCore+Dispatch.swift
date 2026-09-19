@@ -9,6 +9,23 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.projectsList:
+                let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    allProjects(includeArchived: request.includeArchived)))
+
+            case DaemonAPI.Method.projectsAdd:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await addProject(request.folder)))
+
+            case DaemonAPI.Method.projectsArchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await archiveProject(request.folder)))
+
+            case DaemonAPI.Method.projectsUnarchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 

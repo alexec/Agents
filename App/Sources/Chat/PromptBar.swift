@@ -9,6 +9,11 @@ import UniformTypeIdentifiers
 /// it, which is why this is one view rather than a start form and a composer.
 struct PromptBar: View {
     @Environment(AppModel.self) private var model
+    /// Whether the folder is the caller's to decide rather than this bar's.
+    ///
+    /// Set on a project page, where the folder is the project and changing it would
+    /// start the agent under a different one.
+    var folderIsFixed = false
     @State private var text = ""
     @State private var dictation = Dictation()
     @State private var selectedCommand = 0
@@ -149,7 +154,7 @@ struct PromptBar: View {
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
-                        Image(systemName: "folder")
+                        Image(systemName: folderIsFixed ? "folder.fill" : "folder")
                         // The folder's own name. The path it sits under is rarely the
                         // thing you are checking, and it is in the tooltip when it is.
                         Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
@@ -158,7 +163,11 @@ struct PromptBar: View {
                 }
                 .buttonStyle(.glass)
                 .font(.footnote)
-                .help(model.draftCwd.map { "Folder: \($0.path(percentEncoded: false))" } ?? "Folder")
+                // On a project page the folder is the project. Changing it there would
+                // start the agent somewhere else and file it under a different project,
+                // which is not something a prompt on this page should be able to do.
+                .disabled(folderIsFixed)
+                .help(folderHelp)
 
                 Spacer(minLength: 8)
 
@@ -625,6 +634,14 @@ struct PromptBar: View {
                 await model.send(outgoing, attachments: going)
             }
         }
+    }
+
+    /// What the folder chip says when you hover it. On a project page it says why it
+    /// cannot be pressed, rather than looking broken.
+    private var folderHelp: String {
+        guard let cwd = model.draftCwd else { return "Folder" }
+        let path = cwd.path(percentEncoded: false)
+        return folderIsFixed ? "This project's folder: \(path)" : "Folder: \(path)"
     }
 
     /// What an agent can reach beyond its own folder, said in the control itself.

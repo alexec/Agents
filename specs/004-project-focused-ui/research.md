@@ -153,6 +153,11 @@ at is not that. This also keeps two windows independent, which they are today.
 
 ## Clarification session 2026-09-18: the project lead
 
+> **The project lead was removed on 2026-09-19.** Sections below that describe a lead agent, its
+> tools, its guards or its permission handling record a design that was built and then taken out
+> again, before the layout it sat on had settled. They are kept as the reasoning for when it comes
+> back. Nothing they describe is in the code.
+
 Five answers turned a layout feature into one that also lets an agent act on other agents. Five more
 findings, checked the same way.
 

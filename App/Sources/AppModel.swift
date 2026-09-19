@@ -26,6 +26,27 @@ final class AppModel {
     private(set) var isConnected = false
     private(set) var problem: String?
 
+    /// The folders the work happens in. Worked out by the daemon, so two windows agree
+    /// about which projects exist and which of them want the user.
+    private(set) var projects: [DaemonAPI.ProjectSummary] = []
+
+    /// Which project this window is looking at.
+    ///
+    /// Kept here and in `UserDefaults` rather than in the daemon: the daemon owns what
+    /// is true about the work, and which of it somebody happens to be reading is not
+    /// that. It is also what keeps two windows independent.
+    var selectedProject: URL? {
+        didSet {
+            guard selectedProject != oldValue else { return }
+            UserDefaults.standard.set(selectedProject?.path, forKey: Self.selectedProjectKey)
+            // Picking a project shows the project, not a conversation. A chat is
+            // something you go into from here, and come back out of.
+            selection = nil
+        }
+    }
+
+    static let selectedProjectKey = "selectedProjectFolder"
+
     var selection: UUID? {
         didSet {
             guard selection != oldValue else { return }
@@ -89,6 +110,101 @@ final class AppModel {
         runtimes.filter { $0.availability.isAvailable }
     }
 
+    // MARK: Projects
+
+    /// The ones the sidebar lists.
+    var liveProjects: [DaemonAPI.ProjectSummary] {
+        projects.filter { !$0.project.isArchived }
+    }
+
+    var archivedProjects: [DaemonAPI.ProjectSummary] {
+        projects.filter { $0.project.isArchived }
+    }
+
+    var selectedProjectSummary: DaemonAPI.ProjectSummary? {
+        guard let selectedProject else { return nil }
+        return projects.first { $0.folder == selectedProject }
+    }
+
+    /// A project's agents in one group, newest first.
+    ///
+    /// Filtered from the agents this window already holds, so no call is made and the
+    /// archived list's "show more" is a number in a view rather than a fetch.
+    func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
+        guard let folder else { return [] }
+        return agents
+            .filter { Project.standardize($0.cwd) == folder && $0.group == group }
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    func refreshProjects() async {
+        do {
+            projects = try await client.call(DaemonAPI.Method.projectsList,
+                                             DaemonAPI.ProjectsListRequest(),
+                                             returning: [DaemonAPI.ProjectSummary].self)
+            settleProjectSelection()
+        } catch {
+            // A list that failed is not worth an alert: the notification that follows
+            // the next change will bring it back.
+        }
+    }
+
+    /// Pick a project when there is none, or when the one we had has gone or been
+    /// archived. Falls back to the most recently active, which is what the sidebar
+    /// puts at the top.
+    private func settleProjectSelection() {
+        let live = liveProjects
+        if let selectedProject, live.contains(where: { $0.folder == selectedProject }) { return }
+        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectKey)
+            .map { Project.standardize(URL(filePath: $0)) }
+        if let stored, live.contains(where: { $0.folder == stored }) {
+            selectedProject = stored
+        } else {
+            selectedProject = live.first?.folder
+        }
+    }
+
+    func addProject(_ folder: URL) async {
+        await callProject(DaemonAPI.Method.projectsAdd, folder) { [weak self] summary in
+            self?.selectedProject = summary.folder
+        }
+    }
+
+    func archiveProject(_ folder: URL) async {
+        await callProject(DaemonAPI.Method.projectsArchive, folder)
+    }
+
+    func unarchiveProject(_ folder: URL) async {
+        await callProject(DaemonAPI.Method.projectsUnarchive, folder) { [weak self] summary in
+            self?.selectedProject = summary.folder
+        }
+    }
+
+    private func callProject(_ method: String, _ folder: URL,
+                             then: ((DaemonAPI.ProjectSummary) -> Void)? = nil) async {
+        do {
+            let summary = try await client.call(method, DaemonAPI.ProjectRequest(folder: folder),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            upsert(summary)
+            then?(summary)
+            settleProjectSelection()
+        } catch {
+            // A refusal here is the daemon naming the agents to stop, which is exactly
+            // what the user needs to read.
+            problem = describe(error)
+        }
+    }
+
+    func upsert(_ summary: DaemonAPI.ProjectSummary) {
+        if let index = projects.firstIndex(where: { $0.folder == summary.folder }) {
+            projects[index] = summary
+        } else {
+            projects.append(summary)
+        }
+        projects.sort { $0.lastActivityAt > $1.lastActivityAt }
+        settleProjectSelection()
+    }
+
     // MARK: Connecting
 
     /// The daemon exits when it has nothing in hand and nobody watching, so a window
@@ -134,6 +250,10 @@ final class AppModel {
         case DaemonAPI.Notification.agentChanged:
             guard let agent = try? params?.decode(Agent.self) else { return }
             upsert(agent)
+
+        case DaemonAPI.Notification.projectChanged:
+            guard let summary = try? params?.decode(DaemonAPI.ProjectSummary.self) else { return }
+            upsert(summary)
 
         case DaemonAPI.Notification.agentEntry:
             guard let entry = try? params?.decode(DaemonAPI.EntryNotification.self) else { return }
@@ -193,6 +313,9 @@ final class AppModel {
 
     func refreshEverything() async {
         await refreshAgents()
+        // After the agents, because a project's counts are worked out from them and a
+        // sidebar drawn before them would say every project is empty.
+        await refreshProjects()
         await refreshRuntimes()
         await refreshAccounts()
         await refreshPermissions()
@@ -308,10 +431,14 @@ final class AppModel {
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers)
         do {
-            let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            _ = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
             await refreshAgents()
-            selection = id
+            await refreshProjects()
+            // Deliberately not selected. Saying what you want done is not the same as
+            // asking to watch it: the agent appears in the project's list and you stay
+            // where you were, free to say the next thing. Starting three pieces of work
+            // in a row should not mean coming back twice.
         } catch {
             problem = describe(error)
         }
@@ -327,6 +454,34 @@ final class AppModel {
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
         }
+    }
+
+    /// Start an agent on this, in this project's folder.
+    ///
+    /// What the prompt at the top of a project does. There is no separate button for
+    /// it because there is nothing else the prompt could mean: you are looking at a
+    /// folder and saying what you want done in it.
+    func startAgent(in folder: URL, prompt: String) async {
+        let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty, let runtimeID = defaultRuntimeID else { return }
+        await attempt {
+            let id = try await self.client.call(
+                DaemonAPI.Method.agentsStart,
+                DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words),
+                returning: UUID.self)
+            self.selection = id
+        }
+    }
+
+    /// Which runtime a new agent gets when nobody has said.
+    ///
+    /// Whatever the last agent used, when it is still available, because that is the
+    /// one already chosen in every other sense. It can be changed from the chat.
+    var defaultRuntimeID: String? {
+        let available = Set(availableRuntimes.map(\.runtime.id))
+        let recent = agents.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            .first { available.contains($0.runtimeID) }?.runtimeID
+        return recent ?? available.first
     }
 
     /// Take something back off the queue before it goes.
