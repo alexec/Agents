@@ -495,6 +495,32 @@ struct DaemonSlashCommandTests {
         #expect(agent?.availableCommands.last?.inputHint == "directory")
     }
 
+    @Test func aPickedUpAgentKeepsTheCommandsItsNewRuntimeDoesNotRepeat() async throws {
+        let (locations, work) = try temporary()
+        var advertises = FakeACPAgent.Script()
+        advertises.updates = [commandsUpdate]
+        // The first runtime says what it takes; the second says nothing, which is what a
+        // real one does when a session is loaded rather than made — the list was sent
+        // once, into the session this one is picking up. FakeLauncher hands out `then`
+        // first and falls back to `script`, so this is that order.
+        let launcher = FakeLauncher(script: FakeACPAgent.Script(), then: [advertises])
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher)
+
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        await eventually("the commands arrived") {
+            await core.agent(id)?.availableCommands.map(\.name) == ["review", "add-dir"]
+        }
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await eventually("its runtime was handed back") { await core.live[id] == nil }
+
+        try await core.prompt(.init(agentID: id, text: "again"))
+        await eventually("the second turn ended") { await core.agent(id)?.state == .finished }
+        #expect(launcher.launchCount == 2, "a second runtime was started for it")
+        #expect(await core.agent(id)?.availableCommands.map(\.name) == ["review", "add-dir"],
+                "what it takes is still on the record, rather than wiped by a runtime that said nothing")
+    }
+
     @Test func theyAreKeptOnTheRecordForAnAgentWithNoProcessLeft() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
