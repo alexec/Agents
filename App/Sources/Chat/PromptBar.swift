@@ -45,15 +45,24 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
+                // Both of these are settled once the agent exists, so they are
+                // labels rather than controls. They still sit on glass: the
+                // transcript scrolls under this row.
                 Label(agent.cwd.lastPathComponent, systemImage: "folder")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassEffect(.regular, in: Capsule())
                     .help(agent.cwd.path(percentEncoded: false))
                 Spacer(minLength: 8)
                 Text(runtimeName(agent.runtimeID))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassEffect(.regular, in: Capsule())
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {

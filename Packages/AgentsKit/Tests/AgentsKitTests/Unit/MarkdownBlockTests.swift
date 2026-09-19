@@ -55,9 +55,57 @@ struct MarkdownBlockTests {
 
     @Test func nothingIsLost() {
         // Whatever it does not understand stays as text rather than vanishing.
-        let odd = "| a | b |\n|---|---|\n| 1 | 2 |"
+        let odd = "<details><summary>a</summary>\n\nbody\n</details>"
         let blocks = MarkdownBlock.parse(odd)
-        #expect(blocks.count == 1)
-        if case .paragraph(let text) = blocks[0] { #expect(text.contains("| 1 | 2 |")) }
+        #expect(blocks.contains(.paragraph("<details><summary>a</summary>")))
+        #expect(blocks.contains(.paragraph("body\n</details>")))
+    }
+
+    // MARK: GitHub tables
+
+    @Test func aTableIsReadAsATable() {
+        let blocks = MarkdownBlock.parse("| Runtime | Ready |\n|---|---|\n| claude | yes |\n| grok | no |")
+        #expect(blocks == [.table(.init(header: ["Runtime", "Ready"],
+                                        columns: [.leading, .leading],
+                                        rows: [["claude", "yes"], ["grok", "no"]]))])
+    }
+
+    @Test func theDashesSayHowColumnsLineUp() {
+        let blocks = MarkdownBlock.parse("a | b | c\n:--- | :---: | ---:\n1 | 2 | 3")
+        guard case .table(let table) = blocks.first else { Issue.record("not a table"); return }
+        #expect(table.columns == [.leading, .centre, .trailing])
+        #expect(table.header == ["a", "b", "c"])
+        #expect(table.rows == [["1", "2", "3"]])
+    }
+
+    @Test func aRaggedRowIsMadeRectangular() {
+        // GitHub pads the short row and drops what runs over.
+        let blocks = MarkdownBlock.parse("| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |")
+        guard case .table(let table) = blocks.first else { Issue.record("not a table"); return }
+        #expect(table.rows == [["1", ""], ["1", "2"]])
+    }
+
+    @Test func anEscapedPipeStaysInTheCell() {
+        let blocks = MarkdownBlock.parse("| a |\n|---|\n| one \\| two |")
+        guard case .table(let table) = blocks.first else { Issue.record("not a table"); return }
+        #expect(table.rows == [["one | two"]])
+    }
+
+    @Test func pipesWithoutDashesUnderThemAreJustText() {
+        // A line of prose with a pipe in it is not the start of a table.
+        let blocks = MarkdownBlock.parse("run `a | b` to see")
+        #expect(blocks == [.paragraph("run `a | b` to see")])
+    }
+
+    @Test func aTableEndsAtTheBlankLineAfterIt() {
+        let blocks = MarkdownBlock.parse("| a |\n|---|\n| 1 |\n\nAfter.")
+        #expect(blocks.count == 2)
+        #expect(blocks.last == .paragraph("After."))
+    }
+
+    @Test func aTableCanFollowAParagraph() {
+        let blocks = MarkdownBlock.parse("Here:\n| a |\n|---|\n| 1 |")
+        #expect(blocks.first == .paragraph("Here:"))
+        #expect(blocks.count == 2)
     }
 }

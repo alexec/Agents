@@ -8,6 +8,8 @@ import SwiftUI
 struct Transcript: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
+    /// How much of the foot of the pane the floating prompt covers.
+    var bottomInset: CGFloat = 0
     @State private var expandedRuns: Set<UUID> = []
 
     var body: some View {
@@ -28,6 +30,7 @@ struct Transcript: View {
                 .padding(.vertical, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .contentMargins(.bottom, bottomInset, for: .scrollContent)
             .onChange(of: model.entries.count) {
                 withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
             }

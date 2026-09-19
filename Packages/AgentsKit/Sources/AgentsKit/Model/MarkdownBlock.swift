@@ -12,7 +12,26 @@ public enum MarkdownBlock: Hashable, Sendable, Identifiable {
     case numbered([String])
     case quote(String)
     case code(language: String?, text: String)
+    case table(Table)
     case rule
+
+    /// A GitHub-flavoured table: a header row, a row of dashes that says how each
+    /// column lines up, and the rows under it.
+    public struct Table: Hashable, Sendable {
+        public enum Column: String, Hashable, Sendable {
+            case leading, centre, trailing
+        }
+
+        public var header: [String]
+        public var columns: [Column]
+        public var rows: [[String]]
+
+        public init(header: [String], columns: [Column], rows: [[String]]) {
+            self.header = header
+            self.columns = columns
+            self.rows = rows
+        }
+    }
 
     public var id: String {
         switch self {
@@ -22,6 +41,9 @@ public enum MarkdownBlock: Hashable, Sendable, Identifiable {
         case .numbered(let items): return "ol:\(items.joined(separator: "\u{1}"))"
         case .quote(let text): return "q:\(text)"
         case .code(let language, let text): return "c:\(language ?? ""):\(text)"
+        case .table(let table):
+            let body = table.rows.map { $0.joined(separator: "\u{1}") }.joined(separator: "\u{2}")
+            return "t:\(table.header.joined(separator: "\u{1}"))\u{2}\(body)"
         case .rule: return "hr"
         }
     }
@@ -29,8 +51,8 @@ public enum MarkdownBlock: Hashable, Sendable, Identifiable {
     /// Read markdown into blocks.
     ///
     /// Deliberately small. It handles what agents actually send: fenced code, which is
-    /// most of it, headings, lists, quotes and paragraphs. Anything it does not know
-    /// stays as text rather than disappearing.
+    /// most of it, headings, lists, quotes, GitHub tables and paragraphs. Anything it
+    /// does not know stays as text rather than disappearing.
     public static func parse(_ markdown: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         var paragraph: [String] = []
@@ -69,6 +91,24 @@ public enum MarkdownBlock: Hashable, Sendable, Identifiable {
             }
 
             if trimmed.isEmpty { flush(); continue }
+
+            // A table is only a table once the dashes under it say so, which is why
+            // this has to look at the next line before it commits.
+            if let header = trimmed.tableCells,
+               let below = lines.first?.trimmingCharacters(in: .whitespaces),
+               let columns = below.tableColumns,
+               columns.count == header.count {
+                flush()
+                lines = lines.dropFirst() // the dashes
+                var rows: [[String]] = []
+                while let next = lines.first?.trimmingCharacters(in: .whitespaces),
+                      let cells = next.tableCells {
+                    rows.append(cells.fitted(to: header.count))
+                    lines = lines.dropFirst()
+                }
+                blocks.append(.table(Table(header: header, columns: columns, rows: rows)))
+                continue
+            }
 
             if trimmed == "---" || trimmed == "***" || trimmed == "___" {
                 flush()
@@ -111,6 +151,16 @@ public enum MarkdownBlock: Hashable, Sendable, Identifiable {
     }
 }
 
+private extension Array where Element == String {
+    /// GitHub pads a short row and throws away a long one's extra cells, so that a
+    /// ragged table still draws as a rectangle.
+    func fitted(to count: Int) -> [String] {
+        if self.count == count { return self }
+        if self.count > count { return Array(prefix(count)) }
+        return self + Array(repeating: "", count: count - self.count)
+    }
+}
+
 private extension String {
     /// `### Heading` and how deep it is.
     func firstMatch(ofHashes: Void) -> (level: Int, text: String)? {
@@ -134,5 +184,50 @@ private extension String {
         let rest = dropFirst(digits.count)
         guard rest.hasPrefix(". ") else { return nil }
         return String(rest.dropFirst(2))
+    }
+
+    /// The cells of one table row. The outer pipes are optional, a `\|` is a pipe in
+    /// the text rather than a wall, and a line with no pipe at all is not a row.
+    var tableCells: [String]? {
+        guard contains("|") else { return nil }
+        let characters = Array(self)
+        var cells: [String] = []
+        var current = ""
+        var index = 0
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\\", index + 1 < characters.count, characters[index + 1] == "|" {
+                current.append("|")
+                index += 2
+                continue
+            }
+            if character == "|" {
+                cells.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+            index += 1
+        }
+        cells.append(current)
+        if hasPrefix("|") { cells.removeFirst() }
+        if hasSuffix("|"), cells.count > 1 { cells.removeLast() }
+        guard !cells.isEmpty else { return nil }
+        return cells.map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// `|:---|---:|:---:|` read as how each column lines up, or nil if this is some
+    /// other line that happens to have a pipe in it.
+    var tableColumns: [MarkdownBlock.Table.Column]? {
+        guard let cells = tableCells else { return nil }
+        var columns: [MarkdownBlock.Table.Column] = []
+        for cell in cells {
+            let left = cell.hasPrefix(":")
+            let right = cell.hasSuffix(":")
+            let dashes = cell.trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+            guard !dashes.isEmpty, dashes.allSatisfy({ $0 == "-" }) else { return nil }
+            columns.append(left && right ? .centre : right ? .trailing : .leading)
+        }
+        return columns
     }
 }
