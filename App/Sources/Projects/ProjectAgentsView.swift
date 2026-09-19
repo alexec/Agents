@@ -1,12 +1,15 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself: its name, somewhere to say what you want done, and everything
-/// working on it.
+/// The project itself, filling the page: its name, somewhere to say what you want done,
+/// and everything working on it.
 ///
 /// The prompt is at the top because it is how work starts here. You describe the
 /// outcome, the project's lead takes it, and the agents it starts appear in the lists
 /// below. That is why there is no button for starting one by hand any more.
+///
+/// Picking an agent goes into its conversation, and the back button comes out again. A
+/// chat is somewhere you visit from a project rather than a column beside it.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
@@ -52,7 +55,7 @@ struct ProjectAgentsView: View {
 
             archivedSection
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
         .animation(.default, value: model.agents.map(\.state))
     }
 

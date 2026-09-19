@@ -12,34 +12,44 @@ struct ContentView: View {
     /// belongs to it now. The sidebar button brings it back when you want another.
     @State private var columns = NavigationSplitViewVisibility.all
 
+    /// The agent being read, as a path of nothing or one.
+    ///
+    /// A chat is somewhere you go from the project and come back out of, rather than a
+    /// column sitting beside it, so it is a push and the back button is the way home.
+    private var openAgent: Binding<[UUID]> {
+        Binding(get: { model.selection.map { [$0] } ?? [] },
+                set: { model.selection = $0.last })
+    }
+
     var body: some View {
         @Bindable var model = model
         GeometryReader { window in
-            // Three columns: the folders, the project itself, and the conversation.
+            // Two columns: the projects, and the project.
             NavigationSplitView(columnVisibility: $columns) {
                 ProjectListView(selection: $model.selectedProject)
                     .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-            } content: {
-                ProjectAgentsView(selection: $model.selection)
-                    .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
             } detail: {
-                HStack(spacing: 0) {
-                    // One view either way: a new chat turns into the chat rather than
-                    // being replaced by it.
-                    ChatView()
-                        .frame(maxWidth: .infinity)
-                    // Closed means absent, not hidden. Nothing of the sidebar runs
-                    // while it is shut: no folder watch, no web view, no shell
-                    // attached (FR-006, SC-009).
-                    if frame.isOpen, SidebarFrame.fits(inWindowOf: window.size.width) {
-                        SidebarView(windowWidth: window.size.width)
-                            .transition(.move(edge: .trailing))
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        SidebarToggle(windowWidth: window.size.width)
-                    }
+                NavigationStack(path: openAgent) {
+                    ProjectAgentsView(selection: $model.selection)
+                        .navigationDestination(for: UUID.self) { _ in
+                            HStack(spacing: 0) {
+                                ChatView()
+                                    .frame(maxWidth: .infinity)
+                                // Closed means absent, not hidden. Nothing of the
+                                // sidebar runs while it is shut: no folder watch, no
+                                // web view, no shell attached (FR-006, SC-009).
+                                if frame.isOpen,
+                                   SidebarFrame.fits(inWindowOf: window.size.width) {
+                                    SidebarView(windowWidth: window.size.width)
+                                        .transition(.move(edge: .trailing))
+                                }
+                            }
+                            .toolbar {
+                                ToolbarItem(placement: .primaryAction) {
+                                    SidebarToggle(windowWidth: window.size.width)
+                                }
+                            }
+                        }
                 }
             }
         }
@@ -49,7 +59,7 @@ struct ContentView: View {
         // Choosing a project is the end of needing the list of them.
         .onChange(of: model.selectedProject) { _, folder in
             guard folder != nil else { return }
-            withAnimation { columns = .doubleColumn }
+            withAnimation { columns = .detailOnly }
         }
         .task { await model.connect() }
         .alert("That did not work",

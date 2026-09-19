@@ -39,8 +39,9 @@ final class AppModel {
         didSet {
             guard selectedProject != oldValue else { return }
             UserDefaults.standard.set(selectedProject?.path, forKey: Self.selectedProjectKey)
-            // Picking a folder opens the conversation about that folder.
-            if let lead = lead(of: selectedProject) { selection = lead.id }
+            // Picking a project shows the project, not a conversation. A chat is
+            // something you go into from here, and come back out of.
+            selection = nil
         }
     }
 
