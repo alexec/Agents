@@ -48,6 +48,24 @@ struct ElicitationSchemaTests {
         #expect(property.problem(with: .string("blue")) == "Not one of the choices")
     }
 
+    /// A titled option names its value `const`, not `value`, and carries the sentence
+    /// that says what picking it means. Reading it as `value` left the field a text box.
+    @Test func aTitledChoiceIsReadFromItsConst() throws {
+        let schema = try #require(schema(["colour": ["type": "string",
+                                                     "oneOf": [["const": "red", "title": "Red",
+                                                                "description": "Like a tomato"],
+                                                               ["const": "green", "title": "Green"]]]]))
+        let property = try #require(schema.properties.first)
+        guard case .string(_, _, _, let choices) = property.kind, let choices else {
+            Issue.record("expected choices")
+            return
+        }
+        #expect(choices.map(\.value) == ["red", "green"])
+        #expect(choices.first?.title == "Red")
+        #expect(choices.first?.description == "Like a tomato")
+        #expect(property.problem(with: .string("blue")) == "Not one of the choices")
+    }
+
     @Test func aMultiSelectIsCountedAndChecked() throws {
         let schema = try #require(schema(["tags": ["type": "array",
                                                    "items": ["enum": ["a", "b", "c"]],
@@ -57,6 +75,23 @@ struct ElicitationSchemaTests {
         #expect(property.problem(with: .array([.string("a"), .string("b"), .string("c")])) == "Choose at most 2")
         #expect(property.problem(with: .array([.string("z")])) == "Not one of the choices")
         #expect(property.problem(with: .array([.string("a")])) == nil)
+    }
+
+    /// Titled multi-select choices hang off `items.anyOf`. Looking only under
+    /// `items.enum` made the property undrawable, and one undrawable property declines
+    /// the whole form.
+    @Test func aTitledMultiSelectIsReadFromItsAnyOf() throws {
+        let schema = try #require(schema(["tags": ["type": "array",
+                                                   "items": ["anyOf": [["const": "a", "title": "Ay"],
+                                                                        ["const": "b", "title": "Bee"]]]]]))
+        let property = try #require(schema.properties.first)
+        guard case .multiSelect(let items, _, _) = property.kind else {
+            Issue.record("expected a multi-select")
+            return
+        }
+        #expect(items.map(\.value) == ["a", "b"])
+        #expect(items.first?.title == "Ay")
+        #expect(property.problem(with: .array([.string("z")])) == "Not one of the choices")
     }
 
     @Test func somethingRequiredIsMissedWhenItIsMissing() throws {
@@ -79,22 +114,33 @@ struct ElicitationSchemaTests {
 
     @Test func aRequestIsEitherAFormOrALink() {
         let agentID = UUID()
-        let form = ElicitationRequest(wire: ["schema": ["properties": ["a": ["type": "string"]]]],
+        let form = ElicitationRequest(wire: ["message": "Which one?",
+                                             "requestedSchema": ["properties": ["a": ["type": "string"]]]],
                                       agentID: agentID)
         guard case .form? = form?.mode else {
             Issue.record("expected a form")
             return
         }
+        // The question itself lives in `message`: a one-question form names no field.
+        #expect(form?.message == "Which one?")
+        #expect(form?.title == "Which one?")
         let link = ElicitationRequest(wire: ["url": "https://example.com/authorise",
-                                             "description": "Say yes over there"],
+                                             "message": "Say yes over there"],
                                       agentID: agentID)
-        guard case .url(let url, let description)? = link?.mode else {
+        guard case .url(let url)? = link?.mode else {
             Issue.record("expected a link")
             return
         }
         #expect(url == "https://example.com/authorise")
-        #expect(description == "Say yes over there")
+        #expect(link?.message == "Say yes over there")
         #expect(ElicitationRequest(wire: ["nothing": true], agentID: agentID) == nil)
+    }
+
+    /// The whole bug: the form travels as `requestedSchema`, and reading `schema`
+    /// found nothing, so every question was declined before anyone saw it.
+    @Test func aFormUnderTheWrongKeyIsNotAForm() {
+        #expect(ElicitationRequest(wire: ["schema": ["properties": ["a": ["type": "string"]]]],
+                                   agentID: UUID()) == nil)
     }
 
     @Test func anAnswerSaysWhatWasDone() {

@@ -17,6 +17,9 @@ struct ElicitationView: View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(request.title).font(.headline)
+                if let message = request.message, message != request.title {
+                    Text(message).font(.callout)
+                }
 
                 switch request.mode {
                 case .form(let schema):
@@ -42,10 +45,7 @@ struct ElicitationView: View {
                         }
                     }
 
-                case .url(let url, let description):
-                    if let description {
-                        Text(description).font(.callout).foregroundStyle(.secondary)
-                    }
+                case .url(let url):
                     HStack(spacing: 8) {
                         Button("Open") {
                             if let link = URL(string: url) { NSWorkspace.shared.open(link) }
@@ -80,13 +80,26 @@ struct ElicitationView: View {
             switch property.kind {
             case .string(_, _, _, let choices):
                 if let choices {
+                    // Rows rather than a menu: what separates two options is usually
+                    // their description, and a menu has nowhere to put it.
                     Picker("", selection: binding(for: property.name)) {
                         ForEach(choices) { choice in
-                            Text(choice.title).tag(JSONValue.string(choice.value))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(choice.title)
+                                if let description = choice.description {
+                                    Text(description).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .tag(JSONValue.string(choice.value))
+                        }
+                        if !property.isRequired {
+                            // Picking nothing is an answer too, and without a row for
+                            // it the picker cannot be put back.
+                            Text("No answer").tag(JSONValue.string(""))
                         }
                     }
                     .labelsHidden()
-                    .pickerStyle(.menu)
+                    .pickerStyle(.radioGroup)
                 } else {
                     TextField("", text: text(for: property.name))
                         .textFieldStyle(.roundedBorder)
@@ -103,13 +116,20 @@ struct ElicitationView: View {
             case .multiSelect(let items, _, _):
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(items) { item in
-                        Toggle(item.title, isOn: Binding(
+                        Toggle(isOn: Binding(
                             get: { chosen(property.name).contains(item.value) },
                             set: { isOn in
                                 var chosen = chosen(property.name)
                                 if isOn { chosen.append(item.value) } else { chosen.removeAll { $0 == item.value } }
                                 values[property.name] = .array(chosen.map(JSONValue.string))
-                            }))
+                            })) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.title)
+                                if let description = item.description {
+                                    Text(description).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
                     }
                 }
             }

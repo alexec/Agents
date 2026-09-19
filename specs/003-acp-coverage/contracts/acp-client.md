@@ -144,13 +144,19 @@ in a single small edit-and-run turn.
 ### `elicitation/create`
 
 ```json
-{ "sessionId": "...", "elicitationId": "...", "mode": "form", "schema": { ... } }
+{ "sessionId": "...", "mode": "form", "message": "Which branch?", "requestedSchema": { ... } }
 → { "action": "accept", "content": { ... } }   // or { "action": "decline" } / { "action": "cancel" }
 ```
 
 Held like a permission question: survives no window being open, answerable from any window. The
 answer is validated against the schema before it is sent. A schema the app cannot draw is declined
 rather than half-answered.
+
+The question itself is `message`, not a title inside the schema: a one-question form arrives with
+an untitled field and the whole question above it. A field's choices are `enum` (bare strings) or
+`oneOf` (objects naming their value `const`, with a `title` and a `description`); a multi-select's
+are `items.enum` or `items.anyOf`. `url` mode carries `elicitationId`, so `elicitation/complete`
+can withdraw it; a form does not.
 
 ### `elicitation/complete`
 
