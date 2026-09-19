@@ -9,11 +9,18 @@
 A phone that buzzes when an agent is blocked, and takes the answer. An iPad that shows the same three
 panes the Mac does. Both from any network.
 
-The research turned one assumption over. There is no way for two of a user's devices to reach each
-other across the internet on Apple's platforms — Back to My Mac went in 2019 with no successor, and
-everything since is link-local or proximity-scoped. So the channel is not a socket. It is a CloudKit
-private database used as an encrypted mailbox, with push wake-ups: reachable from anywhere, no
-address, no port, no router, no service anyone operates, and storage on the user's own iCloud quota.
+**Two links, one remote.** On the same network the device and the Mac talk over a direct socket
+found by Bonjour: milliseconds, no infrastructure, and the app feels the way it does at the desk.
+Off that network they cannot, and the research is clear about why — there is no way for two of a
+user's devices to reach each other across the internet on Apple's platforms, since Back to My Mac
+went in 2019 with no successor and everything since is link-local or proximity-scoped. So the second
+link is not a socket. It is a CloudKit private database used as an encrypted mailbox, with push
+wake-ups: reachable from anywhere, no address, no port, no router, no service anyone operates, and
+storage on the user's own iCloud quota.
+
+Neither is the optimisation of the other. The direct link is why the iPad on the sofa is pleasant;
+the mailbox is why the phone on the train works at all. The device picks, silently, and says which
+it got only because the speeds honestly differ (`contracts/transport.md`).
 
 Three decisions make that honest rather than merely convenient. We encrypt the payload ourselves with
 CryptoKit rather than trusting `CKRecord.encryptedValues`, because that only keeps Apple out for
@@ -44,10 +51,10 @@ the iOS layout is built and settled against a fake before any of the machinery a
 **Language/Version**: Swift 6.4, Swift 6 language mode, `SWIFT_STRICT_CONCURRENCY: complete`.
 Unchanged.
 
-**Primary Dependencies**: CloudKit, CryptoKit, UserNotifications, SwiftUI. All first-party, all
-already on both platforms. No third-party package is added, and the research rejected the ones that
-tempted it (Tailscale needs a tailnet and an SSO login; a relay we operate is a service the spec
-forbids).
+**Primary Dependencies**: Network (Bonjour and the direct link), CloudKit, CryptoKit,
+UserNotifications, SwiftUI. All first-party, all already on both platforms. No third-party package
+is added, and the research rejected the ones that tempted it (Tailscale needs a tailnet and an SSO
+login; a relay we operate is a service the spec forbids).
 
 **Storage**: One new file, `~/Library/Application Support/Agents/devices.json`, holding one record per
 paired device — a handful, written whole, exactly as `projects.json` is in 004. Each device's private
@@ -127,6 +134,7 @@ specs/005-mobile-remotes/
 ├── quickstart.md        # Phase 1 output
 ├── contracts/           # Phase 1 output
 │   ├── daemon-api.md    # Three methods, one notification, one failure code, one field
+│   ├── transport.md     # The two links, how one is chosen, and the handover between them
 │   ├── mailbox.md       # The record shapes, the envelope, and what the crypto promises
 │   └── ui.md            # What the phone and the iPad show, and what each promises
 ├── checklists/
@@ -151,10 +159,12 @@ Packages/AgentsKit/
     │   │   ├── DaemonClient.swift   # MOVED, with the transport injected (was socket-only)
     │   │   └── AgentsModel.swift    # NEW. What each notification means, lifted out of the Mac app
     │   └── Remote/                  # NEW
-    │       ├── DeviceKey.swift      # Curve25519 pair, kept in the device's own keychain
+    │       ├── DeviceKey.swift      # P256 pair, kept in the device's own keychain
     │       ├── Envelope.swift       # Seal and open. Pure. The most tested file in the feature.
+    │       ├── NetworkLink.swift    # BUILT. Bonjour browse and connect. The direct link.
+    │       ├── LinkChooser.swift    # NEW. Start both, take the first, hand over. transport.md
     │       ├── Mailbox.swift        # protocol. CloudKit behind it, a fake beside it.
-    │       ├── MailboxTransport.swift # LineTransport over the mailbox. The third implementation.
+    │       ├── MailboxTransport.swift # LineTransport over the mailbox. The relayed link.
     │       └── Headline.swift       # The three ≤100-char fields a notification can carry
     └── AgentsKit/                   # macOS only. Depends on Core.
         ├── Daemon/
@@ -199,17 +209,34 @@ reaches it. The bridge and the two apps draw and carry.
 
 ## Key design decisions
 
-### 1. The channel is a mailbox, and the design admits it
+### 1. Two links, chosen by the device, above one `LineTransport`
 
-CloudKit's private database, one record per message per target device, deleted once delivered. Not a
-socket dressed up as one. Everything downstream follows from taking that seriously: transcript in
-coalesced chunks rather than per token, the phone asking for history rather than being sent it, and
-timings quoted in seconds.
+`JSONRPCConnection` takes any `LineTransport`, so a second link costs a file, not a design. The
+direct one is `NetworkLink`: Bonjour `_agents._tcp`, `NWListener` on the Mac, `NWBrowser` on the
+device, `includePeerToPeer` so an iPad finds it with nothing configured. The relayed one is
+`MailboxTransport` over CloudKit. Everything above them — `DaemonClient`, `AgentsModel`, every
+screen — cannot tell which it is on.
+
+The device starts both at once rather than trying direct and falling back, because a Bonjour browse
+on a network with no Mac on it does not fail, it stays quiet, and a user on a train would watch a
+spinner for as long as we were willing to wait. The selection rule, the handover and what the user
+is told are in `contracts/transport.md`.
+
+**The mailbox, taken seriously.** CloudKit's private database, one record per message per target
+device, deleted once delivered. Not a socket dressed up as one. Everything downstream follows:
+transcript in coalesced chunks rather than per token, the phone asking for history rather than being
+sent it, and timings quoted in seconds.
 
 The alternative that keeps coming back is a relay we run. It is faster and it is worse: a service that
 is down when it is down, a bill, a TLS certificate to renew, and an address in the middle that we
 would then have to prove we cannot read. CloudKit is operated by Apple, costs nothing, and bills the
 user's own quota.
+
+**One security model across both.** This is the decision that keeps two links from becoming two
+designs. The same pairing, the same per-device keys, the same `Envelope` sealing, the same
+revocation, on the Wi-Fi at home exactly as on the train. A home network is not a trusted network,
+and the direct link gets no discount for being on one — see FR-004c, and the warning in
+`research.md` §11 about what the direct link does today.
 
 ### 2. The remote is a client, not a protocol
 
@@ -300,8 +327,8 @@ a decision to overrule me.
 | Spec text | What the research found | Proposal |
 |---|---|---|
 | **FR-007**: pairing is "an exchange begun at the Mac" | The phone announces itself and the Mac approves. Nothing connects without the tap on the Mac, but the Mac is not where it starts. | Amend to "confirmed at the Mac". The guarantee is unchanged. |
-| **SC-006**: a change is on the remote "within 1 second, and the reverse" | A store-and-forward round trip is seconds. 1 second is a socket's number. | Amend to "within 3 seconds while the remote is in front". Give the 1-second figure to the direct connection in FR-004, when it lands. |
-| **FR-004**: prefer a direct connection when one is possible | Sound, and it is a whole second transport: a listener, a Bonjour service and a TLS identity. It is an optimisation for being in the next room, not for the train. | Keep it, as the last phase. If it is cut, remove FR-004 and the tighter half of SC-006 rather than leaving them unmet. |
+| **SC-006**: a change is on the remote "within 1 second, and the reverse" | A store-and-forward round trip is seconds. 1 second is a socket's number. | **Amended.** SC-006 now carries both figures: 1 second direct, 3 seconds relayed. |
+| **FR-004**: prefer a direct connection when one is possible | It is a whole second transport: a listener, a Bonjour service, and a security model that has to match the mailbox's rather than lean on the network. | **Amended, and the direction reversed.** FR-004 now requires both links, with FR-004a to FR-004c covering selection, telling the user, and the one security model. It is built first, not cut last. See `research.md` §11. |
 
 One more thing to note rather than amend: **SC-002's two seconds is tight.** A one-second poll plus a
 round trip lands between one and three. It is close enough to build against and measure, and if it
@@ -340,21 +367,32 @@ So the order is: something to hold, then something to trust.
 
    This is where the feature is decided. It ends when the layout is settled, not when it is written.
 
-2. **P1 — answer from anywhere.** Now the machinery, under a layout that has stopped moving: the
-   package split, `Envelope`, `Mailbox`, the bridge, `devices.json`, the three daemon changes and the
-   notification extension, with a hard-coded approval so pairing does not block it. At the end of
-   this a phone buzzes on a train and the agent carries on.
+2. **The direct link. Built (`b3cf6e8` and after), and not finished.** `NetworkLink` and the
+   `agents-bridge` relay: a device on the same network drives the real daemon, which is what turned
+   the layout from something driven by canned data into something worth walking the T024 gate with.
+   It went before the mailbox because it needs no container, no entitlement and no spike, and the
+   spikes were the blocked thing. **It has no pairing and no encryption**, by its own header, so it
+   is a development tool until phase 4 reaches it. Nothing ships with it in this state.
 
-3. **P2 — the rest of the remote.** Transcript paging, starting an agent from the project page's
+3. **P1 — answer from anywhere.** Now the machinery, under a layout that has stopped moving: the
+   package split, `Envelope`, `Mailbox`, `MailboxTransport`, `devices.json`, the three daemon changes
+   and the notification extension, with a hard-coded approval so pairing does not block it. At the
+   end of this a phone buzzes on a train and the agent carries on.
+
+4. **P3 — pairing and revoking, properly, on both links.** The Mac's device list, approve and
+   revoke, key rotation, emptying a revoked device's mailbox — **and retrofitting all of it onto the
+   direct link**, which is the debt phase 2 took on deliberately. `Envelope` over `NetworkLink`,
+   unpaired devices refused at accept, and a revoked device's open connection dropped. FR-004c is
+   met here or not at all.
+
+5. **Selection and handover.** Both links exist, so now they have to be chosen between: start both,
+   take the first, keep browsing on the relayed one, move across without losing an action in flight,
+   and say which link the user is on. `contracts/transport.md`.
+
+6. **P2 — the rest of the remote.** Transcript paging, starting an agent from the project page's
    prompt bar, stopping one, attachments, the archived disclosure. Mostly filling in screens that
-   already exist against data that is now real.
-
-4. **P3 — pairing and revoking, properly.** The Mac's device list, approve and revoke, key rotation,
-   emptying a revoked device's mailbox. This is where the hard-coded approval becomes something a
-   user can hold.
-
-5. **FR-004 — the direct connection.** A fourth `LineTransport` over the local network. Optional, and
-   the spec is amended if it is cut.
+   already exist against data that is now real. Last because it is the least blocked: every screen
+   is already drawn, and none of it changes what the feature promises.
 
 004 is **built** (`9087a1a`), so nothing here waits on it. What it built is not what its contract
 described — two columns and a push, not three columns — and phase 1 copies what shipped. Its project

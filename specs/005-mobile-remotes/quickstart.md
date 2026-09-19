@@ -143,13 +143,34 @@ groups differ in any way from the Mac's.
 
 **Fails if**: a revoked device still receives anything, or its old records remain.
 
-## Phase 5 — the direct connection (FR-004)
+## The two links (FR-004, FR-004a, FR-004b, FR-004c)
 
-On the same network as the Mac, a change must appear on the remote within 1 second, and the app must
-never say which path it is using. Turn Wi-Fi off mid-session: it falls back to the mailbox and keeps
-working, slower, with nothing to do.
+Both links ship. Neither is optional, and the checks below are not a phase gate on each other.
 
-**If this phase is cut**, amend FR-004 and the tighter half of SC-006 out of the spec.
+**Direct, at the desk.** On the same network as the Mac, a change appears on the remote within
+1 second. No badge, no banner, nothing said about the link at all — the fast case is the quiet case.
+
+**Relayed, away.** Off the network, the same change appears within 3 seconds, and the banner reads
+"Away from your Mac's network — updates take a few seconds." Once, calmly. It must read as
+geography, not as a fault.
+
+**The handover.** Turn Wi-Fi off mid-session. The remote moves to the mailbox and keeps working,
+slower, with nothing for the user to do. Turn it back on: it returns to the direct link within a few
+seconds, unasked. Then do it again **with an answer in flight** — the answer is either delivered
+once or reported undelivered and re-sent. Never twice, and never silently swallowed (FR-036).
+
+**The security check, on the direct link.** This is the one most likely to be waved through, because
+it is on the user's own Wi-Fi and it plainly works. Capture the traffic between device and Mac with
+`tcpdump -i any -A port 8790` while a conversation is in flight and confirm there is no readable
+prompt, transcript, file content, command or credential in it (SC-009, FR-004c). Then, with a device
+connected and its app open, revoke it at the Mac: the connection must drop within seconds, not at
+the next reconnect (FR-010).
+
+**Fails if**: anything readable crosses either link; an unpaired device on the network can connect;
+a revoked device's open connection survives; or the user is asked to choose a link.
+
+> As of 2026-09-19 the direct link fails every part of the security check by design — it has no
+> pairing and no encryption yet. See tasks T024e to T024h.
 
 ---
 

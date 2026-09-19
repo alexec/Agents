@@ -30,7 +30,7 @@ Four shells around two libraries. New in this feature, from plan.md:
 - `Packages/AgentsKit/Tests/AgentsKitTests/` — `Unit/`, `Integration/`, `Fake/`
 - `App/Sources/` — the Mac window
 - `Daemon/Sources/` — the `agentsd` helper
-- `Bridge/Sources/` — NEW. The app-like bundle that owns CloudKit on the Mac.
+- `Bridge/Sources/` — NEW. The Mac-side relay. Owns the direct link's listener today, and CloudKit when the mailbox lands.
 - `Remote/Sources/` — NEW. The iPhone and iPad app.
 
 ---
@@ -122,6 +122,53 @@ User story work can begin.
 > T001 to T004 are untouched: they need a developer-portal container, a paired device
 > and a cellular connection. T024 needs real hardware. All five are yours.
 
+> **Where this got to, 2026-09-19, part two.** Phase 2b happened, and it was not in
+> the plan. With T001 to T004 blocked on hardware and a developer-portal container, the
+> direct link was built instead — `NetworkLink` and the `agents-bridge` relay — because
+> it needs none of that and it turns the `Remote` app from something driven by
+> `FakeDaemon` into something driven by the real daemon. That is what T024 needs to be
+> walked honestly.
+>
+> The spec has been amended to match: FR-004 now requires **both** links rather than
+> treating the direct one as an optimisation to cut, with FR-004a to FR-004c covering
+> selection, telling the user, and the single security model across both.
+> `contracts/transport.md` is new and specifies the choosing and the handover. SC-006
+> now carries two figures, 1 second direct and 3 seconds relayed, instead of a socket's
+> number applied to a mailbox.
+>
+> **The thing to carry forward:** what is built has no pairing and no encryption. It is
+> a development tool shaped like the shipping transport, and the gap is T024e to T024h.
+> Do not let the fact that it works on the sofa stand in for it being finished.
+
+
+## Phase 2b: The direct link — built, and not finished
+
+**Purpose**: FR-004's direct link. A device on the same network drives the real daemon over a
+Bonjour-found socket, so the layout gate at T024 can be walked against real data rather than canned.
+
+**Why this phase exists at all.** It was not in the original plan; the plan had the direct link last
+and optional. It went first because it needs no developer-portal container, no entitlement and no
+spike, and the spikes (T001 to T004) are the blocked thing. See `research.md` §11 for the full
+account of the reversal.
+
+**⚠️ What is here does not ship.** `Bridge/Sources/main.swift` accepts any connection on the network
+and carries cleartext, by its own header. It satisfies no part of FR-003, FR-008 or FR-011. T024e to
+T024h are the debt, and they are paid in Phase 5 where the keys and the device list exist.
+
+- [x] T024a Create `NetworkLink` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/NetworkLink.swift`: `serviceType = "_agents._tcp"`, an `NWBrowser` for discovery and an `NWConnection` to a resolved endpoint, wrapped as a `LineTransport` beside `FDTransport` and `PairedTransport`.
+- [x] T024b Create `Bridge/Sources/main.swift`: an `NWListener` advertising the service with `includePeerToPeer` so an iPad finds it with nothing configured, and one `Relay` per device holding its **own** `DaemonClient` connection — a connection each rather than one shared, because the daemon broadcasts to every connection and two devices sharing one would each see half the notifications.
+- [x] T024c Reassemble whole lines in `Relay.forward(_:)`. A line can arrive in three reads and two lines can arrive in one, and the daemon's protocol is one JSON object per line.
+- [x] T024d Add the `NSBonjourServices` and `NSLocalNetworkUsageDescription` keys to the `Remote` target in `project.yml`, so iOS asks for local-network access with a sentence that says why.
+- [ ] T024e **Debt, blocking ship.** Seal every payload on the direct link with `Envelope`, exactly as the mailbox does, so FR-003 and SC-009 hold on the home network too. A home network is not a trusted network (FR-004c). Depends on T029, T031.
+- [ ] T024f **Debt, blocking ship.** Refuse an unpaired device at accept in `Bridge/Sources/main.swift`, checked against `DeviceStore`, and say how to pair rather than dropping the connection silently (FR-011). Depends on T036.
+- [ ] T024g **Debt, blocking ship.** Drop an open connection when its device is revoked — re-checked on `device/changed`, not only at accept — so FR-010's "within seconds even for a device connected at the time" holds on the one link that actually holds a connection open. Depends on T037.
+- [ ] T024h **Debt.** Stop starting the bridge by hand. It is spawned by `agentsd` as `agentsd` is spawned by the app, and it exits when no device is approved (plan.md, Constitution Check: "nothing installed, no login item").
+- [ ] T024i Write `Unit/NetworkLinkTests.swift`: a browser and a listener on the loopback interface find each other, a line written one end arrives whole at the other, and two lines in one write arrive as two. No CloudKit and no second device.
+
+**Checkpoint**: a device on the same Wi-Fi shows real projects and real agents. It is not safe to
+leave running, and the tasks that make it safe are Phase 5's.
+
+---
 
 ## Phase 3: User Story 1 — Answer the thing that is waiting, from anywhere (Priority: P1) 🎯 MVP
 
@@ -229,7 +276,11 @@ no longer connect or read anything, including with its app open at the time.
 - [ ] T072 [P] Update `README.md`: what the remotes are, that they need the same Apple Account with iCloud Drive on, and the two designed behaviours a user would otherwise file as faults — **after a reboot the Mac app must be opened once**, and **a sleeping Mac does not answer**.
 - [ ] T073 Confirm FR-038: with no device paired, `pgrep -fl AgentsRemote` is empty, no CloudKit call is made, and the Mac app behaves exactly as it does today. The feature is inert until it is asked for.
 - [ ] T074 Run every check in `specs/005-mobile-remotes/quickstart.md`, including the privacy one — inspect `Message` records in CloudKit Console while a conversation is in flight and confirm no plaintext field names a project, agent, folder, tool or command (SC-009).
-- [ ] T075 Decide FR-004. Either build the direct local connection as a fourth `LineTransport` over `NWListener` and Bonjour, reusing the device key pairs, or amend FR-004 and the tighter half of SC-006 out of `spec.md`. Do not leave it stated and unmet.
+- [ ] T075 Create `LinkChooser` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/LinkChooser.swift` per `contracts/transport.md`: start the browser and the mailbox fetch **together** and take the first that yields a connection. Not direct-then-fall-back — a Bonjour browse on a network with no Mac on it does not fail, it stays quiet, and a user on a train would watch a spinner for as long as we were willing to wait (depends on T024a, T035).
+- [ ] T076 Keep browsing at a low rate while on the relayed link, so walking back into the house moves the session to the direct link within a few seconds, unasked. Leave the CloudKit subscription in place while on the direct link, so a backgrounded phone that leaves the network is still notified (depends on T075).
+- [ ] T077 Handle the handover in `Remote/Sources/RemoteModel.swift`: an in-flight request is reported undelivered and re-sent on the new link rather than retried across it, and state is re-fetched rather than merged. FR-036 holds because the remote does not rely on the daemon's first-answer-wins to be correct (depends on T075).
+- [ ] T078 [P] Say which link the user is on in `Remote/Sources/StaleBanner.swift` (FR-004b): nothing at all on the direct link, and one calm line on the relayed one — "Away from your Mac's network — updates take a few seconds." The speed difference must read as geography, not as a fault.
+- [ ] T079 Measure both halves of SC-006 and record them in `research.md` §10: a change on the Mac reaching an open remote within 1 second on the direct link and 3 seconds on the relayed one, and the reverse.
 
 ---
 
@@ -239,10 +290,11 @@ no longer connect or read anything, including with its app open at the time.
 
 - **Phase 1 (Setup)**: T001 first. T002 to T004 are the spike — first in importance, not a gate on Phase 2, because nothing in the layout depends on their answer. **If T002 fails, stop and rewrite the spec.**
 - **Phase 2 (Foundational)**: depends on T005. Blocks every user story. The gate is T024.
-- **Phase 3 (US1)**: depends on Phase 2 complete **and T002 passing**.
+- **Phase 2b (the direct link)**: depends on T024a only. It was built out of order and is **not** a gate on anything, because the mailbox does not need it. Its four debt tasks (T024e to T024h) depend on Phase 5's keys and device list, and together they gate shipping — not Phase 3.
+- **Phase 3 (US1)**: depends on Phase 2 complete **and T002 passing**. Does **not** depend on Phase 2b.
 - **Phase 4 (US2)**: depends on Phase 3 — it needs a real connection to work against.
 - **Phase 5 (US3)**: depends on Phase 3 (it replaces T053). Independent of Phase 4.
-- **Phase 6 (Polish)**: depends on the stories being done.
+- **Phase 6 (Polish)**: depends on the stories being done. T075 to T079 — choosing between the links, the handover and both halves of SC-006 — need **both** links to exist, so they depend on Phase 2b and Phase 3 together. They are the last thing, because there is nothing to choose between until then.
 
 ### Within Phase 2
 
@@ -304,10 +356,14 @@ yet a desk — both are honest limitations, neither is a broken promise.
 ### Incremental delivery
 
 1. Setup + Foundational → an iOS app worth using, driven by a fake.
-2. + US1 → the feature. Ship it.
-3. + US2 → the iPad becomes a place to work.
-4. + US3 → pairing and revoking become real; remove the hard-coded approval.
-5. + Polish → the sweep, the declaration, the README, and the FR-004 decision.
+2. + the direct link (2b) → the same app driven by the real daemon, on the same network. **Not
+   shippable**: no pairing, no encryption.
+3. + US1 → the phone buzzes on a train. The feature.
+4. + US2 → the iPad becomes a place to work.
+5. + US3 → pairing and revoking become real, on **both** links; the direct link's debt is paid here
+   and the hard-coded approval goes.
+6. + Polish → choosing between the links, the handover, both halves of SC-006, the sweep, the
+   declaration and the README.
 
 ### Why the layout comes first
 

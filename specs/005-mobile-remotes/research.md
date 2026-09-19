@@ -312,22 +312,46 @@ macOS 27 is unknown. Polling on the Mac was already the design; this makes it in
 **Recommendation**: amend SC-006 to "within 3 seconds while the remote is in front", and let the
 1-second figure belong to the direct connection in §11, when it lands.
 
-## 11. FR-004's direct connection is a phase, not a day one
+## 11. Both links are shipping, and the direct one went first
 
-**Decision**: build the mailbox first. Add a direct local connection afterwards, as its own phase,
-and amend the spec if it is cut.
+**Decision**: two links, not one with an optional extra. The direct link is built; the mailbox is
+not. FR-004 is amended to require both.
 
-FR-004 wants a direct connection when one is possible. On the same network that is `NWListener`, a
-Bonjour service and the device key pairs we already have, carrying the same line protocol — a third
-`LineTransport` beside `FDTransport` and `PairedTransport`, which is why it fits later without
-rework. It would make the app feel instant at the desk and would satisfy the 1-second readings.
+This finding originally said the opposite — build the mailbox first, add a direct connection later
+as its own phase, and cut FR-004 if it came to it. What happened is the reverse, and the reversal is
+worth recording honestly rather than quietly rewriting history.
 
-It is an optimisation. The requirement the user actually stated is the train, and that is the
-mailbox. Shipping the mailbox first gets the feature that matters; shipping the direct path first
-gets a remote that works in the next room.
+**What was built** (`Packages/AgentsKitCore/Remote/NetworkLink.swift`, `Bridge/Sources/main.swift`):
+an `NWListener` on the Mac advertising `_agents._tcp` with `includePeerToPeer`, an `NWBrowser` on
+the device, and a relay process that connects to `agentsd` over the existing Unix socket and carries
+whole lines between the two. It is a third `LineTransport`, exactly as this finding predicted, and
+it fitted without rework, which is the one prediction that held. A device on the same network reaches
+the Mac today.
 
-If it is cut, FR-004 and the tighter half of SC-006 should come out of the spec rather than sit there
-unmet.
+**Why it went first, in hindsight**: it needs no developer-portal container, no entitlement, no
+provisioning profile and no spike. The three CloudKit spikes (T002 to T004) are gates that need
+hardware, a paired device and a cellular connection; the direct link needed an afternoon. Faced
+with a layout that was settled and machinery that was blocked, building the reachable half was the
+right call — it turned the `Remote` app from a thing driven by canned data into a thing driven by
+the real daemon, which is what the layout gate (T024) actually needs to be walked.
+
+**What it does not do, and this is the part that matters.** From its own header:
+
+> There is no pairing and no encryption here yet, so anything on this network that can find the
+> service can drive the daemon. Until `Envelope` and the paired-device list exist, the safety is
+> that this only runs while somebody has decided it should.
+
+So the direct link as it stands **fails FR-003, FR-008 and FR-011**, and satisfies SC-009 only in
+the sense that there is nothing to capture while it is not running. It is a development tool that
+happens to be shaped like the shipping transport. The gap is closed by the same `Envelope`,
+`DeviceKey` and `DeviceStore` the mailbox needs — which is the argument for FR-004c: one security
+model, two routes, so the sealing is written once and both links get it. Nothing about the direct
+link is allowed to ship on the argument that a home network is trusted.
+
+**What this changes downstream**: the transport becomes a choice rather than a given, so there is a
+selection rule to specify (`contracts/transport.md`), a link state to show the user (FR-004b), and a
+handover to get right when a device walks out of the house mid-session. None of that existed when
+the plan assumed one channel.
 
 ## 12. AgentsKit is macOS-only and splits cleanly
 

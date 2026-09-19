@@ -92,13 +92,18 @@ tested file in the feature.
 |---|---|---|
 | `to` | `UUID` | The device it is sealed to. Plaintext, because the mailbox routes on it. |
 | `from` | `UUID` | Who sealed it. Plaintext. |
-| `sequence` | `Int` | Monotonic per sender. Detects loss and reordering. |
+| `sequence` | `Int` | Monotonic per sender **per link**. Detects loss and reordering. |
 | `sealed` | `Data` | HPKE, P256, to `to`'s public key. Everything that matters is in here. |
 
 `to`, `from` and `sequence` are bound in as associated data, so a record whose routing fields were
 edited will not open. What is inside is one JSON-RPC line — the same line that would have gone down
 the Unix socket, which is what makes the whole `DaemonAPI` surface work across this with nothing
 ported.
+
+The same envelope crosses both links (FR-004c): the direct one sends it down a socket and the
+mailbox writes it into a record. Sealing is written once and neither link gets a discount for the
+network it is on. `sequence` is counted separately per link, because the two have no common
+ordering and a gap on one says nothing about the other — see `contracts/transport.md`.
 
 ### Invariants
 
@@ -107,6 +112,8 @@ ported.
 - Nothing is ever sealed to a device without an approved record.
 - `sequence` gaps are reported to the reader, not repaired. A remote that has missed messages
   refetches state rather than pretending it is current.
+- A link change is not a gap. Moving between the direct and relayed links resets the count for the
+  link being taken up, and the remote refetches state rather than reconciling two sequences.
 
 ## Mailbox record
 

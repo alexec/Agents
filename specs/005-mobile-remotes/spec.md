@@ -163,8 +163,21 @@ it can no longer connect or read anything, including with the app already open.
 - **FR-003**: The system MUST NOT expose any readable agent content, prompt, transcript, file, command
   output or credential to any intermediary that carries the connection. Anything in the middle MUST see
   only data it cannot read.
-- **FR-004**: The system MUST prefer a direct connection between device and Mac when one is possible,
-  and MUST fall back without the user noticing anything but speed when it is not.
+- **FR-004**: The system MUST carry the remote over two links and choose between them itself: a
+  **direct link** when the device and the Mac are on the same local network, and a **relayed link**
+  through an intermediary when they are not. Neither is optional. The direct link exists because
+  being at the desk should feel instant; the relayed link exists because FR-001 is the point of the
+  feature.
+- **FR-004a**: The system MUST prefer the direct link whenever it is available, MUST move to the
+  relayed link when it is not, and MUST make that change without the user doing anything and without
+  losing an action in flight.
+- **FR-004b**: The system MUST tell the user which link it is on, because the two have honestly
+  different speeds (SC-006) and a user who sees seconds where they saw milliseconds is owed the
+  reason rather than left to suspect a fault.
+- **FR-004c**: Both links MUST meet FR-003 and FR-008 in full. The direct link being on the user's
+  own network MUST NOT be treated as a reason to send anything in the clear or to accept an unpaired
+  device: a home network is not a trusted network, and the same pairing and the same sealing apply
+  to both.
 - **FR-005**: The daemon MUST accept a connection from a paired device while no Mac window is open, and
   MUST NOT exit while a remote is connected.
 - **FR-006**: The system MUST show the user, on the remote, whether it is connected, and when it last
@@ -268,7 +281,10 @@ it can no longer connect or read anything, including with the app already open.
   including a mobile network and one that allows nothing to connect inward.
 - **SC-005**: A conversation with an hour of transcript opens to something readable in under 2 seconds
   on a mobile connection.
-- **SC-006**: A change on the Mac is on an open remote within 1 second, and the reverse.
+- **SC-006**: A change on the Mac is on an open remote within 1 second on the direct link, and
+  within 3 seconds on the relayed link, and the reverse. The two figures are separate on purpose: a
+  store-and-forward round trip is seconds, and quoting a socket's number for it would be a promise
+  the relayed link cannot keep.
 - **SC-007**: No permission request is ever answered twice, across 100 attempts to answer the same
   request from two devices at once.
 - **SC-008**: A revoked device loses access within 10 seconds and can read nothing afterwards.
@@ -290,8 +306,11 @@ Decisions taken where the description did not say. Each is a candidate for `/spe
   daemon stays the only writer, as it is today.
 - **A rendezvous in the middle is acceptable; a reader in the middle is not.** Reaching the Mac from
   a train needs something both ends can find each other through. That is allowed, on the condition in
-  FR-003: it carries bytes it cannot read. Direct connections are preferred when the networks allow
-  them, and the user never has to know which they got.
+  FR-003: it carries bytes it cannot read.
+- **Two links, one remote.** The user never chooses a link and never configures one. They are told
+  which they are on (FR-004b) and nothing else about it. The same pairing, the same keys and the
+  same sealing serve both, which is what makes switching between them a routing decision rather than
+  a second security model to get right twice.
 - **Notifications go through the platform's push service**, because a phone cannot be woken any other
   way. Their content is not readable by that service, which means the notification carries enough to
   identify the agent and the rest is fetched by the device.

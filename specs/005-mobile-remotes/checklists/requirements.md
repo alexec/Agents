@@ -44,16 +44,21 @@
 ## Post-plan note (2026-09-18)
 
 Planning surfaced three places where the spec's wording outran what the platform can do. They are
-recorded in `plan.md` under "Deviations from the spec" and need a decision before `/speckit-tasks`:
+recorded in `plan.md` under "Deviations from the spec". **Two of the three are now settled and the
+spec has been edited** (2026-09-19):
 
 - **FR-007** says pairing is "an exchange begun at the Mac". It is begun on the phone and confirmed
-  at the Mac. Proposed: amend to "confirmed at the Mac".
-- **SC-006** says 1 second each way. A store-and-forward channel is seconds. Proposed: amend to
-  "within 3 seconds while the remote is in front", and give the 1-second figure to FR-004.
-- **FR-004** (prefer a direct connection) is a whole second transport and is planned as the last
-  phase. If cut, it and the tighter half of SC-006 should come out of the spec.
+  at the Mac. Proposed: amend to "confirmed at the Mac". **Still open — the user's call.**
+- **SC-006** said 1 second each way. A store-and-forward channel is seconds. **Settled**: SC-006 now
+  carries both figures, 1 second on the direct link and 3 seconds on the relayed one.
+- **FR-004** (prefer a direct connection) was planned as an optional last phase. **Settled, in the
+  opposite direction**: the direct link is built and both links are now required. FR-004a to
+  FR-004c cover selection, telling the user, and the single security model across both. See
+  `research.md` §11 for why the order reversed, and `contracts/transport.md` for the design.
 
-The spec has not been edited — these are the user's calls, not the plan's.
+One thing the reversal put on the register, which no requirement covered before: the direct link as
+built has **no pairing and no encryption**. FR-004c exists to say that a home network earns no
+discount, and tasks T024e to T024h are what close it. It must not ship in its current state.
 
 One assumption in the spec also hardened into a constraint: the feature needs both devices signed
 into the same Apple Account with iCloud Drive on. That is narrower than "no account" implied and is
