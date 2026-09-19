@@ -7,6 +7,10 @@ extension DaemonCore {
     /// can arrive while no window is open, and something has to stay alive holding it.
     public var isHoldingAgents: Bool {
         if !live.isEmpty { return true }
+        // An agent on its way back up after a restart has no runtime yet and is not in
+        // any state that says it is busy. Exiting under one would abandon the work a
+        // moment before picking it up again.
+        if !resuming.isEmpty { return true }
         if !pendingPermissions.isEmpty { return true }
         if !drafts.isEmpty { return true }
         // A shell with a build running in it is work, the same as an agent mid-turn.

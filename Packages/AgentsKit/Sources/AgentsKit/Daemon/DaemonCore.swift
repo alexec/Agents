@@ -30,6 +30,12 @@ public actor DaemonCore {
     /// a new one: the ask lives in the runtime's history, so that is the only time it
     /// is gone.
     var needsSuggestionAsk: Set<UUID> = []
+    /// What each agent found dead on start-up was doing when the last daemon went, held
+    /// only until it has been told. See `DaemonCore+Recovery`.
+    var interrupted: [UUID: AgentState] = [:]
+    /// Agents being picked back up after a restart. Work in hand as far as
+    /// `isHoldingAgents` is concerned, from before their runtimes exist.
+    var resuming: Set<UUID> = []
     /// Agents whose next queued prompt is already on its way to a runtime. See
     /// `sendNextQueued`: without this the same words can go twice.
     var sending: Set<UUID> = []

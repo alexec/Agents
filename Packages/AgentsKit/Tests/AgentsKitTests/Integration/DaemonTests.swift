@@ -159,6 +159,63 @@ struct DaemonTests {
         #expect(page.entries.contains { ($0.text ?? "").contains("daemon stopped") })
     }
 
+    @Test func anAgentFoundDeadOnStartUpIsPickedBackUpAndToldWhy() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s1")
+        try await store.save(wasRunning)
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, wasRunning.id, "it was picked back up and worked again") {
+            $0.state == .finished
+        }
+        #expect(launcher.launchCount == 1, "one runtime, started again for it")
+        #expect(await launcher.lastAgent?.continuedSessionParams != nil,
+                "the same conversation, continued rather than begun afresh")
+
+        let page = try await core.transcript(.init(agentID: wasRunning.id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("The app restarted while you were working") },
+                "and it is told why it is being spoken to")
+    }
+
+    @Test func anAgentWaitingOnAnAnswerIsToldItsQuestionWentWithTheDaemon() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasAsking = Agent(runtimeID: "grok", cwd: work, state: .waitingOnUser, runtimeSessionID: "s1")
+        try await store.save(wasAsking)
+
+        let core = try core(FakeLauncher(), locations: locations)
+        await core.pickUpAfterRestart(await core.recover())
+
+        await waitFor(core, wasAsking.id, "it was picked back up") { $0.state == .finished }
+        let page = try await core.transcript(.init(agentID: wasAsking.id))
+        #expect(page.entries.contains { ($0.text ?? "").contains("the question you had asked went with it") })
+    }
+
+    @Test func anAgentWhoseRuntimeHasGoneIsLeftAloneWithAnExplanation() async throws {
+        let (locations, work) = try temporary()
+        let store = try AgentStore(locations: locations)
+        let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running, runtimeSessionID: "s1")
+        try await store.save(wasRunning)
+
+        let core = DaemonCore(store: try AgentStore(locations: locations),
+                              locations: locations,
+                              discovery: RuntimeDiscovery(searchPaths: ["/nowhere"], fileExists: { _ in false }),
+                              launcher: FakeLauncher())
+        await core.pickUpAfterRestart(await core.recover())
+
+        await eventually("it said why it could not") {
+            let page = try? await core.transcript(.init(agentID: wasRunning.id))
+            return page?.entries.contains { ($0.text ?? "").contains("Could not pick this agent back up") } ?? false
+        }
+        #expect(await core.agent(wasRunning.id)?.state == .stopped)
+        #expect(await core.agent(wasRunning.id)?.queuedPrompts.isEmpty == true,
+                "and the words about the restart are not left waiting to be sent next week")
+    }
+
     @Test func theRecordIsWrittenAsThingsHappenNotAtTheEnd() async throws {
         // A daemon killed mid-turn still has to leave something true behind.
         let (locations, work) = try temporary()

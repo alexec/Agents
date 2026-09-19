@@ -54,6 +54,10 @@ public final class Daemon: @unchecked Sendable {
         await core.startWorkflows()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
+        // Last, and on purpose. Picking an agent back up starts a runtime and sends it
+        // a prompt, and both of those belong in front of a window that can watch them
+        // rather than behind a socket nobody can reach yet.
+        await core.pickUpAfterRestart(recovered)
     }
 
     /// Serve until there is nothing in hand and nobody connected.
