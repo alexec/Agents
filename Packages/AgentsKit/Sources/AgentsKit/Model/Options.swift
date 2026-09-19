@@ -72,5 +72,11 @@ public struct StartOptions: Codable, Hashable, Sendable {
         self.extraArguments = extraArguments
     }
 
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        values = try c.decodeIfPresent([String: JSONValue].self, forKey: .values) ?? [:]
+        extraArguments = try c.decodeIfPresent([String].self, forKey: .extraArguments) ?? []
+    }
+
     public static let none = StartOptions()
 }

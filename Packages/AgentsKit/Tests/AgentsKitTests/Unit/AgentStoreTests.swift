@@ -132,3 +132,51 @@ struct AgentStoreTests {
         #expect(Agent.fallbackTitle(from: String(repeating: "x", count: 200)).count == 80)
     }
 }
+
+@Suite("Reading a transcript")
+struct TranscriptReadingTests {
+    private func message(_ text: String, _ id: String?) -> TranscriptEntry {
+        TranscriptEntry(kind: .agentMessage(messageID: id, text: text))
+    }
+
+    @Test func chunksOfOneMessageAreJoinedBack() {
+        let joined = TranscriptEntry.coalesced([
+            message("Hello", "m1"), message(" there", "m1"), message(".", "m1"),
+        ])
+        #expect(joined.count == 1)
+        #expect(joined.first?.text == "Hello there.")
+    }
+
+    @Test func twoMessagesStayTwoMessages() {
+        let joined = TranscriptEntry.coalesced([
+            message("First", "m1"), message(" bit", "m1"),
+            message("Second", "m2"),
+        ])
+        #expect(joined.map(\.text) == ["First bit", "Second"])
+    }
+
+    @Test func chunksWithNoIdStillReadAsOneMessage() {
+        // Copilot sends no messageId at all, so the run of chunks is the message.
+        let joined = TranscriptEntry.coalesced([
+            message("Created ", nil), message("hello", nil), message(".txt", nil),
+        ])
+        #expect(joined.map(\.text) == ["Created hello.txt"])
+    }
+
+    @Test func anythingBetweenThemBreaksTheRun() {
+        let entries = [
+            message("Before", nil),
+            TranscriptEntry(kind: .toolCall(ToolCall(title: "Write a file"))),
+            message("After", nil),
+        ]
+        #expect(TranscriptEntry.coalesced(entries).count == 3)
+    }
+
+    @Test func thoughtsAndMessagesDoNotRunTogether() {
+        let entries = [
+            message("Said", "m1"),
+            TranscriptEntry(kind: .agentThought(messageID: "m1", text: "Thought")),
+        ]
+        #expect(TranscriptEntry.coalesced(entries).count == 2)
+    }
+}

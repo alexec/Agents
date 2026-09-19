@@ -25,7 +25,13 @@ public actor DaemonClient {
 
     /// Connect, starting the daemon if nothing answers.
     public func connect(startIfNeeded: Bool = true, timeout: Duration = .seconds(8)) async throws {
-        if let connection { _ = try? await connection.call(DaemonAPI.Method.ping); return }
+        if let connection {
+            // A connection that has quietly died still looks like one, so it is asked
+            // before it is trusted.
+            if (try? await connection.call(DaemonAPI.Method.ping)) != nil { return }
+            await connection.close()
+            self.connection = nil
+        }
         if let connection = try? await open() {
             self.connection = connection
             return
@@ -80,6 +86,10 @@ public actor DaemonClient {
     /// alone. Its output goes to the log because nothing will be there to read it.
     private func spawnHelper() throws {
         let helper = try locateHelper()
+        // The helper's output goes to the log, and posix_spawn refuses the whole spawn
+        // if that file cannot be opened. On a first run the directory does not exist
+        // yet, and the daemon that would have made it is the thing being started.
+        try? locations.createDirectories()
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
@@ -105,7 +115,8 @@ public actor DaemonClient {
 
         let status = posix_spawn(&pid, helper.path, &actions, &attributes, &argv, &environment)
         guard status == 0 else {
-            throw ConnectError.couldNotStartHelper("posix_spawn failed with \(status)")
+            let reason = String(cString: strerror(status))
+            throw ConnectError.couldNotStartHelper("\(helper.path): \(reason)")
         }
     }
 

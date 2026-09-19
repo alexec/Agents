@@ -63,6 +63,18 @@ public enum DaemonAPI {
             self.startOptions = startOptions
             self.draftID = draftID
         }
+
+        /// Fields with a sensible default may be left out. A caller that wants an
+        /// agent started with whatever the runtime offers should not have to send an
+        /// empty object to say so.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            cwd = try c.decode(URL.self, forKey: .cwd)
+            prompt = try c.decode(String.self, forKey: .prompt)
+            startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
+            draftID = try c.decodeIfPresent(UUID.self, forKey: .draftID)
+        }
     }
 
     public struct AgentRequest: Codable, Sendable {
@@ -85,6 +97,13 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.before = before
             self.limit = limit
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            before = try c.decodeIfPresent(Int.self, forKey: .before)
+            limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 200
         }
     }
 
@@ -111,6 +130,11 @@ public enum DaemonAPI {
     public struct ListRequest: Codable, Sendable {
         public var includeArchived: Bool
         public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+        }
     }
 
     // MARK: Notifications

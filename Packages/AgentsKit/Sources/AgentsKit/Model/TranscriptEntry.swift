@@ -54,3 +54,41 @@ extension TranscriptEntry {
         }
     }
 }
+
+extension TranscriptEntry {
+    /// Join the chunks of one message back into one message.
+    ///
+    /// A runtime streams a sentence as a dozen updates, and the record keeps every one
+    /// of them because the record is what happened. What a person reads is the
+    /// sentence, so chunks that share the runtime's message id are joined here, and
+    /// consecutive chunks with no id are treated as one message for the same reason.
+    public static func coalesced(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
+        var result: [TranscriptEntry] = []
+        for entry in entries {
+            guard let joined = join(entry, onto: result.last) else {
+                result.append(entry)
+                continue
+            }
+            result[result.count - 1] = joined
+        }
+        return result
+    }
+
+    private static func join(_ entry: TranscriptEntry, onto previous: TranscriptEntry?) -> TranscriptEntry? {
+        guard let previous else { return nil }
+        switch (previous.kind, entry.kind) {
+        case (.agentMessage(let firstID, let text), .agentMessage(let nextID, let more))
+            where firstID == nextID:
+            var joined = previous
+            joined.kind = .agentMessage(messageID: firstID, text: text + more)
+            return joined
+        case (.agentThought(let firstID, let text), .agentThought(let nextID, let more))
+            where firstID == nextID:
+            var joined = previous
+            joined.kind = .agentThought(messageID: firstID, text: text + more)
+            return joined
+        default:
+            return nil
+        }
+    }
+}

@@ -72,4 +72,11 @@ extension ACPSession {
     public var isProcessRunning: Bool { runtimeProcess?.isRunning ?? false }
 
     public var processIdentifier: Int32? { runtimeProcess?.processIdentifier }
+
+    /// Kill the runtime outright, the way a restart would. Here so that a test can
+    /// prove a session comes back afterwards, which is the claim the whole pick-up
+    /// story rests on.
+    public func killRuntime() {
+        runtimeProcess?.kill()
+    }
 }

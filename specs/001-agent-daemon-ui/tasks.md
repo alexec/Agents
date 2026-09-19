@@ -116,12 +116,12 @@ watch the work appear in the window and the change appear on disk.
 - [X] T041 [US1] Implement `runtimes/list` and `agents/options` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift`
 - [X] T042 [US1] Implement `agents/start` in the same file: create the agent record with our UUID, create the session, record the runtime's `sessionId` against it, apply `startOptions` with the set-option call, then send the first prompt
 - [X] T043 [US1] Take the agent's title from the runtime's own session title where there is one, and the first line of the instruction where there is not, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Start.swift` (FR-007a)
-- [ ] T044 [P] [US1] Build the agent list in `App/Sources/AgentList/AgentListView.swift`: every agent with its state, title, folder and runtime, grouped so running is not mixed with finished, and an empty state that says how to start the first one rather than showing an error
-- [ ] T045 [P] [US1] Build the transcript view in `App/Sources/Transcript/TranscriptView.swift`, rendering each entry kind, appending live from `agent/entry`, windowed so a long transcript never loads whole
-- [ ] T046 [US1] Build the start sheet in `App/Sources/StartAgent/StartAgentView.swift`: folder picker, runtime picker listing what was found and saying where we looked for what was not, instruction field, and a start button that does nothing while the instruction is empty
-- [ ] T047 [US1] Build the options form in `App/Sources/StartAgent/OptionsForm.swift` generated from the advertised `configOptions`: render by `type`, order by `category`, skip an unrecognised `type` rather than guessing, still start when a runtime advertises none, plus the free-text extra-arguments field split as a shell would
-- [ ] T048 [US1] Wire the app to the daemon in `App/Sources/AppModel.swift`: connect on launch through `DaemonClient`, list, subscribe, and hold no agent state of its own
-- [ ] T049 [US1] Show a runtime that is starting as a state rather than a freeze in `App/Sources/AgentList/AgentRow.swift`, since a first Claude start waits on npm
+- [X] T044 [P] [US1] Build the agent list in `App/Sources/AgentList/AgentListView.swift`: every agent with its state, title, folder and runtime, grouped so running is not mixed with finished, and an empty state that says how to start the first one rather than showing an error
+- [X] T045 [P] [US1] Build the transcript view in `App/Sources/Transcript/TranscriptView.swift`, rendering each entry kind, appending live from `agent/entry`, windowed so a long transcript never loads whole
+- [X] T046 [US1] Build the start sheet in `App/Sources/StartAgent/StartAgentView.swift`: folder picker, runtime picker listing what was found and saying where we looked for what was not, instruction field, and a start button that does nothing while the instruction is empty
+- [X] T047 [US1] Build the options form in `App/Sources/StartAgent/OptionsForm.swift` generated from the advertised `configOptions`: render by `type`, order by `category`, skip an unrecognised `type` rather than guessing, still start when a runtime advertises none, plus the free-text extra-arguments field split as a shell would
+- [X] T048 [US1] Wire the app to the daemon in `App/Sources/AppModel.swift`: connect on launch through `DaemonClient`, list, subscribe, and hold no agent state of its own
+- [X] T049 [US1] Show a runtime that is starting as a state rather than a freeze in `App/Sources/AgentList/AgentRow.swift`, since a first Claude start waits on npm
 
 **Checkpoint**: The app starts a real agent and shows its work. This is the MVP.
 
@@ -142,10 +142,10 @@ folder still changing, reopen and see everything produced while the app was gone
 
 ### Implementation for User Story 2
 
-- [ ] T052 [US2] Make the spawned daemon genuinely detached in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`: its own session, no inherited pipes that die with the app, stdout and stderr to `daemon.log`
+- [X] T052 [US2] Make the spawned daemon genuinely detached in `Packages/AgentsKit/Sources/AgentsKit/Client/DaemonClient.swift`: its own session, no inherited pipes that die with the app, stdout and stderr to `daemon.log`
 - [X] T053 [US2] Implement start-up recovery in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Recovery.swift`, running before the socket accepts anything so no client ever sees a state known to be a lie (FR-019b)
 - [X] T054 [US2] Append transcript entries as updates arrive rather than at turn end, in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, so a daemon that dies mid-turn still leaves an honest record
-- [ ] T055 [US2] Implement reconnect in `App/Sources/AppModel.swift`: on connect, list, ask for the recent transcript of whatever is open, and subscribe, with no special case for "the app crashed"
+- [X] T055 [US2] Implement reconnect in `App/Sources/AppModel.swift`: on connect, list, ask for the recent transcript of whatever is open, and subscribe, with no special case for "the app crashed"
 - [X] T056 [US2] Roll `daemon.log` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonLog.swift` so a long-lived daemon cannot fill the disk
 
 **Checkpoint**: The daemon earns its existence
@@ -171,10 +171,10 @@ a permission question; stop the agent and see it stop.
 - [X] T061 [US3] Implement `agents/stop` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Stop.swift` using the cancel-close-terminate order, recording `cancelled`
 - [X] T062 [US3] Implement `permissions/pending` and `permissions/answer` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Permissions.swift`: at most one outstanding request per agent, never answered by us, and `waitingOnUser` while it waits
 - [X] T063 [US3] Implement `agents/setOption` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Options.swift`, and follow a `config_option_update` or a mode change the runtime makes itself
-- [ ] T064 [P] [US3] Build the composer in `App/Sources/Transcript/Composer.swift`, which says the agent is stopped rather than discarding what was typed
-- [ ] T065 [P] [US3] Build the permission view in `App/Sources/Permission/PermissionView.swift`: the tool call, the agent's own options as buttons, and nothing that answers on the user's behalf
-- [ ] T066 [US3] Put pending permissions at the top of the window on connect in `App/Sources/AgentList/AgentListView.swift`, so a question asked while the app was shut is the first thing seen
-- [ ] T067 [US3] Add stop to the agent row and the transcript header in `App/Sources/AgentList/AgentRow.swift`
+- [X] T064 [P] [US3] Build the composer in `App/Sources/Transcript/Composer.swift`, which says the agent is stopped rather than discarding what was typed
+- [X] T065 [P] [US3] Build the permission view in `App/Sources/Permission/PermissionView.swift`: the tool call, the agent's own options as buttons, and nothing that answers on the user's behalf
+- [X] T066 [US3] Put pending permissions at the top of the window on connect in `App/Sources/AgentList/AgentListView.swift`, so a question asked while the app was shut is the first thing seen
+- [X] T067 [US3] Add stop to the agent row and the transcript header in `App/Sources/AgentList/AgentRow.swift`
 
 **Checkpoint**: The agent can be talked to, answered and stopped
 
@@ -199,7 +199,7 @@ see it answer knowing what it knew.
 - [X] T072 [US5] Discard a `session/load` replay in `Packages/AgentsKit/Sources/AgentsKit/ACP/SessionUpdate.swift` by treating updates during a load as confirmation rather than content
 - [X] T073 [US5] Handle the session being gone in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Resume.swift`: record a `runtimeNote`, start a fresh runtime session for the same agent, keep the history, and tell the app (FR-012d)
 - [X] T074 [US5] Release a finished agent's process in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Lifetime.swift` when a turn ends with `endTurn`, since the session can be picked up later (FR-012e)
-- [ ] T075 [P] [US5] Show picking up as its own moment in `App/Sources/Transcript/TranscriptView.swift`, rendering `runtimeNote` entries plainly so the gaps in an agent's life are visible
+- [X] T075 [P] [US5] Show picking up as its own moment in `App/Sources/Transcript/TranscriptView.swift`, rendering `runtimeNote` entries plainly so the gaps in an agent's life are visible
 
 **Checkpoint**: Stopping something is no longer throwing it away
 
@@ -222,9 +222,9 @@ it in the archive with its history, and bring it back.
 
 - [X] T078 [US4] Implement `agents/archive` and `agents/unarchive` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Archive.swift`, stopping a live agent first and recording `archivedReason: byUser`
 - [X] T079 [US4] Implement `agents/list` with `includeArchived` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+List.swift`
-- [ ] T080 [P] [US4] Group the list by state in `App/Sources/AgentList/AgentListView.swift` with archived folded away at the foot
-- [ ] T081 [P] [US4] Show why an agent ended in `App/Sources/AgentList/AgentRow.swift`: finished, or stopped short with the reason, never both
-- [ ] T082 [US4] Add archive and unarchive to the row and the transcript header in `App/Sources/AgentList/AgentRow.swift`
+- [X] T080 [P] [US4] Group the list by state in `App/Sources/AgentList/AgentListView.swift` with archived folded away at the foot
+- [X] T081 [P] [US4] Show why an agent ended in `App/Sources/AgentList/AgentRow.swift`: finished, or stopped short with the reason, never both
+- [X] T082 [US4] Add archive and unarchive to the row and the transcript header in `App/Sources/AgentList/AgentRow.swift`
 
 **Checkpoint**: All five stories work independently
 
@@ -232,13 +232,13 @@ it in the archive with its history, and bring it back.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T083 [P] Write the live suite in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift`, off unless `AGENTS_LIVE=1`: for each of claude, grok and copilot, initialize, start a session, reach `end_turn`, kill the process, pick the session up by whichever way it advertises, and prove the earlier reply is still there
-- [ ] T084 [P] Assert in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` that nothing under test branches on a runtime's name, which is the one-code-path claim in SC-009
+- [X] T083 [P] Write the live suite in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift`, off unless `AGENTS_LIVE=1`: for each of claude, grok and copilot, initialize, start a session, reach `end_turn`, kill the process, pick the session up by whichever way it advertises, and prove the earlier reply is still there
+- [X] T084 [P] Assert in `Packages/AgentsKit/Tests/AgentsKitTests/Live/LiveRuntimeTests.swift` that nothing under test branches on a runtime's name, which is the one-code-path claim in SC-009
 - [ ] T085 Pin down how a signed-out runtime actually fails, against a logged-out runtime, and make `needsSignIn` real in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/RuntimeDiscovery.swift`. The error is not documented and was not confirmed during planning
 - [ ] T086 [P] Check the ten-agent case by hand for SC-006 and fix what stutters, most likely in `App/Sources/Transcript/TranscriptView.swift`
 - [ ] T087 [P] Make the window's first-run empty state read the way the spec asks in `App/Sources/AgentList/AgentListView.swift`: how to start the first agent, not an error, and no instructional text on a working screen
 - [ ] T088 Walk [quickstart.md](./quickstart.md) end to end on this Mac, including the force-quit and the Mac restart, and record what actually happened
-- [ ] T089 [P] Update `README.md` with how to run the daemon by hand and where its log and state live, for the next person debugging it
+- [X] T089 [P] Update `README.md` with how to run the daemon by hand and where its log and state live, for the next person debugging it
 
 ---
 
