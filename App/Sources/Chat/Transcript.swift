@@ -16,9 +16,15 @@ struct Transcript: View {
     /// that for "the reader scrolled up" would pull the whole transcript in at once.
     @State private var hasSettled = false
     @State private var isLoadingEarlier = false
-    /// Whether the reader is at the end. The conversation follows itself only while
-    /// they are: someone reading back through an hour of it is left where they are.
-    @State private var isAtEnd = true
+    /// Whether the pane is following the end of the conversation.
+    ///
+    /// Not the same thing as being at the end. Being at the end is geometry, and
+    /// geometry moves every time a line arrives; this is a mode, and only the reader
+    /// changes it. Someone reading back through an hour of a conversation is left where
+    /// they are until they ask to come back.
+    @State private var isFollowing = true
+    /// Whether the last thing to move the pane was a hand rather than the conversation.
+    @State private var isUserScrolling = false
     /// Whether anything has arrived since they scrolled away from the end.
     ///
     /// The pane must not move while they are reading (FR-010), so the arrival is said
@@ -51,7 +57,14 @@ struct Transcript: View {
                 .padding(.vertical, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // The text stops above the floating prompt, and so does the scrollbar.
+            // Insetting the content alone left the bar running the whole height of the
+            // pane and disappearing under the glass, where it could be neither read nor
+            // caught. Two lines rather than one bare `contentMargins`, because the bare
+            // one moves the visible area up as well, and the transcript is meant to run
+            // on under the glass rather than stop short of it.
             .contentMargins(.bottom, bottomInset, for: .scrollContent)
+            .contentMargins(.bottom, bottomInset, for: .scrollIndicators)
             .onScrollGeometryChange(for: Edges.self) { geometry in
                 Edges(fromTop: geometry.contentOffset.y,
                       fromBottom: geometry.contentSize.height
@@ -59,29 +72,68 @@ struct Transcript: View {
                           - geometry.containerSize.height,
                       canScroll: geometry.contentSize.height > geometry.containerSize.height)
             } action: { _, edges in
-                isAtEnd = edges.fromBottom < 160
                 canScroll = edges.canScroll
-                if isAtEnd { hasNewBelow = false }
+                // Geometry moves for two reasons: the reader scrolled, or the
+                // conversation grew. Only the first may end follow mode. Reading the
+                // distance on its own got this wrong — a new line puts the end below the
+                // pane for a frame before the pane catches up, and that frame looks
+                // exactly like somebody scrolling away — so the pane decided the reader
+                // had left when they had not, stopped following, and put the way back up
+                // unasked.
+                if isUserScrolling, !isLoadingEarlier, edges.fromBottom > leftTheEnd {
+                    isFollowing = false
+                }
+                // Back at the foot under their own steam. Generous on the way in and
+                // strict on the way out: following again a moment early is a small
+                // wrong, and being left behind a live conversation is the bug.
+                if edges.fromBottom < atTheEnd {
+                    isFollowing = true
+                    hasNewBelow = false
+                }
+                // Following the end, taken from the geometry rather than from new
+                // entries arriving. It used to be an animated scrollTo per entry, and
+                // that is the chunkiness: a reply arrives in fragments, several a
+                // second, and each one started a fresh 0.15s ease that restarted the one
+                // still running, so the pane stuttered rather than moved. The geometry
+                // sees every kind of growth — a new line, a line getting longer, a tool
+                // run unfolding — and there is nothing to animate: at a fragment at a
+                // time the pane moves by the word as the word arrives.
+                //
+                // Both declarative answers were tried here first, against a live agent,
+                // and neither held the foot once the content grew past it:
+                // `.defaultScrollAnchor(.bottom, for: .sizeChanges)`, and a
+                // `ScrollPosition` left standing at its bottom edge. With either of them
+                // the offset stayed where it was while the conversation ran on below the
+                // pane.
+                //
+                // Not guarded on `isLoadingEarlier`: earlier pages land on top, and
+                // whoever is following wants the foot whatever arrives above them.
+                // Guarding it cost three seconds of falling behind at the start of a
+                // turn, and then the catching-up jump this is all meant to stop.
+                if isFollowing, !isUserScrolling, edges.fromBottom > 0.5 {
+                    scroller.scrollTo(bottom, anchor: .bottom)
+                }
                 // A page is 200 entries, and a run of tool calls is one line however
                 // many entries it took, so a page can come back shorter than the
                 // pane. Nothing to scroll means nothing would ever ask for the rest,
                 // so a page that does not fill the pane asks for another itself.
                 if edges.fromTop < 400 || !edges.canScroll { loadEarlier(keeping: scroller) }
             }
-            .onChange(of: model.entries.count) { before, after in
-                // Only new lines at the end move the pane. Loading earlier adds to
-                // the top, and that must not throw the reader back down to the foot —
-                // nor read as something new having arrived.
-                guard after > before, !isLoadingEarlier else { return }
-                guard isAtEnd else {
-                    hasNewBelow = true
-                    return
+            // What counts as the reader moving the pane. `.animating` is this view's own
+            // scrollTo and `.idle` is the conversation growing under a still hand;
+            // neither is a reason to stop following.
+            .onScrollPhaseChange { _, phase in
+                switch phase {
+                case .tracking, .interacting, .decelerating: isUserScrolling = true
+                default: isUserScrolling = false
                 }
-                withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
             }
-            .onChange(of: agent.queuedPrompts.count) {
-                guard isAtEnd else { return }
-                withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
+            .onChange(of: model.entries.count) { before, after in
+                // Nothing here moves the pane; the geometry does that. This is only the
+                // word to the reader who is not watching. Loading earlier adds to the
+                // top, and that must not read as something new having arrived.
+                guard after > before, !isLoadingEarlier, !isFollowing else { return }
+                hasNewBelow = true
             }
             .task(id: model.selection) { await settle(scroller) }
             // The artifacts pane asked for the message something came from
@@ -89,6 +141,10 @@ struct Transcript: View {
             // on it.
             .onChange(of: model.focusedEntry) {
                 guard let focused = model.focusedEntry else { return }
+                // Being sent to a line in the middle is being sent away from the end,
+                // and it was asked for. Following on from here would take the reader
+                // straight back off the line they were sent to.
+                isFollowing = false
                 withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(focused, anchor: .center) }
                 model.clearFocus()
             }
@@ -96,7 +152,7 @@ struct Transcript: View {
             // was used. A counter rather than a flag, so two asks in a row both land.
             .onChange(of: model.scrollToEndToken) { goToEnd(scroller) }
             .overlay(alignment: .bottom) {
-                if canScroll, !isAtEnd {
+                if canScroll, !isFollowing {
                     JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
                         // Clear of the floating prompt, which ChatView has already
                         // measured for the transcript's own bottom inset.
@@ -104,15 +160,22 @@ struct Transcript: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: canScroll && !isAtEnd)
+            .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
         }
     }
 
     private func goToEnd(_ scroller: ScrollViewProxy) {
         hasNewBelow = false
-        isAtEnd = true
+        isFollowing = true
         withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
     }
+
+    /// How far from the foot counts as having left it, and how close counts as being
+    /// back at it. Two numbers rather than one: with a single line between the two
+    /// states, a conversation arriving a line at a time could flip the mode back and
+    /// forth under the reader.
+    private var leftTheEnd: CGFloat { 160 }
+    private var atTheEnd: CGFloat { 40 }
 
     /// How far the pane is from either end of the conversation.
     private struct Edges: Equatable {
@@ -126,7 +189,8 @@ struct Transcript: View {
     private func settle(_ scroller: ScrollViewProxy) async {
         expandedRuns = []
         hasSettled = false
-        isAtEnd = true
+        isFollowing = true
+        isUserScrolling = false
         hasNewBelow = false
         // The first page arrives a moment after the selection does. Waiting for it
         // rather than guessing at a delay is what keeps a big transcript from
