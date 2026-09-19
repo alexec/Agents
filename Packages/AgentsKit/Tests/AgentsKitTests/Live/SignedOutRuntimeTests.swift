@@ -25,7 +25,8 @@ struct SignedOutRuntimeTests {
             environment["HOME"] = home.path
             for key in ["COPILOT_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN",
                         "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
-                        "GROK_API_KEY", "XAI_API_KEY"] {
+                        "GROK_API_KEY", "XAI_API_KEY",
+                        "CURSOR_API_KEY", "CURSOR_AUTH_TOKEN"] {
                 environment.removeValue(forKey: key)
             }
             return try ACPSession.launch(executable: URL(filePath: path),
@@ -83,5 +84,29 @@ struct SignedOutRuntimeTests {
             #expect(error.code == DaemonAPI.Failure.needsSignIn)
         }
         #expect(await core.account(for: "grok").state == .needsSignIn)
+    }
+
+    /// The fourth runtime, added by 006. Its User Story 2 says the app must tell
+    /// "not installed" from "installed and signed out", and until this harness existed
+    /// there was no way to see the second one without signing somebody out for real.
+    @Test func cursorWithNoCredentialsSaysSoToo() async throws {
+        let (locations, work, home) = try sandbox()
+        let core = DaemonCore(store: try AgentStore(locations: locations),
+                              locations: locations,
+                              launcher: SignedOutLauncher(home: home))
+
+        do {
+            _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "hello"))
+            Issue.record("Cursor started a session without credentials")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.needsSignIn)
+            let methods = try? error.data?["authMethods"]?.decode([ACP.AuthMethod].self)
+            #expect(methods?.first?.id == "cursor_login")
+            // What it says to do is not what the app would do. `agent` here is Grok, so
+            // the sentence naming it is dropped before any of this reaches a person.
+            #expect(methods?.first?.terminalCommand == nil, "Cursor names no command properly")
+            #expect(methods?.first?.guidance?.contains("agent login") != true)
+        }
+        #expect(await core.account(for: "cursor").state == .needsSignIn)
     }
 }

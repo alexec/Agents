@@ -206,3 +206,22 @@ out and done on its own, before any of this.
 - The one rule that governs every task: no code path may branch on a runtime's identity. It is written
   into `LiveRuntimeTests.swift:18-19` and it is why there is no `cursor/` handler here
 - Commit after each phase. Phase 2 is one commit, not five
+
+---
+
+## Phase 7: Merging with main (added during implementation)
+
+Main moved a long way while 006 was being written: feature 004 landed, plus the right sidebar, a
+terminal and projects. Merged into this branch rather than the other way round, so the merge onto
+main is a fast-forward.
+
+- [X] T033 Merge `main` into `worktree-006-cursor-cli-runtime`. No conflicts, though four files
+  overlap: `DaemonCore.swift`, `FakeACPAgent.swift`, `README.md` and `GrokServedToolsTests.swift`
+- [X] T034 Add Cursor to `Packages/AgentsKit/Tests/AgentsKitTests/Live/SignedOutRuntimeTests.swift`,
+  which main added to close 003's T076 with a fake `HOME` rather than a real sign-out. Strip
+  `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN` alongside the others. This closes User Story 2 scenario 2,
+  which the spec had recorded as unprovable
+- [X] T035 Correct the Dependencies section of `specs/006-cursor-cli-runtime/spec.md`, which said
+  T076 was open and that proving it was the user's call. It is closed, and the method is better than
+  the one this spec proposed
+- [X] T036 Re-run everything after the merge: 418 unit tests, the live suites, and an app build

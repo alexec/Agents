@@ -309,10 +309,12 @@ waiting on something the user cannot see.
 - **Feature 004**, which owns the group that means an agent is waiting on the user. User Story 3
   scenario 2 here puts a Cursor agent in it and adds nothing to how the group works.
 - **Feature 005**, only in that it will inherit a fourth runtime. Nothing here depends on it.
-- **Feature 003, task T076**, still open: what a signed-out runtime actually returns has never been
-  confirmed against any runtime, and `RuntimeDiscovery` says so in as many words. User Story 2
-  scenario 2 here cannot be proved until it is. Cursor could answer it, but only by signing out of a
-  real account and back in, so that is the user's call to make and not a thing to do on the way past.
+- **Feature 003, task T076**, closed on main while this feature was being written, and better than
+  either of us proposed. Rather than sign anybody out, `SignedOutRuntimeTests` launches a runtime
+  with a `HOME` of its own and no tokens in the environment, so it cannot find credentials while the
+  real ones are left alone. User Story 2 scenario 2 is therefore provable after all, and this feature
+  adds Cursor to that harness: with no credentials it answers `-32000`, the app reports it as needing
+  sign-in, and the one method it offers is `cursor_login`.
 - **The runtimes on this Mac.** Feature 003 promised that every capability claim would be proved by
   handshake against the three runtimes rather than by reading their documentation. A fourth runtime
   reopens that promise, and every claim about Cursor in this spec is to be proved the same way.
