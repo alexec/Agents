@@ -83,6 +83,13 @@ struct PromptBar: View {
                 .font(.title3)
                 .lineLimit(2...12)
                 .focused($focused)
+                // Return sends. Option and Return is left alone, and the field
+                // editor inserts a line break the way it does everywhere else.
+                .onKeyPress(.return, phases: .down) { press in
+                    guard !press.modifiers.contains(.option) else { return .ignored }
+                    send()
+                    return .handled
+                }
 
             Button(action: send) {
                 Image(systemName: "arrow.up")
