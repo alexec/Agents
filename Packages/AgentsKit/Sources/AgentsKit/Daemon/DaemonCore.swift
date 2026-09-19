@@ -25,6 +25,9 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var suggestionTokens: [String: UUID] = [:]
+    /// The two facts about a project that its folder cannot tell us. Everything else
+    /// about a project is derived from the agents in it.
+    lazy var projectStore = ProjectStore(locations: locations)
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
@@ -113,6 +116,10 @@ public actor DaemonCore {
         agents[agent.id] = agent
         try? saveQuietly(agent)
         broadcast(DaemonAPI.Notification.agentChanged, agent)
+        // An agent changing state is what moves its project's counts. Sending the
+        // project after the agent is what lets a sidebar row say a project needs you
+        // in a window that is looking at a different one.
+        projectChanged(forAgentIn: agent.cwd)
     }
 
     private func saveQuietly(_ agent: Agent) throws {

@@ -397,6 +397,12 @@ extension DaemonCore {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        // A lead is not archivable on its own. Every project has one, so archiving it
+        // by itself would leave a project without the thing it is promised to have.
+        guard agent.role != .lead else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
+                               message: "The project lead is archived with its project.")
+        }
         if agent.state.holdsRuntime { try await stop(agentID) }
         await move(agentID, on: .archivedByUser)
     }

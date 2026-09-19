@@ -27,6 +27,13 @@ public enum DaemonAPI {
         /// Not the app's to call. This is how the MCP server we hand to every agent
         /// gets what the agent passed it back to the agent's own record.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
+        // A project is a folder. These four are everything that can be done to one,
+        // which is to say: notice it, and put it away.
+        public static let projectsList = "projects/list"
+        public static let projectsAdd = "projects/add"
+        public static let projectsArchive = "projects/archive"
+        public static let projectsUnarchive = "projects/unarchive"
+
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
         public static let elicitationsAnswer = "elicitations/answer"
@@ -54,6 +61,9 @@ public enum DaemonAPI {
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
+        /// A project appeared, was archived, or its counts moved. Windows upsert by
+        /// folder, the way they upsert agents by id.
+        public static let projectChanged = "project/changed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -61,6 +71,66 @@ public enum DaemonAPI {
     }
 
     // MARK: Requests
+
+    /// Which projects to list. Archived ones come back too by default, the same way
+    /// archived agents do: the window decides what to draw, not us.
+    public struct ProjectsListRequest: Codable, Sendable {
+        public var includeArchived: Bool
+        public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+        }
+    }
+
+    /// One project, named by its folder, because the folder is the identity.
+    public struct ProjectRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    /// A project, plus the parts only the daemon can know.
+    ///
+    /// The name and the counts are worked out here rather than in the window, so that
+    /// two windows cannot disagree and so a sidebar row can say a project needs you
+    /// without that window having looked at the project's agents at all.
+    public struct ProjectSummary: Codable, Hashable, Sendable, Identifiable {
+        public var project: Project
+        /// Disambiguated against every project in the same response.
+        public var name: String
+        /// Whether the directory is there, stamped when this was made.
+        public var exists: Bool
+        /// The newest activity of any agent in it, or `addedAt` when it has none.
+        public var lastActivityAt: Date
+        /// How many workers are in each group. The lead is in none of them, so it is
+        /// not counted here.
+        public var counts: [AgentGroup: Int]
+        /// The project's lead, so the panel can pin it and selecting a project can
+        /// open its conversation.
+        public var leadID: UUID?
+        /// Whether the lead is waiting on the user. Marked in the sidebar even though
+        /// the lead sits in no group.
+        public var leadNeedsInput: Bool
+
+        public var id: URL { project.folder }
+        public var folder: URL { project.folder }
+
+        /// Whether anything in this project wants the user, the lead included.
+        public var needsInput: Bool { (counts[.needsInput] ?? 0) > 0 || leadNeedsInput }
+
+        public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
+                    counts: [AgentGroup: Int], leadID: UUID? = nil,
+                    leadNeedsInput: Bool = false) {
+            self.project = project
+            self.name = name
+            self.exists = exists
+            self.lastActivityAt = lastActivityAt
+            self.counts = counts
+            self.leadID = leadID
+            self.leadNeedsInput = leadNeedsInput
+        }
+    }
 
     public struct OptionsRequest: Codable, Sendable {
         public var runtimeID: String
@@ -519,5 +589,12 @@ public enum DaemonAPI {
         public static let notSupported = -32009
         /// A destructive call that nobody confirmed.
         public static let notConfirmed = -32010
+        /// A folder that is not a project, on archive or unarchive.
+        public static let noSuchProject = -32012
+        /// Archiving a project while one of its agents is still working. Deliberately
+        /// unlike archiving an agent, which stops the one it was given: cancelling
+        /// several turns because somebody tidied their sidebar is not a small thing,
+        /// so this refuses and names them.
+        public static let projectHasLiveAgents = -32013
     }
 }

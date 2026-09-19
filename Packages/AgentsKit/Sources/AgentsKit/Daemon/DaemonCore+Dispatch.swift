@@ -9,6 +9,32 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.projectsList:
+                let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
+                // Listing is also where a project that has no lead gets one. It is the
+                // one call every window makes, so it is the one place that can promise
+                // every project has a lead.
+                for folder in Set(agents.values.map { Project.standardize($0.cwd) }) {
+                    await ensureLead(for: folder)
+                }
+                for folder in projectRecords().keys {
+                    await ensureLead(for: folder)
+                }
+                return .success(try JSONValue.encoding(
+                    allProjects(includeArchived: request.includeArchived)))
+
+            case DaemonAPI.Method.projectsAdd:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await addProject(request.folder)))
+
+            case DaemonAPI.Method.projectsArchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await archiveProject(request.folder)))
+
+            case DaemonAPI.Method.projectsUnarchive:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 

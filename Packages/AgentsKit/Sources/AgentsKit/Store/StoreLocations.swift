@@ -16,6 +16,10 @@ public struct StoreLocations: Sendable {
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
+    /// Every project we have been told about. One file, because the only things in it
+    /// are the two a project's folder cannot tell us: that it is archived, and that it
+    /// was added before anything ran in it.
+    public var projects: URL { root.appendingPathComponent("projects.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

@@ -15,9 +15,15 @@ struct ContentView: View {
     var body: some View {
         @Bindable var model = model
         GeometryReader { window in
+            // Three columns: the folders, the agents in the chosen folder, and the
+            // conversation. A project and an agent stay chosen at the same time, which
+            // is what lets the panel be glanceable while work is in flight.
             NavigationSplitView {
-                AgentListView(selection: $model.selection, isStarting: isStarting)
-                    .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
+                ProjectListView(selection: $model.selectedProject, isStarting: isStarting)
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            } content: {
+                ProjectAgentsView(selection: $model.selection, isStarting: isStarting)
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 460)
             } detail: {
                 HStack(spacing: 0) {
                     // One view either way: a new chat turns into the chat rather than

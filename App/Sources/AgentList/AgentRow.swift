@@ -12,9 +12,9 @@ struct AgentRow: View {
                 Text(agent.title ?? "Untitled")
                     .lineLimit(1)
                 HStack(spacing: 4) {
+                    // No folder here any more: the panel is one project, so saying
+                    // which folder every row is in says the same thing twenty times.
                     Text(runtimeName)
-                    Text("·")
-                    Text(agent.cwd.lastPathComponent)
                     if let ending {
                         Text("·")
                         Text(ending)
@@ -51,10 +51,14 @@ struct AgentRow: View {
 
     /// Finished, or stopped short with the reason. Never both, and never a reason
     /// dressed up as a finish.
+    ///
+    /// "Completed" holds both, so each row has to say which it was: a run that ended
+    /// cleanly and one the runtime crashed out of are not the same news.
     private var ending: String? {
+        if agent.state == .finished { return "finished" }
         guard agent.state == .stopped, let reason = agent.endedReason else { return nil }
         switch reason {
-        case .endTurn: return nil
+        case .endTurn: return "finished"
         case .maxTokens: return "ran out of room"
         case .maxTurnRequests: return "hit its limit"
         case .refusal: return "refused"
