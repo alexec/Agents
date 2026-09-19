@@ -108,8 +108,16 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// Matched on the end of the name because a runtime is free to prefix it: the
     /// Claude adapter shows it as `mcp__agents__suggest_next_prompts`.
     public var isSuggestingPrompts: Bool {
-        (name ?? title).hasSuffix(SuggestionService.toolName)
+        (name ?? title).hasSuffix(AppService.toolName)
     }
+
+    /// Whether this is the app's own show-file tool.
+    public var isShowingFile: Bool {
+        (name ?? title).hasSuffix(AppService.showFileToolName)
+    }
+
+    /// Whether this call is the app's own rather than the agent's work at all.
+    public var isTheApps: Bool { isSuggestingPrompts || isShowingFile }
 
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {

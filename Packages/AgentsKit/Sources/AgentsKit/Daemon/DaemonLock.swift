@@ -6,13 +6,20 @@ import Foundation
 /// the process: a daemon that crashes leaves nothing to clean up and nothing to
 /// explain to the user.
 public final class DaemonLock: @unchecked Sendable {
-    private let descriptor: Int32
+    /// Readable inside the module so a test can close it the way a kill would, which
+    /// is the case that matters: `release` unlocks first, and an unlock is honoured
+    /// however many processes hold the descriptor.
+    private(set) var descriptor: Int32
 
     /// Takes the lock, or returns nil because somebody else holds it.
     public init?(at url: URL) {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
-        descriptor = open(url.path, O_CREAT | O_RDWR, 0o644)
+        // `O_CLOEXEC` rather than a flag set afterwards: the daemon starts shells and
+        // runtimes from other threads, and a descriptor that is inheritable for even
+        // an instant can be inherited. A shell that inherits this holds the lock after
+        // the daemon is gone, and the next daemon quietly decides it is not needed.
+        descriptor = open(url.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
         guard descriptor >= 0 else { return nil }
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
             close(descriptor)

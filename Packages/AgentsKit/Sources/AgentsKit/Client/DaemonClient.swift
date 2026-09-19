@@ -10,6 +10,8 @@ public actor DaemonClient {
         case noHelper(lookedIn: [String])
         case couldNotStartHelper(String)
         case couldNotConnect
+        /// A root so deep that the socket inside it cannot be addressed.
+        case socketPathTooLong(String)
     }
 
     private let locations: StoreLocations
@@ -59,6 +61,9 @@ public actor DaemonClient {
     }
 
     private func connectSocket(path: String) throws -> Int32 {
+        // The same 104 bytes `DaemonServer` refuses to exceed. Said here too, because
+        // a truncated path connects to nothing and reads as "no daemon is running".
+        guard path.utf8.count < 104 else { throw ConnectError.socketPathTooLong(path) }
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw ConnectError.couldNotConnect }
         var address = sockaddr_un()
@@ -108,7 +113,12 @@ public actor DaemonClient {
         argv.append(nil)
         defer { for pointer in argv where pointer != nil { free(pointer) } }
 
-        var environment: [UnsafeMutablePointer<CChar>?] = ProcessInfo.processInfo.environment
+        // Said rather than inherited. A window started with `--root` has the path in
+        // its arguments and not in its environment, and the daemon it starts has to
+        // end up in the same place or it is a different daemon.
+        var inherited = ProcessInfo.processInfo.environment
+        inherited[StoreLocations.rootVariable] = locations.root.path
+        var environment: [UnsafeMutablePointer<CChar>?] = inherited
             .map { strdup("\($0.key)=\($0.value)") }
         environment.append(nil)
         defer { for pointer in environment where pointer != nil { free(pointer) } }

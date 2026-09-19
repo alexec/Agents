@@ -39,7 +39,12 @@ struct ProjectListView: View {
         // numbers to add up in your head, which is the sort of thing you only do after
         // the bill.
         .safeAreaInset(edge: .bottom) { SessionSpend() }
-        .navigationTitle("Projects")
+        // Named only when it is not the ordinary daemon. Two copies of this app can
+        // be running against two roots, and an unlabelled window is the one you
+        // archive the wrong project in.
+        .navigationTitle(StoreLocations.default.isStandard
+                         ? "Projects"
+                         : "Projects — \(StoreLocations.default.name)")
         .toolbar {
             // One button. Agents are started by telling a project what you want done,
             // so a button for starting one by hand would be a second way to do the

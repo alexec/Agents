@@ -82,6 +82,7 @@ struct ArtifactsPane: View {
             // Opened where it can be read, which is the files pane (FR-042).
             state.folder = url.deletingLastPathComponent()
             state.openFile = url
+            state.openLine = nil
             frame.pane = .files
         case .web(let url):
             state.browserURL = url

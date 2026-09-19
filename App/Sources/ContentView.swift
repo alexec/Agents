@@ -20,6 +20,23 @@ struct ContentView: View {
                 set: { model.selection = $0.last })
     }
 
+    /// Put the file the selected agent asked about in front of the user.
+    ///
+    /// Only for the agent on screen. An agent working in another conversation keeps
+    /// its request until that conversation is opened, rather than pulling the window
+    /// away from what is being read: the file is the agent's suggestion, and the
+    /// window is still the user's.
+    private func showWhatWasAskedFor() {
+        guard let agentID = model.selection,
+              let file = model.takeFileToShow(for: agentID) else { return }
+        let state = sidebarStates.state(for: agentID)
+        state.folder = file.url.deletingLastPathComponent()
+        state.openFile = file.url
+        state.openLine = file.line
+        frame.pane = .files
+        frame.isOpen = true
+    }
+
     var body: some View {
         @Bindable var model = model
         GeometryReader { window in
@@ -56,6 +73,11 @@ struct ContentView: View {
         .environment(sidebarStates)
         .environment(webHolders)
         .task { await model.connect() }
+        // An agent asking to be looked at is the one thing that opens this column by
+        // itself. Here rather than in the sidebar, because the sidebar may be shut,
+        // and shut means gone: there would be nothing listening.
+        .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
+        .onChange(of: model.selection) { showWhatWasAskedFor() }
         .alert("That did not work",
                isPresented: Binding(get: { model.problem != nil },
                                     set: { if !$0 { model.dismissProblem() } })) {

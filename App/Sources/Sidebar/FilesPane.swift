@@ -17,6 +17,9 @@ struct FilesPane: View {
     @State private var fileProblem: String?
     @State private var watch: FolderWatch?
     @State private var touched = TouchedPaths()
+    /// The file `probe` was read from, so a file opened from elsewhere is loaded once
+    /// and not once for every pass.
+    @State private var loaded: URL?
 
     private var folder: URL { state.folder ?? agent.cwd }
 
@@ -33,6 +36,12 @@ struct FilesPane: View {
         .task(id: agent.id) { await start() }
         .onDisappear { watch?.stop(); watch = nil }
         .onChange(of: model.entries.count) { refreshTouched() }
+        // The agent can open a file here as well as the user (`show_file`), and when
+        // it does, this pane is already on screen and has already run its task.
+        .onChange(of: state.openFile) { _, url in
+            guard let url, url != loaded else { return }
+            reloadFile(url)
+        }
     }
 
     // MARK: The bar at the top
@@ -42,6 +51,8 @@ struct FilesPane: View {
             if state.openFile != nil {
                 Button {
                     state.openFile = nil
+                    state.openLine = nil
+                    loaded = nil
                     probe = nil
                     fileProblem = nil
                 } label: {
@@ -135,19 +146,15 @@ struct FilesPane: View {
         } else if let probe {
             switch probe.kind {
             case .text:
-                ScrollView([.vertical, .horizontal]) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(probe.text ?? "")
-                            .font(.system(.body, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if probe.isTruncated {
-                            Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
+                VStack(alignment: .leading, spacing: 0) {
+                    FileLines(text: probe.text ?? "", line: state.openLine)
+                    if probe.isTruncated {
+                        Divider()
+                        Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(10)
                     }
-                    .padding(10)
                 }
             case .binary(let description):
                 // Its bytes are never shown (FR-014).
@@ -168,8 +175,16 @@ struct FilesPane: View {
 
     private func start() async {
         refreshTouched()
-        open(folder: folder)
-        if let openFile = state.openFile { open(file: openFile) }
+        // Deliberately not `open(folder:)`, which clears the open file: the pane is
+        // arriving, not being navigated. When the agent asked for a file the sidebar
+        // was usually shut, so this is the first pass and the file it named is sitting
+        // in `state` waiting to be read. Clearing it here showed the folder instead,
+        // which looked like `show_file` having done nothing at all.
+        state.folder = folder
+        reloadListing()
+        // Not `open(file:)` either, for the same reason at one remove: that treats the
+        // file as the user's own choice and throws away the line the agent named.
+        if let openFile = state.openFile { reloadFile(openFile) }
         startWatching()
     }
 
@@ -189,6 +204,7 @@ struct FilesPane: View {
     private func open(folder url: URL) {
         state.folder = url
         state.openFile = nil
+        state.openLine = nil
         probe = nil
         fileProblem = nil
         reloadListing()
@@ -196,6 +212,9 @@ struct FilesPane: View {
 
     private func open(file url: URL) {
         state.openFile = url
+        // The user's own choice of file starts at the top. A line is where an agent
+        // asked them to look, and that is only true of the file the agent named.
+        state.openLine = nil
         reloadFile(url)
     }
 
@@ -217,6 +236,7 @@ struct FilesPane: View {
     }
 
     private func reloadFile(_ url: URL) {
+        loaded = url
         do {
             probe = try FileProbe.read(url)
             fileProblem = nil

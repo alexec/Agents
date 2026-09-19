@@ -26,6 +26,14 @@ final class AppModel {
     private(set) var isConnected = false
     private(set) var problem: String?
 
+    /// Files an agent has asked the user to look at, one per agent, newest winning.
+    ///
+    /// Held rather than acted on, because the window that hears this may be showing
+    /// another conversation. It is taken out when that agent is on screen and the
+    /// sidebar has been pointed at the file, and it is never written down: this is
+    /// "look at this now", and a window opened tomorrow has missed it.
+    private(set) var filesToShow: [UUID: ShownFile] = [:]
+
     /// The folders the work happens in. Worked out by the daemon, so two windows agree
     /// about which projects exist and which of them want the user.
     private(set) var projects: [DaemonAPI.ProjectSummary] = []
@@ -289,6 +297,10 @@ final class AppModel {
             guard let notification = try? params?.decode(DaemonAPI.ElicitationNotification.self) else { return }
             elicitations.removeAll { $0.id == notification.requestID }
             if let request = notification.request { elicitations.append(request) }
+
+        case DaemonAPI.Notification.agentShowFile:
+            guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return }
+            filesToShow[notification.agentID] = notification.file
 
         case DaemonAPI.Notification.agentTerminalOutput:
             guard let notification = try? params?.decode(DaemonAPI.TerminalOutputNotification.self) else { return }
@@ -590,6 +602,12 @@ final class AppModel {
         focusedEntry = nil
     }
 
+    /// What this agent last asked the user to look at, taken rather than read: a file
+    /// that has been put in front of somebody is not still waiting to be.
+    func takeFileToShow(for agentID: UUID) -> ShownFile? {
+        filesToShow.removeValue(forKey: agentID)
+    }
+
     // MARK: Runtimes
 
     func signIn(runtimeID: String, methodID: String) async -> String? {
@@ -741,6 +759,10 @@ final class AppModel {
                 return "The helper would not start: \(reason)"
             case .couldNotConnect:
                 return "Could not reach the helper that runs the agents."
+            case .socketPathTooLong(let path):
+                // Only ever seen by somebody who passed `--root`, and the fix is in
+                // their hands: a shorter path.
+                return "That folder is too deep to run a daemon in: \(path) is past the 104 bytes a socket may be named with."
             }
         }
         return String(describing: error)

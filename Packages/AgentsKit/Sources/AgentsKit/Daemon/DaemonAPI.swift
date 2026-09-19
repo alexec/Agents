@@ -27,6 +27,9 @@ public enum DaemonAPI {
         /// Not the app's to call. This is how the MCP server we hand to every agent
         /// gets what the agent passed it back to the agent's own record.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
+        /// Nor this one. The other half of that MCP server: the agent asking that a
+        /// file be put in front of the user.
+        public static let agentsShowFile = "agents/showFile"
         // A project is a folder. These four are everything that can be done to one,
         // which is to say: notice it, and put it away.
         public static let projectsList = "projects/list"
@@ -61,6 +64,10 @@ public enum DaemonAPI {
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
         public static let agentTerminalOutput = "agent/terminalOutput"
+        /// An agent has asked that a file be shown. Unlike a suggested prompt, which
+        /// goes on the agent's record, this is an event: a window that is not there to
+        /// hear it has missed nothing, because the moment it was about has passed.
+        public static let agentShowFile = "agent/showFile"
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
@@ -266,6 +273,30 @@ public enum DaemonAPI {
         public init(token: String, prompts: [SuggestedPrompt]) {
             self.token = token
             self.prompts = prompts
+        }
+    }
+
+    /// What the MCP helper sends when an agent calls the show-file tool. The token
+    /// does the same work it does for a suggestion, and the path is checked against
+    /// that agent's folders before any window hears about it.
+    public struct ShowFileRequest: Codable, Sendable {
+        public var token: String
+        public var file: ShownFile
+
+        public init(token: String, file: ShownFile) {
+            self.token = token
+            self.file = file
+        }
+    }
+
+    /// One agent, one file, to every window.
+    public struct ShowFileNotification: Codable, Sendable {
+        public var agentID: UUID
+        public var file: ShownFile
+
+        public init(agentID: UUID, file: ShownFile) {
+            self.agentID = agentID
+            self.file = file
         }
     }
 

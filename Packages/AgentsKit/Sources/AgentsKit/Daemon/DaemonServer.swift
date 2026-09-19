@@ -16,7 +16,9 @@ public final class DaemonServer: @unchecked Sendable {
 
     private let url: URL
     private let handler: Handler
-    private var listenFD: Int32 = -1
+    /// Readable inside the module so a test can ask whether it would survive an exec.
+    /// There is no other way to see the flag: it only shows itself in a child.
+    private(set) var listenFD: Int32 = -1
     private let connections = ConnectionSet()
     private let stopped = ManagedAtomicFlag()
     private let onConnectionCountChanged: @Sendable (Int) -> Void
@@ -41,6 +43,10 @@ public final class DaemonServer: @unchecked Sendable {
 
         listenFD = socket(AF_UNIX, SOCK_STREAM, 0)
         guard listenFD >= 0 else { throw DaemonServerError.cannotCreateSocket(errno: errno) }
+        // Darwin has no `SOCK_CLOEXEC`, so it is asked for as soon as there is
+        // something to ask about. Nothing has been spawned yet at this point: the
+        // daemon is not listening, so it is holding no agents and running no shells.
+        setCloseOnExec(listenFD)
 
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -70,6 +76,11 @@ public final class DaemonServer: @unchecked Sendable {
                     if errno == EINTR { continue }
                     return
                 }
+                // An accepted socket does not inherit the listening one's flag, and
+                // this is the descriptor a long-lived shell is most likely to be
+                // handed: a window connects, an agent starts a terminal, and the
+                // window's connection is held open by a shell that never reads it.
+                setCloseOnExec(fd)
                 guard let self, !self.stopped.isSet else { close(fd); return }
                 self.accepted(fd)
             }

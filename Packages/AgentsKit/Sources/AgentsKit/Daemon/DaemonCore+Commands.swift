@@ -14,7 +14,7 @@ extension DaemonCore {
         let draftID = UUID()
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
                                 session: made.session, sessionID: made.sessionID,
-                                mcpServers: request.mcpServers, suggestionToken: made.suggestionToken)
+                                mcpServers: request.mcpServers, appToken: made.appToken)
         let session = made.session
         // The commands arrive as an update a moment after the session exists rather
         // than with it, so a new chat waits briefly for them. Half a second is the
@@ -32,7 +32,7 @@ extension DaemonCore {
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
         let session: ACPSession
         let sessionID: String
-        let suggestionToken: String
+        let appToken: String
         // A draft is only usable if it was made with the servers this start names.
         // They are read once, when the session is made, so reusing a session that
         // never heard about a server would attach it in name only.
@@ -41,7 +41,7 @@ extension DaemonCore {
            draft.mcpServers == request.mcpServers {
             session = draft.session
             sessionID = draft.sessionID
-            suggestionToken = draft.suggestionToken
+            appToken = draft.appToken
         } else {
             // A draft we cannot use is a runtime nobody is going to talk to.
             if let draft { await draft.session.end(gracePeriod: .seconds(2)) }
@@ -49,7 +49,7 @@ extension DaemonCore {
                                               mcpServers: request.mcpServers)
             session = made.session
             sessionID = made.sessionID
-            suggestionToken = made.suggestionToken
+            appToken = made.appToken
         }
 
         var agent = Agent(runtimeID: request.runtimeID,
@@ -68,7 +68,7 @@ extension DaemonCore {
         live[agent.id] = session
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
-        bindSuggestionToken(suggestionToken, to: agent.id)
+        bindAppToken(appToken, to: agent.id)
         // The first prompt of the conversation is the one that asks for suggestions.
         needsSuggestionAsk.insert(agent.id)
         listen(to: session, agentID: agent.id)
@@ -87,7 +87,7 @@ extension DaemonCore {
         var session: ACPSession
         var sessionID: String
         var runtime: Runtime
-        var suggestionToken: String
+        var appToken: String
     }
 
     /// A folder, a runtime, and a handshake. Everything that can go wrong here is
@@ -115,11 +115,11 @@ extension DaemonCore {
             // to have it is the case where making the session fails: what comes back
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
-            let token = mintSuggestionToken()
+            let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [suggestionServer(token: token)])
+                                                      mcpServers: mcpServers + [appServer(token: token)])
             return MadeSession(session: session, sessionID: result.sessionId,
-                               runtime: runtime, suggestionToken: token)
+                               runtime: runtime, appToken: token)
         } catch let error as JSONRPCError where error.isAuthRequired {
             markNeedsSignIn(runtimeID: runtimeID)
             // Not a fault. The runtime is there and needs signing in, which is
@@ -249,9 +249,9 @@ extension DaemonCore {
 
         // A new process is a new MCP server, so a new token. The old one stopped
         // working when the last process died.
-        let token = mintSuggestionToken()
-        let servers = agent.mcpServers + [suggestionServer(token: token)]
-        bindSuggestionToken(token, to: agent.id)
+        let token = mintAppToken()
+        let servers = agent.mcpServers + [appServer(token: token)]
+        bindAppToken(token, to: agent.id)
 
         var updated = agent
         if let sessionID = agent.runtimeSessionID {
@@ -310,7 +310,7 @@ extension DaemonCore {
         // said, not what we added to it.
         var outgoing = blocks
         if needsSuggestionAsk.remove(agentID) != nil {
-            outgoing.append(.text(SuggestionService.askForSuggestions))
+            outgoing.append(.text(AppService.askForSuggestions))
         }
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
