@@ -26,6 +26,10 @@ struct WorkflowPage: View {
 
     /// The file's own text, read only when the workflow cannot be parsed.
     @State private var rawText: String?
+    /// What the workflow's runtime last advertised for this project, out of the
+    /// daemon's memory. Nil until asked; empty when it has nothing, which is an answer
+    /// of its own and is drawn as one.
+    @State private var remembered: [ConfigOption]?
 
     private var summary: WorkflowSummary? {
         model.workflows(in: model.selectedProject).first { $0.id == workflowID }
@@ -63,8 +67,8 @@ struct WorkflowPage: View {
             if let problem = workflow.problem {
                 broken(problem, workflow: workflow)
             }
+            settings(summary)
             prompt(workflow)
-            settingsNote(workflow)
             file(workflow)
             actions(summary)
         }
@@ -156,26 +160,154 @@ struct WorkflowPage: View {
         }
     }
 
-    /// What its `agent:` mode means for the settings — including for the mode where
-    /// they do not apply at all.
+    // MARK: How it runs
+
+    /// The three settings — permission mode, runtime, model — as menus built from what
+    /// the runtime last advertised for this project, so a mode picker looks like a mode
+    /// picker wherever it is.
     ///
-    /// The controls themselves arrive with the next story. What is here now is the
-    /// sentence they will sit under, because it is true whether or not there is a
-    /// control to explain: a `triggering` workflow resumes an agent that is already
-    /// running and never applies a mode, which is the other half of the row leaving
-    /// the settings clause out of its summary.
+    /// Each control has four states, and the two that are not the ordinary menu carry
+    /// the explanation. A value the runtime does not offer is why this workflow is
+    /// refusing every fire, and this page is where that gets said, with what it does
+    /// offer. Nothing remembered means the choices are not known until the runtime has
+    /// been used in this project, and the file's value is shown rather than an empty
+    /// menu or an invented one (FR-024).
+    ///
+    /// The controls are driven from the file's own values rather than state of their
+    /// own: a change goes to the daemon, which writes the file and answers with what it
+    /// now says, and a refusal leaves the file alone — so the menu snaps back to the
+    /// truth without a second mechanism (FR-025).
+    ///
+    /// A `triggering` workflow resumes an agent that is already running and never
+    /// applies a mode, so its controls are shown and disabled under one line saying so.
+    /// Shown rather than hidden, because a person changing `agent:` in the file needs
+    /// to find them again — and because a hidden control is not an explanation.
     @ViewBuilder
-    private func settingsNote(_ workflow: Workflow) -> some View {
-        switch workflow.mode {
-        case .triggering:
-            note("This workflow resumes the agent that triggered it, so a permission mode, runtime or model in its file does not apply.")
-        case .standing:
-            if !workflow.settings.isEmpty {
+    private func settings(_ summary: WorkflowSummary) -> some View {
+        let workflow = summary.workflow
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("How it runs")
+            switch workflow.mode {
+            case .triggering:
+                note("This workflow resumes the agent that triggered it, so these do not apply.")
+            case .standing:
                 note("Applied when its standing agent is started, and again if it has to be replaced.")
+            case .new:
+                EmptyView()
             }
-        case .new:
-            EmptyView()
+            HStack(alignment: .top, spacing: 10) {
+                runtimeControl(summary)
+                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                    settingControl(summary, name: "Permission mode",
+                                   setting: WorkflowSettings.Setting.permissionMode,
+                                   value: workflow.settings.permissionMode,
+                                   option: remembered.flatMap(ModeMemory.modeOption(in:)),
+                                   runtime: runtime,
+                                   chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
+                    settingControl(summary, name: "Model",
+                                   setting: WorkflowSettings.Setting.model,
+                                   value: workflow.settings.model,
+                                   option: remembered.flatMap(WorkflowSettings.modelOption(in:)),
+                                   runtime: runtime,
+                                   chosen: binding(summary, \.model) { $0.model = $1 })
+                }
+            }
+            .disabled(workflow.mode == .triggering)
         }
+        // Asked again when the runtime or the folder changes, and not otherwise: the
+        // answer is the daemon's memory, and it starts nothing to give it.
+        .task(id: RememberedKey(runtimeID: runtimeID(workflow), folder: workflow.folder)) {
+            remembered = nil
+            remembered = await model.rememberedOptions(runtimeID: runtimeID(workflow), cwd: workflow.folder)
+        }
+    }
+
+    private struct RememberedKey: Hashable {
+        var runtimeID: String
+        var folder: URL
+    }
+
+    /// The runtime the file names, or the one a workflow runs on when it names none.
+    private func runtimeID(_ workflow: Workflow) -> String {
+        workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+    }
+
+    /// The runtime, from the catalog rather than from anything remembered: which
+    /// runtimes exist is this app's to know. A value the catalog does not hold is shown
+    /// and marked, because that workflow is refusing every fire on it (FR-009).
+    private func runtimeControl(_ summary: WorkflowSummary) -> some View {
+        let named = summary.workflow.settings.runtimeID
+        let fallback = RuntimeCatalog.builtIn[0]
+        let choices = [ConfigChoice(value: .null, name: "Default (\(fallback.name))")]
+            + RuntimeCatalog.builtIn.map { ConfigChoice(value: .string($0.id), name: $0.name) }
+        let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",
+                                  kind: .select([ConfigChoiceGroup(name: nil, choices: choices)]),
+                                  currentValue: .null)
+        return VStack(alignment: .leading, spacing: 4) {
+            OptionMenu(option: option, chosen: binding(summary, \.runtimeID) { $0.runtimeID = $1 })
+            if let named, RuntimeCatalog.runtime(id: named) == nil {
+                marked("\"\(named)\" is not a runtime this app knows")
+            }
+        }
+    }
+
+    /// One of the two settings the runtime itself defines, in the four states the
+    /// contract names.
+    @ViewBuilder
+    private func settingControl(_ summary: WorkflowSummary, name: String, setting: String,
+                                value: String?, option: ConfigOption?, runtime: Runtime,
+                                chosen: Binding<JSONValue?>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let option {
+                OptionMenu(option: withDefault(option, named: name), chosen: chosen)
+                if let value, !(option.options ?? []).contains(where: { $0.value.stringValue == value }) {
+                    // The same sentence the row carries for the refusal, so the page
+                    // and the row cannot describe the one problem two ways.
+                    marked(WorkflowSettings.refusalDetail(
+                        setting: setting, value: value,
+                        offered: (option.options ?? []).map { $0.value.stringValue ?? $0.name },
+                        runtime: runtime.name))
+                }
+            } else {
+                Text("\(name): \(value ?? "runtime default")")
+                    .font(.callout)
+                if remembered != nil {
+                    note("The choices are not known until \(runtime.name) has been used in this project.")
+                }
+            }
+        }
+    }
+
+    /// The runtime's option with a way to say nothing: the first choice leaves the key
+    /// out of the file, which is what a workflow that never mentioned it has.
+    private func withDefault(_ option: ConfigOption, named name: String) -> ConfigOption {
+        var copy = option
+        copy.name = name
+        copy.currentValue = .null
+        let leading = ConfigChoiceGroup(name: nil, choices: [ConfigChoice(value: .null, name: "Runtime default")])
+        copy.kind = .select([leading] + option.groups)
+        return copy
+    }
+
+    /// A menu's value, read from the file and written through the daemon. `.null` is
+    /// the key left out, which is what the "default" choice means.
+    private func binding(_ summary: WorkflowSummary,
+                         _ read: KeyPath<WorkflowSettings, String?>,
+                         write: @escaping (inout WorkflowSettings, String?) -> Void) -> Binding<JSONValue?> {
+        Binding(get: { summary.workflow.settings[keyPath: read].map(JSONValue.string) ?? .null },
+                set: { chosen in
+                    var settings = summary.workflow.settings
+                    write(&settings, chosen?.stringValue)
+                    guard settings != summary.workflow.settings else { return }
+                    Task { await model.setWorkflowSettings(summary, settings) }
+                })
+    }
+
+    private func marked(_ text: String) -> some View {
+        Label(text, systemImage: "exclamationmark.triangle")
+            .font(.callout)
+            .foregroundStyle(StateTint.attention.style(or: .secondary))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// Where the file is, and the way to it.

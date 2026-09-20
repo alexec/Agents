@@ -140,8 +140,10 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
     /// The option that carries the model, by the same rule `ModeMemory` uses for the
     /// mode: by `category` first, because that is what the rest of the app orders and
     /// reasons about, and by `id` second, because a runtime that sends no category
-    /// still has to be usable.
-    private static func modelOption(in options: [ConfigOption]) -> ConfigOption? {
+    /// still has to be usable. Public for the same reason `ModeMemory.modeOption` is:
+    /// the page that draws the menu and the start path that checks the file must not
+    /// be able to disagree about which option is *the* model.
+    public static func modelOption(in options: [ConfigOption]) -> ConfigOption? {
         let selectable = options.filter { if case .select = $0.kind { return true } else { return false } }
         return selectable.first { $0.category == "model" } ?? selectable.first { $0.id == "model" }
     }
