@@ -92,6 +92,10 @@ public struct StoreLocations: Sendable {
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
     /// What each runtime last advertised. A cache: safe to delete, and deleting it
     /// costs the next start form the wait it used to have every time.
+    /// Every device that has asked to reach this daemon, approved or still waiting.
+    /// One file beside `projects.json`, because a device is a fact about this root
+    /// rather than about any project or agent in it.
+    public var devices: URL { root.appendingPathComponent("devices.json") }
     public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
     /// The two limits the reader set: the most any one agent may spend, and the most
     /// a day may. One file, because there are two facts in it and both belong to the

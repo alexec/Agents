@@ -291,13 +291,14 @@ Where the code differed from the plan:
   380 sidebar — not a ruler held to the running app. `ChatMetrics`'s doc comment says
   so. Constants: cap 580, padding 40 down to 16, ramp from 320 to 660. At 480 the text
   is 425 inside 27 a side; at 860 it is 580, against 572 before.
-- **Files the plan named that do not exist:** `Remote/Sources/Projects/TotalsView.swift`
-  (the phone's spend line is in `RemoteChatView.swift`, moved under T018),
-  `Remote/Sources/Chat/PlanView.swift` (the phone's `PlanView` is private inside
-  `EntryView.swift`, moved under T029), `Remote/Sources/Chat/DocumentView.swift`
-  (see research §7), and the accent-coloured diff button at `EntryView.swift:329`
-  (FR-006b). No accent colour exists anywhere in the phone's chat; the colour check's
-  allow-list is therefore empty, with the mechanism kept.
+- **Files the plan named that were on the `013-ipad-app` branch, not on main:**
+  `Remote/Sources/Projects/TotalsView.swift`, `Remote/Sources/Chat/PlanView.swift`,
+  `Remote/Sources/Chat/DocumentView.swift` and the accent-coloured diff button in
+  `EntryView.swift` (FR-006b). 018 landed on main without them; when 013 was merged
+  afterwards they were brought under the same rules in the merge commit — the spend
+  line onto `StateTint.failure`, the plan view onto the scale and into the type-scale
+  check, the phone's two remaining glyphs marked decorative, and the diff button
+  allow-listed by name as the one control that keeps the accent.
 - **The colour check is broader than T049 asked.** It flags `.red`, `.orange`, `.green`
   and `.accentColor` on any code line, not only inside `foregroundStyle`/`fill`/`stroke`,
   because `AgentRow`'s tint was a `return .orange` in a computed property and the

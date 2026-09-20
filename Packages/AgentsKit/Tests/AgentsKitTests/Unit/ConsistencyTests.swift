@@ -57,12 +57,12 @@ struct ConsistencyTests {
     // MARK: 1. Colour (FR-024)
 
     /// Sites allowed to name a colour outside `StateTint`, each with its reason.
-    ///
-    /// The spec's FR-006b reserved a place here for an accent-coloured button that
-    /// opens a diff on the phone, a control rather than a state. No such site exists
-    /// in the source, so the list is empty; the mechanism stays so the next control
-    /// that earns a colour has somewhere to be written down rather than hidden.
-    private static let colourAllowList: [(file: String, contains: String, why: String)] = []
+    /// A control is not a state; the next one that earns a colour is written down
+    /// here rather than hidden.
+    private static let colourAllowList: [(file: String, contains: String, why: String)] = [
+        (file: "Remote/Sources/Chat/EntryView.swift", contains: ".foregroundStyle(Color.accentColor)",
+         why: "a button that opens a diff, drawn as the system draws controls (FR-006b)"),
+    ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {
         // `.red`, `.orange`, `.green` and the accent are the four things a call site
@@ -109,6 +109,7 @@ struct ConsistencyTests {
         "Remote/Sources/Chat/EntryView.swift",
         "Remote/Sources/Chat/BlocksView.swift",
         "Remote/Sources/Chat/MarkdownText.swift",
+        "Remote/Sources/Chat/PlanView.swift",
     ]
 
     /// A `.font(` line is allowed when it is a markdown heading — those keep their own

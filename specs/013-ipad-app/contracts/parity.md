@@ -28,16 +28,16 @@ its browser, its file system at large, its signed-in accounts — is not.
 | The Mac shows | On iPad | Why |
 |---|---|---|
 | The project's name | **Yes** | Built. |
-| A prompt bar with this project's folder fixed | **Yes** | FR-026. Built. |
+| A prompt bar with this project's folder fixed | **Yes** | FR-026. **Not built** — corrected 2026-09-19. `ProjectPageView` says so in its own comment and the 2026-09-19 inventory read it as built. T072 builds it. |
 | Agents grouped "Needs input", "Working", "Completed" via `AgentGroup` | **Yes** | FR-015. Built, same shared file. |
 | Agent cards, with how a completed one ended | **Yes** | FR-019. Built. |
 | Archived agents behind a disclosure, ten at a time | **Yes** | FR-020. Built. |
-| Workflows section — a project's standing arrangements (008) | **Yes, listed and their state** | FR-021. New. Listing is a fact about the work. |
+| Workflows section — a project's standing arrangements (008) | **Yes — built 2026-09-19, listed and their state** | FR-021. `WorkflowsSection`. No Run now, no Archive. The first fetch is new: `workflow/changed` keeps it current but never fills it. |
 | Starting, confirming, cancelling a workflow (008) | **No** | Out of scope, named in spec: driving, not reading. |
-| Project cost total (012) | **Yes** | FR-021. It is a fact about the work. |
-| Grand total across projects, on its own page (012) | **Yes** | FR-021. Same reason. |
+| Project cost total (012) | **Yes — built 2026-09-19** | FR-021. `ProjectTotal` at the head of the project page. |
+| Grand total across projects, on its own page (012) | **Yes — built 2026-09-19** | FR-021. `TotalsView`, off the project page's toolbar. Archived projects are counted: a project put away still cost what it cost. |
 | Setting or changing a cost limit (010) | **No** | Out of scope, named in spec: the iPad shows what is spent; the Mac is where a limit changes. |
-| A cost limit having been hit, and that it stopped an agent (010) | **Yes** | FR-021. The person must know why it stopped. Showing is not setting. |
+| A cost limit having been hit, and that it stopped an agent (010) | **Yes** | FR-021. Already true through the shared `EndedReason.summary` and `StateLine`. One gap, shared with the Mac: `report?.message` wins over the ending reason, so a cost-limited agent that reported on its work shows the report. One change to both rows, not one. |
 
 ## The conversation
 
@@ -48,29 +48,29 @@ its browser, its file system at large, its signed-in accounts — is not.
 | Diffs (`DiffView`) | **Yes** | FR-016. Built. |
 | Command output | **Yes** | FR-016. Built. |
 | Files a tool call touched (`ToolCall.locations`) | **Yes** | FR-016. Built as a list; FR-020a adds opening one. |
-| **The content of a touched file, read only** | **Yes — new** | FR-020a. `agents/showFile` exists; the iPad has no view yet. |
-| **A document the agent produced (007)** | **Yes — new, read only** | FR-020b. |
+| **The content of a touched file, read only** | **Yes — built 2026-09-19** | FR-020a. `FileView`. The content is the agent's own diffs out of the transcript, not a read of the Mac's disk: nothing in the protocol hands a client a file's bytes. A file the agent only read says so. |
+| **A document the agent produced (007)** | **Yes — built 2026-09-19, read only** | FR-020b. `DocumentView` and `ArtifactsList`, off the conversation's menu. An embedded resource reads in place; one that is a file on the Mac says where it is. |
 | Editing a file, or opening one the agent never touched | **No** | Out of scope, named in spec. |
-| The plan (`PlanView`, `Agent.plans`) | **Yes — new** | FR-017. The data already arrives; the view does not exist. See research §5. |
+| The plan (`PlanView`, `Agent.plans`) | **Yes — built 2026-09-19** | FR-017. `CurrentPlanStrip` at the head of the conversation, collapsed to the step being worked. See research §5. |
 | Cost and context as reported (`ContextMeter`) | **Yes** | FR-018. Built. |
 | How an agent ended — finished, stopped, the error | **Yes** | FR-019. Built. |
-| Resuming / coming-back state (011) | **Yes** | FR-021. `AgentsModel.isComingBack` is shared. |
-| The prompt bar, sending text | **Yes** | FR-025. Built. |
-| Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is 005's. |
-| Slash commands offered while typing (`CommandList`) | **Yes** | FR-021. It is what this runtime takes; withholding it makes the iPad's prompt bar quietly weaker. |
+| Resuming / coming-back state (011) | **Yes** | FR-021. Already true: `AgentCard`, `StatusIcon` and `ComingBackLine` all read the shared `AgentsModel.isComingBack`. |
+| The prompt bar, sending text | **Yes — built 2026-09-19** | FR-025. `Remote/Sources/Chat/PromptBar.swift` (T066a, added because this row was wrong). A field and a send, under the question when there is one. |
+| Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is T074's, and it needs T072's prompt bar to hang on. |
+| Slash commands offered while typing (`CommandList`) | **Yes — built 2026-09-19** | FR-021. The agent's own `availableCommands`, matched by the shared `SlashCommand.matching`. The row is the way to choose one; there are no arrow keys on a touch screen. |
 | Mode / model / effort / permission controls (`SelectCapsule`, `OptionMenu`, 009) | **Yes** | FR-021 and FR-026. An agent started from the iPad must be startable with the runtimes and options the Mac has. |
-| Jump to the live end (`JumpToEnd`) | **Yes** | FR-021. |
+| Jump to the live end (`JumpToEnd`) | **Yes — built 2026-09-19** | FR-021. It needed the auto-scroll fixed first: the chat used to scroll to the foot on every new entry, so nobody could ever be away from the end. Now it follows only a reader already there. |
 | Dictation (`Dictation`) | **Not judged** | Out of scope by omission on the Mac's terms: it is a Mac input method. The iPad has the system's own. No requirement either way — **the one row here that is a shrug, and it is recorded as one.** |
 | Permission request in full, with the Mac's choices (`PermissionView`) | **Yes** | FR-011. Built. |
 | A form request (`ElicitationView`) | **Yes** | FR-011. Built. |
-| Suggested next prompts (`agents/suggestPrompts`) | **Yes** | FR-021. |
+| Suggested next prompts (`agents/suggestPrompts`) | **Yes — built 2026-09-19** | FR-021. Chips over the field while it is empty. Tapping one fills the field; sending is still the person's move. |
 
 ## The right-hand inspector (002)
 
 | The Mac shows | On iPad | Why |
 |---|---|---|
-| A file the agent touched, read only (`FilesPane`, `FileLines`) | **Yes** | FR-020a. The reading half. |
-| A document the agent produced (`ArtifactsPane`, `DocumentView`, 007) | **Yes** | FR-020b. The reading half. |
+| A file the agent touched, read only (`FilesPane`, `FileLines`) | **Yes** | FR-020a. The reading half, built 2026-09-19 as a sheet off the conversation — an iPad has no inspector to put it in. |
+| A document the agent produced (`ArtifactsPane`, `DocumentView`, 007) | **Yes** | FR-020b. The reading half, built 2026-09-19 as a sheet off the conversation, same reason. |
 | A live terminal (`TerminalPane`, `TerminalHostView`, `ShellClient`) | **No** | Out of scope, named in spec: the Mac's window onto the Mac's own machine. |
 | A browser (`BrowserPane`) | **No** | Same. |
 
@@ -97,3 +97,15 @@ Named here rather than hidden, because FR-021 says silence is a defect:
    Mac housekeeping, which argues against.
 
 Both are candidates for `/speckit-clarify` and neither blocks the build.
+
+---
+
+## The read-only audit (T062, SC-014)
+
+Walked 2026-09-19 over `Remote/Sources/`. There is no `TextEditor`, no `ShareLink`, no
+`fileExporter`, no `UIActivityViewController` and no write to disk anywhere in the target.
+Nothing had to be removed. Read-only holds because the iPad has no screen that offers to
+change anything, which is what SC-014 asks for — not because a flag is set somewhere.
+
+Re-walk this when a screen that takes input lands. The first will be T072's prompt bar, which
+writes to the *conversation* and not to a file, and the distinction is the thing to check.

@@ -144,8 +144,9 @@ and 192 is text. That is the reported symptom, reachable at default settings.
 - `PageMetrics` should move to `AgentsKitCore` so the phone stops re-deriving its own
   numbers. Same class of problem, different feature. The phone's copy is
   `Remote/Sources/ReadableWidth.swift`, a fixed 620-point ceiling with no ramp and no
-  test; its doc comment now names this as the follow-on. (The plan referred to a
-  `Remote/Sources/Chat/DocumentView.swift` with a comment to delete — no such file
-  exists; `ReadableWidth.swift` is the one that carries the note.)
+  test; its doc comment names this as the follow-on, and the comment at the head of
+  `Remote/Sources/Chat/DocumentView.swift` explaining why `PageMetrics` is not used
+  there is the one to delete when it happens. (That file arrived with 013's branch,
+  merged after 018 landed.)
 - `AgentsModel.agents(in:group:)` promises "newest activity first" and applies no sort.
   Belongs to 019, and is noted there.
