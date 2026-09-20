@@ -29,6 +29,10 @@ public final class Daemon: @unchecked Sendable {
 
     /// Recover first, then open the door.
     public func start() async throws {
+        // Endings are about to be discovered, and no workflow has been read yet. Hold
+        // what they raise rather than firing it into a layer that cannot act — see
+        // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
+        await core.holdWorkflowEventsUntilStarted()
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")

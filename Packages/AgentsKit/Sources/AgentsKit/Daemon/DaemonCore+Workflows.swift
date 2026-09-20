@@ -20,6 +20,16 @@ extension DaemonCore {
             adoptWorkflows(in: project.folder)
         }
         startWorkflowTicker()
+        workflowsAreStarted = true
+        // Whatever happened while this layer could not act, now, and in the order it
+        // happened — which for a restart is `recover`'s order, most recently active
+        // first. Taken out of the array before any of it is replayed, so an event that
+        // somehow defers again lands on an empty queue instead of a growing one.
+        let waiting = deferredLifecycleEvents
+        deferredLifecycleEvents.removeAll()
+        for held in waiting {
+            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth)
+        }
     }
 
     /// Take a project's workflows on: read them once, and watch for more.
@@ -378,6 +388,16 @@ extension DaemonCore {
             workflowRuns[workflow.id] = run
             record(.ran(agentID: agentID, at: now), for: workflow)
             return nil
+        } catch let refused as SettingRefused {
+            // Its own refusal, and not `.unreadable`: the file is perfectly readable,
+            // and telling somebody their workflow cannot be read when what is wrong is
+            // one word in it sends them looking in the wrong place. This one also
+            // collapses on the setting, so a weekend of the same refusal is one row.
+            workflowRuns.removeValue(forKey: workflow.id)
+            let refusal = WorkflowRefusal.settingRefused(setting: refused.setting,
+                                                         detail: refused.detail)
+            record(.refused(refusal, at: now, repeats: 1), for: workflow)
+            return refusal
         } catch {
             workflowRuns.removeValue(forKey: workflow.id)
             let message = (error as? JSONRPCError)?.message ?? error.localizedDescription
@@ -423,11 +443,62 @@ extension DaemonCore {
         }
     }
 
+    /// A workflow that named a setting it cannot have.
+    ///
+    /// Typed, and thrown rather than returned, because it travels up through `runAgent`
+    /// to `fire`'s existing `catch` — which used to turn everything into `.unreadable`.
+    /// Matching on the type is what lets that `catch` tell this apart from a runtime
+    /// that would not start; matching on the message would have been a sentence in two
+    /// places, waiting to be reworded in one of them.
+    struct SettingRefused: Error {
+        var setting: String
+        var detail: String
+    }
+
+    /// Start a new agent for a workflow, in the mode, on the runtime and with the model
+    /// its file asks for — or start nothing at all.
+    ///
+    /// The refusal cannot be decided before a session exists. Whether a runtime offers
+    /// `plan` is a fact about a live session with that runtime, and there are only two
+    /// other places it could come from, both wrong:
+    ///
+    /// `ACPSession.apply` swallows an option the runtime will not take, and it is right
+    /// to. A person is looking at the control, the agent in front of them is worth more
+    /// than the option that went missing, and they can see what happened. This path has
+    /// nobody in the room at nine in the morning, and the option going missing is the
+    /// sentence *this one may not change files*.
+    ///
+    /// `OptionCache` would answer without starting anything, and would be answering
+    /// from what this runtime offered the last time somebody used it here. A stale
+    /// entry still claiming plan mode is available is exactly the failure FR-008
+    /// exists to prevent — the agent would start, the mode would not be sent, and
+    /// nothing would say so.
+    ///
+    /// So the session is made first, and it is made as a `Draft`, which `start` then
+    /// takes and reuses: one process, whether the settings are honoured or refused.
     private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String) async throws -> UUID {
-        let request = DaemonAPI.StartRequest(
-            runtimeID: RuntimeCatalog.builtIn[0].id,
-            cwd: workflow.folder,
-            prompt: prompt)
+        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
+            // A runtime this version has never heard of. Not rehomed onto the default
+            // one: a workflow that says `runtime: grok` and quietly runs on Claude is
+            // the same betrayal as one that says `permission-mode: plan` and runs
+            // without it (FR-009).
+            throw SettingRefused(
+                setting: WorkflowSettings.Setting.runtime,
+                detail: "There is no runtime called \"\(runtimeID)\" — this version knows "
+                    + RuntimeCatalog.builtIn.map(\.id).joined(separator: ", "))
+        }
+
+        let request: DaemonAPI.StartRequest
+        if workflow.settings.isEmpty {
+            // Today's path exactly, and no draft. Most workflows say nothing about how
+            // they run, and for those there is nothing to check, so there is no reason
+            // to make a session early or to keep one in hand (SC-006).
+            request = DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: workflow.folder, prompt: prompt)
+        } else {
+            request = try await settled(workflow, runtime: runtime, prompt: prompt)
+        }
+
         let agentID = try await start(request)
         if var agent = agents[agentID] {
             agent.startedByWorkflow = workflow.workflowID
@@ -436,6 +507,51 @@ extension DaemonCore {
             changed(agent)
         }
         return agentID
+    }
+
+    /// Make the session, ask it what it offers, and turn the file's words into a start
+    /// — or throw, having started nothing and left no agent behind.
+    private func settled(_ workflow: Workflow, runtime: Runtime,
+                         prompt: String) async throws -> DaemonAPI.StartRequest {
+        let draftID = UUID()
+        let pending = Task { [self] in
+            try await freshSession(runtimeID: runtime.id, cwd: workflow.folder, mcpServers: [])
+        }
+        let draft = Draft(runtimeID: runtime.id, cwd: workflow.folder,
+                          mcpServers: [], pending: pending)
+        drafts[draftID] = draft
+
+        let made: DaemonCore.MadeSession
+        do {
+            made = try await pending.value
+        } catch {
+            // The runtime would not start. Nothing to let go of but the entry itself,
+            // and the error is the runtime's own — this is not a refused setting, and
+            // `fire` should keep saying what it has always said about it.
+            drafts.removeValue(forKey: draftID)
+            throw error
+        }
+
+        // The authoritative list, from `session/new` — what this runtime, in this
+        // folder, is offering right now.
+        let advertised = await made.session.options
+        switch WorkflowSettings.resolve(workflow.settings, against: advertised) {
+        case .refused(let setting, let value, let offered):
+            // No agent is created. The session that was made to ask the question is
+            // ended, because nothing is going to use it.
+            drafts.removeValue(forKey: draftID)
+            await endDraft(draft)
+            throw SettingRefused(
+                setting: setting,
+                detail: WorkflowSettings.refusalDetail(setting: setting, value: value,
+                                                       offered: offered, runtime: runtime.name))
+        case .resolved(let options):
+            // The same session, handed on. `start` takes the draft by this id and
+            // reuses it, so asking what the runtime offered costs no second process.
+            return DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: workflow.folder,
+                                          prompt: prompt, startOptions: options,
+                                          draftID: draftID)
+        }
     }
 
     private func adoptAndPrompt(agentID: UUID, prompt: String,
@@ -500,6 +616,16 @@ extension DaemonCore {
     /// Called from the one funnel every agent state change goes through.
     func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil) {
         guard let agent = agents[agentID] else { return }
+        // Before anything is read off `workflows`, because at this point that
+        // dictionary is empty and the guard below would swallow the event without
+        // leaving a trace. See `deferredLifecycleEvents` for why the whole of this
+        // problem exists.
+        guard workflowsAreStarted else {
+            deferredLifecycleEvents.append(
+                (event: event, agentID: agentID,
+                 depth: depth ?? workflowChainDepth(causedBy: agentID)))
+            return
+        }
         let folder = Project.standardize(agent.cwd)
         guard let byID = workflows[folder], !byID.isEmpty else { return }
         let depth = depth ?? workflowChainDepth(causedBy: agentID)

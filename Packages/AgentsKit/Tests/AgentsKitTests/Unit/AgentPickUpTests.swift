@@ -37,6 +37,48 @@ struct AgentPickUpTests {
         #expect(agent(.stopped, .daemonGone, 0).mayBePickedUpAfterRestart)
         #expect(agent(.stopped, .daemonGone, 1).mayBePickedUpAfterRestart == false)
     }
+
+
+    // MARK: The count the ending must not clear (020)
+
+    /// FR-015, from every state the ending can be reached from.
+    ///
+    /// The count is the only evidence that a chat can reach the end of a turn without
+    /// taking the daemon with it, so an ending that *is* the daemon going says nothing
+    /// about it and must leave it alone. This used to be an inline `if` in
+    /// `DaemonCore.move`, held up by a comment saying `recover` wrote the reason
+    /// directly and so could never clear the count on its way past — a defence that
+    /// disappeared the moment recovery started going through the funnel.
+    @Test func anEndingDiscoveredOnRestartDoesNotClearThePickUpCount() {
+        for state in AgentState.allCases where state.holdsRuntime {
+            let transition = state.applying(.foundDead)
+            #expect(transition?.next == .stopped, "\(state)")
+            #expect(transition?.endedReason == .set(.daemonGone), "\(state)")
+            #expect(transition?.clearsPickUpCount == false,
+                    "\(state) cleared the count on the one ending that must not")
+        }
+    }
+
+    /// And the contrast, so the test above cannot pass by the rule being "never clear".
+    @Test func anEndingOfAnyOtherKindDoesClearIt() {
+        #expect(AgentState.running.applying(.stoppedByUser)?.clearsPickUpCount == true)
+        #expect(AgentState.running.applying(.processDied)?.clearsPickUpCount == true)
+        #expect(AgentState.running.applying(.turnEnded(.endTurn))?.clearsPickUpCount == true)
+        // Including one that ended *with* `daemonGone` reported by the runtime rather
+        // than discovered on a restart: it is the reason that decides, not the event.
+        #expect(AgentState.running.applying(.turnEnded(.daemonGone))?.clearsPickUpCount == false)
+    }
+
+    /// A `starting` agent is picked back up like any other, which is FR-007: its
+    /// process died with the last daemon exactly as a working one's did.
+    @Test func anAgentCutOffBeforeItsFirstTurnIsStillBroughtBack() {
+        let transition = AgentState.starting.applying(.foundDead)
+        #expect(transition?.next == .stopped)
+        var agent = self.agent(.starting, nil, 0)
+        agent.state = transition!.next
+        if case .set(let reason) = transition!.endedReason { agent.endedReason = reason }
+        #expect(agent.mayBePickedUpAfterRestart)
+    }
 }
 
 /// A count that has to survive a record written before it existed, and a record

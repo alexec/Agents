@@ -146,7 +146,7 @@ struct QueuedPromptTests {
             // reads the file, and the file is written a moment after the state changes.
             await eventually("the queue reached the file") {
                 let store = try? AgentStore(locations: locations)
-                let reread = try? await store?.load(id)
+                let reread = try? await store?.load(id).agent
                 return reread?.queuedPrompts.map(\.text) == ["two"]
             }
         }

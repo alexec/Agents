@@ -245,6 +245,139 @@ struct WorkflowFiringTests {
         #expect(agents.contains { $0.id != first && $0.startedByWorkflow == "standup" })
     }
 
+    // MARK: An ending the daemon discovered when it came back (020, US2)
+
+    /// A workflow file that watches for an agent stopping.
+    private func onStopped() -> String {
+        """
+        ---
+        on:
+          - agent-stopped
+        ---
+
+        An agent stopped. Go and look.
+        """
+    }
+
+    /// An agent the last daemon was holding, as it would be found on disk.
+    private func wasWorking(in work: URL, pickUps: Int) -> Agent {
+        Agent(runtimeID: "claude", cwd: work, title: "cut off",
+              state: .running, endedReason: nil, restartPickUps: pickUps)
+    }
+
+    /// SC-005, and the whole of what US2 adds.
+    ///
+    /// Before 020, `recover` wrote the state and the reason by hand, so it never
+    /// reached the one place workflow triggers hang off — a workflow set to run when
+    /// an agent stops did not run when four agents stopped because the Mac restarted,
+    /// which is exactly the moment somebody would want it to.
+    ///
+    /// The agent here has already been picked back up once without reaching the end of
+    /// a turn, so `mayBePickedUpAfterRestart` is false: it will be left alone, its
+    /// stopping is final, and the trigger is owed.
+    @Test func aRestartFiresTheStoppedWorkflowThatWasWaiting() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(onStopped(), as: "on-stop", in: work)
+
+        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 1)])
+        // The real startup order, reproduced, because it is the whole difficulty:
+        // `Daemon.start()` closes the gate, recovers, and only then reads a single
+        // workflow file. An ending raised in that window has nothing to fire at yet.
+        await core.holdWorkflowEventsUntilStarted()
+        await core.recover()
+        await core.startWorkflows()
+
+        await eventually("the restart fired the workflow that was waiting") {
+            await core.allAgents().contains { $0.startedByWorkflow == "on-stop" }
+        }
+        let made = await core.allAgents().first { $0.startedByWorkflow == "on-stop" }
+        #expect(made != nil, "the deferred event never arrived")
+    }
+
+    /// FR-016. An agent about to carry on has not finished stopping.
+    ///
+    /// Same setup, one field different: this one has not been picked back up before,
+    /// so recovery is seconds away from bringing it back. Saying "an agent stopped"
+    /// about it would be false, and would race the pick-up.
+    @Test func anAgentAboutToBePickedBackUpDoesNotFire() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(onStopped(), as: "on-stop", in: work)
+
+        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 0)])
+        await core.holdWorkflowEventsUntilStarted()
+        let recovered = await core.recover()
+        await core.startWorkflows()
+
+        // It was recorded as stopped all the same — the ending happened, it is simply
+        // not one anything should be told about yet.
+        let id = try #require(recovered.first)
+        #expect(await core.agent(id)?.state == .stopped)
+        #expect(await core.agent(id)?.endedReason == .daemonGone)
+        #expect(await core.agent(id)?.mayBePickedUpAfterRestart == true)
+
+        // Nothing to wait for, so give the drain every chance to have misfired.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await core.allAgents().contains { $0.startedByWorkflow == "on-stop" } == false,
+                "a workflow fired at an agent that is about to carry on")
+    }
+
+    /// The deferral itself, asserted directly rather than inferred from a fire.
+    ///
+    /// Worth its own test because the failure mode it guards is silence: if
+    /// `workflowsRespond` dropped the event instead of holding it, every assertion
+    /// above would still pass in a world where the queue did nothing, so long as
+    /// nothing fired for other reasons.
+    @Test func anEventRaisedBeforeWorkflowsStartedIsHeldAndNotDropped() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(onStopped(), as: "on-stop", in: work)
+
+        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 1)])
+        await core.holdWorkflowEventsUntilStarted()
+        await core.recover()
+        // Deliberately not started yet. The ending has happened and nothing has acted.
+        #expect(await core.allAgents().contains { $0.startedByWorkflow == "on-stop" } == false)
+        #expect(await core.deferredLifecycleEvents.count == 1,
+                "the ending was dropped rather than held")
+        #expect(await core.deferredLifecycleEvents.first?.event == .stopped)
+
+        await core.startWorkflows()
+        #expect(await core.deferredLifecycleEvents.isEmpty, "the queue was not drained")
+        await eventually("the held event fired once the layer could act") {
+            await core.allAgents().contains { $0.startedByWorkflow == "on-stop" }
+        }
+    }
+
+    /// FR-013 and SC-004: an ending discovered on a restart is an ending like any
+    /// other, so it writes one transcript line and moves the project's counts.
+    ///
+    /// Exactly one line, because until 020 this loop wrote it by hand — routing
+    /// through `move` without deleting that write would have produced two.
+    @Test func aRecoveryEndingIsRecordedExactlyOnce() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+
+        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 1)])
+        let recovered = await core.recover()
+        let fallback = await core.allAgents().first?.id
+        let id = try #require(recovered.first ?? fallback)
+
+        let entries = try await core.store.transcript(for: id, limit: 200).entries
+        let changes = entries.compactMap { entry -> AgentState? in
+            if case .stateChanged(let state, _) = entry.kind { return state }
+            return nil
+        }
+        #expect(changes == [.stopped], "one line, and only one")
+
+        // And the note explaining it comes first, so the transcript reads in the order
+        // it happened.
+        let firstNote = entries.firstIndex { if case .runtimeNote = $0.kind { return true } else { return false } }
+        let firstChange = entries.firstIndex { if case .stateChanged = $0.kind { return true } else { return false } }
+        #expect(firstNote != nil && firstChange != nil && firstNote! < firstChange!)
+    }
+
     // MARK: Reacting to agents
 
     @Test func anAgentFinishingFiresAWorkflowThatWatchesForIt() async throws {
