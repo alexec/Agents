@@ -160,27 +160,73 @@ done any work, so it would have to be written twice.
 **Alternatives considered**: A third `WorkflowOutcome` case. Rejected: that enum answers "what did
 the *fire* produce", and the answer is still "it ran". How the run went is the agent's to say.
 
-## R11. What the runtimes actually do — not yet measured
+## R11. What the runtimes actually do — measured
 
-**Status**: open. `Live/OutcomeReportLiveTests.swift` is written and has not been run.
-
-Running it needs a signed-in runtime and spends real money on real models, so it is not something
-the build does on its way past. The command is in `quickstart.md` check 7:
+**Status**: run, 2026-09-19, against claude, copilot and grok signed in on this machine.
 
 ```bash
 AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> \
   swift test --package-path Packages/AgentsKit --filter OutcomeReportLiveTests
 ```
 
-**What to write here when it has been run**: the per-runtime adoption rate, against SC-007's 90% of
-normally-ended turns carrying a report. One row per runtime, and the shape of what it did when it
-did not call the tool — prose where a report belonged is the interesting failure, because it is the
-exact thing this feature exists to move out of the transcript and onto the row.
+### Told outright to call the tool
 
-**Why this is a finding rather than a gate**: `SuggestedPromptLiveTests` is the precedent and the
-warning. Offered `suggest_next_prompts` and nothing else, three runtimes called it exactly never,
-however the description was worded; one line in the briefing changed that for two of them and not
-for Copilot, which reached for a follow-up feature of its own instead. The same outcome here would
-be worth knowing and would not be a failure of the design — the whole of Phase 5 exists so that a
-runtime which will not call the tool leaves an ending the app is honest about rather than a tick it
-has not earned. `UnreportedEndingTests` already proves that half without any runtime's cooperation.
+Both runtimes the plumbing check covers did, first time and with a usable sentence.
+
+| Runtime | Outcome | Message |
+|---|---|---|
+| claude | `done` | hello.py contains a single line of Python that prints "hello". |
+| grok | `done` | hello.py is a one-line script that prints hello. |
+
+The chain works end to end: the fourth tool is attached, the runtime starts the helper, the call
+comes back down our socket, and the outcome lands on the agent. Nothing in the rest of this section
+is about the plumbing.
+
+### Asked a question it could not answer, with nothing mentioning the tool
+
+This is the one SC-007 is about, and the target is missed by a wide margin: **one runtime of three
+called the tool unprompted.** The briefing's line is doing less work here than it did for
+`suggest_next_prompts`.
+
+| Runtime | Ended as | Asked? | Report | Where the agent lands |
+|---|---|---|---|---|
+| grok | `finished` | no | `needs_answer` — "Should greet(name) in hello.py greet in English or French?" | Needs attention, its own question on the row |
+| claude | `waitingOnUser` | no | none | Needs attention, via `waitingOnUser` |
+| copilot | `finished` | yes | none | Complete → "Finished without saying how it went" |
+
+**Against SC-007's 90%: 33% (1/3).** Stated plainly, because the number is the finding.
+
+### What each non-adoption actually looked like
+
+**claude reached for a mechanism it already had.** It did not bury the question in prose — the
+failure this feature exists to remove — it ended the turn in `waitingOnUser`, which is ACP's own way
+of saying the same thing. That still lands the agent under Needs attention, because
+`Agent.needsAPerson` has read `state == .waitingOnUser` since before 014. So the *user-visible*
+outcome is correct and the row is honest; what is missing is only the agent's own sentence on it.
+Worth noting that `askForOutcomeIfSilent` correctly declined to ask: its five conditions require
+`state == .finished`, and a runtime that has already flagged it needs the person does not need to be
+asked a second time. That condition was written for a different reason and turns out to earn its
+keep here.
+
+**copilot said nothing, was asked once, and still said nothing.** This is the precedent from
+`SuggestedPromptLiveTests` repeating exactly — Copilot was the one runtime a briefing line did not
+move there either. It is also the single best evidence that Phase 5 carries its weight: the ending
+was asked about exactly once (never twice, which is SC-009 holding in a live run rather than in a
+fake), and the agent now reads *Finished without saying how it went* rather than wearing a tick it
+did not earn. Without Phase 5 this ending would have been the exact bug in the spec's complaint.
+
+### What this means for the design
+
+The thing to take from 33% is not that the tool should be pushed harder. Two of three endings were
+already honest on the row — one by report, one by `waitingOnUser` — and the third was honest because
+the app asked and then said so. The feature's guarantee never rested on adoption; it rests on
+`AgentGroup` being total over `(state, report)` and on the ask-once bound, and both held live.
+
+What would be worth trying before anything structural: grok's message is the shape the whole feature
+wants, and it got there from the same briefing line the other two read. That suggests wording is
+worth one more iteration, not that the mechanism is wrong. What is **not** worth doing is asking a
+silent ending more than once — copilot's second silence cost a turn and produced nothing, which is
+precisely why the bound is structural.
+
+**Re-run this after any change to `Briefing.text`.** It is the only check in the feature that can
+fail for reasons no unit test sees, and the only one whose result is somebody else's software.

@@ -137,9 +137,19 @@ AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> \
   swift test --package-path Packages/AgentsKit --filter OutcomeReportLiveTests
 ```
 
-**Not yet run.** It needs a signed-in runtime and spends real money, so it is opt-in behind
-`AGENTS_LIVE` like every other Live suite. `research.md` R11 holds the empty place where its findings
-go.
+**Run 2026-09-19, against claude, copilot and grok.** It needs a signed-in runtime and spends real
+money, so it stays opt-in behind `AGENTS_LIVE` like every other Live suite. The findings are written
+up in full in `research.md` R11; the short version is below.
+
+Told outright to call the tool, claude and grok both did, first time and with a usable sentence — the
+plumbing works end to end. Asked a question they could not answer, with nothing mentioning the tool,
+**one runtime of three called it**: grok, with the question itself as the message, which is exactly
+the shape this feature wants. claude ended in `waitingOnUser` instead, which lands the agent in the
+same group by a route older than 014. copilot said nothing, was asked once, and said nothing again.
+
+**33% against SC-007's 90%**, and worth reading before you take that as a failure: two of the three
+endings were already honest on the row without the tool, and the third was honest because the app
+asked and then said so. The guarantee never rested on adoption.
 
 Against each signed-in runtime, give a task with an unanswerable question in it and assert the turn
 ends with a `needs_answer` report rather than with the question buried in a reply. Record the
