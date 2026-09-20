@@ -56,9 +56,11 @@ final class AppModel {
         didSet {
             guard selectedProject != oldValue else { return }
             UserDefaults.standard.set(selectedProject?.path, forKey: Self.selectedProjectKey)
-            // Picking a project shows the project, not a conversation. A chat is
-            // something you go into from here, and come back out of.
+            // Picking a project shows the project, not a conversation, and not a
+            // workflow either. Both are things you go into from here, and come back
+            // out of.
             selection = nil
+            openWorkflow = nil
         }
     }
 
@@ -73,9 +75,11 @@ final class AppModel {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
             // The same rule as picking a project: what you picked is what you see,
-            // and a conversation left open underneath would be a second thing on
-            // screen that nobody chose.
+            // and a conversation or a workflow left open underneath would be waiting
+            // to reappear when the bill is closed, which is a place nobody chose to
+            // come back to.
             selection = nil
+            openWorkflow = nil
         }
     }
 
@@ -121,6 +125,7 @@ final class AppModel {
         showsSpending = false
         selectedProject = folder
         selection = nil
+        openWorkflow = nil
     }
 
     /// Bumped when something asks the conversation to go to its end.
@@ -140,6 +145,17 @@ final class AppModel {
             Task { await loadTranscript() }
         }
     }
+
+    /// Which workflow is open, if one is instead of a conversation.
+    ///
+    /// `selection`'s sibling rather than a widening of it. Making that field an enum
+    /// of agent-or-workflow would have been the tidier model and the worse change:
+    /// its `didSet` sets `work.watching` and reloads the transcript, and it is
+    /// threaded through the view tree as a binding in some forty places, every one of
+    /// which would have had to learn about a case it has nothing to say about. One
+    /// more field costs one line. The two are exclusive, and `ContentView`'s `page`
+    /// binding is the single place navigation sets either.
+    var openWorkflow: Workflow.ID?
 
     // What the prompt bar is holding before there is an agent to hold it. It lives
     // here rather than in the view so that starting an agent does not throw it away

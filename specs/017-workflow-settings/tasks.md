@@ -86,15 +86,15 @@ description: "Task list for Workflow Settings"
 
 **Independent test**: Click a workflow row and confirm the whole file's meaning is on screen, including the entire prompt, without opening Finder or an editor. Then do the same to an archived one and to one whose front matter is broken.
 
-- [ ] T025 [US2] Add `var openWorkflow: Workflow.ID?` to `App/Sources/AppModel.swift` beside `selection` (~:92), with a doc comment saying it is `selection`'s sibling rather than a widening of it: `selection`'s `didSet` sets `work.watching` and reloads the transcript and is threaded through the view tree in some forty places, and a second exclusive field costs one line where an enum would cost all of them
-- [ ] T026 [US2] Clear `openWorkflow` alongside `selection` in `selectedProject.didSet` (~:61) and in `showProject(_:)` (~:79) in `App/Sources/AppModel.swift`, extending the comment already there — picking a project shows the project, not a conversation, and now not a workflow either
-- [ ] T027 [US2] Add `enum Page: Hashable { case agent(UUID); case workflow(String) }` and replace the `openAgent` binding in `App/Sources/ContentView.swift:~18` with the `page` binding from [contracts/workflow-page.md](./contracts/workflow-page.md), whose setter keeps the two model fields mutually exclusive. Keep and widen the existing comment about a chat being somewhere you go from the project and come back out of: a workflow is the same kind of thing, so it is the same kind of push
-- [ ] T028 [US2] Change the `navigationDestination` in `App/Sources/ContentView.swift` to switch on `Page`, sending `.agent` to today's `ChatView` + sidebar arrangement untouched, and `.workflow` to the new `WorkflowPage`. The sidebar, its toolbar item and `showWhatWasAskedFor()` stay on the agent branch only — a workflow has no files pane and no agent to ask for one
-- [ ] T029 [US2] Create `App/Sources/Projects/WorkflowPage.swift` drawing, in the chat column `.chatColumn()` gives it (018 replaced the project page's fixed 144pt gutter with it): the name; `workflow.summary`; the next-fire and last-outcome line including a link to the agent a run started; the prompt in full in a selectable monospaced block; where the file is with *Show in Finder*; and *Run now* and *Archive*/*Restore* as words. Its doc comment must say why the prompt is the reason the page exists — an agent can write a workflow in this app without anybody's approval, and until now the prompt was the one part of it nobody could see
-- [ ] T030 [US2] Handle the three awkward states in `WorkflowPage.swift`: an **unreadable** workflow shows its problem *and* the file's raw text (P2), an **archived** one says it will not run and offers Restore (P7), and one whose file is **deleted while open** returns to the project page saying so (P4). Comment that every workflow opens — archived, over a ceiling, unsupported, unreadable — and that the broken one is the one most likely to need looking at, so it is the last thing that may be a dead row
-- [ ] T031 [US2] Make the whole card in `App/Sources/Projects/WorkflowRow.swift` open the workflow by setting `model.openWorkflow`, keeping the play button, the archive button and the *Ran →* link as their own hit areas with their own meanings. The context menu keeps what it has and gains nothing: opening is what the row now does by itself
-- [ ] T032 [P] [US2] Add `WorkflowPage` and any new file to `project.yml` if the target's sources are enumerated rather than globbed, then run `xcodegen generate` and confirm the app still builds
-- [ ] T033 [US2] Walk steps 1, 2 and 9 of [quickstart.md](./quickstart.md) §4 by hand and record what P1–P8 actually did. The app has no view tests; this is the only pass these guarantees get
+- [X] T025 [US2] Add `var openWorkflow: Workflow.ID?` to `App/Sources/AppModel.swift` beside `selection` (~:92), with a doc comment saying it is `selection`'s sibling rather than a widening of it: `selection`'s `didSet` sets `work.watching` and reloads the transcript and is threaded through the view tree in some forty places, and a second exclusive field costs one line where an enum would cost all of them
+- [X] T026 [US2] Clear `openWorkflow` alongside `selection` in `selectedProject.didSet` (~:61) and in `showProject(_:)` (~:79) in `App/Sources/AppModel.swift`, extending the comment already there — picking a project shows the project, not a conversation, and now not a workflow either
+- [X] T027 [US2] Add `enum Page: Hashable { case agent(UUID); case workflow(String) }` and replace the `openAgent` binding in `App/Sources/ContentView.swift:~18` with the `page` binding from [contracts/workflow-page.md](./contracts/workflow-page.md), whose setter keeps the two model fields mutually exclusive. Keep and widen the existing comment about a chat being somewhere you go from the project and come back out of: a workflow is the same kind of thing, so it is the same kind of push
+- [X] T028 [US2] Change the `navigationDestination` in `App/Sources/ContentView.swift` to switch on `Page`, sending `.agent` to today's `ChatView` + sidebar arrangement untouched, and `.workflow` to the new `WorkflowPage`. The sidebar, its toolbar item and `showWhatWasAskedFor()` stay on the agent branch only — a workflow has no files pane and no agent to ask for one
+- [X] T029 [US2] Create `App/Sources/Projects/WorkflowPage.swift` drawing, in the chat column `.chatColumn()` gives it (018 replaced the project page's fixed 144pt gutter with it): the name; `workflow.summary`; the next-fire and last-outcome line including a link to the agent a run started; the prompt in full in a selectable monospaced block; where the file is with *Show in Finder*; and *Run now* and *Archive*/*Restore* as words. Its doc comment must say why the prompt is the reason the page exists — an agent can write a workflow in this app without anybody's approval, and until now the prompt was the one part of it nobody could see
+- [X] T030 [US2] Handle the three awkward states in `WorkflowPage.swift`: an **unreadable** workflow shows its problem *and* the file's raw text (P2), an **archived** one says it will not run and offers Restore (P7), and one whose file is **deleted while open** returns to the project page saying so (P4). Comment that every workflow opens — archived, over a ceiling, unsupported, unreadable — and that the broken one is the one most likely to need looking at, so it is the last thing that may be a dead row
+- [X] T031 [US2] Make the whole card in `App/Sources/Projects/WorkflowRow.swift` open the workflow by setting `model.openWorkflow`, keeping the play button, the archive button and the *Ran →* link as their own hit areas with their own meanings. The context menu keeps what it has and gains nothing: opening is what the row now does by itself
+- [X] T032 [P] [US2] Add `WorkflowPage` and any new file to `project.yml` if the target's sources are enumerated rather than globbed, then run `xcodegen generate` and confirm the app still builds
+- [X] T033 [US2] Walk steps 1, 2 and 9 of [quickstart.md](./quickstart.md) §4 by hand and record what P1–P8 actually did. The app has no view tests; this is the only pass these guarantees get
 
 **Checkpoint**: Every workflow on a project page opens, including the ones that cannot run. US1 and US2 are both complete and independent.
 
@@ -214,3 +214,45 @@ Setup, Foundational, US1. At the end of it a workflow that must not change files
 - `[P]` = different files, no dependencies on incomplete tasks.
 - Commit after each task or logical group; every checkpoint leaves the app working.
 - The comments asked for in these tasks are not garnish. Three of them (T008, T021, T036) exist specifically to stop a later reader undoing a decision that looks, from the code alone, like an oversight.
+
+---
+
+## US2 walked by hand (2026-09-19)
+
+Against a second copy of the app — a throwaway root and a throwaway project in `/tmp`
+with three workflow files: one ordinary, one carrying all three settings, and one whose
+schedule says `:15` so it cannot be read. The real app was left alone.
+
+| # | What it did |
+| --- | --- |
+| P1 | Every one opened: ordinary, settings-carrying, unreadable, and archived |
+| P2 | The unreadable one showed its problem in red **and** the file's raw text, fence and all |
+| P3 | Held indirectly — the page is drawn from the live list, which P4 exercises |
+| P4 | Deleting the open workflow's file returned the reader to the project page within seconds |
+| P5 | The prompt was shown whole, monospaced and selectable, with nothing to edit it |
+| P6 | No control on the page touches a trigger or the prompt body |
+| P7 | Archiving from the page left it open, saying it will not run, offering Restore |
+| P8 | Back returned to the project page |
+
+Step 1 of [quickstart.md](./quickstart.md) §4 passed as written, and it also showed the
+Core half of this feature working end to end for the first time: the settings-carrying
+workflow's row read *"Every day at 2am, in a new agent, in plan mode, on Grok, using
+grok-4"*, which is FR-027 visible on a real row.
+
+Two things the walk found and the code now carries:
+
+- **A tap gesture on the card never fires.** Neither `.onTapGesture` on the card itself
+  nor on a clear `Rectangle` behind it did anything, while the play and archive buttons
+  on the same card worked throughout. A `Button` behind the content does work, and that
+  is what the row uses: the controls in front keep their own clicks and everything else
+  falls through to it. Wrapping the card in a `Button` was not an option — it would have
+  taken the clicks away from the three controls that must keep them.
+- **Setting `openWorkflow` redrew nothing at first.** `ContentView` read it only inside
+  the getter of the binding it handed to `NavigationStack`, and observation registers
+  what a body reads while it runs, not what a stored closure reads later. `selection`
+  had survived the same mistake because the body reads it in three other places anyway.
+  The path is now read in `body`, with a comment saying why it must be.
+
+The settings controls are US3's and are not on the page yet. What is there now is the
+sentence they will sit under, because it is true with or without them: a `triggering`
+workflow never applies a mode, and the page says so.

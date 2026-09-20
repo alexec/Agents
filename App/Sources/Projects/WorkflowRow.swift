@@ -45,6 +45,22 @@ struct WorkflowRow: View {
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
+        // The whole card opens it, from a layer behind the content rather than from
+        // the card itself. Two other arrangements were tried and are worse: a tap
+        // gesture on the card never fires at all, and wrapping the card in a `Button`
+        // would take the clicks away from the play button, the archive button and the
+        // Ran → link, which have their own meanings and must keep their own hit areas.
+        // Behind the content, those three still win their own clicks and everything
+        // else on the card — which is most of it — falls through to here.
+        .background {
+            Button { model.openWorkflow = summary.id } label: {
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open \(workflow.name)")
+        }
         .contextMenu {
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }

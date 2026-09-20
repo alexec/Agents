@@ -11,13 +11,39 @@ struct ContentView: View {
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
 
-    /// The agent being read, as a path of nothing or one.
+    /// What is open on top of the project page: a conversation, or a workflow.
+    enum Page: Hashable {
+        case agent(UUID)
+        /// `Workflow.id` — the folder's path and the file's name, so two projects with
+        /// a workflow of the same name cannot collide.
+        case workflow(String)
+    }
+
+    /// What is being read, as a path of nothing or one.
     ///
     /// A chat is somewhere you go from the project and come back out of, rather than a
     /// column sitting beside it, so it is a push and the back button is the way home.
-    private var openAgent: Binding<[UUID]> {
-        Binding(get: { model.selection.map { [$0] } ?? [] },
-                set: { model.selection = $0.last })
+    /// A workflow is the same kind of thing — you open one to read it and you leave —
+    /// so it is the same kind of push, onto the same stack.
+    ///
+    /// **Read in `body`, not inside the binding's getter.** Observation registers what
+    /// a body actually reads while it runs, and a getter handed to `NavigationStack` is
+    /// run later and elsewhere. `selection` survived that because the body reads it in
+    /// three other places anyway; `openWorkflow` has nowhere else, so a getter was all
+    /// it had, and setting the field redrew nothing and opened nothing.
+    private var pages: [Page] {
+        if let id = model.openWorkflow { return [.workflow(id)] }
+        return model.selection.map { [.agent($0)] } ?? []
+    }
+
+    /// Where navigation writes back to. The only place either field is set from the
+    /// stack, which is what keeps the two exclusive: no path through here leaves both.
+    private func show(_ page: Page?) {
+        switch page {
+        case .agent(let id): model.selection = id; model.openWorkflow = nil
+        case .workflow(let id): model.openWorkflow = id; model.selection = nil
+        case nil: model.selection = nil; model.openWorkflow = nil
+        }
     }
 
     /// Put the file the selected agent asked about in front of the user.
@@ -37,6 +63,25 @@ struct ContentView: View {
         frame.isOpen = true
     }
 
+    /// A conversation and, when it is open and there is room, the sidebar beside it.
+    private func chat(inWindowOf width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            ChatView()
+                .frame(maxWidth: .infinity)
+            // Closed means absent, not hidden. Nothing of the sidebar runs while it is
+            // shut: no folder watch, no web view, no shell attached (FR-006, SC-009).
+            if frame.isOpen, SidebarFrame.fits(inWindowOf: width) {
+                SidebarView(windowWidth: width)
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                SidebarToggle(windowWidth: width)
+            }
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         GeometryReader { window in
@@ -53,25 +98,20 @@ struct ContentView: View {
                 if model.showsSpending {
                     SpendingView()
                 } else {
-                    NavigationStack(path: openAgent) {
+                    // `pages` is read here, in the body, so that opening a workflow
+                    // invalidates it. See the note on `pages`.
+                    let path = pages
+                    NavigationStack(path: Binding(get: { path }, set: { show($0.last) })) {
                         ProjectAgentsView(selection: $model.selection)
-                            .navigationDestination(for: UUID.self) { _ in
-                                HStack(spacing: 0) {
-                                    ChatView()
-                                        .frame(maxWidth: .infinity)
-                                    // Closed means absent, not hidden. Nothing of the
-                                    // sidebar runs while it is shut: no folder watch,
-                                    // no web view, no shell attached (FR-006, SC-009).
-                                    if frame.isOpen,
-                                       SidebarFrame.fits(inWindowOf: window.size.width) {
-                                        SidebarView(windowWidth: window.size.width)
-                                            .transition(.move(edge: .trailing))
-                                    }
-                                }
-                                .toolbar {
-                                    ToolbarItem(placement: .primaryAction) {
-                                        SidebarToggle(windowWidth: window.size.width)
-                                    }
+                            .navigationDestination(for: Page.self) { page in
+                                switch page {
+                                case .agent:
+                                    chat(inWindowOf: window.size.width)
+                                // No files pane and no sidebar toggle: a workflow has
+                                // no agent to have asked about a file, so there would
+                                // be nothing for either to show.
+                                case .workflow(let id):
+                                    WorkflowPage(workflowID: id)
                                 }
                             }
                     }
