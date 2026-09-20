@@ -391,7 +391,13 @@ struct WorkflowRefusalTests {
         _ = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: work, prompt: "Start it off"))
 
-        await eventually("the loop was refused") { await refusal(core, work, "loop") != nil }
+        // For the depth limit specifically. A loop this tight refuses for other reasons
+        // on the way — a run still in flight, most often — and the first refusal of any
+        // kind is not the one this test is about.
+        await eventually("the loop came to rest on the depth limit") {
+            if case .chainTooDeep = await refusal(core, work, "loop") { return true }
+            return false
+        }
 
         guard case .chainTooDeep = await refusal(core, work, "loop") else {
             Issue.record("expected chainTooDeep, got \(String(describing: await refusal(core, work, "loop")))")

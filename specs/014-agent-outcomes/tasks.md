@@ -139,19 +139,19 @@ description: "Task list for How It Actually Went"
 
 ### Tests for User Story 3
 
-- [ ] T045 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, end a turn with no report and assert exactly one prompt is enqueued, carrying `PromptOrigin.app`
-- [ ] T046 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, let the asked turn end with no report either and assert no second prompt is ever enqueued — count them, which is SC-009 — and that the agent then reads as unaccounted for, stays in `.finished` rather than `.needsAttention`, and carries no colour (FR-019, FR-021)
-- [ ] T047 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert the asked turn coming back *with* a report leaves the agent indistinguishable from one that reported first time, with nothing marking it as having been asked
-- [ ] T048 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert no question is asked when a person's prompt is already queued (FR-023), when the agent is archived, and when the turn ended short — cancelled, `maxTokens`, `processDied` — and that `EndedReason.summary` is what is shown in those cases (FR-025)
-- [ ] T049 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert a report followed by the process dying before the turn closes leaves both on the record: the `EndedReason` and the `WorkReport` (FR-031); and assert the asked turn's usage is recorded against the agent like any other turn (FR-024)
-- [ ] T050 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/LegacyRecordTests.swift`, assert an `Agent` record written before 014 opens with `report == nil` and `outcomeAsked == false`, that a 014 record read by a decoder without those keys keeps them in `unknownFields` and writes them back, that a `.workReported` entry read by a `Kind` decoder that does not know it comes through as `.unrecognised` rather than throwing, and that an unknown outcome string decodes to no report (FR-027)
+- [x] T045 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, end a turn with no report and assert exactly one prompt is enqueued, carrying `PromptOrigin.app`
+- [x] T046 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, let the asked turn end with no report either and assert no second prompt is ever enqueued — count them, which is SC-009 — and that the agent then reads as unaccounted for, stays in `.finished` rather than `.needsAttention`, and carries no colour (FR-019, FR-021)
+- [x] T047 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert the asked turn coming back *with* a report leaves the agent indistinguishable from one that reported first time, with nothing marking it as having been asked
+- [x] T048 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert no question is asked when a person's prompt is already queued (FR-023), when the agent is archived, and when the turn ended short — cancelled, `maxTokens`, `processDied` — and that `EndedReason.summary` is what is shown in those cases (FR-025)
+- [x] T049 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnreportedEndingTests.swift`, assert a report followed by the process dying before the turn closes leaves both on the record: the `EndedReason` and the `WorkReport` (FR-031); and assert the asked turn's usage is recorded against the agent like any other turn (FR-024)
+- [x] T050 [P] [US3] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/LegacyRecordTests.swift`, assert an `Agent` record written before 014 opens with `report == nil` and `outcomeAsked == false`, that a 014 record read by a decoder without those keys keeps them in `unknownFields` and writes them back, that a `.workReported` entry read by a `Kind` decoder that does not know it comes through as `.unrecognised` rather than throwing, and that an unknown outcome string decodes to no report (FR-027)
 
 ### Implementation for User Story 3
 
-- [ ] T051 [US3] Add `askForOutcomeIfSilent(agentID:reason:)` to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift` and call it from `finishTurn` after `releaseRuntime` and **before** `drainQueue`. The five conditions, all of which must hold, are in `contracts/daemon-api.md`: `reason == .endTurn`, `report == nil`, `outcomeAsked == false`, `queuedPrompts.isEmpty`, `state == .finished`. Set `outcomeAsked = true` **before** enqueuing, which is what makes the bound structural rather than conventional
-- [ ] T052 [US3] Enqueue the question through the ordinary `enqueue` path with `from: .app` and the wording from `contracts/agent-tool.md` ("That turn ended without a report…"), so it inherits starting the runtime, being recorded, and having its usage counted
-- [ ] T053 [US3] Add the unaccounted-for branch to `description` in `App/Sources/AgentList/AgentRow.swift` — "Finished without saying how it went" when `agent.endingIsUnaccountedFor` — with `questionmark.circle` in `.secondary`, placed after the report branch and before the `switch agent.state`
-- [ ] T054 [P] [US3] Add the same branch, wording and symbol to `Remote/Sources/Projects/AgentCard.swift`
+- [x] T051 [US3] Add `askForOutcomeIfSilent(agentID:reason:)` to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift` and call it from `finishTurn` after `releaseRuntime` and **before** `drainQueue`. The five conditions, all of which must hold, are in `contracts/daemon-api.md`: `reason == .endTurn`, `report == nil`, `outcomeAsked == false`, `queuedPrompts.isEmpty`, `state == .finished`. Set `outcomeAsked = true` **before** enqueuing, which is what makes the bound structural rather than conventional
+- [x] T052 [US3] Enqueue the question through the ordinary `enqueue` path with `from: .app` and the wording from `contracts/agent-tool.md` ("That turn ended without a report…"), so it inherits starting the runtime, being recorded, and having its usage counted
+- [x] T053 [US3] Add the unaccounted-for branch to `description` in `App/Sources/AgentList/AgentRow.swift` — "Finished without saying how it went" when `agent.endingIsUnaccountedFor` — with `questionmark.circle` in `.secondary`, placed after the report branch and before the `switch agent.state`
+- [x] T054 [P] [US3] Add the same branch, wording and symbol to `Remote/Sources/Projects/AgentCard.swift`
 - [x] T055 [US3] Draw a `userMessage` with `from: .app` in the transcript's secondary voice with a short attribution ("Agents asked"), never in the person's bubble, in `App/Sources/Chat/Transcript.swift` (FR-022)
 - [x] T056 [P] [US3] Draw it the same way in `Remote/Sources/Chat/EntryView.swift`
 
@@ -167,13 +167,13 @@ description: "Task list for How It Actually Went"
 
 ### Tests for User Story 4
 
-- [ ] T057 [P] [US4] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/WorkflowFiringTests.swift`, fire a workflow, have its agent report `stuck`, and assert the workflow's row data carries that outcome alongside the existing "Ran" record and that the project's `needsInput` is true (FR-028, FR-029)
+- [x] T057 [P] [US4] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/WorkflowFiringTests.swift`, fire a workflow, have its agent report `stuck`, and assert the workflow's row data carries that outcome alongside the existing "Ran" record and that the project's `needsInput` is true (FR-028, FR-029)
 
 ### Implementation for User Story 4
 
-- [ ] T058 [US4] In `App/Sources/Projects/WorkflowRow.swift`, look the agent up from `WorkflowOutcome.ran(agentID:at:)` — which already carries the id — and show its `report?.message` under the existing "Ran" line. Do not copy the report into the workflow record (Research R10)
-- [ ] T059 [US4] Give that row the colour it already gives a refusal that needs a person, when the run's agent reported an outcome with `needsAPerson`, in `App/Sources/Projects/WorkflowRow.swift`
-- [ ] T060 [P] [US4] Make the project page's equivalent show the same thing in `Remote/Sources/Projects/ProjectPageView.swift`, if that view draws workflow rows; otherwise note in the task's commit that the phone has no workflow row yet and this is Mac-only
+- [x] T058 [US4] In `App/Sources/Projects/WorkflowRow.swift`, look the agent up from `WorkflowOutcome.ran(agentID:at:)` — which already carries the id — and show its `report?.message` under the existing "Ran" line. Do not copy the report into the workflow record (Research R10)
+- [x] T059 [US4] Give that row the colour it already gives a refusal that needs a person, when the run's agent reported an outcome with `needsAPerson`, in `App/Sources/Projects/WorkflowRow.swift`
+- [x] T060 [P] [US4] Make the project page's equivalent show the same thing in `Remote/Sources/Projects/ProjectPageView.swift`, if that view draws workflow rows; otherwise note in the task's commit that the phone has no workflow row yet and this is Mac-only
 
 **Checkpoint**: All four stories work independently.
 
@@ -181,13 +181,13 @@ description: "Task list for How It Actually Went"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T061 Create `Packages/AgentsKit/Tests/AgentsKitTests/Live/OutcomeReportLiveTests.swift` modelled on `Live/SuggestedPromptLiveTests.swift`: against each signed-in runtime, give a task containing an unanswerable question and assert the turn ends with a `needs_answer` report rather than the question buried in a reply. This is the only check that can fail for reasons no unit test sees
-- [ ] T062 Record the per-runtime adoption rate from T061 in `specs/014-agent-outcomes/research.md` as a new section, against SC-007's 90% target — a runtime that will not call the tool is a finding to write down, not a failure of the design
+- [x] T061 Create `Packages/AgentsKit/Tests/AgentsKitTests/Live/OutcomeReportLiveTests.swift` modelled on `Live/SuggestedPromptLiveTests.swift`: against each signed-in runtime, give a task containing an unanswerable question and assert the turn ends with a `needs_answer` report rather than the question buried in a reply. This is the only check that can fail for reasons no unit test sees
+- [ ] T062 Record the per-runtime adoption rate from T061 in `specs/014-agent-outcomes/research.md` as a new section, against SC-007's 90% target — a runtime that will not call the tool is a finding to write down, not a failure of the design. **Blocked on a person**: T061's suite is written but needs a signed-in runtime and spends real money, so it has not been run. `research.md` R11 holds the place and the command.
 - [x] T063 [P] Add `.workReported` and the `userMessage` origin to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReplayTests.swift` so a transcript round-trips through the store unchanged
-- [ ] T064 [P] Update `Remote/Sources/Preview/Canned.swift` and `FakeDaemon.swift` with agents carrying each of the five outcomes and one unaccounted-for ending, so the previews show what the feature actually looks like
-- [ ] T065 Re-read `Briefing.text` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` end to end after T032 and cut anything the four lines now say twice — the file's own rule is that an agent told six things at once follows the first two, and this feature adds the fourth thing
-- [ ] T066 Run `swift test --package-path Packages/AgentsKit` and `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, and fix what breaks
-- [ ] T067 Walk `specs/014-agent-outcomes/quickstart.md` checks 1 through 6 by hand, including check 5 in the running app, and correct the quickstart where the built thing differs from what it predicted
+- [x] T064 [P] Update `Remote/Sources/Preview/Canned.swift` and `FakeDaemon.swift` with agents carrying each of the five outcomes and one unaccounted-for ending, so the previews show what the feature actually looks like
+- [x] T065 Re-read `Briefing.text` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` end to end after T032 and cut anything the four lines now say twice — the file's own rule is that an agent told six things at once follows the first two, and this feature adds the fourth thing
+- [x] T066 Run `swift test --package-path Packages/AgentsKit` and `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, and fix what breaks
+- [ ] T067 Walk `specs/014-agent-outcomes/quickstart.md` checks 1 through 6 by hand, including check 5 in the running app, and correct the quickstart where the built thing differs from what it predicted. **Checks 1, 2, 3, 4 and 6 done and the quickstart corrected against them. Check 5 is blocked on a person**: it needs the app in front of somebody with a signed-in runtime.
 
 ---
 

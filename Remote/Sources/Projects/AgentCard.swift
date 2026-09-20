@@ -13,7 +13,8 @@ struct AgentCard: View {
         NavigationLink(value: agent.id) {
             HStack(alignment: .top, spacing: 12) {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
-                           outcome: agent.report?.outcome)
+                           outcome: agent.report?.outcome,
+                           isUnaccountedFor: agent.endingIsUnaccountedFor)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -62,6 +63,10 @@ struct AgentCard: View {
         // anything we would otherwise derive (FR-013). The same branch, in the same
         // place, as the Mac's row.
         if let message = agent.report?.message { return message }
+        // Ours, because nobody said. A turn that ended cleanly, was asked how it went,
+        // and still said nothing is a thing to know rather than a thing to do — so it
+        // is marked, and left where it is (FR-019).
+        if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
         switch agent.state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting for your answer"
@@ -98,7 +103,8 @@ struct AgentCard: View {
         [agent.title ?? "Untitled",
          isComingBack
             ? AgentsModel.comingBackDescription
-            : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome),
+            : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
+                               isUnaccountedFor: agent.endingIsUnaccountedFor),
          description]
             .joined(separator: ", ")
     }
@@ -116,6 +122,10 @@ struct StatusIcon: View {
     /// What the agent said about the work, where it said anything. Filled means
     /// somebody said so, hollow means nobody did, and colour means you.
     var outcome: WorkOutcome?
+    /// A turn that ended cleanly, was asked how it went, and still said nothing.
+    /// Hollow and grey: nobody vouched for it, which is worth seeing and not worth
+    /// spending the app's one colour on.
+    var isUnaccountedFor = false
 
     var body: some View {
         Group {
@@ -150,6 +160,7 @@ struct StatusIcon: View {
             case .stuck: return "exclamationmark.triangle.fill"
             }
         }
+        if isUnaccountedFor && state == .finished { return "questionmark.circle" }
         switch state {
         case .running: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"
@@ -168,8 +179,10 @@ struct StatusIcon: View {
 
     /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,
     /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
-    static func words(for state: AgentState, outcome: WorkOutcome? = nil) -> String {
+    static func words(for state: AgentState, outcome: WorkOutcome? = nil,
+                      isUnaccountedFor: Bool = false) -> String {
         if state == .finished, let outcome { return outcome.heading }
+        if state == .finished, isUnaccountedFor { return "Finished without saying how it went" }
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"

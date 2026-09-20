@@ -7,6 +7,10 @@ import Foundation
 /// two projects that would share a name, an agent waiting on a question, one working
 /// with a plan half done, one that crashed, one archived, and a conversation long
 /// enough that opening it has to page.
+///
+/// And every outcome an agent can report, plus an ending nobody accounted for, because
+/// the whole of 014 is a difference between endings and a preview that shows one of
+/// them shows none of it.
 enum Canned {
     static let home = URL(filePath: NSHomeDirectory())
 
@@ -21,6 +25,11 @@ enum Canned {
     static let done = UUID(uuidString: "00000000-0000-0000-0000-0000000000A4")!
     static let filed = UUID(uuidString: "00000000-0000-0000-0000-0000000000A5")!
     static let inTheOther = UUID(uuidString: "00000000-0000-0000-0000-0000000000A6")!
+    static let asking = UUID(uuidString: "00000000-0000-0000-0000-0000000000A7")!
+    static let halfDone = UUID(uuidString: "00000000-0000-0000-0000-0000000000A8")!
+    static let stuck = UUID(uuidString: "00000000-0000-0000-0000-0000000000A9")!
+    static let nothingToDo = UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!
+    static let unaccounted = UUID(uuidString: "00000000-0000-0000-0000-0000000000AB")!
 
     static func ago(_ minutes: Int) -> Date { Date(timeIntervalSinceNow: -Double(minutes) * 60) }
 
@@ -47,10 +56,51 @@ enum Canned {
                   title: "Rename the suggestion service", state: .stopped,
                   createdAt: ago(190), lastActivityAt: ago(140),
                   endedReason: .processDied, costToDate: ["USD": 0.11]),
+            // Reported `done`: green, filled, and the only thing in this app allowed
+            // to read as Complete.
             Agent(id: done, runtimeID: "grok", cwd: agentsFolder,
                   title: "Swipe a chat aside to archive it", state: .finished,
                   createdAt: ago(400), lastActivityAt: ago(320),
-                  endedReason: .endTurn, costToDate: ["USD": 0.47]),
+                  endedReason: .endTurn, costToDate: ["USD": 0.47],
+                  report: WorkReport(outcome: .done,
+                                     message: "Renamed 14 call sites; the tests pass.",
+                                     at: ago(320))),
+            // The three that want a person, which is what Needs attention is for.
+            Agent(id: asking, runtimeID: "claude", cwd: agentsFolder,
+                  title: "Fix the parser", state: .finished,
+                  createdAt: ago(80), lastActivityAt: ago(52),
+                  endedReason: .endTurn, costToDate: ["USD": 0.31],
+                  report: WorkReport(outcome: .needsAnswer,
+                                     message: "Drop the old index first, or migrate it?",
+                                     at: ago(52))),
+            Agent(id: halfDone, runtimeID: "copilot", cwd: agentsFolder,
+                  title: "Update the call sites", state: .finished,
+                  createdAt: ago(70), lastActivityAt: ago(44),
+                  endedReason: .endTurn, costToDate: ["USD": 0.22],
+                  report: WorkReport(outcome: .partlyDone,
+                                     message: "Five of six done; the sixth is generated code.",
+                                     at: ago(44))),
+            Agent(id: stuck, runtimeID: "cursor", cwd: apiFolder,
+                  title: "Ship the release", state: .finished,
+                  createdAt: ago(60), lastActivityAt: ago(35),
+                  endedReason: .endTurn, costToDate: ["USD": 0.08],
+                  report: WorkReport(outcome: .stuck,
+                                     message: "No signing certificate on this machine.",
+                                     at: ago(35))),
+            // Looked, and there was nothing to do: hollow and grey, under Complete.
+            Agent(id: nothingToDo, runtimeID: "grok", cwd: agentsFolder,
+                  title: "Nightly build check", state: .finished,
+                  createdAt: ago(600), lastActivityAt: ago(590),
+                  endedReason: .endTurn, costToDate: ["USD": 0.03],
+                  report: WorkReport(outcome: .nothingToDo,
+                                     message: "Nothing failed overnight.", at: ago(590))),
+            // Asked, and still said nothing. Under Complete, and marked so nobody
+            // mistakes it for an ending somebody vouched for.
+            Agent(id: unaccounted, runtimeID: "copilot", cwd: agentsFolder,
+                  title: "Tidy the imports", state: .finished,
+                  createdAt: ago(500), lastActivityAt: ago(470),
+                  endedReason: .endTurn, costToDate: ["USD": 0.05],
+                  outcomeAsked: true),
             Agent(id: filed, runtimeID: "claude", cwd: agentsFolder,
                   title: "The project lead that came back out", state: .archived,
                   createdAt: ago(2_200), lastActivityAt: ago(2_000),

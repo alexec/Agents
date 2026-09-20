@@ -68,18 +68,23 @@ public enum Briefing {
     ///
     /// The one line here that buys something the app cannot get any other way: without
     /// it the app knows only that a turn ended, and a turn ending is not the work being
-    /// finished. It names the outcomes rather than pointing at the tool's own
-    /// description, because a description is a menu and this is an instruction — the
-    /// same lesson `suggestions` was written from.
+    /// finished.
     ///
     /// It sits after `escalation` deliberately. An agent reads that it should ask with
     /// the tool that waits before it reads that it can end by saying it needs an
     /// answer, which is the order those two have to be read in.
+    ///
+    /// What it does *not* do is list the five outcomes. The tool's own schema enumerates
+    /// them and refuses anything else, so saying them here as well would be this block's
+    /// own rule broken — an agent told six things at once follows the first two, and the
+    /// thing this line has to land is that the call happens at all. It also does not
+    /// repeat "when you finish a turn", which `suggestions` has already said: two lines
+    /// naming the same moment read as two moments.
     public static let outcome = """
-        When you finish a turn, call \(AppTool.reportOutcome) to say how it actually \
-        went — done, or nothing to do, or that you need an answer, or that you only got \
-        part of the way, or that you are stuck — with a sentence I can read without \
-        opening the conversation. Without it I only see that you stopped.
+        Call \(AppTool.reportOutcome) at the end of that same turn, with how it \
+        actually went and a sentence I can read without opening the conversation. \
+        Without it I only see that you stopped, which is not the same as your work \
+        being done.
         """
 
     /// In the order they are sent.

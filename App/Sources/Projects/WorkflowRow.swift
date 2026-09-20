@@ -83,6 +83,14 @@ struct WorkflowRow: View {
                     }
                 }
                 .buttonStyle(.link)
+                // What the run's agent said about the work, in its own words. Without
+                // this the row can say a run happened and nothing about whether it was
+                // any good, which is the whole of the fourth story: four quiet nights
+                // and one that stopped half way look identical otherwise.
+                if let said = ranReport?.message {
+                    Text("·")
+                    Text(said).lineLimit(1).truncationMode(.tail)
+                }
             } else if let outcome = outcomeText {
                 Text(outcome)
             }
@@ -90,8 +98,25 @@ struct WorkflowRow: View {
         .font(.caption)
         // Grey unless somebody is needed. The app's one use of colour, and spending it
         // on a workflow that skipped a single fire would be spending it on nothing.
-        .foregroundStyle(summary.needsAPerson ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tertiary))
+        // An agent that said it cannot get further without a person earns it on the
+        // same terms a refusal that needs one does.
+        .foregroundStyle(wantsAPerson ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tertiary))
         .lineLimit(1)
+    }
+
+    /// What the agent this workflow's last run started said about how it went.
+    ///
+    /// Looked up rather than copied onto the workflow record: `WorkflowOutcome.ran`
+    /// already carries the agent's id, and a second copy of the report would be a
+    /// second thing to keep in step with the first.
+    private var ranReport: WorkReport? {
+        model.work.agent(ranAgentID)?.report
+    }
+
+    /// Whether this row wants a person: because the workflow itself does, or because
+    /// the agent its last run started said so.
+    private var wantsAPerson: Bool {
+        summary.needsAPerson || ranReport?.outcome.needsAPerson == true
     }
 
     /// Two icons, and on an archived row one word.
@@ -150,6 +175,9 @@ struct WorkflowRow: View {
 
     /// Whether anything is drawn after the next-fire time.
     private var hasHappened: Bool { ranAgentID != nil || outcomeText != nil }
+
+    /// The id of the agent the last run started, if the last thing that happened was
+    /// a run rather than a refusal.
 
     private var ranAgentID: UUID? {
         if case .ran(let agentID, _) = summary.lastOutcome { return agentID }

@@ -76,15 +76,20 @@ speaking, because it is sent in their turn, and kept short because the whole blo
 first prompt of every conversation.
 
 ```text
-When you finish a turn, call report_outcome to say how it actually went — done, or
-nothing to do, or that you need an answer, or that you only got part of the way, or that
-you are stuck — with a sentence I can read without opening the conversation. Without it
-I only see that you stopped.
+Call report_outcome at the end of that same turn, with how it actually went and a
+sentence I can read without opening the conversation. Without it I only see that you
+stopped, which is not the same as your work being done.
 ```
 
-`BriefingTests.itStaysShortEnoughToBeRead` caps the whole block at 1,200 characters. This line is
-roughly 300, and the existing three come to roughly 900, so the ceiling moves — deliberately, in the
-manner that test already describes, "a ceiling to notice, not a rule".
+**Changed from the draft above during T065**, which re-read the whole block end to end as the file's
+own rule demands. The draft opened "When you finish a turn", which `suggestions` has already said —
+two lines naming the same moment read as two moments — and listed all five outcomes, which the tool's
+schema already enumerates and refuses anything outside. Both are cut. What is left is the one thing
+this line has to land: that the call happens at all.
+
+`BriefingTests.itStaysShortEnoughToBeRead` capped the whole block at 1,200 characters. The four lines
+come to roughly 1,130, so the ceiling moves to 1,500 — deliberately, in the manner that test already
+describes, "a ceiling to notice, not a rule".
 
 ## The question a silent agent gets
 

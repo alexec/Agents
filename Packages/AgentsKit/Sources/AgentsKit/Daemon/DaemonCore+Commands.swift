@@ -544,7 +544,11 @@ extension DaemonCore {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
-        clearSuggestions(for: agentID)
+        //
+        // Only by them. The app's own question is not an answer to a suggestion, and
+        // taking the chips away would lose the person something they never acted on
+        // over a turn they did not ask for (FR-031).
+        if from == .person { clearSuggestions(for: agentID) }
         // The text is kept beside the blocks so the record reads the way it always has.
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
                      for: agentID)
@@ -626,8 +630,61 @@ extension DaemonCore {
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
+        await askForOutcomeIfSilent(agentID: agentID, reason: reason)
         await drainQueue(after: agentID)
     }
+
+    /// A turn ended and said nothing about how it went. Ask, once.
+    ///
+    /// Most silences are an agent that simply forgot, and one question gets an answer
+    /// out of most of them. A second would be an argument, and an unbounded number
+    /// would let a runtime that will never call the tool double the cost of every turn
+    /// it takes — so the flag goes up *before* the prompt is enqueued. The turn this
+    /// question causes comes back through here, finds the flag already set, and stops.
+    /// That is what makes the bound structural rather than a convention somebody has to
+    /// keep.
+    ///
+    /// Nothing is owed after the fact. A daemon that restarts between the ending and
+    /// this leaves `outcomeAsked` false on a record whose turn is long over, which is
+    /// harmless: only a fresh `.endTurn` opens the gate.
+    func askForOutcomeIfSilent(agentID: UUID, reason: EndedReason) async {
+        guard willAskForOutcome(agentID: agentID, reason: reason),
+              var agent = agents[agentID] else { return }
+        agent.outcomeAsked = true
+        changed(agent)
+        // Through the ordinary path, so it starts the runtime, is recorded, and has
+        // what it costs counted against the agent like any other turn (FR-024).
+        try? await enqueue(DaemonAPI.PromptRequest(agentID: agentID, text: Self.askForOutcome,
+                                                   from: .app), first: false)
+    }
+
+    /// Whether this ending is one the app is about to ask about.
+    ///
+    /// Asked twice, at two moments in the same ending: once by `move`, which holds the
+    /// lifecycle workflows back so they fire on the ending that is accounted for rather
+    /// than on both, and once by `askForOutcomeIfSilent`, which acts on it. The same
+    /// five conditions either time, which is why they are here and not written out
+    /// twice.
+    ///
+    /// An ending short keeps its own wording and is never asked about: this feature
+    /// adds an account of the *work*, not a restatement of how the *turn* ended
+    /// (FR-025). A prompt already waiting means they have moved the work on, and asking
+    /// an agent to account for a turn they have superseded is noise (FR-023).
+    func willAskForOutcome(agentID: UUID, reason: EndedReason?) -> Bool {
+        guard reason == .endTurn, let agent = agents[agentID] else { return false }
+        return agent.state == .finished
+            && agent.report == nil
+            && !agent.outcomeAsked
+            && agent.queuedPrompts.isEmpty
+    }
+
+    /// The whole of what a silent agent is asked. Short, and closed: an agent invited
+    /// to explain itself in prose would explain itself in prose, and prose is not an
+    /// outcome.
+    static let askForOutcome = """
+        That turn ended without a report. Call \(AppTool.reportOutcome) now with how it \
+        actually went, and say nothing else. If the work is done, that is done.
+        """
 
     private func turnFailed(agentID: UUID, error: any Error) async {
         turnTasks.removeValue(forKey: agentID)

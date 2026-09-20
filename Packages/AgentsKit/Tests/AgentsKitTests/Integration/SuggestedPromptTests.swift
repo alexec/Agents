@@ -229,10 +229,12 @@ struct SuggestedPromptTests {
 
         _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
         await eventually("the prompt reached the runtime") {
-            await launcher.lastAgent?.promptContent != nil
+            await launcher.allAgents.first?.promptContent != nil
         }
 
-        let sent = await launcher.lastAgent?.promptContent?.arrayValue ?? []
+        // The first runtime's, not the last one's: a turn that ends without saying how
+        // it went is asked, and that question starts a runtime of its own.
+        let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
         #expect(sent.count == 2)
         #expect(sent.first?["text"]?.stringValue == "do the thing")
         #expect(sent.last?["text"]?.stringValue == Briefing.text)
@@ -256,16 +258,25 @@ struct SuggestedPromptTests {
                          ["and the next thing"]])
     }
 
-    /// Every prompt that reached a runtime, in order, as lists of the text in it.
+    /// Every prompt of the person's that reached a runtime, in order, as lists of the
+    /// text in it.
     ///
     /// Asked of every runtime the launcher made rather than of the last one: the
     /// daemon starts the next runtime before it has anything to send it, so "the last
     /// one" is sometimes a process that has not been spoken to yet.
+    ///
+    /// The app's own question after a silent ending is left out. It is a prompt and it
+    /// does reach a runtime, but these tests are about what the briefing rides on, and
+    /// 014's question is covered where it belongs, in `UnreportedEndingTests`.
     private func prompts(_ launcher: FakeLauncher) async -> [[String]] {
         var sent: [[String]] = []
         for fake in launcher.allAgents {
             guard let blocks = await fake.promptContent?.arrayValue else { continue }
-            sent.append(blocks.compactMap { $0["text"]?.stringValue })
+            let texts = blocks.compactMap { $0["text"]?.stringValue }
+            if texts.contains(where: { $0.contains(AppTool.reportOutcome) && $0.hasPrefix("That turn") }) {
+                continue
+            }
+            sent.append(texts)
         }
         return sent
     }
