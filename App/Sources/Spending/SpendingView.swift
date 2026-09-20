@@ -113,7 +113,7 @@ private struct ShareRow: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 24)
-            Text(share.amount.formatted(.currency(code: currency)))
+            Text(share.amount.money(in: currency))
                 .monospacedDigit()
                 .foregroundStyle(share.isArchived ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
         }
@@ -124,7 +124,7 @@ private struct ShareRow: View {
 
     /// Said in words, because "greyed out" is not something VoiceOver can read.
     private var accessibilityLabel: String {
-        let amount = share.amount.formatted(.currency(code: currency))
+        let amount = share.amount.money(in: currency)
         return share.isArchived ? "\(share.name), archived, \(amount)" : "\(share.name), \(amount)"
     }
 }

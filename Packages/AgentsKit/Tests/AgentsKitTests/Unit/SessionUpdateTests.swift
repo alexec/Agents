@@ -159,8 +159,9 @@ struct SessionUpdateTests {
     @Test func aTotalIsOneNumberPerCurrency() {
         #expect(Cost.total(of: [:]) == nil, "nothing spent shows nothing, not a zero")
 
+        // To the nearest whole unit, which is how every cost is shown (`money(in:)`).
         let one = Cost.total(of: ["USD": 1.5])
-        #expect(one?.contains("1.5") == true)
+        #expect(one == Decimal(2).money(in: "USD"))
 
         // Two currencies read as two numbers, in currency order, never added.
         let two = Cost.total(of: ["USD": 1.5, "GBP": 0.5])

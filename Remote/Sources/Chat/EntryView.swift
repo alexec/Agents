@@ -124,7 +124,7 @@ private struct EntryRow: View {
     static func usageLine(_ usage: TurnUsage) -> String? {
         guard let cost = usage.cost else { return nil }
         return "\(usage.totalTokens.formatted()) tokens · "
-            + cost.amount.formatted(.currency(code: cost.currency))
+            + cost.amount.money(in: cost.currency)
     }
 }
 

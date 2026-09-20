@@ -55,7 +55,7 @@ struct ContextMeter: View {
         guard let ceiling = agent.ceiling(under: limits), let headroom else {
             return "What this agent has cost so far"
         }
-        let left = headroom.formatted(.currency(code: ceiling.currency))
+        let left = headroom.money(in: ceiling.currency)
         return agent.isAtCostLimit(under: limits)
             ? "This agent has reached its cost limit"
             : "What this agent has cost so far — \(left) left of its limit"
@@ -93,7 +93,7 @@ struct ContextMeter: View {
         if agent.costIsUnmeasured { return "Not measured" }
         let spent = Cost.total(of: agent.costToDate)
             ?? (agent.usage?.cost?.amount ?? 0)
-                .formatted(.currency(code: agent.usage?.cost?.currency ?? "USD"))
+                .money(in: agent.usage?.cost?.currency ?? "USD")
         // `$0.42 of $2.00`, and nothing extra when there is no limit — a figure that
         // comes and goes is one you stop trusting.
         guard let ceiling = agent.ceiling(under: limits) else { return spent }

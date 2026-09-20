@@ -57,7 +57,7 @@ struct UsageLine: View {
             parts.append("\(usage.totalTokens.formatted()) tokens")
         }
         if let cost = usage.cost {
-            parts.append(cost.amount.formatted(.currency(code: cost.currency)))
+            parts.append(cost.amount.money(in: cost.currency))
         }
         return parts.joined(separator: " · ")
     }

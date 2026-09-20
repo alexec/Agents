@@ -147,7 +147,7 @@ private struct ShareRow: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
-            Text(share.amount.formatted(.currency(code: currency)))
+            Text(share.amount.money(in: currency))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }

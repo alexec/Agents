@@ -199,7 +199,7 @@ private struct SpendingRow: View {
                     // not a thing to draw an empty gauge for.
                     if let state = model.costState, let left = state.dayHeadroom,
                        let daily = state.limits.daily {
-                        Text("\(left.formatted(.currency(code: daily.currency))) left")
+                        Text("\(left.money(in: daily.currency)) left")
                             .font(.caption2)
                     }
                 }

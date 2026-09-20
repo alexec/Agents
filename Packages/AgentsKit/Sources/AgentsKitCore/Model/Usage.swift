@@ -100,7 +100,20 @@ public struct Cost: Codable, Hashable, Sendable {
         guard !costToDate.isEmpty else { return nil }
         return costToDate
             .sorted { $0.key < $1.key }
-            .map { $0.value.formatted(.currency(code: $0.key)) }
+            .map { $0.value.money(in: $0.key) }
             .joined(separator: " · ")
+    }
+}
+
+public extension Decimal {
+    /// A cost for the eye: whole units, to the nearest, in the currency's own sign —
+    /// `$3`, not `$2.84`. Every figure of spending a person is shown goes through
+    /// here, so the sidebar, the meter, the spending page and the phone agree on what
+    /// a dollar looks like. Not for a limit: that is a number somebody typed, and it
+    /// is shown as typed.
+    func money(in currency: String) -> String {
+        formatted(.currency(code: currency)
+            .precision(.fractionLength(0))
+            .rounded(rule: .toNearestOrAwayFromZero))
     }
 }

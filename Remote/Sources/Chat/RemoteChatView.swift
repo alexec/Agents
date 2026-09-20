@@ -271,7 +271,7 @@ struct ContextMeter: View {
         if agent.costIsUnmeasured { return "Not measured" }
         let spent = Cost.total(of: agent.costToDate)
             ?? (agent.usage?.cost?.amount ?? 0)
-                .formatted(.currency(code: agent.usage?.cost?.currency ?? "USD"))
+                .money(in: agent.usage?.cost?.currency ?? "USD")
         guard let ceiling = agent.ceiling(under: model.costLimits) else { return spent }
         return "\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))"
     }
