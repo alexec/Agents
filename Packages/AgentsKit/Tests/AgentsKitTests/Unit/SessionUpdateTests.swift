@@ -75,6 +75,7 @@ struct SessionUpdateTests {
                          "content": ["type": "image", "mimeType": "image/png", "data": .string(picture)]]],
             "rawInput": ["description": "Take a screenshot"],
             "rawOutput": [["type": "image", "source": ["data": .string(picture)]]],
+            "_meta": ["claudeCode": ["toolResponse": ["file": ["base64": .string(picture)]]]],
             "invented": "kept",
         ])
         guard case .entry(.toolCallUpdate(let call)) = update else {
@@ -87,6 +88,7 @@ struct SessionUpdateTests {
         #expect(call.raw?["content"] == nil)
         #expect(call.raw?["rawInput"] == nil)
         #expect(call.raw?["rawOutput"] == nil)
+        #expect(call.raw?["_meta"] == nil)
         #expect(call.raw?["title"]?.stringValue == "Screenshot")
         #expect(call.raw?["invented"]?.stringValue == "kept")
         #expect(call.line == "Take a screenshot")

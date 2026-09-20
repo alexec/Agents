@@ -126,9 +126,14 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// two megabytes for one call, and a chat whose page took seconds to load. What
     /// is left is what nothing else took: the title, the kind, the status, the
     /// locations, and any key a runtime invents.
+    ///
+    /// `_meta` goes too. It is the protocol's bag for a runtime's own extras, and the
+    /// Claude adapter fills it with the whole tool response — the same screenshot a
+    /// third time, under `claudeCode.toolResponse.file.base64`. Nothing in either app
+    /// reads a tool call's `_meta`, and a copy nobody reads is not detail, it is weight.
     public static func trimmingParsedFields(_ raw: JSONValue?) -> JSONValue? {
         guard case .object(var fields)? = raw else { return raw }
-        for key in ["content", "rawInput", "rawOutput"] { fields.removeValue(forKey: key) }
+        for key in ["content", "rawInput", "rawOutput", "_meta"] { fields.removeValue(forKey: key) }
         return .object(fields)
     }
 
