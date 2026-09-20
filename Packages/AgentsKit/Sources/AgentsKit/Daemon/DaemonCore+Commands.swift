@@ -201,7 +201,11 @@ extension DaemonCore {
 
     /// A folder, a runtime, and a handshake. Everything that can go wrong here is
     /// something the user needs told rather than a log line.
-    private func freshSession(runtimeID: String, cwd: URL,
+    ///
+    /// Internal rather than private because the workflow start path has to make a
+    /// session before there is an agent, so that it can refuse a setting the runtime
+    /// will not take without an agent ever existing to be refused on.
+    func freshSession(runtimeID: String, cwd: URL,
                               mcpServers: [MCPServer] = []) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
