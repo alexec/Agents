@@ -142,10 +142,16 @@ struct ElicitationView: View {
     /// among them — bounded so that a long one cannot push the answer row off the
     /// bottom of the window.
     ///
-    /// Only wrapped in a scroll view once it is actually too tall. A scroll view takes
-    /// all the height it is offered, so wrapping unconditionally left a short question
-    /// sitting at the top of a card padded out to the cap — which is what it did, and
-    /// what the card looked like before this measured first and wrapped second.
+    /// Measured first, then wrapped in a scroll view no taller than what was measured.
+    /// A scroll view takes all the height it is offered, so wrapping before measuring
+    /// left a short question sitting at the top of a card padded out to the cap; held
+    /// to its content's height it is exactly the question when there is room. And it
+    /// is wrapped whether or not it is over the cap, because the bound that matters
+    /// is not only the cap but the pane: a plain stack ignores a height it cannot
+    /// meet and overflows, and with the card pinned to the foot of the pane the
+    /// overflow went below the window, taking the answer row with it. A scroll view
+    /// keeps to what the pane leaves it after the prompt bar and the card's own words,
+    /// so the row stays on the glass at any window height and the question scrolls.
     @ViewBuilder
     private func question(_ properties: [ElicitationSchema.Property],
                           page: Int, last: Int) -> some View {
@@ -156,11 +162,12 @@ struct ElicitationView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeights[page] = $0 }
-        if (questionHeights[page] ?? 0) > Self.questionCap {
+        if let measured = questionHeights[page], measured > 0 {
             ScrollView { content }
-                .frame(height: Self.questionCap)
+                .frame(maxHeight: min(measured, Self.questionCap))
                 .scrollBounceBehavior(.basedOnSize)
         } else {
+            // The first pass, which is where the measurement comes from.
             content
         }
     }
