@@ -87,7 +87,7 @@ public enum SessionUpdate: Sendable {
                  locations: (update["locations"]?.arrayValue ?? []).compactMap(ToolCallLocation.init(wire:)),
                  rawInput: update["rawInput"],
                  rawOutput: update["rawOutput"],
-                 raw: update)
+                 raw: ToolCall.trimmingParsedFields(update))
     }
 }
 

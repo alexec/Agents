@@ -68,7 +68,10 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// carries only the output must not lose the input. That was the bug.
     public var rawInput: JSONValue?
     public var rawOutput: JSONValue?
-    /// The whole thing as it arrived, for the parts of the UI that want detail.
+    /// The rest of what arrived, for the parts of the UI that want detail: whatever
+    /// the fields above did not take. Never `content`, `rawInput` or `rawOutput` —
+    /// those are parsed out and kept above, and keeping them here as well stored a
+    /// screenshot four times over (`trimmingParsedFields`).
     public var raw: JSONValue?
 
     public init(toolCallID: String? = nil, title: String, name: String? = nil,
@@ -81,26 +84,52 @@ public struct ToolCall: Codable, Hashable, Sendable {
         self.name = name
         self.kind = kind
         self.status = status
-        self.content = content
-        self.locations = locations
-        self.rawInput = rawInput
-        self.rawOutput = rawOutput
-        self.raw = raw
+        // Whatever was handed over whole and not as a field of its own is split out
+        // here, the same way an update off the wire is: a permission question hands
+        // over the whole tool call, and a record written before these fields existed
+        // holds only the whole update. Either way the fields end up filled and `raw`
+        // ends up trimmed, so nothing has to look in two places.
+        self.content = content.isEmpty
+            ? (raw?["content"]?.arrayValue ?? []).map(ToolCallContent.init(wire:)) : content
+        self.locations = locations.isEmpty
+            ? (raw?["locations"]?.arrayValue ?? []).compactMap(ToolCallLocation.init(wire:)) : locations
+        self.rawInput = rawInput ?? raw?["rawInput"]
+        self.rawOutput = rawOutput ?? raw?["rawOutput"]
+        self.raw = Self.trimmingParsedFields(raw)
     }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        toolCallID = try c.decodeIfPresent(String.self, forKey: .toolCallID)
-        title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Tool call"
-        name = try c.decodeIfPresent(String.self, forKey: .name)
-        kind = try c.decodeIfPresent(String.self, forKey: .kind)
-        status = try c.decodeIfPresent(String.self, forKey: .status)
-        // Every one of these is new in 003. A record written before it has none.
-        content = try c.decodeIfPresent([ToolCallContent].self, forKey: .content) ?? []
-        locations = try c.decodeIfPresent([ToolCallLocation].self, forKey: .locations) ?? []
-        rawInput = try c.decodeIfPresent(JSONValue.self, forKey: .rawInput)
-        rawOutput = try c.decodeIfPresent(JSONValue.self, forKey: .rawOutput)
-        raw = try c.decodeIfPresent(JSONValue.self, forKey: .raw)
+        // Every field past `status` is new in 003. A record written before it has none.
+        // Through the same initialiser as everything else, so a record from before
+        // the fields existed is split the same way, and a record written with the
+        // copies still in `raw` is trimmed as it is read: an old chat costs no more
+        // to open than a new one.
+        self.init(toolCallID: try c.decodeIfPresent(String.self, forKey: .toolCallID),
+                  title: try c.decodeIfPresent(String.self, forKey: .title) ?? "Tool call",
+                  name: try c.decodeIfPresent(String.self, forKey: .name),
+                  kind: try c.decodeIfPresent(String.self, forKey: .kind),
+                  status: try c.decodeIfPresent(String.self, forKey: .status),
+                  content: try c.decodeIfPresent([ToolCallContent].self, forKey: .content) ?? [],
+                  locations: try c.decodeIfPresent([ToolCallLocation].self, forKey: .locations) ?? [],
+                  rawInput: try c.decodeIfPresent(JSONValue.self, forKey: .rawInput),
+                  rawOutput: try c.decodeIfPresent(JSONValue.self, forKey: .rawOutput),
+                  raw: try c.decodeIfPresent(JSONValue.self, forKey: .raw))
+    }
+
+    /// `raw` without the parts that are kept as fields of their own.
+    ///
+    /// A tool call's update carries `content`, `rawInput` and `rawOutput`, and each
+    /// of those is parsed into a field above. Keeping the update whole beside them
+    /// meant every byte of a tool's output was in the record twice, and a screenshot
+    /// — which the Claude adapter sends as content *and* as raw output — four times:
+    /// two megabytes for one call, and a chat whose page took seconds to load. What
+    /// is left is what nothing else took: the title, the kind, the status, the
+    /// locations, and any key a runtime invents.
+    public static func trimmingParsedFields(_ raw: JSONValue?) -> JSONValue? {
+        guard case .object(var fields)? = raw else { return raw }
+        for key in ["content", "rawInput", "rawOutput"] { fields.removeValue(forKey: key) }
+        return .object(fields)
     }
 
     /// The one line the chat draws for this call.
@@ -110,7 +139,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// to read, and it is the better line by a distance. Shown on its own, not beside
     /// the title, because saying the same thing twice is the annoyance.
     public var line: String {
-        let described = (rawInput ?? raw?["rawInput"])?["description"]?.stringValue
+        let described = rawInput?["description"]?.stringValue
         if let described, !described.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return described
         }

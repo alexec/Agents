@@ -588,7 +588,7 @@ private struct ToolCallLine: View {
     /// What the runtime sent, as it sent it. Every runtime describes its tools
     /// differently and none of that is ours to tidy.
     private var raw: String? {
-        let interesting = call.rawInput ?? call.raw?["rawInput"] ?? call.rawOutput ?? call.raw
+        let interesting = call.rawInput ?? call.rawOutput ?? call.raw
         guard let interesting else { return nil }
         if let text = interesting.stringValue { return text }
         return Self.pretty(interesting)

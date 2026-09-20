@@ -679,7 +679,9 @@ public actor ACPSession {
                                 title: toolCallValue?["title"]?.stringValue ?? "Do something",
                                 kind: toolCallValue?["kind"]?.stringValue,
                                 status: toolCallValue?["status"]?.stringValue,
-                                raw: toolCallValue)
+                                rawInput: toolCallValue?["rawInput"],
+                                rawOutput: toolCallValue?["rawOutput"],
+                                raw: ToolCall.trimmingParsedFields(toolCallValue))
         let options = (params?["options"]?.arrayValue ?? []).compactMap { option -> PermissionOption? in
             guard let id = option["optionId"]?.stringValue else { return nil }
             return PermissionOption(optionID: id,

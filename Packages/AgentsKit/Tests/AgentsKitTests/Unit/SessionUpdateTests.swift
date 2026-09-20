@@ -61,6 +61,56 @@ struct SessionUpdateTests {
         #expect(call.rawInput == nil)
     }
 
+    /// A screenshot arrives as content and again as raw output, and the whole update
+    /// used to be kept beside both — four copies of the picture in one record. The
+    /// parsed fields keep theirs; `raw` keeps only what nothing else took.
+    @Test func aToolCallsRawDoesNotCarryItsContentAgain() {
+        let picture = String(repeating: "A", count: 2_000)
+        let update = SessionUpdate.decode([
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "t2",
+            "title": "Screenshot",
+            "status": "completed",
+            "content": [["type": "content",
+                         "content": ["type": "image", "mimeType": "image/png", "data": .string(picture)]]],
+            "rawInput": ["description": "Take a screenshot"],
+            "rawOutput": [["type": "image", "source": ["data": .string(picture)]]],
+            "invented": "kept",
+        ])
+        guard case .entry(.toolCallUpdate(let call)) = update else {
+            Issue.record("expected a tool call update")
+            return
+        }
+        #expect(call.content.count == 1)
+        #expect(call.rawInput?["description"]?.stringValue == "Take a screenshot")
+        #expect(call.rawOutput != nil)
+        #expect(call.raw?["content"] == nil)
+        #expect(call.raw?["rawInput"] == nil)
+        #expect(call.raw?["rawOutput"] == nil)
+        #expect(call.raw?["title"]?.stringValue == "Screenshot")
+        #expect(call.raw?["invented"]?.stringValue == "kept")
+        #expect(call.line == "Take a screenshot")
+    }
+
+    /// A record written before the trimming still holds the copies. They are dropped
+    /// as the record is read, so an old chat costs no more to open than a new one.
+    @Test func aRecordWrittenWithTheCopiesIsTrimmedAsItIsRead() throws {
+        let json = """
+        {"title":"Screenshot","status":"completed",
+         "rawInput":{"description":"Take a screenshot"},
+         "rawOutput":[{"data":"PICTURE"}],
+         "raw":{"title":"Screenshot","rawInput":{"description":"Take a screenshot"},
+                "rawOutput":[{"data":"PICTURE"}],"content":[{"data":"PICTURE"}],"kind":"other"}}
+        """
+        let call = try JSONDecoder().decode(ToolCall.self, from: Data(json.utf8))
+        #expect(call.rawInput?["description"]?.stringValue == "Take a screenshot")
+        #expect(call.rawOutput != nil)
+        #expect(call.raw?["rawInput"] == nil)
+        #expect(call.raw?["rawOutput"] == nil)
+        #expect(call.raw?["content"] == nil)
+        #expect(call.raw?["kind"]?.stringValue == "other")
+    }
+
     // MARK: Usage
 
     @Test func usageIsReadWithItsCost() {
