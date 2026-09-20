@@ -55,6 +55,8 @@ struct Transcript: View {
                     // it the moment the prompt lands.
                     if model.isComingBack(agent) {
                         ComingBackLine()
+                    } else if agent.state == .running || agent.state == .starting {
+                        WorkingLine()
                     }
                     Color.clear.frame(height: 1).id(bottom)
                 }
@@ -606,6 +608,20 @@ private extension JSONEncoder {
         e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return e
     }()
+}
+
+/// The agent is at work and the person is waiting: the same small spinner the
+/// sidebar row shows, at the foot of the conversation, so the chat itself moves while
+/// nothing else on it does. Live rather than recorded — it is there exactly as long
+/// as the wait is, and it rides the end of the transcript as the reply arrives.
+private struct WorkingLine: View {
+    var body: some View {
+        ProgressView()
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 2)
+            .accessibilityLabel("Working")
+    }
 }
 
 /// The chat is being picked back up by the daemon, and nobody typed for it.
