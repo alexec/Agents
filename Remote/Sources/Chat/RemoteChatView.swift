@@ -120,13 +120,20 @@ struct RemoteChatView: View {
         }
     }
 
-    /// The question, sitting over the foot of the conversation where the prompt bar
-    /// will be. Nothing else is worth covering the transcript for.
+    /// The question, over the foot of the conversation, with the prompt bar under it.
+    ///
+    /// The question takes the place of the bar rather than sitting above it: an agent
+    /// waiting on an answer wants the answer, and a text field beside the buttons is
+    /// an invitation to type past the thing that is blocking it.
     @ViewBuilder
     private var question: some View {
         if let request = model.questionForSelection {
             PermissionSheet(request: request)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if let agent, agent.state != .archived {
+            // Nothing to say to an agent that has been put away. Bringing it back is
+            // in the menu, and that is the move to make first.
+            PromptBar(agent: agent)
         }
     }
 

@@ -32,12 +32,12 @@ its browser, its file system at large, its signed-in accounts — is not.
 | Agents grouped "Needs input", "Working", "Completed" via `AgentGroup` | **Yes** | FR-015. Built, same shared file. |
 | Agent cards, with how a completed one ended | **Yes** | FR-019. Built. |
 | Archived agents behind a disclosure, ten at a time | **Yes** | FR-020. Built. |
-| Workflows section — a project's standing arrangements (008) | **Yes, listed and their state** | FR-021. New. Listing is a fact about the work. |
+| Workflows section — a project's standing arrangements (008) | **Yes — built 2026-09-19, listed and their state** | FR-021. `WorkflowsSection`. No Run now, no Archive. The first fetch is new: `workflow/changed` keeps it current but never fills it. |
 | Starting, confirming, cancelling a workflow (008) | **No** | Out of scope, named in spec: driving, not reading. |
-| Project cost total (012) | **Yes** | FR-021. It is a fact about the work. |
-| Grand total across projects, on its own page (012) | **Yes** | FR-021. Same reason. |
+| Project cost total (012) | **Yes — built 2026-09-19** | FR-021. `ProjectTotal` at the head of the project page. |
+| Grand total across projects, on its own page (012) | **Yes — built 2026-09-19** | FR-021. `TotalsView`, off the project page's toolbar. Archived projects are counted: a project put away still cost what it cost. |
 | Setting or changing a cost limit (010) | **No** | Out of scope, named in spec: the iPad shows what is spent; the Mac is where a limit changes. |
-| A cost limit having been hit, and that it stopped an agent (010) | **Yes** | FR-021. The person must know why it stopped. Showing is not setting. |
+| A cost limit having been hit, and that it stopped an agent (010) | **Yes** | FR-021. Already true through the shared `EndedReason.summary` and `StateLine`. One gap, shared with the Mac: `report?.message` wins over the ending reason, so a cost-limited agent that reported on its work shows the report. One change to both rows, not one. |
 
 ## The conversation
 
@@ -54,16 +54,16 @@ its browser, its file system at large, its signed-in accounts — is not.
 | The plan (`PlanView`, `Agent.plans`) | **Yes — built 2026-09-19** | FR-017. `CurrentPlanStrip` at the head of the conversation, collapsed to the step being worked. See research §5. |
 | Cost and context as reported (`ContextMeter`) | **Yes** | FR-018. Built. |
 | How an agent ended — finished, stopped, the error | **Yes** | FR-019. Built. |
-| Resuming / coming-back state (011) | **Yes** | FR-021. `AgentsModel.isComingBack` is shared. |
-| The prompt bar, sending text | **Yes** | FR-025. **Not built** — corrected 2026-09-19. There is no `TextField` anywhere in `Remote/Sources/`. T072 builds it, and T067 and T069 hang off it. |
+| Resuming / coming-back state (011) | **Yes** | FR-021. Already true: `AgentCard`, `StatusIcon` and `ComingBackLine` all read the shared `AgentsModel.isComingBack`. |
+| The prompt bar, sending text | **Yes — built 2026-09-19** | FR-025. `Remote/Sources/Chat/PromptBar.swift` (T066a, added because this row was wrong). A field and a send, under the question when there is one. |
 | Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is T074's, and it needs T072's prompt bar to hang on. |
-| Slash commands offered while typing (`CommandList`) | **Yes** | FR-021. It is what this runtime takes; withholding it makes the iPad's prompt bar quietly weaker. |
+| Slash commands offered while typing (`CommandList`) | **Yes — built 2026-09-19** | FR-021. The agent's own `availableCommands`, matched by the shared `SlashCommand.matching`. The row is the way to choose one; there are no arrow keys on a touch screen. |
 | Mode / model / effort / permission controls (`SelectCapsule`, `OptionMenu`, 009) | **Yes** | FR-021 and FR-026. An agent started from the iPad must be startable with the runtimes and options the Mac has. |
-| Jump to the live end (`JumpToEnd`) | **Yes** | FR-021. |
+| Jump to the live end (`JumpToEnd`) | **Yes — built 2026-09-19** | FR-021. It needed the auto-scroll fixed first: the chat used to scroll to the foot on every new entry, so nobody could ever be away from the end. Now it follows only a reader already there. |
 | Dictation (`Dictation`) | **Not judged** | Out of scope by omission on the Mac's terms: it is a Mac input method. The iPad has the system's own. No requirement either way — **the one row here that is a shrug, and it is recorded as one.** |
 | Permission request in full, with the Mac's choices (`PermissionView`) | **Yes** | FR-011. Built. |
 | A form request (`ElicitationView`) | **Yes** | FR-011. Built. |
-| Suggested next prompts (`agents/suggestPrompts`) | **Yes** | FR-021. |
+| Suggested next prompts (`agents/suggestPrompts`) | **Yes — built 2026-09-19** | FR-021. Chips over the field while it is empty. Tapping one fills the field; sending is still the person's move. |
 
 ## The right-hand inspector (002)
 

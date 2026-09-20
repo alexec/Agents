@@ -327,6 +327,30 @@ final class RemoteModel {
         }
     }
 
+    /// Say something to an agent that already exists.
+    ///
+    /// Answers whether it went, so the prompt bar can keep what was typed when it did
+    /// not. A prompt that could not be delivered and was cleared from the field anyway
+    /// is the worst outcome here: the person believes they asked, and nothing did.
+    ///
+    /// An agent mid-turn is not refused — the daemon queues it and gets to it after
+    /// this turn. That is the daemon's rule and it is deliberately not second-guessed
+    /// from here.
+    func send(_ what: String, to agentID: UUID) async -> Bool {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that was not sent."
+            return false
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsPrompt,
+                                  DaemonAPI.PromptRequest(agentID: agentID, text: what))
+            return true
+        } catch {
+            problem = "That did not reach your Mac. What you typed is still there."
+            return false
+        }
+    }
+
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
