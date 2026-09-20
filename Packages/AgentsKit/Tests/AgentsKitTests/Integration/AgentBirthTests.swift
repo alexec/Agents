@@ -66,8 +66,8 @@ struct AgentBirthTests {
                 "the turn never ended, so the window under test never closed")
 
         for (index, agent) in beforeAnyEnding.enumerated() {
-            #expect(agent.group == .running,
-                    "broadcast \(index) put a new agent under \(agent.group.title)")
+            #expect(agent.group(wantsEyes: false) == .running,
+                    "broadcast \(index) put a new agent under \(agent.group(wantsEyes: false).title)")
             #expect(agent.endedReason == nil,
                     "broadcast \(index) carried \(String(describing: agent.endedReason))")
         }

@@ -44,7 +44,13 @@ extension DaemonCore {
             var costToDate: [String: Decimal] = [:]
             var unmeasured = 0
             for agent in inFolder {
-                counts[agent.group, default: 0] += 1
+                // Without eyes, and said so. The daemon has no window and stores
+                // nothing about a file being looked at — it refuses to show one when no
+                // window is open — so it cannot know whether an agent is waiting to be
+                // looked at. This is the count a surface that cannot show a file takes
+                // as complete (the phone); the Mac window completes it from its own
+                // grouping, `AgentsModel.counts(in:)`, which has the fact (FR-009).
+                counts[agent.group(wantsEyes: false), default: 0] += 1
                 for (currency, amount) in agent.costToDate {
                     costToDate[currency, default: 0] += amount
                 }

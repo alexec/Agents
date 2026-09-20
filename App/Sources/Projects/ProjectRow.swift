@@ -49,12 +49,20 @@ struct ProjectRow: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    /// Whether this project wants the person.
+    /// This window's own counts, from the one grouping its panel uses.
     ///
-    /// Two ways to want somebody: an agent blocked on a question, which the daemon
-    /// counts, and an agent that has asked for a file to be looked at, which only
-    /// this window knows because the daemon deliberately stores nothing for it.
-    private var needsPerson: Bool { summary.needsInput || model.wantsEyes(in: summary.folder) }
+    /// Not `summary.counts`: the daemon computes those without knowing whether an
+    /// agent has asked to be looked at, because it has no window and stores nothing
+    /// for one. This window has that fact, so it completes the count itself — and the
+    /// number on this row is then the number of rows under the heading, at the same
+    /// moment, by construction (FR-007, FR-009).
+    private var counts: [AgentGroup: Int] { model.counts(in: summary.folder) }
+
+    /// Whether this project wants the person: exactly when something in it is under
+    /// Needs attention, and on no other reckoning (FR-008). It used to OR the daemon's
+    /// count with a separate "asked to be looked at" check that never consulted state,
+    /// which is how a stopped agent went on wanting eyes.
+    private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
     /// What is going on in there, in as few words as it takes.
     ///
@@ -63,8 +71,8 @@ struct ProjectRow: View {
     /// "Needs attention" goes alone, undiluted — it is the only one of these that is
     /// asking for something.
     private var subtitle: String? {
-        let working = summary.counts[.running] ?? 0
-        let complete = summary.counts[.finished] ?? 0
+        let working = counts[.running] ?? 0
+        let complete = counts[.finished] ?? 0
         if needsPerson { return "Needs attention" }
         if working > 0 {
             return complete > 0 ? "\(working) working · \(complete) complete" : "\(working) working"

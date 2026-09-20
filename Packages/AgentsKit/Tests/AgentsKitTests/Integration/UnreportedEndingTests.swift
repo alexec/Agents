@@ -83,7 +83,7 @@ struct UnreportedEndingTests {
         // Left honestly: not accounted for, still under Complete, and no colour.
         #expect(agent.endingIsUnaccountedFor)
         #expect(agent.report == nil)
-        #expect(agent.group == .finished)
+        #expect(agent.group(wantsEyes: false) == .finished)
         #expect(agent.needsAPerson == false)
     }
 
@@ -115,7 +115,7 @@ struct UnreportedEndingTests {
         #expect(agent.report?.outcome == .done)
         // Nothing about it reads as an agent that had to be asked.
         #expect(agent.endingIsUnaccountedFor == false)
-        #expect(agent.group == .finished)
+        #expect(agent.group(wantsEyes: false) == .finished)
     }
 
     // MARK: When nothing is asked at all
@@ -126,6 +126,32 @@ struct UnreportedEndingTests {
     ///
     /// The turn *their* prompt causes is a different ending, and gets its own one
     /// question — which is the whole point of the bound being per ending.
+    /// What 019's grouping reads, held where it is set. The daemon changes nothing
+    /// for 019: the flag goes up before the question is enqueued and only a person's
+    /// prompt takes it down, so `running && outcomeAsked` is the question and nothing
+    /// else. This holds both facts the way the plan says they already are, and that
+    /// the grouping keeps the agent where it was for as long as they hold.
+    @Test func theQuestionIsAskedWithTheFlagUpAndAPromptTakesItDown() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(300)
+        let core = try core(FakeLauncher(script: script), locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
+        let asked = try #require(await core.agent(id))
+        #expect(asked.outcomeAsked)
+        // Whether the question's turn is still in flight or already over, the group is
+        // the one it had before the app spoke (US3-1, US3-5).
+        #expect(asked.group(wantsEyes: false) == .finished)
+
+        // A person's prompt is work they asked for: the flag comes down at once, and
+        // with it the agent is Working (US3-4).
+        try await core.prompt(.init(agentID: id, text: "carry on"))
+        #expect(await core.agent(id)?.outcomeAsked == false)
+        try await settle(core, id)
+    }
+
     @Test func theEndingAPersonsPromptOvertookIsNotAskedAbout() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()

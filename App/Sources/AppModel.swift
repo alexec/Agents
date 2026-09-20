@@ -223,8 +223,8 @@ final class AppModel {
         work.agents(in: folder, group: group)
     }
 
-    /// Whether anything in this project has asked to be looked at and not been.
-    func wantsEyes(in folder: URL?) -> Bool { work.wantsEyes(in: folder) }
+    /// This window's own counts for a project, from the grouping its panel uses.
+    func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }

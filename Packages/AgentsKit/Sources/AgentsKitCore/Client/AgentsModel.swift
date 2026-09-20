@@ -298,15 +298,28 @@ public final class AgentsModel {
     /// the daemon, which stores nothing for this and refuses to show a file when no
     /// window is open.
     public func group(of agent: Agent) -> AgentGroup {
-        AgentGroup(for: agent.state, wantsEyes: filesToShow[agent.id] != nil,
-                   report: agent.report)
+        agent.group(wantsEyes: filesToShow[agent.id] != nil)
     }
 
-    /// Whether any agent in this folder has asked to be looked at and not been.
-    public func wantsEyes(in folder: URL?) -> Bool {
-        guard let folder, !filesToShow.isEmpty else { return false }
+    /// How many agents of one project are in each group, by this window's own grouping.
+    ///
+    /// This is what FR-009 means by a count being completed by something that knows.
+    /// The daemon's `ProjectSummary.counts` are computed without knowing whether an
+    /// agent asked to be looked at, because the daemon has no window; this one does,
+    /// and the same `group(of:)` that files an agent under a heading counts it here —
+    /// so the number on a project row is the number of rows under the heading, at the
+    /// same moment, by construction (FR-006, FR-007). "Wants a person" is then
+    /// `counts[.needsAttention] > 0` and nothing else, which consults the agent's state
+    /// the way the check it replaced never did: a stopped agent that once asked to be
+    /// looked at is under Stopped, and wants nobody (FR-008, FR-011, FR-012).
+    public func counts(in folder: URL?) -> [AgentGroup: Int] {
+        guard let folder else { return [:] }
         let wanted = Project.standardize(folder)
-        return agents.contains { Project.standardize($0.cwd) == wanted && filesToShow[$0.id] != nil }
+        var counts: [AgentGroup: Int] = [:]
+        for agent in agents where Project.standardize(agent.cwd) == wanted {
+            counts[group(of: agent), default: 0] += 1
+        }
+        return counts
     }
 
     /// The question this agent is blocked on, if it still is.

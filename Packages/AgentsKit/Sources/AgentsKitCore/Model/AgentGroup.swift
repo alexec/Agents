@@ -36,9 +36,18 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// that block an agent on the user — a permission question and an elicitation form
     /// — already put it in that state.
     ///
-    /// The two arguments are the other two ways an agent comes to want a person: it
-    /// asked them to look at something, or it said, at the end of its turn, that it
-    /// cannot get further without them.
+    /// The other three arguments are the other ways an agent comes to want a person, or
+    /// not to: it asked them to look at something; it said, at the end of its turn, that
+    /// it cannot get further without them; or the only thing it is doing is answering
+    /// this app's own question, which is not work anybody asked for.
+    ///
+    /// None of them defaults, on purpose. A default of `false` on `wantsEyes` is how
+    /// the daemon's project counts came to disagree with the window's list: the daemon
+    /// took the free answer, the window supplied the real one, and the badge and the
+    /// panel answered the same question differently. A caller that cannot know a fact
+    /// has to say so where a reader can see it — `wantsEyes: false` with a reason
+    /// beside it — rather than be handed "no" by the signature (FR-004). The compiler
+    /// then lists every caller, which is the whole of how "one grouping" is kept.
     ///
     /// `wantsEyes` is not a state and must never become one. `waitingOnUser` carries
     /// `holdsRuntime` and `hasTurnInFlight` with it, so an agent put there for showing
@@ -59,9 +68,22 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// what the agent said about the work: an agent the person put away is not waiting on
     /// them whatever it last claimed, and a run cut short is news of its own.
     ///
-    /// Still total over `(AgentState, Bool, WorkReport?)`, so an agent is in exactly one
-    /// group and never in none.
-    public init(for state: AgentState, wantsEyes: Bool = false, report: WorkReport? = nil) {
+    /// `outcomeAsked` is the one fact the daemon already keeps to tell this app's turn
+    /// from a person's: it goes up before the question after a silent ending is
+    /// enqueued, and only a person's prompt takes it down — the question itself never
+    /// does, because not clearing it is how the two are told apart at all. So an agent
+    /// that is `running` with it set is answering the app, and nothing else. That turn
+    /// is real and costs money, but it is work nobody asked for and it lasts seconds,
+    /// and a panel that slides an agent into Working and back unbidden is worse than
+    /// one that is briefly incomplete: the agent stays grouped as the finished one it
+    /// was a moment ago, with the same eyes and report arms (FR-014, FR-018). A person's
+    /// prompt clears the flag and the same agent is Working (FR-016). One that never
+    /// answers ends `finished` with the flag still up, which is the unaccounted ending
+    /// 014 already draws (FR-017).
+    ///
+    /// Still total over `(AgentState, Bool, WorkReport?, Bool)`, so an agent is in
+    /// exactly one group and never in none.
+    public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         switch state {
         // Grouped with the working agents, and without `running`'s `wantsEyes` arm: an
@@ -69,6 +91,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         // anything. No heading is added, renamed or removed (FR-006, FR-023).
         case .starting: self = .running
         case .waitingOnUser: self = .needsAttention
+        // Answering the app's question: where it was, not Working. See above.
+        case .running where outcomeAsked: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished
         case .running: self = wantsEyes ? .needsAttention : .running
         case .finished: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished
         case .stopped: self = .stopped
@@ -96,9 +120,16 @@ extension AgentGroup: CodingKeyRepresentable {
 }
 
 public extension Agent {
-    /// Which of the four this agent falls in. Leads are asked this too, but the panel
-    /// never asks: it pins them above the groups instead.
-    var group: AgentGroup { AgentGroup(for: state, wantsEyes: false, report: report) }
+    /// Which of the five this agent falls in — the one way to ask.
+    ///
+    /// The argument is the one fact only a window holds: whether this agent asked the
+    /// person to look at something and they have not. `false` is honest from anything
+    /// that is not a window — the daemon, a preview, a test asking the daemon's view —
+    /// and a lie from anything that is. There is no version without the argument,
+    /// because the version without it was the bug (FR-001, FR-004).
+    func group(wantsEyes: Bool) -> AgentGroup {
+        AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked)
+    }
 
     /// Whether somebody has to do something about this agent.
     ///

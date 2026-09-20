@@ -277,7 +277,7 @@ struct AgentStateTests {
         #expect(agent.endedReason == nil)
         #expect(agent.archivedReason == nil)
         #expect(agent.isConsistent)
-        #expect(agent.group == .running, "and never once under Stopped")
+        #expect(agent.group(wantsEyes: false) == .running, "and never once under Stopped")
     }
 
     /// The fourth invariant. It is what makes `starting` worth having: the old code

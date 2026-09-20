@@ -79,7 +79,7 @@ struct OutcomeReportTests {
 
         try await settle(core, id)
         let agent = try #require(await core.agent(id))
-        #expect(agent.group == .needsAttention)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         #expect(agent.report?.outcome == .needsAnswer)
         // Its own question, which is what the row shows.
         #expect(agent.report?.message == "Drop the old index first, or migrate it?")
@@ -98,7 +98,7 @@ struct OutcomeReportTests {
         try await settle(core, id)
 
         let agent = try #require(await core.agent(id))
-        #expect(agent.group == .finished)
+        #expect(agent.group(wantsEyes: false) == .finished)
         #expect(agent.report?.outcome == .done)
         #expect(agent.needsAPerson == false)
         let project = await core.allProjects().first { Project.standardize($0.folder) == Project.standardize(work) }
@@ -149,11 +149,11 @@ struct OutcomeReportTests {
 
         try await report(core, launcher, "needs_answer", "Which index?")
         try await settle(core, id)
-        #expect(await core.agent(id)?.group == .needsAttention)
+        #expect(await core.agent(id)?.group(wantsEyes: false) == .needsAttention)
 
         try await core.archive(id)
         let agent = try #require(await core.agent(id))
-        #expect(agent.group == .archived)
+        #expect(agent.group(wantsEyes: false) == .archived)
         // The record is kept. Archiving changes the group, not what was said.
         #expect(agent.report?.outcome == .needsAnswer)
     }
@@ -193,7 +193,7 @@ struct OutcomeReportTests {
 
             let agent = try #require(await core.agent(id))
             #expect(agent.report?.outcome == outcome)
-            #expect(agent.group == (outcome.needsAPerson ? .needsAttention : .finished))
+            #expect(agent.group(wantsEyes: false) == (outcome.needsAPerson ? .needsAttention : .finished))
             // Whatever the outcome, the row reads the agent's own words.
             #expect(agent.report?.message == "what the agent said about \(wire)")
         }

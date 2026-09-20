@@ -3,35 +3,43 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The one property that stops an agent disappearing: every state is in exactly one
-/// group. A state added later and not thought about fails this rather than quietly
-/// becoming an agent nobody can see.
+/// The one property that stops an agent disappearing: every combination of the facts
+/// the grouping consults lands in exactly one group. A fact added later and not thought
+/// about fails to compile here rather than quietly becoming an agent nobody can see.
+///
+/// Every call spells out all four facts, because the initialiser has no defaults — the
+/// default was the bug 019 removed. The helper below is this file's shorthand only.
 @Suite("Agent grouping")
 struct AgentGroupTests {
-    @Test("every state maps to a group")
-    func totalOverStates() {
-        for state in AgentState.allCases {
-            _ = AgentGroup(for: state)
-        }
-        #expect(AgentState.allCases.count == 6)
+    private static func group(_ state: AgentState, eyes: Bool = false,
+                              _ outcome: WorkOutcome? = nil, asked: Bool = false) -> AgentGroup {
+        AgentGroup(for: state, wantsEyes: eyes, report: outcome.map(report), outcomeAsked: asked)
     }
+
+    private static func report(_ outcome: WorkOutcome) -> WorkReport {
+        WorkReport(outcome: outcome, message: "words", at: Date())
+    }
+
+    private static let reports: [WorkOutcome?] = [nil] + WorkOutcome.allCases
 
     @Test("each state maps to the group the spec names")
     func mappingIsTheSpecs() {
         // Under Working, so a new agent never appears among the settled ones — and no
-        // heading is added, renamed or removed for it (FR-006, FR-023).
-        #expect(AgentGroup(for: .starting) == .running)
-        #expect(AgentGroup(for: .waitingOnUser) == .needsAttention)
-        #expect(AgentGroup(for: .running) == .running)
-        #expect(AgentGroup(for: .finished) == .finished)
-        #expect(AgentGroup(for: .stopped) == .stopped)
-        #expect(AgentGroup(for: .archived) == .archived)
+        // heading is added, renamed or removed for it (020 FR-006, FR-023).
+        #expect(Self.group(.starting) == .running)
+        #expect(Self.group(.waitingOnUser) == .needsAttention)
+        #expect(Self.group(.running) == .running)
+        #expect(Self.group(.finished) == .finished)
+        #expect(Self.group(.stopped) == .stopped)
+        #expect(Self.group(.archived) == .archived)
     }
 
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
-        let reached = Set(AgentState.allCases.map { AgentGroup(for: $0) })
+        let reached = Set(AgentState.allCases.map { Self.group($0) })
         #expect(reached == Set(AgentGroup.allCases))
+        #expect(AgentGroup.allCases.count == 5)
+        #expect(AgentState.allCases.count == 6)
     }
 
     @Test("the four live groups are in the order the panel draws them")
@@ -40,94 +48,65 @@ struct AgentGroupTests {
         #expect(!AgentGroup.live.contains(.archived))
     }
 
-    @Test("titles are the words the spec uses")
-    func titles() {
-        #expect(AgentGroup.needsAttention.title == "Needs attention")
-        #expect(AgentGroup.running.title == "Working")
-        #expect(AgentGroup.finished.title == "Complete")
-        #expect(AgentGroup.stopped.title == "Stopped")
-    }
-
-    /// No longer one group per state — `starting` and `running` share Working, which
-    /// is the point of the new state rather than a slip. Every group is still reachable
-    /// and every state still lands in exactly one, which are the properties that matter.
-    @Test("no state is left without a group, and no group without a state")
-    func groupsAndStatesBothAccountedFor() {
-        #expect(AgentGroup.allCases.count == 5)
-        #expect(AgentState.allCases.count == 6)
-        #expect(Set(AgentState.allCases.map { AgentGroup(for: $0) }) == Set(AgentGroup.allCases))
-    }
-
-    /// An agent whose conversation has not begun has not asked anybody to look at
-    /// anything, so it does not take `running`'s `wantsEyes` arm.
-    @Test func aStartingAgentIsWorkingWhateverElseIsTrueOfIt() {
-        for wantsEyes in [true, false] {
-            #expect(AgentGroup(for: .starting, wantsEyes: wantsEyes) == .running)
-        }
-        for outcome in WorkOutcome.allCases {
-            #expect(AgentGroup(for: .starting, report: Self.report(outcome)) == .running)
-        }
-    }
-
-    /// FR-023, stated as a test so it cannot be lost quietly.
+    /// FR-022 of 019 and FR-023 of 020, stated as a test so it cannot be lost quietly.
     @Test func noHeadingWasAddedRenamedOrRemoved() {
         #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped"])
         #expect(AgentGroup.archived.title == "Archived")
     }
 
-    /// An agent that has asked to be looked at, which is a mark and not a state.
-    ///
-    /// The property is the same one the rest of this suite holds: exactly one group
-    /// per agent, never none. Widened to both inputs rather than relaxed.
-    @Test func wantingToBeLookedAtIsStillExactlyOneGroup() {
+    /// SC-006 of 019. Every combination of the four facts the grouping consults lands
+    /// in exactly one group. A fact added to the initialiser without a loop added here
+    /// fails to compile, which is the point (FR-002, FR-019).
+    @Test func everyCombinationOfTheFourFactsIsExactlyOneGroup() {
+        var seen = 0
         for state in AgentState.allCases {
-            for wantsEyes in [true, false] {
-                let group = AgentGroup(for: state, wantsEyes: wantsEyes)
-                #expect(AgentGroup.allCases.contains(group))
+            for eyes in [false, true] {
+                for outcome in Self.reports {
+                    for asked in [false, true] {
+                        let group = Self.group(state, eyes: eyes, outcome, asked: asked)
+                        #expect(AgentGroup.allCases.contains(group))
+                        seen += 1
+                    }
+                }
+            }
+        }
+        #expect(seen == 6 * 2 * (1 + WorkOutcome.allCases.count) * 2)
+    }
+
+    /// An agent whose conversation has not begun has not asked anybody to look at
+    /// anything, so it does not take `running`'s `wantsEyes` arm.
+    @Test func aStartingAgentIsWorkingWhateverElseIsTrueOfIt() {
+        for eyes in [true, false] {
+            for outcome in Self.reports {
+                for asked in [false, true] {
+                    #expect(Self.group(.starting, eyes: eyes, outcome, asked: asked) == .running)
+                }
             }
         }
     }
 
     /// A working agent that has asked for a file goes where the person will see it.
     @Test func aWorkingAgentThatAskedToBeLookedAtNeedsAttention() {
-        #expect(AgentGroup(for: .running, wantsEyes: true) == .needsAttention)
-        #expect(AgentGroup(for: .finished, wantsEyes: true) == .needsAttention)
+        #expect(Self.group(.running, eyes: true) == .needsAttention)
+        #expect(Self.group(.finished, eyes: true) == .needsAttention)
     }
 
     /// An agent that is not going anywhere is not waiting on you.
     @Test func aSettledAgentIsNotDraggedIntoNeedsAttention() {
-        #expect(AgentGroup(for: .stopped, wantsEyes: true) == .stopped)
-        #expect(AgentGroup(for: .archived, wantsEyes: true) == .archived)
+        #expect(Self.group(.stopped, eyes: true) == .stopped)
+        #expect(Self.group(.archived, eyes: true) == .archived)
     }
 
     // MARK: And what the agent said about the work
 
-    private static func report(_ outcome: WorkOutcome) -> WorkReport {
-        WorkReport(outcome: outcome, message: "words", at: Date())
-    }
-
-    /// The same property again, widened to the third input rather than relaxed:
-    /// exactly one group per agent, never none and never two.
-    @Test func everyStateAndReportPairIsStillExactlyOneGroup() {
-        let reports: [WorkReport?] = [nil] + WorkOutcome.allCases.map(Self.report)
-        for state in AgentState.allCases {
-            for wantsEyes in [true, false] {
-                for report in reports {
-                    let group = AgentGroup(for: state, wantsEyes: wantsEyes, report: report)
-                    #expect(AgentGroup.allCases.contains(group))
-                }
-            }
-        }
-    }
-
-    /// The one rule this feature adds: an agent that said it cannot get further
-    /// without a person is where the person actually looks.
+    /// The one rule 014 added: an agent that said it cannot get further without a
+    /// person is where the person actually looks.
     @Test func aFinishedAgentThatNeedsAPersonIsInNeedsAttention() {
         for outcome in WorkOutcome.allCases where outcome.needsAPerson {
-            #expect(AgentGroup(for: .finished, report: Self.report(outcome)) == .needsAttention)
+            #expect(Self.group(.finished, outcome) == .needsAttention)
         }
         for outcome in WorkOutcome.allCases where !outcome.needsAPerson {
-            #expect(AgentGroup(for: .finished, report: Self.report(outcome)) == .finished)
+            #expect(Self.group(.finished, outcome) == .finished)
         }
     }
 
@@ -135,23 +114,51 @@ struct AgentGroupTests {
     /// somebody stopped, or put away, is not waiting on them whatever it last claimed.
     @Test func aStoppedOrArchivedAgentIsUnmovedByAnyReport() {
         for outcome in WorkOutcome.allCases {
-            #expect(AgentGroup(for: .stopped, report: Self.report(outcome)) == .stopped)
-            #expect(AgentGroup(for: .archived, report: Self.report(outcome)) == .archived)
+            #expect(Self.group(.stopped, outcome) == .stopped)
+            #expect(Self.group(.archived, outcome) == .archived)
         }
     }
 
     /// A report is about a turn that is over, so it says nothing about one in flight.
     @Test func aRunningAgentIsGroupedByWhatItIsDoing() {
         for outcome in WorkOutcome.allCases {
-            #expect(AgentGroup(for: .running, report: Self.report(outcome)) == .running)
-            #expect(AgentGroup(for: .waitingOnUser, report: Self.report(outcome)) == .needsAttention)
+            #expect(Self.group(.running, outcome) == .running)
+            #expect(Self.group(.waitingOnUser, outcome) == .needsAttention)
         }
     }
 
-    /// The old initialiser still means what it meant.
-    @Test func theOlderInitialiserIsTheNoEyesCase() {
-        for state in AgentState.allCases {
-            #expect(AgentGroup(for: state) == AgentGroup(for: state, wantsEyes: false))
+    // MARK: And whether the app is the one asking
+
+    /// US3 of 019. An agent running the app's own question is grouped exactly as the
+    /// finished agent it was a moment ago — same eyes, same report — and not Working.
+    @Test func anAgentAnsweringTheAppStaysWhereItWas() {
+        for eyes in [false, true] {
+            for outcome in Self.reports {
+                #expect(Self.group(.running, eyes: eyes, outcome, asked: true)
+                        == Self.group(.finished, eyes: eyes, outcome, asked: true))
+            }
+        }
+    }
+
+    /// A person's prompt clears the flag, and the same agent is then Working — or
+    /// Needs attention on the strength of eyes alone, as any working agent is.
+    @Test func aPersonsPromptMakesItWorkAgain() {
+        for outcome in Self.reports {
+            #expect(Self.group(.running, outcome, asked: false) == .running)
+            #expect(Self.group(.running, eyes: true, outcome, asked: false) == .needsAttention)
+        }
+    }
+
+    /// The flag says nothing about any other state: an agent that never answered ends
+    /// `finished` with it still up and is grouped as finished; a stopped one is stopped.
+    @Test func theFlagMovesNothingButARunningAgent() {
+        for state in AgentState.allCases where state != .running {
+            for eyes in [false, true] {
+                for outcome in Self.reports {
+                    #expect(Self.group(state, eyes: eyes, outcome, asked: true)
+                            == Self.group(state, eyes: eyes, outcome, asked: false))
+                }
+            }
         }
     }
 }

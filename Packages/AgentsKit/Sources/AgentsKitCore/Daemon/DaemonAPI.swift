@@ -173,7 +173,11 @@ public enum DaemonAPI {
         public var exists: Bool
         /// The newest activity of any agent in it, or `addedAt` when it has none.
         public var lastActivityAt: Date
-        /// How many agents are in each group.
+        /// How many agents are in each group — computed **without** knowing whether an
+        /// agent asked to be looked at, because the daemon has no window and stores
+        /// nothing for one. Complete for a surface that cannot show a file (the phone);
+        /// on the Mac, `AgentsModel.counts(in:)` completes it from the window's own
+        /// grouping, and the row reads that instead (019, FR-009).
         public var counts: [AgentGroup: Int]
         /// What every agent in this folder has spent over its whole life, per currency.
         /// **Empty when nothing has been spent**, which is how a view knows to show no
@@ -189,6 +193,8 @@ public enum DaemonAPI {
         public var folder: URL { project.folder }
 
         /// Whether anything in this project wants the user.
+        /// From the daemon's counts, so with the same blind spot: an agent waiting to be
+        /// looked at is not in here. The phone's dot; the Mac asks its own window.
         public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
         public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,

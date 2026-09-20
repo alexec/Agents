@@ -148,6 +148,42 @@ struct AgentsModelTests {
         #expect(model.agent(id)?.usage?.used == 100)
     }
 
+    /// FR-020: the number on the row is the number of rows under the heading, for
+    /// every heading, including the one an agent is under only because it asked to
+    /// be looked at — the fact the daemon's own counts cannot see.
+    @Test func theCountsAreTheListUnderEveryHeading() throws {
+        let model = AgentsModel()
+        for state in AgentState.allCases {
+            model.apply(DaemonAPI.Notification.agentChanged, try notification(agent(state: state)))
+        }
+        let shown = agent(state: .running)
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(shown))
+        model.apply(DaemonAPI.Notification.agentShowFile,
+                    try notification(DaemonAPI.ShowFileNotification(
+                        agentID: shown.id, file: ShownFile(path: "/tmp/work/api/main.swift"))))
+
+        let counts = model.counts(in: folder)
+        for group in AgentGroup.allCases {
+            #expect(counts[group] ?? 0 == model.agents(in: folder, group: group).count, "\(group)")
+        }
+        #expect(model.agents(in: folder, group: .needsAttention).contains { $0.id == shown.id })
+        #expect(!model.agents(in: folder, group: .running).contains { $0.id == shown.id })
+    }
+
+    /// US2: an agent that asked to be looked at and was then stopped wants nobody,
+    /// because the grouping consults its state and the count is the grouping.
+    @Test func aStoppedAgentThatAskedToBeLookedAtIsNotWanted() throws {
+        let model = AgentsModel()
+        let stopped = agent(state: .stopped)
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(stopped))
+        model.apply(DaemonAPI.Notification.agentShowFile,
+                    try notification(DaemonAPI.ShowFileNotification(
+                        agentID: stopped.id, file: ShownFile(path: "/tmp/work/api/main.swift"))))
+
+        #expect((model.counts(in: folder)[.needsAttention] ?? 0) == 0)
+        #expect(model.agents(in: folder, group: .stopped).map(\.id) == [stopped.id])
+    }
+
     /// A file an agent asked to be looked at is taken, not read: one that has been put
     /// in front of somebody is not still waiting to be.
     @Test func aFileToShowIsHandedOverOnce() throws {

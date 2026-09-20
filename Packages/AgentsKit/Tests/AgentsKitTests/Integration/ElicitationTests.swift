@@ -276,7 +276,7 @@ struct ElicitationTests {
         #expect(lastRunning > lastWaiting, "states: \(states)")
         #expect(states.last != .waitingOnUser, "states: \(states)")
         #expect(await core.agent(id)?.state != .waitingOnUser)
-        #expect(await core.agent(id)?.group != .needsAttention)
+        #expect(await core.agent(id)?.group(wantsEyes: false) != .needsAttention)
     }
 
     @Test func nothingIsAskedWhenWeDidNotSayWeTakeForms() async throws {
