@@ -158,6 +158,20 @@ struct Transcript: View {
             // Somebody asked for the end: the prompt was sent, or the menu command
             // was used. A counter rather than a flag, so two asks in a row both land.
             .onChange(of: model.scrollToEndToken) { goToEnd(scroller) }
+            // The floor rose: a question or a permission card appeared above the
+            // prompt bar, and the transcript's bottom margin grew with it. The
+            // geometry does not count that as the end moving — content size and
+            // offset are what they were — so whoever was following was left with the
+            // last thing said, usually the question itself, under the glass. Only for
+            // the follower: a reader elsewhere is not moved (FR-010), and the card
+            // floats in view for them regardless. A turn of the run loop later, so
+            // the new margin is in force before the pane is asked to reach the end.
+            .onChange(of: bottomInset) { before, after in
+                guard after > before, isFollowing else { return }
+                Task { @MainActor in
+                    withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
+                }
+            }
             .overlay(alignment: .bottom) {
                 if canScroll, !isFollowing {
                     JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
@@ -286,7 +300,7 @@ private struct EntryRow: View {
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
-            Text(call.title).chatText(.supporting).foregroundStyle(.secondary)
+            Text(call.line).chatText(.supporting).foregroundStyle(.secondary)
 
         case .plan(let raw):
             // The shape 001 stored. Read into entries where it can be.
@@ -418,6 +432,12 @@ private struct QueuedPromptRow: View {
 }
 
 /// A run of tool calls: what it is doing now, and the rest a click away.
+///
+/// Folded, the run is its latest line and nothing else — no count, no chevron — and
+/// clicking that line unfolds the run rather than the call, because the first thing
+/// anyone wants from a folded run is to see what is in it. Unfolded, every line is
+/// there and each one opens its own call. A run of one has nothing to unfold, so its
+/// line opens the call straight away.
 private struct ToolRunRow: View {
     let calls: [ToolCall]
     let isExpanded: Bool
@@ -425,20 +445,12 @@ private struct ToolRunRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if isExpanded {
+            if isExpanded || calls.count == 1 {
                 ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
                     ToolCallLine(call: call)
                 }
-                Button("Show less", action: toggle)
-                    .buttonStyle(.link)
-                    .chatText(.fine)
-            } else {
-                if let latest = calls.last { ToolCallLine(call: latest) }
-                if calls.count > 1 {
-                    Button("\(calls.count - 1) more", action: toggle)
-                        .buttonStyle(.link)
-                        .chatText(.fine)
-                }
+            } else if let latest = calls.last {
+                ToolCallLine(call: latest, onClick: toggle)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -455,6 +467,9 @@ private struct ToolRunRow: View {
 private struct ToolCallLine: View {
     @Environment(AppModel.self) private var model
     let call: ToolCall
+    /// What a click does instead of opening the call, where the line is standing in
+    /// for a whole folded run.
+    var onClick: (() -> Void)? = nil
     @State private var isExpanded = false
 
     var body: some View {
@@ -468,36 +483,36 @@ private struct ToolCallLine: View {
 
     @ViewBuilder
     private var summary: some View {
-        if hasDetail {
+        if let onClick {
+            Button(action: onClick) { line }
+                .buttonStyle(.plain)
+                .help("Show the whole run")
+        } else if hasDetail {
             Button {
                 withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
             } label: {
-                line(chevron: true)
+                line
             }
             .buttonStyle(.plain)
             .help(isExpanded ? "Hide what it did" : "Show what it did")
         } else {
-            line(chevron: false)
+            line
         }
     }
 
-    /// The chevron keeps its place whether or not there is one, so a run of calls has
-    /// one left edge rather than a ragged one.
-    private func line(chevron: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "chevron.right")
-                .chatText(.fine)
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .opacity(chevron ? 1 : 0)
-                .frame(width: 8, alignment: .leading)
-            Text(call.title)
-                .chatText(.supporting)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect)
+    /// The description alone. It is the whole affordance: no chevron in front of it,
+    /// so a run of calls is a run of sentences — one line each. A title with no
+    /// description behind it is usually a command line or a path, and a path that
+    /// wraps to three lines is three lines of a run that reads as one call per line;
+    /// the whole of it is a click away in the detail, where the raw input is.
+    private var line: some View {
+        Text(call.line)
+            .chatText(.supporting)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
     }
 
     // MARK: What it did, once asked
@@ -534,8 +549,6 @@ private struct ToolCallLine: View {
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
             }
         }
-        // Lines up under the title rather than under the chevron.
-        .padding(.leading, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

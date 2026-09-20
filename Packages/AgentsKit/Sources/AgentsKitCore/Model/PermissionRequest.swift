@@ -103,6 +103,20 @@ public struct ToolCall: Codable, Hashable, Sendable {
         raw = try c.decodeIfPresent(JSONValue.self, forKey: .raw)
     }
 
+    /// The one line the chat draws for this call.
+    ///
+    /// A runtime's title is its machinery: a command line, a path, a tool name. Where
+    /// the agent wrote a `description` argument, that sentence was written for a person
+    /// to read, and it is the better line by a distance. Shown on its own, not beside
+    /// the title, because saying the same thing twice is the annoyance.
+    public var line: String {
+        let described = (rawInput ?? raw?["rawInput"])?["description"]?.stringValue
+        if let described, !described.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return described
+        }
+        return title
+    }
+
     /// Whether this is the app's own suggestion tool rather than the agent's work.
     ///
     /// Matched on the end of the name because a runtime is free to prefix it: the

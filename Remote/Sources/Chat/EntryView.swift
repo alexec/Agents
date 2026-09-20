@@ -55,7 +55,7 @@ private struct EntryRow: View {
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
-            Text(call.title).chatText(.supporting).foregroundStyle(.secondary)
+            Text(call.line).chatText(.supporting).foregroundStyle(.secondary)
 
         case .plan(let raw):
             PlanView(plan: Plan(planID: nil,
@@ -200,7 +200,7 @@ private struct ToolCallLine: View {
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .opacity(hasDetail ? 1 : 0)
                         .frame(width: 8, alignment: .leading)
-                    Text(call.title)
+                    Text(call.line)
                         .chatText(.supporting)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
