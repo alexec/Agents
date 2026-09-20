@@ -36,7 +36,9 @@ struct WorkflowsSection: View {
                 if archived.isEmpty { empty } else { allArchived }
             } else {
                 ForEach(workflows) { summary in
+                    // Put away the way an agent's card is: two fingers to the left.
                     WorkflowRow(summary: summary, selection: $selection)
+                        .swipeToArchive { await model.setWorkflowArchived(summary, true) }
                 }
             }
             if let limit = limitToName { limitNote(limit) }

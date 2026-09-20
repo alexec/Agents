@@ -37,6 +37,23 @@ struct ChatView: View {
         }
         .animation(.snappy(duration: 0.28), value: model.selection)
         .navigationTitle(agent?.title ?? "New agent")
+        // One click, and back to the project. The context menu on the card has the same
+        // word; this is for when you are already reading the thing you are putting away.
+        .toolbar {
+            if let agent, agent.state != .archived {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        Task {
+                            await model.archive(agent.id)
+                            model.selection = nil
+                        }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox")
+                    }
+                    .help("Archive this chat and go back to the project")
+                }
+            }
+        }
         .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
     }
 

@@ -67,6 +67,7 @@ struct WorkflowPage: View {
             if let problem = workflow.problem {
                 broken(problem, workflow: workflow)
             }
+            runs(workflow)
             settings(summary)
             prompt(workflow)
             file(workflow)
@@ -156,6 +157,39 @@ struct WorkflowPage: View {
             VStack(alignment: .leading, spacing: 8) {
                 sectionTitle("The prompt")
                 block(workflow.prompt)
+            }
+        }
+    }
+
+    // MARK: What it has run
+
+    /// The agents this workflow started, newest first, each a click from its
+    /// conversation. Drawn with the same row the project page uses, so a run reads
+    /// here exactly as it reads there — and carries the same marker saying a workflow
+    /// started it.
+    private func runs(_ workflow: Workflow) -> some View {
+        let folder = Project.standardize(workflow.folder)
+        let started = model.agents
+            .filter { Project.standardize($0.cwd) == folder && $0.startedByWorkflow == workflow.workflowID }
+            .sorted { $0.createdAt > $1.createdAt }
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Recent runs")
+            if started.isEmpty {
+                note("Nothing has run yet.")
+            }
+            ForEach(started.prefix(12)) { agent in
+                Button {
+                    model.openWorkflow = nil
+                    model.selection = agent.id
+                } label: {
+                    AgentRow(agent: agent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -349,8 +383,15 @@ struct WorkflowPage: View {
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(summary.isRunning)
-                Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
-                    .buttonStyle(.glass)
+                // One click, and back to the project: the same thing the archive button
+                // on a chat does, so putting a thing away is one gesture wherever it is.
+                Button("Archive") {
+                    Task {
+                        await model.setWorkflowArchived(summary, true)
+                        model.openWorkflow = nil
+                    }
+                }
+                .buttonStyle(.glass)
             }
         }
     }

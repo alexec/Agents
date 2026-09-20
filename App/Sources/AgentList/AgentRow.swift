@@ -18,9 +18,21 @@ struct AgentRow: View {
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(agent.title ?? "Untitled")
-                    .font(.headline)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(agent.title ?? "Untitled")
+                        .font(.headline)
+                        .lineLimit(1)
+                    // Started by a workflow rather than a person: the one thing about
+                    // an agent's origin worth a mark, because it is the difference
+                    // between something you asked for and something that ran itself.
+                    if let workflowName = startedByWorkflowName {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .help("Started by the workflow \(workflowName)")
+                            .accessibilityLabel("started by the workflow \(workflowName)")
+                    }
+                }
 
                 Text(description)
                     .font(.callout)
@@ -57,6 +69,13 @@ struct AgentRow: View {
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }
+
+    /// The name of the workflow that started this agent, if one did — or its id when
+    /// the file has since gone, so the mark never disappears with it.
+    private var startedByWorkflowName: String? {
+        guard let id = agent.startedByWorkflow else { return nil }
+        return model.workflows(in: agent.cwd).first { $0.workflow.workflowID == id }?.workflow.name ?? id
+    }
 
     /// What it is doing, in its own words where it has said them.
     ///

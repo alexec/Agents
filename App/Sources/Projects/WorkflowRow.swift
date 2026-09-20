@@ -25,9 +25,18 @@ struct WorkflowRow: View {
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(workflow.name)
-                    .font(.headline)
-                    .lineLimit(1)
+                // The name opens it in its own right, in front of the glass. The button
+                // behind the card is the design; this is the way in that does not depend
+                // on a click falling through a glass layer, which on this build it did
+                // not: every part of the card was clicked on 2026-09-20 and nothing
+                // opened.
+                Button { model.openWorkflow = summary.id } label: {
+                    Text(workflow.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
 
                 Text(workflow.summary)
                     .font(.callout)
@@ -62,6 +71,11 @@ struct WorkflowRow: View {
             .accessibilityLabel("Open \(workflow.name)")
         }
         .contextMenu {
+            // The contract said the menu gains nothing because opening is what the row
+            // does by itself. It is here because the row did not, on a real mouse, and
+            // a page nobody can reach is worse than a menu with one more line.
+            Button("Open") { model.openWorkflow = summary.id }
+            Divider()
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
@@ -135,12 +149,12 @@ struct WorkflowRow: View {
         summary.needsAPerson || ranReport?.outcome.needsAPerson == true
     }
 
-    /// Two icons, and on an archived row one word.
+    /// One icon, and on an archived row one word.
     ///
-    /// Icons because this row repeats down the page and two words each would be the
-    /// loudest thing on it, and because what they do — run it, put it away — is what
-    /// those two symbols have always meant. The words are in the tooltips and in the
-    /// context menu, which is where a person goes when a symbol is not enough.
+    /// An icon because this row repeats down the page and a word would be the loudest
+    /// thing on it. Archiving is not here: it is the same two-finger swipe an agent's
+    /// card takes, and it is a button on the workflow's own page, one click from going
+    /// back to the project — the way it is on a chat. The context menu still has both.
     private var controls: some View {
         HStack(spacing: 6) {
             // An archived workflow gets one control, and it is the way back. Nothing
@@ -168,17 +182,6 @@ struct WorkflowRow: View {
                     .buttonStyle(.glass)
                     .help("Run this workflow now")
                 }
-
-                // The only way to hold a workflow. There was a pause here too, and it
-                // said the same thing in a second place: both stop it running, both are
-                // one tap back. This one also says where the row went.
-                Button {
-                    Task { await model.setWorkflowArchived(summary, true) }
-                } label: {
-                    Image(systemName: "archivebox")
-                }
-                .buttonStyle(.glass)
-                .help("Archive this workflow: it stops running and moves under Archived")
             }
         }
     }
