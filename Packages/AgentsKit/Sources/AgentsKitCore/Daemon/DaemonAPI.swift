@@ -891,6 +891,16 @@ public enum DaemonAPI {
         /// waits on that agent's queue, because losing what somebody typed because a
         /// budget was reached would be the worst possible reading of "control cost".
         public static let dayLimitReached = -32018
+        /// A question that was already settled — by another device, by the Mac, or by
+        /// the agent giving up on it. Raised instead of `noSuchAgent`, which is what a
+        /// second answer used to be told and which reads as though the agent had gone.
+        ///
+        /// 013's tasks proposed -32018 for this. Feature 010 took that number first,
+        /// so it is -32019 here and `noSuchDevice` is -32020. The file already carries
+        /// one collision at -32010; it does not need a second.
+        public static let alreadyAnswered = -32019
+        /// A device id that is not in the store — never paired, or revoked since.
+        public static let noSuchDevice = -32020
     }
 
     // MARK: Workflows
