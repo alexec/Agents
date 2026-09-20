@@ -87,4 +87,96 @@ struct WorkflowSettingsTests {
         // applies it.
         #expect(!workflow.summary.contains("plan"))
     }
+
+    // MARK: What the runtime is told
+
+    /// A mode option whose id is deliberately not `mode`. A runtime gets to call it
+    /// whatever it likes, and anything here that hard-codes the word fails on this.
+    private let modeOption = ConfigOption(
+        id: "permission_mode", name: "Mode", category: "mode", type: "select",
+        currentValue: .string("default"),
+        options: [ConfigChoice(value: .string("default"), name: "Manual"),
+                  ConfigChoice(value: .string("acceptEdits"), name: "Accept edits"),
+                  ConfigChoice(value: .string("bypassPermissions"), name: "Bypass permissions")])
+
+    /// A model option found only by its category — its id is not `model`, so the second
+    /// rule cannot be what finds it.
+    private let modelOption = ConfigOption(
+        id: "llm", name: "Model", category: "model", type: "select",
+        options: [ConfigChoice(value: .string("opus"), name: "Opus"),
+                  ConfigChoice(value: .string("sonnet"), name: "Sonnet")])
+
+    private func resolved(_ settings: WorkflowSettings,
+                          _ advertised: [ConfigOption]) -> StartOptions? {
+        guard case .resolved(let options) = WorkflowSettings.resolve(settings, against: advertised) else {
+            return nil
+        }
+        return options
+    }
+
+    private func refusal(_ settings: WorkflowSettings,
+                         _ advertised: [ConfigOption]) -> (setting: String, value: String, offered: [String])? {
+        guard case .refused(let setting, let value, let offered) =
+                WorkflowSettings.resolve(settings, against: advertised) else { return nil }
+        return (setting, value, offered)
+    }
+
+    @Test func nothingIsSentWhenTheFileAsksForNothing() {
+        #expect(resolved(WorkflowSettings(), [modeOption, modelOption]) == StartOptions.none)
+    }
+
+    @Test func aNamedModeIsSentUnderTheIdTheRuntimeAdvertised() {
+        let options = resolved(WorkflowSettings(permissionMode: "acceptEdits"), [modeOption, modelOption])
+        #expect(options?.values == ["permission_mode": .string("acceptEdits")])
+        // Not under "mode", which is what a reimplementation of `ModeMemory`'s rule
+        // would most likely have picked.
+        #expect(options?.values["mode"] == nil)
+    }
+
+    /// **The test that carries the feature.** Every substitution available here is
+    /// toward more permission, and the file asked for less on purpose.
+    @Test func aModeTheRuntimeDoesNotOfferIsRefusedAndNotSubstituted() {
+        let outcome = WorkflowSettings.resolve(WorkflowSettings(permissionMode: "plan"),
+                                               against: [modeOption, modelOption])
+        guard case .refused(let setting, let value, _) = outcome else {
+            Issue.record("expected a refusal, got \(outcome)")
+            return
+        }
+        #expect(setting == WorkflowSettings.Setting.permissionMode)
+        #expect(value == "plan")
+        // And nothing was resolved in its place — no default, no nearest match, no
+        // silently dropped key.
+        #expect(resolved(WorkflowSettings(permissionMode: "plan"), [modeOption]) == nil)
+    }
+
+    @Test func theRefusalNamesWhatWouldHaveWorked() {
+        let refused = refusal(WorkflowSettings(permissionMode: "plan"), [modeOption])
+        // In the order the runtime sent them, so the sentence reads as its menu.
+        #expect(refused?.offered == ["default", "acceptEdits", "bypassPermissions"])
+
+        let detail = WorkflowSettings.refusalDetail(
+            setting: WorkflowSettings.Setting.permissionMode, value: "plan",
+            offered: refused?.offered ?? [], runtime: "Claude")
+        #expect(detail == "\"plan\" is not a permission mode Claude offers here — it offers default, acceptEdits, bypassPermissions")
+    }
+
+    @Test func aRuntimeThatOffersNoModeAtAllRefusesRatherThanIgnores() {
+        let refused = refusal(WorkflowSettings(permissionMode: "plan"), [modelOption])
+        #expect(refused?.setting == WorkflowSettings.Setting.permissionMode)
+        #expect(refused?.offered == [])
+
+        let detail = WorkflowSettings.refusalDetail(
+            setting: WorkflowSettings.Setting.permissionMode, value: "plan",
+            offered: [], runtime: "Claude")
+        #expect(detail == "Claude does not offer a permission mode here at all")
+    }
+
+    @Test func theModelIsFoundByCategoryNotByName() {
+        let options = resolved(WorkflowSettings(model: "sonnet"), [modeOption, modelOption])
+        #expect(options?.values == ["llm": .string("sonnet")])
+
+        let refused = refusal(WorkflowSettings(model: "haiku"), [modelOption])
+        #expect(refused?.setting == WorkflowSettings.Setting.model)
+        #expect(refused?.offered == ["opus", "sonnet"])
+    }
 }

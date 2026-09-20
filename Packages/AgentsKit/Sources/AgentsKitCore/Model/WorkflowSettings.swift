@@ -58,4 +58,112 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         if let model { clauses.append("using \(model)") }
         return clauses.isEmpty ? nil : clauses.joined(separator: ", ")
     }
+
+    /// The names these settings go by in the file, and the names a refusal is grouped
+    /// by afterwards.
+    ///
+    /// One set of strings, because a refusal that says `permission-mode` and a file
+    /// that says `permission_mode` would be the app and the document disagreeing about
+    /// what the person wrote.
+    public enum Setting {
+        public static let permissionMode = "permission-mode"
+        public static let runtime = "runtime"
+        public static let model = "model"
+    }
+
+    /// What to start with, or why nothing may start.
+    public enum Resolution: Sendable {
+        case resolved(StartOptions)
+        case refused(setting: String, value: String, offered: [String])
+    }
+
+    /// Turn what the file asked for into what the runtime will be sent — or say that it
+    /// cannot be.
+    ///
+    /// Pure: no I/O, no actor, no clock. It is handed the options the runtime advertised
+    /// in this session, and it either finds every named value among them or refuses.
+    ///
+    /// **There is no fallback branch, and adding one later would be adding the bug.**
+    /// Every fallback available here is in the permissive direction: the mode a workflow
+    /// names is the restrictive one — that is why somebody bothered to write it down —
+    /// and the thing to fall back to is always the runtime's default, which allows more.
+    /// An agent a person starts has them sitting in front of it and can afford a dropped
+    /// option; this one starts at nine in the morning with nobody in the room. A
+    /// workflow that does not run is a row that says why. A workflow that runs with a
+    /// permission nobody granted is the thing this whole feature exists to prevent.
+    public static func resolve(_ settings: WorkflowSettings,
+                               against advertised: [ConfigOption]) -> Resolution {
+        var values: [String: JSONValue] = [:]
+
+        if let named = settings.permissionMode {
+            // `ModeMemory`'s, and not a second opinion: the prompt bar and a workflow
+            // must not be able to come to disagree about which advertised option is
+            // *the* mode, because then a person would be setting one thing and a
+            // workflow another under the same word.
+            let option = ModeMemory.modeOption(in: advertised)
+            guard let option, let choice = choice(named, in: option) else {
+                return .refused(setting: Setting.permissionMode, value: named,
+                                offered: offered(by: option))
+            }
+            // Keyed by the id the runtime advertised, never by the string "mode": a
+            // runtime is free to call it `permission_mode`, and it is the one that
+            // decides.
+            values[option.id] = choice.value
+        }
+
+        if let named = settings.model {
+            let option = modelOption(in: advertised)
+            guard let option, let choice = choice(named, in: option) else {
+                return .refused(setting: Setting.model, value: named,
+                                offered: offered(by: option))
+            }
+            values[option.id] = choice.value
+        }
+
+        return .resolved(StartOptions(values: values))
+    }
+
+    /// The sentence a refusal carries, read by a person on the row and by an agent that
+    /// asks how its workflow got on.
+    ///
+    /// It names what would have worked, because the reader's next move is to edit the
+    /// file and the list is the whole of what they need to do it.
+    public static func refusalDetail(setting: String, value: String,
+                                     offered: [String], runtime: String) -> String {
+        let phrase = phrase(for: setting)
+        guard !offered.isEmpty else {
+            return "\(runtime) does not offer \(phrase) here at all"
+        }
+        return "\"\(value)\" is not \(phrase) \(runtime) offers here — it offers \(offered.joined(separator: ", "))"
+    }
+
+    /// The option that carries the model, by the same rule `ModeMemory` uses for the
+    /// mode: by `category` first, because that is what the rest of the app orders and
+    /// reasons about, and by `id` second, because a runtime that sends no category
+    /// still has to be usable.
+    private static func modelOption(in options: [ConfigOption]) -> ConfigOption? {
+        let selectable = options.filter { if case .select = $0.kind { return true } else { return false } }
+        return selectable.first { $0.category == "model" } ?? selectable.first { $0.id == "model" }
+    }
+
+    /// The advertised choice a file's word names, if the runtime offers one. A file can
+    /// only hold text, so the comparison is against the choice's own string value.
+    private static func choice(_ named: String, in option: ConfigOption) -> ConfigChoice? {
+        (option.options ?? []).first { $0.value.stringValue == named }
+    }
+
+    /// What the runtime does offer, in the order it sent them, so the refusal reads as
+    /// a menu rather than a sorted set somebody has to search.
+    private static func offered(by option: ConfigOption?) -> [String] {
+        (option?.options ?? []).map { $0.value.stringValue ?? $0.name }
+    }
+
+    private static func phrase(for setting: String) -> String {
+        switch setting {
+        case Setting.permissionMode: return "a permission mode"
+        case Setting.runtime: return "a runtime"
+        case Setting.model: return "a model"
+        default: return "a \(setting)"
+        }
+    }
 }
