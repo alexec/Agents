@@ -133,6 +133,16 @@ extension DaemonCore {
         // down — `prompt` appends every prompt to `queuedPrompts`, so testing that
         // once meant a chat somebody had typed at was silently never brought back.
         guard var agent = agents[id], agent.mayBePickedUpAfterRestart else { return }
+        // An agent cut off before its first turn is the one case with nothing to
+        // explain: its conversation never began, so there is no interruption to
+        // describe and nothing above for it to carry on from. What it needs is the
+        // words it was created with, which are still on its queue — sending a note
+        // about the restart first would spend a whole turn saying nothing.
+        //
+        // A `starting` record written before those words were queued has an empty
+        // queue, and still gets the note, which is why that arm of
+        // `wordsAboutTheRestart` exists.
+        let stillHasItsFirstWords = was == .starting && !agent.queuedPrompts.isEmpty
         let text = Self.wordsAboutTheRestart(was)
         // Written down before the words go, never after. A daemon killed part-way
         // through starting a runtime has already recorded that it tried, and the next
@@ -140,14 +150,21 @@ extension DaemonCore {
         agent.restartPickUps += 1
         changed(agent)
         do {
-            try await promptFirst(DaemonAPI.PromptRequest(agentID: id, text: text))
+            if stillHasItsFirstWords {
+                try await sendNextQueued(to: id)
+            } else {
+                try await promptFirst(DaemonAPI.PromptRequest(agentID: id, text: text))
+            }
             DaemonLog.shared.write("picked agent \(id) back up after the restart")
         } catch {
             let why = (error as? JSONRPCError)?.message ?? error.localizedDescription
             // The words go back out of the queue. They are about this minute — an agent
             // told next week that the app has just restarted is being told something
             // untrue — so a prompt that could not be sent now is not one to keep.
-            if var agent = agents[id] {
+            // Only our own words. What the person typed stays where it is — it was
+            // never about this minute, and losing it is the thing this whole path
+            // exists to prevent.
+            if !stillHasItsFirstWords, var agent = agents[id] {
                 agent.queuedPrompts.removeAll { $0.text == text }
                 changed(agent)
             }

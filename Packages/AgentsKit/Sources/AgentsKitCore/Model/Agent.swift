@@ -159,10 +159,14 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
-        // A state we have never heard of is an ending nothing vouched for, whatever
-        // the record said the reason was — that reason described a state this build
-        // cannot reason about.
-        if rawState != nil { endedReason = .unrecognised }
+        // A state we have never heard of, and no reason beside it, is an ending
+        // nothing vouched for. Only when there is no reason: a newer build that wrote
+        // `maxTokens` beside a state of its own said something this build understands,
+        // and replacing it would hand that build back a reason we invented — on the
+        // one key the lenient decode exists to preserve, while `unknownFields` guards
+        // every other. Either way this decodes to `stopped` and is never read as a
+        // completion.
+        if rawState != nil && endedReason == nil { endedReason = .unrecognised }
         archivedReason = try c.decodeIfPresent(ArchivedReason.self, forKey: .archivedReason)
         // Every field below arrived with 003. A record written before it has none of
         // them, and must still open.

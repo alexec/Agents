@@ -154,9 +154,27 @@ extension DaemonCore {
                           advertisedOptions: await session.options,
                           availableCommands: await session.commands,
                           additionalDirectories: request.additionalDirectories,
-                          mcpServers: request.mcpServers)
+                          mcpServers: request.mcpServers,
+                          // On the queue from the agent's first moment, not held in
+                          // this call. It is the only copy: a daemon killed between
+                          // the save below and `beginTurn` would otherwise lose what
+                          // the person typed entirely — only its first eighty
+                          // characters survive, as the title — and the next daemon
+                          // would pick the agent up and spend a turn asking it to
+                          // work with nothing to work on.
+                          queuedPrompts: [QueuedPrompt(text: request.prompt,
+                                                       attachments: request.attachments)])
+        // Saved before it is known to the daemon, so a save that fails leaves nothing
+        // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
+        // so an agent stranded in it by a failed write would keep `isHoldingAgents`
+        // true for ever and the daemon could never exit.
+        do {
+            try await store.save(agent)
+        } catch {
+            await session.end(gracePeriod: .seconds(2))
+            throw error
+        }
         agents[agent.id] = agent
-        try await store.save(agent)
         live[agent.id] = session
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
@@ -178,10 +196,19 @@ extension DaemonCore {
         //
         // Every `await` above this line is a window for it: `prepareServing`,
         // `session.apply`, and the two before them.
-        guard agents[agent.id]?.state == .starting else { return agent.id }
+        guard var made = agents[agent.id], made.state == AgentState.starting,
+              let first = made.queuedPrompts.first
+        else { return agent.id }
 
-        await beginTurn(agentID: agent.id, text: request.prompt,
-                        blocks: request.blocks, session: session)
+        // Off the queue as its turn begins, exactly as `sendNextQueued` does it. It
+        // cannot go through that function: `starting` answers true to
+        // `hasTurnInFlight` — which is what makes a *second* prompt queue rather than
+        // race (FR-004) — and that same answer would make `sendNextQueued` decline to
+        // send the first.
+        made.queuedPrompts.removeFirst()
+        changed(made)
+        await beginTurn(agentID: agent.id, text: first.text,
+                        blocks: first.blocks, session: session)
         return agent.id
     }
 

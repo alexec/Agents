@@ -258,4 +258,43 @@ struct LegacyRecordTests {
         #expect(json["state"] as? String == "starting")
         #expect(json["endedReason"] == nil, "and it carries no ending, which is FR-002")
     }
+
+    /// FR-021 preserves the state a newer build wrote. It must preserve the reason
+    /// beside it too.
+    ///
+    /// `unknownFields` guards every other key; the one key this feature deliberately
+    /// touches was the one it used to overwrite — a record saved as
+    /// `{"state":"reviewing","endedReason":"maxTokens"}` came back as
+    /// `endedReason: "unrecognised"`, handing that build a reason this one invented.
+    @Test func aNewerBuildsEndingSurvivesAlongsideItsState() throws {
+        let data = Data("""
+            {"id": "\(UUID().uuidString)", "runtimeID": "copilot", "cwd": "file:///tmp",
+             "state": "reviewing", "endedReason": "maxTokens",
+             "createdAt": "2026-09-20T09:00:00.000Z",
+             "lastActivityAt": "2026-09-20T09:00:00.000Z"}
+            """.utf8)
+        let agent = try decoder().decode(Agent.self, from: data)
+
+        #expect(agent.state == .stopped)
+        #expect(agent.endedReason == .maxTokens, "this build replaced a reason it understood")
+        #expect(agent.rawState == "reviewing")
+        #expect(agent.isConsistent)
+
+        let json = try #require(try JSONSerialization.jsonObject(
+            with: try StoreCoding.encoder.encode(agent)) as? [String: Any])
+        #expect(json["state"] as? String == "reviewing")
+        #expect(json["endedReason"] as? String == "maxTokens")
+    }
+
+    /// And with no reason beside it, the ending is still one nothing vouched for.
+    @Test func aNewerBuildsStateWithNoReasonIsUnaccountedFor() throws {
+        let data = Data("""
+            {"id": "\(UUID().uuidString)", "runtimeID": "copilot", "cwd": "file:///tmp",
+             "state": "reviewing", "createdAt": "2026-09-20T09:00:00.000Z",
+             "lastActivityAt": "2026-09-20T09:00:00.000Z"}
+            """.utf8)
+        let agent = try decoder().decode(Agent.self, from: data)
+        #expect(agent.endedReason == .unrecognised)
+        #expect(agent.isConsistent)
+    }
 }

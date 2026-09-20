@@ -231,6 +231,32 @@ struct AgentStoreTests {
         #expect(all.mends[id] == .stoppedWithNoReason)
     }
 
+    /// A mend that is only announced is a mend that happens again tomorrow.
+    ///
+    /// Nothing else ever saves a settled agent — `changed` is reached when the agent
+    /// does something, and this one never will — so without a write-back the same
+    /// record is re-mended and the same note re-appended on every daemon start, for
+    /// ever, each one bumping `lastActivityAt` and floating it to the top of the list.
+    @Test func aMendedRecordIsWrittenBackSoItIsMendedOnlyOnce() async throws {
+        let (store, locations) = try temporaryStore()
+        let id = UUID()
+        try FileManager.default.createDirectory(at: locations.agent(id), withIntermediateDirectories: true)
+        try Data("""
+            {"id": "\(id.uuidString)", "runtimeID": "copilot", "cwd": "file:///tmp",
+             "state": "stopped", "createdAt": "2026-09-20T09:00:00.000Z",
+             "lastActivityAt": "2026-09-20T09:00:00.000Z"}
+            """.utf8).write(to: locations.record(id))
+
+        let first = try await store.load(id)
+        #expect(first.mend == .stoppedWithNoReason)
+        // What the daemon does with it.
+        try await store.save(first.agent)
+
+        let second = try await store.load(id)
+        #expect(second.mend == nil, "the record still needs mending, so it will be announced again")
+        #expect(second.agent.endedReason == .unrecognised)
+    }
+
     @Test func aTitleFallsBackToTheFirstLineOfTheInstruction() {
         #expect(Agent.fallbackTitle(from: "Fix the bug\nand then some") == "Fix the bug")
         #expect(Agent.fallbackTitle(from: String(repeating: "x", count: 200)).count == 80)

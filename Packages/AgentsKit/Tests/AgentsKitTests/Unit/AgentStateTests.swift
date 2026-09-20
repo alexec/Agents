@@ -123,6 +123,26 @@ struct AgentStateTests {
         #expect(AgentState.stopped.applying(.foundDead) == nil)
     }
 
+    /// The pick-up suppression is about one event, and must not leak to another.
+    ///
+    /// An agent stopped by `daemonGone` and then archived comes back out of the
+    /// archive as `stopped`/`daemonGone` with no pick-ups — so it answers true to
+    /// `mayBePickedUpAfterRestart` even though nothing is about to pick it up.
+    /// Suppressing its `agentStopped` trigger on the strength of that record alone
+    /// would silently change what unarchiving does, which is why `move` gates on the
+    /// event as well.
+    @Test func anUnarchivedAgentLooksPickUpAbleAndIsNot() {
+        var agent = Agent(runtimeID: "grok", cwd: URL(filePath: "/tmp"),
+                          state: .archived, endedReason: .daemonGone,
+                          archivedReason: .byUser)
+        let transition = try? #require(agent.state.applying(.unarchivedByUser,
+                                                            endedReason: agent.endedReason))
+        #expect(transition?.next == .stopped)
+        agent.state = transition!.next
+        // The record alone cannot tell the two apart — which is the point.
+        #expect(agent.mayBePickedUpAfterRestart)
+    }
+
     @Test func onlyRunningAndWaitingHoldARuntime() {
         // A finished agent's process is let go, because the session comes back.
         #expect(AgentState.running.holdsRuntime)

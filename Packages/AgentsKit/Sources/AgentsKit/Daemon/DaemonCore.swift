@@ -336,19 +336,21 @@ public actor DaemonCore {
             if next == .finished, willAskForOutcome(agentID: agentID, reason: reasonThisEventSet) {
                 break
             }
-            // Read the depth before the run is released: releasing it is what makes a
-            // finished agent's depth unfindable, and a depth that quietly resets to
-            // zero is a loop the limit never stops.
             // An agent a restarting daemon is about to bring back has not finished
             // stopping — it is about to carry on. Saying "an agent stopped" about it
             // would be false, and would race the pick-up that is seconds away (011,
-            // FR-016). Decided from the post-transition record, because that is what
-            // `mayBePickedUpAfterRestart` reads.
+            // FR-016).
+            //
+            // Gated on the **event**, not only on the resulting record. An agent
+            // unarchived back to `stopped`/`daemonGone` also answers true to
+            // `mayBePickedUpAfterRestart`, and nothing is about to pick that one up —
+            // suppressing its trigger would be a silent change to what unarchiving
+            // does, for a reason that does not apply to it.
             //
             // The agent that will *not* be picked back up does fire, and that is the
             // behaviour this feature adds: before it, a daemon restart fired nothing
             // at all, because recovery never reached this line.
-            if next == .stopped, agent.mayBePickedUpAfterRestart {
+            if next == .stopped, event == .foundDead, agent.mayBePickedUpAfterRestart {
                 break
             }
             // Read the depth before the run is released: releasing it is what makes a
@@ -384,6 +386,12 @@ public actor DaemonCore {
         for (id, mend) in loaded.mends {
             await record(.runtimeNote(mend.summary), for: id)
             DaemonLog.shared.write("mended agent \(id) on read: \(mend)")
+            // Written back, or the mend is not a mend. Nothing else will ever save a
+            // settled agent — `changed` is only reached when the agent does something
+            // — so without this the same record is re-mended and re-announced on every
+            // daemon start, and `record` bumping `lastActivityAt` floats it to the top
+            // of the list each time.
+            if let mended = agents[id] { try? await store.save(mended) }
         }
     }
 
