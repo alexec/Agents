@@ -34,7 +34,7 @@ struct QueuedPromptTests {
 
     private func texts(_ core: DaemonCore, _ id: UUID) async throws -> [String] {
         try await core.transcript(.init(agentID: id)).entries.compactMap { entry in
-            if case .userMessage(let text, _) = entry.kind { return text }
+            if case .userMessage(let text, _, _) = entry.kind { return text }
             return nil
         }
     }

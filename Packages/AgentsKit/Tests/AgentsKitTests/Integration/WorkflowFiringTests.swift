@@ -180,7 +180,7 @@ struct WorkflowFiringTests {
         let page = try await core.transcript(
             DaemonAPI.TranscriptRequest(agentID: agent.id, before: nil, limit: 50))
         let said = page.entries.contains { entry in
-            if case .userMessage(let text, _) = entry.kind { return text.contains("Count to three.") }
+            if case .userMessage(let text, _, _) = entry.kind { return text.contains("Count to three.") }
             return false
         }
         #expect(said)

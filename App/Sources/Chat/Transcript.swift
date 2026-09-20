@@ -253,7 +253,7 @@ private struct EntryRow: View {
 
     var body: some View {
         switch entry.kind {
-        case .userMessage(let text, let blocks):
+        case .userMessage(let text, let blocks, let from):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                 .padding(12)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))

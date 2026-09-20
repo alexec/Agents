@@ -334,19 +334,28 @@ public enum DaemonAPI {
         public var agentID: UUID
         public var text: String
         public var attachments: [Attachment]
+        /// Whose prompt this is. The daemon sends itself one of these after a turn
+        /// that ended without saying how it went, and only the person's clears what
+        /// the agent last said about the turn before.
+        public var from: PromptOrigin
 
-        public init(agentID: UUID, text: String, attachments: [Attachment] = []) {
+        public init(agentID: UUID, text: String, attachments: [Attachment] = [],
+                    from: PromptOrigin = .person) {
             self.agentID = agentID
             self.text = text
             self.attachments = attachments
+            self.from = from
         }
 
         /// An older app sends only the text, so attachments are optional on the way in.
+        /// A remote built before 014 sends no origin, and its prompts are the person's,
+        /// which is correct.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agentID = try c.decode(UUID.self, forKey: .agentID)
             text = try c.decode(String.self, forKey: .text)
             attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
+            from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
         }
 
         public var blocks: [ContentBlock] {
@@ -370,6 +379,25 @@ public enum DaemonAPI {
     /// anything on this Mac can reach the daemon's socket. A token the daemon minted
     /// for one session is the only thing that says which agent this is, and it is
     /// refused the moment that session is over.
+    /// What the MCP helper sends when an agent says how the work went.
+    ///
+    /// The token does the same work it does for a suggestion: the helper is a process
+    /// the runtime started, anything on this Mac can reach the socket, and a token the
+    /// daemon minted for one session is the only thing that says which agent this is.
+    /// The outcome is the wire spelling, checked at the daemon rather than here — a
+    /// word this build does not know must be refused, never rounded.
+    public struct ReportOutcomeRequest: Codable, Sendable {
+        public var token: String
+        public var outcome: String
+        public var message: String
+
+        public init(token: String, outcome: String, message: String) {
+            self.token = token
+            self.outcome = outcome
+            self.message = message
+        }
+    }
+
     public struct SuggestPromptsRequest: Codable, Sendable {
         public var token: String
         public var prompts: [SuggestedPrompt]

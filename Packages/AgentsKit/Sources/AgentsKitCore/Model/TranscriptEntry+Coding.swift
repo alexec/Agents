@@ -20,8 +20,12 @@ extension TranscriptEntry.Kind {
               let payload = object[name] else { return nil }
         switch name {
         case "userMessage":
+            // `from` absent is the person's, which is what every record written before
+            // 014 is and what a remote that has not been rebuilt still sends.
             return .userMessage(payload["_0"]?.stringValue ?? "",
-                                blocks: [ContentBlock](wire: payload["blocks"]))
+                                blocks: [ContentBlock](wire: payload["blocks"]),
+                                from: PromptOrigin(rawValue: payload["from"]?.stringValue ?? "")
+                                    ?? .person)
         case "agentMessage":
             return .agentMessage(messageID: payload["messageID"]?.stringValue,
                                  text: payload["text"]?.stringValue ?? "",
@@ -66,6 +70,11 @@ extension TranscriptEntry.Kind {
             return .stateChanged(state, reason: try? payload["reason"]?.decode(EndedReason.self))
         case "runtimeNote":
             return .runtimeNote(payload["_0"]?.stringValue ?? "")
+        case "workReported":
+            // An outcome this build does not know is a report that never arrived, and
+            // the entry falls to `.unrecognised` rather than being rounded to `done`.
+            guard let report = try? payload["_0"]?.decode(WorkReport.self) else { return nil }
+            return .workReported(report)
         default:
             return nil
         }
@@ -77,9 +86,12 @@ extension TranscriptEntry.Kind {
 
     var wire: JSONValue {
         switch self {
-        case .userMessage(let text, let blocks):
+        case .userMessage(let text, let blocks, let from):
             var payload: [String: JSONValue] = ["_0": .string(text)]
             if !blocks.isEmpty { payload["blocks"] = blocks.wire }
+            // Only written when it is not the person's, so every entry an older build
+            // reads back is exactly the shape it wrote.
+            if from != .person { payload["from"] = .string(from.rawValue) }
             return ["userMessage": .object(payload)]
         case .agentMessage(let messageID, let text, let blocks):
             var payload: [String: JSONValue] = ["text": .string(text)]
@@ -122,6 +134,8 @@ extension TranscriptEntry.Kind {
             return ["stateChanged": .object(payload)]
         case .runtimeNote(let text):
             return ["runtimeNote": ["_0": .string(text)]]
+        case .workReported(let report):
+            return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.

@@ -27,7 +27,7 @@ struct AgentGroupTests {
 
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
-        let reached = Set(AgentState.allCases.map(AgentGroup.init(for:)))
+        let reached = Set(AgentState.allCases.map { AgentGroup(for: $0) })
         #expect(reached == Set(AgentGroup.allCases))
     }
 

@@ -310,7 +310,7 @@ struct SuggestedPromptTests {
         }
 
         let said = try await core.transcript(.init(agentID: id)).entries.compactMap { entry -> String? in
-            if case .userMessage(let text, _) = entry.kind { return text }
+            if case .userMessage(let text, _, _) = entry.kind { return text }
             return nil
         }
         #expect(said == ["do the thing"])

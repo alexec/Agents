@@ -803,7 +803,7 @@ struct DaemonTests {
         }
         let page = try await core.transcript(.init(agentID: wasRunning.id))
         let prompts = page.entries.compactMap { entry -> String? in
-            guard case .userMessage(let text, _) = entry.kind else { return nil }
+            guard case .userMessage(let text, _, _) = entry.kind else { return nil }
             return text
         }
         let restart = prompts.firstIndex { $0.contains("The app restarted") }
