@@ -54,10 +54,38 @@ extension DaemonCore {
 
     // MARK: Where the person is
 
-    /// The paired devices the ladder may route to. None until Slice C builds the store;
-    /// the ladder's device rungs are exhausted in `RoutingTests` against records made
-    /// by hand, which is why Slice A can ship without one.
-    var pairedDevices: [Device] { [] }
+    /// The devices the ladder may route to: the ones that have identified themselves,
+    /// with what each last said about its own notification permission. A stand-in for
+    /// the device store (T064), and it treats an identified device as approved — which
+    /// is what the LAN link, with no pairing, already does for everything else.
+    var pairedDevices: [Device] {
+        knownDevices.values.map { device in
+            var device = device
+            device.mayNotify = deviceMayNotify[device.id] ?? device.mayNotify
+            return device
+        }
+    }
+
+    /// `surface/identify`, after the server has taken the identity: register the
+    /// device so the ladder can choose it. The connection's surface must already be
+    /// this device — the server sets it first — or the call is not a device's.
+    func identify(_ who: DaemonAPI.SurfaceIdentification, from surface: Surface?, connection: UUID?) throws {
+        guard connection != nil, surface == .device(who.id) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
+                               message: "Only a device's own connection may say which device it is.")
+        }
+        let now = now()
+        if var known = knownDevices[who.id] {
+            known.name = who.name
+            known.kind = who.kind
+            known.lastSeenAt = now
+            knownDevices[who.id] = known
+        } else {
+            knownDevices[who.id] = Device(id: who.id, name: who.name, kind: who.kind,
+                                          announcedAt: now, approvedAt: now, lastSeenAt: now)
+        }
+        reconsider()
+    }
 
     /// `presence/report`. The surface is the connection's, never the parameters', and the
     /// time is this clock's, never the sender's — a device with a fast clock must not
@@ -67,10 +95,13 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
                                message: "This connection is not a window or a device, so it cannot say where anybody is.")
         }
+        let now = now()
         presences[connection] = Presence(surface: surface, watching: report.watching,
-                                         active: report.active, heardAt: now())
-        if let mayNotify = report.mayNotify, let device = surface.deviceID {
-            deviceMayNotify[device] = mayNotify
+                                         active: report.active, heardAt: now)
+        if let device = surface.deviceID {
+            if let mayNotify = report.mayNotify { deviceMayNotify[device] = mayNotify }
+            // Heard from is used by: the default rung reads it when nobody is in hand.
+            knownDevices[device]?.lastSeenAt = now
         }
         reconsider()
     }

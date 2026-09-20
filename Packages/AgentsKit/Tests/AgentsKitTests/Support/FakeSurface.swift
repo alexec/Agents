@@ -60,4 +60,14 @@ struct FakeSurface: Sendable {
     func disconnect(_ core: DaemonCore) async {
         await core.forgetPresence(connection: connection)
     }
+
+    /// `surface/identify`, as a device does once it is connected. The identity is
+    /// passed beside the request, as the server passes it after setting it.
+    @discardableResult
+    func identify(_ core: DaemonCore, name: String, kind: Device.Kind) async -> Result<JSONValue, JSONRPCError> {
+        guard let id = surface.deviceID else { return .failure(.internalError("not a device")) }
+        let params = try? JSONValue.encoding(DaemonAPI.SurfaceIdentification(id: id, name: name, kind: kind))
+        return await core.handle(method: DaemonAPI.Method.surfaceIdentify, params: params,
+                                 from: surface, connection: connection)
+    }
 }

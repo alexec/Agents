@@ -36,6 +36,7 @@ struct RemoteApp: App {
 /// a way back.
 struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
 
     /// The conversation, as a path of nothing or one. A chat is somewhere you go from
     /// the project and come back out of, not a third column.
@@ -55,6 +56,8 @@ struct RemoteView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        // Where this device is, told to the Mac on every change (021).
+        .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
         .task {
             await model.connect()
 #if DEBUG

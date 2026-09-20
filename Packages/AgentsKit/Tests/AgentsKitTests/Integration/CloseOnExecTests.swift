@@ -154,6 +154,45 @@ struct CloseOnExecTests {
         return count
     }
 
+    /// 021 T051: a connection is a window until it says it is a device, and then it
+    /// is that device for every request after — as the handler sees it, never as the
+    /// request's own parameters claim.
+    @Test func aConnectionBecomesTheDeviceItIdentifiesAs() async throws {
+        let url = temporaryFile()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let seen = SeenContexts()
+        let server = DaemonServer(url: url) { context, _, _ in
+            seen.append(context)
+            return .success([:])
+        }
+        try server.start()
+        defer { server.stop() }
+
+        let mine = try connect(to: url)
+        defer { close(mine) }
+        let device = UUID()
+        let identify = """
+            {"jsonrpc":"2.0","id":1,"method":"surface/identify","params":{"id":"\(device.uuidString)","name":"Phone","kind":"iPhone"}}\n
+            """
+        let then = #"{"jsonrpc":"2.0","id":2,"method":"presence/report","params":{"active":true}}"# + "\n"
+        // One after the other, as a real client does: it waits for the reply before it
+        // sends the next. Two lines at once are handled concurrently, in either order.
+        _ = identify.withCString { write(mine, $0, strlen($0)) }
+        await eventually("identify was handled") { seen.contexts.count == 1 }
+        _ = then.withCString { write(mine, $0, strlen($0)) }
+        await eventually("both requests were handled") { seen.contexts.count == 2 }
+        #expect(seen.contexts.first?.surface == .device(device), "identify itself is handled as the device")
+        #expect(seen.contexts.last?.surface == .device(device))
+        #expect(seen.contexts.first?.id == seen.contexts.last?.id, "one connection, one identity")
+    }
+
+    private final class SeenContexts: @unchecked Sendable {
+        private let lock = NSLock()
+        private var held: [DaemonServer.ConnectionContext] = []
+        func append(_ context: DaemonServer.ConnectionContext) { lock.lock(); held.append(context); lock.unlock() }
+        var contexts: [DaemonServer.ConnectionContext] { lock.lock(); defer { lock.unlock() }; return held }
+    }
+
     /// The listening socket has no consequence that can be watched from outside — it
     /// is unlinked on the way out — so this one does look at the flag.
     @Test func theListeningSocketIsNotInherited() throws {

@@ -1,3 +1,5 @@
+import SwiftUI
+import UIKit
 import AgentsKitCore
 import Foundation
 import Observation
@@ -36,11 +38,25 @@ final class RemoteModel {
         didSet {
             guard selection != oldValue else { return }
             work.watching = selection
+            presence?.watching(selection)
             Task { await loadTranscript() }
         }
     }
 
     private let client: DaemonClient
+    /// 021: this device's banner, and its report of where the person is. Neither
+    /// decides anything; the Mac routes and these two obey.
+    private let notifier = DeviceNotifier()
+    private var presence: PresenceReporter?
+    /// Which device this is, minted once and kept. Told to the Mac right after every
+    /// connection (`surface/identify`), so every later request on it is this device's.
+    private let deviceID: UUID = {
+        let key = "device.id"
+        if let text = UserDefaults.standard.string(forKey: key), let id = UUID(uuidString: text) { return id }
+        let id = UUID()
+        UserDefaults.standard.set(id.uuidString, forKey: key)
+        return id
+    }()
     private var listening: Task<Void, Never>?
     /// The loop looking for the Mac, so two of them never run at once.
     private var reconnecting: Task<Void, Never>?
@@ -184,6 +200,9 @@ final class RemoteModel {
             lastHeardFrom = Date()
             problem = nil
             listen()
+            await identify()
+            startPresence()
+            presence?.connected()
             await refreshEverything()
             return true
         } catch {
@@ -206,6 +225,10 @@ final class RemoteModel {
                 // Anything the shared model does not claim is the Mac's own — shells,
                 // terminals — and a remote has no business with it.
                 _ = self.work.apply(notification.method, notification.params)
+                if notification.method == DaemonAPI.Notification.attentionChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
+                    await self.notifier.apply(change, me: .device(self.deviceID))
+                }
             }
             await self?.lostTouch()
         }
@@ -224,11 +247,57 @@ final class RemoteModel {
         await refreshProjects()
         await refreshPermissions()
         await refreshElicitations()
+        await refreshAttention()
         await refreshResuming()
         await refreshCostState()
         await refreshWorkflows()
         await loadTranscript()
         settleSelection()
+    }
+
+    // MARK: Where this device is (021)
+
+    /// The app came to the front or went behind. `.active` is foreground and unlocked,
+    /// which is what "in the person's hands" means on a device.
+    func scenePhase(_ phase: ScenePhase) {
+        presence?.scenePhase(phase)
+        if phase == .active { Task { await refreshAttention() } }
+    }
+
+    private func identify() async {
+        let kind: Device.Kind
+        switch UIDevice.current.userInterfaceIdiom {
+        case .phone: kind = .iPhone
+        case .pad: kind = .iPad
+        default: kind = .unknown
+        }
+        _ = try? await client.call(DaemonAPI.Method.surfaceIdentify,
+                                   DaemonAPI.SurfaceIdentification(id: deviceID, name: UIDevice.current.name, kind: kind))
+    }
+
+    private func startPresence() {
+        guard presence == nil else { return }
+        notifier.open = { [weak self] agentID in
+            guard let self, let agent = self.work.agent(agentID) else { return }
+            self.selectedProject = Project.standardize(agent.cwd)
+            self.selection = agentID
+        }
+        notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
+        let reporter = PresenceReporter { [weak self] watching, active, mayNotify in
+            guard let self else { return }
+            _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
+                                            DaemonAPI.PresenceReport(watching: watching, active: active,
+                                                                     mayNotify: mayNotify))
+        }
+        presence = reporter
+    }
+
+    private func refreshAttention() async {
+        guard let pending = try? await client.call(DaemonAPI.Method.attentionPending,
+                                                   Optional<String>.none,
+                                                   returning: DaemonAPI.AttentionPending.self) else { return }
+        work.replaceAttention(pending)
+        await notifier.sweep(keeping: pending)
     }
 
     private func refreshAgents() async {

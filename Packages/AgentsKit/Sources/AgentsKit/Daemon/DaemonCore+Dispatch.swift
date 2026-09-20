@@ -22,6 +22,11 @@ extension DaemonCore {
             case DaemonAPI.Method.attentionPending:
                 return .success(try JSONValue.encoding(attentionPending()))
 
+            case DaemonAPI.Method.surfaceIdentify:
+                let who = try require(params, as: DaemonAPI.SurfaceIdentification.self)
+                try identify(who, from: surface, connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
                 return .success(try JSONValue.encoding(

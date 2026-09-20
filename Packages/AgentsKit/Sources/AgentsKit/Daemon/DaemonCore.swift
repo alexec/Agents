@@ -31,6 +31,12 @@ public actor DaemonCore {
     var settlingTimers: [NeedID: Task<Void, Never>] = [:]
     /// What each device last said about its own notification permission (FR-023).
     var deviceMayNotify: [UUID: Bool] = [:]
+    /// The devices that have identified themselves on a connection, treated as approved.
+    /// **Phase 6's stand-in** for the device store: nothing here is paired, verified or
+    /// written down, and T064 replaces it with `DeviceStore`. Held so the ladder's
+    /// device rungs can be walked on real hardware over the LAN before a line of
+    /// CloudKit exists.
+    var knownDevices: [UUID: Device] = [:]
     /// The four numbers routing turns on. Injected so a test names its own and sleeps
     /// for none of the real ones.
     let thresholds: AttentionThresholds

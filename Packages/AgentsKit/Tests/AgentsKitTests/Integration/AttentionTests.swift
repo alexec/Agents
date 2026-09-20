@@ -261,6 +261,134 @@ struct AttentionTests {
         await eventually("moved to nowhere") { heard.changes.last?.to == nil && heard.changes.last?.need != nil }
     }
 
+    // MARK: US2, the device in hand (Phase 6, without the hardware)
+
+    /// A phone and a pad, identified and permitted, as the LAN link presents them.
+    private func devices(_ core: DaemonCore) async -> (phone: FakeSurface, pad: FakeSurface) {
+        let phone = FakeSurface(.device(UUID())), pad = FakeSurface(.device(UUID()))
+        await phone.identify(core, name: "Phone", kind: .iPhone)
+        await pad.identify(core, name: "Pad", kind: .iPad)
+        return (phone, pad)
+    }
+
+    /// US2 scenarios 1 and 2: the device used most recently is the one told.
+    @Test func theDeviceUsedMostRecentlyWins() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let (phone, pad) = await devices(core)
+        await phone.report(core, active: true, mayNotify: true)
+        try await Task.sleep(for: .milliseconds(20))
+        await pad.report(core, active: true, mayNotify: true)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("the pad was told") { heard.deliveries.first != nil }
+        #expect(heard.deliveries.first?.to == pad.surface)
+        #expect(heard.deliveries.first?.alert == true, "no pause when away from the Mac")
+
+        // Then the phone is picked up: the need moves to it, silently inside the interval.
+        await phone.report(core, active: true, mayNotify: true)
+        await eventually("moved to the phone") { heard.changes.last?.to == phone.surface }
+        #expect(heard.changes.last?.alert == false)
+    }
+
+    /// US2 scenario 3 and the staleness edge: nobody recent enough falls to the iPhone;
+    /// a device not heard from past `deviceStaleness` is not the device in hand.
+    @Test func nobodyRecentFallsToTheIPhone() async throws {
+        var clock = Date()
+        let tick = { (by: TimeInterval) in clock = clock.addingTimeInterval(by) }
+        let (locations, work) = try temporary()
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: asking(),
+                              now: { [clock] in clock }, thresholds: thresholds)
+        _ = tick
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let (phone, pad) = await devices(core)
+        await phone.report(core, active: true, mayNotify: true)
+        await pad.report(core, active: true, mayNotify: true)
+        // Both go quiet for longer than a surface counts as evidence.
+        await phone.report(core, active: false, mayNotify: true)
+        await pad.report(core, active: false, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("somebody was told") { heard.deliveries.first != nil }
+        // Neither is active, so neither is in hand; the default is the iPhone.
+        #expect(heard.deliveries.first?.to == phone.surface)
+    }
+
+    /// US2 scenario 5: one device paired is that device, whatever it is.
+    @Test func theOnlyDeviceIsTheOneWhateverItIs() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let pad = FakeSurface(.device(UUID()))
+        await pad.identify(core, name: "Pad", kind: .iPad)
+        await pad.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("the pad was told") { heard.deliveries.first != nil }
+        #expect(heard.deliveries.first?.to == pad.surface)
+    }
+
+    /// US2 scenario 4: the Mac, active but behind another app, beats both devices.
+    @Test func theMacBehindAnotherAppBeatsTheDevices() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let (phone, pad) = await devices(core)
+        await phone.report(core, active: true, mayNotify: true)
+        await pad.report(core, active: true, mayNotify: true)
+        await FakeSurface(.mac).report(core, watching: nil, active: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("the Mac was told, after its pause") { heard.deliveries.first != nil }
+        #expect(heard.deliveries.first?.to == .mac)
+    }
+
+    /// A device that may not notify is never chosen, in hand or as the default.
+    @Test func aDeviceThatMayNotNotifyIsNeverChosen() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.identify(core, name: "Phone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: false)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        try await settled()
+        #expect(heard.deliveries.isEmpty)
+        #expect(await core.attentionPending().needs.count == 1)
+    }
+
+    /// Two reports in the same instant resolve by the daemon's clock and not by anything
+    /// either device claimed; on an exact tie the iPhone wins.
+    @Test func aTieIsTheDaemonsClockAndThenTheIPhone() async throws {
+        let frozen = Date()
+        let (locations, work) = try temporary()
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: asking(),
+                              now: { frozen }, thresholds: thresholds)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let (phone, pad) = await devices(core)
+        await pad.report(core, active: true, mayNotify: true)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("somebody was told") { heard.deliveries.first != nil }
+        #expect(heard.deliveries.first?.to == phone.surface)
+    }
+
+    @Test func aDeviceMayOnlyIdentifyOnItsOwnConnection() async throws {
+        let (locations, _) = try temporary()
+        let core = try core(asking(), locations: locations)
+        let params = try JSONValue.encoding(DaemonAPI.SurfaceIdentification(id: UUID(), name: "x", kind: .iPhone))
+        let answer = await core.handle(method: DaemonAPI.Method.surfaceIdentify, params: params,
+                                       from: .mac, connection: UUID())
+        guard case .failure(let error) = answer else { Issue.record("expected a refusal"); return }
+        #expect(error.code == DaemonAPI.Failure.notASurface)
+    }
+
     @Test func aReportWithNoIdentityIsRefused() async throws {
         let (locations, _) = try temporary()
         let core = try core(asking(), locations: locations)

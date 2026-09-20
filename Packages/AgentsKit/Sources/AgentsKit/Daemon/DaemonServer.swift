@@ -27,6 +27,23 @@ public final class DaemonServer: @unchecked Sendable {
 
     public typealias Handler = @Sendable (ConnectionContext, String, JSONValue?) async -> Result<JSONValue, JSONRPCError>
 
+    /// One connection's identity, held by the server for the connection's life. It
+    /// starts as a window and becomes a device only through `surface/identify`, which
+    /// the server reads before the request reaches the daemon — so the daemon never
+    /// sees a surface a caller merely claimed in some other request's parameters.
+    final class ConnectionIdentity: @unchecked Sendable {
+        let id = UUID()
+        private let lock = NSLock()
+        private var _surface: Surface? = .mac
+
+        var surface: Surface? {
+            get { lock.lock(); defer { lock.unlock() }; return _surface }
+            set { lock.lock(); defer { lock.unlock() }; _surface = newValue }
+        }
+
+        var context: ConnectionContext { ConnectionContext(id: id, surface: surface) }
+    }
+
     private let url: URL
     private let handler: Handler
     /// Readable inside the module so a test can ask whether it would survive an exec.
@@ -114,10 +131,17 @@ public final class DaemonServer: @unchecked Sendable {
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
-        let context = ConnectionContext(id: UUID(), surface: .mac)
+        let identity = ConnectionIdentity()
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
-            await handler(context, method, params)
+            // A device saying which it is. The server sets the identity here, once,
+            // and only then hands the request on — so what the daemon registers under
+            // is what every later request on this connection will carry (021 T051).
+            if method == DaemonAPI.Method.surfaceIdentify,
+               let who = try? params?.decode(DaemonAPI.SurfaceIdentification.self) {
+                identity.surface = .device(who.id)
+            }
+            return await handler(identity.context, method, params)
         }
         connections.add(connection)
         onConnectionCountChanged(connections.count)
@@ -134,7 +158,7 @@ public final class DaemonServer: @unchecked Sendable {
             await connection.close()
             self.connections.remove(connection)
             self.onConnectionCountChanged(self.connections.count)
-            self.onDisconnected(context.id)
+            self.onDisconnected(identity.id)
         }
     }
 

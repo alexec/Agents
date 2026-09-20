@@ -39,6 +39,12 @@ public enum DaemonAPI {
         /// `permissions/pending` and for the same reason: a surface that was not
         /// listening is put right rather than left guessing.
         public static let attentionPending = "attention/pending"
+        /// A remote saying which device it is, once, right after it connects. The
+        /// server takes the identity from this and then owns it: every later request
+        /// on the connection is that device's, and `presence/report` never carries it
+        /// (021 T051). A stand-in until pairing verifies it against the device store —
+        /// Phase 7 makes the bridge refuse an unpaired device at accept.
+        public static let surfaceIdentify = "surface/identify"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
@@ -1031,6 +1037,19 @@ public enum DaemonAPI {
     }
 
     // MARK: Attention (021)
+
+    /// `surface/identify`: which device this connection is.
+    public struct SurfaceIdentification: Codable, Sendable {
+        public var id: UUID
+        public var name: String
+        public var kind: Device.Kind
+
+        public init(id: UUID, name: String, kind: Device.Kind) {
+            self.id = id
+            self.name = name
+            self.kind = kind
+        }
+    }
 
     /// `presence/report`. Three small fields, sent on a change and never on a timer.
     /// **No timestamp**: a contract term, not an omission — the daemon's clock stamps it.
