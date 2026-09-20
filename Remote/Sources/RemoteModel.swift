@@ -70,6 +70,27 @@ final class RemoteModel {
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
+    /// A file being read, by path, or nothing.
+    ///
+    /// On the model rather than in a view's `@State` because the tap that opens one is
+    /// a tool call's file name, several views down inside the transcript, and passing a
+    /// binding through every row to reach it would be a worse thing than this.
+    var fileOnScreen: String?
+
+    /// What the agent has asked be looked at, if the conversation open is its own.
+    /// Peeked rather than taken: taking it is what opening it does.
+    var fileTheAgentWants: ShownFile? {
+        guard let selection else { return nil }
+        return work.filesToShow[selection]
+    }
+
+    /// Open what the agent asked for, and take it off the model so it is asked once.
+    /// "Look at this" is about a moment, and the moment has passed by the next launch.
+    func openFileTheAgentWants() {
+        guard let selection, let file = work.takeFileToShow(for: selection) else { return }
+        fileOnScreen = file.path
+    }
+
     /// Whether what is on screen can still be trusted, and acted on.
     ///
     /// Stale is not an error. It is the honest answer for a Mac that is asleep, and

@@ -219,11 +219,10 @@ private struct ToolCallLine: View {
                 view(for: piece)
             }
             if !call.locations.isEmpty {
-                // Where it did its work. Named, not opened: the file is on the Mac,
-                // and a remote that pretended otherwise would be a second file system.
-                Text(call.locations.map(\.fileName).joined(separator: ", "))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                // Where it did its work, and now openable (FR-020a). Still not a
+                // second file system: what opens is the change the agent made to that
+                // file, out of this conversation, not a read of the Mac's disk.
+                FlowOfNames(locations: call.locations)
             }
         }
         .padding(.leading, 14)
@@ -302,5 +301,88 @@ private struct StateLine: View {
             }
         case .archived: return "Archived"
         }
+    }
+}
+
+/// The files a tool call touched, each a way into what it did to that one.
+///
+/// A row of buttons rather than one joined line: a tool call can touch six files and
+/// on a phone the sixth needs to be reachable without the reader guessing where one
+/// name ends. Wrapped, because file names are long and a horizontal scroll inside a
+/// vertical one is a trap.
+private struct FlowOfNames: View {
+    @Environment(RemoteModel.self) private var model
+    let locations: [ToolCallLocation]
+
+    var body: some View {
+        WrappingHStack(spacing: 8) {
+            ForEach(locations) { location in
+                Button {
+                    model.fileOnScreen = location.path
+                } label: {
+                    Text(location.fileName)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .accessibilityLabel("Show what changed in \(location.fileName)")
+            }
+        }
+    }
+}
+
+/// A row that wraps. SwiftUI has no such stack, and a `Layout` is the one honest way
+/// to get one: a `LazyVGrid` with adaptive columns gives every name the width of the
+/// longest, which on a list of `main.swift` and `DaemonCore+Dispatch.swift` is most of
+/// the screen spent on white space.
+private struct WrappingHStack: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let rows = arrange(subviews: subviews, in: width)
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize,
+                       subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews: subviews, in: bounds.width) {
+            var x = bounds.minX
+            for item in row.items {
+                subviews[item.index].place(at: CGPoint(x: x, y: y),
+                                           anchor: .topLeading,
+                                           proposal: ProposedViewSize(item.size))
+                x += item.size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var items: [(index: Int, size: CGSize)] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(subviews: Subviews, in width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for (index, subview) in subviews.enumerated() {
+            let size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            let needed = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            if needed > width, !row.items.isEmpty {
+                rows.append(row)
+                row = Row()
+            }
+            row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.items.append((index, size))
+        }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
     }
 }

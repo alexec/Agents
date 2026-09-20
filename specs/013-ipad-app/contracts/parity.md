@@ -28,7 +28,7 @@ its browser, its file system at large, its signed-in accounts — is not.
 | The Mac shows | On iPad | Why |
 |---|---|---|
 | The project's name | **Yes** | Built. |
-| A prompt bar with this project's folder fixed | **Yes** | FR-026. Built. |
+| A prompt bar with this project's folder fixed | **Yes** | FR-026. **Not built** — corrected 2026-09-19. `ProjectPageView` says so in its own comment and the 2026-09-19 inventory read it as built. T072 builds it. |
 | Agents grouped "Needs input", "Working", "Completed" via `AgentGroup` | **Yes** | FR-015. Built, same shared file. |
 | Agent cards, with how a completed one ended | **Yes** | FR-019. Built. |
 | Archived agents behind a disclosure, ten at a time | **Yes** | FR-020. Built. |
@@ -48,15 +48,15 @@ its browser, its file system at large, its signed-in accounts — is not.
 | Diffs (`DiffView`) | **Yes** | FR-016. Built. |
 | Command output | **Yes** | FR-016. Built. |
 | Files a tool call touched (`ToolCall.locations`) | **Yes** | FR-016. Built as a list; FR-020a adds opening one. |
-| **The content of a touched file, read only** | **Yes — new** | FR-020a. `agents/showFile` exists; the iPad has no view yet. |
-| **A document the agent produced (007)** | **Yes — new, read only** | FR-020b. |
+| **The content of a touched file, read only** | **Yes — built 2026-09-19** | FR-020a. `FileView`. The content is the agent's own diffs out of the transcript, not a read of the Mac's disk: nothing in the protocol hands a client a file's bytes. A file the agent only read says so. |
+| **A document the agent produced (007)** | **Yes — built 2026-09-19, read only** | FR-020b. `DocumentView` and `ArtifactsList`, off the conversation's menu. An embedded resource reads in place; one that is a file on the Mac says where it is. |
 | Editing a file, or opening one the agent never touched | **No** | Out of scope, named in spec. |
-| The plan (`PlanView`, `Agent.plans`) | **Yes — new** | FR-017. The data already arrives; the view does not exist. See research §5. |
+| The plan (`PlanView`, `Agent.plans`) | **Yes — built 2026-09-19** | FR-017. `CurrentPlanStrip` at the head of the conversation, collapsed to the step being worked. See research §5. |
 | Cost and context as reported (`ContextMeter`) | **Yes** | FR-018. Built. |
 | How an agent ended — finished, stopped, the error | **Yes** | FR-019. Built. |
 | Resuming / coming-back state (011) | **Yes** | FR-021. `AgentsModel.isComingBack` is shared. |
-| The prompt bar, sending text | **Yes** | FR-025. Built. |
-| Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is 005's. |
+| The prompt bar, sending text | **Yes** | FR-025. **Not built** — corrected 2026-09-19. There is no `TextField` anywhere in `Remote/Sources/`. T072 builds it, and T067 and T069 hang off it. |
+| Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is T074's, and it needs T072's prompt bar to hang on. |
 | Slash commands offered while typing (`CommandList`) | **Yes** | FR-021. It is what this runtime takes; withholding it makes the iPad's prompt bar quietly weaker. |
 | Mode / model / effort / permission controls (`SelectCapsule`, `OptionMenu`, 009) | **Yes** | FR-021 and FR-026. An agent started from the iPad must be startable with the runtimes and options the Mac has. |
 | Jump to the live end (`JumpToEnd`) | **Yes** | FR-021. |
@@ -69,8 +69,8 @@ its browser, its file system at large, its signed-in accounts — is not.
 
 | The Mac shows | On iPad | Why |
 |---|---|---|
-| A file the agent touched, read only (`FilesPane`, `FileLines`) | **Yes** | FR-020a. The reading half. |
-| A document the agent produced (`ArtifactsPane`, `DocumentView`, 007) | **Yes** | FR-020b. The reading half. |
+| A file the agent touched, read only (`FilesPane`, `FileLines`) | **Yes** | FR-020a. The reading half, built 2026-09-19 as a sheet off the conversation — an iPad has no inspector to put it in. |
+| A document the agent produced (`ArtifactsPane`, `DocumentView`, 007) | **Yes** | FR-020b. The reading half, built 2026-09-19 as a sheet off the conversation, same reason. |
 | A live terminal (`TerminalPane`, `TerminalHostView`, `ShellClient`) | **No** | Out of scope, named in spec: the Mac's window onto the Mac's own machine. |
 | A browser (`BrowserPane`) | **No** | Same. |
 
@@ -97,3 +97,15 @@ Named here rather than hidden, because FR-021 says silence is a defect:
    Mac housekeeping, which argues against.
 
 Both are candidates for `/speckit-clarify` and neither blocks the build.
+
+---
+
+## The read-only audit (T062, SC-014)
+
+Walked 2026-09-19 over `Remote/Sources/`. There is no `TextEditor`, no `ShareLink`, no
+`fileExporter`, no `UIActivityViewController` and no write to disk anywhere in the target.
+Nothing had to be removed. Read-only holds because the iPad has no screen that offers to
+change anything, which is what SC-014 asks for — not because a flag is set somewhere.
+
+Re-walk this when a screen that takes input lands. The first will be T072's prompt bar, which
+writes to the *conversation* and not to a file, and the distinction is the thing to check.

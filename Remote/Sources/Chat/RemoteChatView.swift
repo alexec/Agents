@@ -11,6 +11,7 @@ struct RemoteChatView: View {
     @Environment(RemoteModel.self) private var model
     @State private var isLoadingEarlier = false
     @State private var hasSettled = false
+    @State private var isShowingArtifacts = false
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -60,10 +61,42 @@ struct RemoteChatView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { question }
+        .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
+                                    set: { if !$0 { model.fileOnScreen = nil } })) {
+            // A look-aside, not a level. On the Mac this is a pane beside the
+            // conversation; a sheet is what that is on a screen with one column.
+            NavigationStack {
+                if let path = model.fileOnScreen {
+                    FileView(path: path)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") { model.fileOnScreen = nil }
+                            }
+                        }
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingArtifacts) {
+            NavigationStack {
+                ArtifactsList()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { isShowingArtifacts = false }
+                        }
+                    }
+            }
+        }
+        // The agent asking to be looked at. An event, so it opens the moment it
+        // arrives and is taken off the model in the same breath.
+        .onChange(of: model.fileTheAgentWants) { _, wanted in
+            if wanted != nil { model.openFileTheAgentWants() }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if let agent { ChatMenu(agent: agent) }
+                if let agent { ChatMenu(agent: agent, isShowingArtifacts: $isShowingArtifacts) }
             }
+        }
+        .toolbar {
             ToolbarItem(placement: .bottomBar) {
                 if let agent { ContextMeter(agent: agent) }
             }
@@ -120,27 +153,32 @@ struct RemoteChatView: View {
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
+    @Binding var isShowingArtifacts: Bool
 
     var body: some View {
         Menu {
+            Button("Handed over", systemImage: "doc") { isShowingArtifacts = true }
+            Divider()
             if agent.state.holdsRuntime {
                 Button("Stop", systemImage: "stop.circle") {
                     Task { await model.stop(agent.id) }
                 }
+                .disabled(model.isStale)
             }
             if agent.state == .archived {
                 Button("Bring back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
                 }
+                .disabled(model.isStale)
             } else {
                 Button("Archive", systemImage: "archivebox") {
                     Task { await model.archive(agent.id) }
                 }
+                .disabled(model.isStale)
             }
         } label: {
             Label("Actions", systemImage: "ellipsis.circle")
         }
-        .disabled(model.isStale)
     }
 }
 
