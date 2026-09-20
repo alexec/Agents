@@ -155,6 +155,21 @@ struct WorkflowToolTests {
         #expect(answer.contains("archive"))
     }
 
+    @Test func aWriteNamingAModeIsToldBackInWords() async throws {
+        // FR-029, FR-030: what the agent is handed after a write is the row's own
+        // sentence, and the settings clause is part of it — "in plan mode", not a
+        // quoted line of YAML the agent would have to parse back out of a reply.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, _) = try await core(locations, in: work)
+        let withMode = sample.replacingOccurrences(of: "agent: new\n", with: "agent: new\npermission-mode: plan\n")
+
+        let answer = try await call(core, token, .write, id: "advisories", content: withMode)
+
+        #expect(answer.contains("in plan mode"))
+        #expect(!answer.contains("permission-mode:"))
+    }
+
     @Test func aWriteWithNoWindowOpenStillHappens() async throws {
         // The case asking first could not serve. An agent working at three in the
         // morning for somebody who closed the window has nobody to ask, and the old

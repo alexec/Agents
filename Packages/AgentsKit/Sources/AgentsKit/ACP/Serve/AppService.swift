@@ -316,6 +316,14 @@ public actor AppService {
             `standing`, or `triggering`); everything under the front matter is the \
             prompt, sent verbatim.
 
+            A workflow may also say how its agent runs: `permission-mode:` (the \
+            runtime's own mode, e.g. a read-only or plan mode), `runtime:` and \
+            `model:`. Leave them out and it runs on the default runtime with that \
+            runtime's own defaults. Set `permission-mode:` when the person says the \
+            workflow must not change anything — a workflow runs unattended, so this is \
+            the only chance to say so. A mode the runtime does not offer stops the \
+            workflow running rather than falling back.
+
             Listing and reading ask nobody. Creating, changing or removing one asks the \
             person first, in plain words, and does nothing if they decline.
             """,
@@ -334,6 +342,10 @@ public actor AppService {
                         `morning-build-check`. Required for read, write and remove.
                         """,
                 ],
+                // The example carries `permission-mode:` so the shape an agent copies
+                // is the shape with the setting in it. `WorkflowExample.prompt` had to
+                // name the tool because two runtimes went and wrote a crontab instead;
+                // the same lesson applies to showing the key rather than describing it.
                 "content": [
                     "type": "string",
                     "description": """
@@ -347,6 +359,7 @@ public actor AppService {
                               between: "09:00-09:00"
                               days: [mon, tue, wed, thu, fri]
                         agent: new
+                        permission-mode: plan
                         ---
 
                         Check the build and say whether it is green.
