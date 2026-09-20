@@ -717,4 +717,57 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.workflowChanged, summary)
         return summary
     }
+
+    /// Change what a workflow is allowed to do, by writing its own file.
+    ///
+    /// The one place in this app that edits a document a person wrote, which is why
+    /// every step of it refuses rather than doing its best, and why nothing is written
+    /// until all three keys have been applied to the text in hand. A file half-edited
+    /// and then refused would be worse than one not edited at all: the person would be
+    /// left with a change they did not ask for and no message saying what happened.
+    public func setWorkflowSettings(_ request: DaemonAPI.WorkflowSettingsRequest) throws -> WorkflowSummary {
+        guard let existing = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        let url = WorkflowFile.url(for: existing.workflowID, in: existing.folder)
+        guard let original = try? String(contentsOf: url, encoding: .utf8) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "\(url.lastPathComponent) could not be read.")
+        }
+
+        // A key the caller left out is removed. The page sends what it is showing, so
+        // "no mode" is a thing it can say, and saying it has to take the line out
+        // rather than leave the old one behind.
+        var edited = original
+        do {
+            for (key, value) in [(WorkflowSettings.Setting.permissionMode, request.settings.permissionMode),
+                                 (WorkflowSettings.Setting.runtime, request.settings.runtimeID),
+                                 (WorkflowSettings.Setting.model, request.settings.model)] {
+                edited = try FrontMatterEdit.set(key, to: value, in: edited)
+            }
+        } catch let refusal as FrontMatterEdit.Refusal {
+            // The editor's own sentence, unchanged. It is the one that knows what it
+            // found, and nothing was written (FR-025).
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable, message: refusal.message)
+        }
+
+        do {
+            try Data(edited.utf8).write(to: url, options: .atomic)
+        } catch {
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
+        }
+
+        // Synchronously, and not through the watcher. The watcher is debounced by
+        // 250ms and will fire anyway and find nothing changed; waiting that long to
+        // tell the window what it just asked for is the kind of lag that reads as the
+        // app having ignored you. The rescan also broadcasts to every other window.
+        rescanWorkflows(in: existing.folder)
+        guard let reread = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "\(request.workflowID) went while it was being changed.")
+        }
+        return summary(for: reread)
+    }
 }

@@ -38,6 +38,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
                 return .success(try JSONValue.encoding(try archiveWorkflow(request)))
 
+            case DaemonAPI.Method.workflowsSettings:
+                let request = try require(params, as: DaemonAPI.WorkflowSettingsRequest.self)
+                return .success(try JSONValue.encoding(try setWorkflowSettings(request)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
@@ -101,6 +105,10 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsOptions:
                 let request = try require(params, as: DaemonAPI.OptionsRequest.self)
                 return .success(try JSONValue.encoding(try await options(request)))
+
+            case DaemonAPI.Method.optionsRemembered:
+                let request = try require(params, as: DaemonAPI.RememberedOptionsRequest.self)
+                return .success(try JSONValue.encoding(rememberedOptions(request)))
 
             case DaemonAPI.Method.agentsStart:
                 let request = try require(params, as: DaemonAPI.StartRequest.self)

@@ -260,6 +260,41 @@ final class AppModel {
                                                                 archived: archived))
     }
 
+    /// Change what a workflow is allowed to do. The daemon writes the file.
+    ///
+    /// The one call in this section that does **not** swallow its error, and the
+    /// difference matters: every other one here is asking for something the daemon
+    /// will do or will not, and the next notification puts the window right either way.
+    /// This one is asking for somebody's own file to be changed, and a refusal — front
+    /// matter it will not touch, a file it cannot write — has to reach them, or the
+    /// app has silently kept a change it never made (FR-025).
+    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings) async {
+        do {
+            let updated: WorkflowSummary = try await client.call(
+                DaemonAPI.Method.workflowsSettings,
+                DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
+                                                  workflowID: summary.workflowID,
+                                                  settings: settings),
+                returning: WorkflowSummary.self)
+            work.upsert(updated)
+        } catch {
+            problem = describe(error)
+            // What the file still says, so the control goes back to the truth rather
+            // than sitting on a value that was never written.
+            await refreshWorkflows()
+        }
+    }
+
+    /// What a runtime last advertised for a folder, for the menus on the workflow page.
+    ///
+    /// Empty is an answer, not a failure: it means nothing has been remembered for this
+    /// runtime here yet, and the page says so rather than offering a menu it made up.
+    func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
+        (try? await client.call(DaemonAPI.Method.optionsRemembered,
+                                DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd),
+                                returning: [ConfigOption].self)) ?? []
+    }
+
     /// What today has cost and what the reader will allow. A daemon too old to know
     /// the method answers method-not-found, which leaves `costState` nil and every
     /// surface showing what it showed before this feature.

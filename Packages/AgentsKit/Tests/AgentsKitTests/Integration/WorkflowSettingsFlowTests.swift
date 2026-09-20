@@ -192,4 +192,95 @@ struct WorkflowSettingsFlowTests {
         // offered at the time — and the setting is what makes them the same reason.
         #expect(repeats == 4)
     }
+
+    // MARK: Changing one from the page
+
+    @Test func writingASettingChangesTheFileAndNothingElse() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write("""
+            ---
+            name: Say hello
+            on:
+              - schedule:
+                  at: [":00"]
+            agent: new   # a fresh one every time
+            ---
+
+            Say hello and stop.
+            """, as: "say-hello", in: work)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let before = try String(contentsOf: url, encoding: .utf8)
+        _ = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(permissionMode: "plan")))
+
+        let after = try String(contentsOf: url, encoding: .utf8)
+        // One line added, just inside the closing fence, and every other line of
+        // somebody's file exactly as they left it — the comment included.
+        #expect(after == before.replacingOccurrences(
+            of: "agent: new   # a fresh one every time\n---",
+            with: "agent: new   # a fresh one every time\npermission-mode: plan\n---"))
+    }
+
+    @Test func theWindowHearsAboutItWithoutWaitingForTheWatcher() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(file("name: Say hello"), as: "say-hello", in: work)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let summary = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(permissionMode: "plan")))
+
+        // Not after a sleep, and not on the next notification: the answer to the write
+        // already carries what the file now says. The watcher is debounced by 250ms,
+        // and waiting that long to show somebody what they just asked for reads as the
+        // app having ignored them.
+        #expect(summary.workflow.settings.permissionMode == "plan")
+        #expect(summary.workflow.summary.contains("in plan mode"))
+    }
+
+    @Test func aSettingOnAReadOnlyFileIsRefusedAndNotHeld() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write(file("name: Say hello"), as: "say-hello", in: work)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let before = try String(contentsOf: url, encoding: .utf8)
+
+        // An atomic write makes its temporary alongside, so it is the folder that has
+        // to refuse it.
+        let folder = WorkflowFile.folder(in: work)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+
+        await #expect(throws: JSONRPCError.self) {
+            try await core.setWorkflowSettings(
+                DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                                  settings: WorkflowSettings(permissionMode: "plan")))
+        }
+        // Refused, and nothing kept: the file is what it was, and the workflow the
+        // daemon holds still says what the file says.
+        #expect(try String(contentsOf: url, encoding: .utf8) == before)
+        #expect(await core.allWorkflows(in: work).first?.workflow.settings.isEmpty == true)
+    }
+
+    @Test func rememberedOptionsStartsNothing() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+
+        let (core, launcher) = try await core(locations, script: offering(modes: ["default", "plan"]))
+        let offered = await core.rememberedOptions(
+            DaemonAPI.RememberedOptionsRequest(runtimeID: "claude", cwd: work))
+
+        // Nothing remembered here yet, and — the point of the method — nothing started
+        // to find out. Reading a workflow must not spawn a runtime.
+        #expect(offered.isEmpty)
+        #expect(await launcher.launchCount == 0)
+    }
 }

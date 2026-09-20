@@ -20,6 +20,17 @@ public enum DaemonAPI {
         /// guessing from the notifications it was not there to hear.
         public static let agentsResuming = "agents/resuming"
         public static let agentsOptions = "agents/options"
+        /// What a runtime last advertised for a folder, out of `OptionCache`.
+        ///
+        /// Not `agents/options`, and the difference is the whole reason this exists:
+        /// that one *starts a session*, because it is answering "what may this agent I
+        /// am about to run be allowed to do", and it must not be answered from memory.
+        /// This one starts nothing and spawns no process, because it is answering
+        /// "what shall I put in this menu" — and reading a workflow must not start a
+        /// runtime. An empty answer is a real answer: the page then shows the value the
+        /// file holds and says the choices are not known here yet, rather than offering
+        /// an empty menu or inventing one.
+        public static let optionsRemembered = "options/remembered"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
@@ -50,6 +61,10 @@ public enum DaemonAPI {
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.
         public static let workflowsArchive = "workflows/archive"
+        /// Change what a workflow is allowed to do, by writing its own file. The daemon
+        /// is the writer for the reason it writes every other workflow change: a second
+        /// window — or a phone — must not become a second author of the same file.
+        public static let workflowsSettings = "workflows/settings"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// And the last of them: the agent saying how the work actually went, at the
@@ -942,6 +957,32 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.archived = archived
+        }
+    }
+
+    /// Change what a workflow is allowed to do.
+    ///
+    /// The whole settings, not a delta: a key the caller leaves `nil` is removed from
+    /// the file. The page always sends what it is showing, so there is no third state
+    /// between "set this" and "leave this alone" to get wrong.
+    public struct WorkflowSettingsRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var settings: WorkflowSettings
+        public init(folder: URL, workflowID: String, settings: WorkflowSettings) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.settings = settings
+        }
+    }
+
+    /// What this runtime last advertised for this folder. Starts nothing.
+    public struct RememberedOptionsRequest: Codable, Sendable {
+        public var runtimeID: String
+        public var cwd: URL
+        public init(runtimeID: String, cwd: URL) {
+            self.runtimeID = runtimeID
+            self.cwd = cwd
         }
     }
 

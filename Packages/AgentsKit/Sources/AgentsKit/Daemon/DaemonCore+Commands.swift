@@ -95,6 +95,16 @@ extension DaemonCore {
         return entry
     }
 
+    /// What this runtime last advertised for this folder, and nothing else.
+    ///
+    /// Starts no session and spawns no process, which is the whole of why it is not
+    /// `agents/options`. A workflow attaches no MCP servers, so the key is built with
+    /// an empty list. An empty answer is a real answer and is returned as one.
+    public func rememberedOptions(_ request: DaemonAPI.RememberedOptionsRequest) -> [ConfigOption] {
+        let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd, mcpServers: [])
+        return rememberedOptions(for: key)?.options ?? []
+    }
+
     func remember(_ entry: OptionCache.Entry, for key: String) {
         guard entry.isWorthKeeping else { return }
         if rememberedOptions == nil { rememberedOptions = optionCache.load() }
