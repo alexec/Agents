@@ -101,6 +101,12 @@ public final class DaemonServer: @unchecked Sendable {
             // The connection ends when the window goes. Which it will: quitting the
             // app is the ordinary case, not the exceptional one.
             for await _ in connection.incomingNotifications() {}
+            // The stream ending says the other side hung up; it does not close our
+            // descriptor, and nothing else will. Left open, every window, phone and
+            // helper that ever connected costs the daemon one descriptor for the rest
+            // of its life, until `accept` fails and the front door is shut with the
+            // daemon still standing behind it — 2,422 of them, one Sunday morning.
+            await connection.close()
             self.connections.remove(connection)
             self.onConnectionCountChanged(self.connections.count)
         }

@@ -100,6 +100,60 @@ struct CloseOnExecTests {
         #expect(read == 0, "the connection was still open: a shell inherited it")
     }
 
+    /// A window that has gone must take its descriptor with it.
+    ///
+    /// The other half of the descriptor story: not what a child walks off with, but
+    /// what the daemon itself keeps. Every window, phone and helper connects and
+    /// disconnects freely, and each one used to leave its accepted socket open in the
+    /// daemon for good — 2,422 of them on one Sunday morning, at which point `accept`
+    /// could take no more and the front door was shut with the daemon still standing
+    /// behind it. Counted through `/dev/fd` rather than by asking the server, because
+    /// the server thought it had let go: it had dropped the connection from its set,
+    /// and the descriptor was the one thing it had not closed. Only the sockets bound
+    /// to this test's own path are counted, so the tests running beside this one can
+    /// open and close whatever they like without being mistaken for a leak.
+    @Test func aWindowThatHasGoneLeavesNoDescriptorBehind() async throws {
+        let url = temporaryFile()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let server = DaemonServer(url: url) { _, _ in .success([:]) }
+        try server.start()
+        defer { server.stop() }
+
+        let rounds = 100
+        let before = try socketsBound(to: url)
+        for _ in 0..<rounds {
+            let mine = try connect(to: url)
+            await eventually("the server counted the connection") { server.connectionCount == 1 }
+            close(mine)
+            await eventually("the server let the connection go") { server.connectionCount == 0 }
+        }
+        let after = try socketsBound(to: url)
+        // The listener itself is bound to the path and stays; a window that has gone
+        // should add nothing. Well short of one per round, so a partial fix fails too.
+        #expect(after - before < rounds / 2,
+                "\(after - before) descriptors left behind by \(rounds) windows that had gone")
+    }
+
+    /// How many of this process's descriptors are Unix sockets bound to `url`'s path:
+    /// the listener, plus every accepted connection the server still holds.
+    private func socketsBound(to url: URL) throws -> Int {
+        var count = 0
+        for name in try FileManager.default.contentsOfDirectory(atPath: "/dev/fd") {
+            guard let fd = Int32(name) else { continue }
+            var address = sockaddr_un()
+            var size = socklen_t(MemoryLayout<sockaddr_un>.size)
+            let bound = withUnsafeMutablePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &size) }
+            }
+            guard bound == 0, address.sun_family == sa_family_t(AF_UNIX) else { continue }
+            let path = withUnsafePointer(to: &address.sun_path) { pointer in
+                String(cString: UnsafeRawPointer(pointer).assumingMemoryBound(to: CChar.self))
+            }
+            if path == url.path { count += 1 }
+        }
+        return count
+    }
+
     /// The listening socket has no consequence that can be watched from outside — it
     /// is unlinked on the way out — so this one does look at the flag.
     @Test func theListeningSocketIsNotInherited() throws {
