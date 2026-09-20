@@ -6,8 +6,13 @@ import SwiftUI
 /// The reason this page exists is the prompt. An agent can write a workflow into a
 /// project without anybody's approval — that is what `manage_workflows` is for — and
 /// until there was somewhere to read one, the prompt was the single part of a standing
-/// arrangement that nobody could see without leaving the app for an editor. Everything
-/// else here was already on the row; the prompt was nowhere.
+/// arrangement that nobody could see without leaving the app for an editor.
+///
+/// It is laid out as the prompt bar is, on purpose: the file where the bar has the
+/// folder, the runtime top right, the prompt in the middle where the words go, and
+/// under it the permission mode on the left and the model on the right. A workflow is
+/// a prompt that sends itself, and its page should read as the thing it is. Below the
+/// form, the agents it has run — three at a time, because there is no end to them.
 ///
 /// Nothing on this page edits the file's triggers or its prompt. Those are the
 /// author's, and an app that quietly rewrote the body of a file in somebody's
@@ -30,6 +35,11 @@ struct WorkflowPage: View {
     /// daemon's memory. Nil until asked; empty when it has nothing, which is an answer
     /// of its own and is drawn as one.
     @State private var remembered: [ConfigOption]?
+    /// How many of its runs are on show. Three to begin with, and more on request.
+    @State private var shownRuns = Self.runsAtFirst
+
+    private static let runsAtFirst = 3
+    private static let runsPerMore = 6
 
     private var summary: WorkflowSummary? {
         model.workflows(in: model.selectedProject).first { $0.id == workflowID }
@@ -57,6 +67,7 @@ struct WorkflowPage: View {
             guard gone, !model.workflows(in: model.selectedProject).isEmpty else { return }
             model.openWorkflow = nil
         }
+        .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
     }
 
     @ViewBuilder
@@ -67,11 +78,8 @@ struct WorkflowPage: View {
             if let problem = workflow.problem {
                 broken(problem, workflow: workflow)
             }
+            form(summary)
             runs(workflow)
-            settings(summary)
-            prompt(workflow)
-            file(workflow)
-            actions(summary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // The column the transcript, the prompt bar and the project page all use, so
@@ -81,48 +89,86 @@ struct WorkflowPage: View {
         .padding(.bottom, 40)
     }
 
+    // MARK: The title line
+
     /// The name, what it is, and what is happening to it — the row's three lines, in
-    /// the row's words.
+    /// the row's words — and on the right, the two things you do to a workflow.
     ///
     /// Deliberately the same sentence as the row: this page is the row opened up, not
     /// a second description of the same workflow that could come to disagree with it.
     private func heading(_ summary: WorkflowSummary) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(summary.workflow.name)
-                .font(.largeTitle.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            // Not when the file is broken. `Workflow.summary` falls back to the
-            // problem's own sentence then, and the red line below says the same thing
-            // better and next to the file it is about — twice is a stutter, and the
-            // grey copy is the one carrying less.
-            if summary.workflow.problem == nil {
-                Text(summary.workflow.summary)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(summary.workflow.name)
+                    .font(.largeTitle.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            if let happening = happening(summary) {
-                HStack(spacing: 4) {
-                    Text(happening)
-                    if let agentID = ranAgentID(summary) {
-                        Text("·")
-                        // The one thing here that goes anywhere, because it is the only
-                        // thing with somewhere to go.
-                        Button {
-                            model.openWorkflow = nil
-                            model.selection = agentID
-                        } label: {
-                            HStack(spacing: 2) {
-                                Text("Open the agent it started")
-                                Image(systemName: "arrow.right")
-                            }
-                        }
-                        .buttonStyle(.link)
-                    }
+                // Not when the file is broken. `Workflow.summary` falls back to the
+                // problem's own sentence then, and the red line below says the same
+                // thing better and next to the file it is about — twice is a stutter,
+                // and the grey copy is the one carrying less.
+                if summary.workflow.problem == nil {
+                    Text(summary.workflow.summary)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.callout)
-                .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
-                .fixedSize(horizontal: false, vertical: true)
+                if let happening = happening(summary) {
+                    HStack(spacing: 4) {
+                        Text(happening)
+                        if let agentID = ranAgentID(summary) {
+                            Text("·")
+                            Button {
+                                model.openWorkflow = nil
+                                model.selection = agentID
+                            } label: {
+                                HStack(spacing: 2) {
+                                    Text("Open the agent it started")
+                                    Image(systemName: "arrow.right")
+                                }
+                            }
+                            .buttonStyle(.link)
+                        }
+                    }
+                    .font(.callout)
+                    .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            actions(summary)
+                .padding(.top, 6)
+        }
+    }
+
+    /// Run it, and put it away or bring it back — on the title line, where the same
+    /// two are on a chat. Words rather than the row's icon: there is one of each here.
+    private func actions(_ summary: WorkflowSummary) -> some View {
+        HStack(spacing: 8) {
+            if summary.isArchived {
+                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                    .buttonStyle(.glassProminent)
+            } else {
+                // Offered even on a workflow that cannot fire on its own. Being able to
+                // try one is what makes writing one worth doing, and a refusal says why
+                // rather than nothing happening.
+                Button(summary.isRunning ? "Running…" : "Run now") {
+                    Task { await model.runWorkflow(summary) }
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(summary.isRunning)
+                // One click, and back to the project: the same thing the archive
+                // button on a chat does, so putting a thing away is one gesture
+                // wherever it is.
+                Button {
+                    Task {
+                        await model.setWorkflowArchived(summary, true)
+                        model.openWorkflow = nil
+                    }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .buttonStyle(.glass)
+                .help("Archive this workflow and go back to the project")
             }
         }
     }
@@ -146,66 +192,20 @@ struct WorkflowPage: View {
         .task(id: workflow) { rawText = try? String(contentsOf: url(workflow), encoding: .utf8) }
     }
 
-    /// The prompt, whole, exactly as it will be sent.
+    // MARK: The form, shaped like the prompt bar
+
+    /// The file top left, the runtime top right, the prompt in the middle, and the
+    /// settings under it — the prompt bar's own arrangement, because this is a prompt
+    /// that sends itself.
     ///
-    /// Selectable and not editable. Monospaced because it is a thing that will be sent
-    /// verbatim, and because the difference between two spaces and one can matter to
-    /// what an agent does with it.
-    @ViewBuilder
-    private func prompt(_ workflow: Workflow) -> some View {
-        if !workflow.prompt.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                sectionTitle("The prompt")
-                block(workflow.prompt)
-            }
-        }
-    }
-
-    // MARK: What it has run
-
-    /// The agents this workflow started, newest first, each a click from its
-    /// conversation. Drawn with the same row the project page uses, so a run reads
-    /// here exactly as it reads there — and carries the same marker saying a workflow
-    /// started it.
-    private func runs(_ workflow: Workflow) -> some View {
-        let folder = Project.standardize(workflow.folder)
-        let started = model.agents
-            .filter { Project.standardize($0.cwd) == folder && $0.startedByWorkflow == workflow.workflowID }
-            .sorted { $0.createdAt > $1.createdAt }
-        return VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Recent runs")
-            if started.isEmpty {
-                note("Nothing has run yet.")
-            }
-            ForEach(started.prefix(12)) { agent in
-                Button {
-                    model.openWorkflow = nil
-                    model.selection = agent.id
-                } label: {
-                    AgentRow(agent: agent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 13)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(RoundedRectangle(cornerRadius: 14))
-                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    // MARK: How it runs
-
-    /// The three settings — permission mode, runtime, model — as menus built from what
-    /// the runtime last advertised for this project, so a mode picker looks like a mode
-    /// picker wherever it is.
-    ///
-    /// Each control has four states, and the two that are not the ordinary menu carry
-    /// the explanation. A value the runtime does not offer is why this workflow is
-    /// refusing every fire, and this page is where that gets said, with what it does
-    /// offer. Nothing remembered means the choices are not known until the runtime has
-    /// been used in this project, and the file's value is shown rather than an empty
-    /// menu or an invented one (FR-024).
+    /// The settings are the three the file can hold. The bar also shows a runtime's
+    /// thinking level and speed; a workflow has no key for those, so they are not
+    /// drawn here as controls that would write nothing. Each control has four states,
+    /// and the two that are not the ordinary menu carry the explanation: a value the
+    /// runtime does not offer is why this workflow is refusing every fire, and this
+    /// page is where that gets said, with what it does offer; nothing remembered means
+    /// the choices are not known until the runtime has been used in this project, and
+    /// the file's value is shown rather than an empty menu or an invented one (FR-024).
     ///
     /// The controls are driven from the file's own values rather than state of their
     /// own: a change goes to the daemon, which writes the file and answers with what it
@@ -216,43 +216,67 @@ struct WorkflowPage: View {
     /// applies a mode, so its controls are shown and disabled under one line saying so.
     /// Shown rather than hidden, because a person changing `agent:` in the file needs
     /// to find them again — and because a hidden control is not an explanation.
-    @ViewBuilder
-    private func settings(_ summary: WorkflowSummary) -> some View {
+    private func form(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("How it runs")
-            switch workflow.mode {
-            case .triggering:
-                note("This workflow resumes the agent that triggered it, so these do not apply.")
-            case .standing:
-                note("Applied when its standing agent is started, and again if it has to be replaced.")
-            case .new:
-                EmptyView()
-            }
-            HStack(alignment: .top, spacing: 10) {
-                runtimeControl(summary)
-                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
-                    settingControl(summary, name: "Permission mode",
-                                   setting: WorkflowSettings.Setting.permissionMode,
-                                   value: workflow.settings.permissionMode,
-                                   option: remembered.flatMap(ModeMemory.modeOption(in:)),
-                                   runtime: runtime,
-                                   chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
-                    settingControl(summary, name: "Model",
-                                   setting: WorkflowSettings.Setting.model,
-                                   value: workflow.settings.model,
-                                   option: remembered.flatMap(WorkflowSettings.modelOption(in:)),
-                                   runtime: runtime,
-                                   chosen: binding(summary, \.model) { $0.model = $1 })
+        return GlassEffectContainer(spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                fileAndRuntime(summary)
+                block(workflow.prompt.isEmpty ? "(no prompt)" : workflow.prompt)
+                switch workflow.mode {
+                case .triggering:
+                    note("This workflow resumes the agent that triggered it, so these do not apply.")
+                case .standing:
+                    note("Applied when its standing agent is started, and again if it has to be replaced.")
+                case .new:
+                    EmptyView()
                 }
+                HStack(alignment: .top, spacing: 10) {
+                    if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                        settingControl(summary, name: "Permission mode",
+                                       setting: WorkflowSettings.Setting.permissionMode,
+                                       value: workflow.settings.permissionMode,
+                                       option: remembered.flatMap(ModeMemory.modeOption(in:)),
+                                       runtime: runtime,
+                                       chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
+                        Spacer(minLength: 16)
+                        settingControl(summary, name: "Model",
+                                       setting: WorkflowSettings.Setting.model,
+                                       value: workflow.settings.model,
+                                       option: remembered.flatMap(WorkflowSettings.modelOption(in:)),
+                                       runtime: runtime,
+                                       chosen: binding(summary, \.model) { $0.model = $1 })
+                    } else {
+                        Spacer(minLength: 0)
+                    }
+                }
+                .disabled(workflow.mode == .triggering)
             }
-            .disabled(workflow.mode == .triggering)
         }
         // Asked again when the runtime or the folder changes, and not otherwise: the
         // answer is the daemon's memory, and it starts nothing to give it.
         .task(id: RememberedKey(runtimeID: runtimeID(workflow), folder: workflow.folder)) {
             remembered = nil
             remembered = await model.rememberedOptions(runtimeID: runtimeID(workflow), cwd: workflow.folder)
+        }
+    }
+
+    /// The file on the left, where the bar has the folder; the runtime on the right,
+    /// where the bar has its picker.
+    private func fileAndRuntime(_ summary: WorkflowSummary) -> some View {
+        let workflow = summary.workflow
+        return HStack(spacing: 12) {
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([url(workflow)])
+            } label: {
+                Label(url(workflow).lastPathComponent, systemImage: "doc.text")
+                    .lineLimit(1)
+            }
+            .buttonStyle(.glass)
+            .font(.footnote)
+            .help("\(url(workflow).path) — click to show in Finder")
+            Spacer(minLength: 8)
+            runtimeControl(summary)
+                .disabled(workflow.mode == .triggering)
         }
     }
 
@@ -277,7 +301,7 @@ struct WorkflowPage: View {
         let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",
                                   kind: .select([ConfigChoiceGroup(name: nil, choices: choices)]),
                                   currentValue: .null)
-        return VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .trailing, spacing: 4) {
             OptionMenu(option: option, chosen: binding(summary, \.runtimeID) { $0.runtimeID = $1 })
             if let named, RuntimeCatalog.runtime(id: named) == nil {
                 marked("\"\(named)\" is not a runtime this app knows")
@@ -304,7 +328,8 @@ struct WorkflowPage: View {
                 }
             } else {
                 Text("\(name): \(value ?? "runtime default")")
-                    .font(.callout)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 if remembered != nil {
                     note("The choices are not known until \(runtime.name) has been used in this project.")
                 }
@@ -339,59 +364,48 @@ struct WorkflowPage: View {
 
     private func marked(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.triangle")
-            .font(.callout)
+            .font(.footnote)
             .foregroundStyle(StateTint.attention.style(or: .secondary))
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Where the file is, and the way to it.
-    private func file(_ workflow: Workflow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("The file")
-            HStack(spacing: 8) {
-                Text(url(workflow).path)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([url(workflow)])
+    // MARK: What it has run
+
+    /// The agents this workflow started, newest first, each a click from its
+    /// conversation. Drawn with the same row the project page uses, so a run reads
+    /// here exactly as it reads there — and carries the same marker saying a workflow
+    /// started it. Three to begin with: there is no end to a workflow's runs, and the
+    /// form above must not be pushed off the page by them.
+    private func runs(_ workflow: Workflow) -> some View {
+        let folder = Project.standardize(workflow.folder)
+        let started = model.agents
+            .filter { Project.standardize($0.cwd) == folder && $0.startedByWorkflow == workflow.workflowID }
+            .sorted { $0.createdAt > $1.createdAt }
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Recent runs")
+            if started.isEmpty {
+                note("Nothing has run yet.")
+            }
+            ForEach(started.prefix(shownRuns)) { agent in
+                Button {
+                    model.openWorkflow = nil
+                    model.selection = agent.id
+                } label: {
+                    AgentRow(agent: agent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
+            if started.count > shownRuns {
+                Button("Show more (\(started.count - shownRuns) more)") {
+                    shownRuns += Self.runsPerMore
                 }
                 .buttonStyle(.glass)
                 .font(.callout)
-            }
-        }
-    }
-
-    /// Run it, and put it away or bring it back.
-    ///
-    /// Words rather than the row's icons: there is one of each here, so the reason the
-    /// row uses symbols — that they repeat down a page and two words each would be the
-    /// loudest thing on it — does not apply.
-    private func actions(_ summary: WorkflowSummary) -> some View {
-        HStack(spacing: 10) {
-            if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
-                    .buttonStyle(.glassProminent)
-            } else {
-                // Offered even on a workflow that cannot fire on its own. Being able to
-                // try one is what makes writing one worth doing, and a refusal says why
-                // rather than nothing happening.
-                Button(summary.isRunning ? "Running…" : "Run now") {
-                    Task { await model.runWorkflow(summary) }
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(summary.isRunning)
-                // One click, and back to the project: the same thing the archive button
-                // on a chat does, so putting a thing away is one gesture wherever it is.
-                Button("Archive") {
-                    Task {
-                        await model.setWorkflowArchived(summary, true)
-                        model.openWorkflow = nil
-                    }
-                }
-                .buttonStyle(.glass)
             }
         }
     }
@@ -406,19 +420,24 @@ struct WorkflowPage: View {
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.callout)
+            .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    /// The prompt, whole, exactly as it will be sent, in the bar's own glass.
+    ///
+    /// Selectable and not editable. Monospaced because it is a thing that will be sent
+    /// verbatim, and because the difference between two spaces and one can matter to
+    /// what an agent does with it.
     private func block(_ text: String) -> some View {
         Text(text)
             .font(.callout.monospaced())
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(12)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+            .padding(14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func url(_ workflow: Workflow) -> URL {
