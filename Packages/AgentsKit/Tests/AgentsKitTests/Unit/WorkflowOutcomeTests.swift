@@ -111,6 +111,31 @@ struct WorkflowOutcomeTests {
         #expect(WorkflowRefusal.chainTooDeep(depth: 3).isSameReason(as: .chainTooDeep(depth: 4)))
     }
 
+    @Test func aSettingRefusedTwiceIsOneThingHappening() {
+        // The sentence names what the runtime offers, and that list can change between
+        // two fires that are the same problem. The setting is the reason; the detail is
+        // only how it was explained at the time.
+        let first = WorkflowRefusal.settingRefused(
+            setting: "permission-mode",
+            detail: "\"plan\" is not a permission mode Claude offers here — it offers default")
+        let again = WorkflowRefusal.settingRefused(
+            setting: "permission-mode",
+            detail: "\"plan\" is not a permission mode Claude offers here — it offers default, acceptEdits")
+        #expect(first.isSameReason(as: again))
+
+        // A different setting is a different problem, even on the same workflow.
+        let model = WorkflowRefusal.settingRefused(setting: "model", detail: "…")
+        #expect(!first.isSameReason(as: model))
+    }
+
+    @Test func aWeekendOfRefusedSettingsIsOneRowWithACount() {
+        let refusal = WorkflowRefusal.settingRefused(setting: "permission-mode", detail: "no plan mode here")
+        let first = WorkflowOutcome.refused(refusal, at: Date(), repeats: 1)
+        let second = WorkflowOutcome.refused(refusal, at: Date(), repeats: 1).following(first)
+        #expect(second == .refused(refusal, at: second.at, repeats: 2))
+        #expect(second.summary == "Did not run 2 times — no plan mode here")
+    }
+
     @Test func aFortnightAwayReadsAsOneLine() {
         let outcome = WorkflowOutcome.refused(.missedWhileClosed, at: Date(), repeats: 14)
         #expect(outcome.summary == "Missed 14 times — the app was closed")
@@ -128,6 +153,9 @@ struct WorkflowOutcomeTests {
         // somebody archiving another workflow.
         #expect(WorkflowRefusal.overLimit(.project).needsAPerson)
         #expect(WorkflowRefusal.overLimit(.total).needsAPerson)
+        // And a setting that cannot be had: it refuses every fire until either the file
+        // changes or the runtime starts offering it, and neither happens by itself.
+        #expect(WorkflowRefusal.settingRefused(setting: "permission-mode", detail: "x").needsAPerson)
         #expect(!WorkflowRefusal.runInFlight.needsAPerson)
         #expect(!WorkflowRefusal.archived.needsAPerson)
         #expect(!WorkflowRefusal.missedWhileClosed.needsAPerson)

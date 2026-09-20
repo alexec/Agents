@@ -84,6 +84,15 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case folderGone
     /// The day's spending limit has been reached, so nothing new may start.
     case dayLimitReached
+    /// The file names a permission mode, a runtime or a model that cannot be had, so
+    /// nothing was started rather than something being started differently.
+    ///
+    /// `setting` is the key as the file spells it — `permission-mode`, `runtime`,
+    /// `model` — and `detail` is the whole sentence, naming what the runtime does
+    /// offer. The two are apart rather than one string because the reason a row
+    /// collapses on is the setting, while the sentence carries a list that may change
+    /// between one fire and the next.
+    case settingRefused(setting: String, detail: String)
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -100,6 +109,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .missedWhileClosed: return "the app was closed"
         case .folderGone: return "the project folder is not there"
         case .dayLimitReached: return "the day's spending limit has been reached"
+        case .settingRefused(_, let detail): return detail
         }
     }
 
@@ -111,8 +121,13 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     public var needsAPerson: Bool {
         switch self {
         // Over the limit earns the colour: unlike a skipped fire, this one keeps
-        // happening until somebody archives or removes another workflow.
-        case .chainTooDeep, .unreadable, .folderGone, .overLimit: return true
+        // happening until somebody archives or removes another workflow. A refused
+        // setting is the same shape and earns it on the same terms: nothing resolves it
+        // on its own, and it refuses every fire until either the file changes or the
+        // runtime starts offering what the file asked for. Left grey, a workflow that
+        // has silently run nothing for a fortnight looks exactly like one whose trigger
+        // never matched.
+        case .chainTooDeep, .unreadable, .folderGone, .overLimit, .settingRefused: return true
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .triggerNotSupported, .agentUnavailable,
@@ -133,6 +148,11 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
         case (.triggerNotSupported(let a), .triggerNotSupported(let b)): return a == b
+        // The setting only, and never the detail — the same rule `chainTooDeep` follows
+        // by ignoring its depth. The sentence names what the runtime offers, and that
+        // list can change between two fires that are the same refusal; comparing it
+        // would turn a weekend of one problem into a column of near-identical rows.
+        case (.settingRefused(let a, _), .settingRefused(let b, _)): return a == b
         default: return false
         }
     }
@@ -194,6 +214,15 @@ extension Workflow {
     /// actor, no clock of its own. That is what makes every refusal rule a table test
     /// rather than something needing a daemon to demonstrate — and if a refusal ever
     /// needs one, the decision has leaked out of here and belongs back.
+    ///
+    /// `settingRefused` is the one refusal this function does not and cannot raise, and
+    /// that is deliberate rather than an omission. Whether a runtime offers the mode a
+    /// file names is not a fact about the workflow: it is a fact about a live session
+    /// with that runtime, which only exists once one has been started. Asking it here
+    /// would mean either starting a process from a pure function or answering from
+    /// `OptionCache`, which is a remembered answer and can be wrong in the permissive
+    /// direction. So it is raised in the start path instead, where the runtime has
+    /// actually said what it offers.
     public func refusalIfBlocked(isRunning: Bool, depth: Int,
                                  isArchived: Bool = false,
                                  overLimit: WorkflowLimit? = nil,
