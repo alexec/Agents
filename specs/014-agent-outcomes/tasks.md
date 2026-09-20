@@ -81,12 +81,12 @@ description: "Task list for How It Actually Went"
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift`, assert `needsAPerson` and `heading` are defined for every `WorkOutcome.allCases` with no duplicate headings, and that `WorkReport.init?` refuses an empty and a whitespace-only message and cuts a 2,000-character one to exactly 1,000
-- [ ] T020 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentGroupTests.swift`, extend the existing exhaustive walk to every `(AgentState, WorkReport?)` pair, asserting each lands in exactly one group, that `.finished` plus a `needsAPerson` report is `.needsAttention`, and that `.stopped` and `.archived` are unmoved by any report
-- [ ] T021 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AppServiceTests.swift`, assert `tools/list` offers four tools including `report_outcome`, that a call with an unknown outcome string and a call with an empty message each come back `isError: true` with the sentences from `contracts/agent-tool.md`, and that the name is matched on its suffix so `mcp__agents__report_outcome` reaches the same sink
-- [ ] T022 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, drive the daemon over its socket: report `needs_answer`, then assert the agent's group is `.needsAttention`, its `report.message` is the question, and the folder's `ProjectSummary.needsInput` is true
-- [ ] T023 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert reporting `done` leaves the agent in `.finished` with its message on it; that a second report in the same turn replaces the first (FR-005); that a prompt from the person clears the report (FR-006); and that archiving an agent which reported `needs_answer` takes it out of `.needsAttention` (FR-018)
-- [ ] T024 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert every refusal in `contracts/daemon-api.md`: a token whose session is over gives `noSuchAgent` (-32005); an empty message and an unknown outcome give `invalidParams`; and a report sent while a permission request for that agent is outstanding gives `invalidParams` with the "you have a question waiting" sentence (FR-008)
+- [x] T019 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift`, assert `needsAPerson` and `heading` are defined for every `WorkOutcome.allCases` with no duplicate headings, and that `WorkReport.init?` refuses an empty and a whitespace-only message and cuts a 2,000-character one to exactly 1,000
+- [x] T020 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentGroupTests.swift`, extend the existing exhaustive walk to every `(AgentState, WorkReport?)` pair, asserting each lands in exactly one group, that `.finished` plus a `needsAPerson` report is `.needsAttention`, and that `.stopped` and `.archived` are unmoved by any report
+- [x] T021 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AppServiceTests.swift`, assert `tools/list` offers four tools including `report_outcome`, that a call with an unknown outcome string and a call with an empty message each come back `isError: true` with the sentences from `contracts/agent-tool.md`, and that the name is matched on its suffix so `mcp__agents__report_outcome` reaches the same sink
+- [x] T022 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, drive the daemon over its socket: report `needs_answer`, then assert the agent's group is `.needsAttention`, its `report.message` is the question, and the folder's `ProjectSummary.needsInput` is true
+- [x] T023 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert reporting `done` leaves the agent in `.finished` with its message on it; that a second report in the same turn replaces the first (FR-005); that a prompt from the person clears the report (FR-006); and that archiving an agent which reported `needs_answer` takes it out of `.needsAttention` (FR-018)
+- [x] T024 [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert every refusal in `contracts/daemon-api.md`: a token whose session is over gives `noSuchAgent` (-32005); an empty message and an unknown outcome give `invalidParams`; and a report sent while a permission request for that agent is outstanding gives `invalidParams` with the "you have a question waiting" sentence (FR-008)
 
 ### Implementation for User Story 1
 
@@ -99,10 +99,10 @@ description: "Task list for How It Actually Went"
 - [x] T031 [US1] Clear `agent.report` and `agent.outcomeAsked` in `enqueue` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift` when and only when the incoming `PromptRequest.from == .person` (FR-006, FR-023), and pass `from` through to the `QueuedPrompt` it builds
 - [x] T032 [US1] Add `Briefing.outcome` to `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` with the wording from `contracts/agent-tool.md`, insert it into `lines` after `escalation` and before `workflows`, and raise the character ceiling in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/BriefingTests.swift` deliberately, in the manner that test already describes ("a ceiling to notice, not a rule")
 - [x] T033 [US1] Teach `AgentsModel.group(of:)` in `Packages/AgentsKit/Sources/AgentsKitCore/Client/AgentsModel.swift` to pass `report: agent.report` alongside `wantsEyes`
-- [ ] T034 [US1] In `App/Sources/AgentList/AgentRow.swift`, insert `agent.report?.message` into `description` between `currentStep` and the `switch agent.state`, per the precedence list in `contracts/ui.md`, and give `StatusIcon` a `report` parameter resolving `needsAnswer` to `questionmark.circle.fill` in orange and `done` to `checkmark.circle.fill` in green
-- [ ] T035 [P] [US1] Make the same two changes in `Remote/Sources/Projects/AgentCard.swift`, reading the identical `heading` and `needsAPerson` from `WorkOutcome` so the phone and the window cannot drift (FR-017)
-- [ ] T036 [US1] Draw the `.workReported` entry at the end of the conversation in `App/Sources/Chat/Transcript.swift` — the outcome's `heading` above the agent's message, in the manner of the existing state-change lines rather than as a message from the agent (FR-015)
-- [ ] T037 [P] [US1] Draw the same entry the same way in `Remote/Sources/Chat/EntryView.swift`
+- [x] T034 [US1] In `App/Sources/AgentList/AgentRow.swift`, insert `agent.report?.message` into `description` between `currentStep` and the `switch agent.state`, per the precedence list in `contracts/ui.md`, and give `StatusIcon` a `report` parameter resolving `needsAnswer` to `questionmark.circle.fill` in orange and `done` to `checkmark.circle.fill` in green
+- [x] T035 [P] [US1] Make the same two changes in `Remote/Sources/Projects/AgentCard.swift`, reading the identical `heading` and `needsAPerson` from `WorkOutcome` so the phone and the window cannot drift (FR-017)
+- [x] T036 [US1] Draw the `.workReported` entry at the end of the conversation in `App/Sources/Chat/Transcript.swift` — the outcome's `heading` above the agent's message, in the manner of the existing state-change lines rather than as a message from the agent (FR-015)
+- [x] T037 [P] [US1] Draw the same entry the same way in `Remote/Sources/Chat/EntryView.swift`
 - [x] T038 [US1] Suppress the `report_outcome` tool call in `TranscriptEntry.display` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/TranscriptDisplay.swift`, extending the existing `isSuggestingPrompts` suppression to cover it and keeping its comment's reasoning — what it did is drawn as the report, and a line saying it was called would be the same thing said twice
 
 **Checkpoint**: An agent that needs an answer is findable from the list. The spec's central complaint is answered.
@@ -117,15 +117,15 @@ description: "Task list for How It Actually Went"
 
 ### Tests for User Story 2
 
-- [ ] T039 [P] [US2] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert `partly_done` and `stuck` each land in `.needsAttention` with the agent's own message, and that `nothing_to_do` lands in `.finished` reading as nothing needed rather than as work done
-- [ ] T040 [P] [US2] Add a test to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift` proving SC-001 directly: no `WorkOutcome` other than `.done` has the heading "Complete", and no combination of `(AgentState, EndedReason?, WorkReport?)` produces it
+- [x] T039 [P] [US2] In `Packages/AgentsKit/Tests/AgentsKitTests/Integration/OutcomeReportTests.swift`, assert `partly_done` and `stuck` each land in `.needsAttention` with the agent's own message, and that `nothing_to_do` lands in `.finished` reading as nothing needed rather than as work done
+- [x] T040 [P] [US2] Add a test to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift` proving SC-001 directly: no `WorkOutcome` other than `.done` has the heading "Complete", and no combination of `(AgentState, EndedReason?, WorkReport?)` produces it
 
 ### Implementation for User Story 2
 
-- [ ] T041 [US2] Complete the symbol and tint table in `App/Sources/AgentList/AgentRow.swift` for the remaining three outcomes per `contracts/ui.md`: `nothingToDo` → `checkmark.circle` secondary, `partlyDone` → `circle.lefthalf.filled` orange, `stuck` → `exclamationmark.triangle.fill` orange
-- [ ] T042 [P] [US2] Complete the same table in `Remote/Sources/Projects/AgentCard.swift`
-- [ ] T043 [US2] Set every icon's `help` and `accessibilityLabel` from `WorkOutcome.heading` in both `App/Sources/AgentList/AgentRow.swift` and `Remote/Sources/Projects/AgentCard.swift`, so the words a screen reader hears come from the same place the ones on screen do
-- [ ] T044 [US2] Search `App/Sources/` and `Remote/Sources/` for the literal `"Complete"` and confirm every remaining occurrence is behind `WorkOutcome.done` or `AgentGroup.finished.title`, changing `App/Sources/Chat/Transcript.swift:582` and `Remote/Sources/Chat/EntryView.swift:247` if they describe a state rather than a group (FR-012)
+- [x] T041 [US2] Complete the symbol and tint table in `App/Sources/AgentList/AgentRow.swift` for the remaining three outcomes per `contracts/ui.md`: `nothingToDo` → `checkmark.circle` secondary, `partlyDone` → `circle.lefthalf.filled` orange, `stuck` → `exclamationmark.triangle.fill` orange
+- [x] T042 [P] [US2] Complete the same table in `Remote/Sources/Projects/AgentCard.swift`
+- [x] T043 [US2] Set every icon's `help` and `accessibilityLabel` from `WorkOutcome.heading` in both `App/Sources/AgentList/AgentRow.swift` and `Remote/Sources/Projects/AgentCard.swift`, so the words a screen reader hears come from the same place the ones on screen do
+- [x] T044 [US2] Search `App/Sources/` and `Remote/Sources/` for the literal `"Complete"` and confirm every remaining occurrence is behind `WorkOutcome.done` or `AgentGroup.finished.title`, changing `App/Sources/Chat/Transcript.swift:582` and `Remote/Sources/Chat/EntryView.swift:247` if they describe a state rather than a group (FR-012)
 
 **Checkpoint**: All five outcomes read correctly on both platforms.
 
@@ -152,8 +152,8 @@ description: "Task list for How It Actually Went"
 - [ ] T052 [US3] Enqueue the question through the ordinary `enqueue` path with `from: .app` and the wording from `contracts/agent-tool.md` ("That turn ended without a report…"), so it inherits starting the runtime, being recorded, and having its usage counted
 - [ ] T053 [US3] Add the unaccounted-for branch to `description` in `App/Sources/AgentList/AgentRow.swift` — "Finished without saying how it went" when `agent.endingIsUnaccountedFor` — with `questionmark.circle` in `.secondary`, placed after the report branch and before the `switch agent.state`
 - [ ] T054 [P] [US3] Add the same branch, wording and symbol to `Remote/Sources/Projects/AgentCard.swift`
-- [ ] T055 [US3] Draw a `userMessage` with `from: .app` in the transcript's secondary voice with a short attribution ("Agents asked"), never in the person's bubble, in `App/Sources/Chat/Transcript.swift` (FR-022)
-- [ ] T056 [P] [US3] Draw it the same way in `Remote/Sources/Chat/EntryView.swift`
+- [x] T055 [US3] Draw a `userMessage` with `from: .app` in the transcript's secondary voice with a short attribution ("Agents asked"), never in the person's bubble, in `App/Sources/Chat/Transcript.swift` (FR-022)
+- [x] T056 [P] [US3] Draw it the same way in `Remote/Sources/Chat/EntryView.swift`
 
 **Checkpoint**: The app is honest about endings nobody vouched for, and the cost of asking is bounded by the number of endings.
 
@@ -183,7 +183,7 @@ description: "Task list for How It Actually Went"
 
 - [ ] T061 Create `Packages/AgentsKit/Tests/AgentsKitTests/Live/OutcomeReportLiveTests.swift` modelled on `Live/SuggestedPromptLiveTests.swift`: against each signed-in runtime, give a task containing an unanswerable question and assert the turn ends with a `needs_answer` report rather than the question buried in a reply. This is the only check that can fail for reasons no unit test sees
 - [ ] T062 Record the per-runtime adoption rate from T061 in `specs/014-agent-outcomes/research.md` as a new section, against SC-007's 90% target — a runtime that will not call the tool is a finding to write down, not a failure of the design
-- [ ] T063 [P] Add `.workReported` and the `userMessage` origin to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReplayTests.swift` so a transcript round-trips through the store unchanged
+- [x] T063 [P] Add `.workReported` and the `userMessage` origin to `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReplayTests.swift` so a transcript round-trips through the store unchanged
 - [ ] T064 [P] Update `Remote/Sources/Preview/Canned.swift` and `FakeDaemon.swift` with agents carrying each of the five outcomes and one unaccounted-for ending, so the previews show what the feature actually looks like
 - [ ] T065 Re-read `Briefing.text` in `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` end to end after T032 and cut anything the four lines now say twice — the file's own rule is that an agent told six things at once follows the first two, and this feature adds the fourth thing
 - [ ] T066 Run `swift test --package-path Packages/AgentsKit` and `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, and fix what breaks

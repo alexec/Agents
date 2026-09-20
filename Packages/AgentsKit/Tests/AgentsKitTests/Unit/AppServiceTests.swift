@@ -13,10 +13,14 @@ struct AppServiceTests {
     /// A service on one end of a pipe and a plain JSON-RPC client on the other, which
     /// is what a runtime is here.
     private func pair(sink: @escaping AppService.Sink,
-                      showFile: @escaping AppService.FileSink = { _ in .refused("not expected") })
+                      showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
+                      reportOutcome: @escaping AppService.OutcomeSink = { _, _ in
+                          .refused("not expected")
+                      })
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
-        let service = AppService(transport: theirs, sink: sink, showFile: showFile)
+        let service = AppService(transport: theirs, sink: sink, showFile: showFile,
+                                 reportOutcome: reportOutcome)
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         return (client, service)
@@ -282,5 +286,66 @@ struct AppServiceTests {
     private actor Box {
         private(set) var prompts: [SuggestedPrompt] = []
         func record(_ prompts: [SuggestedPrompt]) { self.prompts = prompts }
+    }
+
+    // MARK: Saying how the work went
+
+    /// The refusals are what an agent reads when it got the call wrong, so they have
+    /// to say which five words there are rather than that one was not among them.
+    @Test func anOutcomeWeDoNotKnowIsNamedRatherThanRounded() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.reportOutcomeToolName),
+            "arguments": ["outcome": "succeeded", "message": "all good"],
+        ])
+        #expect(result["isError"]?.boolValue == true)
+        let text = result["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
+        #expect(text.contains("nothing_to_do"))
+        #expect(text.contains("partly_done"))
+        await service.close()
+    }
+
+    @Test func anOutcomeWithNoWordsIsRefused() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        for message in ["", "   "] {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.reportOutcomeToolName),
+                "arguments": ["outcome": "done", "message": .string(message)],
+            ])
+            #expect(result["isError"]?.boolValue == true)
+            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
+                .contains("how it went") == true)
+        }
+        await service.close()
+    }
+
+    /// A runtime is free to prefix the name — the Claude adapter shows the first of
+    /// these as `mcp__agents__suggest_next_prompts` — so the match is on the end.
+    @Test func aPrefixedNameStillReachesTheSameSink() async throws {
+        let seen = Recorder()
+        let (client, service) = await pair(sink: neverCalled(),
+                                           reportOutcome: { outcome, message in
+            await seen.record(outcome, message)
+            return .shown("Noted.")
+        })
+        let result = try await client.call("tools/call", [
+            "name": "mcp__agents__report_outcome",
+            "arguments": ["outcome": "needs_answer", "message": "  Drop the index first?  "],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await seen.outcome == "needs_answer")
+        // Trimmed on the way through, so the daemon is never handed the agent's
+        // whitespace to decide about.
+        #expect(await seen.message == "Drop the index first?")
+        await service.close()
+    }
+
+    private actor Recorder {
+        var outcome = ""
+        var message = ""
+        func record(_ outcome: String, _ message: String) {
+            self.outcome = outcome
+            self.message = message
+        }
     }
 }

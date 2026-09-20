@@ -6,4 +6,76 @@ import Testing
 /// the same, and only the one an agent chose for itself is allowed the word Complete.
 @Suite("What an agent says about its work")
 struct WorkOutcomeTests {
+    @Test("every outcome answers both questions the app asks of it")
+    func theTableIsTotal() {
+        // Neither is optional and neither has a `default`, so a sixth case added later
+        // fails to compile rather than quietly landing nowhere.
+        for outcome in WorkOutcome.allCases {
+            #expect(!outcome.heading.isEmpty)
+            _ = outcome.needsAPerson
+        }
+        #expect(WorkOutcome.allCases.count == 5)
+    }
+
+    @Test("the three that want a person are the three the spec names")
+    func whichOnesWantAPerson() {
+        #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer, .partlyDone, .stuck])
+        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo])
+    }
+
+    /// Two outcomes that read the same are two outcomes a person cannot tell apart,
+    /// which is the whole of what this feature is for.
+    @Test("no two outcomes read the same")
+    func headingsAreDistinct() {
+        let headings = WorkOutcome.allCases.map(\.heading)
+        #expect(Set(headings).count == headings.count)
+    }
+
+    /// SC-001, directly. The word is a claim, and only one thing may make it.
+    @Test("only a reported done is called Complete")
+    func completeIsReserved() {
+        #expect(WorkOutcome.done.heading == "Complete")
+        for outcome in WorkOutcome.allCases where outcome != .done {
+            #expect(outcome.heading != "Complete")
+        }
+    }
+
+    @Test("the wire spellings are the ones the tool offers")
+    func wireSpellings() {
+        #expect(WorkOutcome.allCases.map(\.rawValue)
+            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
+        for outcome in WorkOutcome.allCases {
+            #expect(WorkOutcome(wire: outcome.rawValue) == outcome)
+        }
+    }
+
+    /// FR-027. A newer runtime's sixth word is a report that never arrived, never a
+    /// report rounded to the nearest one we happen to know.
+    @Test("an outcome we do not know is not rounded to one we do")
+    func unknownOutcomesAreNotRounded() {
+        #expect(WorkOutcome(wire: "succeeded") == nil)
+        #expect(WorkOutcome(wire: "done_ish") == nil)
+        #expect(WorkOutcome(wire: "") == nil)
+        #expect(WorkOutcome(wire: "DONE") == nil)
+    }
+
+    @Test("a report with no words is refused")
+    func anEmptyMessageIsRefused() {
+        #expect(WorkReport(outcome: .done, wire: "") == nil)
+        #expect(WorkReport(outcome: .done, wire: "   \n\t ") == nil)
+    }
+
+    /// Cut rather than refused: losing the outcome over one long sentence would be
+    /// worse than trimming it, which is the rule `SuggestedPrompt` already follows.
+    @Test("a message that runs long is cut, not refused")
+    func aLongMessageIsCut() {
+        let report = WorkReport(outcome: .stuck, wire: String(repeating: "a", count: 2_000))
+        #expect(report?.message.count == WorkReport.messageLimit)
+        #expect(WorkReport.messageLimit == 1_000)
+    }
+
+    @Test("the words are trimmed of what surrounds them")
+    func theMessageIsTrimmed() {
+        #expect(WorkReport(outcome: .done, wire: "  it is done.\n")?.message == "it is done.")
+    }
 }
