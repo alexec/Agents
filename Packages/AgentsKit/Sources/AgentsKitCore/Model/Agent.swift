@@ -324,6 +324,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// second, so keying this on `lastTurnUsage` being present would miss the very
     /// runtime the rule exists for.
     ///
+    /// `usage?.cost` is in here because silence means *nowhere*. A runtime that quotes
+    /// its price on the mid-turn usage update and not on the turn's reply — which is
+    /// every Claude agent — has said what it costs, and saying "Not measured" over the
+    /// top of a figure the app is holding was this predicate's own bug, not the
+    /// runtime's. It also covers every record written before the cost was banked.
+    ///
     /// Settled rather than running, so nothing is claimed mid-turn — a label that
     /// comes and goes is one you stop trusting, and a turn that has not ended yet
     /// has not failed to report anything.
@@ -333,7 +339,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// that cannot touch it, so this is shown wherever a cost would otherwise be.
     public var costIsUnmeasured: Bool {
         !state.hasTurnInFlight && costToDate.isEmpty && lastTurnUsage?.cost == nil
-            && lastActivityAt > createdAt
+            && usage?.cost == nil && lastActivityAt > createdAt
     }
 
     /// The invariants from the data model, in a form a test can assert.

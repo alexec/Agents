@@ -17,36 +17,19 @@ struct AgentsApp: App {
             CommandGroup(after: .toolbar) {
                 Button("Jump to Latest") { model.scrollToEnd() }
                     .keyboardShortcut(.downArrow, modifiers: .command)
-                SpendingMenuItem()
+                // The keyboard route to what the sidebar's last row does. The row is
+                // the way in; this is for the hands that never leave the keys.
+                Button("Spending") { model.showsSpending = true }
             }
         }
 
-        // A scene of its own, sharing the one `AppModel` the app holds. That sharing
-        // is what makes its figures move in step with the main window without a fetch
-        // of its own, and a separate window is what makes closing it return you to
-        // exactly what you were looking at.
-        Window("Spending", id: "spending") {
-            SpendingView()
-                .environment(model)
-        }
-        .defaultSize(width: 460, height: 560)
-
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
-        // Separate from the Spending window beside it because that one is read-only
-        // by construction, and a limit is the one number in this app a person types.
+        // A scene rather than a page beside Spending, which Spending itself is not:
+        // that one is read-only by construction, and a limit is the one number in
+        // this app a person types.
         Settings {
             CostSettingsView()
                 .environment(model)
         }
-    }
-}
-
-/// The menu route into Spending. Its own view because `openWindow` is an environment
-/// value, and a `Scene`'s `commands` builder is not a view that has one.
-private struct SpendingMenuItem: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Spending") { openWindow(id: "spending") }
     }
 }

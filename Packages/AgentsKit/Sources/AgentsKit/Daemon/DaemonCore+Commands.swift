@@ -412,6 +412,38 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.costChanged, currentCostState())
     }
 
+    /// Bank a cost quoted on a **usage update**, into the agent and into the day.
+    ///
+    /// Not for the cost on a turn's own reply, which is a different fact: that one is
+    /// what the turn cost and is simply added, in `finishTurn`. This one is a
+    /// **running total for the runtime's session** — the SDK documents
+    /// `total_cost_usd` as "cumulative across turns … read the latest result rather
+    /// than summing across results" — so what is banked is its increase over the last
+    /// reading. Two cases, and only two:
+    ///
+    /// - The reading went up. The difference is new spend. The ordinary case.
+    /// - The reading went **down**. The session started over — a resume, or a
+    ///   `/clear`, both of which the SDK documents as resetting the running total —
+    ///   so the whole of the new reading is new spend on top of what the agent had
+    ///   already cost. Never a correction downwards: money already spent stays spent,
+    ///   and an agent's total must never go backwards under a reader who is watching
+    ///   it against a limit.
+    ///
+    /// Equal readings bank nothing, which is what makes this safe to call on every
+    /// one of the several usage updates a turn sends.
+    func bank(_ cost: Cost, into agent: inout Agent) {
+        let previous = costReadings[agent.id]?[cost.currency] ?? 0
+        let added = cost.amount >= previous ? cost.amount - previous : cost.amount
+        costReadings[agent.id, default: [:]][cost.currency] = cost.amount
+        guard added > 0 else { return }
+        // Per currency. Adding two currencies would be a number nobody could check.
+        agent.costToDate[cost.currency] = (agent.costToDate[cost.currency] ?? 0) + added
+        // The ledger before the windows: a daemon killed between here and the next
+        // broadcast comes back having counted the money rather than having forgotten
+        // it. It is also the only copy that survives the agent being archived.
+        spendLedger.add(Cost(amount: added, currency: cost.currency), on: now())
+    }
+
     /// Send what is waiting to every agent that has something waiting.
     ///
     /// What the day rolling over does, and what raising the daily limit does. A held
@@ -585,6 +617,15 @@ extension DaemonCore {
             await record(.usageRecorded(usage), for: agentID)
             if var agent = agents[agentID] {
                 agent.lastTurnUsage = usage
+                // A cost quoted *here* is what this one turn cost, so it is added.
+                // A cost quoted on the usage update is a running total for the
+                // session, so that one is banked by its increase — see `bank`. Two
+                // different facts with the same name, which is the whole of why this
+                // feature read "Not measured" for a month.
+                //
+                // `claude-agent-acp` never quotes a cost here: it builds this reply
+                // from `sessionUsage()`, which has no cost field. This is the door
+                // for the runtimes that do.
                 if let cost = usage.cost {
                     // Per currency. Adding two currencies would be a number nobody
                     // could check.

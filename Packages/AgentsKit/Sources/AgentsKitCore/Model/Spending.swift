@@ -20,13 +20,14 @@ public extension Agent {
     ///
     /// Three cases, all of which look like "no money" from outside:
     ///
-    /// | Case | `lastTurnUsage` | `costToDate` | `isUnmeasured` |
-    /// |---|---|---|---|
-    /// | Started, never finished a turn | nil | empty | false — nothing has happened yet |
-    /// | Ran, runtime reported a price | set | non-empty | false — measured |
-    /// | Ran, runtime reported no price | set | empty | **true** — unmeasurable, not free |
+    /// | Case | `lastTurnUsage` | `costToDate` | `usage.cost` | `isUnmeasured` |
+    /// |---|---|---|---|---|
+    /// | Started, never finished a turn | nil | empty | — | false — nothing has happened yet |
+    /// | Ran, runtime reported a price | set | non-empty | — | false — measured |
+    /// | Ran, priced only mid-turn | set | empty | set | false — measured, and banked from there |
+    /// | Ran, runtime reported no price | set | empty | nil | **true** — unmeasurable, not free |
     var isUnmeasured: Bool {
-        lastTurnUsage != nil && costToDate.isEmpty
+        lastTurnUsage != nil && costToDate.isEmpty && usage?.cost == nil
     }
 }
 
