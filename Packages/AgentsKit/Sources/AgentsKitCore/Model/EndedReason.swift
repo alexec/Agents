@@ -21,6 +21,11 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// Found dead when the daemon started: a logout, a restart, or the daemon killed.
     case daemonGone
 
+    /// The app itself decided this agent had spent enough. The only ending that means
+    /// a limit the reader set was reached, and the only one the app chooses rather
+    /// than observes. Always arrives at the end of a turn, never in the middle of one.
+    case costLimit
+
     /// A turn ended with a stop reason this app has never heard of. Not in the
     /// protocol's list and not one of ours: it is what happens when a runtime ships a
     /// new one, and it belongs in the record rather than being rounded to the nearest
@@ -41,6 +46,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .cancelled: return "Stopped by you"
         case .processDied: return "The runtime crashed"
         case .daemonGone: return "Stopped with the daemon"
+        case .costLimit: return "Reached its cost limit"
         case .unrecognised: return "Stopped for a reason we do not know"
         }
     }

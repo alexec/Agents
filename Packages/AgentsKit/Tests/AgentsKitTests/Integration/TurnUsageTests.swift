@@ -72,6 +72,50 @@ struct TurnUsageTests {
         #expect(agent?.costToDate.isEmpty == true, "nothing is invented")
     }
 
+    /// The turn that crosses the ceiling is recorded whole, and only then does the
+    /// agent stop. A transcript ending mid-tool-call is a bug in this feature, not an
+    /// acceptable cost of enforcing a limit.
+    @Test func theTurnThatCrossesTheLimitFinishesBeforeTheAgentStops() async throws {
+        let (locations, work) = try temporary()
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try LimitStore(locations: locations).save(CostLimits(perAgent: Cost(amount: 1, currency: "USD")))
+
+        var script = FakeACPAgent.Script()
+        // One turn, well over the limit. A single long turn can pass a limit by a
+        // wide margin before it ends, and the rule that a turn is never cut short
+        // means it will. What must not happen is silence.
+        script.usage = ["totalTokens": 10, "cost": ["amount": 2.5, "currency": "USD"]]
+        script.updates = [["sessionUpdate": "agent_message_chunk",
+                           "content": ["type": "text", "text": "the whole answer"]]]
+        let core = try core(FakeLauncher(script: script), locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the agent stopped for its limit") {
+            await core.agent(id)?.endedReason == .costLimit
+        }
+
+        let agent = await core.agent(id)
+        #expect(agent?.state == .stopped, "not finished: a limit is not a finish")
+        #expect(agent?.costToDate["USD"] == 2.5,
+                "the real figure, not one clamped to the limit — a clamped figure would be a lie")
+
+        let page = try await core.transcript(.init(agentID: id))
+        let said = page.entries.contains {
+            if case .agentMessage(_, let text, _) = $0.kind { return text.contains("the whole answer") }
+            return false
+        }
+        #expect(said, "the crossing turn is recorded in full before the agent stops")
+        let usages = page.entries.filter {
+            if case .usageRecorded = $0.kind { return true } else { return false }
+        }
+        #expect(usages.count == 1, "the turn's own usage still reached the record")
+        let toldWhy = page.entries.contains {
+            if case .runtimeNote(let note) = $0.kind { return note.contains("cost limit") || note.contains("limit you set") }
+            return false
+        }
+        #expect(toldWhy, "the reader and the agent are both told which limit stopped it")
+    }
+
     @Test func twoTurnsInTwoCurrenciesAreKeptApart() async throws {
         let (locations, work) = try temporary()
         var first = FakeACPAgent.Script()

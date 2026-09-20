@@ -56,6 +56,10 @@ final class RemoteModel {
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
+    /// What the reader will allow, as the Mac has it. The phone shows limits and
+    /// never sets them, so there is no setter beside this.
+    var costState: DaemonAPI.CostState? { work.costState }
+    var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     var hasMoreBefore: Bool { work.hasMoreBefore }
 
     func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedProject, group: group) }
@@ -154,6 +158,7 @@ final class RemoteModel {
         await refreshProjects()
         await refreshPermissions()
         await refreshResuming()
+        await refreshCostState()
         await loadTranscript()
         settleSelection()
     }
@@ -163,6 +168,16 @@ final class RemoteModel {
                                                   DaemonAPI.ListRequest(),
                                                   returning: [Agent].self) else { return }
         work.replaceAgents(listed)
+    }
+
+    /// What today has cost and what the reader will allow. The phone shows limits
+    /// and never sets them. A daemon too old to know the method leaves this nil, and
+    /// every surface shows what it showed before this feature.
+    private func refreshCostState() async {
+        guard let state = try? await client.call(DaemonAPI.Method.costState,
+                                                 Optional<String>.none,
+                                                 returning: DaemonAPI.CostState.self) else { return }
+        work.replaceCostState(state)
     }
 
     private func refreshProjects() async {

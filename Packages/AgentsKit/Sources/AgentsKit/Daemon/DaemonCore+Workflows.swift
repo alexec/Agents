@@ -280,6 +280,23 @@ extension DaemonCore {
     /// One pass of the clock. `now` is a parameter so a test can drive a week through
     /// this in a millisecond rather than waiting for one.
     public func tickWorkflows(now: Date) async {
+        // The day rolling over, noticed on the heartbeat that is already running
+        // rather than on a timer of its own. `now` is the parameter this already
+        // takes, so midnight is testable without waiting for it.
+        //
+        // What was holding becomes promptable again where it stands, with its
+        // conversation intact — a held agent is an ordinary settled agent with an
+        // undrained queue, so draining is the whole of it.
+        let today = SpendLedger.stamp(for: now)
+        if lastSeenDay != today {
+            let rolled = lastSeenDay != nil
+            lastSeenDay = today
+            if rolled {
+                broadcastCostState()
+                await drainEverythingHolding()
+            }
+        }
+
         var records = workflowStore.load()
         let since = records.lastTickAt
         records.lastTickAt = now
@@ -338,6 +355,7 @@ extension DaemonCore {
             depth: depth,
             isArchived: state?.isArchived ?? false,
             overLimit: limitReached(by: workflow, records: records),
+            dayLimitReached: isDayLimitReached(),
             folderExists: Self.isDirectory(workflow.folder),
             triggeringAgentIsUsable: triggeringAgentIsUsable) {
             record(.refused(refusal, at: now, repeats: 1), for: workflow)

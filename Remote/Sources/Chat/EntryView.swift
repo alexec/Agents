@@ -254,6 +254,9 @@ private struct StateLine: View {
             case .maxTurnRequests: return "Hit its limit"
             case .refusal: return "Refused to carry on"
             case .unrecognised: return "Stopped for a reason we do not know"
+            // The same words as the window's copy of this switch, which is what
+            // FR-027 asks for: an agent stopped by a limit reads the same on both.
+            case .costLimit: return "Reached its cost limit"
             case .endTurn, nil: return "Stopped"
             }
         case .archived: return "Archived"

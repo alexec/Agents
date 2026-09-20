@@ -13,6 +13,7 @@ import SwiftUI
 /// for it. Every number in it is the runtime's own; the only thing the app supplies is
 /// the zero before anything has been priced.
 struct ContextMeter: View {
+    @Environment(AppModel.self) private var model
     let agent: Agent
 
     var body: some View {
@@ -24,9 +25,40 @@ struct ContextMeter: View {
             Text(cost)
                 .font(.footnote)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .help("What this agent has cost so far")
+                // Colour means a person is needed, on the app's one existing
+                // threshold rather than a second number for readers to learn.
+                .foregroundStyle(isCloseToItsLimit ? AnyShapeStyle(.red)
+                                                   : AnyShapeStyle(.secondary))
+                .help(costHelp)
         }
+    }
+
+    /// The agent's own ceiling, or the app-wide one when it has none.
+    private var limits: CostLimits { model.costLimits }
+
+    /// What is left before it stops, when there is a limit to be left of.
+    private var headroom: Decimal? { agent.costHeadroom(under: limits) }
+
+    /// Approaching a limit, on `Usage.closeToFull` rather than a threshold of its own.
+    private var isCloseToItsLimit: Bool {
+        guard let ceiling = agent.ceiling(under: limits), ceiling.amount > 0,
+              !agent.costIsUnmeasured else { return false }
+        let spent = agent.costToDate[ceiling.currency] ?? 0
+        return (spent / ceiling.amount) >= Decimal(Usage.closeToFull)
+    }
+
+    private var costHelp: String {
+        if agent.costIsUnmeasured {
+            return "This runtime reports no price, so this agent cannot be measured "
+                + "and no limit applies to it."
+        }
+        guard let ceiling = agent.ceiling(under: limits), let headroom else {
+            return "What this agent has cost so far"
+        }
+        let left = headroom.formatted(.currency(code: ceiling.currency))
+        return agent.isAtCostLimit(under: limits)
+            ? "This agent has reached its cost limit"
+            : "What this agent has cost so far — \(left) left of its limit"
     }
 
     /// A ring that fills as the window does, going round from the top, and turns red
@@ -55,9 +87,17 @@ struct ContextMeter: View {
     /// runtime quotes mid-turn stands in — still the runtime's own number, still
     /// unconverted — and before anything has been priced at all, a plain zero.
     private var cost: String {
-        if let total = Cost.total(of: agent.costToDate) { return total }
-        let live = agent.usage?.cost
-        return (live?.amount ?? 0).formatted(.currency(code: live?.currency ?? "USD"))
+        // The worst failure available here is a reader believing an agent is covered
+        // by a limit that cannot touch it. A runtime that reports no price is named
+        // as such, never shown as a zero and never given a headroom.
+        if agent.costIsUnmeasured { return "Not measured" }
+        let spent = Cost.total(of: agent.costToDate)
+            ?? (agent.usage?.cost?.amount ?? 0)
+                .formatted(.currency(code: agent.usage?.cost?.currency ?? "USD"))
+        // `$0.42 of $2.00`, and nothing extra when there is no limit — a figure that
+        // comes and goes is one you stop trusting.
+        guard let ceiling = agent.ceiling(under: limits) else { return spent }
+        return "\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))"
     }
 
     private func helpText(_ usage: Usage) -> String {

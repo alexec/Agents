@@ -28,6 +28,9 @@ public enum DaemonAPI {
         public static let agentsUnarchive = "agents/unarchive"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
+        /// Letting one agent carry on past the per-agent limit, or giving it a
+        /// tighter ceiling of its own. The reader's call, never an agent's.
+        public static let agentsSetCeiling = "agents/setCeiling"
         /// Not the app's to call. This is how the MCP server we hand to every agent
         /// gets what the agent passed it back to the agent's own record.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
@@ -65,6 +68,13 @@ public enum DaemonAPI {
         public static let shellResize = "shell/resize"
         public static let shellSignal = "shell/signal"
         public static let shellRestart = "shell/restart"
+
+        // What the reader will allow to be spent. All three are window calls: none is
+        // advertised to `AppService`, added to the MCP tool surface, or named in any
+        // standing instruction given to an agent. A runaway that can raise its own
+        // limit is not stopped.
+        public static let costState = "cost/state"
+        public static let costSetLimits = "cost/setLimits"
     }
 
     public enum Notification {
@@ -103,6 +113,12 @@ public enum DaemonAPI {
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
         public static let shellStateChanged = "shell/stateChanged"
+
+        /// A limit changed, a turn's cost was banked, or the local day rolled over.
+        /// Carries the whole resolved fact rather than a delta, for the reason
+        /// `project/changed` does: two windows cannot then disagree, and one that
+        /// missed a notification is put right by the next rather than drifting.
+        public static let costChanged = "cost/changed"
     }
 
     // MARK: Requests
@@ -423,6 +439,91 @@ public enum DaemonAPI {
             agentID = try c.decode(UUID.self, forKey: .agentID)
             before = try c.decodeIfPresent(Int.self, forKey: .before)
             limit = try c.decodeIfPresent(Int.self, forKey: .limit) ?? 200
+        }
+    }
+
+    // MARK: Cost
+
+    /// The whole truth about money, as it stands. Carried by `cost/changed` and
+    /// returned by `cost/state` and `cost/setLimits`, so a caller sees the result
+    /// rather than assuming it.
+    public struct CostState: Codable, Sendable, Hashable {
+        /// What the reader has set.
+        public var limits: CostLimits
+        /// What this local day has cost, per currency. Empty until something is
+        /// spent, so a view shows nothing rather than a zero.
+        public var today: [String: Decimal]
+        /// Which local day `today` is about, `yyyy-MM-dd`.
+        ///
+        /// The only signal a window should use to notice a rollover. A window must
+        /// never consult its own clock: it may be in a different time zone from the
+        /// daemon's, and the daemon's is the one the limit uses.
+        public var day: String
+
+        public init(limits: CostLimits, today: [String: Decimal], day: String) {
+            self.limits = limits
+            self.today = today
+            self.day = day
+        }
+
+        /// Derived here rather than sent, so there is one place the rule lives.
+        public var dayLimitReached: Bool { limits.isDayLimitReached(spentToday: today) }
+        public var dayHeadroom: Decimal? { limits.dailyHeadroom(against: today) }
+
+        /// Close enough to be worth saying before it arrives, on the app's existing
+        /// threshold for a nearly full context rather than a second number.
+        public var dayIsCloseToFull: Bool {
+            guard let daily = limits.daily, daily.amount > 0 else { return false }
+            let spent = today[daily.currency] ?? 0
+            return (spent / daily.amount) >= Decimal(Usage.closeToFull)
+        }
+    }
+
+    /// Setting or clearing either limit. The only way either changes.
+    ///
+    /// Each field is a double optional and the distinction is the whole point:
+    /// **absent** means "leave it as it is", **present and null** means "no limit".
+    /// A limit of zero is a limit; clearing one requires an explicit null.
+    public struct SetLimitsRequest: Codable, Sendable {
+        public var perAgent: Cost??
+        public var daily: Cost??
+
+        public init(perAgent: Cost?? = nil, daily: Cost?? = nil) {
+            self.perAgent = perAgent
+            self.daily = daily
+        }
+
+        enum CodingKeys: String, CodingKey { case perAgent, daily }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            perAgent = c.contains(.perAgent)
+                ? .some(try c.decodeIfPresent(Cost.self, forKey: .perAgent)) : .none
+            daily = c.contains(.daily)
+                ? .some(try c.decodeIfPresent(Cost.self, forKey: .daily)) : .none
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            if case .some(let value) = perAgent {
+                if let value { try c.encode(value, forKey: .perAgent) }
+                else { try c.encodeNil(forKey: .perAgent) }
+            }
+            if case .some(let value) = daily {
+                if let value { try c.encode(value, forKey: .daily) }
+                else { try c.encodeNil(forKey: .daily) }
+            }
+        }
+    }
+
+    /// One agent's own ceiling. Null means "no ceiling of its own": the app-wide
+    /// per-agent limit applies again.
+    public struct SetCeilingRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var ceiling: Cost?
+        public init(agentID: UUID, ceiling: Cost?) {
+            self.agentID = agentID
+            self.ceiling = ceiling
         }
     }
 
@@ -753,6 +854,11 @@ public enum DaemonAPI {
         public static let notInWorkflowFolder = -32016
         /// A new workflow in a project that already has all the live ones it may have.
         public static let workflowLimitReached = -32017
+        /// A new agent asked for while the day's spending limit is reached. Raised by
+        /// `agents/start` only: a prompt to an agent that already exists succeeds and
+        /// waits on that agent's queue, because losing what somebody typed because a
+        /// budget was reached would be the worst possible reading of "control cost".
+        public static let dayLimitReached = -32018
     }
 
     // MARK: Workflows

@@ -73,6 +73,7 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
+                atItsLimit
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: attachments,
                                     refusal: { $0.refusal(from: model.promptCapabilities) },
@@ -134,6 +135,65 @@ struct PromptBar: View {
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
         .onChange(of: model.agents.count) { prepare() }
+    }
+
+    // MARK: A limit reached
+
+    /// Said above the field when the open agent may take no more prompts, with
+    /// exactly two ways out: raise the limit, or let this one agent go on.
+    ///
+    /// Neither happens without the reader choosing it and neither is the default.
+    /// Nothing here sends a prompt — raising a ceiling makes an agent promptable
+    /// again; continuing is the reader's second act, deliberately.
+    @ViewBuilder
+    private var atItsLimit: some View {
+        if let agent, agent.isAtCostLimit(under: model.costLimits) {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("This agent has reached its cost limit")
+                        .font(.footnote.weight(.medium))
+                    Text("\(Cost.total(of: agent.costToDate) ?? "") spent. "
+                         + "Anything you send waits until you allow more.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                SettingsLink { Text("Raise the limit") }
+                    .buttonStyle(.glass)
+                    .font(.footnote)
+                Button("Let this one go on") {
+                    Task { await model.letThisAgentGoOn(agent) }
+                }
+                .buttonStyle(.glass)
+                .font(.footnote)
+                .help("Raises this agent's own ceiling. No other agent is changed.")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+        } else if let agent, model.costState?.dayLimitReached == true {
+            HStack(spacing: 10) {
+                Image(systemName: "clock")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("The day's spending limit has been reached")
+                        .font(.footnote.weight(.medium))
+                    Text("What you send waits here, and goes when the day rolls over.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                SettingsLink { Text("Raise the limit") }
+                    .buttonStyle(.glass)
+                    .font(.footnote)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+            .id(agent.id)
+        }
     }
 
     // MARK: The folder, and what runs in it

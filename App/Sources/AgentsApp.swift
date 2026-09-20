@@ -30,6 +30,14 @@ struct AgentsApp: App {
                 .environment(model)
         }
         .defaultSize(width: 460, height: 560)
+
+        // The app's first Settings scene, and what gives it ⌘, and the menu item.
+        // Separate from the Spending window beside it because that one is read-only
+        // by construction, and a limit is the one number in this app a person types.
+        Settings {
+            CostSettingsView()
+                .environment(model)
+        }
     }
 }
 

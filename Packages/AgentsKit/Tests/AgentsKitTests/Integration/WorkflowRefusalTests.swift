@@ -479,6 +479,62 @@ struct WorkflowRefusalTests {
         }
     }
 
+    // MARK: The day's spending limit
+
+    /// Automation has to stop as visibly as a person is stopped. A workflow that
+    /// skips every fire because the budget is gone, and says nothing, is
+    /// indistinguishable from one whose trigger never matched.
+    @Test func aFireIsRefusedWhenTheDaysLimitIsReached() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try LimitStore(locations: locations)
+            .save(CostLimits(daily: Cost(amount: 1, currency: "USD")))
+        SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
+
+        try write(onSchedule, as: "nightly", in: work)
+        let core = try await core(locations)
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
+
+        #expect(await refusal(core, work, "nightly") == .dayLimitReached,
+                "asserted on the recorded outcome, never on the absence of an agent")
+        // Grey, not coloured: midnight resolves it with nobody doing anything.
+        #expect(WorkflowRefusal.dayLimitReached.needsAPerson == false)
+
+        let summary = try #require(await core.allWorkflows(in: work).first)
+        #expect(!summary.isArchived, "a refusal does not pause the workflow")
+        #expect(summary.nextFireAt != nil, "nor does it alter its schedule")
+
+        // Twenty refusals over an exhausted evening are one row with a count, not
+        // twenty entries nobody will read.
+        for _ in 0..<19 {
+            try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
+        }
+        guard case .refused(let refused, _, let repeats) = await outcome(core, work, "nightly") else {
+            Issue.record("the twentieth refusal was not recorded")
+            return
+        }
+        #expect(refused == .dayLimitReached)
+        #expect(repeats == 20)
+    }
+
+    /// The person's own decision answers every other question, the budget included.
+    @Test func anArchivedWorkflowIsRefusedForThatRatherThanForTheBudget() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try LimitStore(locations: locations)
+            .save(CostLimits(daily: Cost(amount: 1, currency: "USD")))
+        SpendLedger(locations: locations).add(Cost(amount: 5, currency: "USD"), on: Date())
+
+        try write(onSchedule, as: "nightly", in: work)
+        let core = try await core(locations)
+        _ = try await core.archiveWorkflow(
+            DaemonAPI.WorkflowArchiveRequest(folder: work, workflowID: "nightly", archived: true))
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
+
+        #expect(await refusal(core, work, "nightly") == .archived)
+    }
 }
 
 extension DaemonCore {

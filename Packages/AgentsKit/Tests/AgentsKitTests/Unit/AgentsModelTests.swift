@@ -232,4 +232,69 @@ struct AgentsModelTests {
         #expect(model.liveProjects.map(\.name) == ["api"])
         #expect(model.archivedProjects.map(\.name) == ["old"])
     }
+
+    // MARK: What is being spent
+
+    @Test("cost state is seeded on connect and kept current by the notification")
+    func moneyArrivesTheWayProjectsDo() throws {
+        let model = AgentsModel()
+        #expect(model.costState == nil,
+                "nothing until the daemon says, so a window shows nothing rather than a zero")
+
+        model.replaceCostState(DaemonAPI.CostState(
+            limits: CostLimits(perAgent: Cost(amount: 2, currency: "USD"),
+                               daily: Cost(amount: 10, currency: "USD")),
+            today: ["USD": 4], day: "2026-09-19"))
+        #expect(model.costState?.today["USD"] == 4)
+        #expect(model.costState?.dayHeadroom == 6, "derived here, never sent")
+        #expect(model.costState?.dayLimitReached == false)
+
+        let update = try notification(DaemonAPI.CostState(
+            limits: CostLimits(daily: Cost(amount: 10, currency: "USD")),
+            today: ["USD": 10], day: "2026-09-19"))
+        #expect(model.apply(DaemonAPI.Notification.costChanged, update))
+        #expect(model.costState?.dayLimitReached == true, "reached, not exceeded")
+        #expect(model.costState?.dayHeadroom == 0, "floored, never negative")
+        #expect(model.costState?.dayIsCloseToFull == true)
+    }
+
+    @Test("a changed day resets today without the client consulting its own clock")
+    func theDaemonsDayIsTheOnlyDay() throws {
+        let model = AgentsModel()
+        model.replaceCostState(DaemonAPI.CostState(
+            limits: CostLimits(daily: Cost(amount: 10, currency: "USD")),
+            today: ["USD": 10], day: "2026-09-19"))
+        #expect(model.costState?.dayLimitReached == true)
+
+        // The daemon says it is tomorrow. A window may be in another time zone, so
+        // its own clock is not something it may consult about this.
+        let tomorrow = try notification(DaemonAPI.CostState(
+            limits: CostLimits(daily: Cost(amount: 10, currency: "USD")),
+            today: [:], day: "2026-09-20"))
+        #expect(model.apply(DaemonAPI.Notification.costChanged, tomorrow))
+        #expect(model.costState?.day == "2026-09-20")
+        #expect(model.costState?.today.isEmpty == true, "the day's figure starts from zero")
+        #expect(model.costState?.dayLimitReached == false)
+    }
+
+    @Test("headroom for one agent follows its own ceiling, and is nothing when uncapped")
+    func anAgentsHeadroomIsTheAgentsOwn() {
+        let model = AgentsModel()
+        var spender = agent(state: .finished)
+        spender.costToDate = ["USD": 1.5]
+        model.replaceAgents([spender])
+
+        #expect(model.costHeadroom(for: spender) == nil, "no limits known yet, nothing to show")
+        #expect(!model.isAtCostLimit(spender))
+
+        model.replaceCostState(DaemonAPI.CostState(
+            limits: CostLimits(perAgent: Cost(amount: 2, currency: "USD")),
+            today: ["USD": 1.5], day: "2026-09-19"))
+        #expect(model.costHeadroom(for: spender) == 0.5)
+        #expect(!model.isAtCostLimit(spender))
+
+        spender.costCeiling = Cost(amount: 1, currency: "USD")
+        #expect(model.costHeadroom(for: spender) == 0, "its own ceiling wins")
+        #expect(model.isAtCostLimit(spender))
+    }
 }

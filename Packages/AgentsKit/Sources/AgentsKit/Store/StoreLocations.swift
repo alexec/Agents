@@ -93,6 +93,21 @@ public struct StoreLocations: Sendable {
     /// What each runtime last advertised. A cache: safe to delete, and deleting it
     /// costs the next start form the wait it used to have every time.
     public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
+    /// The two limits the reader set: the most any one agent may spend, and the most
+    /// a day may. One file, because there are two facts in it and both belong to the
+    /// person rather than to any agent or project.
+    ///
+    /// One root is one budget. A branch build pointed at its own root has its own
+    /// limits and its own day, which is consistent with the root being the daemon's
+    /// identity and is worth knowing before wondering why a limit did not bite.
+    public var limits: URL { root.appendingPathComponent("limits.json") }
+    /// What each of the last few local days cost, per currency. One file, so a daemon
+    /// restarted part-way through a day comes back having counted the money rather
+    /// than starting the day again from zero.
+    ///
+    /// Not a history and must never be shown as one: what is kept beyond today exists
+    /// only so every boundary question has an unambiguous answer.
+    public var spend: URL { root.appendingPathComponent("spend.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)
