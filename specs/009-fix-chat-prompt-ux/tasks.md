@@ -4,6 +4,8 @@ description: "Task list for 009-fix-chat-prompt-ux"
 
 # Tasks: Prompt Controls, Project Navigation, Scroll-to-Bottom, Remembered Mode, and Unseen File Requests
 
+> **Obsolete — 2026-09-20.** Retired by Alex. The 16 tasks still open below are not to be picked up; what they described has either been superseded by 018 and 020 or is no longer wanted.
+
 **Input**: Design documents from `specs/009-fix-chat-prompt-ux/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/)
