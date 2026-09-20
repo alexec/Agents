@@ -31,6 +31,10 @@ final class AppModel {
     /// What the terminals the daemon is running for an agent have printed so far.
     private(set) var terminalOutput: [String: String] = [:]
     private(set) var isConnected = false
+    /// 021: the Mac's banner, and the window's report of where the person is. Neither
+    /// decides anything; the daemon routes and these two obey.
+    private let notifier = MacNotifier()
+    private var presence: PresenceReporter?
     private(set) var problem: String?
 
     // What the window reads, which is the shared model under another name. Forwarded
@@ -142,6 +146,7 @@ final class AppModel {
             // Which conversation is being read is what decides whether an arriving
             // transcript entry is ours to keep, so the shared model is told first.
             work.watching = selection
+            presence?.watching(selection)
             Task { await loadTranscript() }
         }
     }
@@ -422,6 +427,8 @@ final class AppModel {
             isConnected = true
             problem = nil
             listen()
+            startPresence()
+            presence?.connected()
             await refreshEverything()
         } catch {
             isConnected = false
@@ -449,6 +456,10 @@ final class AppModel {
         // Mac's own: the shells and terminals a phone has no business with.
         if work.apply(method, params) {
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
+            if method == DaemonAPI.Notification.attentionChanged,
+               let change = try? params?.decode(DaemonAPI.AttentionNotification.self) {
+                await notifier.apply(change)
+            }
             return
         }
 
@@ -496,6 +507,7 @@ final class AppModel {
         await refreshWorkflows()
         await refreshPermissions()
         await refreshElicitations()
+        await refreshAttention()
         await refreshResuming()
         await refreshCostState()
         await loadTranscript()
@@ -529,6 +541,38 @@ final class AppModel {
                                                        Optional<String>.none,
                                                        returning: [RuntimeStatus].self)
         }
+    }
+
+    /// What wants a person and where each is showing, on connect and on coming to the
+    /// front: the daemon's list is the truth, and a banner it no longer lists is stale.
+    func refreshAttention() async {
+        guard let pending = try? await client.call(DaemonAPI.Method.attentionPending,
+                                                   Optional<String>.none,
+                                                   returning: DaemonAPI.AttentionPending.self) else { return }
+        work.replaceAttention(pending)
+        await notifier.sweep(keeping: pending)
+    }
+
+    /// The window's own report of where the person is, started once and kept for the
+    /// life of the window. Opening a banner selects the conversation it names.
+    private func startPresence() {
+        guard presence == nil else { return }
+        notifier.open = { [weak self] agentID in
+            guard let self else { return }
+            self.showsSpending = false
+            self.openWorkflow = nil
+            self.selection = agentID
+        }
+        let reporter = PresenceReporter { [weak self] watching, active in
+            guard let self else { return }
+            _ = try? await self.client.call(DaemonAPI.Method.presenceReport,
+                                            DaemonAPI.PresenceReport(watching: watching, active: active))
+            // Coming to the front is also the moment to drop any banner that has gone
+            // stale while nobody was looking.
+            if active { await self.refreshAttention() }
+        }
+        reporter.start()
+        presence = reporter
     }
 
     func refreshPermissions() async {
