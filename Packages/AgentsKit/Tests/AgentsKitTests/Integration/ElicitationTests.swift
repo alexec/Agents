@@ -228,6 +228,57 @@ struct ElicitationTests {
         #expect(await core.pendingElicitations().isEmpty)
     }
 
+    /// The form is taken down by the runtime rather than answered here — the same
+    /// question was put somewhere else, or the model changed its mind — and the agent
+    /// has to come back out of "Needs attention" with it. A withdrawn form that left
+    /// the state behind is an agent sitting under that heading with nothing on the
+    /// page to answer, and no way out of `waitingOnUser` except stopping it.
+    @Test func aWithdrawnFormTakesTheAgentOutOfWaiting() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.clientRequests = [(ACP.ClientMethod.createElicitation, aForm)]
+        let launcher = FakeLauncher(script: script, capabilities: serving)
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the agent is waiting on its form") {
+            await core.agent(id)?.state == .waitingOnUser
+        }
+
+        #expect(launcher.launchCount == 1, "launches: \(launcher.launchCount)")
+        #expect(await launcher.lastAgent?.received.contains(ACP.Method.prompt) == true,
+                "the last agent is not the one holding the form")
+        await launcher.lastAgent?.emit(FakeACPAgent.chunk("still listening"))
+        await eventually("an ordinary update still arrives while a form is pending") {
+            let page = try? await core.transcript(.init(agentID: id, before: nil, limit: 200))
+            return page?.entries.contains { "\($0.kind)".contains("still listening") } == true
+        }
+        await launcher.lastAgent?.emitNotification(ACP.ClientMethod.completeElicitation,
+                                                   ["elicitationId": "e1"])
+        let answer = await eventuallySome("the runtime heard the cancel") {
+            await launcher.lastAgent?.answer(to: ACP.ClientMethod.createElicitation)
+        }
+        #expect(answer != nil)
+        await eventually("the form came down") {
+            await core.pendingElicitations().isEmpty
+        }
+        // The fake ends its turn the moment it hears the cancel, so by the time the
+        // form is seen to be gone the agent may already be finished. What must be true
+        // is that it passed through `running` on the way — the step a withdrawal used
+        // to skip — rather than going from waiting straight to the end.
+        let states = try await core.transcript(.init(agentID: id, before: nil, limit: 200)).entries
+            .compactMap { entry -> AgentState? in
+                if case .stateChanged(let state, _) = entry.kind { return state }
+                return nil
+            }
+        let lastWaiting = states.lastIndex(of: .waitingOnUser) ?? -1
+        let lastRunning = states.lastIndex(of: .running) ?? -1
+        #expect(lastRunning > lastWaiting, "states: \(states)")
+        #expect(states.last != .waitingOnUser, "states: \(states)")
+        #expect(await core.agent(id)?.state != .waitingOnUser)
+        #expect(await core.agent(id)?.group != .needsAttention)
+    }
+
     @Test func nothingIsAskedWhenWeDidNotSayWeTakeForms() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()

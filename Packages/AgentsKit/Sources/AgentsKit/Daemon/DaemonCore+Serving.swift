@@ -65,8 +65,21 @@ extension DaemonCore {
                                                     request: request))
     }
 
-    func withdrawElicitation(_ requestID: UUID, agentID: UUID) {
-        guard elicitations.removeValue(forKey: requestID) != nil else { return }
+    /// The runtime took its own form down — answered somewhere else, or it changed its
+    /// mind. Everything an answer would have done still has to happen: the record
+    /// closes, the agent comes back out of "Needs attention", the windows hear. Left
+    /// out, the agent sat under that heading with nothing on the page to answer and
+    /// no way out but stopping it.
+    ///
+    /// The state moves before the form is dropped, not after: each `await` here is a
+    /// place a window can look, and a window that sees no form must not see an agent
+    /// still waiting on one.
+    func withdrawElicitation(_ requestID: UUID, agentID: UUID) async {
+        guard elicitations[requestID] != nil else { return }
+        await record(.elicitationAnswered(id: requestID, summary: ElicitationOutcome.cancel.summary),
+                     for: agentID)
+        await move(agentID, on: .permissionAnswered)
+        elicitations.removeValue(forKey: requestID)
         broadcast(DaemonAPI.Notification.agentElicitation,
                   DaemonAPI.ElicitationNotification(agentID: agentID, requestID: requestID, request: nil))
     }

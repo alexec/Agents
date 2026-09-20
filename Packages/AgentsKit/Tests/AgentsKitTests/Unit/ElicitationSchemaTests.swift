@@ -196,4 +196,66 @@ struct ElicitationSchemaTests {
         ]))
         #expect(schema?.singleChoice == nil)
     }
+
+    // MARK: What goes on one page together
+
+    /// The shape this app's own question tool sends: the choices, then the box for an
+    /// answer that is not among them. Two properties, one question, one page.
+    @Test func aChoiceAndItsOwnFreeTextBoxSharePage() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": [
+                "question_0": ["type": "string", "enum": ["a", "b"]],
+                "question_0_custom": ["type": "string", "title": "Other"],
+                "question_1": ["type": "string", "enum": ["c"]],
+                "question_1_custom": ["type": "string", "title": "Other"],
+            ],
+            "propertyOrder": ["question_0", "question_0_custom", "question_1", "question_1_custom"],
+        ])))
+        #expect(schema.properties.count == 4)
+        #expect(schema.pages.map { $0.map(\.name) }
+                == [["question_0", "question_0_custom"], ["question_1", "question_1_custom"]])
+    }
+
+    /// Two questions that have nothing to do with each other get a page each, whatever
+    /// their types.
+    @Test func unrelatedPropertiesGetAPageEach() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": ["colour": ["type": "string", "enum": ["red"]],
+                           "name": ["type": "string"]],
+            "propertyOrder": ["colour", "name"],
+        ])))
+        #expect(schema.pages.count == 2)
+    }
+
+    /// A free-text field named after the one before it but *needed* is a question of
+    /// its own, not a note on that one, and is not to be tucked in beside it where it
+    /// can be paged past without being noticed.
+    @Test func aRequiredFieldKeepsItsOwnPage() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": ["question_0": ["type": "string", "enum": ["a"]],
+                           "question_0_custom": ["type": "string"]],
+            "propertyOrder": ["question_0", "question_0_custom"],
+            "required": ["question_0_custom"],
+        ])))
+        #expect(schema.pages.count == 2)
+    }
+
+    /// So is one with a length or a format to satisfy: it is being asked for, not
+    /// offered.
+    @Test func aConstrainedFieldKeepsItsOwnPage() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": ["question_0": ["type": "string", "enum": ["a"]],
+                           "question_0_email": ["type": "string", "format": "email"]],
+            "propertyOrder": ["question_0", "question_0_email"],
+        ])))
+        #expect(schema.pages.count == 2)
+    }
+
+    /// One question is one page, with or without a box beside it.
+    @Test func oneQuestionIsOnePage() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": ["colour": ["type": "string", "enum": ["red", "green"]]],
+        ])))
+        #expect(schema.pages.count == 1)
+    }
 }

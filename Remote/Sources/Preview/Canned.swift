@@ -30,6 +30,10 @@ enum Canned {
     static let stuck = UUID(uuidString: "00000000-0000-0000-0000-0000000000A9")!
     static let nothingToDo = UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!
     static let unaccounted = UUID(uuidString: "00000000-0000-0000-0000-0000000000AB")!
+    /// Blocked on a form rather than on a permission. A different screen from `waiting`
+    /// and, until this existed, one nobody could look at: the form hides behind a live
+    /// permission on the same agent, so sharing one made it unreachable.
+    static let onAForm = UUID(uuidString: "00000000-0000-0000-0000-0000000000AC")!
 
     static func ago(_ minutes: Int) -> Date { Date(timeIntervalSinceNow: -Double(minutes) * 60) }
 
@@ -96,6 +100,11 @@ enum Canned {
                                      message: "Nothing failed overnight.", at: ago(590))),
             // Asked, and still said nothing. Under Complete, and marked so nobody
             // mistakes it for an ending somebody vouched for.
+            Agent(id: onAForm, runtimeID: "claude", cwd: agentsFolder,
+                  title: "Backfill the email column", state: .waitingOnUser,
+                  createdAt: ago(30), lastActivityAt: ago(1),
+                  usage: Usage(used: 22_000, size: 200_000),
+                  costToDate: ["USD": 0.28]),
             Agent(id: unaccounted, runtimeID: "copilot", cwd: agentsFolder,
                   title: "Tidy the imports", state: .finished,
                   createdAt: ago(500), lastActivityAt: ago(470),
@@ -208,5 +217,45 @@ enum Canned {
                       PermissionOption(optionID: "always", name: "Always allow", kind: .allowAlways),
                       PermissionOption(optionID: "no", name: "Don't allow", kind: .rejectOnce)],
             askedAt: ago(2))
+    }
+
+    /// And the other kind of blocked, on an agent of its own.
+    ///
+    /// On its own rather than behind the permission, which is where it started: the
+    /// phone will not draw two blocking cards at once — `formForSelection` hides the
+    /// form while a permission is live — so sharing an agent left the form unreachable
+    /// without answering the permission first, and a screen nobody can open is a screen
+    /// nobody can settle.
+    ///
+    /// Two properties, not one, because that is what this app's own question tool
+    /// actually sends: the choices, and an optional free-text "Other" beside them. A
+    /// preview built on a one-property form would pass while the real thing fell through
+    /// to "this wants your Mac".
+    static var form: ElicitationRequest {
+        ElicitationRequest(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!,
+            agentID: onAForm,
+            message: "Drop the old index before the backfill, or after it?",
+            mode: .form(ElicitationSchema(
+                title: "Which order?",
+                description: "Dropping it first is quicker and slow to undo.",
+                properties: [
+                    ElicitationSchema.Property(
+                        name: "question_0",
+                        title: "Order",
+                        isRequired: true,
+                        kind: .string(format: nil, minLength: nil, maxLength: nil, choices: [
+                            .init(value: "first", title: "Drop it first",
+                                  description: "Quicker, and slow to undo"),
+                            .init(value: "after", title: "Drop it after",
+                                  description: "Slower, and reversible"),
+                        ])),
+                    ElicitationSchema.Property(
+                        name: "question_0_custom",
+                        title: "Other",
+                        description: "add to your selection above",
+                        kind: .string(format: nil, minLength: nil, maxLength: nil, choices: nil)),
+                ])),
+            askedAt: ago(1))
     }
 }

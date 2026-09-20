@@ -41,6 +41,7 @@ private actor FakeState {
     private var connection: JSONRPCConnection?
     private(set) var agents: [Agent] = Canned.agents
     private(set) var permissions: [PermissionRequest] = [Canned.question]
+    private(set) var forms: [ElicitationRequest] = [Canned.form]
 
     func hold(_ connection: JSONRPCConnection) {
         self.connection = connection
@@ -67,7 +68,7 @@ private actor FakeState {
                 return .success(try JSONValue.encoding(permissions))
 
             case DaemonAPI.Method.elicitationsPending:
-                return .success(.array([]))
+                return .success(try JSONValue.encoding(forms))
 
             case DaemonAPI.Method.agentsResuming:
                 return .success(try JSONValue.encoding(DaemonAPI.ResumingResponse(agentIDs: [])))
@@ -76,6 +77,11 @@ private actor FakeState {
                 let request = try params?.decode(DaemonAPI.TranscriptRequest.self)
                 let whole = Canned.transcript(for: request?.agentID)
                 return .success(try JSONValue.encoding(page(of: whole, request: request)))
+
+            case DaemonAPI.Method.elicitationsAnswer:
+                let request = try params?.decode(DaemonAPI.AnswerElicitationRequest.self)
+                forms.removeAll { $0.id == request?.requestID }
+                return .success(.object([:]))
 
             case DaemonAPI.Method.permissionsAnswer:
                 let request = try params?.decode(DaemonAPI.AnswerRequest.self)

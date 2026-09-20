@@ -1,0 +1,227 @@
+import AgentsKitCore
+import SwiftUI
+
+/// A question from the agent that wants a particular shape of answer, on the phone.
+///
+/// The daemon has held these since 003 and only the Mac could ever answer one. That is
+/// the wrong way round for the question channel this app is proudest of: the whole claim
+/// is that a question reaches you wherever you are, and "wherever you are" was a desk.
+///
+/// Built on `PermissionSheet` rather than on the Mac's `ElicitationView`, deliberately.
+/// The Mac's version pages through a form of several questions with arrows and a Send;
+/// that is a good answer for a window and a poor one for a phone held in one hand. What
+/// a phone is good at is the case that actually arrives — one question, a few answers,
+/// one tap — which is what this app's own question tool sends and what every runtime
+/// raising a choice sends. So that case gets the whole screen and one tap, and the rarer
+/// shapes are honest about needing the Mac rather than half-drawn here.
+struct ElicitationSheet: View {
+    @Environment(RemoteModel.self) private var model
+    let request: ElicitationRequest
+
+    /// What was tapped, while the answer is in flight — the same guard against a second
+    /// tap that `PermissionSheet` makes, and for the same reason.
+    @State private var chosen: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(request.title)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                // The question itself often lives here rather than in the schema: a
+                // one-question form arrives with an untitled field and the whole
+                // question in `message`.
+                if let message = request.message, message != request.title {
+                    Text(message)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let chosen {
+                Sending(what: chosen)
+            } else {
+                answers
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .readableWidth()
+        .animation(.snappy(duration: 0.2), value: chosen)
+    }
+
+    @ViewBuilder
+    private var answers: some View {
+        switch request.mode {
+        case .form(let schema):
+            if let choice = Self.oneTapChoice(in: schema) {
+                oneTap(schema, choice)
+            } else {
+                needsTheMac
+            }
+        case .url(let link):
+            page(link)
+        }
+    }
+
+    /// The one question this form is really asking, when it is only asking one.
+    ///
+    /// Deliberately more generous than `ElicitationSchema.singleChoice`, which wants a
+    /// schema of exactly one property. The elicitation that actually arrives here is
+    /// this app's own question tool's, and it sends *two*: `question_0` for the choices
+    /// and an optional `question_0_custom` for a free-text "Other". Held to one property,
+    /// the commonest question in the app would fall through to "this wants your Mac",
+    /// which is the opposite of the point.
+    ///
+    /// So: one page — `pages` is what groups a note with the question it belongs to —
+    /// a first property offering choices, and nothing else on the form that has to be
+    /// filled in. The free text is what gets given up by answering from a phone, and
+    /// giving up an optional box to answer in one tap is the trade this screen is for.
+    static func oneTapChoice(in schema: ElicitationSchema)
+        -> (property: ElicitationSchema.Property, choices: [ElicitationSchema.Property.Choice])? {
+        guard schema.pages.count == 1, let asked = schema.pages[0].first,
+              case .string(_, _, _, let choices) = asked.kind,
+              let choices, !choices.isEmpty,
+              // Anything else that must be answered cannot be, from here.
+              !schema.properties.contains(where: { $0.name != asked.name && $0.isRequired })
+        else { return nil }
+        return (asked, choices)
+    }
+
+    /// One question, the agent's own answers, one tap each.
+    ///
+    /// Stacked rather than in a row, which is the rule `PermissionSheet` already
+    /// follows: three buttons across a phone at the largest Dynamic Type sizes are
+    /// three truncated words, and an answer nobody can read is one nobody can give.
+    private func oneTap(_ schema: ElicitationSchema,
+                        _ single: (property: ElicitationSchema.Property,
+                                   choices: [ElicitationSchema.Property.Choice])) -> some View {
+        VStack(spacing: 8) {
+            if let description = schema.description {
+                Text(description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            ForEach(single.choices) { choice in
+                Button {
+                    send(choice.title, action: .accept,
+                         content: [single.property.name: .string(choice.value)])
+                } label: {
+                    label(choice.title, note: choice.description, onFill: true)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+            }
+            // Answering with nothing, where the agent said the question may go
+            // unanswered. Not the same as declining, and the daemon tells them apart.
+            if !single.property.isRequired {
+                Button {
+                    send("No answer", action: .accept,
+                         content: [single.property.name: .string("")])
+                } label: {
+                    label("No answer", note: nil)
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+            }
+            declineButton
+        }
+        .disabled(model.isStale)
+    }
+
+    /// Go and look at something, then say how it went.
+    private func page(_ link: String) -> some View {
+        VStack(spacing: 8) {
+            if let url = URL(string: link) {
+                Link(destination: url) { label("Open", note: link, onFill: true) }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+            }
+            Button { send("Done", action: .accept) } label: { label("Done", note: nil) }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+            declineButton
+        }
+        .disabled(model.isStale)
+    }
+
+    /// A form of several questions, free text or a number: shapes that cannot be
+    /// answered by one tap.
+    ///
+    /// Said plainly rather than drawn badly. A half-filled form that looks answerable
+    /// is worse than one that admits where it can be answered — and declining is still
+    /// offered, because leaving an agent blocked on a form you cannot fill in from here
+    /// is the thing this is trying to avoid.
+    private var needsTheMac: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("This one asks for more than a single choice, so it wants your Mac.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            declineButton
+        }
+        .disabled(model.isStale)
+    }
+
+    private var declineButton: some View {
+        Button { send("No thanks", action: .decline) } label: { label("No thanks", note: nil) }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+    }
+
+    /// Full width, wrapping rather than truncating — the largest Dynamic Type sizes are
+    /// exactly when a one-word button becomes half a word.
+    ///
+    /// `onFill` is about contrast and was found by looking at it. What a choice *means*
+    /// is often the whole substance of the question — "quicker, and slow to undo" is the
+    /// part you are actually deciding on — and drawn as `.secondary` it comes out grey on
+    /// a saturated blue fill, which is the one place that colour has no contrast left.
+    /// On a fill the note is white held back a little; off one, `.secondary` as usual.
+    private func label(_ title: String, note: String?, onFill: Bool = false) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+            if let note, !note.isEmpty {
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(onFill ? AnyShapeStyle(.white.opacity(0.85))
+                                            : AnyShapeStyle(.secondary))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func send(_ what: String,
+                      action: DaemonAPI.AnswerElicitationRequest.Action,
+                      content: [String: JSONValue] = [:]) {
+        chosen = what
+        Task {
+            await model.answer(request, action: action, content: content)
+            // Left showing what was sent. What becomes of it arrives as the daemon
+            // withdrawing the question, which takes this whole view away.
+        }
+    }
+}
+
+/// What was sent, where the buttons were. Never a second answer.
+private struct Sending: View {
+    let what: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("\(what) — telling your Mac")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+    }
+}

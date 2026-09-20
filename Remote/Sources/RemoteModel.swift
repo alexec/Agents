@@ -106,6 +106,15 @@ final class RemoteModel {
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
+    /// The form it is blocked on instead, if it is one of those.
+    ///
+    /// The two never share the screen, and the permission wins where both somehow
+    /// exist: it is the one the runtime is most likely to be sitting on, and two
+    /// blocking cards at once on a phone is a card nobody can read.
+    var formForSelection: ElicitationRequest? {
+        questionForSelection == nil ? work.elicitation(for: selection) : nil
+    }
+
     /// A file being read, by path, or nothing.
     ///
     /// On the model rather than in a view's `@State` because the tap that opens one is
@@ -214,6 +223,7 @@ final class RemoteModel {
         // After the agents, because a project's counts are worked out from them.
         await refreshProjects()
         await refreshPermissions()
+        await refreshElicitations()
         await refreshResuming()
         await refreshCostState()
         await refreshWorkflows()
@@ -251,6 +261,16 @@ final class RemoteModel {
                                                   Optional<String>.none,
                                                   returning: [PermissionRequest].self) else { return }
         work.replacePermissions(listed)
+    }
+
+    /// The forms an agent is blocked on. Fetched for the same reason permissions are:
+    /// `agent/elicitation` keeps them current afterwards, but a question raised before
+    /// this phone connected would otherwise never appear at all.
+    private func refreshElicitations() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.elicitationsPending,
+                                                  Optional<String>.none,
+                                                  returning: [ElicitationRequest].self) else { return }
+        work.replaceElicitations(listed)
     }
 
     /// What the Mac is still bringing back after a restart.
@@ -324,6 +344,30 @@ final class RemoteModel {
                                                           optionID: optionID))
         } catch {
             problem = "That question could not be answered."
+        }
+    }
+
+    /// Answer the form the agent is blocked on.
+    ///
+    /// Refused here when the Mac is not answering, exactly as a permission is: an
+    /// answer that cannot be delivered is not an answer, and an agent left waiting
+    /// while the person believes they replied is the worst of both.
+    func answer(_ request: ElicitationRequest,
+                action: DaemonAPI.AnswerElicitationRequest.Action,
+                content: [String: JSONValue] = [:]) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.elicitationsAnswer,
+                                  DaemonAPI.AnswerElicitationRequest(requestID: request.id,
+                                                                     action: action,
+                                                                     content: content))
+        } catch {
+            // The daemon refuses an answer that does not fit the shape the agent asked
+            // for, and says why. Its words, not ours: it knows which field was wrong.
+            problem = (error as? JSONRPCError)?.message ?? "That question could not be answered."
         }
     }
 

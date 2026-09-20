@@ -121,6 +121,26 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
         return (only, choices)
     }
 
+    /// The properties grouped into what belongs on one page of the form.
+    ///
+    /// Two properties on the wire are sometimes one question to whoever is answering:
+    /// this app's own question tool sends `question_0` for the choices and
+    /// `question_0_custom` for the free-text box beside them, whose description reads
+    /// "add to your selection above". Drawn a page apart, "above" points at nothing.
+    /// So an optional free-text property named after the property before it travels
+    /// with it. Everything else gets a page of its own.
+    public var pages: [[Property]] {
+        var pages: [[Property]] = []
+        for property in properties {
+            if let previous = pages.last?.last, property.isNote(on: previous) {
+                pages[pages.count - 1].append(property)
+            } else {
+                pages.append([property])
+            }
+        }
+        return pages
+    }
+
     public struct Property: Codable, Hashable, Sendable, Identifiable {
         public var name: String
         public var title: String?
@@ -224,6 +244,17 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
             case .int(let v): return Double(v)
             default: return nil
             }
+        }
+
+        /// Whether this is the free-text box belonging to the question before it:
+        /// unconstrained text, optional, and named after it — `question_0_custom`
+        /// beside `question_0`. A required field, or one with a length or a format of
+        /// its own, is a question in its own right and keeps its own page.
+        func isNote(on previous: Property) -> Bool {
+            guard !isRequired, name.hasPrefix(previous.name + "_"),
+                  case .string(nil, nil, nil, nil) = kind
+            else { return false }
+            return true
         }
 
         /// Why this value will not do, or nil if it will.

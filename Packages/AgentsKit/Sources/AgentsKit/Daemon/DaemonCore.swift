@@ -504,7 +504,7 @@ public actor DaemonCore {
             workflowsRespond(to: .askedForm, agentID: agentID)
 
         case .elicitationWithdrawn(let requestID):
-            withdrawElicitation(requestID, agentID: agentID)
+            await withdrawElicitation(requestID, agentID: agentID)
 
         case .served(let request):
             await record(.servedRequest(request), for: agentID)

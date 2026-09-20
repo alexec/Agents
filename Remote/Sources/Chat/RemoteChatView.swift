@@ -130,6 +130,11 @@ struct RemoteChatView: View {
         if let request = model.questionForSelection {
             PermissionSheet(request: request)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if let form = model.formForSelection {
+            // The other kind of blocked, and it takes the bar for the same reason: an
+            // agent waiting on an answer wants the answer, not a way to type past it.
+            ElicitationSheet(request: form)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let agent, agent.state != .archived {
             // Nothing to say to an agent that has been put away. Bringing it back is
             // in the menu, and that is the move to make first.

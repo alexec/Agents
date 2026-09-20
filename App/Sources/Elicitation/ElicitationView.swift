@@ -12,6 +12,10 @@ struct ElicitationView: View {
     let request: ElicitationRequest
 
     @State private var values: [String: JSONValue] = [:]
+    /// Which question of a multi-question form is on screen.
+    @State private var step = 0
+    /// How tall the question on that page wants to be, measured rather than guessed.
+    @State private var questionHeight: CGFloat = 0
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -29,27 +33,7 @@ struct ElicitationView: View {
                     oneClick(schema)
 
                 case .form(let schema):
-                    if let description = schema.description {
-                        Text(description).font(.callout).foregroundStyle(.secondary)
-                    }
-                    ForEach(schema.properties) { property in
-                        field(for: property)
-                    }
-                    HStack(spacing: 8) {
-                        Button("Send") {
-                            Task { await model.answerElicitation(request, action: .accept, content: values) }
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(!schema.problems(with: values).isEmpty)
-                        Button("No thanks") {
-                            Task { await model.answerElicitation(request, action: .decline) }
-                        }
-                        .buttonStyle(.glass)
-                        Spacer(minLength: 0)
-                        if let problem = schema.problems(with: values).first {
-                            Text(problem).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
+                    pages(schema)
 
                 case .url(let url):
                     HStack(spacing: 8) {
@@ -75,6 +59,197 @@ struct ElicitationView: View {
         // Floats above the prompt bar, in its column.
         .chatColumn()
         .onAppear { fillInDefaults() }
+        // A second question arriving while the first is still on screen starts at
+        // its own first page, not wherever the last one was left.
+        .onChange(of: request.id) { _, _ in step = 0 }
+    }
+
+    /// A form of several questions, one to a page.
+    ///
+    /// Drawn all at once, a form of more than two or three questions is taller than
+    /// the window, and the first thing to fall off the bottom is the button that
+    /// sends it — the card becomes unanswerable by being too big to answer. So a page
+    /// is one question: the question itself, a button for each of its options, and a
+    /// box for an answer that is not among them. Clicking an option answers and moves
+    /// on, which is the whole interaction for most forms. The row underneath holds
+    /// the way back, where you are, and — only when they can do anything — Next and
+    /// Submit.
+    @ViewBuilder
+    private func pages(_ schema: ElicitationSchema) -> some View {
+        let pages = schema.pages
+        let last = pages.count - 1
+        let page = min(max(step, 0), last)
+        if let description = schema.description {
+            Text(description).font(.callout).foregroundStyle(.secondary)
+        }
+        question(pages[page], page: page, last: last)
+        HStack(spacing: 8) {
+            if last > 0 {
+                turn(to: page - 1, "chevron.backward", "Previous question", enabled: page > 0)
+                Text("\(page + 1)/\(pages.count)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+            // On the last page this names whichever question is still unanswered,
+            // which is why Submit will not go.
+            if page == last, let problem = schema.problems(with: values).first {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            // Saying no is an answer, and the paged form is the one shape that used
+            // to have nowhere to say it: a form you cannot finish and cannot dismiss
+            // is a card that sits there for ever.
+            Button("No thanks") {
+                Task { await model.answerElicitation(request, action: .decline) }
+            }
+            .buttonStyle(.glass)
+            // Always offered, on every page but the last. Clicking an option turns
+            // the page by itself, so here Next is mostly the way past a question
+            // that a click cannot answer: a boolean left alone, an optional box left
+            // empty, a multi-select with nothing ticked. Gating it on the page being
+            // answered made those pages dead ends, and because Submit lives on the
+            // last page alone, one dead end made the whole form unanswerable.
+            // Whether the answer will do is Submit's business, not this button's.
+            if page < last {
+                Button("Next") { step = page + 1 }
+                    .buttonStyle(.glass)
+            }
+            if page == last {
+                Button("Submit") {
+                    Task { await model.answerElicitation(request, action: .accept, content: values) }
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(!schema.problems(with: values).isEmpty)
+            }
+        }
+    }
+
+    /// The question on this page — its choices, and the box for an answer that is not
+    /// among them — bounded so that a long one cannot push the answer row off the
+    /// bottom of the window.
+    ///
+    /// Only wrapped in a scroll view once it is actually too tall. A scroll view takes
+    /// all the height it is offered, so wrapping unconditionally left a short question
+    /// sitting at the top of a card padded out to the cap — which is what it did, and
+    /// what the card looked like before this measured first and wrapped second.
+    @ViewBuilder
+    private func question(_ properties: [ElicitationSchema.Property],
+                          page: Int, last: Int) -> some View {
+        let content = VStack(alignment: .leading, spacing: 10) {
+            ForEach(properties) { property in
+                part(property, page: page, last: last)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeight = $0 }
+        if questionHeight > Self.questionCap {
+            ScrollView { content }
+                .frame(height: Self.questionCap)
+                .scrollBounceBehavior(.basedOnSize)
+        } else {
+            content
+        }
+    }
+
+    /// As tall as a question may get before it scrolls instead — beside the caps a
+    /// long diff and the command list keep.
+    private static let questionCap: CGFloat = 260
+
+    private func turn(to page: Int, _ symbol: String, _ label: String, enabled: Bool) -> some View {
+        Button { step = page } label: { Image(systemName: symbol) }
+            .buttonStyle(.glass)
+            .disabled(!enabled)
+            .accessibilityLabel(label)
+    }
+
+    /// One part of a page: a question with its options as buttons, a list to tick, or
+    /// an ordinary field for everything else.
+    @ViewBuilder
+    private func part(_ property: ElicitationSchema.Property, page: Int, last: Int) -> some View {
+        switch property.kind {
+        case .string(_, _, _, let choices?):
+            asked(property)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(choices) { choice in
+                    // Clicking answers and turns the page. On the last page there is
+                    // nowhere to turn to, so it selects and waits for Submit.
+                    option(choice.title, choice.description,
+                           chosen: values[property.name]?.stringValue == choice.value) {
+                        values[property.name] = .string(choice.value)
+                        if page < last { step = page + 1 }
+                    }
+                }
+            }
+        case .multiSelect(let items, _, _):
+            asked(property)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(items) { item in
+                    // Several can be picked, so a click cannot mean "and move on":
+                    // it adds or removes, and Next appears once anything is on.
+                    option(item.title, item.description,
+                           chosen: chosen(property.name).contains(item.value)) {
+                        var picked = chosen(property.name)
+                        if let at = picked.firstIndex(of: item.value) {
+                            picked.remove(at: at)
+                        } else {
+                            picked.append(item.value)
+                        }
+                        values[property.name] = .array(picked.map(JSONValue.string))
+                    }
+                }
+            }
+        default:
+            field(for: property)
+        }
+    }
+
+    /// The question itself: its own words, above its options.
+    private func asked(_ property: ElicitationSchema.Property) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(property.title ?? property.name)
+                    .font(.callout)
+                    .fontWeight(.medium)
+                if property.isRequired {
+                    Text("needed").font(.caption).foregroundStyle(.tertiary)
+                }
+            }
+            if let description = property.description {
+                Text(description).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// An option, full width down the card rather than along a row: there is one
+    /// question on the page now, so there is room to read what each one means.
+    @ViewBuilder
+    private func option(_ title: String, _ description: String?,
+                        chosen: Bool, choose: @escaping () -> Void) -> some View {
+        if chosen {
+            Button(action: choose) { optionLabel(title, description) }
+                .buttonStyle(.glassProminent)
+        } else {
+            Button(action: choose) { optionLabel(title, description) }
+                .buttonStyle(.glass)
+        }
+    }
+
+    private func optionLabel(_ title: String, _ description: String?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+            if let description, !description.isEmpty {
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// A question whose whole answer is one choice, answered by clicking the choice.
