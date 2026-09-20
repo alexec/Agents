@@ -237,3 +237,23 @@ to the next rung rather than to a device that will silently drop it.
 Nothing starts by itself. No daemon, no bridge, no notifications until the Mac app has been
 opened once. That is 005 §7's decision — no login item, nothing installed — and it is a cost,
 not an oversight. The remote says when it last heard from the Mac rather than spinning.
+
+---
+
+## Walk log — Slice A, 2026-09-20
+
+Driven from the daemon's socket with Alex at the screen, on `796f4b8`. Times are the
+daemon's, read through `attention/pending` every five seconds.
+
+| Check | Daemon side | Seen |
+|---|---|---|
+| A2 | Permission held 16:23:50; delivered `→ mac` at **16:24:10**, twenty seconds later and not before | banner — Alex to confirm the three lines and the click |
+| A3 | — | Alex's: watch the conversation, provoke a question, expect silence |
+| A4 | Answered `allow-once` at 16:24:40; withdrawn at **16:24:41** | banner gone — Alex to confirm |
+| A5 | The A2 agent finished cleanly (`done`), no need. An essay agent stopped mid-turn (`cancelled`), no need | nothing appeared — Alex to confirm |
+| A6 | Not yet: no device slice in place, so the need stays on the Mac, which is correct | — |
+
+Found on the way, and fixed before the walk: the window reported `active` as "Agents is
+frontmost", so switching to another app moved the need to nowhere — the opposite of A2.
+At the Mac now means the session is in use (unlocked, input in any app inside `macIdle`),
+and watching stays the narrow fact (`796f4b8`).
