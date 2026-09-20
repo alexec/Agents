@@ -30,7 +30,7 @@ struct ProjectRow: View {
             Spacer(minLength: 4)
             if needsPerson {
                 Circle()
-                    .fill(Color.accentColor)
+                    .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 7, height: 7)
                     .accessibilityHidden(true)
             }

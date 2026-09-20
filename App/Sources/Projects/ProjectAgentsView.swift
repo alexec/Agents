@@ -9,8 +9,8 @@ import SwiftUI
 /// it is in the same mode it is in for a new chat, with the folder already set to this
 /// project, so saying what you want done starts an agent here and takes you into it.
 ///
-/// Everything sits in the same 144pt gutter the transcript and prompt bar use, so the
-/// page and a conversation are the same width.
+/// Everything sits in the same column the transcript and prompt bar use, so the page
+/// and a conversation are the same width at every size of window.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
@@ -20,7 +20,6 @@ struct ProjectAgentsView: View {
     /// this window already holds every one of them.
     @State private var archivedShown = Self.pageSize
     static let pageSize = 10
-    static let gutter: CGFloat = 144
     static let cardSpacing: CGFloat = 10
 
     private var folder: URL? { model.selectedProject }
@@ -65,7 +64,7 @@ struct ProjectAgentsView: View {
             if let summary, !summary.exists {
                 Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(Color.red)
+                    .tinted(.failure)
                     .lineLimit(1)
                     .help(summary.folder.path)
             }
@@ -79,7 +78,7 @@ struct ProjectAgentsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Self.gutter)
+        .chatColumn()
         .padding(.top, 28)
     }
 
@@ -143,7 +142,7 @@ struct ProjectAgentsView: View {
                         .padding(.vertical, 6)
                 }
             }
-            .padding(.horizontal, Self.gutter)
+            .chatColumn()
             .padding(.bottom, 28)
         }
         .animation(.default, value: model.agents.map(\.state))

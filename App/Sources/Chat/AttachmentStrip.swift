@@ -13,25 +13,27 @@ struct AttachmentStrip: View {
                 ForEach(attachments) { attachment in
                     HStack(spacing: 6) {
                         Image(systemName: symbol(for: attachment))
+                            // Decorative: a glyph in a badge, not text (FR-015).
                             .font(.system(size: 10))
                         VStack(alignment: .leading, spacing: 0) {
                             Text(attachment.displayName)
                                 .lineLimit(1)
                             if let refusal = refusal(attachment) {
                                 // Said before it is sent, not after.
-                                Text(refusal).font(.caption2).foregroundStyle(.red)
+                                Text(refusal).chatText(.fine).tinted(.failure)
                             }
                         }
                         Button {
                             remove(attachment)
                         } label: {
                             Image(systemName: "xmark")
+                                // Decorative: a glyph in a badge, not text (FR-015).
                                 .font(.system(size: 8, weight: .bold))
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                     }
-                    .font(.footnote)
+                    .chatText(.supporting)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .glassEffect(.regular, in: .capsule)
@@ -65,9 +67,9 @@ struct MentionList: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(mentions.enumerated()), id: \.element.id) { index, mention in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(mention.name).font(.footnote)
+                            Text(mention.name).chatText(.supporting)
                             Text(mention.relativePath)
-                                .font(.caption)
+                                .chatText(.fine)
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                             Spacer(minLength: 8)

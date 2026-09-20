@@ -32,15 +32,15 @@ struct CommandList: View {
     private func row(_ command: SlashCommand, isSelected: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("/" + command.name)
-                .font(.footnote.monospaced())
+                .chatText(.code)
             if let hint = command.inputHint, !hint.isEmpty {
                 Text(hint)
-                    .font(.caption.monospaced())
+                    .chatText(.code)
                     .foregroundStyle(.tertiary)
             }
             if let description = command.description, !description.isEmpty {
                 Text(description)
-                    .font(.caption)
+                    .chatText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

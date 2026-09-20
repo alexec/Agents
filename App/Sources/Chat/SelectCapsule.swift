@@ -19,6 +19,7 @@ struct SelectCapsule<Content: View>: View {
             HStack(spacing: 4) {
                 Text(title)
                 Image(systemName: "chevron.down")
+                    // Decorative: a glyph in a capsule, not text (FR-015).
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
@@ -61,6 +62,7 @@ struct BooleanCapsule: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    // Decorative: a glyph in a capsule, not text (FR-015).
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 Text(name)

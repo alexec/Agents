@@ -223,13 +223,13 @@ private struct SpendingRow: View {
         model.costState.flatMap { Cost.total(of: $0.today) }
     }
 
-    /// Colour means a person is needed. The app's existing threshold for a nearly full
-    /// context, not a second number to learn. A picked row is drawn on the selection
-    /// colour, where red on blue is neither legible nor a warning anybody reads.
+    /// Colour means the limit is about to bite. The app's existing threshold for a
+    /// nearly full context, not a second number to learn. A picked row is drawn on the
+    /// selection colour, where red on blue is neither legible nor a warning anybody
+    /// reads.
     private var foreground: AnyShapeStyle {
         if isPicked { return AnyShapeStyle(.primary) }
-        return model.costState?.dayIsCloseToFull == true
-            ? AnyShapeStyle(.red)
-            : AnyShapeStyle(.secondary)
+        return (model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
+            .style(or: .secondary)
     }
 }

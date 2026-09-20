@@ -107,7 +107,7 @@ private struct MissingFolder: View {
     var body: some View {
         Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
             .font(.callout)
-            .foregroundStyle(Color.red)
+            .tinted(.failure)
             .padding(.top, 4)
             .accessibilityHint(path)
     }

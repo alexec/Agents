@@ -151,8 +151,8 @@ struct ContextMeter: View {
                     Circle().stroke(.quaternary, lineWidth: 2)
                     Circle()
                         .trim(from: 0, to: fraction)
-                        .stroke(usage.isCloseToFull ? AnyShapeStyle(.red)
-                                                    : AnyShapeStyle(.secondary),
+                        .stroke((usage.isCloseToFull ? StateTint.failure : .none)
+                                    .style(or: .secondary),
                                 style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
@@ -161,8 +161,8 @@ struct ContextMeter: View {
             }
             Text(cost)
                 .monospacedDigit()
-                .foregroundStyle(isCloseToItsLimit ? AnyShapeStyle(.red)
-                                                   : AnyShapeStyle(.secondary))
+                .foregroundStyle((isCloseToItsLimit ? StateTint.failure : .none)
+                                    .style(or: .secondary))
         }
         .font(.footnote)
     }

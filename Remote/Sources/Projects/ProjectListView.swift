@@ -53,7 +53,7 @@ struct ProjectRow: View {
             Spacer(minLength: 4)
             if summary.needsInput {
                 Circle()
-                    .fill(Color.accentColor)
+                    .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
             }

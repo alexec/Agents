@@ -25,10 +25,10 @@ struct ContextMeter: View {
             Text(cost)
                 .font(.footnote)
                 .monospacedDigit()
-                // Colour means a person is needed, on the app's one existing
+                // Colour means the limit is about to bite, on the app's one existing
                 // threshold rather than a second number for readers to learn.
-                .foregroundStyle(isCloseToItsLimit ? AnyShapeStyle(.red)
-                                                   : AnyShapeStyle(.secondary))
+                .foregroundStyle((isCloseToItsLimit ? StateTint.failure : .none)
+                                    .style(or: .secondary))
                 .help(costHelp)
         }
     }
@@ -70,7 +70,7 @@ struct ContextMeter: View {
                 .stroke(.quaternary, lineWidth: 2)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(usage.isCloseToFull ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary),
+                .stroke((usage.isCloseToFull ? StateTint.failure : .none).style(or: .secondary),
                         style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }

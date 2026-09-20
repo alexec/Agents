@@ -52,9 +52,10 @@ struct ArtifactsPane: View {
                 }
                 if artifact.isMissing {
                     // It stays in the list. The record that it arrived is still true
-                    // (FR-045).
+                    // (FR-045). Red, not orange: a missing artifact is the same news
+                    // as a missing folder, and nobody is being asked anything.
                     Text("no longer there")
-                        .foregroundStyle(.orange)
+                        .tinted(.failure)
                 }
             }
             .font(.caption)

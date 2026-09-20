@@ -22,7 +22,8 @@ struct RuntimeAccountView: View {
             Text(name).font(.headline)
             Text(state)
                 .font(.callout)
-                .foregroundStyle(account.state == .needsSignIn ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                .foregroundStyle((account.state == .needsSignIn ? StateTint.failure : .none)
+                                    .style(or: .secondary))
 
             if account.state != .ready, !account.authMethods.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {

@@ -132,7 +132,7 @@ struct StatusIcon: View {
             } else {
                 Image(systemName: symbol)
                     .font(.system(size: 15))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(tint.style(or: .secondary))
             }
         }
         .frame(width: 18, height: 18)
@@ -170,14 +170,14 @@ struct StatusIcon: View {
         }
     }
 
-    private var tint: Color {
+    private var tint: StateTint {
         if let settledOutcome {
-            if settledOutcome.needsAPerson { return .orange }
-            return settledOutcome == .done ? .green : .secondary
+            if settledOutcome.needsAPerson { return .attention }
+            return settledOutcome == .done ? .vouched : .none
         }
         switch state {
-        case .waitingOnUser: return .orange
-        default: return .secondary
+        case .waitingOnUser: return .attention
+        default: return .none
         }
     }
 

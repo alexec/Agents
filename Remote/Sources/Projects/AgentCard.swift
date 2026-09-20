@@ -135,7 +135,7 @@ struct StatusIcon: View {
             } else {
                 Image(systemName: symbol)
                     .font(.system(size: 16))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(tint.style(or: .secondary))
             }
         }
         .frame(width: 20, height: 20)
@@ -172,9 +172,13 @@ struct StatusIcon: View {
         }
     }
 
-    private var tint: Color {
-        if let settledOutcome { return settledOutcome.needsAPerson ? .accentColor : .secondary }
-        return state == .waitingOnUser ? .accentColor : .secondary
+    /// The same cases the Mac's `AgentRow` picks, so the two cannot diverge.
+    private var tint: StateTint {
+        if let settledOutcome {
+            if settledOutcome.needsAPerson { return .attention }
+            return settledOutcome == .done ? .vouched : .none
+        }
+        return state == .waitingOnUser ? .attention : .none
     }
 
     /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,

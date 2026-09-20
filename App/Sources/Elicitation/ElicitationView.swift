@@ -72,7 +72,8 @@ struct ElicitationView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(.horizontal, 144)
+        // Floats above the prompt bar, in its column.
+        .chatColumn()
         .onAppear { fillInDefaults() }
     }
 
@@ -85,9 +86,9 @@ struct ElicitationView: View {
     /// of bare words.
     ///
     /// It scrolls sideways for the same reason the prompt bar's option row does: these
-    /// are the agent's words in a 144pt gutter, so there is no bound on how wide the
-    /// row wants to be, and a layout that measures its own width and picks a layout
-    /// from that has crashed this app through AppKit before.
+    /// are the agent's words in a column of bounded width, so there is no bound on how
+    /// wide the row wants to be, and a layout that measures its own width and picks a
+    /// layout from that has crashed this app through AppKit before.
     @ViewBuilder
     private func oneClick(_ schema: ElicitationSchema) -> some View {
         if let single = schema.singleChoice {
@@ -218,7 +219,7 @@ struct ElicitationView: View {
                 Text(description).font(.caption).foregroundStyle(.secondary)
             }
             if let problem = property.problem(with: values[property.name]), values[property.name] != nil {
-                Text(problem).font(.caption).foregroundStyle(.red)
+                Text(problem).font(.caption).tinted(.failure)
             }
         }
     }

@@ -29,14 +29,15 @@ private struct EntryRow: View {
             // is, and never in the person's bubble (FR-022).
             if from == .app {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Agents asked").font(.caption).foregroundStyle(.tertiary)
+                    Text("Agents asked").chatText(.fine).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
-                        .font(.callout)
+                        .chatText(.supporting)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                    .chatText(.prose)
                     .padding(12)
                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,16 +45,17 @@ private struct EntryRow: View {
 
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                .chatText(.prose)
 
         case .agentThought(_, let text):
             Text(text)
-                .font(.callout)
+                .chatText(.supporting)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
-            Text(call.title).font(.callout).foregroundStyle(.secondary)
+            Text(call.title).chatText(.supporting).foregroundStyle(.secondary)
 
         case .plan(let raw):
             PlanView(plan: Plan(planID: nil,
@@ -64,23 +66,23 @@ private struct EntryRow: View {
 
         case .usageRecorded(let usage):
             if let line = Self.usageLine(usage) {
-                Text(line).font(.caption).foregroundStyle(.tertiary)
+                Text(line).chatText(.fine).foregroundStyle(.tertiary)
             }
 
         case .servedRequest(let request):
-            Text(request.summary).font(.caption).foregroundStyle(.tertiary)
+            Text(request.summary).chatText(.fine).foregroundStyle(.tertiary)
 
         case .elicitationAsked(let request):
-            Text("Asked: \(request.title)").font(.callout).foregroundStyle(.secondary)
+            Text("Asked: \(request.title)").chatText(.supporting).foregroundStyle(.secondary)
 
         case .elicitationAnswered(_, let summary):
-            Text(summary).font(.callout).foregroundStyle(.secondary)
+            Text(summary).chatText(.supporting).foregroundStyle(.secondary)
 
         case .compaction(let status, let summary):
             VStack(alignment: .leading, spacing: 6) {
                 Text(status == "completed" ? "Made room by summarising the conversation so far"
                                            : "Summarising the conversation so far…")
-                    .font(.callout)
+                    .chatText(.supporting)
                     .foregroundStyle(.secondary)
                 if !summary.isEmpty {
                     BlocksView(blocks: summary).foregroundStyle(.secondary)
@@ -89,17 +91,17 @@ private struct EntryRow: View {
 
         case .permissionAsked(let request):
             Text("Asked: \(request.toolCall.title)")
-                .font(.callout)
+                .chatText(.supporting)
                 .foregroundStyle(.secondary)
 
         case .permissionAnswered(let optionID, let name):
             Text("You chose \(name ?? optionID)")
-                .font(.callout)
+                .chatText(.supporting)
                 .foregroundStyle(.secondary)
 
         case .optionChanged(let id, let value):
             Text("\(id) is now \(value.stringValue ?? "changed")")
-                .font(.caption)
+                .chatText(.fine)
                 .foregroundStyle(.secondary)
 
         case .stateChanged(let state, let reason):
@@ -109,7 +111,7 @@ private struct EntryRow: View {
             WorkReportLine(report: report)
 
         case .runtimeNote(let text):
-            Text(text).font(.caption).foregroundStyle(.secondary)
+            Text(text).chatText(.fine).foregroundStyle(.secondary)
 
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
@@ -138,11 +140,11 @@ private struct WorkReportLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(report.outcome.heading)
-                .font(.callout.weight(.medium))
-                .foregroundStyle(report.outcome.needsAPerson
-                                 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .chatText(.supporting).fontWeight(.medium)
+                .foregroundStyle((report.outcome.needsAPerson ? StateTint.attention : .none)
+                                    .style(or: .secondary))
             Text(report.message)
-                .font(.callout)
+                .chatText(.supporting)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
@@ -163,12 +165,12 @@ private struct ToolRunRow: View {
                     ToolCallLine(call: call)
                 }
                 Button("Show less") { withAnimation { isExpanded = false } }
-                    .font(.caption)
+                    .chatText(.fine)
             } else {
                 if let latest = calls.last { ToolCallLine(call: latest) }
                 if calls.count > 1 {
                     Button("\(calls.count - 1) more") { withAnimation { isExpanded = true } }
-                        .font(.caption)
+                        .chatText(.fine)
                 }
             }
         }
@@ -193,13 +195,13 @@ private struct ToolCallLine: View {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
+                        .chatText(.fine)
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .opacity(hasDetail ? 1 : 0)
                         .frame(width: 8, alignment: .leading)
                     Text(call.title)
-                        .font(.callout)
+                        .chatText(.supporting)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
@@ -222,7 +224,7 @@ private struct ToolCallLine: View {
                 // Where it did its work. Named, not opened: the file is on the Mac,
                 // and a remote that pretended otherwise would be a second file system.
                 Text(call.locations.map(\.fileName).joined(separator: ", "))
-                    .font(.caption)
+                    .chatText(.fine)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -237,17 +239,17 @@ private struct ToolCallLine: View {
             DiffView(diff: diff)
         case .content(let block):
             BlocksView(blocks: [block])
-                .font(.callout)
+                .chatText(.supporting)
                 .foregroundStyle(.secondary)
         case .terminal:
             // The terminal's output is streamed to the Mac's window, not to a phone.
             Text("Ran a command on your Mac")
-                .font(.caption)
+                .chatText(.fine)
                 .foregroundStyle(.tertiary)
         case .unknown:
             // Kept in the record, and not guessed at here.
             Text("Something this version does not know how to show")
-                .font(.caption)
+                .chatText(.fine)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -261,7 +263,7 @@ private struct ToolCallLine: View {
 struct ComingBackLine: View {
     var body: some View {
         Label(AgentsModel.comingBackDescription, systemImage: AgentsModel.comingBackSymbol)
-            .font(.caption)
+            .chatText(.fine)
             .foregroundStyle(.secondary)
     }
 }
@@ -272,9 +274,9 @@ private struct StateLine: View {
 
     var body: some View {
         Text(text)
-            .font(.caption)
-            // The one place a colour earns itself: something went wrong.
-            .foregroundStyle(isFailure ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            .chatText(.fine)
+            // The one place in the transcript a colour earns itself: something went wrong.
+            .foregroundStyle((isFailure ? StateTint.failure : .none).style(or: .secondary))
     }
 
     private var isFailure: Bool { reason == .processDied || reason == .daemonGone }
@@ -314,11 +316,11 @@ private struct PlanView: View {
             ForEach(Array(plan.entries.enumerated()), id: \.offset) { _, entry in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: symbol(entry.status))
-                        .font(.caption)
+                        .chatText(.fine)
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                     Text(entry.content)
-                        .font(.callout)
+                        .chatText(.supporting)
                         .foregroundStyle(entry.status == .completed ? .tertiary : .secondary)
                         .strikethrough(entry.status == .completed)
                 }

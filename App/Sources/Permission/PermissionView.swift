@@ -35,7 +35,8 @@ struct PermissionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding(.horizontal, 144)
+        // Floats above the prompt bar, in its column.
+        .chatColumn()
     }
 
     private func answer(_ option: PermissionOption) {

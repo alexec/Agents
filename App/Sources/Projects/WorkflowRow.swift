@@ -96,11 +96,11 @@ struct WorkflowRow: View {
             }
         }
         .font(.caption)
-        // Grey unless somebody is needed. The app's one use of colour, and spending it
-        // on a workflow that skipped a single fire would be spending it on nothing.
-        // An agent that said it cannot get further without a person earns it on the
-        // same terms a refusal that needs one does.
-        .foregroundStyle(wantsAPerson ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tertiary))
+        // Grey unless somebody is needed. The attention tint is `StateTint`'s to name,
+        // and spending it on a workflow that skipped a single fire would be spending
+        // it on nothing. An agent that said it cannot get further without a person
+        // earns it on the same terms a refusal that needs one does.
+        .foregroundStyle((wantsAPerson ? StateTint.attention : .none).style(or: .tertiary))
         .lineLimit(1)
     }
 
@@ -212,7 +212,7 @@ private struct WorkflowStatusIcon: View {
     var body: some View {
         Image(systemName: name)
             .font(.callout)
-            .foregroundStyle(summary.needsAPerson ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
+            .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
             .accessibilityLabel(label)
     }
 

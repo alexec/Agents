@@ -12,7 +12,7 @@ struct DiffView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(diff.path)
-                .font(.caption)
+                .chatText(.fine)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -21,10 +21,10 @@ struct DiffView: View {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(line.mark)
-                                .font(.caption.monospaced())
+                                .chatText(.code)
                                 .foregroundStyle(.tertiary)
                             Text(line.text.isEmpty ? " " : line.text)
-                                .font(.footnote.monospaced())
+                                .chatText(.code)
                                 .foregroundStyle(line.isRemoved ? AnyShapeStyle(.tertiary)
                                                                 : AnyShapeStyle(.primary))
                                 .strikethrough(line.isRemoved)
@@ -69,7 +69,7 @@ struct TerminalOutputView: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             Text(text.isEmpty ? "…" : text)
-                .font(.footnote.monospaced())
+                .chatText(.code)
                 .textSelection(.enabled)
                 .padding(8)
         }

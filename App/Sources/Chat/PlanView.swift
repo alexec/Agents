@@ -13,17 +13,17 @@ struct PlanView: View {
             ForEach(plan.entries) { entry in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(mark(for: entry.status))
-                        .font(.footnote.monospaced())
+                        .chatText(.code)
                         .foregroundStyle(.secondary)
                     Text(entry.content)
-                        .font(.callout)
+                        .chatText(.supporting)
                         .foregroundStyle(entry.status == .completed ? .secondary : .primary)
                         .strikethrough(plan.state == .withdrawn)
                 }
             }
             if plan.state == .withdrawn {
                 Text("The agent dropped this plan")
-                    .font(.caption)
+                    .chatText(.fine)
                     .foregroundStyle(.secondary)
             }
         }
@@ -47,7 +47,7 @@ struct UsageLine: View {
 
     var body: some View {
         Text(summary)
-            .font(.caption)
+            .chatText(.fine)
             .foregroundStyle(.tertiary)
     }
 
@@ -71,13 +71,13 @@ struct ServedRequestLine: View {
         HStack(spacing: 6) {
             Text(request.summary)
             if case .refused(let reason) = request.outcome {
-                Text(reason).foregroundStyle(.red)
+                Text(reason).tinted(.failure)
             }
             if case .failed(let message) = request.outcome {
-                Text(message).foregroundStyle(.red)
+                Text(message).tinted(.failure)
             }
         }
-        .font(.caption)
+        .chatText(.fine)
         .foregroundStyle(.secondary)
     }
 }

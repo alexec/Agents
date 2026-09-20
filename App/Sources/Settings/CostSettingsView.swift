@@ -77,10 +77,10 @@ struct CostSettingsView: View {
                 if let left = state.dayHeadroom, let daily = state.limits.daily {
                     Text("\(left.formatted(.currency(code: daily.currency))) left")
                         .font(.caption)
-                        // Colour means a person is needed, on the app's one existing
-                        // threshold rather than a second number to learn.
-                        .foregroundStyle(state.dayIsCloseToFull ? AnyShapeStyle(.red)
-                                                                : AnyShapeStyle(.secondary))
+                        // Colour means the limit is about to bite, on the app's one
+                        // existing threshold rather than a second number to learn.
+                        .foregroundStyle((state.dayIsCloseToFull ? StateTint.failure : .none)
+                                            .style(or: .secondary))
                 }
             }
         }
@@ -172,7 +172,7 @@ private struct LimitField: View {
             if let warning {
                 Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .tinted(.failure)
             }
         }
         .onAppear(perform: showWhatIsSet)

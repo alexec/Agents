@@ -94,7 +94,9 @@ struct PromptBar: View {
                 options
             }
         }
-        .padding(.horizontal, 144)
+        // The same column the transcript draws in, so the bar's edges track its edges
+        // at every width (FR-021).
+        .chatColumn()
         .padding(.vertical, 20)
         .sheet(isPresented: $isShowingRuntimeAccount) {
             if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
@@ -149,8 +151,12 @@ struct PromptBar: View {
     private var atItsLimit: some View {
         if let agent, agent.isAtCostLimit(under: model.costLimits) {
             HStack(spacing: 10) {
+                // The failure tint, not attention. An agent at its limit is waiting on
+                // a ceiling being raised, which is a thing broken about its situation
+                // rather than a question it has asked; orange is reserved for the
+                // latter (FR-006a).
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .tinted(.failure)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("This agent has reached its cost limit")
                         .font(.footnote.weight(.medium))
@@ -688,6 +694,7 @@ struct PromptBar: View {
                         HStack(spacing: 4) {
                             Text(reachTitle)
                             Image(systemName: "chevron.down")
+                                // Decorative: a glyph in a capsule, not text (FR-015).
                                 .font(.system(size: 8, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         }

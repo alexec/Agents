@@ -52,6 +52,10 @@ targets:
     sources:
       - path: App/Sources
       - path: App/Resources
+      # Compiled into the Remote as well. The two apps shared no view code before
+      # this, which is how they came to draw the same state in three colours and the
+      # same block kind at two sizes; the definitions both must agree on live here.
+      - path: Shared/UI
       # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
       # of the file and rewrite it from this one on every generate — and with nothing
       # under the key to write, what it writes is an empty plist. The project is not in
@@ -108,6 +112,8 @@ targets:
     supportedDestinations: [iOS]
     sources:
       - path: Remote/Sources
+      # The same files the Mac compiles. See the note on the Agents target.
+      - path: Shared/UI
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
