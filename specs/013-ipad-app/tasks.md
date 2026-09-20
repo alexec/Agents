@@ -181,7 +181,7 @@ on top of an unanswered one.
 
 **⚠️ Depends only on Phase 1.** Run it over the direct link with the bridge started by hand, in parallel with Phase 2. This is Track B.
 
-- [ ] T059 [P] [US2] Create `Remote/Sources/Chat/PlanView.swift` drawing `Agent.plans`, mirroring `App/Sources/Chat/PlanView.swift` (FR-017). The data already arrives on `agent/changed` and nothing draws it. **Do not wire `agent/plan`** — the constant is declared and referenced nowhere, and the plan travels on the record (research §5).
+- [X] T059 [P] [US2] Create `Remote/Sources/Chat/PlanView.swift` drawing `Agent.plans`, mirroring `App/Sources/Chat/PlanView.swift` (FR-017). The data already arrives on `agent/changed` and nothing draws it. **Do not wire `agent/plan`** — the constant is declared and referenced nowhere, and the plan travels on the record (research §5).
 - [ ] T060 [P] [US2] Create `Remote/Sources/Chat/FileView.swift`: the content of a file a tool call touched, and the change if the tool made one, **read only** (FR-020a). Consume the existing `AgentsModel.takeFileToShow(for:)` and the `agent/showFile` notification rather than adding a second path — 011 already built one the Mac uses (research §6).
 - [ ] T061 [P] [US2] Create `Remote/Sources/Chat/DocumentView.swift`: a document the agent produced, laid out for the screen as `App/Sources/Sidebar/DocumentView.swift` lays it out on the Mac, **read only** (FR-020b).
 - [ ] T062 [US2] Audit `Remote/Sources/` for any path that offers to edit, save or share back a file or document, and remove it. Read-only is enforced by there being no such screen, not by a flag (SC-014). Depends on T060, T061.

@@ -304,36 +304,3 @@ private struct StateLine: View {
         }
     }
 }
-
-/// The plan the agent is working to, with the step it is on.
-private struct PlanView: View {
-    let plan: Plan
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(plan.entries.enumerated()), id: \.offset) { _, entry in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: symbol(entry.status))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                    Text(entry.content)
-                        .font(.callout)
-                        .foregroundStyle(entry.status == .completed ? .tertiary : .secondary)
-                        .strikethrough(entry.status == .completed)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func symbol(_ status: PlanEntry.Status) -> String {
-        switch status {
-        case .completed: return "checkmark"
-        case .inProgress: return "arrow.right"
-        case .pending: return "circle"
-        }
-    }
-}

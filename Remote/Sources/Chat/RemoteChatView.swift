@@ -51,7 +51,14 @@ struct RemoteChatView: View {
         }
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                StaleBanner()
+                // Under the banner, not over it: when the Mac has gone quiet, what
+                // the agent last said it would do is the less urgent of the two.
+                if let agent { CurrentPlanStrip(agent: agent) }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) { question }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
