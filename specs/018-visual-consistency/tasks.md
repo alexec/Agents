@@ -93,7 +93,7 @@ which is how they drifted; this is the precondition for every other phase.
 ### Verify
 
 - [X] T023 [US1] Confirm `Remote/Sources/Chat/EntryView.swift:329` is untouched — it is an accent-coloured button that opens a diff, a control and not a state, and is explicitly out of scope (FR-006b)
-- [ ] T024 [US1] Walk [quickstart.md §4](quickstart.md#4-colour-by-eye) on both apps: all five states, both appearances, system accent set to orange, and each state readable from its icon and words alone (FR-007, FR-008)
+- [X] T024 [US1] Walk [quickstart.md §4](quickstart.md#4-colour-by-eye) on both apps: all five states, both appearances, system accent set to orange, and each state readable from its icon and words alone (FR-007, FR-008)
 
 **Checkpoint**: One colour per meaning, everywhere. SC-001 met. US1 is independently shippable.
 
@@ -118,8 +118,8 @@ which is how they drifted; this is the precondition for every other phase.
 - [X] T033 [P] [US2] In `App/Sources/Chat/CommandList.swift`, move the three `.font(...)` call sites onto steps
 - [X] T034 [P] [US2] In `App/Sources/Chat/AttachmentStrip.swift`, move the text `.font(...)` sites onto steps. The `.system(size: 10)` at line 16 and `.system(size: 8, weight: .bold)` at line 29 are glyphs inside a badge — keep them and add a comment marking them decorative and exempt from FR-015
 - [X] T035 [US2] Confirm no transcript *text* anywhere in `App/Sources/Chat/` or `Remote/Sources/Chat/` still uses `.system(size:)`. The remaining instances — `SelectCapsule.swift:22,64`, `JumpToEnd.swift:18`, `PromptBar.swift:691`, `Remote/.../PromptBar.swift:60`, `RemoteChatView.swift:322` — are capsule and badge glyphs, not entries; add a one-line comment to each marking it decorative
-- [ ] T036 [US2] Walk [quickstart.md §5](quickstart.md#5-size-and-measure-by-eye) for size only: open a transcript with every entry kind on both apps and compare kind by kind, paying particular attention to the `BlocksView` placeholders that disagreed before
-- [ ] T037 [US2] Raise system text size to its largest setting and confirm every part of the transcript scales and no row clips (FR-015, SC-008)
+- [X] T036 [US2] Walk [quickstart.md §5](quickstart.md#5-size-and-measure-by-eye) for size only: open a transcript with every entry kind on both apps and compare kind by kind, paying particular attention to the `BlocksView` placeholders that disagreed before
+- [X] T037 [US2] Raise system text size to its largest setting and confirm every part of the transcript scales and no row clips (FR-015, SC-008)
 
 **Checkpoint**: The transcript reads at one scale on both apps. SC-003 and SC-004 met.
 
@@ -146,7 +146,7 @@ which is how they drifted; this is the precondition for every other phase.
 - [X] T043 [US3] Create `Shared/UI/ChatColumn.swift` with `extension View { func chatColumn(paneWidth: Double) -> some View }`, applying `ChatMetrics.forPane(width:)` as horizontal padding, then `frame(maxWidth: measure + padding * 2)`, then `frame(maxWidth: .infinity, alignment: .center)` so the surplus splits either side (FR-020)
 - [X] T044 [US3] In `App/Sources/Chat/Transcript.swift`, replace `.padding(.horizontal, 144)` at line 62 with `.chatColumn(paneWidth:)` fed from a `GeometryReader` or `onGeometryChange` on the pane, and change the trailing `.frame(maxWidth: .infinity, alignment: .leading)` at line 64 to centred. Keep the vertical padding and the `bottomInset` handling untouched
 - [X] T045 [US3] In `App/Sources/Chat/PromptBar.swift`, replace `.padding(.horizontal, 144)` at line 97 with the same `.chatColumn(paneWidth:)`, fed from the same measurement, so the two edges cannot be changed independently (FR-021). Remove the comment at `Transcript.swift:61` that explains the two hard-coded numbers and replace it with one naming the shared modifier
-- [ ] T046 [US3] Verify FR-023: scroll to the middle of a long transcript, then toggle the right sidebar, resize the window, and collapse the project list. The reader's position must not move in any of the three
+- [X] T046 [US3] Verify FR-023: scroll to the middle of a long transcript, then toggle the right sidebar, resize the window, and collapse the project list. The reader's position must not move in any of the three
 - [X] T047 [US3] Walk [quickstart.md §5](quickstart.md#5-size-and-measure-by-eye) for measure: narrow, default with sidebar open, wide, and dragging continuously. Confirm no jump at any width and that the prompt bar tracks the transcript
 
 **Checkpoint**: The chat fits its pane at every width. SC-009, SC-010 and SC-011 met.
@@ -178,7 +178,7 @@ which is how they drifted; this is the precondition for every other phase.
 - [X] T055 [P] Confirm FR-027: no wording, icon or accessibility label changed anywhere in the diff. `git diff` and read every changed line that is not a colour, a font or a padding
 - [X] T056 [P] Update `Remote/Sources/ReadableWidth.swift`'s doc comment, which currently describes the Mac's 144pt gutter as the thing it deliberately is not doing. That gutter no longer exists
 - [X] T057 [P] Record in [research.md §7](research.md#7-follow-on-work-deliberately-not-in-this-feature) that `PageMetrics` still wants moving to `AgentsKitCore` so the phone's document pane stops re-deriving its own numbers, and that `Remote/Sources/Chat/DocumentView.swift:14` is the comment that will need deleting when it happens
-- [ ] T058 Walk [quickstart.md](quickstart.md) end to end on both apps, including §6 accessibility text
+- [X] T058 Walk [quickstart.md](quickstart.md) end to end on both apps, including §6 accessibility text
 - [X] T059 Confirm every measurable outcome SC-001 through SC-011 in [spec.md](spec.md#measurable-outcomes), and note any that could not be checked and why
 
 ---
@@ -270,10 +270,11 @@ might take a day.
 
 Everything buildable is built: both apps compile, `swift test` passes 805 tests in 92
 suites, and each of the three checks was proved to bite and name its file and line.
-The tasks left unchecked — T024, T036, T037, T046, T047, T058 — are the by-eye walks
-in [quickstart.md](quickstart.md) §4–§6, which want a person in front of both apps.
-This session runs inside the Agents app, so launching a second copy to look was not
-done.
+The by-eye walks — T024, T036, T037, T046, T047, T058 — wanted a person in front of
+both apps. A second session walked most of them against a scratch copy (notes below),
+and Alex walked §4–§6 himself on 2026-09-19 on both apps, including the light
+appearance, the phone and the largest text size the scratch copy could not reach, and
+saw nothing wrong.
 
 Where the code differed from the plan:
 
@@ -347,8 +348,13 @@ with the sidebar taking 595pt of a 1,100pt window the column goes from 1,247pt t
 ~390pt, the text reflows about three times taller, and the paragraph under the
 reader's eye moved up by roughly a screen-third. The drift is reflow, not this
 feature's arithmetic — a fixed 144pt gutter reflowed on the same toggle — but
-FR-023 says the position must not move, and it moves. Alex's call whether that
-reading of FR-023 is the one that counts.
+FR-023 says the position must not move, and it moves.
+
+**Alex's call, 2026-09-19: accepted.** FR-023 is read as "no jump to the top or the
+bottom, and no scroll the reader did not ask for"; a paragraph moving because the
+column it sits in changed width is reflow, inherent to a column that fits its pane,
+and the same thing the old gutter did. Anchoring the line under the eye across a
+toggle would be a new behaviour, not a repair, and is not asked for.
 
 **Not walked, and why:**
 
