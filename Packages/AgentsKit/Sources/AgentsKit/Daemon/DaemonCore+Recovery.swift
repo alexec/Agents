@@ -11,26 +11,42 @@ extension DaemonCore {
     /// This runs before the socket accepts anything, so no window ever sees a state we
     /// already know to be a lie. Bringing them back is `pickUpAfterRestart`, which runs
     /// after it, for the opposite reason.
+    ///
+    /// Every ending here goes through `move`, the same as every other ending in the
+    /// app. It did not always: this loop used to write the state and the reason by
+    /// hand, for two good reasons that are now rules the transition itself knows —
+    /// `daemonGone` never clears the pick-up count, and an agent about to be picked
+    /// back up fires no stopped trigger. What that bypass cost was every *other*
+    /// consequence of an ending, so a workflow set to run when an agent stops did not
+    /// run when six agents stopped because the Mac restarted.
     @discardableResult
     public func recover() async -> [UUID] {
         await loadFromDisk()
         // `agents` is a Dictionary, whose order is nobody's. Most recently active
         // first, because pick-up is one at a time and the chat the person last left
         // running should not wait behind every runtime ahead of it.
+        //
+        // `holdsRuntime` sweeps up `starting` for free, which is FR-007: an agent cut
+        // off before its first turn began had its process die with the last daemon in
+        // exactly the way a working one did, and is owed the same ending.
         let wereWorking = agents.values
             .filter { $0.state.holdsRuntime }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
         var recovered: [UUID] = []
         for agent in wereWorking {
             let id = agent.id
-            var updated = agent
-            updated.state = .stopped
-            updated.endedReason = .daemonGone
-            agents[id] = updated
-            try? await store.save(updated)
+            // Before the move, so the transcript reads in the order it happened: the
+            // explanation, and then the ending it explains.
             await record(.runtimeNote("This agent was working when the daemon stopped, so it stopped too."),
                          for: id)
-            await record(.stateChanged(.stopped, reason: .daemonGone), for: id)
+            // Through the funnel, like every other ending. This is the whole of what
+            // 020 closes: the record, the broadcast, the transcript line, the project
+            // counts and the triggers all happen here now, because they all hang off
+            // `move` and this is no longer the one caller that went round it.
+            await move(id, on: .foundDead)
+            // Re-read: `mayBePickedUpAfterRestart` is a question about the record
+            // after the ending, not the one this loop was handed.
+            guard let updated = agents[id] else { continue }
             // A chat brought back last time and cut off again before it reached the
             // end of a turn is the likeliest reason this daemon went. It keeps the
             // ending it actually had — `daemonGone` is what happened to it — and why
@@ -148,6 +164,15 @@ extension DaemonCore {
     /// history back should be able to tell which.
     static func wordsAboutTheRestart(_ was: AgentState) -> String {
         switch was {
+        case .starting:
+            // Cut off before its first turn began, so there is nothing above for it to
+            // carry on from — every other arm here tells the agent its turn was
+            // interrupted and that what is above is still its own, and both halves of
+            // that would be false. This switch has a `default:` and would have
+            // compiled silently; it was visited by hand.
+            return """
+                (The app restarted before this conversation had begun, so nothing you were asked has reached you until now. There is no history above this — start the work from here.)
+                """
         case .waitingOnUser:
             return """
                 (The app restarted while you were waiting for an answer, so the turn you were in the middle of was cut off and the question you had asked went with it. Everything above is still yours. Ask it again if you still need it; otherwise carry on from where you left off, checking what you had actually finished rather than assuming the last thing you tried worked.)

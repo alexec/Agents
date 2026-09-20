@@ -107,6 +107,31 @@ public actor DaemonCore {
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?
+    /// Whether the workflow layer may act on a lifecycle event now, or has to hold it.
+    ///
+    /// Open by default, and closed by `Daemon.start()` for exactly the window that
+    /// needs it — from before `recover()` until `startWorkflows()`. Defaulting it
+    /// *open* rather than closed matters: a `DaemonCore` driven directly, which is
+    /// every test and any future embedder, adopts workflows through `rescanWorkflows`
+    /// and never calls `startWorkflows` at all. Defaulting closed made those queue
+    /// their triggers forever with nothing to drain them — the silent failure D4 is
+    /// about, reintroduced by the fix for it.
+    var workflowsAreStarted = true
+    /// Lifecycle events that happened before the workflow layer could act on them,
+    /// kept in the order they happened.
+    ///
+    /// This exists because of one deliberate ordering: `Daemon.start()` runs
+    /// `recover()` first and `startWorkflows()` only afterwards, so that a workflow is
+    /// never fired at an agent the daemon has not yet worked out is dead. That
+    /// ordering is why `recover` used to write the state by hand and go round `move`
+    /// entirely — routing it through the funnel without this queue would call
+    /// `workflowsRespond` before a single workflow had been read, and it would
+    /// silently do nothing. That trades a bypass somebody can see for one nobody can,
+    /// which is worse than the bypass.
+    ///
+    /// So `move` always emits. Whether the emission can be acted on now, or has to
+    /// wait a moment, is the workflow layer's business and not the funnel's (FR-014).
+    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int)] = []
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -208,6 +233,15 @@ public actor DaemonCore {
         self.broadcaster.set(broadcaster)
     }
 
+    /// Hold lifecycle events rather than acting on them, until `startWorkflows`.
+    ///
+    /// Called by `Daemon.start()` before `recover()`. Nothing else should need it: it
+    /// exists for the one ordering where endings are discovered before any workflow
+    /// has been read.
+    func holdWorkflowEventsUntilStarted() {
+        workflowsAreStarted = false
+    }
+
     public func setConnectionCount(_ count: Int) {
         connectionCount = count
     }
@@ -247,24 +281,44 @@ public actor DaemonCore {
                   DaemonAPI.EntryNotification(agentID: agentID, entry: entry))
     }
 
-    func move(_ agentID: UUID, on event: AgentEvent, endedReason: EndedReason? = nil) async {
+    /// The one way an agent's state changes.
+    ///
+    /// There is no `endedReason:` parameter any more, and that is the point: the reason
+    /// an agent ended comes from the event that ended it, so a caller can no longer say
+    /// `.stoppedByUser` and hand it a reason that contradicts itself. Everything the
+    /// resulting record needs is in the `Transition` the table returns, including the
+    /// rule about the pick-up count, which used to be an inline `if` here.
+    func move(_ agentID: UUID, on event: AgentEvent) async {
         guard var agent = agents[agentID] else { return }
-        guard let next = agent.state.applying(event, endedReason: agent.endedReason) else { return }
+        guard let transition = agent.state.applying(event, endedReason: agent.endedReason)
+        else { return }
+        let next = transition.next
         agent.state = next
-        if let endedReason { agent.endedReason = endedReason }
-        // Any ending that is not the daemon dying — finished, out of tokens, stopped
-        // by hand — is evidence this chat can reach the end of a turn without taking
-        // the daemon with it, which is the only question the count asks. `recover`
-        // sets `daemonGone` directly rather than through here, so it can never clear
-        // the count on its way past.
-        if next == .finished || next == .stopped, agent.endedReason != .daemonGone {
-            agent.restartPickUps = 0
+        // The one place the string a newer build wrote is allowed to die. Keeping it
+        // past this point would write the agent back out still claiming a state it no
+        // longer has — the round trip outliving the truth it was preserving.
+        agent.rawState = nil
+        // Held separately from `agent.endedReason` because they are different facts: an
+        // agent that was already stopped and is being unarchived keeps the ending it
+        // had, and the transcript line is about *this* change, not about that one. The
+        // line the transcript gets is the reason this event set, or none.
+        var reasonThisEventSet: EndedReason?
+        switch transition.endedReason {
+        case .set(let reason):
+            agent.endedReason = reason
+            reasonThisEventSet = reason
+        case .leave:
+            break
         }
-        if next == .archived { agent.archivedReason = .byUser }
-        if next == .running { agent.archivedReason = nil }
+        switch transition.archivedReason {
+        case .set(let reason): agent.archivedReason = reason
+        case .clear: agent.archivedReason = nil
+        case .leave: break
+        }
+        if transition.clearsPickUpCount { agent.restartPickUps = 0 }
         agent.lastActivityAt = Date()
         changed(agent)
-        await record(.stateChanged(next, reason: endedReason), for: agentID)
+        await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
 
         // The whole of the lifecycle trigger surface, in the one place every state
         // change already passes through. `applying` returns nil for a transition that
@@ -279,7 +333,22 @@ public actor DaemonCore {
             // here as well would run every agent-finished workflow twice per agent —
             // and the run held until the second ending is the better one anyway: by
             // then the agent's outcome is on the record for the workflow's row to show.
-            if next == .finished, willAskForOutcome(agentID: agentID, reason: endedReason) {
+            if next == .finished, willAskForOutcome(agentID: agentID, reason: reasonThisEventSet) {
+                break
+            }
+            // Read the depth before the run is released: releasing it is what makes a
+            // finished agent's depth unfindable, and a depth that quietly resets to
+            // zero is a loop the limit never stops.
+            // An agent a restarting daemon is about to bring back has not finished
+            // stopping — it is about to carry on. Saying "an agent stopped" about it
+            // would be false, and would race the pick-up that is seconds away (011,
+            // FR-016). Decided from the post-transition record, because that is what
+            // `mayBePickedUpAfterRestart` reads.
+            //
+            // The agent that will *not* be picked back up does fire, and that is the
+            // behaviour this feature adds: before it, a daemon restart fired nothing
+            // at all, because recovery never reached this line.
+            if next == .stopped, agent.mayBePickedUpAfterRestart {
                 break
             }
             // Read the depth before the run is released: releasing it is what makes a
@@ -289,7 +358,10 @@ public actor DaemonCore {
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
                              agentID: agentID, depth: depth)
-        case .waitingOnUser, .running, .archived:
+        // An agent that has started has neither finished nor stopped, so it fires
+        // nothing. Named rather than folded in with `.running`, because it is not
+        // running — it is about to be.
+        case .starting, .waitingOnUser, .running, .archived:
             break
         }
     }
@@ -299,6 +371,20 @@ public actor DaemonCore {
     public func loadFromDisk() async {
         let loaded = await store.loadAll()
         for agent in loaded.agents { agents[agent.id] = seedingCost(agent) }
+        // A record the rules forbid was brought to one they allow on the way in, and
+        // the person is told so here, in the transcript, which is where this app
+        // already explains itself.
+        //
+        // This is a write nobody asked for, against a convention this app otherwise
+        // keeps — it does not quietly change a person's records. It is taken because
+        // the alternative is worse than the bug: `loadAll` already drops a record it
+        // cannot decode, and an agent somebody cannot see is one they can do nothing
+        // about. Announcing it is what makes the mend honest rather than silent
+        // (FR-020).
+        for (id, mend) in loaded.mends {
+            await record(.runtimeNote(mend.summary), for: id)
+            DaemonLog.shared.write("mended agent \(id) on read: \(mend)")
+        }
     }
 
     /// Give a record written before the cost was banked its total back.
@@ -439,7 +525,7 @@ public actor DaemonCore {
                           DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
             }
             if agents[agentID]?.state.holdsRuntime == true {
-                await move(agentID, on: .processDied, endedReason: .processDied)
+                await move(agentID, on: .processDied)
             }
             forget(agentID)
 

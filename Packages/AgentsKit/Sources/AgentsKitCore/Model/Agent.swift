@@ -13,7 +13,27 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var runtimeID: String
     public var cwd: URL
     public var title: String?
+    /// What it is doing. Defaults to `starting` in the memberwise `init`, with no
+    /// ending and no reason for one (FR-002).
+    ///
+    /// It used to default to `stopped` with `endedReason: .endTurn`, which was never
+    /// carelessness: `isConsistent` requires a stopped agent to carry a reason, and
+    /// `endTurn` is the only one whose `summary` is `nil`, so it was the cheapest
+    /// reason that would not print something false on the row. The falsehood moved
+    /// into the record instead, where it was broadcast to every window before the
+    /// first turn began.
     public var state: AgentState
+    /// The state string a newer build wrote, when this build has never heard of it.
+    ///
+    /// The one thing this feature keeps in memory and not on the wire. It is not in
+    /// `CodingKeys` on purpose — the `known` set that `unknownFields` is filtered
+    /// against is built from `CodingKeys.allCases`, and adding this to it would make
+    /// the filter start dropping a key that really is on the record.
+    ///
+    /// Held so `encode` can put the original back rather than quietly replacing what
+    /// that build knew with `stopped` (FR-021). Cleared the moment a transition writes
+    /// a state of our own, in `DaemonCore.move`.
+    public var rawState: String?
     public var runtimeSessionID: String?
     public var startOptions: StartOptions
 
@@ -105,7 +125,32 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         runtimeID = try c.decode(String.self, forKey: .runtimeID)
         cwd = try c.decode(URL.self, forKey: .cwd)
         title = try c.decodeIfPresent(String.self, forKey: .title)
-        state = try c.decode(AgentState.self, forKey: .state)
+        // Lenient, because the alternative is losing the agent. `state` is a
+        // `String` raw-value enum, so an unknown value thrown from here fails the
+        // whole `Agent`, and `loadAll` files it under `unreadable` — the agent simply
+        // vanishes from the app with nothing a person can see. Every *other* field a
+        // newer build might add is already protected by `unknownFields`; `state` was
+        // not, because it is a known key.
+        //
+        // `unrecognised` is the honest reading and already means exactly this
+        // elsewhere: not in the protocol's list and not one of ours, belonging in the
+        // record rather than rounded to the nearest reason we do recognise.
+        // `WorkOutcome.init(wire:)` takes the same position for the same reason. It is
+        // never read as a completion.
+        //
+        // The honest limit: this protects builds that *have* it from states added
+        // *after* it. A build predating it meeting a `starting` record still drops
+        // that agent. That is written down in `contracts/record-and-wire.md`, and it
+        // is the argument for doing this now rather than the next time a state is
+        // added.
+        let writtenState = try c.decode(String.self, forKey: .state)
+        if let known = AgentState(rawValue: writtenState) {
+            state = known
+            rawState = nil
+        } else {
+            state = .stopped
+            rawState = writtenState
+        }
         runtimeSessionID = try c.decodeIfPresent(String.self, forKey: .runtimeSessionID)
         startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
         // Records written before the controls moved onto the prompt bar have none.
@@ -114,6 +159,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
+        // A state we have never heard of is an ending nothing vouched for, whatever
+        // the record said the reason was — that reason described a state this build
+        // cannot reason about.
+        if rawState != nil { endedReason = .unrecognised }
         archivedReason = try c.decodeIfPresent(ArchivedReason.self, forKey: .archivedReason)
         // Every field below arrived with 003. A record written before it has none of
         // them, and must still open.
@@ -155,7 +204,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(runtimeID, forKey: .runtimeID)
         try c.encode(cwd, forKey: .cwd)
         try c.encodeIfPresent(title, forKey: .title)
-        try c.encode(state, forKey: .state)
+        // The original string where there was one, so a state from a newer build
+        // survives a round trip through this one instead of being silently downgraded
+        // to `stopped` (FR-021).
+        try c.encode(rawState ?? state.rawValue, forKey: .state)
         try c.encodeIfPresent(runtimeSessionID, forKey: .runtimeSessionID)
         try c.encode(startOptions, forKey: .startOptions)
         try c.encode(advertisedOptions, forKey: .advertisedOptions)
@@ -211,7 +263,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 runtimeID: String,
                 cwd: URL,
                 title: String? = nil,
-                state: AgentState = .stopped,
+                state: AgentState = .starting,
                 runtimeSessionID: String? = nil,
                 startOptions: StartOptions = .none,
                 advertisedOptions: [ConfigOption] = [],
@@ -342,11 +394,19 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
             && usage?.cost == nil && lastActivityAt > createdAt
     }
 
-    /// The invariants from the data model, in a form a test can assert.
+    /// The invariants from the data model.
+    ///
+    /// Asserted only in tests until 020; from Phase 5 of that feature these are checked
+    /// wherever an agent is written and wherever one is read, so a record that cannot
+    /// be true never reaches disk and one already there is mended rather than believed.
     public var isConsistent: Bool {
         if state == .archived && archivedReason == nil { return false }
         if state == .stopped && endedReason == nil { return false }
         if state == .finished && endedReason != .endTurn { return false }
+        // A new agent has not ended and has not been put away. This is the invariant
+        // that makes `starting` worth having: the reason the old code wrote `stopped`
+        // with `endTurn` was that rule 2 demanded *some* reason, and now nothing does.
+        if state == .starting && (endedReason != nil || archivedReason != nil) { return false }
         return true
     }
 }

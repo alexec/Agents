@@ -76,6 +76,7 @@ struct AgentRow: View {
         if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
         switch agent.state {
         case .running: return "Working"
+        case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting for your answer"
         // Never "Complete" on the strength of the turn ending. That word belongs to
         // `AgentGroup.finished`, which is the heading, and to an agent that reported
@@ -125,7 +126,13 @@ struct StatusIcon: View {
 
     var body: some View {
         Group {
-            if state == .running {
+            // `.starting` spins too. The `symbol` switch below is only reached in
+            // this branch's `else`, so the working *icon* is this spinner and not the
+            // `circle.dotted` that `case .running` nominally returns — meaning a
+            // starting agent drawn from `symbol` would show a static circle and then
+            // flip to a spinner the moment its first turn began. That is the same
+            // flicker 020 exists to remove, one layer down.
+            if state == .running || state == .starting {
                 ProgressView()
                     .controlSize(.small)
                     .scaleEffect(0.7)
@@ -161,6 +168,10 @@ struct StatusIcon: View {
         if isUnaccountedFor && state == .finished { return "questionmark.circle" }
         switch state {
         case .running: return "circle.dotted"
+        // The working icon. A state that lasts a moment and is grouped under Working
+        // does not earn a symbol of its own, and one that flashed a different shape on
+        // every start would be the flicker this feature removes, wearing a coat.
+        case .starting: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"
         // Hollow, because nobody vouched for it. Green and filled is now reserved for
         // an agent that said `done` itself (FR-012).
@@ -175,6 +186,14 @@ struct StatusIcon: View {
             if settledOutcome.needsAPerson { return .attention }
             return settledOutcome == .done ? .vouched : .none
         }
+        // This switch has a `default:`, so the compiler does not ask it to answer for a
+        // new state. `.starting` was checked against it by hand when 020 added the
+        // state: `.none` is the wanted answer, because an agent whose conversation has
+        // not begun is neither asking for a person nor vouched for by one.
+        //
+        // Left as a `default:` rather than made exhaustive, because the rule here is
+        // genuinely "one state is special and the rest are not" — but the next person
+        // to add a state gets no warning from this line, and now knows it.
         switch state {
         case .waitingOnUser: return .attention
         default: return .none
@@ -189,6 +208,7 @@ struct StatusIcon: View {
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
         switch state {
         case .running: return "Working"
+        case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting on you"
         case .finished: return "Finished"
         case .stopped: return "Stopped"

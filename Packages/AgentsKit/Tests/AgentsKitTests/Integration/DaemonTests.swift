@@ -734,7 +734,7 @@ struct DaemonTests {
         // The record on disk, which is the only thing the next daemon will read.
         let onDisk = try AgentStore(locations: locations)
         await eventually("the record already says it has been tried") {
-            (try? await onDisk.load(wasRunning.id))?.restartPickUps == 1
+            (try? await onDisk.load(wasRunning.id))?.agent.restartPickUps == 1
         }
         #expect(await core.agent(wasRunning.id)?.state == .stopped,
                 "and the turn has not even begun, which is the point")
@@ -983,7 +983,7 @@ struct DaemonSlashCommandTests {
         // `changed` saves on a detached task, which means the record in memory is right
         // some way before the record on disk is.
         let reread = await eventuallySome("the commands reached the file") {
-            let onDisk = try? await AgentStore(locations: locations).load(id)
+            let onDisk = try? await AgentStore(locations: locations).load(id).agent
             return onDisk?.availableCommands.map(\.name) == ["review", "add-dir"] ? onDisk : nil
         }
         #expect(reread?.availableCommands.map(\.name) == ["review", "add-dir"])

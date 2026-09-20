@@ -69,6 +69,7 @@ struct AgentCard: View {
         if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
         switch agent.state {
         case .running: return "Working"
+        case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting for your answer"
         // Never "Complete" on the strength of the turn ending. That word belongs to
         // `AgentGroup.finished`, which is the heading, and to an agent that reported
@@ -129,7 +130,13 @@ struct StatusIcon: View {
 
     var body: some View {
         Group {
-            if state == .running {
+            // `.starting` spins too. The `symbol` switch below is only reached in
+            // this branch's `else`, so the working *icon* is this spinner and not the
+            // `circle.dotted` that `case .running` nominally returns — meaning a
+            // starting agent drawn from `symbol` would show a static circle and then
+            // flip to a spinner the moment its first turn began. That is the same
+            // flicker 020 exists to remove, one layer down.
+            if state == .running || state == .starting {
                 ProgressView()
                     .controlSize(.small)
             } else {
@@ -163,6 +170,7 @@ struct StatusIcon: View {
         if isUnaccountedFor && state == .finished { return "questionmark.circle" }
         switch state {
         case .running: return "circle.dotted"
+        case .starting: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"
         // Hollow, because nobody vouched for it. Filled is now reserved for an agent
         // that said `done` itself (FR-012).
@@ -189,6 +197,7 @@ struct StatusIcon: View {
         if state == .finished, isUnaccountedFor { return "Finished without saying how it went" }
         switch state {
         case .running: return "Working"
+        case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting on you"
         case .finished: return "Finished"
         case .stopped: return "Stopped"

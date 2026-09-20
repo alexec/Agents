@@ -13,11 +13,14 @@ struct AgentGroupTests {
         for state in AgentState.allCases {
             _ = AgentGroup(for: state)
         }
-        #expect(AgentState.allCases.count == 5)
+        #expect(AgentState.allCases.count == 6)
     }
 
     @Test("each state maps to the group the spec names")
     func mappingIsTheSpecs() {
+        // Under Working, so a new agent never appears among the settled ones — and no
+        // heading is added, renamed or removed for it (FR-006, FR-023).
+        #expect(AgentGroup(for: .starting) == .running)
         #expect(AgentGroup(for: .waitingOnUser) == .needsAttention)
         #expect(AgentGroup(for: .running) == .running)
         #expect(AgentGroup(for: .finished) == .finished)
@@ -45,9 +48,31 @@ struct AgentGroupTests {
         #expect(AgentGroup.stopped.title == "Stopped")
     }
 
-    @Test("one group per state, so a row never needs a second reading")
-    func oneGroupPerState() {
-        #expect(AgentGroup.allCases.count == AgentState.allCases.count)
+    /// No longer one group per state — `starting` and `running` share Working, which
+    /// is the point of the new state rather than a slip. Every group is still reachable
+    /// and every state still lands in exactly one, which are the properties that matter.
+    @Test("no state is left without a group, and no group without a state")
+    func groupsAndStatesBothAccountedFor() {
+        #expect(AgentGroup.allCases.count == 5)
+        #expect(AgentState.allCases.count == 6)
+        #expect(Set(AgentState.allCases.map { AgentGroup(for: $0) }) == Set(AgentGroup.allCases))
+    }
+
+    /// An agent whose conversation has not begun has not asked anybody to look at
+    /// anything, so it does not take `running`'s `wantsEyes` arm.
+    @Test func aStartingAgentIsWorkingWhateverElseIsTrueOfIt() {
+        for wantsEyes in [true, false] {
+            #expect(AgentGroup(for: .starting, wantsEyes: wantsEyes) == .running)
+        }
+        for outcome in WorkOutcome.allCases {
+            #expect(AgentGroup(for: .starting, report: Self.report(outcome)) == .running)
+        }
+    }
+
+    /// FR-023, stated as a test so it cannot be lost quietly.
+    @Test func noHeadingWasAddedRenamedOrRemoved() {
+        #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped"])
+        #expect(AgentGroup.archived.title == "Archived")
     }
 
     /// An agent that has asked to be looked at, which is a mark and not a state.

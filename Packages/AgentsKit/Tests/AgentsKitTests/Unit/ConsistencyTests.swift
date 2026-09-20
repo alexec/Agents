@@ -210,4 +210,55 @@ struct ConsistencyTests {
             \(violations.joined(separator: "\n"))
             """)
     }
+
+    // MARK: 4. The word for a starting agent (020 FR-023)
+
+    /// Whether a line of code spells the word out instead of using the constant.
+    ///
+    /// Pulled out as a pure function so the check can be *proved to bite* by asserting
+    /// it against a sample, rather than by editing a real source file and putting it
+    /// back — a scan that matches nothing is a green test protecting nothing, but
+    /// mutating the repository to demonstrate that is a trick that leaves the mutation
+    /// behind the one time something interrupts the run.
+    static func spellsOutStarting(_ line: String) -> Bool {
+        code(line).contains("\"Starting\"")
+    }
+
+    /// The check above, against lines that must and must not trip it.
+    @Test func theStartingWordScanCatchesWhatItIsFor() {
+        #expect(Self.spellsOutStarting(#"case .starting: return "Starting""#))
+        #expect(Self.spellsOutStarting(#"    Text("Starting")"#))
+        // The constant itself is the fix, not a violation.
+        #expect(!Self.spellsOutStarting("case .starting: return AgentState.startingLabel"))
+        // A comment that names the word while explaining why not to write it.
+        #expect(!Self.spellsOutStarting(#"// never write "Starting" here"#))
+        // A longer word that merely contains it.
+        #expect(!Self.spellsOutStarting(#"Text("Starting up…")"#))
+    }
+
+    /// 020 added one state and one word for it, and put the word in `AgentsKitCore`
+    /// for the reason `EndedReason.summary` is there: the phone and the window have to
+    /// say the same thing about the same agent.
+    ///
+    /// Only this one word. The other five are *not* identical across the two apps
+    /// today — `AgentRow` says "Waiting for your answer" where its own accessibility
+    /// label says "Waiting on you" — so there is no shared `AgentState.label` to point
+    /// a wider check at. Unifying those is 018's argument, not 020's.
+    @Test func noCallSiteSpellsOutTheWordForAStartingAgent() throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["App/Sources", "Remote/Sources", "Shared/UI"]) {
+            scanned += 1
+            for (index, line) in source.lines.enumerated() where Self.spellsOutStarting(line) {
+                violations.append("\(Self.at(source, index)): \(Self.code(line).trimmingCharacters(in: .whitespaces))")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            A view spells out the word for a starting agent. Use \
+            `AgentState.startingLabel`, so the row, the accessibility label, the \
+            transcript line and the phone's card cannot drift apart.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
 }

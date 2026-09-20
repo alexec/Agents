@@ -149,12 +149,10 @@ extension DaemonCore {
         var agent = Agent(runtimeID: request.runtimeID,
                           cwd: request.cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
-                          state: .stopped,
                           runtimeSessionID: sessionID,
                           startOptions: request.startOptions,
                           advertisedOptions: await session.options,
                           availableCommands: await session.commands,
-                          endedReason: .endTurn,
                           additionalDirectories: request.additionalDirectories,
                           mcpServers: request.mcpServers)
         agents[agent.id] = agent
@@ -171,6 +169,16 @@ extension DaemonCore {
         await session.apply(request.startOptions)
         agent = agents[agent.id] ?? agent
         changed(agent)
+
+        // Stopped while it was being made. `starting` answers true to `holdsRuntime`,
+        // which is exactly what lets `stop` act on an agent whose first turn has not
+        // begun — and by now it has already moved the record to `stopped`, cancelled
+        // what was queued and let the runtime go. Beginning a turn on top of that
+        // would restart an agent the person has just stopped.
+        //
+        // Every `await` above this line is a window for it: `prepareServing`,
+        // `session.apply`, and the two before them.
+        guard agents[agent.id]?.state == .starting else { return agent.id }
 
         await beginTurn(agentID: agent.id, text: request.prompt,
                         blocks: request.blocks, session: session)
@@ -584,7 +592,11 @@ extension DaemonCore {
         // The text is kept beside the blocks so the record reads the way it always has.
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
                      for: agentID)
-        await move(agentID, on: .promptSent)
+        // One moment reached from two directions: the first turn of an agent that is
+        // still `starting`, and an ordinary prompt to a settled one. They are two
+        // events rather than one because that is what lets the table refuse
+        // `(.starting, .promptSent)` — a prompt arriving mid-start has to queue.
+        await move(agentID, on: agents[agentID]?.state == .starting ? .turnBegun : .promptSent)
         turnTasks[agentID]?.cancel()
         // The words of ours, sent with the first prompt of a conversation and not
         // again. They stay in the runtime's own history from there, and that history is
@@ -667,7 +679,7 @@ extension DaemonCore {
                              for: agentID)
             }
         }
-        await move(agentID, on: .turnEnded(reason), endedReason: reason)
+        await move(agentID, on: .turnEnded(reason))
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
@@ -730,7 +742,7 @@ extension DaemonCore {
     private func turnFailed(agentID: UUID, error: any Error) async {
         turnTasks.removeValue(forKey: agentID)
         await record(.runtimeNote("The runtime stopped answering: \(error)."), for: agentID)
-        await move(agentID, on: .processDied, endedReason: .processDied)
+        await move(agentID, on: .processDied)
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
@@ -760,15 +772,8 @@ extension DaemonCore {
     // MARK: Stopping, archiving, picking back up
 
     public func stop(_ agentID: UUID) async throws {
-        guard var agent = agents[agentID] else {
+        guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
-        }
-        // Written down before anything here is awaited. The turn unwinds on its own
-        // task, and whichever of the two gets there first, it has to be able to see
-        // that this was the user's doing and leave the queue alone.
-        if agent.state.hasTurnInFlight {
-            agent.endedReason = .cancelled
-            agents[agentID] = agent
         }
         // Withdrawn from the pick-up queue before any `await`, which on an actor is
         // the whole of the lock. Without this, stopping a chat waiting to come back
@@ -797,8 +802,18 @@ extension DaemonCore {
         }
         if let session = live[agentID] { await session.cancel() }
         turnTasks.removeValue(forKey: agentID)?.cancel()
-        if agent.state.holdsRuntime {
-            await move(agentID, on: .stoppedByUser, endedReason: .cancelled)
+        // Re-read, rather than trusting the `agent` captured at the top of this
+        // function: several `await`s have happened since, and the turn may have ended
+        // under us. It used to be kept roughly in step by the `endedReason` pre-write
+        // that stood here; that write is gone, because writing an ending before the
+        // table has agreed to one is the thing FR-010 forbids.
+        //
+        // The table would refuse the call anyway — `.finished` and `.stopped` both
+        // reject `.stoppedByUser` — so this is not what keeps the record right. It is
+        // here so the code says what it means instead of leaning on a refusal to
+        // undo a call it should not have made.
+        if agents[agentID]?.state.holdsRuntime == true {
+            await move(agentID, on: .stoppedByUser)
         }
         // Only when there was in fact a pick-up to withdraw. An ordinary stop should
         // not gain a line about something that was never going to happen.

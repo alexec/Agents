@@ -596,7 +596,10 @@ struct PromptBar: View {
         // what the agent is doing. The state line in the transcript says that.
         if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
         switch agent.state {
-        case .running, .waitingOnUser: return "Say what next"
+        // `.starting` cannot reach here — it answers true to `hasTurnInFlight`, so the
+        // guard above has already returned. Named anyway, because the compiler asks and
+        // because a silent `default:` is how the next new state gets the wrong words.
+        case .starting, .running, .waitingOnUser: return "Say what next"
         case .finished, .stopped: return "Say what next"
         case .archived: return "Say what next, and this comes back"
         }

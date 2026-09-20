@@ -64,6 +64,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     public init(for state: AgentState, wantsEyes: Bool = false, report: WorkReport? = nil) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         switch state {
+        // Grouped with the working agents, and without `running`'s `wantsEyes` arm: an
+        // agent whose conversation has not begun has not asked anybody to look at
+        // anything. No heading is added, renamed or removed (FR-006, FR-023).
+        case .starting: self = .running
         case .waitingOnUser: self = .needsAttention
         case .running: self = wantsEyes ? .needsAttention : .running
         case .finished: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished

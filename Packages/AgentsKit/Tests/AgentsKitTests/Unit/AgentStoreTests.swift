@@ -22,7 +22,7 @@ struct AgentStoreTests {
         agent.title = "Pineapple"
         try await store.save(agent)
 
-        let read = try await store.load(agent.id)
+        let read = try await store.load(agent.id).agent
         #expect(read.id == agent.id)
         #expect(read.title == agent.title)
         #expect(read.runtimeID == agent.runtimeID)
@@ -126,6 +126,109 @@ struct AgentStoreTests {
         #expect(!agent.isConsistent, "archived without a reason is not a state we may write")
         agent.archivedReason = .byUser
         #expect(agent.isConsistent)
+    }
+
+    // MARK: Rules of the record, not of this test file (020, US3)
+
+    /// The four forbidden shapes, each as a record somebody could construct.
+    private func forbidden() -> [(name: String, agent: Agent, rule: String)] {
+        var stoppedWithNoReason = anAgent()
+        stoppedWithNoReason.state = .stopped
+
+        var finishedWrongly = anAgent()
+        finishedWrongly.state = .finished
+        finishedWrongly.endedReason = .refusal
+
+        var archivedWithNoReason = anAgent()
+        archivedWithNoReason.state = .archived
+        archivedWithNoReason.endedReason = .endTurn
+
+        var startingWithAnEnding = anAgent()
+        startingWithAnEnding.state = .starting
+        startingWithAnEnding.endedReason = .endTurn
+
+        return [
+            ("stopped with no reason", stoppedWithNoReason, "2"),
+            ("finished that did not end in endTurn", finishedWrongly, "3"),
+            ("archived with nobody having archived it", archivedWithNoReason, "1"),
+            ("starting while carrying an ending", startingWithAnEnding, "4"),
+        ]
+    }
+
+    /// SC-006. Until 020 these were asserted against `isConsistent` and enforced
+    /// nowhere, so a record breaking one could be written, saved, read back and
+    /// carried forever — and the first anybody knew was a group that looked wrong.
+    @Test func everyForbiddenRecordIsRefused() async throws {
+        for (name, agent, rule) in forbidden() {
+            let (store, locations) = try temporaryStore()
+            await #expect(throws: AgentStore.RecordRefused.self, "rule \(rule): \(name)") {
+                try await store.save(agent)
+            }
+            // And nothing partial reached disk, which is the half of SC-006 a throw
+            // alone does not prove.
+            #expect(!FileManager.default.fileExists(atPath: locations.record(agent.id).path),
+                    "rule \(rule): a refused record was written anyway")
+        }
+    }
+
+    /// The contrast, so the test above cannot pass by everything being refused.
+    @Test func aRecordThatObeysTheRulesIsSaved() async throws {
+        let (store, locations) = try temporaryStore()
+        var agent = anAgent()
+        agent.state = .stopped
+        agent.endedReason = .cancelled
+        try await store.save(agent)
+        #expect(FileManager.default.fileExists(atPath: locations.record(agent.id).path))
+    }
+
+    /// SC-007. A record already on disk is mended rather than refused, because
+    /// refusing a read loses the agent and a person who cannot see an agent can do
+    /// nothing about it.
+    @Test func everyBrokenRecordOnDiskOpensAndSaysSo() async throws {
+        let expected: [(state: String, extra: String, mend: AgentStore.Mend, becomes: AgentState, reason: EndedReason?)] = [
+            ("stopped", "", .stoppedWithNoReason, .stopped, .unrecognised),
+            ("finished", #""endedReason": "refusal","#, .finishedWithoutEndTurn(.refusal), .stopped, .refusal),
+            ("archived", #""endedReason": "endTurn","#, .archivedWithNoReason, .archived, .endTurn),
+            ("starting", #""endedReason": "endTurn","#, .startingWithAnEnding, .stopped, .daemonGone),
+        ]
+        for case_ in expected {
+            let (store, locations) = try temporaryStore()
+            let id = UUID()
+            try FileManager.default.createDirectory(at: locations.agent(id), withIntermediateDirectories: true)
+            let json = """
+                {"id": "\(id.uuidString)", "runtimeID": "copilot", "cwd": "file:///tmp",
+                 "state": "\(case_.state)", \(case_.extra)
+                 "createdAt": "2026-09-20T09:00:00.000Z", "lastActivityAt": "2026-09-20T09:00:00.000Z"}
+                """
+            try Data(json.utf8).write(to: locations.record(id))
+
+            let read = try await store.load(id)
+            #expect(read.mend == case_.mend, "\(case_.state)")
+            #expect(read.agent.state == case_.becomes, "\(case_.state)")
+            #expect(read.agent.endedReason == case_.reason, "\(case_.state)")
+            // Whatever it was, it is now a record the rules allow — which is the
+            // point, and is what makes it safe to hand to the rest of the app.
+            #expect(read.agent.isConsistent, "\(case_.state) was mended into another forbidden shape")
+            // And the mend is announced, not silent.
+            #expect(!case_.mend.summary.isEmpty)
+        }
+    }
+
+    /// A mended record comes back through `loadAll` too, with its mend, which is how
+    /// `loadFromDisk` knows to write the transcript line.
+    @Test func loadAllCarriesTheMendsAlongsideTheAgents() async throws {
+        let (store, locations) = try temporaryStore()
+        let id = UUID()
+        try FileManager.default.createDirectory(at: locations.agent(id), withIntermediateDirectories: true)
+        try Data("""
+            {"id": "\(id.uuidString)", "runtimeID": "copilot", "cwd": "file:///tmp",
+             "state": "stopped", "createdAt": "2026-09-20T09:00:00.000Z", "lastActivityAt": "2026-09-20T09:00:00.000Z"}
+            """.utf8).write(to: locations.record(id))
+
+        let all = await store.loadAll()
+        #expect(all.agents.count == 1)
+        #expect(all.unreadable.isEmpty, "a forbidden record is a different thing from an unreadable one")
+        #expect(all.mends[id] == .stoppedWithNoReason)
     }
 
     @Test func aTitleFallsBackToTheFirstLineOfTheInstruction() {

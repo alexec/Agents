@@ -20,6 +20,16 @@ extension DaemonCore {
             adoptWorkflows(in: project.folder)
         }
         startWorkflowTicker()
+        workflowsAreStarted = true
+        // Whatever happened while this layer could not act, now, and in the order it
+        // happened — which for a restart is `recover`'s order, most recently active
+        // first. Taken out of the array before any of it is replayed, so an event that
+        // somehow defers again lands on an empty queue instead of a growing one.
+        let waiting = deferredLifecycleEvents
+        deferredLifecycleEvents.removeAll()
+        for held in waiting {
+            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth)
+        }
     }
 
     /// Take a project's workflows on: read them once, and watch for more.
@@ -500,6 +510,16 @@ extension DaemonCore {
     /// Called from the one funnel every agent state change goes through.
     func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil) {
         guard let agent = agents[agentID] else { return }
+        // Before anything is read off `workflows`, because at this point that
+        // dictionary is empty and the guard below would swallow the event without
+        // leaving a trace. See `deferredLifecycleEvents` for why the whole of this
+        // problem exists.
+        guard workflowsAreStarted else {
+            deferredLifecycleEvents.append(
+                (event: event, agentID: agentID,
+                 depth: depth ?? workflowChainDepth(causedBy: agentID)))
+            return
+        }
         let folder = Project.standardize(agent.cwd)
         guard let byID = workflows[folder], !byID.isEmpty else { return }
         let depth = depth ?? workflowChainDepth(causedBy: agentID)

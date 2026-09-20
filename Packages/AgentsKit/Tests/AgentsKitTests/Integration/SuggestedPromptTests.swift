@@ -359,7 +359,7 @@ struct SuggestedPromptTests {
         // detached task, so the record in hand is right well before the record on disk
         // is, and the record on disk is what the core below opens.
         await eventually("the suggestions reached the file") {
-            let onDisk = try? await AgentStore(locations: locations).load(id)
+            let onDisk = try? await AgentStore(locations: locations).load(id).agent
             return onDisk?.suggestedPrompts.map(\.label) == ["Run the tests"]
         }
 
