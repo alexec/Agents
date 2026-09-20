@@ -12,8 +12,10 @@ import Testing
 @Suite("What every agent is told")
 struct BriefingTests {
     @Test func everyLineIsInTheBlockThatIsSent() {
-        for line in Briefing.lines {
-            #expect(Briefing.text.contains(line))
+        for policy in ToolPolicyCatalog.builtIn {
+            for line in Briefing.lines(for: policy) {
+                #expect(Briefing.text(for: policy).contains(line))
+            }
         }
     }
 
@@ -21,15 +23,56 @@ struct BriefingTests {
     /// it is called; an agent told the name can call it.
     @Test func theToolsItNamesAreNamedExactly() {
         #expect(Briefing.suggestions.contains(AppTool.suggestPrompts))
-        #expect(Briefing.workflows.contains(AppTool.manageWorkflows))
+        #expect(Briefing.workflows(scheduling: false).contains(AppTool.manageWorkflows))
+        #expect(Briefing.workflows(scheduling: true).contains(AppTool.manageWorkflows))
     }
 
-    /// The escalation line names no tool, because the tool is the runtime's: an
-    /// elicitation, which each adapter raises from something of its own. It has to say
-    /// the act and the reason instead.
+    /// The escalation line asks for the act first, whatever the runtime, because the act
+    /// is the part that is true everywhere and a runtime may know its tool by a name we
+    /// have not written down.
     @Test func theEscalationLineAsksForTheActRatherThanATool() {
-        #expect(!Briefing.escalation.contains("mcp__"))
-        #expect(Briefing.escalation.lowercased().contains("ask me"))
+        for tool in [nil, "ask_user_question"] {
+            let line = Briefing.escalation(named: tool)
+            #expect(!line.contains("mcp__"))
+            #expect(line.lowercased().contains("ask me"))
+            // The reason, which is the load-bearing half: an agent that believes nobody
+            // is there is the agent that guesses.
+            #expect(line.contains("phone"))
+        }
+    }
+
+    /// And names the tool on top of it where the policy has one. Claude's question
+    /// arrives as a held elicitation, so an agent that knows the name can raise one.
+    @Test func andNamesTheToolWhereThePolicyKnowsIt() {
+        #expect(Briefing.escalation(named: "AskUserQuestion").contains("`AskUserQuestion`"))
+        #expect(Briefing.text(for: ToolPolicyCatalog.claude).contains("`AskUserQuestion`"))
+    }
+
+    /// And names nothing on a runtime with no tool that can reach the person — which
+    /// includes Grok, whose `ask_user_question` is a terminal-UI card with no ACP
+    /// channel behind it (R13). Naming it was measured: the agent spent the turn
+    /// searching the MCP catalogue for it and guessed anyway. Worse than saying nothing,
+    /// which is what FR-008 is about.
+    @Test func andNamesNothingWhereThereIsNoChannel() {
+        for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.cursor] {
+            #expect(policy.escalationTool == nil, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy).contains("your question or form tool"))
+            #expect(!Briefing.text(for: policy).contains("Yours is called"))
+        }
+        // Kept all the same: taking it out of the allowlist would buy nothing today and
+        // cost us the day Grok gives it a way out.
+        #expect(ToolPolicyCatalog.grok.kept.contains { $0.name == "ask_user_question" })
+    }
+
+    /// The name the briefing says out loud is the one the policy deliberately kept, not
+    /// a second spelling maintained beside it that could drift.
+    @Test func theNamedToolIsTheOneScopingKept() {
+        for policy in ToolPolicyCatalog.builtIn {
+            guard let tool = policy.escalationTool else { continue }
+            #expect(policy.kept.contains { $0.name == tool },
+                    "\(policy.runtimeID) names \(tool) in the briefing and does not keep it")
+            #expect(!policy.removed.contains { $0.name == tool })
+        }
     }
 
     /// Short, because it is paid for on the first prompt of every conversation and an
@@ -41,8 +84,77 @@ struct BriefingTests {
     /// app cannot learn any other way — a turn ending says nothing about whether the
     /// work is done — so it is worth the three hundred characters, and `Briefing.text`
     /// was read end to end for repetition before the number moved.
+    ///
+    /// Held against the longest of the four in 015, which is the runtime with the most
+    /// residue. That feature pushes the other way: where a tool is actually gone the
+    /// words about it go too, so three of the four now read shorter than they did.
     @Test func itStaysShortEnoughToBeRead() {
-        #expect(Briefing.text.count < 1_500)
-        #expect(Briefing.lines.count <= 4)
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.text(for: policy).count < 1_500)
+            #expect(Briefing.lines(for: policy).count <= 5)
+        }
+    }
+
+    // MARK: What could not be taken away
+
+    /// The residue line names this runtime's residue and nobody else's. It is generated
+    /// from the policy precisely so that it cannot drift from it — a tool named here
+    /// that the agent still has, or has never had, is the failure this guards.
+    ///
+    /// Names are matched in their backticks rather than bare, because the briefing says
+    /// the word "workflow" in the ordinary course of telling an agent what a workflow
+    /// is, and Grok's residue happens to be called that.
+    @Test func theResidueLineNamesThisRuntimesResidueAndNoOthers() throws {
+        let cursor = try #require(Briefing.residue(ToolPolicyCatalog.cursor.residue))
+        #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains(cursor))
+        for tool in ToolPolicyCatalog.cursor.residue {
+            #expect(cursor.contains("`\(tool.name)`"))
+        }
+        for tool in ToolPolicyCatalog.grok.residue {
+            #expect(!cursor.contains("`\(tool.name)`"))
+        }
+    }
+
+    /// And a runtime that gave up everything we asked for is told nothing about it.
+    /// A removed tool needs no words: the model never sees it.
+    @Test func aRuntimeWithNoResidueIsToldNothingAboutIt() {
+        #expect(ToolPolicyCatalog.claude.residue.isEmpty)
+        #expect(Briefing.residue(ToolPolicyCatalog.claude.residue) == nil)
+        let claude = Briefing.text(for: ToolPolicyCatalog.claude)
+        #expect(!claude.contains("does not work in this app"))
+        #expect(!claude.contains("do not work in this app"))
+    }
+
+    /// One sentence per category however many tools share it, so Cursor's two goal
+    /// tools do not produce the same advice twice.
+    @Test func theAdviceIsSaidOncePerCategory() throws {
+        let line = try #require(Briefing.residue(ToolPolicyCatalog.cursor.residue))
+        let advice = RemitCategory.standingArrangements.instead
+        #expect(line.components(separatedBy: advice).count == 2)
+        #expect(line.contains(RemitCategory.agents.instead))
+    }
+
+    /// The cron sentence is spent only where there is still something to forbid. On a
+    /// runtime whose scheduling tools are gone it is a sentence about a door that is
+    /// already shut.
+    @Test func theCronSentenceGoesWhereTheCronToolsHave() {
+        let cron = "cron entries"
+        #expect(!Briefing.workflows(scheduling: true).contains(cron))
+        #expect(Briefing.workflows(scheduling: false).contains(cron))
+        // Both halves survive either way: name the tool, and say not to invent a
+        // workflow nobody asked for. The second is the condition 016's reversal rests
+        // on and must not be tidied away with the first.
+        for text in [Briefing.workflows(scheduling: true), Briefing.workflows(scheduling: false)] {
+            #expect(text.contains(AppTool.manageWorkflows))
+            #expect(text.contains("did not ask for"))
+        }
+    }
+
+    /// And it is decided by the policy rather than by a runtime's name: Claude and Grok
+    /// lose their schedulers, Cursor keeps everything it has.
+    @Test func whichOfThoseEachRuntimeGetsComesFromItsPolicy() {
+        #expect(!Briefing.text(for: ToolPolicyCatalog.claude).contains("cron entries"))
+        #expect(!Briefing.text(for: ToolPolicyCatalog.grok).contains("cron entries"))
+        #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains("cron entries"))
     }
 }

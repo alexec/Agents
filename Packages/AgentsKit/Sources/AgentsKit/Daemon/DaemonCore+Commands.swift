@@ -267,7 +267,8 @@ extension DaemonCore {
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [appServer(token: token)])
+                                                      mcpServers: mcpServers + [appServer(token: token)],
+                                                      meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch let error as JSONRPCError where error.isAuthRequired {
@@ -572,12 +573,17 @@ extension DaemonCore {
         let servers = agent.mcpServers + [appServer(token: token)]
         bindAppToken(token, to: agent.id)
 
+        // The same scoping a new conversation gets, so an agent picked back up is not
+        // quietly wider than one started this minute (FR-012).
+        let meta = ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta
+
         var updated = agent
         if let sessionID = agent.runtimeSessionID {
             do {
                 try await session.continueSession(id: sessionID, cwd: agent.cwd,
                                                   additionalDirectories: agent.additionalDirectories,
-                                                  mcpServers: servers)
+                                                  mcpServers: servers,
+                                                  meta: meta)
                 await record(.runtimeNote("Picked the conversation back up."), for: agent.id)
             } catch {
                 // The runtime no longer has it. The agent is not lost: it carries on as
@@ -586,7 +592,8 @@ extension DaemonCore {
                              for: agent.id)
                 let result = try await session.newSession(cwd: agent.cwd,
                                                           additionalDirectories: agent.additionalDirectories,
-                                                          mcpServers: servers)
+                                                          mcpServers: servers,
+                                                          meta: meta)
                 updated.runtimeSessionID = result.sessionId
                 // A conversation beginning again, so the briefing goes again: it
                 // lived in the history this runtime has just told us it no longer has.
@@ -595,7 +602,8 @@ extension DaemonCore {
         } else {
             let result = try await session.newSession(cwd: agent.cwd,
                                                       additionalDirectories: agent.additionalDirectories,
-                                                      mcpServers: servers)
+                                                      mcpServers: servers,
+                                                      meta: meta)
             updated.runtimeSessionID = result.sessionId
             needsBriefing.insert(agent.id)
         }
@@ -646,8 +654,10 @@ extension DaemonCore {
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
-        if needsBriefing.remove(agentID) != nil {
-            outgoing.append(.text(Briefing.text))
+        // The runtime is read first on purpose: an agent that has somehow gone keeps its
+        // place in the queue rather than having the briefing quietly spent on nobody.
+        if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
+            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID))))
         }
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }

@@ -209,6 +209,30 @@ extension DaemonCore {
         return request.options.first { $0.kind == .allowAlways }
             ?? request.options.first { $0.kind == .allowOnce }
     }
+
+    /// And refuse, ourselves, the ones this app could not take away.
+    ///
+    /// Three of the four runtimes let the app remove its rivals outright, and what is
+    /// removed needs no answer: the model never sees it. This is for the remainder —
+    /// the tools a runtime holds on to — and it fires only where that runtime asks the
+    /// client before running one.
+    ///
+    /// The sentence comes from the tool's remit category, which is the same place the
+    /// briefing's residue line reads, so the two cannot end up saying different things
+    /// about the same tool. It names what to use instead rather than reporting that
+    /// something was blocked: an agent can act on the first and not on the second.
+    ///
+    /// Nothing is refused where the runtime offered no way of refusing. Answering with
+    /// an option it did not give would be worse than letting the call through.
+    func autoRefused(_ request: PermissionRequest) -> (option: PermissionOption, note: String)? {
+        guard let runtimeID = agents[request.agentID]?.runtimeID else { return nil }
+        let policy = ToolPolicyCatalog.policy(for: runtimeID)
+        guard let residual = policy.residual(matching: request.toolCall.name ?? request.toolCall.title),
+              let option = request.options.first(where: { $0.kind == .rejectOnce })
+                  ?? request.options.first(where: { $0.kind == .rejectAlways })
+        else { return nil }
+        return (option, "`\(residual.name)` is not available in this app. \(residual.instead)")
+    }
 }
 
 /// The workflow tool: what an agent may do to its own project's standing arrangements.

@@ -152,9 +152,10 @@ public actor ACPSession {
     @discardableResult
     public func newSession(cwd: URL,
                            additionalDirectories: [URL] = [],
-                           mcpServers: [MCPServer] = []) async throws -> ACP.NewSessionResult {
+                           mcpServers: [MCPServer] = [],
+                           meta: JSONValue? = nil) async throws -> ACP.NewSessionResult {
         let params = sessionParams(cwd: cwd, additionalDirectories: additionalDirectories,
-                                   mcpServers: mcpServers)
+                                   mcpServers: mcpServers, meta: meta)
         let result = try await connection.call(ACP.Method.newSession, params)
         let decoded = try result.decode(ACP.NewSessionResult.self)
         sessionID = decoded.sessionId
@@ -171,9 +172,10 @@ public actor ACPSession {
     /// `-32601` to resume, which is the advertised behaviour rather than a fault.
     public func continueSession(id: String, cwd: URL,
                                 additionalDirectories: [URL] = [],
-                                mcpServers: [MCPServer] = []) async throws {
+                                mcpServers: [MCPServer] = [],
+                                meta: JSONValue? = nil) async throws {
         var params = sessionParams(cwd: cwd, additionalDirectories: additionalDirectories,
-                                   mcpServers: mcpServers)
+                                   mcpServers: mcpServers, meta: meta)
         if case .object(var object) = params {
             object["sessionId"] = .string(id)
             params = .object(object)
@@ -250,13 +252,18 @@ public actor ACPSession {
     /// What every session-making call takes. `additionalDirectories` is sent only
     /// where the runtime advertised it, because a field a runtime does not know is a
     /// refusal waiting to happen.
+    ///
+    /// `meta` is where the app's tool scoping rides, handed in by the daemon rather
+    /// than worked out here: nothing in this file knows which runtime it is talking to,
+    /// and a runtime with nothing to say sends no `_meta` at all, exactly as before.
     private func sessionParams(cwd: URL, additionalDirectories: [URL],
-                               mcpServers: [MCPServer]) -> JSONValue {
+                               mcpServers: [MCPServer], meta: JSONValue?) -> JSONValue {
         var params: [String: JSONValue] = ["cwd": .string(cwd.path),
                                            "mcpServers": .array(mcpServers.map(\.wire))]
         if !additionalDirectories.isEmpty, initializeResult?.supportsAdditionalDirectories == true {
             params["additionalDirectories"] = .array(additionalDirectories.map { .string($0.path) })
         }
+        if let meta { params["_meta"] = meta }
         return .object(params)
     }
 
@@ -315,7 +322,13 @@ public actor ACPSession {
     }
 
     /// Branch this conversation. The original is untouched.
-    public func forkSession(cwd: URL, additionalDirectories: [URL] = []) async throws -> String {
+    ///
+    /// `meta` is taken here too, and is the reason this method has a parameter it looks
+    /// like it does not need: a branch is a new conversation by any other name, and it
+    /// builds its own parameters rather than going through `sessionParams`, so leaving
+    /// it out would have made it the one door out of the app's scoping.
+    public func forkSession(cwd: URL, additionalDirectories: [URL] = [],
+                            meta: JSONValue? = nil) async throws -> String {
         guard let sessionID else { throw ACPSessionError.noSession }
         guard initializeResult?.supportsFork ?? false else {
             throw ACPSessionError.notSupported(ACP.Method.forkSession)
@@ -324,6 +337,7 @@ public actor ACPSession {
         if !additionalDirectories.isEmpty, initializeResult?.supportsAdditionalDirectories == true {
             params["additionalDirectories"] = .array(additionalDirectories.map { .string($0.path) })
         }
+        if let meta { params["_meta"] = meta }
         let result = try await connection.call(ACP.Method.forkSession, .object(params))
         return try result.decode(ACP.ForkSessionResult.self).sessionId
     }

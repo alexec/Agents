@@ -163,7 +163,8 @@ extension DaemonCore {
         }
         try await session.continueSession(id: sessionID, cwd: agent.cwd)
         let forked = try await session.forkSession(cwd: agent.cwd,
-                                                   additionalDirectories: agent.additionalDirectories)
+                                                   additionalDirectories: agent.additionalDirectories,
+                                                   meta: ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta)
 
         var copy = agent
         copy.id = UUID()

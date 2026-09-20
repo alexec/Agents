@@ -38,31 +38,58 @@ public enum Briefing {
     /// that writes a crontab, or a shell script nothing will ever run, or a note in a
     /// README asking a human to remember.
     ///
-    /// The restraint is in the second half. An agent told it can schedule things will
+    /// The restraint is in the last sentence. An agent told it can schedule things will
     /// schedule things, and a workflow that starts an agent that writes a workflow is
     /// the shape the chain-depth limit exists to contain. So: only when asked.
-    public static let workflows = """
-        If I ask for something to happen on its own — on a schedule, or whenever an \
-        agent finishes, stops, or asks for something — that is a workflow, and \
-        \(AppTool.manageWorkflows) is how you read and write them. Do not write cron \
-        entries, launch agents, or scripts that nothing will run. Do not create a \
-        workflow I did not ask for.
-        """
+    ///
+    /// The middle sentence is conditional now, and that is 015's doing. Where a runtime
+    /// has actually lost its scheduling tools there is nothing left to forbid, and a
+    /// sentence forbidding it is a sentence spent on a door that is already shut. This
+    /// is the shape the whole briefing should take as removal gets better: words are
+    /// the fallback, not the first line.
+    public static func workflows(scheduling isRemoved: Bool) -> String {
+        let restraint = isRemoved ? "" : """
+            Do not write cron entries, launch agents, or scripts that nothing will \
+            run.\u{20}
+            """
+        return """
+            If I ask for something to happen on its own — on a schedule, or whenever an \
+            agent finishes, stops, or asks for something — that is a workflow, and \
+            \(AppTool.manageWorkflows) is how you read and write them. \(restraint)Do \
+            not create a workflow I did not ask for.
+            """
+    }
 
     /// Ask, rather than guess or stop.
     ///
-    /// The tool is the runtime's, not ours — an elicitation, which the Claude adapter
-    /// raises from `AskUserQuestion` — so this names the act and not the tool. What the
-    /// app adds is the reason it is worth doing: the question is held by the daemon,
-    /// survives the window being shut, and can be answered from a phone. An agent that
-    /// gives up because nobody seemed to be there is giving up on nothing.
-    public static let escalation = """
-        When something is mine to decide — a choice between real alternatives, a \
-        missing credential, anything hard to undo — ask me with your question or form \
-        tool rather than guessing at it or ending the turn with the question in your \
-        reply. Your question reaches me wherever I am, including on my phone, and it \
-        waits for me. A question in the middle of a reply I may not read does not.
-        """
+    /// The act, and then the reason it is worth doing: the question is held by the
+    /// daemon, survives the window being shut, and can be answered from a phone. An
+    /// agent that gives up because nobody seemed to be there is giving up on nothing.
+    ///
+    /// The tool is named where the policy knows its name, and that is a change of mind
+    /// with a measurement behind it. This said "your question or form tool" and nothing
+    /// else, because the tool is the runtime's and each spells it differently. The live
+    /// run of 2026-09-20 showed what that costs: given two defensible answers, Grok
+    /// called `search_tool` three times over — "ask the person", "form fields", "raise" —
+    /// hunting for something matching those words, failed to recognise `ask_user_question`
+    /// as the thing being described, and guessed. It had the tool the whole time.
+    ///
+    /// So the description gets the name appended to it. Not instead of the act: a runtime
+    /// whose name we do not know still gets the sentence that was there before, and an
+    /// agent that knows the act by another name can still act on it. `ToolPolicy` is what
+    /// supplies the name, so nothing here asks which runtime it is talking to, and FR-008
+    /// holds — a tool is named only where the policy has deliberately kept it.
+    public static func escalation(named tool: String?) -> String {
+        let named = tool.map { " Yours is called `\($0)`." } ?? ""
+        return """
+            When something is mine to decide — a choice between real alternatives, a \
+            missing credential, anything hard to undo — ask me with your question or \
+            form tool rather than guessing at it or ending the turn with the question \
+            in your reply.\(named) Your question reaches me wherever I am, including on \
+            my phone, and it waits for me. A question in the middle of a reply I may \
+            not read does not.
+            """
+    }
 
     /// Say how it went, at the end.
     ///
@@ -87,9 +114,49 @@ public enum Briefing {
         being done.
         """
 
-    /// In the order they are sent.
-    public static var lines: [String] { [suggestions, escalation, outcome, workflows] }
+    /// The tools a runtime would not let go of, said out loud.
+    ///
+    /// Generated from the policy rather than written beside it, so the words and the
+    /// table cannot drift: a tool that stops being residue stops being mentioned on the
+    /// same day, and one that becomes residue is named without anybody remembering to
+    /// come here. `nil` where there is nothing to say, which is most runtimes and is
+    /// the point — a line naming a tool an agent does not have is worse than no line.
+    public static func residue(_ tools: [ResidualTool]) -> String? {
+        guard !tools.isEmpty else { return nil }
+        let names = tools.map { "`\($0.name)`" }
+        let named = names.count == 1
+            ? names[0]
+            : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+        // One sentence per category, in the order the policy lists them, and each said
+        // once however many of its tools there are.
+        var seen: Set<RemitCategory> = []
+        let instead = tools.compactMap { seen.insert($0.category).inserted ? $0.instead : nil }
+        return ([named + " \(tools.count == 1 ? "does" : "do") not work in this app."] + instead)
+            .joined(separator: " ")
+    }
+
+    /// In the order they are sent, for the runtime this agent is on.
+    ///
+    /// The only place the order is decided and the only place a new line is added. The
+    /// one that fires every turn goes first, then the one whose failure costs most,
+    /// then the one that closes a turn, then the one that is conditional on the person
+    /// asking for something recurring — which most turns never do.
+    ///
+    /// It takes a policy because 015 made two of these lines depend on what the agent
+    /// actually has: the workflow line is shorter where the scheduling tools are gone,
+    /// and the residue line exists only where something conflicting could not be
+    /// removed. A tool the app does not serve yet still gets no line at all.
+    public static func lines(for policy: ToolPolicy) -> [String] {
+        let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
+        return [suggestions,
+                escalation(named: policy.escalationTool),
+                outcome,
+                workflows(scheduling: schedulingRemoved)]
+            + [residue(policy.residue)].compactMap { $0 }
+    }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
-    public static var text: String { lines.joined(separator: "\n\n") }
+    public static func text(for policy: ToolPolicy) -> String {
+        lines(for: policy).joined(separator: "\n\n")
+    }
 }

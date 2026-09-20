@@ -128,6 +128,38 @@ To check what each runtime advertises against what the app does with it:
 ./scripts/acp-handshake.sh
 ```
 
+## Scoping an agent's tools
+
+Every runtime arrives holding its own version of nearly everything this app owns: a way to
+schedule something, a way to raise a question, a way to start another agent, somewhere to
+put what it wrote. Used, they put the work somewhere the app cannot see — a cron entry with
+no row in the project, a question in a queue that never reaches your phone, a report in a
+document nobody agreed on. So for the sessions the app starts, those tools are taken away,
+and the app's own are all that is left.
+
+Nothing of yours changes. No file in your home directory is read as configuration or
+written, and nothing is left behind when the app is not running: the same runtime started
+from your terminal a minute later has everything it always had.
+
+How it is asked for depends on what each runtime offers, and it is a table rather than a
+condition — `ToolPolicyCatalog` is the one place that knows. Claude takes a denial list on
+the session and loses fifteen built-ins and two connectors. Copilot takes flags at launch
+and loses its subagents, its session store and the whole rival MCP server that duplicated
+this app's remit. Grok takes an allow list on the session, plus a config overlay the app
+writes under its own root. Cursor has no lever at all, so its three conflicting tools stay
+— and are named in the briefing instead, along with what to use in their place.
+
+Nothing the work needs is touched: reading, searching, editing, writing, running commands,
+planning and keeping a to-do list stay, and so does the question tool each runtime raises
+an escalation through — the one thing here it would matter most to break.
+
+To re-ask every runtime what it has today, and see anything the policy does not account
+for:
+
+```sh
+./scripts/runtime-tools.sh
+```
+
 ## How work happens here
 
 Spec Kit, one feature at a time. Each feature is a folder under `specs/`:

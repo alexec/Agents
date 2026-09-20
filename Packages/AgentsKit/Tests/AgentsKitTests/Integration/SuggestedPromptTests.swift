@@ -237,7 +237,7 @@ struct SuggestedPromptTests {
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
         #expect(sent.count == 2)
         #expect(sent.first?["text"]?.stringValue == "do the thing")
-        #expect(sent.last?["text"]?.stringValue == Briefing.text)
+        #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.copilot))
     }
 
     /// Asked once. The runtime keeps it in its own history and replays that history
@@ -254,7 +254,7 @@ struct SuggestedPromptTests {
         try await settle(core, id)
 
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text],
+        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)],
                          ["and the next thing"]])
     }
 
@@ -281,6 +281,17 @@ struct SuggestedPromptTests {
         return sent
     }
 
+    /// The blocks of the prompt that said "carry on", wherever it landed, or `nil` if
+    /// it has not landed yet.
+    private func carryOn(_ launcher: FakeLauncher) async -> [String]? {
+        for fake in launcher.allAgents {
+            guard let blocks = await fake.promptContent?.arrayValue else { continue }
+            let texts = blocks.compactMap { $0["text"]?.stringValue }
+            if texts.contains("carry on") { return texts }
+        }
+        return nil
+    }
+
     /// Except here. A runtime that has lost the conversation is starting a new one,
     /// and the ask went with the history it no longer has.
     @Test func aRuntimeThatLostTheConversationIsAskedAgain() async throws {
@@ -302,8 +313,101 @@ struct SuggestedPromptTests {
         // Two prompts, and the ask on both: the second runtime is a conversation
         // starting again, however much of it the app still has on its own record.
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text],
-                         ["carry on", Briefing.text]])
+        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)],
+                         ["carry on", Briefing.text(for: ToolPolicyCatalog.copilot)]])
+    }
+
+    /// The other way a conversation comes back, and the one the two tests above leave
+    /// out: the daemon went away and the agent was picked up off its own record. The
+    /// runtime still has the conversation, so it still has the briefing in its history,
+    /// and sending it again would be paying twice for words already said (FR-012).
+    @Test func aConversationResumedAfterARestartIsNotBriefedAgain() async throws {
+        let (locations, work) = try temporary()
+        let first = FakeLauncher()
+        let core = try core(first, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        try await settle(core, id)
+        #expect(await prompts(first) == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)]])
+
+        // Wait for the record on disk, not the one in memory. `settle` watches the
+        // daemon's own copy, and the file is written a moment behind it — the same gap
+        // `QueuedPromptTests` waits out for the same reason. Skipped, the second daemon
+        // below can read an agent still marked as mid-turn, queue the prompt behind a
+        // turn that is not running, and wait for a drain that never comes. That is what
+        // this test failed on under a loaded machine, about one run in three.
+        await eventually("the finished turn reached the file") {
+            let store = try? AgentStore(locations: locations)
+            let reread = try? await store?.load(id)
+            return reread?.agent.state.hasTurnInFlight == false
+                && reread?.agent.runtimeSessionID != nil
+        }
+
+        // A new daemon on the same root, knowing only what is on disk — which is the
+        // agent and its runtime session id, and nothing at all about what was briefed.
+        let second = FakeLauncher()
+        let reopened = DaemonCore(store: try AgentStore(locations: locations),
+                                  locations: locations,
+                                  discovery: .findsEverything,
+                                  launcher: second)
+        await reopened.loadFromDisk()
+        try await reopened.prompt(.init(agentID: id, text: "carry on"))
+        // Asked for by its words rather than read off the end of a list, which is what
+        // this test did at first and why it failed in a full run about one time in
+        // three. A fake holds only the last prompt it was given, and after a restart
+        // the daemon has a prompt of its own to send — 014's question about a turn that
+        // ended without saying how it went. Whether that lands on this agent's runtime
+        // before or after the person's words is a race, and when it lands after, the
+        // person's prompt is simply gone. Waiting for the one being measured is the
+        // difference between a test that is quiet and a test that is right.
+        await eventually("the person's prompt reached a runtime") {
+            await self.carryOn(second) != nil
+        }
+        try await settle(reopened, id)
+
+        // The runtime gave the conversation back, so the words are still in it.
+        #expect(await carryOn(second) == ["carry on"])
+    }
+
+    /// Every agent is briefed however it was started (FR-014). A workflow-started one is
+    /// the case with no person in the loop at the moment the words go, which is exactly
+    /// when an agent most needs to know there is a way to reach one.
+    @Test func anAgentAWorkflowStartedIsBriefedLikeAnyOther() async throws {
+        let (locations, work) = try temporary()
+        let folder = WorkflowFile.folder(in: Project.standardize(work))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("""
+            ---
+            on:
+              - schedule:
+                  at: [":00", ":30"]
+            agent: new
+            ---
+
+            Check the build.
+            """.utf8).write(to: WorkflowFile.url(for: "check-build", in: Project.standardize(work)))
+
+        let launcher = FakeLauncher()
+        let core = try core(launcher, locations: locations)
+        await core.rescanWorkflows(in: Project.standardize(work))
+
+        // Two ticks either side of a boundary: the first only says where the window
+        // starts, because everything before the daemon existed is somebody else's.
+        var when = DateComponents()
+        when.year = 2026; when.month = 9; when.day = 21; when.hour = 9; when.minute = 29
+        let justBefore = Calendar.current.date(from: when)!
+        await core.tickWorkflows(now: justBefore)
+        await core.tickWorkflows(now: justBefore.addingTimeInterval(90))
+
+        guard let started = await core.allAgents().first else {
+            Issue.record("the workflow started nothing")
+            return
+        }
+        try await settle(core, started.id)
+        #expect(started.startedByWorkflow == "check-build")
+        let sent = await prompts(launcher)
+        #expect(sent == [["Check the build.",
+                          Briefing.text(for: ToolPolicyCatalog.policy(for: started.runtimeID))]])
     }
 
     /// Ours is a block of its own and not part of what was said. The transcript is a
