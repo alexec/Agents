@@ -12,6 +12,11 @@ struct RemoteChatView: View {
     @State private var isLoadingEarlier = false
     @State private var hasSettled = false
     @State private var isShowingArtifacts = false
+    /// How far the foot of the conversation is below the foot of the screen. Zero
+    /// means the reader is at the live end.
+    @State private var distanceFromEnd: CGFloat = 0
+    /// Something arrived while the reader was up the conversation reading.
+    @State private var hasNewBelow = false
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -41,14 +46,26 @@ struct RemoteChatView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .readableWidth()
             }
-            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, offset in
-                if offset < 400 { loadEarlier(keeping: scroller) }
+            .onScrollGeometryChange(for: Place.self) { Place($0) } action: { _, place in
+                if place.offset < 400 { loadEarlier(keeping: scroller) }
+                distanceFromEnd = place.distanceFromEnd
+                // Back at the end, so there is nothing new below any more — whether
+                // they got here by the button or by scrolling.
+                if place.isAtEnd { hasNewBelow = false }
+                // The conversation is the only thing that knows how tall it is, and
+                // the page it asks for next should be sized to that (SC-007).
+                model.measure(transcriptHeight: place.height)
             }
             .task(id: model.selection) { await settle(scroller) }
             .onChange(of: model.entries.count) { before, after in
                 guard after > before, !isLoadingEarlier, hasSettled else { return }
+                // Only when they are already at the end. Dragging somebody to the foot
+                // of the conversation because a tool call landed is taking the screen
+                // off the person reading it.
+                guard isAtEnd else { hasNewBelow = true; return }
                 withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
             }
+            .overlay(alignment: .bottom) { jumpToEnd(scroller) }
         }
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
@@ -115,6 +132,25 @@ struct RemoteChatView: View {
 
     private var bottom: String { "bottom" }
 
+    /// Within a screen's-worth of the foot counts as being at the end: a reader who
+    /// has nudged the scroll a little has not gone anywhere, and a button that appears
+    /// for that is a button that flickers.
+    private var isAtEnd: Bool { distanceFromEnd < 120 }
+
+    /// The way back to the live end. Shown only when it would do something — there is
+    /// more conversation than screen, and the reader is not already at the foot of it.
+    @ViewBuilder
+    private func jumpToEnd(_ scroller: ScrollViewProxy) -> some View {
+        if !isAtEnd, hasSettled {
+            JumpToEnd(hasNewBelow: hasNewBelow) {
+                hasNewBelow = false
+                withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
+            }
+            .padding(.bottom, 12)
+            .transition(.opacity)
+        }
+    }
+
     /// Open at the end, the way every chat does, and only then let reaching the top
     /// mean something. Without the wait, a transcript that arrives a beat after the
     /// screen does would be read as "the user scrolled up" and pull the whole history
@@ -129,6 +165,7 @@ struct RemoteChatView: View {
         scroller.scrollTo(bottom, anchor: .bottom)
         try? await Task.sleep(for: .milliseconds(400))
         guard !Task.isCancelled else { return }
+        hasNewBelow = false
         hasSettled = true
     }
 
@@ -238,5 +275,58 @@ struct ContextMeter: View {
     private func label(_ usage: Usage) -> String {
         let tokens = "\(usage.used.formatted()) of \(usage.size.formatted()) tokens"
         return usage.isCloseToFull ? "Context nearly full — \(tokens)" : tokens
+    }
+}
+
+/// Where the reader is in the conversation, in one value, because `onScrollGeometryChange`
+/// fires on one.
+private struct Place: Equatable {
+    var offset: CGFloat
+    var distanceFromEnd: CGFloat
+    /// The height of the visible part, which is what a page should be sized to.
+    var height: CGFloat
+
+    init(_ geometry: ScrollGeometry) {
+        offset = geometry.contentOffset.y
+        height = geometry.containerSize.height
+        // What is below the foot of the screen. Negative while rubber-banding past the
+        // end, which is still the end, so it is floored at zero.
+        distanceFromEnd = max(0, geometry.contentSize.height
+                                 - geometry.containerSize.height
+                                 - geometry.contentOffset.y)
+    }
+
+    var isAtEnd: Bool { distanceFromEnd < 120 }
+}
+
+/// The way back to the live end of a conversation.
+///
+/// The Mac's control, at a size a thumb can hit. No colour — colour means something
+/// has gone wrong in this app, and being three screens up a conversation is not that.
+/// New lines arriving while you read are said in words.
+private struct JumpToEnd: View {
+    let hasNewBelow: Bool
+    let go: () -> Void
+
+    var body: some View {
+        Button(action: go) {
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 11, weight: .semibold))
+                if hasNewBelow {
+                    Text("Something new")
+                }
+            }
+            .padding(.horizontal, hasNewBelow ? 14 : 12)
+            .padding(.vertical, 10)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .font(.footnote)
+        .fixedSize()
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityLabel(hasNewBelow
+                            ? "Go to the end of the conversation, where something new is"
+                            : "Go to the end of the conversation")
     }
 }

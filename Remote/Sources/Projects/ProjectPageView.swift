@@ -8,9 +8,9 @@ import SwiftUI
 /// headings. The Mac's 144pt gutter is not here: a phone is 390 points wide and a
 /// gutter that size would leave a column of text a hundred points across.
 ///
-/// The prompt bar is not here yet. Starting an agent from the remote is US2, and this
-/// page is built now so that the layout under it has stopped moving by the time it
-/// arrives.
+/// The prompt bar is not here yet. Starting an agent from the remote is US3 — T072 —
+/// and this page is built now so the layout under it has stopped moving by the time it
+/// arrives. parity.md said it was built; it was not, and now says so.
 struct ProjectPageView: View {
     @Environment(RemoteModel.self) private var model
     @State private var showsArchived = false
@@ -30,6 +30,15 @@ struct ProjectPageView: View {
         .navigationTitle(model.selectedSummary?.name ?? "Project")
         .navigationBarTitleDisplayMode(.large)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    TotalsView()
+                } label: {
+                    Label("Spending", systemImage: "sterlingsign.circle")
+                }
+            }
+        }
         .onChange(of: model.selectedProject) { archivedShown = pageSize }
     }
 
@@ -38,6 +47,10 @@ struct ProjectPageView: View {
             LazyVStack(alignment: .leading, spacing: 10) {
                 if let summary = model.selectedSummary, !summary.exists {
                     MissingFolder(path: summary.folder.path)
+                }
+
+                if let summary = model.selectedSummary {
+                    ProjectTotal(summary: summary)
                 }
 
                 ForEach(AgentGroup.live, id: \.self) { group in
@@ -51,6 +64,8 @@ struct ProjectPageView: View {
                 }
 
                 archivedSection
+
+                WorkflowsSection()
 
                 if isEmpty {
                     Text("Nothing here yet. Start an agent on the Mac and it appears here.")

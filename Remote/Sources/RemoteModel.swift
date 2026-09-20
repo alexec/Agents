@@ -53,6 +53,11 @@ final class RemoteModel {
     // MARK: What the screens read
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
+    /// Archived ones too, for the spending page. A project put away still cost what it
+    /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
+    var allProjects: [DaemonAPI.ProjectSummary] { work.projects }
+    /// The open project's standing arrangements. Listed here, driven on the Mac.
+    var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
@@ -61,6 +66,37 @@ final class RemoteModel {
     var costState: DaemonAPI.CostState? { work.costState }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     var hasMoreBefore: Bool { work.hasMoreBefore }
+
+    /// How much transcript to ask for on the first fetch, measured rather than fixed.
+    ///
+    /// A constant page means the iPad fetches twice before the reader has finished the
+    /// first screen: a 13-inch iPad in landscape shows two to three times a phone's
+    /// lines, and the same number of entries covers proportionally less of it
+    /// (research §9, SC-007).
+    ///
+    /// Entries, not lines — the protocol pages by entry — so the screen's height is
+    /// turned into one through a rough average of how tall an entry draws. Rough is
+    /// enough: being out by a third costs one extra fetch, which is what the constant
+    /// cost every time.
+    private(set) var firstPageSize = defaultPageSize
+
+    /// A phone's, near enough, for the first conversation opened before anything has
+    /// been measured. Every one after it uses the real height.
+    static let defaultPageSize = 60
+
+    /// About as tall as an entry draws: a line of tool call, a short paragraph, a
+    /// state change. Measured by eye rather than computed, and the clamp either side
+    /// is what keeps a bad guess from becoming a bad fetch.
+    private static let entryHeight: CGFloat = 80
+    /// Screens' worth to hold: enough to scroll a couple before going back for more.
+    private static let screensHeld: CGFloat = 3
+
+    /// Told by the conversation, which is the only thing that knows how tall it is.
+    func measure(transcriptHeight height: CGFloat) {
+        guard height > 0 else { return }
+        let entries = (height / Self.entryHeight) * Self.screensHeld
+        firstPageSize = min(200, max(30, Int(entries.rounded())))
+    }
 
     func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedProject, group: group) }
 
@@ -180,6 +216,7 @@ final class RemoteModel {
         await refreshPermissions()
         await refreshResuming()
         await refreshCostState()
+        await refreshWorkflows()
         await loadTranscript()
         settleSelection()
     }
@@ -220,6 +257,16 @@ final class RemoteModel {
     ///
     /// A daemon too old to know the method answers method-not-found, which is the
     /// same as nothing coming back — not a connection that failed.
+    /// Every project's, in one call, the way the window asks for them. `workflow/changed`
+    /// keeps them current afterwards; without this first fetch the section would stay
+    /// empty until something happened to a workflow, which on a quiet project is never.
+    private func refreshWorkflows() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.workflowsList,
+                                                  DaemonAPI.WorkflowsListRequest(),
+                                                  returning: [WorkflowSummary].self) else { return }
+        work.replaceWorkflows(listed)
+    }
+
     private func refreshResuming() async {
         let response = try? await client.call(DaemonAPI.Method.agentsResuming,
                                               Optional<String>.none,
@@ -241,7 +288,7 @@ final class RemoteModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         guard let page = try? await client.call(DaemonAPI.Method.agentsTranscript,
-                                                DaemonAPI.TranscriptRequest(agentID: selection),
+                                                DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize),
                                                 returning: TranscriptPage.self) else { return }
         work.replaceTranscript(with: page)
     }
@@ -254,7 +301,8 @@ final class RemoteModel {
         defer { isLoadingEarlier = false }
         guard let page = try? await client.call(
             DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex),
+            DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
+                                        limit: firstPageSize),
             returning: TranscriptPage.self) else { return }
         work.prepend(page)
     }
