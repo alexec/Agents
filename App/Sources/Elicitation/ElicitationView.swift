@@ -14,8 +14,8 @@ struct ElicitationView: View {
     @State private var values: [String: JSONValue] = [:]
     /// Which question of a multi-question form is on screen.
     @State private var step = 0
-    /// How tall the question on that page wants to be, measured rather than guessed.
-    @State private var questionHeight: CGFloat = 0
+    /// How tall the question on each page wants to be, measured rather than guessed.
+    @State private var questionHeights: [Int: CGFloat] = [:]
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -82,7 +82,17 @@ struct ElicitationView: View {
         if let description = schema.description {
             Text(description).font(.callout).foregroundStyle(.secondary)
         }
-        question(pages[page], page: page, last: last)
+        // Every page is laid out, hidden, under the one that shows, so the card is as
+        // tall as its tallest question whichever page is up. Answering the first
+        // question then puts the second exactly where the first was; before this the
+        // card shrank around a shorter question and, being pinned to the foot of the
+        // pane, dropped it to wherever the shorter card's top now was.
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(pages.enumerated()), id: \.offset) { index, group in
+                question(group, page: index, last: last).hidden()
+            }
+            question(pages[page], page: page, last: last)
+        }
         HStack(spacing: 8) {
             if last > 0 {
                 turn(to: page - 1, "chevron.backward", "Previous question", enabled: page > 0)
@@ -145,8 +155,8 @@ struct ElicitationView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeight = $0 }
-        if questionHeight > Self.questionCap {
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeights[page] = $0 }
+        if (questionHeights[page] ?? 0) > Self.questionCap {
             ScrollView { content }
                 .frame(height: Self.questionCap)
                 .scrollBounceBehavior(.basedOnSize)
