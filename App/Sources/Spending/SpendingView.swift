@@ -3,9 +3,10 @@ import SwiftUI
 
 /// What all of the work has cost, and where it went.
 ///
-/// A window of its own rather than a page in the detail column, so closing it returns
-/// you to exactly the project and chat you left — true by construction, with no flag to
-/// unwind — and so it can sit open beside the work while the figures move.
+/// A page in the detail column, picked from the last row of the sidebar. It was a
+/// window of its own until the money was somewhere a person could find it: a window
+/// is a thing you have to know exists, and the figure that was supposed to advertise
+/// it sat at the foot of a column hiding itself whenever nothing had been banked.
 ///
 /// It reads `model.projects` and nothing else. The grand total and the shares beneath it
 /// are folded from the same array in the same render, which is what makes it impossible

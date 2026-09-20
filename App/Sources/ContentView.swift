@@ -42,30 +42,39 @@ struct ContentView: View {
         GeometryReader { window in
             // Two columns: the projects, and the project.
             NavigationSplitView(columnVisibility: $columns) {
-                ProjectListView(selection: $model.selectedProject)
+                ProjectListView(selection: $model.sidebarItem)
                     .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
             } detail: {
-                NavigationStack(path: openAgent) {
-                    ProjectAgentsView(selection: $model.selection)
-                        .navigationDestination(for: UUID.self) { _ in
-                            HStack(spacing: 0) {
-                                ChatView()
-                                    .frame(maxWidth: .infinity)
-                                // Closed means absent, not hidden. Nothing of the
-                                // sidebar runs while it is shut: no folder watch, no
-                                // web view, no shell attached (FR-006, SC-009).
-                                if frame.isOpen,
-                                   SidebarFrame.fits(inWindowOf: window.size.width) {
-                                    SidebarView(windowWidth: window.size.width)
-                                        .transition(.move(edge: .trailing))
+                // Spending is a page here rather than a window of its own, so closing
+                // it is picking a project again and the window keeps its place. It
+                // sits outside the conversation stack deliberately: a chat is pushed
+                // from a project and popped back to it, and the bill is not on that
+                // path.
+                if model.showsSpending {
+                    SpendingView()
+                } else {
+                    NavigationStack(path: openAgent) {
+                        ProjectAgentsView(selection: $model.selection)
+                            .navigationDestination(for: UUID.self) { _ in
+                                HStack(spacing: 0) {
+                                    ChatView()
+                                        .frame(maxWidth: .infinity)
+                                    // Closed means absent, not hidden. Nothing of the
+                                    // sidebar runs while it is shut: no folder watch,
+                                    // no web view, no shell attached (FR-006, SC-009).
+                                    if frame.isOpen,
+                                       SidebarFrame.fits(inWindowOf: window.size.width) {
+                                        SidebarView(windowWidth: window.size.width)
+                                            .transition(.move(edge: .trailing))
+                                    }
+                                }
+                                .toolbar {
+                                    ToolbarItem(placement: .primaryAction) {
+                                        SidebarToggle(windowWidth: window.size.width)
+                                    }
                                 }
                             }
-                            .toolbar {
-                                ToolbarItem(placement: .primaryAction) {
-                                    SidebarToggle(windowWidth: window.size.width)
-                                }
-                            }
-                        }
+                    }
                 }
             }
         }

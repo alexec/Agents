@@ -7,7 +7,7 @@ import SwiftUI
 /// work rather than the length of the history, which is the whole point of the change.
 struct ProjectListView: View {
     @Environment(AppModel.self) private var model
-    @Binding var selection: URL?
+    @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     @State private var isChoosingFolder = false
@@ -16,7 +16,7 @@ struct ProjectListView: View {
         List(selection: $selection) {
             ForEach(model.liveProjects) { summary in
                 ProjectRow(summary: summary)
-                    .tag(summary.folder)
+                    .tag(SidebarItem.project(summary.folder))
                     .contextMenu { menu(for: summary) }
             }
 
@@ -37,8 +37,9 @@ struct ProjectListView: View {
         .listStyle(.sidebar)
         // Carried over from the agent list this replaced: four agents running is four
         // numbers to add up in your head, which is the sort of thing you only do after
-        // the bill.
-        .safeAreaInset(edge: .bottom) { SessionSpend() }
+        // the bill. Pinned rather than scrolled with the projects: it is about all of
+        // them, and a list long enough to scroll is exactly when you want it.
+        .safeAreaInset(edge: .bottom) { SpendingRow(selection: $selection) }
         // Named only when it is not the ordinary daemon. Two copies of this app can
         // be running against two roots, and an unlabelled window is the one you
         // archive the wrong project in.
@@ -159,54 +160,76 @@ private struct RuntimeMissingLine: View {
     }
 }
 
-/// What today has cost, and how much of the day's limit is left.
+/// The way into Spending, and what today has cost on the way past.
 ///
-/// Today rather than "this sitting", which is what stood here before limits existed.
-/// Today's figure is what the daily limit is measured against, it survives closing
-/// the window, and it needs no baseline subtracted from it. Two similar money figures
-/// in one sidebar is also how a reader learns to trust neither, so this is a
-/// replacement rather than an addition.
+/// The bottom of this column has always been where the money is, so Spending is here
+/// rather than in a row above the projects: a line that already shows a figure is the
+/// one place somebody looks for more of it. It is a row of the sidebar and not a
+/// button to a window of its own — the bill is something you read beside the work and
+/// come back out of, like a project.
 ///
-/// The meter in a chat says what one agent cost. Per currency, like every other total
-/// here: two currencies read as two numbers rather than one nobody could check.
-private struct SessionSpend: View {
+/// Today rather than "this sitting": today's figure is what the daily limit is
+/// measured against, it survives closing the window, and it needs no baseline
+/// subtracted from it. The meter in a chat says what one agent cost. Per currency,
+/// like every other total here: two currencies read as two numbers rather than one
+/// nobody could check.
+///
+/// Drawn whether or not anything has been spent, unlike the line it replaces. A row
+/// that hides itself until the first pound is spent is a row nobody can use to find
+/// out that nothing has been — and while the cost was going unbanked, it was the only
+/// way in and it was never there.
+private struct SpendingRow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
+    @Binding var selection: SidebarItem?
+
+    private var isPicked: Bool { selection == .spending }
 
     var body: some View {
-        if let state = model.costState, let spend = Cost.total(of: state.today) {
-            // The way into Spending. A line that already shows money is the one place
-            // somebody will look for more of it, so this is a button rather than a
-            // second affordance in a column that is not about money — and `.plain`
-            // keeps it reading as the status line it was rather than growing chrome.
-            Button {
-                openWindow(id: "spending")
-            } label: {
-                HStack {
-                    Text("Today")
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text(spend).monospacedDigit()
-                        // Nothing when there is no limit: headroom that does not
-                        // exist is not a thing to draw an empty gauge for.
-                        if let left = state.dayHeadroom, let daily = state.limits.daily {
-                            Text("\(left.formatted(.currency(code: daily.currency))) left")
-                                .font(.caption2)
-                        }
+        Button {
+            selection = .spending
+        } label: {
+            HStack(alignment: .firstTextBaseline) {
+                Text(today == nil ? "Spending" : "Today")
+                Spacer()
+                VStack(alignment: .trailing, spacing: 1) {
+                    if let today {
+                        Text(today).monospacedDigit()
+                    }
+                    // Nothing when there is no limit: headroom that does not exist is
+                    // not a thing to draw an empty gauge for.
+                    if let state = model.costState, let left = state.dayHeadroom,
+                       let daily = state.limits.daily {
+                        Text("\(left.formatted(.currency(code: daily.currency))) left")
+                            .font(.caption2)
                     }
                 }
-                .font(.footnote)
-                // Colour means a person is needed. The app's existing threshold for
-                // a nearly full context, not a second number to learn.
-                .foregroundStyle(state.dayIsCloseToFull ? AnyShapeStyle(.red)
-                                                        : AnyShapeStyle(.secondary))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .background(.bar)
-            .help("What every agent has cost since this window opened. Opens Spending.")
+            .font(.footnote)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isPicked ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .background(.bar)
+        .help(today == nil
+              ? "What all of the work has cost"
+              : "What every agent has cost today. Opens Spending.")
+    }
+
+    private var today: String? {
+        model.costState.flatMap { Cost.total(of: $0.today) }
+    }
+
+    /// Colour means a person is needed. The app's existing threshold for a nearly full
+    /// context, not a second number to learn. A picked row is drawn on the selection
+    /// colour, where red on blue is neither legible nor a warning anybody reads.
+    private var foreground: AnyShapeStyle {
+        if isPicked { return AnyShapeStyle(.primary) }
+        return model.costState?.dayIsCloseToFull == true
+            ? AnyShapeStyle(.red)
+            : AnyShapeStyle(.secondary)
     }
 }

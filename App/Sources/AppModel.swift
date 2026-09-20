@@ -64,6 +64,45 @@ final class AppModel {
 
     static let selectedProjectKey = "selectedProjectFolder"
 
+    /// Whether the window is showing Spending rather than a project.
+    ///
+    /// Not persisted, unlike the selected project. Spending is somewhere you go to
+    /// answer a question — what has this cost — and a window that reopens on the bill
+    /// rather than on the work would be answering a question nobody asked twice.
+    var showsSpending = false {
+        didSet {
+            guard showsSpending, showsSpending != oldValue else { return }
+            // The same rule as picking a project: what you picked is what you see,
+            // and a conversation left open underneath would be a second thing on
+            // screen that nobody chose.
+            selection = nil
+        }
+    }
+
+    /// What is picked in the sidebar, as one value.
+    ///
+    /// The projects and Spending share a column, so they have to share a selection:
+    /// two bindings would let both look picked at once. `selectedProject` stays the
+    /// stored fact — it is what the window reopens on — and this is the view of it
+    /// the list is driven by.
+    var sidebarItem: SidebarItem? {
+        get { showsSpending ? .spending : selectedProject.map(SidebarItem.project) }
+        set {
+            switch newValue {
+            case .spending:
+                showsSpending = true
+            case .project(let folder):
+                showsSpending = false
+                showProject(folder)
+            case nil:
+                // A list that clears its own selection — which macOS does while rows
+                // come and go — must not empty the detail column. Nothing is picked
+                // is not a thing this window can show.
+                break
+            }
+        }
+    }
+
     /// Go to a project's page, whether or not it was already the selected one.
     ///
     /// `selectedProject`'s `didSet` says the rule — picking a project shows the
@@ -77,6 +116,9 @@ final class AppModel {
     /// decides which transcript this window is watching, and the turn belongs to the
     /// daemon.
     func showProject(_ folder: URL) {
+        // Going to a project is going away from Spending, wherever the ask came from
+        // — a new project being added, a menu item, the list itself.
+        showsSpending = false
         selectedProject = folder
         selection = nil
     }
