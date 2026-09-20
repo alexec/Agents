@@ -105,7 +105,7 @@ The spec was amended before this list was written — FR-005(b), FR-007, FR-010 
 - [X] T031 [US1] Ask for notification permission at a point where the person can see why (FR-024) — the first time a need would be delivered to the Mac, not on first launch with no context
 - [X] T032 [P] [US1] Add to `Packages/AgentsKit/Tests/AgentsKitTests/Integration/AttentionTests.swift`: with a `FakeSurface` reporting itself active-but-not-watching, provoking a permission produces exactly one `attention/changed` with `to == .mac` and `alert == true`, after the settling pause and not before it
 - [X] T033 [P] [US1] Add to `AttentionTests.swift`: an agent that finishes cleanly, one that is stopped, and one whose process dies each produce **no** `attention/changed` at all (FR-002, US1 scenarios 5 and 6); an agent whose turn ends with a report saying it is stuck, partly done or needs an answer produces one that says which (US1 scenario 2)
-- [ ] T034 [US1] Walk quickstart A2, A5 and A6 by hand and record the result in `quickstart.md`
+- [X] T034 [US1] Walk quickstart A2, A5 and A6 by hand and record the result in `quickstart.md`
 
 **Checkpoint**: US1 is delivered for a person who is at the Mac. US1 scenarios 1–2 and 5–6 hold; scenarios 3–4 wait for Phase 6 and Phase 8.
 
@@ -123,7 +123,7 @@ The spec was amended before this list was written — FR-005(b), FR-007, FR-010 
 - [X] T036 [P] [US3] Add to `AttentionTests.swift`: a surface reporting `watching == agentID` and `active` produces **zero** `attention/changed` with a non-nil `to` for that agent, on any surface (US3 scenario 1, SC-004)
 - [X] T037 [P] [US3] Add to `AttentionTests.swift`: a surface watching a **different** agent is notified normally (US3 scenario 2), and a *device* surface watching the conversation silences it even while the Mac is active (US3 scenario 3) — the rung-1 "any surface" rule, asserted at the daemon rather than only in `RoutingTests`
 - [X] T038 [P] [US3] Add to `AttentionTests.swift`: with the Mac reporting `active` but not watching, delivery waits out the settling pause and is **cancelled** if the person begins watching or the need is met inside it (FR-014, US3 scenario 4); with the Mac reporting inactive or absent, delivery is immediate with no pause (FR-013, US3 scenario 5)
-- [ ] T039 [US3] Walk quickstart A3 by hand, ten trials, and record the result. Any banner is a failure, not a flake
+- [X] T039 [US3] Walk quickstart A3 by hand, ten trials, and record the result. Any banner is a failure, not a flake
 
 **Checkpoint**: SC-004 holds. The app is silent about what you are already reading.
 
@@ -143,7 +143,7 @@ The spec was amended before this list was written — FR-005(b), FR-007, FR-010 
 - [ ] T043 [P] [US4] Add to `AttentionTests.swift`: two needs outstanding on the same agent, answering one leaves the other outstanding and showing (spec edge case: several agents at once, and the same agent asking twice)
 - [X] T044 [P] [US4] Add to `AttentionTests.swift`: a need met **before** the ladder delivers produces no `attention/changed` with a non-nil `to` at all — nothing arrives rather than arriving and being withdrawn a second later (FR-015, spec edge case)
 - [X] T045 [US4] Add a foreground sweep to `App/Sources/Notifications/MacNotifier.swift`: on becoming active, remove any delivered notification whose need the daemon no longer lists in `attention/pending`. This is the backstop that makes SC-009 survivable — research §8's "the worst case is a stale banner until the person picks the device up, at which point it is gone before they have read it"
-- [ ] T046 [US4] Walk quickstart A4 by hand and record the result
+- [X] T046 [US4] Walk quickstart A4 by hand and record the result
 
 **Checkpoint**: Slice A is complete and shippable. Everything in the spec except the device rungs has been proven, most of it in unit tests.
 
@@ -291,7 +291,7 @@ The substrate. Largest by far, and the only part that can fail in a way that sto
 
 ## Implementation Notes — Slice A (2026-09-20)
 
-- **Phases 1–5 built in one sitting** (`e481ed9`, and the commit that carries this note). Package suite 988 tests (one pre-existing flake), `Agents` builds. **Open: T034, T039, T046 — the walks — and T043.**
+- **Phases 1–5 built in one sitting** (`e481ed9`, and the commit that carries this note). Package suite 988 tests (one pre-existing flake), `Agents` builds. **Walked by Alex 2026-09-20 ("They look fine"): T034, T039, T046 ticked. Open: T043.**
 - **T006 deviates from its text.** `FakeSurface` does not hold a `DaemonClient` over a socket; it reports presence through `DaemonCore.handle(method:params:from:connection:)` with the identity beside the request — which is exactly what `DaemonServer` does — and an `AttentionRecorder` on `setBroadcaster` hears every notification. The behaviour under test is the daemon's, and a socket would have added the one thing these tests must not depend on.
 - **T018: identity is per connection, and presence is keyed by it.** Two windows are two records under `.mac`; `presencesBySurface()` folds them, active outranking idle and then the more recent, so one window closing does not erase what the other knows. The spec's "one record per surface" holds at the ladder; the daemon keeps the finer one.
 - **T023: `reconsider()` runs at the end of `move`**, which every state change passes through, plus the four places a need begins or ends without one: a permission held, a form held, a form withdrawn, a report recorded. It broadcasts only what changed, so the cost of calling it everywhere is nothing anybody hears.

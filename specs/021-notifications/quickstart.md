@@ -247,13 +247,15 @@ daemon's, read through `attention/pending` every five seconds.
 
 | Check | Daemon side | Seen |
 |---|---|---|
-| A2 | Permission held 16:23:50; delivered `→ mac` at **16:24:10**, twenty seconds later and not before | banner — Alex to confirm the three lines and the click |
-| A3 | — | Alex's: watch the conversation, provoke a question, expect silence |
-| A4 | Answered `allow-once` at 16:24:40; withdrawn at **16:24:41** | banner gone — Alex to confirm |
-| A5 | The A2 agent finished cleanly (`done`), no need. An essay agent stopped mid-turn (`cancelled`), no need | nothing appeared — Alex to confirm |
+| A2 | Permission held 16:23:50; delivered `→ mac` at **16:24:10**, twenty seconds later and not before | banner seen, three lines read right, click opened the conversation ("They look fine") |
+| A3 | A question held 16:30:30 and **not delivered for eight minutes** while its conversation was watched; delivered `→ mac` at 16:38:32 when Alex moved away | silence while watching, confirmed |
+| A4 | Answered `allow-once` at 16:24:40; withdrawn at **16:24:41** | banner gone, confirmed |
+| A5 | The A2 agent finished cleanly (`done`), no need. An essay agent stopped mid-turn (`cancelled`), no need | nothing appeared, confirmed |
 | A6 | Not yet: no device slice in place, so the need stays on the Mac, which is correct | — |
 
 Found on the way, and fixed before the walk: the window reported `active` as "Agents is
 frontmost", so switching to another app moved the need to nowhere — the opposite of A2.
 At the Mac now means the session is in use (unlocked, input in any app inside `macIdle`),
 and watching stays the narrow fact (`796f4b8`).
+
+Also seen on live traffic during the walk: a form answered fifteen seconds after it was asked was never delivered (FR-015), and a banner withdrew the moment its conversation was opened from it.
