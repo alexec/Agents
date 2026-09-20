@@ -1,5 +1,7 @@
 # Feature Specification: Paper Document View
 
+> **Obsolete — 2026-09-20.** Retired by Alex before it was ever tasked. The plan, contracts and data model stay as a record of the thinking; nothing here is to be built.
+
 **Feature Branch**: `007-paper-document-view`
 
 **Created**: 2026-09-18

@@ -4,6 +4,8 @@ description: "Task list for Remotes for iPhone and iPad"
 
 # Tasks: Remotes for iPhone and iPad
 
+> **Obsolete — 2026-09-20.** Retired by Alex. Superseded by 013-ipad-app; the 66 tasks still open below are not to be picked up.
+
 **Input**: Design documents from `specs/005-mobile-remotes/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
