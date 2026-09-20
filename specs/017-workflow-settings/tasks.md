@@ -144,10 +144,10 @@ description: "Task list for Workflow Settings"
 ## Phase 7: Polish & Cross-Cutting
 
 - [ ] T051 Run the whole of [quickstart.md](./quickstart.md) §4 by hand, all nine steps plus the agent-written workflow, and record what each did
-- [ ] T052 [P] Add a line to `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowExample.swift` or its comment only if step 10 of the quickstart shows the empty-state suggestion now reads oddly beside settings — otherwise leave it alone and say so in the commit
-- [ ] T053 [P] Update `specs/008-agentic-workflows/spec.md` FR-032 to point at 017's FR-021, in the manner FR-024 and FR-035 in that same file already point at what superseded them. Do not rewrite the requirement; annotate it
-- [ ] T054 Run `swift test --package-path Packages/AgentsKit` and `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, both green
-- [ ] T055 Read back every comment added in T008, T018, T021 and T036 — in `Workflow.swift`, `WorkflowOutcome.swift`, `DaemonCore+Workflows.swift` and `FrontMatter.swift` — as a stranger would. Each one exists to stop a later reader undoing a decision that looks like an oversight; if any of them reads as description rather than reason, rewrite it
+- [X] T052 [P] Add a line to `Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowExample.swift` or its comment only if step 10 of the quickstart shows the empty-state suggestion now reads oddly beside settings — otherwise leave it alone and say so in the commit
+- [X] T053 [P] Update `specs/008-agentic-workflows/spec.md` FR-032 to point at 017's FR-021, in the manner FR-024 and FR-035 in that same file already point at what superseded them. Do not rewrite the requirement; annotate it
+- [X] T054 Run `swift test --package-path Packages/AgentsKit` and `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, both green
+- [X] T055 Read back every comment added in T008, T018, T021 and T036 — in `Workflow.swift`, `WorkflowOutcome.swift`, `DaemonCore+Workflows.swift` and `FrontMatter.swift` — as a stranger would. Each one exists to stop a later reader undoing a decision that looks like an oversight; if any of them reads as description rather than reason, rewrite it
 
 ---
 
@@ -256,3 +256,11 @@ Two things the walk found and the code now carries:
 The settings controls are US3's and are not on the page yet. What is there now is the
 sentence they will sit under, because it is true with or without them: a `triggering`
 workflow never applies a mode, and the page says so.
+
+## Implementation Notes (2026-09-20)
+
+- **T051 is open and is Alex's**: the nine steps of quickstart §4 plus the agent-written workflow, by hand in the built app.
+- **T052**: the empty-state sentence (`WorkflowExample.prompt`) reads as it did beside the settings and was left alone.
+- **T055**: the comments from T008, T018, T021 and T036 were read back as a stranger would; each carries its reason rather than a description, and none was rewritten.
+- `WorkflowSettings.modelOption(in:)` became public in T044, so the page and the start path use one rule for which option is the model, as `ModeMemory.modeOption` already did for the mode.
+- `WorkflowToolTests` flakes in filtered runs (`--filter WorkflowToolTests`) on the token-drop race its own `keepingAlive` helper describes — 2 of 3 runs at clean HEAD before any of this. The full suite is not affected.

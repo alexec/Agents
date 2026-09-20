@@ -161,7 +161,7 @@ Someone tells an agent *every morning, check whether any of our dependencies hav
 - **FR-031**: Each row MUST offer running it now and archiving it, as icons carrying tooltips rather than words: the row repeats down the page, and two labelled buttons on each is the loudest thing on it. The words MUST still be reachable — in the tooltips, and in the row's context menu.
 - **FR-031a**: Each row MUST offer archiving, and an archived workflow MUST never fire, MUST stay out of the project's live list, MUST leave its file untouched, and MUST be restorable from the same page.
 - **FR-031b**: A project MUST run at most three workflows at once, and all projects together MUST run at most ten. Archived ones do not count against either. Files past a ceiling MUST still be listed and readable — never hidden — and MUST refuse to fire with which ceiling, and what to do about it, stated on their row.
-- **FR-032**: The project page MUST NOT offer editing a workflow's trigger or body; authoring happens in the file or through an agent.
+- **FR-032**: *Amended by 017's FR-021.* The project page MUST NOT offer editing a workflow's trigger or body; authoring happens in the file or through an agent. 017 lets the workflow's page change its settings — permission mode, runtime, model — and only those; the trigger and the prompt remain the author's.
 
 **The tool agents use**
 
