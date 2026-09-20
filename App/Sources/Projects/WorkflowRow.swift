@@ -20,23 +20,20 @@ struct WorkflowRow: View {
     private var workflow: Workflow { summary.workflow }
 
     var body: some View {
+        // The whole card is the button, exactly as an agent's card is (`AgentCard`):
+        // the content is the label, the glass is interactive, and the play button and
+        // the Ran → link inside keep their own clicks because a nested button wins
+        // its own hit. A button *behind* the card was tried first and a real mouse
+        // never reached it through the glass.
+        Button { model.openWorkflow = summary.id } label: {
         HStack(alignment: .top, spacing: 12) {
             WorkflowStatusIcon(summary: summary)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
-                // The name opens it in its own right, in front of the glass. The button
-                // behind the card is the design; this is the way in that does not depend
-                // on a click falling through a glass layer, which on this build it did
-                // not: every part of the card was clicked on 2026-09-20 and nothing
-                // opened.
-                Button { model.openWorkflow = summary.id } label: {
-                    Text(workflow.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
+                Text(workflow.name)
+                    .font(.headline)
+                    .lineLimit(1)
 
                 Text(workflow.summary)
                     .font(.callout)
@@ -53,23 +50,11 @@ struct WorkflowRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
-        // The whole card opens it, from a layer behind the content rather than from
-        // the card itself. Two other arrangements were tried and are worse: a tap
-        // gesture on the card never fires at all, and wrapping the card in a `Button`
-        // would take the clicks away from the play button, the archive button and the
-        // Ran → link, which have their own meanings and must keep their own hit areas.
-        // Behind the content, those three still win their own clicks and everything
-        // else on the card — which is most of it — falls through to here.
-        .background {
-            Button { model.openWorkflow = summary.id } label: {
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open \(workflow.name)")
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(workflow.name)")
         .contextMenu {
             // The contract said the menu gains nothing because opening is what the row
             // does by itself. It is here because the row did not, on a real mouse, and
