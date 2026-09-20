@@ -44,10 +44,12 @@ extension TranscriptEntry {
         for entry in coalesced(entries) {
             switch entry.kind {
             case .toolCall(let call), .toolCallUpdate(let call):
-                // The app's own suggestion tool is not drawn. It is not hidden work:
-                // what it did is the row above the prompt, and a line here saying so
-                // would be the same thing said twice.
-                if call.isSuggestingPrompts {
+                // The app's own suggestion tool is not drawn, and nor is the outcome
+                // report. Neither is hidden work: what one did is the row above the
+                // prompt and what the other did is the report at the foot of the
+                // conversation, and a line here saying so would be the same thing said
+                // twice.
+                if call.isSuggestingPrompts || call.isReportingOutcome {
                     if let id = call.toolCallID { suppressed.insert(id) }
                     continue
                 }

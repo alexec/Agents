@@ -298,7 +298,8 @@ public final class AgentsModel {
     /// the daemon, which stores nothing for this and refuses to show a file when no
     /// window is open.
     public func group(of agent: Agent) -> AgentGroup {
-        AgentGroup(for: agent.state, wantsEyes: filesToShow[agent.id] != nil)
+        AgentGroup(for: agent.state, wantsEyes: filesToShow[agent.id] != nil,
+                   report: agent.report)
     }
 
     /// Whether any agent in this folder has asked to be looked at and not been.

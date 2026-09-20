@@ -285,8 +285,19 @@ extension DaemonCore {
         // Everything goes on the queue, even when it is going straight out again.
         // That is what keeps the order the order it was typed in: a prompt sent while
         // three are waiting joins the back of them rather than jumping the lot.
-        let queued = QueuedPrompt(text: request.text, attachments: request.attachments)
+        let queued = QueuedPrompt(text: request.text, attachments: request.attachments,
+                                  from: request.from)
         agent.queuedPrompts.insert(queued, at: first ? 0 : agent.queuedPrompts.endIndex)
+        // The person moving the work on is what settles the turn before it. What the
+        // agent said about that turn is now history, and so is any claim on the one
+        // question this app will ask about a silence — they have superseded it.
+        //
+        // Only theirs. The app's own question clears neither: there is nothing there to
+        // clear, and not clearing is how the two are told apart at all (FR-006, FR-023).
+        if request.from == .person {
+            agent.report = nil
+            agent.outcomeAsked = false
+        }
         changed(agent)
         guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else { return }
         try await sendNextQueued(to: agent.id)
@@ -356,7 +367,8 @@ extension DaemonCore {
               let index = agent.queuedPrompts.firstIndex(where: { $0.id == next.id }) else { return }
         agent.queuedPrompts.remove(at: index)
         changed(agent)
-        await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks, session: session)
+        await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks,
+                        from: next.from, session: session)
     }
 
     /// Whatever is waiting, now that a turn has ended of its own accord.
@@ -528,13 +540,14 @@ extension DaemonCore {
     // MARK: The turn itself
 
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
-                   session: ACPSession) async {
+                   from: PromptOrigin = .person, session: ACPSession) async {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
         clearSuggestions(for: agentID)
         // The text is kept beside the blocks so the record reads the way it always has.
-        await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : []), for: agentID)
+        await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
+                     for: agentID)
         await move(agentID, on: .promptSent)
         turnTasks[agentID]?.cancel()
         // The words of ours, sent with the first prompt of a conversation and not

@@ -48,7 +48,8 @@ struct AppServiceTests {
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
         #expect(tools.compactMap { $0["name"]?.stringValue }
-            == [AppService.toolName, AppService.showFileToolName, AppService.workflowToolName])
+            == [AppService.toolName, AppService.showFileToolName, AppService.workflowToolName,
+                AppService.reportOutcomeToolName])
 
         let items = tools.first?["inputSchema"]?["properties"]?["prompts"]?["items"]
         #expect(items?["properties"]?["label"] != nil)
@@ -61,12 +62,22 @@ struct AppServiceTests {
         // a call it can make.
         #expect(showFile?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["path"])
 
-        let workflows = tools.last?["inputSchema"]
+        let workflows = tools[2]["inputSchema"]
         #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue } == ["list", "read", "write", "remove"])
         // Only the action is required: `list` needs nothing else, which is the call an
         // agent makes first.
         #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
+
+        let outcome = tools.last?["inputSchema"]
+        // The five, and only the five, spelled the way the daemon reads them. A sixth
+        // word offered here would be a word the daemon has to refuse.
+        #expect(outcome?["properties"]?["outcome"]?["enum"]?.arrayValue?
+            .compactMap { $0.stringValue }
+            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
+        // Both required. A status with no words is what the app already had.
+        #expect(outcome?["required"]?.arrayValue?.compactMap { $0.stringValue }
+            == ["outcome", "message"])
         await service.close()
     }
 

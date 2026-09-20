@@ -78,6 +78,62 @@ extension DaemonCore {
             : "\(prompts.count) shown above the prompt. The person may tap one, edit it, or ignore them."
     }
 
+    /// An agent has said how the work actually went.
+    ///
+    /// The last thing it does, and the only thing that can tell a turn being handed
+    /// back from the work being finished. Everything refused here is refused in a
+    /// sentence rather than a code, because the agent is what reads it.
+    ///
+    /// The one refusal worth the words: a report while a question of the agent's own is
+    /// still outstanding. Claiming the work is settled while the app is holding a form
+    /// or a permission for the person would tell them the opposite of the truth, so the
+    /// agent is sent back to its own question first.
+    public func reportOutcome(_ request: DaemonAPI.ReportOutcomeRequest) async throws -> String {
+        guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                               message: "That conversation is not open any more, so nothing was recorded.")
+        }
+        guard let outcome = WorkOutcome(wire: request.outcome) else {
+            // Never rounded to the nearest one we know. An unrecognised word read as
+            // `done` is the unearned tick this whole feature exists to remove.
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: """
+                                Nothing was recorded: outcome has to be one of done, \
+                                nothing_to_do, needs_answer, partly_done or stuck.
+                                """)
+        }
+        let waiting = pendingPermissions.values.contains { $0.agentID == agentID }
+            || elicitations.values.contains { $0.agentID == agentID }
+        guard !waiting else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: """
+                                Nothing was recorded: you have a question waiting to be \
+                                answered, so this work is not over. Answer it first, or \
+                                let it be answered.
+                                """)
+        }
+        guard let report = WorkReport(outcome: outcome, wire: request.message) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: """
+                                Nothing was recorded: say in a sentence how it went. An \
+                                outcome with no words is no more use than the turn simply \
+                                ending.
+                                """)
+        }
+        // Replacing whatever this turn said before it changed its mind (FR-005).
+        agent.report = report
+        // The record before the windows, which is the order that leaves something true
+        // behind when the daemon is killed mid-call.
+        await record(.workReported(report), for: agentID)
+        changed(agent)
+        return outcome.needsAPerson
+            ? """
+                Noted. The person will see this conversation under "Needs attention", \
+                with your message on it.
+                """
+            : "Noted. This conversation now reads as \"\(outcome.heading)\" wherever the person looks."
+    }
+
     /// An agent has asked that a file be put in front of the user.
     ///
     /// Three things are checked here rather than in the window, because the window is

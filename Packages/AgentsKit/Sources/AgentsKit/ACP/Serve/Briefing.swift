@@ -64,10 +64,26 @@ public enum Briefing {
         waits for me. A question in the middle of a reply I may not read does not.
         """
 
-    /// In the order they are sent. A tool the app does not serve yet does not appear
-    /// here: the outcome report of 014 is the next line to join this list, and it joins
-    /// it when there is something to call.
-    public static var lines: [String] { [suggestions, escalation, workflows] }
+    /// Say how it went, at the end.
+    ///
+    /// The one line here that buys something the app cannot get any other way: without
+    /// it the app knows only that a turn ended, and a turn ending is not the work being
+    /// finished. It names the outcomes rather than pointing at the tool's own
+    /// description, because a description is a menu and this is an instruction — the
+    /// same lesson `suggestions` was written from.
+    ///
+    /// It sits after `escalation` deliberately. An agent reads that it should ask with
+    /// the tool that waits before it reads that it can end by saying it needs an
+    /// answer, which is the order those two have to be read in.
+    public static let outcome = """
+        When you finish a turn, call \(AppTool.reportOutcome) to say how it actually \
+        went — done, or nothing to do, or that you need an answer, or that you only got \
+        part of the way, or that you are stuck — with a sentence I can read without \
+        opening the conversation. Without it I only see that you stopped.
+        """
+
+    /// In the order they are sent.
+    public static var lines: [String] { [suggestions, escalation, outcome, workflows] }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static var text: String { lines.joined(separator: "\n\n") }

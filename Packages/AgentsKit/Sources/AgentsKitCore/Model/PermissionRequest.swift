@@ -121,9 +121,14 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.manageWorkflows)
     }
 
+    /// Whether this is the app's own outcome tool.
+    public var isReportingOutcome: Bool {
+        (name ?? title).hasSuffix(AppTool.reportOutcome)
+    }
+
     /// Whether this call is the app's own rather than the agent's work at all.
     public var isTheApps: Bool {
-        isSuggestingPrompts || isShowingFile || isManagingWorkflows
+        isSuggestingPrompts || isShowingFile || isManagingWorkflows || isReportingOutcome
     }
 
     /// Whether the app may answer the runtime's permission question itself.
