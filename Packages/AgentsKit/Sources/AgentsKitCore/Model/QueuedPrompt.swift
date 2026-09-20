@@ -14,13 +14,17 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
     public var text: String
     public var attachments: [Attachment]
     public var queuedAt: Date
+    /// Whose prompt this is. The app queues one of its own after a turn that ended
+    /// without saying how it went; everything else here is the person's.
+    public var from: PromptOrigin
 
     public init(id: UUID = UUID(), text: String, attachments: [Attachment] = [],
-                queuedAt: Date = Date()) {
+                queuedAt: Date = Date(), from: PromptOrigin = .person) {
         self.id = id
         self.text = text
         self.attachments = attachments
         self.queuedAt = queuedAt
+        self.from = from
     }
 
     /// What goes to the runtime when its turn comes: the words, then what was
@@ -35,5 +39,7 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
         text = try c.decode(String.self, forKey: .text)
         attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
         queuedAt = try c.decodeIfPresent(Date.self, forKey: .queuedAt) ?? Date()
+        // New in 014. Absent is the person's, which every prompt queued before it was.
+        from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
     }
 }

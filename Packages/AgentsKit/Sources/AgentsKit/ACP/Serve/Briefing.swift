@@ -64,10 +64,31 @@ public enum Briefing {
         waits for me. A question in the middle of a reply I may not read does not.
         """
 
-    /// In the order they are sent. A tool the app does not serve yet does not appear
-    /// here: the outcome report of 014 is the next line to join this list, and it joins
-    /// it when there is something to call.
-    public static var lines: [String] { [suggestions, escalation, workflows] }
+    /// Say how it went, at the end.
+    ///
+    /// The one line here that buys something the app cannot get any other way: without
+    /// it the app knows only that a turn ended, and a turn ending is not the work being
+    /// finished.
+    ///
+    /// It sits after `escalation` deliberately. An agent reads that it should ask with
+    /// the tool that waits before it reads that it can end by saying it needs an
+    /// answer, which is the order those two have to be read in.
+    ///
+    /// What it does *not* do is list the five outcomes. The tool's own schema enumerates
+    /// them and refuses anything else, so saying them here as well would be this block's
+    /// own rule broken — an agent told six things at once follows the first two, and the
+    /// thing this line has to land is that the call happens at all. It also does not
+    /// repeat "when you finish a turn", which `suggestions` has already said: two lines
+    /// naming the same moment read as two moments.
+    public static let outcome = """
+        Call \(AppTool.reportOutcome) at the end of that same turn, with how it \
+        actually went and a sentence I can read without opening the conversation. \
+        Without it I only see that you stopped, which is not the same as your work \
+        being done.
+        """
+
+    /// In the order they are sent.
+    public static var lines: [String] { [suggestions, escalation, outcome, workflows] }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static var text: String { lines.joined(separator: "\n\n") }

@@ -35,11 +35,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// sorting. `waitingOnUser` is the whole of "Needs attention" because both things
     /// that block an agent on the user — a permission question and an elicitation form
     /// — already put it in that state.
-    public init(for state: AgentState) {
-        self.init(for: state, wantsEyes: false)
-    }
-
-    /// The same, for an agent that has asked the person to look at something.
+    ///
+    /// The two arguments are the other two ways an agent comes to want a person: it
+    /// asked them to look at something, or it said, at the end of its turn, that it
+    /// cannot get further without them.
     ///
     /// `wantsEyes` is not a state and must never become one. `waitingOnUser` carries
     /// `holdsRuntime` and `hasTurnInFlight` with it, so an agent put there for showing
@@ -47,14 +46,27 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// out of it except answering a permission. Showing a file blocks nothing: the
     /// agent asked and carried on working.
     ///
-    /// Still total over `(AgentState, Bool)`, so an agent is in exactly one group and
-    /// never in none. An agent that is not going anywhere is not waiting on you, so
-    /// the settled states ignore it.
-    public init(for state: AgentState, wantsEyes: Bool) {
+    /// An agent that is not going anywhere is not waiting on you, so the settled states
+    /// ignore it.
+    ///
+    /// A report is not a state either, and for a sharper reason than `wantsEyes`: it
+    /// describes a turn that is already over. `needsAnswer`, `partlyDone` and `stuck`
+    /// each mean somebody has to do something, so a finished agent carrying one of them
+    /// belongs in the one group a person actually reads — but it holds no runtime, queues
+    /// no prompts, and is answered by prompting it rather than by filling in a form.
+    ///
+    /// `stopped` and `archived` ignore the report entirely. How a turn *ended* outranks
+    /// what the agent said about the work: an agent the person put away is not waiting on
+    /// them whatever it last claimed, and a run cut short is news of its own.
+    ///
+    /// Still total over `(AgentState, Bool, WorkReport?)`, so an agent is in exactly one
+    /// group and never in none.
+    public init(for state: AgentState, wantsEyes: Bool = false, report: WorkReport? = nil) {
+        let wantsAnswer = report?.outcome.needsAPerson == true
         switch state {
         case .waitingOnUser: self = .needsAttention
         case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = wantsEyes ? .needsAttention : .finished
+        case .finished: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished
         case .stopped: self = .stopped
         case .archived: self = .archived
         }
@@ -82,7 +94,25 @@ extension AgentGroup: CodingKeyRepresentable {
 public extension Agent {
     /// Which of the four this agent falls in. Leads are asked this too, but the panel
     /// never asks: it pins them above the groups instead.
-    var group: AgentGroup { AgentGroup(for: state) }
+    var group: AgentGroup { AgentGroup(for: state, wantsEyes: false, report: report) }
+
+    /// Whether somebody has to do something about this agent.
+    ///
+    /// The two ways that becomes true: a question asked mid-turn, which holds the
+    /// runtime, and an outcome reported at the end of one, which does not. Both reach
+    /// the person the same way, because to them they are the same news.
+    var needsAPerson: Bool {
+        state == .waitingOnUser || (state == .finished && report?.outcome.needsAPerson == true)
+    }
+
+    /// A turn that ended cleanly, was asked how it went, and still said nothing.
+    ///
+    /// Not a completion — nothing vouched for it. It stays under Complete rather than
+    /// competing for attention with the agents that asked for it, and is marked so the
+    /// person can see which endings they can trust.
+    var endingIsUnaccountedFor: Bool {
+        state == .finished && endedReason == .endTurn && report == nil && outcomeAsked
+    }
 
     /// The plan it is working to, if it still stands.
     ///

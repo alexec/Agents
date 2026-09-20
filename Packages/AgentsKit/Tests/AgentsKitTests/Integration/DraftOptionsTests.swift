@@ -126,11 +126,15 @@ struct DraftOptionsTests {
         let id = try await later.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
                                              startOptions: StartOptions(values: ["model": "b"]),
                                              draftID: form.draftID))
-        await eventually("the turn ran to its end") { await later.agent(id)?.state == .finished }
-
+        // Read here, before the turn has ended: the claim is about the start, and a
+        // turn that ends without saying how it went is asked, which starts a runtime of
+        // its own a moment later.
         #expect(launcher.launchCount == 1, "the runtime started behind the form is the one used")
+        await eventually("the turn ran to its end") { await later.agent(id)?.state == .finished }
         #expect(await later.agent(id)?.state == .finished)
-        let applied = await launcher.lastAgent?.setOptions
+        // The first runtime's, not the last one's: the turn's ending is asked about,
+        // and that question starts a runtime of its own with no options set on it.
+        let applied = await launcher.allAgents.first?.setOptions
         #expect(applied?.first?.value.stringValue == "b")
     }
 

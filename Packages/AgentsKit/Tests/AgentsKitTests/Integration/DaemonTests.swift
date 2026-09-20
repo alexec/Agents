@@ -119,11 +119,16 @@ struct DaemonTests {
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
                                             startOptions: StartOptions(values: ["model": "b"]),
                                             draftID: offered.draftID))
-        await waitFor(core, id, "the turn ended") { $0.state == .finished }
+        // Read here, before the turn has ended: the claim is about the start, and a
+        // turn that ends without saying how it went is asked, which starts one of its
+        // own a moment later.
         #expect(launcher.launchCount == 1, "the draft session is used rather than a second runtime started")
+        await waitFor(core, id, "the turn ended") { $0.state == .finished }
         #expect(await core.agent(id)?.state == .finished)
 
-        let applied = await launcher.lastAgent?.setOptions
+        // The first runtime's, not the last one's: the turn's ending is asked about,
+        // and that question starts a runtime of its own with no options set on it.
+        let applied = await launcher.allAgents.first?.setOptions
         #expect(applied?.first?.id == "model")
         #expect(applied?.first?.value.stringValue == "b")
     }
@@ -480,7 +485,11 @@ struct DaemonTests {
         for agent in saved {
             await waitFor(core, agent.id, "it came back") { $0.state == .finished }
         }
-        #expect(launcher.launchCount == 3, "one runtime each, and no more")
+        // One runtime each to bring them back. Each of those turns then ends without
+        // saying how it went and is asked once, which is a runtime each again — so the
+        // number that matters is that no agent was started twice to be picked up.
+        #expect(launcher.launchCount <= 6, "one runtime each to pick up, and one to ask")
+        #expect(launcher.launchCount >= 3)
     }
 
     /// The chat the person was last watching should not wait behind every runtime
@@ -499,7 +508,12 @@ struct DaemonTests {
                            runtimeSessionID: "s", lastActivityAt: now)
         for agent in [oldest, middle, newest] { try await store.save(agent) }
 
-        let launcher = FakeLauncher()
+        // A turn long enough that none of the three ends while the others are still
+        // being picked up. A turn that ends without saying how it went is asked, and
+        // that question starts a runtime of its own, which would land in this order.
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .seconds(2)
+        let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 
@@ -621,6 +635,10 @@ struct DaemonTests {
         let store = try AgentStore(locations: locations)
         var script = FakeACPAgent.Script()
         script.handshakeDelay = .milliseconds(200)
+        // Long enough that no turn ends while the three are still starting. A turn that
+        // ends without saying how it went is asked, and that question starts a runtime
+        // of its own — which would land between two pick-ups and read as a short gap.
+        script.turnDelay = .seconds(2)
         for _ in 0..<3 {
             try await store.save(Agent(runtimeID: "grok", cwd: work, state: .running,
                                        runtimeSessionID: "s", lastActivityAt: Date()))
@@ -743,7 +761,10 @@ struct DaemonTests {
         await waitFor(core, running.id, "the one that was working came back") { $0.state == .finished }
         await waitFor(core, asking.id, "and the one that was asking") { $0.state == .finished }
         try await Task.sleep(for: .milliseconds(300))
-        #expect(launcher.launchCount == 2, "and nothing else was touched")
+        // Two picked back up, and nothing else touched. Each of those two is then
+        // asked how its turn went, which is a runtime apiece again.
+        #expect(launcher.launchCount <= 4, "and nothing else was touched")
+        #expect(launcher.launchCount >= 2)
         #expect(await core.agent(stopped.id)?.endedReason == .cancelled,
                 "a chat somebody stopped stays stopped")
         #expect(await core.agent(archived.id)?.state == .archived)
@@ -803,7 +824,7 @@ struct DaemonTests {
         }
         let page = try await core.transcript(.init(agentID: wasRunning.id))
         let prompts = page.entries.compactMap { entry -> String? in
-            guard case .userMessage(let text, _) = entry.kind else { return nil }
+            guard case .userMessage(let text, _, _) = entry.kind else { return nil }
             return text
         }
         let restart = prompts.firstIndex { $0.contains("The app restarted") }
@@ -832,7 +853,9 @@ struct DaemonTests {
         await core.pickUpAfterRestart(await core.recover())
 
         // While the first is still starting, stop the one behind it in the queue.
-        await eventually("the first is on its way") { launcher.launchCount == 1 }
+        // At least one, not exactly one: a turn that ends without saying how it went is
+        // asked, and that question starts a runtime of its own.
+        await eventually("the first is on its way") { launcher.launchCount >= 1 }
         try await core.stop(withdrawn.id)
 
         #expect(await core.stillResuming().contains(withdrawn.id) == false,

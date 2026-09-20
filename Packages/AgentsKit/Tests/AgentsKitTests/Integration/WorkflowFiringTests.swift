@@ -180,7 +180,7 @@ struct WorkflowFiringTests {
         let page = try await core.transcript(
             DaemonAPI.TranscriptRequest(agentID: agent.id, before: nil, limit: 50))
         let said = page.entries.contains { entry in
-            if case .userMessage(let text, _) = entry.kind { return text.contains("Count to three.") }
+            if case .userMessage(let text, _, _) = entry.kind { return text.contains("Count to three.") }
             return false
         }
         #expect(said)
@@ -275,6 +275,49 @@ struct WorkflowFiringTests {
 
         let made = await core.allAgents().first { $0.startedByWorkflow == "on-finish" }
         #expect(made != nil)
+    }
+
+    /// US4. A workflow's row has to be able to say whether the run was any good, not
+    /// only that it happened — four quiet nights and one that stopped half way look
+    /// identical otherwise.
+    ///
+    /// Nothing is copied onto the workflow: `WorkflowOutcome.ran` carries the agent's
+    /// id, and the row reads the report off that agent. So what this asserts is that
+    /// the two are still joined, and that the project says somebody is wanted.
+    @Test func aRunsOutcomeIsReadableFromTheWorkflowsRow() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(everyHalfHour("Check the build."), as: "nightly", in: work)
+
+        let core = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let summary = try await core.runWorkflow(
+            DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
+
+        guard case .ran(let agentID, _) = summary.lastOutcome else {
+            Issue.record("expected a run, got \(String(describing: summary.lastOutcome))")
+            return
+        }
+        // The agent the run started, saying it could not do the work.
+        let token = await eventuallySome("the run's agent has a token") {
+            await core.appTokens.first { $0.value == agentID }?.key
+        } ?? ""
+        _ = try await core.reportOutcome(.init(token: token, outcome: "stuck",
+                                               message: "The build machine is unreachable."))
+
+        // What the row reads: the agent the run names, and what it said.
+        let agent = try #require(await core.agent(agentID))
+        #expect(agent.report?.outcome == .stuck)
+        #expect(agent.report?.message == "The build machine is unreachable.")
+        #expect(agent.report?.outcome.needsAPerson == true)
+        // And the project is marked, for the same reason any other agent would mark it.
+        // Waited on rather than read at once: the counts follow the agent's group, and
+        // an agent whose turn is still in flight is working rather than wanting anyone.
+        await eventually("the project says somebody is wanted") {
+            await core.allProjects()
+                .first { Project.standardize($0.folder) == Project.standardize(work) }?
+                .needsInput == true
+        }
     }
 
     @Test func aTriggeringWorkflowSendsThePromptBackIntoTheSameAgent() async throws {

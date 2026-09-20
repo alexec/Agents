@@ -67,12 +67,17 @@ The whole of User Story 3, and the check that makes the cost of the design bound
 ## 4. The conversation and the list agree
 
 ```bash
-swift test --package-path Packages/AgentsKit --filter 'TranscriptDisplay|ReplayTests'
+swift test --package-path Packages/AgentsKit --filter 'TranscriptDisplay|LegacyRecordTests'
 ```
 
 A `.workReported` entry is drawn at the end of the transcript; the `report_outcome` tool call itself
 is not drawn; the app's own question is drawn as a prompt that is visibly not the person's (FR-015,
 FR-022).
+
+**Corrected after the build.** This said `ReplayTests`, which turned out to be about a shell's
+terminal output and not about transcripts at all — nothing in it round-trips a `TranscriptEntry`.
+The round-trip for both of 014's new shapes lives in `LegacyRecordTests` instead, beside the rest of
+what the record promises in both directions.
 
 ## 5. In the app, by eye
 
@@ -92,7 +97,21 @@ Confirm by eye, without opening either conversation:
 - Open the second: the same words are at the bottom of the conversation.
 
 Then leave a third agent to end a turn without reporting, and watch the app ask it once — the
-question appears in the conversation, attributed to Agents rather than to you.
+question appears in the conversation under "Agents asked", in the secondary voice rather than in
+your own bubble.
+
+**Two things the build changed that are worth looking for by eye.**
+
+An agent that has not reported no longer reads *Complete* anywhere — not on the row, not in the
+transcript's state line. It reads **Finished**, which is what actually happened, and *Complete* is
+now only ever a claim an agent made about its own work. The group heading is still "Complete",
+which the spec keeps deliberately: an outcome moves an agent between headings, it does not rename
+them.
+
+And every agent now takes a second turn when it ends without reporting, which is visible as a
+second runtime starting and a second usage line. That is FR-024 working rather than something
+wrong, but it doubles the turns a quiet agent takes and is the thing to watch for a week before
+deciding Phase 5 is carrying its weight.
 
 ## 6. Old records still open, new records still open in old builds
 
@@ -108,14 +127,19 @@ decodes to no report rather than throwing (FR-027).
 
 ## 7. Real runtimes actually call it
 
-```bash
-swift test --package-path Packages/AgentsKit --filter OutcomeReportLiveTests
-```
-
 The check that matters most and the only one that can fail for reasons no unit test can see. The
 briefing is the whole of the lever here — `SuggestedPromptLiveTests` exists because three runtimes
 called `suggest_next_prompts` exactly never until the briefing named it in words, and this feature
 inherits that risk entirely.
+
+```bash
+AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> \
+  swift test --package-path Packages/AgentsKit --filter OutcomeReportLiveTests
+```
+
+**Not yet run.** It needs a signed-in runtime and spends real money, so it is opt-in behind
+`AGENTS_LIVE` like every other Live suite. `research.md` R11 holds the empty place where its findings
+go.
 
 Against each signed-in runtime, give a task with an unanswerable question in it and assert the turn
 ends with a `needs_answer` report rather than with the question buried in a reply. Record the

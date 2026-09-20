@@ -32,9 +32,11 @@ struct QueuedPromptTests {
         return FakeLauncher(script: script)
     }
 
+    /// What the person said, in order. The app's own question after a silent ending is
+    /// a `userMessage` too, and it is not what a test about queueing is counting.
     private func texts(_ core: DaemonCore, _ id: UUID) async throws -> [String] {
         try await core.transcript(.init(agentID: id)).entries.compactMap { entry in
-            if case .userMessage(let text, _) = entry.kind { return text }
+            if case .userMessage(let text, _, .person) = entry.kind { return text }
             return nil
         }
     }

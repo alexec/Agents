@@ -12,7 +12,9 @@ struct AgentCard: View {
     var body: some View {
         NavigationLink(value: agent.id) {
             HStack(alignment: .top, spacing: 12) {
-                StatusIcon(state: agent.state, isComingBack: isComingBack)
+                StatusIcon(state: agent.state, isComingBack: isComingBack,
+                           outcome: agent.report?.outcome,
+                           isUnaccountedFor: agent.endingIsUnaccountedFor)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -57,10 +59,21 @@ struct AgentCard: View {
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
         if let step = agent.currentStep { return step }
+        // The agent's own words about the turn that just ended, in preference to
+        // anything we would otherwise derive (FR-013). The same branch, in the same
+        // place, as the Mac's row.
+        if let message = agent.report?.message { return message }
+        // Ours, because nobody said. A turn that ended cleanly, was asked how it went,
+        // and still said nothing is a thing to know rather than a thing to do — so it
+        // is marked, and left where it is (FR-019).
+        if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
         switch agent.state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting for your answer"
-        case .finished: return "Complete"
+        // Never "Complete" on the strength of the turn ending. That word belongs to
+        // `AgentGroup.finished`, which is the heading, and to an agent that reported
+        // `done`, which is a claim somebody made (FR-012).
+        case .finished: return "Finished"
         case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
         }
@@ -88,7 +101,10 @@ struct AgentCard: View {
     /// The state said in words, because the icon beside it is not one VoiceOver reads.
     private var accessibilityLabel: String {
         [agent.title ?? "Untitled",
-         isComingBack ? AgentsModel.comingBackDescription : StatusIcon.words(for: agent.state),
+         isComingBack
+            ? AgentsModel.comingBackDescription
+            : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
+                               isUnaccountedFor: agent.endingIsUnaccountedFor),
          description]
             .joined(separator: ", ")
     }
@@ -103,6 +119,13 @@ struct StatusIcon: View {
     /// Its own symbol rather than a spinner: nothing is running yet, and the card
     /// stays under "Stopped" until the chat's own state moves it.
     var isComingBack = false
+    /// What the agent said about the work, where it said anything. Filled means
+    /// somebody said so, hollow means nobody did, and colour means you.
+    var outcome: WorkOutcome?
+    /// A turn that ended cleanly, was asked how it went, and still said nothing.
+    /// Hollow and grey: nobody vouched for it, which is worth seeing and not worth
+    /// spending the app's one colour on.
+    var isUnaccountedFor = false
 
     var body: some View {
         Group {
@@ -119,26 +142,51 @@ struct StatusIcon: View {
         .accessibilityHidden(true)
     }
 
+    /// The outcome, where the turn it describes is the one the agent is settled on.
+    /// A stopped or archived agent keeps its own symbol whatever it last claimed,
+    /// which is the rule `AgentGroup` follows for the same reason.
+    private var settledOutcome: WorkOutcome? {
+        state == .finished && !isComingBack ? outcome : nil
+    }
+
     private var symbol: String {
         if isComingBack { return AgentsModel.comingBackSymbol }
+        if let settledOutcome {
+            switch settledOutcome {
+            case .done: return "checkmark.circle.fill"
+            case .nothingToDo: return "checkmark.circle"
+            case .needsAnswer: return "questionmark.circle.fill"
+            case .partlyDone: return "circle.lefthalf.filled"
+            case .stuck: return "exclamationmark.triangle.fill"
+            }
+        }
+        if isUnaccountedFor && state == .finished { return "questionmark.circle" }
         switch state {
         case .running: return "circle.dotted"
         case .waitingOnUser: return "questionmark.circle.fill"
-        case .finished: return "checkmark.circle.fill"
+        // Hollow, because nobody vouched for it. Filled is now reserved for an agent
+        // that said `done` itself (FR-012).
+        case .finished: return "checkmark.circle"
         case .stopped: return "stop.circle"
         case .archived: return "archivebox"
         }
     }
 
     private var tint: Color {
-        state == .waitingOnUser ? .accentColor : .secondary
+        if let settledOutcome { return settledOutcome.needsAPerson ? .accentColor : .secondary }
+        return state == .waitingOnUser ? .accentColor : .secondary
     }
 
-    static func words(for state: AgentState) -> String {
+    /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,
+    /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
+    static func words(for state: AgentState, outcome: WorkOutcome? = nil,
+                      isUnaccountedFor: Bool = false) -> String {
+        if state == .finished, let outcome { return outcome.heading }
+        if state == .finished, isUnaccountedFor { return "Finished without saying how it went" }
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Complete"
+        case .finished: return "Finished"
         case .stopped: return "Stopped"
         case .archived: return "Archived"
         }

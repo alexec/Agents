@@ -26,6 +26,9 @@ public actor AppService {
     /// And the third: read and write the project's standing arrangements.
     public static let workflowToolName = AppTool.manageWorkflows
 
+    /// And the fourth, which is the last thing an agent does: say how the work went.
+    public static let reportOutcomeToolName = AppTool.reportOutcome
+
     /// The line about this tool that the daemon sends after the user's own words on
     /// the first prompt of a conversation. See `Briefing`, which holds it and the rest
     /// of what an agent is told, and says why saying it in words is necessary at all.
@@ -54,10 +57,16 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
+    /// Where an outcome goes: the wire spelling, and the agent's own sentence. Both
+    /// still strings here — the daemon owns which words it knows, because it is the
+    /// daemon that has to refuse one it does not.
+    public typealias OutcomeSink = @Sendable (String, String) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let sink: Sink
     private let fileSink: FileSink
     private let workflowSink: WorkflowSink
+    private let outcomeSink: OutcomeSink
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
@@ -65,11 +74,15 @@ public actor AppService {
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
+                },
+                reportOutcome: @escaping OutcomeSink = { _, _ in
+                    .refused("This app cannot record an outcome.")
                 }) {
         let box = self.box
         self.sink = sink
         self.fileSink = showFile
         self.workflowSink = workflows
+        self.outcomeSink = reportOutcome
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -107,7 +120,8 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array([Self.tool, Self.showFileTool, Self.workflowTool])])
+            return .success(["tools": .array([Self.tool, Self.showFileTool, Self.workflowTool,
+                                              Self.reportOutcomeTool])])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -145,6 +159,30 @@ public actor AppService {
                 return .success(Self.reply(await workflowSink(action,
                                                               arguments?["id"]?.stringValue,
                                                               arguments?["content"]?.stringValue)))
+            }
+
+            if name.hasSuffix(Self.reportOutcomeToolName) {
+                // Checked here as well as at the daemon, so an agent that sent a word
+                // we do not know is told which five we do before the call goes any
+                // further. Never rounded to the nearest one: an unknown outcome read
+                // as `done` is exactly the unearned tick this tool exists to remove.
+                let raw = (arguments?["outcome"]?.stringValue ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard WorkOutcome(wire: raw) != nil else {
+                    return .success(Self.reply("""
+                        Nothing was recorded: outcome has to be one of done, \
+                        nothing_to_do, needs_answer, partly_done or stuck.
+                        """, isError: true))
+                }
+                let message = (arguments?["message"]?.stringValue ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !message.isEmpty else {
+                    return .success(Self.reply("""
+                        Nothing was recorded: say in a sentence how it went. An outcome \
+                        with no words is no more use than the turn simply ending.
+                        """, isError: true))
+                }
+                return .success(Self.reply(await outcomeSink(raw, message)))
             }
 
             return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
@@ -316,6 +354,65 @@ public actor AppService {
                 ],
             ],
             "required": .array(["action"]),
+        ],
+    ]
+
+    /// Say how the work actually went, at the very end of it.
+    ///
+    /// The wording matters more than the schema, and more here than anywhere: without
+    /// this call the app can only say a turn ended, which is not the same sentence as
+    /// the work being done. `Briefing` says the harder truth about descriptions — one
+    /// alone got `suggest_next_prompts` called exactly never by three runtimes — so
+    /// this is written to be read by an agent already told, in the briefing, to call
+    /// it. The description's job is then to say which of the five is true.
+    ///
+    /// It also draws the line against the tools that interrupt, because the failure it
+    /// prevents is an agent using this to ask a question it could have had answered
+    /// mid-turn: this one does not wait.
+    static let reportOutcomeTool: JSONValue = [
+        "name": .string(reportOutcomeToolName),
+        "title": "Say how the work went",
+        "description": """
+            Call this once, at the very end of your work, after everything else \
+            including suggest_next_prompts. It says how the work actually went, and it \
+            is the only thing that does: without it the app can only say your turn \
+            ended, which it will show as an ending nobody accounted for.
+
+            Pick the one that is true:
+
+              done            You did what was asked. Nothing is left for anyone.
+              nothing_to_do   You looked, and there was nothing that needed doing.
+              needs_answer    You cannot go further until the person answers something.
+              partly_done     You did some of it. The rest needs a decision that is not yours.
+              stuck           You could not do it, and you know why.
+
+            The message is one or two sentences in your own words, and it is what the \
+            person reads on the row before they open anything — so write it for \
+            somebody who has not read the conversation. For needs_answer, the message \
+            is the question itself.
+
+            If you can carry on once you have an answer, do not use this: ask with \
+            your question or form tool, which stops and waits for them. This one does \
+            not wait. It is how you end.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "outcome": [
+                    "type": "string",
+                    "enum": .array(["done", "nothing_to_do", "needs_answer",
+                                    "partly_done", "stuck"]),
+                    "description": "The one that is true.",
+                ],
+                "message": [
+                    "type": "string",
+                    "description": """
+                        One or two sentences, for somebody who has not read the \
+                        conversation. For needs_answer, the question itself.
+                        """,
+                ],
+            ],
+            "required": .array(["outcome", "message"]),
         ],
     ]
 }

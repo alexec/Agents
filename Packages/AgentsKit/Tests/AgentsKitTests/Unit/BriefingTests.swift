@@ -34,10 +34,15 @@ struct BriefingTests {
 
     /// Short, because it is paid for on the first prompt of every conversation and an
     /// agent told six things at once follows the first two. The number is a ceiling to
-    /// notice, not a rule: if a fourth line is worth more than this limit, raise it on
+    /// notice, not a rule: if a fifth line is worth more than this limit, raise it on
     /// purpose.
+    ///
+    /// Raised on purpose in 014, from 1,200. The outcome line is the one thing here the
+    /// app cannot learn any other way — a turn ending says nothing about whether the
+    /// work is done — so it is worth the three hundred characters, and `Briefing.text`
+    /// was read end to end for repetition before the number moved.
     @Test func itStaysShortEnoughToBeRead() {
-        #expect(Briefing.text.count < 1_200)
+        #expect(Briefing.text.count < 1_500)
         #expect(Briefing.lines.count <= 4)
     }
 }

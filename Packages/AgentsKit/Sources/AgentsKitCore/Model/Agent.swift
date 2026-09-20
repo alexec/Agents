@@ -60,6 +60,16 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// from, and a stale one is worse than none.
     public var suggestedPrompts: [SuggestedPrompt]
 
+    /// What the agent said about how the work went, from the turn that just ended.
+    /// Cleared by the person's next prompt, for the same reason the suggestions are:
+    /// it is an account of one turn, and a stale one is worse than none.
+    public var report: WorkReport?
+
+    /// Whether this agent has already been asked to account for an ending it did not
+    /// account for. Set when the question is enqueued, cleared by a prompt from the
+    /// person. One ask per silence, and the agent cannot write it.
+    public var outcomeAsked: Bool
+
     public var createdAt: Date
     public var lastActivityAt: Date
     public var endedReason: EndedReason?
@@ -129,6 +139,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
+        // New in 014. A record written before agents could say how it went opens as an
+        // agent that never reported and has never been asked — which is the truth about
+        // it, and is why neither of these is a completion.
+        report = try c.decodeIfPresent(WorkReport.self, forKey: .report)
+        outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
         unknownFields = whole.filter { !known.contains($0.key) }
@@ -163,6 +178,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
+        try c.encodeIfPresent(report, forKey: .report)
+        if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -180,6 +197,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun
         case restartPickUps
+        case report, outcomeAsked
     }
 
     struct AnyKey: CodingKey {
@@ -214,6 +232,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 startedByWorkflow: String? = nil,
                 startedByRun: UUID? = nil,
                 restartPickUps: Int = 0,
+                report: WorkReport? = nil,
+                outcomeAsked: Bool = false,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -240,6 +260,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.startedByWorkflow = startedByWorkflow
         self.startedByRun = startedByRun
         self.restartPickUps = restartPickUps
+        self.report = report
+        self.outcomeAsked = outcomeAsked
         self.unknownFields = unknownFields
     }
 

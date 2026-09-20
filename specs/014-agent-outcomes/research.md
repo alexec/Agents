@@ -159,3 +159,28 @@ done any work, so it would have to be written twice.
 
 **Alternatives considered**: A third `WorkflowOutcome` case. Rejected: that enum answers "what did
 the *fire* produce", and the answer is still "it ran". How the run went is the agent's to say.
+
+## R11. What the runtimes actually do — not yet measured
+
+**Status**: open. `Live/OutcomeReportLiveTests.swift` is written and has not been run.
+
+Running it needs a signed-in runtime and spends real money on real models, so it is not something
+the build does on its way past. The command is in `quickstart.md` check 7:
+
+```bash
+AGENTS_LIVE=1 AGENTS_MCP_HELPER=<path to agentsd> \
+  swift test --package-path Packages/AgentsKit --filter OutcomeReportLiveTests
+```
+
+**What to write here when it has been run**: the per-runtime adoption rate, against SC-007's 90% of
+normally-ended turns carrying a report. One row per runtime, and the shape of what it did when it
+did not call the tool — prose where a report belonged is the interesting failure, because it is the
+exact thing this feature exists to move out of the transcript and onto the row.
+
+**Why this is a finding rather than a gate**: `SuggestedPromptLiveTests` is the precedent and the
+warning. Offered `suggest_next_prompts` and nothing else, three runtimes called it exactly never,
+however the description was worded; one line in the briefing changed that for two of them and not
+for Copilot, which reached for a follow-up feature of its own instead. The same outcome here would
+be worth knowing and would not be a failure of the design — the whole of Phase 5 exists so that a
+runtime which will not call the tool leaves an ending the app is honest about rather than a tick it
+has not earned. `UnreportedEndingTests` already proves that half without any runtime's cooperation.

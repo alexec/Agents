@@ -37,22 +37,42 @@ struct TurnUsageTests {
         // says nothing about either.
         await eventually("both the meter and the turn's total arrived") {
             guard let agent = await core.agent(id) else { return false }
+            // Not `costToDate` here: this agent takes two turns, so the total it has
+            // banked depends on how many have finished, and waiting on one figure
+            // would be waiting for a moment rather than for an arrival. It is asserted
+            // below, against the number of turns actually taken.
             return agent.usage?.used == 30360 && agent.lastTurnUsage?.totalTokens == 90229
-                && agent.costToDate["USD"] == 0.244
+                && agent.costToDate["USD"] != nil
+        }
+        @Sendable func count(_ isWanted: @Sendable @escaping (TranscriptEntry.Kind) -> Bool)
+            async -> Int {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.count { isWanted($0.kind) } ?? 0
         }
         @Sendable func usagesOnTheRecord() async -> Int {
-            let page = try? await core.transcript(.init(agentID: id))
-            return page?.entries.filter {
-                if case .usageRecorded = $0.kind { return true } else { return false }
-            }.count ?? 0
+            await count { if case .usageRecorded = $0 { return true } else { return false } }
         }
-        await eventually("the turn's usage reached the record") { await usagesOnTheRecord() == 1 }
+        // Turns, not prompts of the person's: this agent takes two, because a turn
+        // that ends without saying how it went is asked once and that question is a
+        // turn of its own. What it costs is counted against the agent like any other,
+        // which is FR-024 and is the point of counting per turn here rather than once.
+        @Sendable func turns() async -> Int {
+            await count { if case .userMessage = $0 { return true } else { return false } }
+        }
+        await eventually("every turn's usage reached the record") {
+            let taken = await turns()
+            let recorded = await usagesOnTheRecord()
+            return taken > 0 && recorded == taken
+        }
 
         let agent = await core.agent(id)
         #expect(agent?.usage?.used == 30360, "the meter follows the turn")
         #expect(agent?.lastTurnUsage?.totalTokens == 90229)
-        #expect(agent?.costToDate["USD"] == 0.244)
-        #expect(await usagesOnTheRecord() == 1, "once per turn, at the end of it")
+        let taken = await turns()
+        let recorded = await usagesOnTheRecord()
+        // The sum over the turns it took, which is what `costToDate` has always been.
+        #expect(agent?.costToDate["USD"] == 0.244 * Decimal(taken))
+        #expect(recorded == taken, "once per turn, at the end of it")
     }
 
     @Test func aRuntimeThatReportsNothingShowsNothing() async throws {

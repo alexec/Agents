@@ -1,5 +1,16 @@
 import Foundation
 
+/// Whose prompt a `userMessage` was.
+///
+/// The app speaks in the person's turn exactly once — the single question it asks an
+/// agent that ended without accounting for itself — and a person reading the
+/// conversation has to be able to tell that apart from something they typed.
+public enum PromptOrigin: String, Codable, Hashable, Sendable {
+    case person
+    /// The app asking on its own behalf. Today: the one question after a silent ending.
+    case app
+}
+
 /// One line of an agent's life, appended and never rewritten.
 ///
 /// Entries are appended as they arrive rather than at the end of a turn, so a daemon
@@ -18,7 +29,11 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: Codable, Hashable, Sendable {
         /// The text is kept alongside the blocks so a record written by 001 still
         /// reads, and so the places that search rather than draw stay simple.
-        case userMessage(String, blocks: [ContentBlock] = [])
+        ///
+        /// `from` says whose prompt it was. Almost always the person's; the app sends
+        /// one of its own after a turn that ended without saying how it went, and that
+        /// one must never be drawn as though they typed it.
+        case userMessage(String, blocks: [ContentBlock] = [], from: PromptOrigin = .person)
         case agentMessage(messageID: String?, text: String, blocks: [ContentBlock] = [])
         case agentThought(messageID: String?, text: String)
         case toolCall(ToolCall)
@@ -34,6 +49,10 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case permissionAnswered(optionID: String, optionName: String?)
         case optionChanged(id: String, value: JSONValue)
         case stateChanged(AgentState, reason: EndedReason?)
+
+        /// The agent saying how the work went, at the end of it. Drawn at the foot of
+        /// the conversation so the list and the transcript agree about the same turn.
+        case workReported(WorkReport)
 
         /// Ours, not the agent's: "runtime starting", "session resumed", "the runtime
         /// could not give the session back". This is how the record stays honest
@@ -52,7 +71,7 @@ extension TranscriptEntry {
     /// written before 003 has only text, so it becomes one text block.
     public var blocks: [ContentBlock]? {
         switch kind {
-        case .userMessage(let text, let blocks), .agentMessage(_, let text, let blocks):
+        case .userMessage(let text, let blocks, _), .agentMessage(_, let text, let blocks):
             return blocks.isEmpty ? (text.isEmpty ? [] : [.text(text)]) : blocks
         case .compaction(_, let summary):
             return summary
@@ -64,7 +83,7 @@ extension TranscriptEntry {
     /// The text an agent produced, for the places that want to read rather than render.
     public var text: String? {
         switch kind {
-        case .userMessage(let t, _): return t
+        case .userMessage(let t, _, _): return t
         case .agentMessage(_, let t, _): return t
         case .agentThought(_, let t): return t
         case .runtimeNote(let t): return t

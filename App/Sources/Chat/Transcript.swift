@@ -253,11 +253,24 @@ private struct EntryRow: View {
 
     var body: some View {
         switch entry.kind {
-        case .userMessage(let text, let blocks):
-            BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
-                .padding(12)
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+        case .userMessage(let text, let blocks, let from):
+            // Not in the person's bubble when it is not the person's. The app asks an
+            // agent that ended without saying how it went, once, and a question they
+            // never typed must not be shown as though they had (FR-022).
+            if from == .app {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Agents asked").font(.caption).foregroundStyle(.tertiary)
+                    BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                    .padding(12)
+                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
@@ -321,6 +334,9 @@ private struct EntryRow: View {
         case .stateChanged(let state, let reason):
             StateLine(state: state, reason: reason)
 
+        case .workReported(let report):
+            WorkReportLine(report: report)
+
         case .runtimeNote(let text):
             Text(text).font(.caption).foregroundStyle(.secondary)
 
@@ -328,6 +344,30 @@ private struct EntryRow: View {
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
         }
+    }
+}
+
+/// The agent's own account of how the work went, at the foot of the conversation.
+///
+/// Drawn in the manner of the other state-change lines rather than as a message from
+/// the agent, because it is not one: it is the app's record of a claim. The heading is
+/// the app's word for the outcome and the sentence below it is the agent's own, which
+/// is the same pair the row in the list shows (FR-015).
+private struct WorkReportLine: View {
+    let report: WorkReport
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(report.outcome.heading)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(report.outcome.needsAPerson
+                                 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+            Text(report.message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -579,7 +619,9 @@ private struct StateLine: View {
         switch state {
         case .running: return "Working"
         case .waitingOnUser: return "Waiting on you"
-        case .finished: return "Complete"
+        // Never "Complete": that word is now reserved for an agent that said `done`
+        // itself, and a turn handing itself back says nothing about the work (FR-012).
+        case .finished: return "Finished"
         case .stopped:
             switch reason {
             case .cancelled: return "You stopped it"
