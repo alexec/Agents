@@ -53,6 +53,19 @@ public final class AgentsModel {
     /// connect rather than inferring it.
     public private(set) var resuming: Set<UUID> = []
 
+    /// What the reader will allow, what today has cost, and which local day that is.
+    ///
+    /// Seeded by `cost/state` on connect and kept current by `cost/changed`, the way
+    /// projects are seeded by `projects/list` and kept current by `project/changed`.
+    /// Nil until the daemon has said, so a window shows nothing rather than a zero
+    /// it invented. Everything derived from it — whether the day's limit is reached,
+    /// what is left, whether it is close — is computed on `CostState` and never sent.
+    ///
+    /// A window notices the day rolling over by `day` changing here. It must never
+    /// consult its own clock: it may be in a different time zone from the daemon's,
+    /// and the daemon's is the one the limit uses.
+    public private(set) var costState: DaemonAPI.CostState?
+
     public init() {}
 
     // MARK: What each notification means
@@ -105,6 +118,10 @@ public final class AgentsModel {
             workflows.removeAll {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
+
+        case DaemonAPI.Notification.costChanged:
+            guard let state = try? params?.decode(DaemonAPI.CostState.self) else { return true }
+            costState = state
 
         case DaemonAPI.Notification.agentShowFile:
             guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return true }
@@ -174,6 +191,20 @@ public final class AgentsModel {
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
         projects = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+
+    /// What this agent has left before it stops, under the limits as they stand.
+    /// Nil when uncapped, when unmeasured, or before the daemon has said.
+    public func costHeadroom(for agent: Agent) -> Decimal? {
+        guard let limits = costState?.limits else { return nil }
+        return agent.costHeadroom(under: limits)
+    }
+
+    public func isAtCostLimit(_ agent: Agent) -> Bool {
+        guard let limits = costState?.limits else { return false }
+        return agent.isAtCostLimit(under: limits)
     }
 
     public func replacePermissions(_ listed: [PermissionRequest]) { permissions = listed }

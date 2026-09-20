@@ -132,6 +132,51 @@ struct AgentStoreTests {
         #expect(Agent.fallbackTitle(from: "Fix the bug\nand then some") == "Fix the bug")
         #expect(Agent.fallbackTitle(from: String(repeating: "x", count: 200)).count == 80)
     }
+
+    /// A ceiling is something the reader set, so the one thing this must never do is
+    /// lose one — neither by sweeping it into `unknownFields` on the way in, nor by
+    /// dropping somebody else's field on the way out.
+    @Test func aCeilingSetByTheReaderSurvivesEveryRoundTrip() throws {
+        // A record written before 010: no `costCeiling` key at all.
+        let older = """
+        {"id":"\(UUID().uuidString)","runtimeID":"claude","cwd":"file:///tmp/",
+         "state":"finished","endedReason":"endTurn",
+         "createdAt":"2026-09-19T09:00:00.000Z","lastActivityAt":"2026-09-19T09:00:00.000Z"}
+        """
+        let read = try StoreCoding.decoder.decode(Agent.self, from: Data(older.utf8))
+        #expect(read.costCeiling == nil, "no ceiling of its own: the app-wide limit applies")
+        #expect(read.unknownFields["costCeiling"] == nil, "a key we know is never unknown")
+
+        // Written by this build, read back by it.
+        var withCeiling = read
+        withCeiling.costCeiling = Cost(amount: 2.5, currency: "USD")
+        let encoded = try StoreCoding.encoder.encode(withCeiling)
+        let back = try StoreCoding.decoder.decode(Agent.self, from: encoded)
+        #expect(back.costCeiling == Cost(amount: 2.5, currency: "USD"))
+        #expect(back.unknownFields.isEmpty)
+
+        // A ceiling of zero is a ceiling, and must not encode away as absent.
+        withCeiling.costCeiling = Cost(amount: 0, currency: "USD")
+        let zeroed = try StoreCoding.decoder.decode(
+            Agent.self, from: try StoreCoding.encoder.encode(withCeiling))
+        #expect(zeroed.costCeiling?.amount == 0, "nothing may run is not the same as no limit")
+
+        // A key a newer build wrote survives a read and a write by this one.
+        let newer = """
+        {"id":"\(UUID().uuidString)","runtimeID":"claude","cwd":"file:///tmp/",
+         "state":"finished","endedReason":"endTurn","costCeiling":{"amount":1,"currency":"GBP"},
+         "createdAt":"2026-09-19T09:00:00.000Z","lastActivityAt":"2026-09-19T09:00:00.000Z",
+         "somethingFromTheFuture":{"kept":true}}
+        """
+        let fromTheFuture = try StoreCoding.decoder.decode(Agent.self, from: Data(newer.utf8))
+        #expect(fromTheFuture.costCeiling == Cost(amount: 1, currency: "GBP"))
+        #expect(fromTheFuture.unknownFields["somethingFromTheFuture"] != nil)
+        let rewritten = try StoreCoding.decoder.decode(
+            Agent.self, from: try StoreCoding.encoder.encode(fromTheFuture))
+        #expect(rewritten.unknownFields["somethingFromTheFuture"] != nil,
+                "an older build must not quietly delete what a newer one wrote")
+        #expect(rewritten.costCeiling == Cost(amount: 1, currency: "GBP"))
+    }
 }
 
 @Suite("Reading a transcript")

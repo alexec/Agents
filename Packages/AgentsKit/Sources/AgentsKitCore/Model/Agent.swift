@@ -34,6 +34,14 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var lastTurnUsage: TurnUsage?
     public var costToDate: [String: Decimal]
 
+    /// This agent's own ceiling, when the reader has given it one. Nil means the
+    /// app-wide per-agent limit applies.
+    ///
+    /// This is how "let this one go on" is expressed: the allowance raises *this*
+    /// agent's ceiling and touches nothing else. Set only by the reader, only through
+    /// `agents/setCeiling`.
+    public var costCeiling: Cost?
+
     /// What the agent said it was going to do. The current one is last.
     public var plans: [Plan]
 
@@ -102,6 +110,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         usage = try c.decodeIfPresent(Usage.self, forKey: .usage)
         lastTurnUsage = try c.decodeIfPresent(TurnUsage.self, forKey: .lastTurnUsage)
         costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
+        // New in 010. A record written before limits existed has no ceiling of its
+        // own, which is the app-wide per-agent limit applying.
+        costCeiling = try c.decodeIfPresent(Cost.self, forKey: .costCeiling)
         plans = try c.decodeIfPresent([Plan].self, forKey: .plans) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
@@ -141,6 +152,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(usage, forKey: .usage)
         try c.encodeIfPresent(lastTurnUsage, forKey: .lastTurnUsage)
         if !costToDate.isEmpty { try c.encode(costToDate, forKey: .costToDate) }
+        try c.encodeIfPresent(costCeiling, forKey: .costCeiling)
         if !plans.isEmpty { try c.encode(plans, forKey: .plans) }
         if !additionalDirectories.isEmpty {
             try c.encode(additionalDirectories, forKey: .additionalDirectories)
@@ -164,7 +176,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case id, runtimeID, cwd, title, state, runtimeSessionID, startOptions
         case advertisedOptions, availableCommands, createdAt, lastActivityAt
         case endedReason, archivedReason
-        case usage, lastTurnUsage, costToDate, plans, additionalDirectories, mcpServers
+        case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun
         case restartPickUps
@@ -193,6 +205,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 usage: Usage? = nil,
                 lastTurnUsage: TurnUsage? = nil,
                 costToDate: [String: Decimal] = [:],
+                costCeiling: Cost? = nil,
                 plans: [Plan] = [],
                 additionalDirectories: [URL] = [],
                 mcpServers: [MCPServer] = [],
@@ -218,6 +231,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.usage = usage
         self.lastTurnUsage = lastTurnUsage
         self.costToDate = costToDate
+        self.costCeiling = costCeiling
         self.plans = plans
         self.additionalDirectories = additionalDirectories
         self.mcpServers = mcpServers
@@ -246,6 +260,58 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// and starting it a third time is a loop rather than a recovery.
     public var mayBePickedUpAfterRestart: Bool {
         state == .stopped && endedReason == .daemonGone && restartPickUps == 0
+    }
+
+    // MARK: What the reader will allow
+    //
+    // Four rules, all computed and all taking the limits as a parameter. None of them
+    // is stored, and none of them must ever become stored state: a flag written when
+    // a limit was reached would still say so after the reader raised the limit, and
+    // would not say so for an agent that was already over one they have just lowered.
+    // Computing means lowering a limit is instantly true of every agent that exists,
+    // with no write and no sweep.
+
+    /// The ceiling this agent is actually held to: its own if it has one, otherwise
+    /// the app-wide per-agent limit. The only place that precedence is decided.
+    public func ceiling(under limits: CostLimits) -> Cost? {
+        costCeiling ?? limits.perAgent
+    }
+
+    /// Whether this agent has spent everything it is allowed to.
+    ///
+    /// *Reaches*, not exceeds: the spec's word, so an agent exactly at its limit is
+    /// at it. False when there is no ceiling, and false when the agent is unmeasured —
+    /// a runtime that reports no cost can never be capped, and must never be treated
+    /// as though it had been.
+    public func isAtCostLimit(under limits: CostLimits) -> Bool {
+        guard !costIsUnmeasured, let ceiling = ceiling(under: limits) else { return false }
+        return (costToDate[ceiling.currency] ?? 0) >= ceiling.amount
+    }
+
+    /// What is left before it stops. `nil` when uncapped, which is how a view knows to
+    /// show nothing rather than a headroom that does not exist.
+    public func costHeadroom(under limits: CostLimits) -> Decimal? {
+        guard !costIsUnmeasured else { return nil }
+        return CostLimits.headroom(of: ceiling(under: limits), against: costToDate)
+    }
+
+    /// A turn has ended and the runtime said nothing at all about money.
+    ///
+    /// Two shapes of silence, and both are this: a runtime that sends a usage block
+    /// with no price in it, and one that sends no usage block at all. Grok does the
+    /// second, so keying this on `lastTurnUsage` being present would miss the very
+    /// runtime the rule exists for.
+    ///
+    /// Settled rather than running, so nothing is claimed mid-turn — a label that
+    /// comes and goes is one you stop trusting, and a turn that has not ended yet
+    /// has not failed to report anything.
+    ///
+    /// Never capped, never counted, and always labelled as such. The worst failure
+    /// available to this feature is a reader believing an agent is covered by a limit
+    /// that cannot touch it, so this is shown wherever a cost would otherwise be.
+    public var costIsUnmeasured: Bool {
+        !state.hasTurnInFlight && costToDate.isEmpty && lastTurnUsage?.cost == nil
+            && lastActivityAt > createdAt
     }
 
     /// The invariants from the data model, in a form a test can assert.

@@ -159,7 +159,13 @@ private struct RuntimeMissingLine: View {
     }
 }
 
-/// What every agent between them has cost since the window opened.
+/// What today has cost, and how much of the day's limit is left.
+///
+/// Today rather than "this sitting", which is what stood here before limits existed.
+/// Today's figure is what the daily limit is measured against, it survives closing
+/// the window, and it needs no baseline subtracted from it. Two similar money figures
+/// in one sidebar is also how a reader learns to trust neither, so this is a
+/// replacement rather than an addition.
 ///
 /// The meter in a chat says what one agent cost. Per currency, like every other total
 /// here: two currencies read as two numbers rather than one nobody could check.
@@ -168,7 +174,7 @@ private struct SessionSpend: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        if let spend = Cost.total(of: model.sessionCost) {
+        if let state = model.costState, let spend = Cost.total(of: state.today) {
             // The way into Spending. A line that already shows money is the one place
             // somebody will look for more of it, so this is a button rather than a
             // second affordance in a column that is not about money — and `.plain`
@@ -177,12 +183,23 @@ private struct SessionSpend: View {
                 openWindow(id: "spending")
             } label: {
                 HStack {
-                    Text("This session")
+                    Text("Today")
                     Spacer()
-                    Text(spend).monospacedDigit()
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(spend).monospacedDigit()
+                        // Nothing when there is no limit: headroom that does not
+                        // exist is not a thing to draw an empty gauge for.
+                        if let left = state.dayHeadroom, let daily = state.limits.daily {
+                            Text("\(left.formatted(.currency(code: daily.currency))) left")
+                                .font(.caption2)
+                        }
+                    }
                 }
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                // Colour means a person is needed. The app's existing threshold for
+                // a nearly full context, not a second number to learn.
+                .foregroundStyle(state.dayIsCloseToFull ? AnyShapeStyle(.red)
+                                                        : AnyShapeStyle(.secondary))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())

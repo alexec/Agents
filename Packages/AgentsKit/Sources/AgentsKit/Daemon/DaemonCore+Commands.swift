@@ -103,6 +103,20 @@ extension DaemonCore {
     }
 
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
+        // Before the session is made. Refusing after spawning a runtime costs a
+        // process for a turn that was never going to run. A new agent has no queue
+        // to wait on, which is why this is a refusal where a prompt is a hold — and
+        // it names the limit, because a silent refusal is the one thing forbidden.
+        let limits = limitStore.load()
+        if limits.isDayLimitReached(spentToday: spendLedger.total(on: now())) {
+            let spent = Cost.total(of: spendLedger.total(on: now())) ?? "nothing"
+            let ceiling = limits.daily
+                .map { $0.amount.formatted(.currency(code: $0.currency)) } ?? "the day's limit"
+            throw JSONRPCError(
+                code: DaemonAPI.Failure.dayLimitReached,
+                message: "Today has cost \(spent), which reaches the \(ceiling) you allowed for a day. "
+                    + "Nothing new starts until the day rolls over, or until you raise the limit.")
+        }
         let session: ACPSession
         let sessionID: String
         let appToken: String
@@ -298,6 +312,37 @@ extension DaemonCore {
         guard let agent = agents[agentID], !agent.state.hasTurnInFlight,
               turnTasks[agentID] == nil, !sending.contains(agentID),
               let next = agent.queuedPrompts.first else { return }
+        // The two limits, in the one funnel every turn begins through: a person
+        // typing, a queued prompt draining behind a finished turn, a workflow's
+        // prompt, and a restart pick-up all arrive here. Both return without
+        // removing anything from the queue, which is this function's existing
+        // promise — the words stay exactly where they were, and go when the day
+        // rolls over or the reader raises the limit.
+        //
+        // Neither is silent. A prompt that goes nowhere without a word said is the
+        // failure this whole feature is most able to produce, so each says which
+        // limit stopped it — once per hold, so an agent at its limit does not fill
+        // its own transcript saying so on every drain attempt.
+        let limits = limitStore.load()
+        if agent.isAtCostLimit(under: limits) {
+            if held.insert(agentID).inserted {
+                await record(.runtimeNote(
+                    "What you sent is waiting: this agent has reached its cost limit. "
+                    + "Raise the limit, or let this one agent go on, and it will go."),
+                             for: agentID)
+            }
+            return
+        }
+        if isDayLimitReached(under: limits) {
+            if held.insert(agentID).inserted {
+                await record(.runtimeNote(
+                    "What you sent is waiting: the day's spending limit has been reached. "
+                    + "It will go when the day rolls over, or when you raise the limit."),
+                             for: agentID)
+            }
+            return
+        }
+        held.remove(agentID)
         // Claimed before the runtime is started, because starting one is a long await
         // and the two callers of this can both arrive inside it: the user typing as a
         // turn ends, and that turn draining the queue behind them. Nothing else here
@@ -320,12 +365,90 @@ extension DaemonCore {
     /// them to send or throw away themselves.
     func drainQueue(after agentID: UUID) async {
         guard agents[agentID]?.endedReason != .cancelled else { return }
+        // A limit is not a failure to send. `sendNextQueued` holds the words and
+        // says which limit did it, so nothing extra belongs here — a second copy of
+        // that decision is a second chance for the two to drift.
         do {
             try await sendNextQueued(to: agentID)
         } catch {
             await record(.runtimeNote("Could not send what you queued: \(reason(error)) It is still waiting."),
                          for: agentID)
         }
+    }
+
+    // MARK: Money
+
+    /// Whether the day's limit is reached, as of what has been banked.
+    ///
+    /// One global fact rather than a per-agent one: every agent is affected
+    /// identically, so there is one number to compare and nothing is marked.
+    func isDayLimitReached(under limits: CostLimits? = nil) -> Bool {
+        let limits = limits ?? limitStore.load()
+        return limits.isDayLimitReached(spentToday: spendLedger.total(on: now()))
+    }
+
+    /// The whole truth about money as it stands, for a broadcast or a reply.
+    func currentCostState() -> DaemonAPI.CostState {
+        DaemonAPI.CostState(limits: limitStore.load(),
+                            today: spendLedger.total(on: now()),
+                            day: SpendLedger.stamp(for: now()))
+    }
+
+    /// Always after the ledger is written, never before. A window is never told about
+    /// money the daemon has not yet recorded.
+    func broadcastCostState() {
+        broadcast(DaemonAPI.Notification.costChanged, currentCostState())
+    }
+
+    /// Send what is waiting to every agent that has something waiting.
+    ///
+    /// What the day rolling over does, and what raising the daily limit does. A held
+    /// agent is an ordinary settled agent with an undrained queue, so this is the
+    /// whole of "it becomes promptable again where it stands".
+    func drainEverythingHolding() async {
+        held.removeAll()
+        for id in agents.keys where !(agents[id]?.queuedPrompts.isEmpty ?? true) {
+            await drainQueue(after: id)
+        }
+    }
+
+    // MARK: The reader's limits
+
+    public func costState() async -> DaemonAPI.CostState { currentCostState() }
+
+    public func setLimits(_ request: DaemonAPI.SetLimitsRequest) async -> DaemonAPI.CostState {
+        var limits = limitStore.load()
+        let dayWasReached = isDayLimitReached(under: limits)
+        // Absent leaves it alone; present-and-null clears it. A zero is a limit and
+        // is never a way to turn one off.
+        if case .some(let value) = request.perAgent { limits.perAgent = value }
+        if case .some(let value) = request.daily { limits.daily = value }
+        // Written before the reply returns and before anything is broadcast. A limit
+        // lower than what is already spent is allowed and is not an error: the reply
+        // carries the new state, from which the caller can see it is already reached
+        // and say so at the moment it is set.
+        try? limitStore.save(limits)
+        broadcastCostState()
+        // Raising the daily limit takes effect now, without a restart.
+        if dayWasReached && !isDayLimitReached(under: limits) {
+            await drainEverythingHolding()
+        }
+        return currentCostState()
+    }
+
+    /// Letting one agent carry on past the per-agent limit, or giving it a tighter
+    /// ceiling of its own. Exactly one agent; no other agent and neither app-wide
+    /// limit is touched.
+    public func setCeiling(_ request: DaemonAPI.SetCeilingRequest) async throws -> Agent {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        agent.costCeiling = request.ceiling
+        changed(agent)
+        // Deliberately does not send a prompt. Raising a ceiling makes an agent
+        // promptable again; continuing is the reader's second, deliberate act.
+        held.remove(request.agentID)
+        return agents[request.agentID] ?? agent
     }
 
     private func reason(_ error: any Error) -> String {
@@ -437,6 +560,10 @@ extension DaemonCore {
 
     private func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        // Whether this turn was the one that crossed the per-agent ceiling. Decided
+        // here because banking is what makes a limit true, and acted on below rather
+        // than now because the turn is the unit: it finishes, whole, first.
+        var crossedItsLimit = false
         if let usage = result.usage {
             await record(.usageRecorded(usage), for: agentID)
             if var agent = agents[agentID] {
@@ -445,17 +572,42 @@ extension DaemonCore {
                     // Per currency. Adding two currencies would be a number nobody
                     // could check.
                     agent.costToDate[cost.currency] = (agent.costToDate[cost.currency] ?? 0) + cost.amount
+                    // The record before the windows: a daemon killed between these
+                    // two lines comes back having counted the money rather than
+                    // having forgotten it.
+                    spendLedger.add(cost, on: now())
                 }
+                let limits = limitStore.load()
+                crossedItsLimit = agent.isAtCostLimit(under: limits)
                 changed(agent)
+                if usage.cost != nil { broadcastCostState() }
             }
         }
-        let reason: EndedReason
+        var reason: EndedReason
         if let known = result.reason {
             reason = known
         } else {
             await record(.runtimeNote("The runtime ended the turn with a stop reason we do not know: \(result.rawStopReason ?? "none")."),
                          for: agentID)
             reason = .unrecognised
+        }
+        if crossedItsLimit {
+            // The limit is what this agent stopped for, whatever the turn's own
+            // reason was. Said in the app's voice and with the figure it actually
+            // spent — which may be over the limit, because a turn is never cut short
+            // and a figure clamped to the limit would be a lie.
+            reason = .costLimit
+            if let agent = agents[agentID] {
+                let limits = limitStore.load()
+                let spent = Cost.total(of: agent.costToDate) ?? "nothing"
+                let ceiling = agent.ceiling(under: limits)
+                    .map { $0.amount.formatted(.currency(code: $0.currency)) } ?? "its limit"
+                await record(.runtimeNote(
+                    "Stopped: this agent has spent \(spent), which reaches the \(ceiling) limit you set. "
+                    + "The turn it was in finished first, so nothing is half-done. "
+                    + "Raise the limit, or let this one agent go on, and it will take a prompt again."),
+                             for: agentID)
+            }
         }
         await move(agentID, on: .turnEnded(reason), endedReason: reason)
         // A finished agent's process is let go: every runtime hands the session back,

@@ -589,6 +589,7 @@ private struct StateLine: View {
             case .maxTurnRequests: return "Hit its limit"
             case .refusal: return "Refused to carry on"
             case .unrecognised: return "Stopped for a reason we do not know"
+            case .costLimit: return "Reached its cost limit"
             case .endTurn, nil: return "Stopped"
             }
         case .archived: return "Archived"

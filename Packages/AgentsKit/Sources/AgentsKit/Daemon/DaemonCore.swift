@@ -50,6 +50,31 @@ public actor DaemonCore {
     lazy var optionCache = OptionCache(locations: locations)
     var rememberedOptions: [String: OptionCache.Entry]?
 
+    // MARK: Money
+
+    /// The two limits the reader set. Read from disk each time rather than cached:
+    /// "at its limit" is computed and never stored, and a limit lowered in the
+    /// Settings window has to be true of every agent on the next turn end.
+    lazy var limitStore = LimitStore(locations: locations)
+    /// What each of the last few local days cost. The day's total has to survive a
+    /// restart, and it counts agents that have since ended or been archived, so it
+    /// cannot be derived from the agents that happen to still be about.
+    lazy var spendLedger = SpendLedger(locations: locations)
+    /// The local day the last tick saw, so the heartbeat can notice a rollover
+    /// without a timer of its own. Nil until the first tick.
+    var lastSeenDay: String?
+    /// Agents that have been told once that a limit is why their queue is not
+    /// draining. In memory and not on the record: it exists only to keep an agent at
+    /// its limit from filling its own transcript saying so on every drain attempt.
+    var held: Set<UUID> = []
+    /// What time it is, for everything about money.
+    ///
+    /// One clock rather than a `Date()` at each of the five places that bank, gate,
+    /// report and prune — which is also what lets a test walk past midnight instead
+    /// of waiting for it. The day a limit is measured against is the machine's, and
+    /// this is where the machine is asked.
+    let now: @Sendable () -> Date
+
     // MARK: Workflows
 
     /// What the app remembers about workflows, which is nothing their files can say.
@@ -126,11 +151,13 @@ public actor DaemonCore {
     public init(store: AgentStore,
                 locations: StoreLocations,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
-                launcher: (any SessionLauncher)? = nil) {
+                launcher: (any SessionLauncher)? = nil,
+                now: (@Sendable () -> Date)? = nil) {
         self.store = store
         self.locations = locations
         self.discovery = discovery
         self.launcher = launcher ?? ProcessSessionLauncher()
+        self.now = now ?? { Date() }
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.

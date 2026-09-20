@@ -141,6 +141,7 @@ private struct ChatMenu: View {
 /// never estimated, so a runtime that sends none shows no ring; the cost is always
 /// shown, falling back to zero, so the figure never disappears mid-session.
 struct ContextMeter: View {
+    @Environment(RemoteModel.self) private var model
     let agent: Agent
 
     var body: some View {
@@ -158,18 +159,35 @@ struct ContextMeter: View {
                 .frame(width: 12, height: 12)
                 .accessibilityLabel(label(usage))
             }
-            Text(cost).monospacedDigit().foregroundStyle(.secondary)
+            Text(cost)
+                .monospacedDigit()
+                .foregroundStyle(isCloseToItsLimit ? AnyShapeStyle(.red)
+                                                   : AnyShapeStyle(.secondary))
         }
         .font(.footnote)
     }
 
-    /// The session's running total, per currency. Until the first turn ends there is no
-    /// total, so the figure the runtime quotes mid-turn stands in — still its own
-    /// number — and before anything has been priced at all, a plain zero.
+    /// The running total and what is left of the limit, matching the window exactly.
+    ///
+    /// Until the first turn ends there is no total, so the figure the runtime quotes
+    /// mid-turn stands in — still its own number — and before anything has been
+    /// priced at all, a plain zero. A runtime that reports no price is named as
+    /// unmeasured rather than shown as within a limit it cannot be held to.
     private var cost: String {
-        if let total = Cost.total(of: agent.costToDate) { return total }
-        let live = agent.usage?.cost
-        return (live?.amount ?? 0).formatted(.currency(code: live?.currency ?? "USD"))
+        if agent.costIsUnmeasured { return "Not measured" }
+        let spent = Cost.total(of: agent.costToDate)
+            ?? (agent.usage?.cost?.amount ?? 0)
+                .formatted(.currency(code: agent.usage?.cost?.currency ?? "USD"))
+        guard let ceiling = agent.ceiling(under: model.costLimits) else { return spent }
+        return "\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))"
+    }
+
+    /// The app's existing threshold for a nearly full context, not a second number.
+    private var isCloseToItsLimit: Bool {
+        guard let ceiling = agent.ceiling(under: model.costLimits), ceiling.amount > 0,
+              !agent.costIsUnmeasured else { return false }
+        return ((agent.costToDate[ceiling.currency] ?? 0) / ceiling.amount)
+            >= Decimal(Usage.closeToFull)
     }
 
     private func label(_ usage: Usage) -> String {

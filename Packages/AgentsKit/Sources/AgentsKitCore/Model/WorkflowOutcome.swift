@@ -82,6 +82,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case missedWhileClosed
     /// The project folder is not there any more.
     case folderGone
+    /// The day's spending limit has been reached, so nothing new may start.
+    case dayLimitReached
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -97,6 +99,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .noTriggeringAgent: return "nothing triggered it, so there was no agent to resume"
         case .missedWhileClosed: return "the app was closed"
         case .folderGone: return "the project folder is not there"
+        case .dayLimitReached: return "the day's spending limit has been reached"
         }
     }
 
@@ -110,8 +113,10 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // Over the limit earns the colour: unlike a skipped fire, this one keeps
         // happening until somebody archives or removes another workflow.
         case .chainTooDeep, .unreadable, .folderGone, .overLimit: return true
+        // Grey, not coloured: midnight resolves it with nobody doing anything, which
+        // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .triggerNotSupported, .agentUnavailable,
-             .noTriggeringAgent, .missedWhileClosed: return false
+             .noTriggeringAgent, .missedWhileClosed, .dayLimitReached: return false
         }
     }
 
@@ -123,7 +128,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case (.chainTooDeep, .chainTooDeep), (.runInFlight, .runInFlight),
              (.archived, .archived), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
-             (.folderGone, .folderGone):
+             (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached):
             return true
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
@@ -192,6 +197,7 @@ extension Workflow {
     public func refusalIfBlocked(isRunning: Bool, depth: Int,
                                  isArchived: Bool = false,
                                  overLimit: WorkflowLimit? = nil,
+                                 dayLimitReached: Bool = false,
                                  folderExists: Bool = true,
                                  triggeringAgentIsUsable: Bool? = nil) -> WorkflowRefusal? {
         // First, and ahead even of a file that cannot be read: somebody has already
@@ -203,6 +209,11 @@ extension Workflow {
         // useful thing to hear about a broken file, and before the rest, because no
         // amount of unpausing will help.
         if let overLimit { return .overLimit(overLimit) }
+        // After archived and paused, and after the file's own problems: a workflow
+        // the person put away is refused for that reason, not for the budget. It
+        // does not pause the workflow or alter its schedule — it refused one fire
+        // and will try again when it is next due.
+        if dayLimitReached { return .dayLimitReached }
         if isRunning { return .runInFlight }
         if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
         if let problem {

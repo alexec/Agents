@@ -42,6 +42,10 @@ final class AppModel {
     var entries: [TranscriptEntry] { work.entries }
     var transcriptHasMore: Bool { work.hasMoreBefore }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
+    /// What the reader will allow and what today has cost. Nil until the daemon has
+    /// said, which is how every surface knows to show nothing rather than a zero.
+    var costState: DaemonAPI.CostState? { work.costState }
+    var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
 
     /// Which project this window is looking at.
     ///
@@ -139,26 +143,6 @@ final class AppModel {
     /// An agent's `costToDate` is its whole life, and agents outlive the window, so
     /// adding them up would be an all-time figure wearing the word "session". Taking
     /// away what was spent before we were watching leaves what this sitting cost.
-    @ObservationIgnored private var spentBeforeWeWatched: [UUID: [String: Decimal]] = [:]
-
-    /// What this sitting has cost, per currency. Empty until something has been spent,
-    /// which is how the sidebar knows to show nothing rather than a zero.
-    var sessionCost: [String: Decimal] {
-        Cost.spent(by: agents, since: spentBeforeWeWatched)
-    }
-
-    /// Take a note of what every agent we have not seen before had already spent.
-    ///
-    /// Swept after anything files an agent, rather than hooked into the filing itself:
-    /// it is idempotent, there are tens of agents rather than thousands, and the
-    /// alternative is a callback threaded through the shared model for the benefit of
-    /// one line in one window.
-    private func noteWhatWasAlreadySpent() {
-        for agent in work.agents where spentBeforeWeWatched[agent.id] == nil {
-            spentBeforeWeWatched[agent.id] = agent.costToDate
-        }
-    }
-
     var selectedAgent: Agent? { work.agent(selection) }
 
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
@@ -216,6 +200,49 @@ final class AppModel {
                                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                                 workflowID: summary.workflowID,
                                                                 archived: archived))
+    }
+
+    /// What today has cost and what the reader will allow. A daemon too old to know
+    /// the method answers method-not-found, which leaves `costState` nil and every
+    /// surface showing what it showed before this feature.
+    func refreshCostState() async {
+        guard let state = try? await client.call(DaemonAPI.Method.costState,
+                                                 Optional<String>.none,
+                                                 returning: DaemonAPI.CostState.self) else { return }
+        work.replaceCostState(state)
+    }
+
+    /// The reader setting or clearing a limit. Theirs alone: nothing an agent or a
+    /// workflow can reach calls this.
+    func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {
+        guard let state = try? await client.call(
+            DaemonAPI.Method.costSetLimits,
+            DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
+            returning: DaemonAPI.CostState.self) else { return }
+        work.replaceCostState(state)
+    }
+
+    /// Letting one agent carry on past the per-agent limit, or giving it one of its
+    /// own. Does not resume it — continuing is the reader's second, deliberate act.
+    func setCostCeiling(_ agentID: UUID, to ceiling: Cost?) async {
+        guard let agent = try? await client.call(
+            DaemonAPI.Method.agentsSetCeiling,
+            DaemonAPI.SetCeilingRequest(agentID: agentID, ceiling: ceiling),
+            returning: Agent.self) else { return }
+        work.upsert(agent)
+    }
+
+    /// Let one agent that has reached the per-agent limit carry on.
+    ///
+    /// Raises that agent's own ceiling by the app-wide limit again — a concrete,
+    /// bounded allowance rather than removing the cap, so an agent let go on once is
+    /// still stopped eventually. Applies to that agent alone, and does not resume it.
+    func letThisAgentGoOn(_ agent: Agent) async {
+        let ceiling = agent.ceiling(under: costLimits)
+        let currency = ceiling?.currency ?? "USD"
+        let already = agent.costToDate[currency] ?? 0
+        let step = ceiling?.amount ?? already
+        await setCostCeiling(agent.id, to: Cost(amount: already + step, currency: currency))
     }
 
     func refreshProjects() async {
@@ -328,7 +355,6 @@ final class AppModel {
         // so the window and the phone cannot drift apart. What is left here is the
         // Mac's own: the shells and terminals a phone has no business with.
         if work.apply(method, params) {
-            noteWhatWasAlreadySpent()
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
             return
         }
@@ -378,6 +404,7 @@ final class AppModel {
         await refreshPermissions()
         await refreshElicitations()
         await refreshResuming()
+        await refreshCostState()
         await loadTranscript()
     }
 
@@ -400,7 +427,6 @@ final class AppModel {
             self.work.replaceAgents(listed)
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
-            self.noteWhatWasAlreadySpent()
         }
     }
 

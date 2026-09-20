@@ -139,6 +139,19 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
 
+            case DaemonAPI.Method.agentsSetCeiling:
+                let request = try require(params, as: DaemonAPI.SetCeilingRequest.self)
+                return .success(try JSONValue.encoding(try await setCeiling(request)))
+
+            // The reader's money. All three are window calls and none is served to
+            // an agent: a runaway that can raise its own limit is not stopped.
+            case DaemonAPI.Method.costState:
+                return .success(try JSONValue.encoding(await costState()))
+
+            case DaemonAPI.Method.costSetLimits:
+                let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
+                return .success(try JSONValue.encoding(await setLimits(request)))
+
             case DaemonAPI.Method.agentsSuggestPrompts:
                 let request = try require(params, as: DaemonAPI.SuggestPromptsRequest.self)
                 return .success(["note": .string(try await suggestPrompts(request))])
