@@ -67,6 +67,20 @@ public actor DaemonCore {
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
+    /// The last cost figure each agent's runtime quoted, per currency.
+    ///
+    /// A runtime's cost is a **running total for its session**, not what the last turn
+    /// added: the SDK's `total_cost_usd` is documented as "cumulative across turns …
+    /// read the latest result rather than summing across results". So a reading is
+    /// banked by its increase over the previous one, and this is the previous one.
+    ///
+    /// In memory rather than on the record, because it is about a live runtime session
+    /// and not about the work: a reading that dropped is a session that started afresh
+    /// — a resume, or a `/clear` — and the whole of that new reading is new spend on
+    /// top of what the agent had already cost. That rule is what makes this safe to
+    /// lose on restart, and it is also the only thing that catches a mid-session
+    /// `/clear`, which no lifecycle hook would see.
+    var costReadings: [UUID: [String: Decimal]] = [:]
     /// What time it is, for everything about money.
     ///
     /// One clock rather than a `Date()` at each of the five places that bank, gate,
@@ -284,7 +298,30 @@ public actor DaemonCore {
 
     public func loadFromDisk() async {
         let loaded = await store.loadAll()
-        for agent in loaded.agents { agents[agent.id] = agent }
+        for agent in loaded.agents { agents[agent.id] = seedingCost(agent) }
+    }
+
+    /// Give a record written before the cost was banked its total back.
+    ///
+    /// Every chat run before this was fixed holds its price in `usage.cost` — the last
+    /// figure its runtime quoted, which is that session's running total — and an empty
+    /// `costToDate`, because the banking watched the turn's reply, where no price ever
+    /// arrived. The figure is right there and is the right figure, so it is seeded
+    /// rather than left as a hole in every project total.
+    ///
+    /// Only into an empty total, so this can never touch a record that has been banked
+    /// properly and can never run twice on the same one. Nothing is written here: the
+    /// record is rewritten the next time the agent changes for a reason of its own,
+    /// and until then the seeded value is simply what the daemon serves.
+    ///
+    /// Not added to `spendLedger`: the ledger is what *today* cost, and none of this
+    /// was spent today. The day would be wrong for a week and then right again, which
+    /// is worse than a day that only counts from here.
+    private func seedingCost(_ agent: Agent) -> Agent {
+        guard agent.costToDate.isEmpty, let cost = agent.usage?.cost else { return agent }
+        var seeded = agent
+        seeded.costToDate[cost.currency] = cost.amount
+        return seeded
     }
 
     public func allAgents(includeArchived: Bool = true) -> [Agent] {
@@ -341,11 +378,18 @@ public actor DaemonCore {
         case .usageChanged(let usage):
             guard var agent = agents[agentID] else { return }
             agent.usage = usage
+            // The only place a cost ever arrives. The turn's own reply carries tokens
+            // and no price — `claude-agent-acp` builds it from `sessionUsage()`, which
+            // has no cost field at all — so banking at the end of the turn, as 010
+            // research §2 chose to, banked nothing and left every agent reading
+            // "Not measured". Here is where the money is.
+            if let cost = usage.cost { bank(cost, into: &agent) }
             agents[agentID] = agent
             // Usage arrives several times a turn, so it is broadcast on its own rather
             // than as a whole agent, and the record is written at the end of the turn.
             broadcast(DaemonAPI.Notification.agentUsage,
                       DaemonAPI.UsageNotification(agentID: agentID, usage: usage))
+            if usage.cost != nil { broadcastCostState() }
 
         case .planChanged(let plan):
             guard var agent = agents[agentID] else { return }
