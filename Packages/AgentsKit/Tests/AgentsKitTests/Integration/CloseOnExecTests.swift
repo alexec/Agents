@@ -70,7 +70,7 @@ struct CloseOnExecTests {
         let url = temporaryFile()
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let server = DaemonServer(url: url) { _, _ in .success([:]) }
+        let server = DaemonServer(url: url) { _, _, _ in .success([:]) }
         try server.start()
 
         let mine = try connect(to: url)
@@ -115,7 +115,7 @@ struct CloseOnExecTests {
     @Test func aWindowThatHasGoneLeavesNoDescriptorBehind() async throws {
         let url = temporaryFile()
         defer { try? FileManager.default.removeItem(at: url) }
-        let server = DaemonServer(url: url) { _, _ in .success([:]) }
+        let server = DaemonServer(url: url) { _, _, _ in .success([:]) }
         try server.start()
         defer { server.stop() }
 
@@ -159,7 +159,7 @@ struct CloseOnExecTests {
     @Test func theListeningSocketIsNotInherited() throws {
         let url = temporaryFile()
         defer { try? FileManager.default.removeItem(at: url) }
-        let server = DaemonServer(url: url) { _, _ in .success([:]) }
+        let server = DaemonServer(url: url) { _, _, _ in .success([:]) }
         try server.start()
         defer { server.stop() }
         #expect(isCloseOnExec(server.listenFD))

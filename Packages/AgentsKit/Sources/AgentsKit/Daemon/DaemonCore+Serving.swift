@@ -52,6 +52,7 @@ extension DaemonCore {
                   DaemonAPI.ElicitationNotification(agentID: pending.agentID,
                                                     requestID: pending.request.id,
                                                     request: nil))
+        reconsider()
     }
 
     func holdElicitation(_ request: ElicitationRequest, agentID: UUID) async {
@@ -63,6 +64,7 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.agentElicitation,
                   DaemonAPI.ElicitationNotification(agentID: agentID, requestID: request.id,
                                                     request: request))
+        reconsider()
     }
 
     /// The runtime took its own form down — answered somewhere else, or it changed its
@@ -82,6 +84,7 @@ extension DaemonCore {
         elicitations.removeValue(forKey: requestID)
         broadcast(DaemonAPI.Notification.agentElicitation,
                   DaemonAPI.ElicitationNotification(agentID: agentID, requestID: requestID, request: nil))
+        reconsider()
     }
 
     // MARK: Terminals

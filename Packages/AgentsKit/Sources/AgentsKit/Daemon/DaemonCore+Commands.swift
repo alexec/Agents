@@ -927,6 +927,7 @@ extension DaemonCore {
         await move(pending.agentID, on: .permissionAnswered)
         broadcast(DaemonAPI.Notification.agentPermission,
                   DaemonAPI.PermissionNotification(agentID: pending.agentID, request: nil))
+        reconsider()
     }
 
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {

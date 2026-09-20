@@ -31,6 +31,14 @@ public enum DaemonAPI {
         /// file holds and says the choices are not known here yet, rather than offering
         /// an empty menu or inventing one.
         public static let optionsRemembered = "options/remembered"
+        /// Where the person is, told by every surface when it comes to the front, goes
+        /// behind, changes conversation, or sees input after a quiet spell (021 FR-011).
+        /// No timestamp is accepted: the daemon stamps arrival with its own clock.
+        public static let presenceReport = "presence/report"
+        /// What wants a person and where it is showing, asked once on connect, beside
+        /// `permissions/pending` and for the same reason: a surface that was not
+        /// listening is put right rather than left guessing.
+        public static let attentionPending = "attention/pending"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
@@ -118,6 +126,10 @@ public enum DaemonAPI {
         /// offered last time. Carries the failure instead when the runtime being
         /// started behind that form would not start.
         public static let draftOptions = "agents/draftOptions"
+        /// The whole resolved fact for one need: where it should be showing and whether
+        /// the person may be buzzed. Broadcast to every connection, not only to `to`,
+        /// which is what lets the losers withdraw (021).
+        public static let attentionChanged = "attention/changed"
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
@@ -922,6 +934,12 @@ public enum DaemonAPI {
         public static let alreadyAnswered = -32019
         /// A device id that is not in the store — never paired, or revoked since.
         public static let noSuchDevice = -32020
+        /// A need id that is not outstanding — met, or never existed (021).
+        public static let noSuchNeed = -32021
+        /// `presence/report` from a connection with no identity: not a window and not a
+        /// device the bridge opened on behalf of. The surface is taken from the
+        /// connection and never from the parameters, so there is nothing to report as.
+        public static let notASurface = -32022
     }
 
     // MARK: Workflows
@@ -1009,6 +1027,61 @@ public enum DaemonAPI {
             self.action = action
             self.workflowID = workflowID
             self.content = content
+        }
+    }
+
+    // MARK: Attention (021)
+
+    /// `presence/report`. Three small fields, sent on a change and never on a timer.
+    /// **No timestamp**: a contract term, not an omission — the daemon's clock stamps it.
+    public struct PresenceReport: Codable, Sendable {
+        public var watching: UUID?
+        public var active: Bool
+        /// Whether this surface may show notifications; omitted means unchanged.
+        public var mayNotify: Bool?
+
+        public init(watching: UUID?, active: Bool, mayNotify: Bool? = nil) {
+            self.watching = watching
+            self.active = active
+            self.mayNotify = mayNotify
+        }
+    }
+
+    /// One need and where it is showing, as `attention/pending` lists them.
+    public struct AttentionDelivery: Codable, Sendable, Hashable {
+        public var needID: NeedID
+        public var to: Surface?
+
+        public init(needID: NeedID, to: Surface?) {
+            self.needID = needID
+            self.to = to
+        }
+    }
+
+    /// `attention/pending`: what is outstanding, and where each is showing.
+    public struct AttentionPending: Codable, Sendable {
+        public var needs: [Need]
+        public var deliveries: [AttentionDelivery]
+
+        public init(needs: [Need], deliveries: [AttentionDelivery]) {
+            self.needs = needs
+            self.deliveries = deliveries
+        }
+    }
+
+    /// `attention/changed`: the whole resolved fact for one need. `need` nil means met,
+    /// and every surface withdraws; `to` nil means nowhere reachable, or watched.
+    public struct AttentionNotification: Codable, Sendable, Hashable {
+        public var needID: NeedID
+        public var need: Need?
+        public var to: Surface?
+        public var alert: Bool
+
+        public init(needID: NeedID, need: Need?, to: Surface?, alert: Bool) {
+            self.needID = needID
+            self.need = need
+            self.to = to
+            self.alert = alert
         }
     }
 }

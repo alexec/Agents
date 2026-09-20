@@ -3,11 +3,24 @@ import Foundation
 extension DaemonCore {
     /// One place where a method name becomes work. Anything unrecognised is declined
     /// loudly, the same way we decline a runtime asking us for something.
-    public func handle(method: String, params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+    ///
+    /// `surface` and `connection` are who is asking, taken from the connection by the
+    /// server and never from the parameters: a presence report has to belong to
+    /// somebody, and the one thing a caller must not be able to say is who it is.
+    public func handle(method: String, params: JSONValue?,
+                       from surface: Surface? = nil, connection: UUID? = nil) async -> Result<JSONValue, JSONRPCError> {
         do {
             switch method {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
+
+            case DaemonAPI.Method.presenceReport:
+                let report = try require(params, as: DaemonAPI.PresenceReport.self)
+                try reportPresence(report, from: surface, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.attentionPending:
+                return .success(try JSONValue.encoding(attentionPending()))
 
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)

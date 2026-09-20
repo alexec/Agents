@@ -26,7 +26,7 @@ struct InheritedDescriptorTests {
 
         let lock = try #require(DaemonLock(at: folder.appendingPathComponent("daemon.lock")))
         defer { lock.release() }
-        let server = DaemonServer(url: folder.appendingPathComponent("d.sock")) { _, _ in
+        let server = DaemonServer(url: folder.appendingPathComponent("d.sock")) { _, _, _ in
             .success(["ok": true])
         }
         try server.start()

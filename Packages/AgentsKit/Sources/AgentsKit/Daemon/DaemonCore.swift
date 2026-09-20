@@ -21,6 +21,19 @@ public actor DaemonCore {
     /// Forms an agent is blocked on, held here for the same reason permissions are:
     /// the question can arrive while no window is open.
     var elicitations: [UUID: PendingElicitation] = [:]
+    /// 021: where the person is, per connection, and what is showing where. Held in
+    /// memory and never written down — what a person is doing right now is not a fact
+    /// worth keeping, and neither survives a restart by design. See `DaemonCore+Attention`.
+    var presences: [UUID: Presence] = [:]
+    var deliveries: [NeedID: Delivery] = [:]
+    /// When each need was first seen, so a re-routed need keeps its `raisedAt`.
+    var needRaisedAt: [NeedID: Date] = [:]
+    var settlingTimers: [NeedID: Task<Void, Never>] = [:]
+    /// What each device last said about its own notification permission (FR-023).
+    var deviceMayNotify: [UUID: Bool] = [:]
+    /// The four numbers routing turns on. Injected so a test names its own and sleeps
+    /// for none of the real ones.
+    let thresholds: AttentionThresholds
     /// The commands we are running for each agent.
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
@@ -191,12 +204,14 @@ public actor DaemonCore {
                 locations: StoreLocations,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
-                now: (@Sendable () -> Date)? = nil) {
+                now: (@Sendable () -> Date)? = nil,
+                thresholds: AttentionThresholds = .standard) {
         self.store = store
         self.locations = locations
         self.discovery = discovery
-        self.launcher = launcher ?? ProcessSessionLauncher()
+        self.launcher = launcher ?? ProcessSessionLauncher(locations: locations)
         self.now = now ?? { Date() }
+        self.thresholds = thresholds
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.
@@ -366,6 +381,10 @@ public actor DaemonCore {
         case .starting, .waitingOnUser, .running, .archived:
             break
         }
+        // Every way a need begins or ends is a state change or passes through one, and
+        // this is the one place every state change passes through. Cheap, and it says
+        // nothing unless something changed (021, FR-002).
+        reconsider()
     }
 
     // MARK: Reading
@@ -517,6 +536,19 @@ public actor DaemonCore {
                 await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
+            // And the mirror of it: a tool this app wishes were gone, on a runtime that
+            // would not let us take it away. The app answers its own tools yes and
+            // these no, and the person is not asked either question.
+            //
+            // Second line, never the first. A runtime that auto-approves its own tools
+            // never asks at all — Grok's configuration on this Mac does exactly that —
+            // so the policy leans on the briefing for residue and treats this as the
+            // catch when a runtime happens to be polite about it.
+            if let refusal = autoRefused(request) {
+                await live[agentID]?.answerPermission(id: request.id, optionID: refusal.option.optionID)
+                await record(.runtimeNote(refusal.note), for: agentID)
+                return
+            }
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)
             await record(.permissionAsked(request), for: agentID)
             await move(agentID, on: .permissionAsked)
@@ -525,6 +557,7 @@ public actor DaemonCore {
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
             workflowsRespond(to: .askedPermission, agentID: agentID)
+            reconsider()
 
         case .processExited:
             for (id, pending) in pendingPermissions where pending.agentID == agentID {
@@ -536,6 +569,7 @@ public actor DaemonCore {
                 await move(agentID, on: .processDied)
             }
             forget(agentID)
+            reconsider()
 
         case .standardError(let text):
             DaemonLog.shared.write("agent \(agentID) stderr: \(text)")
@@ -613,14 +647,27 @@ public protocol SessionLauncher: Sendable {
     func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession
 }
 
+/// Two of the three places the app's tool scoping is applied are here: the arguments
+/// the process is started with, and the environment it is started in. The third is the
+/// `_meta` on the session, which the daemon sends once the process is talking.
+///
+/// It takes the root because one runtime is scoped by a file rather than by a flag, and
+/// that file belongs under the daemon's own root like everything else the app writes.
 public struct ProcessSessionLauncher: SessionLauncher {
-    public init() {}
+    let locations: StoreLocations
+
+    public init(locations: StoreLocations) {
+        self.locations = locations
+    }
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
-        try ACPSession.launch(executable: URL(fileURLWithPath: path),
-                              arguments: runtime.arguments,
-                              cwd: cwd,
-                              environment: LoginShellPath.environment(),
-                              capabilities: .app)
+        let policy = ToolPolicyCatalog.policy(for: runtime.id)
+        let environment = RuntimePolicyFiles(locations: locations)
+            .environment(for: policy, onto: LoginShellPath.environment())
+        return try ACPSession.launch(executable: URL(fileURLWithPath: path),
+                                     arguments: runtime.arguments + policy.launchArguments,
+                                     cwd: cwd,
+                                     environment: environment,
+                                     capabilities: .app)
     }
 }

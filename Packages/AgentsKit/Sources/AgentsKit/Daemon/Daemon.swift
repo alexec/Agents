@@ -43,8 +43,12 @@ public final class Daemon: @unchecked Sendable {
             onConnectionCountChanged: { count in
                 Task { await core.setConnectionCount(count) }
             },
-            handler: { method, params in
-                await core.handle(method: method, params: params)
+            onDisconnected: { connection in
+                Task { await core.forgetPresence(connection: connection) }
+            },
+            handler: { context, method, params in
+                await core.handle(method: method, params: params,
+                                  from: context.surface, connection: context.id)
             })
         self.server = server
         await core.setBroadcaster { method, params in

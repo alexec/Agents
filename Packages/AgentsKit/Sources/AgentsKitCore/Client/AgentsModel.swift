@@ -21,6 +21,10 @@ public final class AgentsModel {
     public private(set) var projects: [DaemonAPI.ProjectSummary] = []
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
+    /// What wants a person and where each is showing, as the daemon last said (021).
+    /// The model stores the fact; it posts nothing and decides nothing.
+    public private(set) var needs: [NeedID: Need] = [:]
+    public private(set) var deliveries: [NeedID: Surface] = [:]
 
     /// Every project's workflows, newest state winning. Here rather than in the Mac's
     /// own model because a workflow is about the work, and the phone will want them.
@@ -101,6 +105,16 @@ public final class AgentsModel {
             guard let notification = try? params?.decode(DaemonAPI.ElicitationNotification.self) else { return true }
             elicitations.removeAll { $0.id == notification.requestID }
             if let request = notification.request { elicitations.append(request) }
+
+        case DaemonAPI.Notification.attentionChanged:
+            guard let notification = try? params?.decode(DaemonAPI.AttentionNotification.self) else { return true }
+            if let need = notification.need {
+                needs[notification.needID] = need
+                deliveries[notification.needID] = notification.to
+            } else {
+                needs.removeValue(forKey: notification.needID)
+                deliveries.removeValue(forKey: notification.needID)
+            }
 
         case DaemonAPI.Notification.agentUsage:
             guard let notification = try? params?.decode(DaemonAPI.UsageNotification.self) else { return true }
@@ -210,6 +224,14 @@ public final class AgentsModel {
     public func replacePermissions(_ listed: [PermissionRequest]) { permissions = listed }
 
     public func replaceElicitations(_ listed: [ElicitationRequest]) { elicitations = listed }
+
+    /// What `attention/pending` said on connect: the outstanding needs and where each
+    /// is showing, replacing whatever this surface believed while it was not listening.
+    public func replaceAttention(_ pending: DaemonAPI.AttentionPending) {
+        needs = Dictionary(uniqueKeysWithValues: pending.needs.map { ($0.id, $0) })
+        deliveries = Dictionary(uniqueKeysWithValues: pending.deliveries.map { ($0.needID, $0.to) })
+            .compactMapValues { $0 }
+    }
 
     /// The first page of the conversation being read: the end of it.
     public func replaceTranscript(with page: TranscriptPage) {

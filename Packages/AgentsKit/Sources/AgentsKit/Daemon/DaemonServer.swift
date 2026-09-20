@@ -12,7 +12,20 @@ public enum DaemonServerError: Error, Sendable {
 /// Several connections at once are normal, and all of them get every notification, so
 /// two windows agree without either of them being in charge.
 public final class DaemonServer: @unchecked Sendable {
-    public typealias Handler = @Sendable (String, JSONValue?) async -> Result<JSONValue, JSONRPCError>
+    /// Who a request came from. `surface` is the identity presence is reported under —
+    /// a window is `.mac`; a connection the bridge opens on behalf of a device is that
+    /// device (Slice C) — and it is set by the server, never said by the caller (021).
+    public struct ConnectionContext: Hashable, Sendable {
+        public var id: UUID
+        public var surface: Surface?
+
+        public init(id: UUID, surface: Surface?) {
+            self.id = id
+            self.surface = surface
+        }
+    }
+
+    public typealias Handler = @Sendable (ConnectionContext, String, JSONValue?) async -> Result<JSONValue, JSONRPCError>
 
     private let url: URL
     private let handler: Handler
@@ -22,13 +35,18 @@ public final class DaemonServer: @unchecked Sendable {
     private let connections = ConnectionSet()
     private let stopped = ManagedAtomicFlag()
     private let onConnectionCountChanged: @Sendable (Int) -> Void
+    /// A connection that has gone, by id. What is known about where its person was
+    /// goes with it: gone is more truthful than stale (021).
+    private let onDisconnected: @Sendable (UUID) -> Void
 
     public init(url: URL,
                 onConnectionCountChanged: @escaping @Sendable (Int) -> Void = { _ in },
+                onDisconnected: @escaping @Sendable (UUID) -> Void = { _ in },
                 handler: @escaping Handler) {
         self.url = url
         self.handler = handler
         self.onConnectionCountChanged = onConnectionCountChanged
+        self.onDisconnected = onDisconnected
     }
 
     public func start() throws {
@@ -93,7 +111,14 @@ public final class DaemonServer: @unchecked Sendable {
 
     private func accepted(_ fd: Int32) {
         let transport = FDTransport(socket: fd)
-        let connection = JSONRPCConnection(transport: transport, handler: handler)
+        // Everything that reaches this socket is a window on this Mac, until the bridge
+        // exists to say otherwise: helpers and probes that connect here never report
+        // presence, and a window that does is the Mac.
+        let context = ConnectionContext(id: UUID(), surface: .mac)
+        let handler = self.handler
+        let connection = JSONRPCConnection(transport: transport) { method, params in
+            await handler(context, method, params)
+        }
         connections.add(connection)
         onConnectionCountChanged(connections.count)
         Task {
@@ -109,6 +134,7 @@ public final class DaemonServer: @unchecked Sendable {
             await connection.close()
             self.connections.remove(connection)
             self.onConnectionCountChanged(self.connections.count)
+            self.onDisconnected(context.id)
         }
     }
 
