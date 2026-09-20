@@ -166,6 +166,50 @@ struct WorkflowFileTests {
         #expect(workflow.unknownFields["retries"] == .string("3"))
     }
 
+    // MARK: Settings that cannot be read
+
+    @Test func aSettingThatIsNotASingleValueIsUnreadable() {
+        let listed = parse("""
+            ---
+            on: agent-finished
+            permission-mode:
+              - plan
+              - default
+            ---
+
+            Go.
+            """)
+        #expect(listed.problem == .unreadable("`permission-mode:` must be a single value"))
+
+        let blocked = parse("""
+            ---
+            on: agent-finished
+            model:
+              name: opus
+            ---
+
+            Go.
+            """)
+        #expect(blocked.problem == .unreadable("`model:` must be a single value"))
+    }
+
+    @Test func aRuntimeThisVersionHasNeverHeardOfIsNotAParseError() {
+        let workflow = parse("""
+            ---
+            on: agent-finished
+            runtime: nonesuch
+            ---
+
+            Go.
+            """)
+        // No problem at all: the refusal for this one comes later and from somewhere
+        // else — the start path, which is the only place the catalog is consulted. A
+        // runtime dropped or renamed should leave a workflow that says why it did not
+        // run, not a file its author has to go and edit.
+        #expect(workflow.problem == nil)
+        #expect(workflow.settings.runtimeID == "nonesuch")
+    }
+
     // MARK: Files that are broken
 
     @Test func aFileWithNoMetadataBlockIsUnreadable() {

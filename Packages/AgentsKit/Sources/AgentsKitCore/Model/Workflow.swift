@@ -57,6 +57,14 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// Front-matter keys this version does not know, kept so that writing the file back
     /// does not quietly delete what a later version put there.
     public var unknownFields: [String: JSONValue]
+    /// What the file says about how its agent should be started.
+    ///
+    /// Part of the file, and therefore part of the repository, which is the difference
+    /// between this and `isArchived` or the standing agent: those are the app's own
+    /// bookkeeping and are deliberately kept out of it, because writing them back would
+    /// put the app's bookkeeping into a history nobody wants to review. How much an
+    /// agent is allowed to do while nobody is watching is not bookkeeping.
+    public var settings: WorkflowSettings
 
     /// Unique across projects, so one window showing two of them cannot collide.
     public var id: String { folder.path + "/" + workflowID }
@@ -64,7 +72,8 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     public init(workflowID: String, folder: URL, name: String? = nil,
                 triggers: [WorkflowTrigger] = [], mode: WorkflowMode = .new,
                 prompt: String = "", problem: WorkflowProblem? = nil,
-                unknownFields: [String: JSONValue] = [:]) {
+                unknownFields: [String: JSONValue] = [:],
+                settings: WorkflowSettings = WorkflowSettings()) {
         self.workflowID = workflowID
         self.folder = Project.standardize(folder)
         self.name = name ?? Self.defaultName(for: workflowID)
@@ -73,6 +82,25 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         self.prompt = prompt
         self.problem = problem
         self.unknownFields = unknownFields
+        self.settings = settings
+    }
+
+    /// Lenient about `settings` for the reason `WorkflowSummary` is lenient about
+    /// `isArchived`: a daemon and a window of different vintages should disagree about
+    /// a field, not fail. A `Workflow` is sent whole inside a `WorkflowSummary`, so an
+    /// older daemon omitting this key would otherwise cost the newer window every
+    /// workflow in the project rather than one line of its description.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        workflowID = try c.decode(String.self, forKey: .workflowID)
+        folder = try c.decode(URL.self, forKey: .folder)
+        name = try c.decode(String.self, forKey: .name)
+        triggers = try c.decode([WorkflowTrigger].self, forKey: .triggers)
+        mode = try c.decode(WorkflowMode.self, forKey: .mode)
+        prompt = try c.decode(String.self, forKey: .prompt)
+        problem = try c.decodeIfPresent(WorkflowProblem.self, forKey: .problem)
+        unknownFields = try c.decodeIfPresent([String: JSONValue].self, forKey: .unknownFields) ?? [:]
+        settings = try c.decodeIfPresent(WorkflowSettings.self, forKey: .settings) ?? WorkflowSettings()
     }
 
     /// A file name turned into something worth reading: `morning-build-check` becomes
@@ -111,7 +139,14 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
             return triggers.first?.summary ?? "Nothing makes this run"
         }
         let triggerPart = supported.map(\.summary).joined(separator: ", and ")
-        return "\(triggerPart), \(mode.summary)"
+        let base = "\(triggerPart), \(mode.summary)"
+        // A `triggering` workflow never starts an agent — it resumes the one that set
+        // it off — so it never applies a setting, and a row saying "in plan mode" about
+        // one would be a false statement in the one place this feature exists to make
+        // true. The settings are still in the file and still shown on the page, which
+        // says the longer version; what must not happen is the row asserting them.
+        guard mode != .triggering, let settingsPart = settings.summary else { return base }
+        return "\(base), \(settingsPart)"
     }
 
     /// The next time a clock makes this fire, across all of its schedules.

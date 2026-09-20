@@ -101,13 +101,42 @@ public enum WorkflowFile {
             problem = .triggerNotSupported(triggers[0].name)
         }
 
-        let known: Set<String> = ["on", "agent", "name"]
+        // How the agent should be started. A key that is there but is not a scalar —
+        // a list, or a block under it — is a file somebody has to fix, because the one
+        // thing worse than a workflow that does not run is one that runs with a
+        // permission we guessed at. A key with nothing after it says nothing, which is
+        // the same as leaving it out.
+        func setting(_ key: String) throws -> String? {
+            guard let node = mapping[key] else { return nil }
+            guard let value = node.scalar else {
+                throw YAMLNode.Failure("`\(key):` must be a single value")
+            }
+            return value.isEmpty ? nil : value
+        }
+        let settings: WorkflowSettings
+        do {
+            settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
+                                        runtimeID: try setting("runtime"),
+                                        model: try setting("model"))
+        } catch let error as YAMLNode.Failure {
+            return broken(error.message)
+        } catch {
+            return broken("The settings could not be read")
+        }
+        // A `runtime:` naming an id this version has never heard of is deliberately not
+        // a parse error. A runtime dropped or renamed should turn into a workflow that
+        // says why it did not run — which is a refusal, raised in the start path where
+        // the catalog is actually consulted — and not into a file marked broken, which
+        // is what a person would have to go and edit. See research.md §4.
+
+        let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model"]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
                         name: mapping["name"]?.scalar,
                         triggers: triggers, mode: mode,
-                        prompt: body, problem: problem, unknownFields: unknown)
+                        prompt: body, problem: problem, unknownFields: unknown,
+                        settings: settings)
     }
 
     // MARK: Triggers

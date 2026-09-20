@@ -35,3 +35,141 @@ public enum FrontMatter {
         return lines.joined(separator: "\n")
     }
 }
+
+/// Changing one key in the metadata block of a file somebody else wrote.
+///
+/// Here rather than in a file of its own, because the positional rule about `---` is
+/// `FrontMatter`'s and stating it a second time somewhere else is how the top of a
+/// document gets eaten. `strip` and this read the same fence the same way.
+///
+/// This is the only thing in the app that writes into a file a person wrote. It is
+/// theirs: it is in their repository, it goes into their history, and somebody will
+/// read the diff. So it does one key at a time and refuses anything it cannot do
+/// exactly, rather than doing its best — a best effort here does not fail loudly, it
+/// succeeds quietly and leaves a change nobody asked for in somebody's commit.
+public enum FrontMatterEdit {
+    /// Why nothing was written. Carries a sentence a person can act on, because the
+    /// app is going to show it to them rather than keep the change and pretend.
+    public struct Refusal: Error, Sendable {
+        public var message: String
+        public init(_ message: String) { self.message = message }
+    }
+
+    /// Set, change or remove one top-level scalar key. `nil` removes it.
+    ///
+    /// Pure: a function of text returning text. The atomic write and the rescan that
+    /// follows belong with every other workflow write, not here.
+    public static func set(_ key: String, to value: String?, in source: String) throws -> String {
+        let newline = source.range(of: "\r\n") != nil ? "\r\n" : "\n"
+        var lines = source.components(separatedBy: newline)
+
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+            throw Refusal("This file does not start with a metadata block, and one cannot be invented for it")
+        }
+        guard let closing = lines.dropFirst().firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces) == "---"
+        }) else {
+            throw Refusal("The metadata block is never closed")
+        }
+
+        // Column zero, and nothing else. A `model:` indented under a trigger belongs to
+        // the trigger, and the difference between the two is the whole of E3.
+        let matches = (1..<closing).filter { isKeyLine(lines[$0], key: key) }
+        guard matches.count <= 1 else {
+            throw Refusal("`\(key):` appears more than once in the metadata — which one is meant is not something to pick between silently")
+        }
+
+        guard let index = matches.first else {
+            guard let value else { return source }
+            lines.insert("\(key): \(quoted(value))", at: closing)
+            return lines.joined(separator: newline)
+        }
+
+        // A key whose value is a list or a block has more under it than one line, and
+        // replacing the line would leave the rest of it orphaned at the top of the file.
+        let parts = split(lines[index], key: key)
+        if parts.value.isEmpty, index + 1 < closing, isContinuation(lines[index + 1]) {
+            throw Refusal("`\(key):` has a list or a block under it, which this cannot change")
+        }
+        if parts.value.hasPrefix("[") || parts.value.hasPrefix("{") {
+            throw Refusal("`\(key):` is a list, which this cannot change")
+        }
+
+        guard let value else {
+            lines.remove(at: index)
+            return lines.joined(separator: newline)
+        }
+        // The spacing after the colon and whatever followed the value are the author's,
+        // and a diff that moves them is a diff about this app rather than about the
+        // change that was asked for.
+        lines[index] = "\(key):\(parts.spacing)\(quoted(value))\(parts.trailing)"
+        return lines.joined(separator: newline)
+    }
+
+    /// Whether this line is `key:` at column zero, as against a key of the same name
+    /// nested under something, or a longer key that merely starts the same way.
+    private static func isKeyLine(_ line: String, key: String) -> Bool {
+        guard line.hasPrefix(key) else { return false }
+        return line.dropFirst(key.count).first == ":"
+    }
+
+    /// Whether this line belongs to the key above it: indented, or a block sequence's
+    /// dash. Either way there is more to the value than the one line.
+    private static func isContinuation(_ line: String) -> Bool {
+        if line.hasPrefix("-") { return true }
+        guard let first = line.first else { return false }
+        return first.isWhitespace && !line.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// One `key: value  # comment` line, taken apart so that everything except the
+    /// value can be put back exactly as it was.
+    private static func split(_ line: String, key: String) -> (spacing: String, value: String, trailing: String) {
+        let rest = line.dropFirst(key.count + 1)
+        let spacing = String(rest.prefix(while: { $0 == " " || $0 == "\t" }))
+        let after = String(rest.dropFirst(spacing.count))
+
+        // A `#` inside quotes is part of the value; a `#` after whitespace, or at the
+        // start of what is left, opens a comment.
+        var quote: Character?
+        var commentStart: String.Index?
+        var previous: Character?
+        for index in after.indices {
+            let character = after[index]
+            if let open = quote {
+                if character == open { quote = nil }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == "#", previous == nil || previous!.isWhitespace {
+                commentStart = index
+                break
+            }
+            previous = character
+        }
+
+        let valuePart = commentStart.map { String(after[..<$0]) } ?? after
+        let comment = commentStart.map { String(after[$0...]) } ?? ""
+        let value = String(valuePart.reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
+        let padding = String(valuePart.dropFirst(value.count))
+        return (spacing, value, padding + comment)
+    }
+
+    /// A plain scalar where one will do, and a quoted one where it will not.
+    ///
+    /// Written conservatively: this decides what somebody's file looks like, and a
+    /// value that reads back as something else is worse than one wearing quotes it
+    /// did not strictly need.
+    private static func quoted(_ value: String) -> String {
+        let indicators: Set<Character> = ["-", "?", ":", ",", "[", "]", "{", "}", "#",
+                                          "&", "*", "!", "|", ">", "'", "\"", "%", "@", "`"]
+        let needsQuotes = value.isEmpty
+            || value.first!.isWhitespace || value.last!.isWhitespace
+            || indicators.contains(value.first!)
+            || value.contains(": ") || value.contains(" #")
+            || value.contains("\n") || value.contains("\r")
+        guard needsQuotes else { return value }
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+}
