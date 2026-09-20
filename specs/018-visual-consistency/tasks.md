@@ -147,7 +147,7 @@ which is how they drifted; this is the precondition for every other phase.
 - [X] T044 [US3] In `App/Sources/Chat/Transcript.swift`, replace `.padding(.horizontal, 144)` at line 62 with `.chatColumn(paneWidth:)` fed from a `GeometryReader` or `onGeometryChange` on the pane, and change the trailing `.frame(maxWidth: .infinity, alignment: .leading)` at line 64 to centred. Keep the vertical padding and the `bottomInset` handling untouched
 - [X] T045 [US3] In `App/Sources/Chat/PromptBar.swift`, replace `.padding(.horizontal, 144)` at line 97 with the same `.chatColumn(paneWidth:)`, fed from the same measurement, so the two edges cannot be changed independently (FR-021). Remove the comment at `Transcript.swift:61` that explains the two hard-coded numbers and replace it with one naming the shared modifier
 - [ ] T046 [US3] Verify FR-023: scroll to the middle of a long transcript, then toggle the right sidebar, resize the window, and collapse the project list. The reader's position must not move in any of the three
-- [ ] T047 [US3] Walk [quickstart.md §5](quickstart.md#5-size-and-measure-by-eye) for measure: narrow, default with sidebar open, wide, and dragging continuously. Confirm no jump at any width and that the prompt bar tracks the transcript
+- [X] T047 [US3] Walk [quickstart.md §5](quickstart.md#5-size-and-measure-by-eye) for measure: narrow, default with sidebar open, wide, and dragging continuously. Confirm no jump at any width and that the prompt bar tracks the transcript
 
 **Checkpoint**: The chat fits its pane at every width. SC-009, SC-010 and SC-011 met.
 
@@ -312,3 +312,52 @@ Where the code differed from the plan:
 SC status: SC-001, SC-003, SC-004, SC-007, SC-009, SC-010 and SC-011 hold by
 construction and by test. SC-002, SC-005, SC-006 and SC-008 need a person and are
 carried by the unchecked walks above.
+
+---
+
+## By-eye walk (2026-09-19, second session)
+
+Walked against a second copy of the app — the live root's records copied into
+`/tmp/018-walk`, a second instance launched with `--root`, and the real app left
+alone. Four states seeded onto one project: an agent reporting `stuck`, one
+reporting `done`, one `nothing_to_do`, and a project folder that does not exist.
+
+**T047 — measure, walked and passing.** Three widths, right sidebar both ways:
+
+| pane | measure | margin each side | verdict |
+| --- | --- | --- | --- |
+| 302pt (1100 window, sidebar open) | ~272pt | ~15pt | text beats margin; was 14pt of text against 288pt of gutter |
+| 497pt (700 window) | ~443pt | ~27pt | never collapses |
+| 536pt (1440 window, sidebar open) | ~475pt | ~30pt | still ramping |
+| 1247pt (1440 window, sidebar shut) | ~579pt | ~334pt | at the 580 cap, centred, surplus split evenly |
+
+The prompt bar's left and right edges matched the transcript's at every width
+(FR-021, SC-010). The reported symptom — the default window with the sidebar open
+being mostly margin — is gone.
+
+**T024 — colour, walked in dark mode.** Attention is orange on the agent list's
+`stuck` row and on both project rows' dots; `done` is a green check; a project whose
+folder is missing says so in red on its heading, and the dot beside it is not orange.
+Each state is readable from its icon and words with the colour ignored (FR-007):
+"Needs attention", "Folder is missing", a warning triangle, a tick.
+
+**T046 — scroll position, walked, with one thing to look at.** Toggling the right
+sidebar does not jump the reader to the top or the bottom, but the position drifts:
+with the sidebar taking 595pt of a 1,100pt window the column goes from 1,247pt to
+~390pt, the text reflows about three times taller, and the paragraph under the
+reader's eye moved up by roughly a screen-third. The drift is reflow, not this
+feature's arithmetic — a fixed 144pt gutter reflowed on the same toggle — but
+FR-023 says the position must not move, and it moves. Alex's call whether that
+reading of FR-023 is the one that counts.
+
+**Not walked, and why:**
+
+- Light appearance and a system accent set to orange (FR-005, FR-008). Both are
+  system-wide settings on a machine that is being worked on; passing
+  `-AppleInterfaceStyle Light -AppleAccentColor 1` in the scratch instance's
+  argument domain does not take.
+- The phone half of T036, and T037's largest accessibility text. Both want the
+  Remote target in a simulator paired to a daemon.
+- An agent at its cost limit (the triangle moved from orange to red under T022).
+  The state could not be reached from records alone.
+- T058's end-to-end walk, which is the four above plus what is already walked.
