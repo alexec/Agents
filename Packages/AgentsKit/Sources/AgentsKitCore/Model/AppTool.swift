@@ -20,4 +20,7 @@ public enum AppTool {
     /// And this one reads and writes the project's standing arrangements: the prompts
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
+
+    /// And the fourth: how the work went, said at the end of it.
+    public static let reportOutcome = "report_outcome"
 }

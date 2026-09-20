@@ -30,9 +30,9 @@ description: "Task list for How It Actually Went"
 
 **Purpose**: The two names everything else refers to.
 
-- [ ] T001 Add `public static let reportOutcome = "report_outcome"` to `Packages/AgentsKit/Sources/AgentsKitCore/Model/AppTool.swift`, beside `manageWorkflows`, with a doc comment in the file's voice ("And the fourth: how the work went, said at the end of it")
-- [ ] T002 [P] Add `public static let agentsReportOutcome = "agents/reportOutcome"` to the `Method` enum in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, beside `agentsManageWorkflows`
-- [ ] T003 [P] Create the empty test suites `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift`, `Integration/OutcomeReportTests.swift` and `Integration/UnreportedEndingTests.swift` with `@Suite` names matching the house style ("What an agent says about its work", "Reporting how it went", "An ending nobody accounted for")
+- [x] T001 Add `public static let reportOutcome = "report_outcome"` to `Packages/AgentsKit/Sources/AgentsKitCore/Model/AppTool.swift`, beside `manageWorkflows`, with a doc comment in the file's voice ("And the fourth: how the work went, said at the end of it")
+- [x] T002 [P] Add `public static let agentsReportOutcome = "agents/reportOutcome"` to the `Method` enum in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, beside `agentsManageWorkflows`
+- [x] T003 [P] Create the empty test suites `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkOutcomeTests.swift`, `Integration/OutcomeReportTests.swift` and `Integration/UnreportedEndingTests.swift` with `@Suite` names matching the house style ("What an agent says about its work", "Reporting how it went", "An ending nobody accounted for")
 
 ---
 

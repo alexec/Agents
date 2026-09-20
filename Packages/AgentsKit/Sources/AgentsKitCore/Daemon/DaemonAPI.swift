@@ -52,6 +52,10 @@ public enum DaemonAPI {
         public static let workflowsArchive = "workflows/archive"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
+        /// And the last of them: the agent saying how the work actually went, at the
+        /// end of it. The app cannot know this any other way — a turn giving itself
+        /// back says nothing about whether the work is finished.
+        public static let agentsReportOutcome = "agents/reportOutcome"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
