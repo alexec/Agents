@@ -8,6 +8,12 @@ import Foundation
 public struct FileProbe: Sendable, Equatable {
     public enum Kind: Sendable, Equatable {
         case text
+        /// A picture, for the surface to draw rather than read. Decided from the name
+        /// and not the bytes: an SVG passes every byte-level test for text and is
+        /// still a picture, and a pane would rather draw it than number its lines. The
+        /// description is carried for the day the drawing fails, so what is said then
+        /// is the same thing that would be said of any other binary.
+        case image(describedAs: String)
         /// What it is, said in words, because its bytes are not worth showing (FR-014).
         case binary(describedAs: String)
 
@@ -62,7 +68,12 @@ public struct FileProbe: Sendable, Equatable {
                          size: size)
     }
 
-    /// Text or not, from the first bytes and the name.
+    /// Text, image or neither, from the name and the first bytes.
+    ///
+    /// The name is asked first and only about images. Every image format the Mac can
+    /// draw has a NUL in its first bytes, so the byte rules below would call them all
+    /// binary, and the pane would describe a picture instead of showing it — which is
+    /// what it did until someone asked to see the picture.
     ///
     /// A NUL byte means binary: no text encoding this app shows puts one in the middle
     /// of a document, and every binary format has them early. Invalid UTF-8 means
@@ -71,6 +82,9 @@ public struct FileProbe: Sendable, Equatable {
     ///
     /// An empty file is text. There is nothing in it to be binary.
     public static func classify(_ prefix: Data, filename: String, size: Int) -> Kind {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        if imageKinds.contains(ext) { return .image(describedAs: describe(filename, size: size)) }
+
         let window = prefix.prefix(sniffLimit)
         if window.contains(0) { return .binary(describedAs: describe(filename, size: size)) }
         if window.isEmpty { return .text }
@@ -110,9 +124,18 @@ public struct FileProbe: Sendable, Equatable {
         return "\(kind), \(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))"
     }
 
+    /// The formats AppKit decodes without help. Listed here rather than asked of the
+    /// system because this half of the kit is also built for iOS, where there is no
+    /// AppKit to ask; the surface finds out for itself when it draws, and a name on
+    /// this list that turns out not to decode is handed back as a plain binary.
+    static let imageKinds: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "tiff", "tif", "bmp", "svg", "icns",
+    ]
+
     private static let knownKinds: [String: String] = [
         "png": "PNG image", "jpg": "JPEG image", "jpeg": "JPEG image", "gif": "GIF image",
-        "heic": "HEIC image", "webp": "WebP image", "tiff": "TIFF image", "icns": "Icon",
+        "heic": "HEIC image", "heif": "HEIF image", "webp": "WebP image", "tiff": "TIFF image",
+        "tif": "TIFF image", "bmp": "BMP image", "svg": "SVG image", "icns": "Icon",
         "pdf": "PDF document", "zip": "Zip archive", "gz": "Gzip archive", "tar": "Tar archive",
         "mp3": "Audio", "wav": "Audio", "m4a": "Audio", "mp4": "Video", "mov": "Video",
         "o": "Object file", "a": "Static library", "dylib": "Dynamic library",

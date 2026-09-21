@@ -30,18 +30,48 @@ struct FileProbeTests {
         #expect(probe.text == "")
     }
 
-    @Test func aPNGIsBinaryAndIsDescribedRatherThanShown() throws {
-        // The real 8-byte PNG signature, which carries a NUL in the fourth byte.
+    @Test func aPNGIsAnImageAndCarriesItsDescription() throws {
+        // The real 8-byte PNG signature, which carries a NUL in the fourth byte. The
+        // NUL would make it binary; the name makes it a picture first, and the
+        // description travels with it for the day the picture will not decode.
         var bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         bytes.append(Data(repeating: 0, count: 64))
         let url = try write(bytes, named: "logo.png")
+        let probe = try FileProbe.read(url)
+        #expect(probe.kind.isText == false)
+        guard case .image(let description) = probe.kind else {
+            Issue.record("expected image")
+            return
+        }
+        #expect(description.contains("PNG image"))
+        #expect(probe.text == nil)
+    }
+
+    @Test func anSVGIsAnImageThoughEveryByteOfItIsText() throws {
+        // The byte rules say text. The name wins: a pane that numbered its lines would
+        // be showing the source of a picture to someone who asked for the picture.
+        let url = try write(Data("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".utf8), named: "mark.svg")
+        let probe = try FileProbe.read(url)
+        guard case .image(let description) = probe.kind else {
+            Issue.record("expected image")
+            return
+        }
+        #expect(description.contains("SVG image"))
+    }
+
+    @Test func aZipIsBinaryAndIsDescribedRatherThanShown() throws {
+        // The local file header signature, then a NUL-padded run: binary by the byte
+        // rule, and not on the image list, so it is described (FR-014).
+        var bytes = Data([0x50, 0x4B, 0x03, 0x04])
+        bytes.append(Data(repeating: 0, count: 64))
+        let url = try write(bytes, named: "bundle.zip")
         let probe = try FileProbe.read(url)
         #expect(probe.kind.isText == false)
         guard case .binary(let description) = probe.kind else {
             Issue.record("expected binary")
             return
         }
-        #expect(description.contains("PNG image"))
+        #expect(description.contains("Zip archive"))
         #expect(probe.text == nil)
     }
 

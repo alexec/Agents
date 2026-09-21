@@ -165,15 +165,11 @@ struct FilesPane: View {
                             .padding(10)
                     }
                 }
+            case .image(let description):
+                ImageFile(url: url, probe: probe, description: description)
             case .binary(let description):
-                // Its bytes are never shown (FR-014).
-                VStack(spacing: 6) {
-                    Image(systemName: "doc.badge.gearshape")
-                        .font(.largeTitle)
-                        .foregroundStyle(.tertiary)
-                    Text(description).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Its bytes are never shown (FR-014). What is shown is the way out.
+                OpenElsewhere(url: url, description: description)
             }
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
