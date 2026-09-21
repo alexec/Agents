@@ -167,4 +167,12 @@ listener.stateUpdateHandler = { state in
 }
 
 listener.start(queue: .main)
+
+// The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
+// the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.
+let mailboxTransport = MailboxTransport()
+if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil {
+    mailboxTransport.start()
+}
+
 dispatchMain()

@@ -8,6 +8,9 @@ import SwiftUI
 /// layout can be judged until it launches.
 @main
 struct RemoteApp: App {
+    /// For pushes only. See `PushDelegate`.
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var push
+
     /// The real Mac, found on the network it is on, unless `-fake` says otherwise.
     ///
     /// Nothing above this line knows which it got. That was the point of making the
@@ -24,6 +27,7 @@ struct RemoteApp: App {
         WindowGroup {
             RemoteView()
                 .environment(model)
+                .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
         }
     }
 }

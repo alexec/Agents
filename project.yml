@@ -114,9 +114,15 @@ targets:
       - path: Remote/Sources
       # The same files the Mac compiles. See the note on the Agents target.
       - path: Shared/UI
+      # Listed, not owned. See the note on the Agents target's entitlements.
+      - path: Remote/Remote.entitlements
+        buildPhase: none
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
+      # The notification service extension: the banner's words are assembled on the
+      # device, from a sealed push (021 T068).
+      - target: RemoteNotify
     info:
       path: Remote/Info.plist
       properties:
@@ -132,6 +138,10 @@ targets:
           your agents are doing.
         NSBonjourServices:
           - _agents._tcp
+        # A silent push — a need moved elsewhere, or met — wakes the app to show or
+        # remove its own banner (021 T079). Best effort by Apple's design.
+        UIBackgroundModes:
+          - remote-notification
         # Scene-based from the first commit, because iOS 27 will not launch an app
         # without the UIScene lifecycle and nothing can be judged until it launches.
         UIApplicationSceneManifest:
@@ -150,12 +160,46 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote
         PRODUCT_NAME: Agents
+        CODE_SIGN_ENTITLEMENTS: Remote/Remote.entitlements
         SDKROOT: iphoneos
         SUPPORTED_PLATFORMS: iphoneos iphonesimulator
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+
+  # Opens the sealed headline in a loud push and puts the words in the banner, on
+  # the device (021 T068). Links AgentsKitCore only, as the Remote does.
+  RemoteNotify:
+    type: app-extension
+    supportedDestinations: [iOS]
+    sources:
+      - path: RemoteNotify/Sources
+      - path: RemoteNotify/RemoteNotify.entitlements
+        buildPhase: none
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKitCore
+    info:
+      path: RemoteNotify/Info.plist
+      properties:
+        CFBundleDisplayName: RemoteNotify
+        CFBundleName: RemoteNotify
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote.notify
+        PRODUCT_NAME: RemoteNotify
+        CODE_SIGN_ENTITLEMENTS: RemoteNotify/RemoteNotify.entitlements
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos iphonesimulator
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
 
   # The Mac end of the direct connection: a door onto the daemon for a device on the
   # same network. Started by hand — it has no pairing and no encryption yet.

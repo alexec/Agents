@@ -59,7 +59,10 @@ final class RemoteModel {
     }()
     /// This device's key, made once and kept in this device's keychain. The Mac only
     /// ever sees the public half.
-    private let key: DeviceKey? = try? DeviceKey.load()
+    private let key: DeviceKey? = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)
+    /// The mailbox's subscriptions are saved once per launch, the first time the Mac
+    /// says this device is approved.
+    private var subscribed = false
     /// This device, as the Mac has it: `nil` until the Mac has answered the announce,
     /// unapproved until somebody says yes there. Read by `PairingView`.
     private(set) var thisDevice: Device?
@@ -245,6 +248,7 @@ final class RemoteModel {
                     // Approved, or revoked. A revoked device announces again on its
                     // next connection and waits, as it did the first time.
                     self.thisDevice = change.gone ? nil : change.device
+                    self.subscribeIfApproved()
                 }
             }
             await self?.lostTouch()
@@ -305,6 +309,7 @@ final class RemoteModel {
                                              name: UIDevice.current.name, kind: kind),
                 returning: Device.self)
             pairingProblem = nil
+            subscribeIfApproved()
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.notSupported {
             pairingProblem = "Your Mac knows this device under a different key. Revoke it there and pair again."
         } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
@@ -319,6 +324,49 @@ final class RemoteModel {
     /// when the LAN cannot.
     var isPaired: Bool { thisDevice?.isApproved == true }
 
+    /// Ask CloudKit to push this device's mailbox items here. Idempotent on the server
+    /// — the subscriptions have stable ids — so once per launch is plenty.
+    private func subscribeIfApproved() {
+        guard isPaired, !subscribed else { return }
+        subscribed = true
+        Task {
+            do { try await CloudKitMailbox().subscribe(device: deviceID) } catch { subscribed = false }
+        }
+    }
+
+    // MARK: A push arrived (021 T077, T079)
+
+    /// A silent push: a need moved here without a buzz, moved away, or was met. The
+    /// loud ones never come here — `RemoteNotify` turns those into banners before the
+    /// system shows them. Everything this does is to local notifications, and it
+    /// decides nothing about where the need belongs.
+    func receivedPush(_ userInfo: [AnyHashable: Any]) async {
+        guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
+        if pushed.withdrawn || pushed.envelope == nil {
+            notifier.withdraw(pushed.token)
+            return
+        }
+        guard let key, let envelope = pushed.envelope,
+              let headline = try? Envelope.open(envelope, with: key) else { return }
+        notifier.show(headline, needID: pushed.needID, alert: pushed.alert)
+    }
+
+    /// Which conversation a banner is about, from the need it names. The Mac's
+    /// `attention/pending` is the truth; this reads the copy the model already holds.
+    func agentID(forNeedToken token: String) -> UUID? {
+        if let need = work.needs.first(where: { $0.key.token == token }) { return need.value.agentID }
+        switch token.split(separator: ":", maxSplits: 1).map(String.init) {
+        case let parts where parts.count == 2 && parts[0] == "permission":
+            return work.permissions.first { $0.id.uuidString == parts[1] }?.agentID
+        case let parts where parts.count == 2 && parts[0] == "elicitation":
+            return work.elicitations.first { $0.id.uuidString == parts[1] }?.agentID
+        case let parts where parts.count == 2 && parts[0] == "report":
+            return UUID(uuidString: String(parts[1].split(separator: ":").first ?? ""))
+        default:
+            return nil
+        }
+    }
+
     private func identify() async {
         _ = try? await client.call(DaemonAPI.Method.surfaceIdentify,
                                    DaemonAPI.SurfaceIdentification(id: deviceID, name: UIDevice.current.name, kind: kind))
@@ -330,6 +378,10 @@ final class RemoteModel {
             guard let self, let agent = self.work.agent(agentID) else { return }
             self.selectedProject = Project.standardize(agent.cwd)
             self.selection = agentID
+        }
+        notifier.openNeed = { [weak self] token in
+            guard let self, let agentID = self.agentID(forNeedToken: token) else { return }
+            self.notifier.open(agentID)
         }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
         let reporter = PresenceReporter { [weak self] watching, active, mayNotify in

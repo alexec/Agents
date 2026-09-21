@@ -2,9 +2,13 @@ import AgentsKitCore
 import Foundation
 import UserNotifications
 
-/// This device's banner for a need the Mac has routed here — a **local** notification,
-/// which reaches the person only while the app is running. That is the LAN link's
-/// limit, not this file's: a push that wakes a backgrounded phone is Slice C.
+/// This device's banner for a need the Mac has routed here — a **local** notification
+/// while the app is running and the LAN carries the decision; when it is not, a push
+/// through the mailbox does the same job, loud ones opened by `RemoteNotify` and
+/// silent ones handed here by `RemoteModel.receivedPush`. The push half of withdrawal
+/// is **best effort** by Apple's design: a silent push is low priority, coalesced
+/// one-deep, and not delivered at all to a force-quit app — which is why `sweep` on
+/// coming to the front is not optional.
 ///
 /// The same two jobs as the Mac's `MacNotifier` and the same idempotent rule: mine and
 /// not showing → show, with sound iff alert; not mine and showing → withdraw; over and
@@ -13,6 +17,8 @@ import UserNotifications
 final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Open that agent's conversation, with the question in front of the person.
     var open: @MainActor (UUID) -> Void = { _ in }
+    /// The same, from a pushed banner that names only the need.
+    var openNeed: @MainActor (String) -> Void = { _ in }
     /// The permission was asked, or refused; the presence report should say so.
     var authorisationChanged: @MainActor () -> Void = {}
 
@@ -51,22 +57,29 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func show(_ need: Need, token: String, alert: Bool) {
+        show(need.headline, needID: need.id, alert: alert, agentID: need.agentID)
+    }
+
+    /// A headline opened from a push, or one the Mac sent in the clear over the LAN.
+    func show(_ headline: Headline, needID: NeedID, alert: Bool, agentID: UUID? = nil) {
+        let token = needID.token
         let content = UNMutableNotificationContent()
-        let headline = need.headline.truncating()
+        let headline = headline.truncating()
         content.title = headline.h2
         content.subtitle = headline.h1
         content.body = headline.h3
         content.sound = alert ? .default : nil
-        content.userInfo = ["agentID": need.agentID.uuidString]
-        content.threadIdentifier = need.agentID.uuidString
-        showing[token] = need.id
+        content.userInfo = ["needToken": token]
+        if let agentID { content.userInfo["agentID"] = agentID.uuidString }
+        content.threadIdentifier = agentID?.uuidString ?? token
+        showing[token] = needID
         center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil)) { [weak self] error in
             guard error != nil else { return }
             Task { @MainActor in self?.showing.removeValue(forKey: token) }
         }
     }
 
-    private func withdraw(_ token: String) {
+    func withdraw(_ token: String) {
         showing.removeValue(forKey: token)
         center.removeDeliveredNotifications(withIdentifiers: [token])
         center.removePendingNotificationRequests(withIdentifiers: [token])
@@ -94,8 +107,11 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
-        guard let text = response.notification.request.content.userInfo["agentID"] as? String,
-              let agentID = UUID(uuidString: text) else { return }
-        await MainActor.run { open(agentID) }
+        let userInfo = response.notification.request.content.userInfo
+        if let text = userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
+            await MainActor.run { open(agentID) }
+        } else if let token = userInfo["needToken"] as? String {
+            await MainActor.run { openNeed(token) }
+        }
     }
 }
