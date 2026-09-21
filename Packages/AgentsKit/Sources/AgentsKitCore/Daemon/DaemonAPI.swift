@@ -152,6 +152,13 @@ public enum DaemonAPI {
         /// A device announced, was approved, was heard from, or was revoked. `{ device }`
         /// for the first three and `{ id, gone: true }` for the last (021).
         public static let deviceChanged = "device/changed"
+        /// Something for a device's mailbox: a `MailboxItem`, sealed. The daemon has no
+        /// CloudKit and must not; the bridge hears this and posts it. Every connection
+        /// hears it, and that is safe: a need id, a device id and ciphertext name
+        /// nothing (021 FR-022).
+        public static let mailboxPost = "mailbox/post"
+        /// A device was revoked: whatever is waiting for it is thrown away unread.
+        public static let mailboxEmpty = "mailbox/empty"
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
@@ -1106,6 +1113,12 @@ public enum DaemonAPI {
             self.device = nil
             self.gone = true
         }
+    }
+
+    /// `mailbox/empty`: whose.
+    public struct MailboxEmptied: Codable, Sendable, Hashable {
+        public var device: UUID
+        public init(device: UUID) { self.device = device }
     }
 
     /// `presence/report`. Three small fields, sent on a change and never on a timer.

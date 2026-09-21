@@ -19,9 +19,17 @@ public struct DeviceKey: Sendable {
         case software(P256.KeyAgreement.PrivateKey)
     }
 
+    /// The keychain access group the Remote and its notification service extension
+    /// share, so the extension can open what was sealed to the app's key. The team
+    /// prefix is the one in `project.yml`; an access group is spelt with it.
+    public static let sharedAccessGroup = "6T4RVD5724.com.alexecollins.agents.shared"
+
     /// The device's key, made on first use and found in the keychain after that.
-    public static func load(account: String = "device-key") throws -> DeviceKey {
-        if let stored = try Keychain.read(account: account) {
+    /// `accessGroup` is the shared group on a device and `nil` on a Mac or in a test,
+    /// where there is no entitlement to name one.
+    public static func load(account: String = "device-key", accessGroup: String? = nil) throws -> DeviceKey {
+        let keychain = Keychain(accessGroup: accessGroup)
+        if let stored = try keychain.read(account: account) {
             if SecureEnclave.isAvailable,
                let key = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: stored) {
                 return DeviceKey(publicKey: key.publicKey.x963Representation,
@@ -33,7 +41,7 @@ public struct DeviceKey: Sendable {
             }
         }
         let made = try make()
-        try Keychain.write(made.representation, account: account)
+        try keychain.write(made.representation, account: account)
         return made
     }
 
@@ -74,12 +82,20 @@ public struct DeviceKey: Sendable {
     }
 
     /// The device's keychain, and nothing else: one generic-password item per account.
-    enum Keychain {
-        static func read(account: String) throws -> Data? {
-            let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+    struct Keychain {
+        var accessGroup: String?
+
+        private func base(_ account: String) -> [String: Any] {
+            var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                         kSecAttrService as String: "com.alexecollins.agents.device",
-                                        kSecAttrAccount as String: account,
-                                        kSecReturnData as String: true]
+                                        kSecAttrAccount as String: account]
+            if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+            return query
+        }
+
+        func read(account: String) throws -> Data? {
+            var query = base(account)
+            query[kSecReturnData as String] = true
             var item: CFTypeRef?
             let status = SecItemCopyMatching(query as CFDictionary, &item)
             if status == errSecItemNotFound { return nil }
@@ -87,10 +103,8 @@ public struct DeviceKey: Sendable {
             return item as? Data
         }
 
-        static func write(_ data: Data, account: String) throws {
-            let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                        kSecAttrService as String: "com.alexecollins.agents.device",
-                                        kSecAttrAccount as String: account]
+        func write(_ data: Data, account: String) throws {
+            let query = base(account)
             SecItemDelete(query as CFDictionary)
             var add = query
             add[kSecValueData as String] = data

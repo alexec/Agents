@@ -56,11 +56,3 @@ public actor FakeMailbox: Mailbox {
         return latest.values.sorted { $0.postedAt < $1.postedAt }
     }
 }
-
-/// No mailbox at all: what a daemon has until the bridge hands it one, and what a test
-/// that is not about mailboxes runs with.
-public struct NoMailbox: Mailbox {
-    public init() {}
-    public func post(_ item: MailboxItem) async throws {}
-    public func empty(device: UUID) async throws {}
-}

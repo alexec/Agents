@@ -35,9 +35,10 @@ public actor DaemonCore {
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
     /// Where a sealed headline goes for a device the LAN cannot reach, and what is
-    /// emptied when a device is revoked. A no-op by default: the real one is the
-    /// bridge's, handed in by `Daemon`.
-    let mailbox: any Mailbox
+    /// emptied when a device is revoked. `nil` — the daemon's own case — means it is
+    /// broadcast as `mailbox/post` for the bridge to carry: the daemon has no CloudKit
+    /// and must not. A test hands in a `FakeMailbox` and reads what was posted.
+    let mailbox: (any Mailbox)?
     /// Posts to the mailbox in the order they were decided: a withdrawal must not
     /// overtake the banner it withdraws.
     var mailboxTail: Task<Void, Never>?
@@ -223,7 +224,7 @@ public actor DaemonCore {
         self.launcher = launcher ?? ProcessSessionLauncher(locations: locations)
         self.now = now ?? { Date() }
         self.thresholds = thresholds
-        self.mailbox = mailbox ?? NoMailbox()
+        self.mailbox = mailbox
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.

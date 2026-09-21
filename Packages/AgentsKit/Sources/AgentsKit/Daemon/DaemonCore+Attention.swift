@@ -216,8 +216,11 @@ extension DaemonCore {
     }
 
     private func enqueue(_ item: MailboxItem) {
+        guard let mailbox else {
+            broadcast(DaemonAPI.Notification.mailboxPost, item)
+            return
+        }
         let previous = mailboxTail
-        let mailbox = mailbox
         mailboxTail = Task {
             await previous?.value
             try? await mailbox.post(item)

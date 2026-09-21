@@ -511,3 +511,4 @@ struct AttentionTests {
         #expect(listed.first?.publicKey == phone.key.publicKey)
     }
 }
+

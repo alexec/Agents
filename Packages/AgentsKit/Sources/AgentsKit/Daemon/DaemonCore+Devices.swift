@@ -81,11 +81,14 @@ extension DaemonCore {
         loadedDevices = all
         try deviceStore.save(Array(all.values))
         broadcast(DaemonAPI.Notification.deviceChanged, DaemonAPI.DeviceNotification(gone: id))
-        let mailbox = mailbox
-        let previous = mailboxTail
-        mailboxTail = Task {
-            await previous?.value
-            try? await mailbox.empty(device: id)
+        if let mailbox {
+            let previous = mailboxTail
+            mailboxTail = Task {
+                await previous?.value
+                try? await mailbox.empty(device: id)
+            }
+        } else {
+            broadcast(DaemonAPI.Notification.mailboxEmpty, DaemonAPI.MailboxEmptied(device: id))
         }
         // Whatever was showing there is now showing nowhere, and every surface hears so
         // — then the ladder decides again as though the device had never been.
