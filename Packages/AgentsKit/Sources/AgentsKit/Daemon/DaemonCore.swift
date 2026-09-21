@@ -29,14 +29,18 @@ public actor DaemonCore {
     /// When each need was first seen, so a re-routed need keeps its `raisedAt`.
     var needRaisedAt: [NeedID: Date] = [:]
     var settlingTimers: [NeedID: Task<Void, Never>] = [:]
-    /// What each device last said about its own notification permission (FR-023).
-    var deviceMayNotify: [UUID: Bool] = [:]
-    /// The devices that have identified themselves on a connection, treated as approved.
-    /// **Phase 6's stand-in** for the device store: nothing here is paired, verified or
-    /// written down, and T064 replaces it with `DeviceStore`. Held so the ladder's
-    /// device rungs can be walked on real hardware over the LAN before a line of
-    /// CloudKit exists.
-    var knownDevices: [UUID: Device] = [:]
+    /// The paired devices, read from `devices.json` the first time they are wanted and
+    /// written whole on every change. The daemon is the only writer. See
+    /// `DaemonCore+Devices`.
+    lazy var deviceStore = DeviceStore(locations: locations)
+    var loadedDevices: [UUID: Device]?
+    /// Where a sealed headline goes for a device the LAN cannot reach, and what is
+    /// emptied when a device is revoked. A no-op by default: the real one is the
+    /// bridge's, handed in by `Daemon`.
+    let mailbox: any Mailbox
+    /// Posts to the mailbox in the order they were decided: a withdrawal must not
+    /// overtake the banner it withdraws.
+    var mailboxTail: Task<Void, Never>?
     /// The four numbers routing turns on. Injected so a test names its own and sleeps
     /// for none of the real ones.
     let thresholds: AttentionThresholds
@@ -211,13 +215,15 @@ public actor DaemonCore {
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 now: (@Sendable () -> Date)? = nil,
-                thresholds: AttentionThresholds = .standard) {
+                thresholds: AttentionThresholds = .standard,
+                mailbox: (any Mailbox)? = nil) {
         self.store = store
         self.locations = locations
         self.discovery = discovery
         self.launcher = launcher ?? ProcessSessionLauncher(locations: locations)
         self.now = now ?? { Date() }
         self.thresholds = thresholds
+        self.mailbox = mailbox ?? NoMailbox()
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.

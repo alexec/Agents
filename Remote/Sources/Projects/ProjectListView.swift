@@ -20,7 +20,12 @@ struct ProjectListView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Projects")
-        .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                StaleBanner()
+                PairingView()
+            }
+        }
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }

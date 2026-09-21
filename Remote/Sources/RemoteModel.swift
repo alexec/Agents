@@ -57,6 +57,15 @@ final class RemoteModel {
         UserDefaults.standard.set(id.uuidString, forKey: key)
         return id
     }()
+    /// This device's key, made once and kept in this device's keychain. The Mac only
+    /// ever sees the public half.
+    private let key: DeviceKey? = try? DeviceKey.load()
+    /// This device, as the Mac has it: `nil` until the Mac has answered the announce,
+    /// unapproved until somebody says yes there. Read by `PairingView`.
+    private(set) var thisDevice: Device?
+    /// Why the announce did not take, when it did not — a key the Mac does not
+    /// recognise under this id, or a Mac too old to be asked.
+    private(set) var pairingProblem: String?
     private var listening: Task<Void, Never>?
     /// The loop looking for the Mac, so two of them never run at once.
     private var reconnecting: Task<Void, Never>?
@@ -200,6 +209,7 @@ final class RemoteModel {
             lastHeardFrom = Date()
             problem = nil
             listen()
+            await announce()
             await identify()
             startPresence()
             presence?.connected()
@@ -228,6 +238,13 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.attentionChanged,
                    let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
                     await self.notifier.apply(change, me: .device(self.deviceID))
+                }
+                if notification.method == DaemonAPI.Notification.deviceChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
+                   change.id == self.deviceID {
+                    // Approved, or revoked. A revoked device announces again on its
+                    // next connection and waits, as it did the first time.
+                    self.thisDevice = change.gone ? nil : change.device
                 }
             }
             await self?.lostTouch()
@@ -264,13 +281,45 @@ final class RemoteModel {
         if phase == .active { Task { await refreshAttention() } }
     }
 
-    private func identify() async {
-        let kind: Device.Kind
+    private var kind: Device.Kind {
         switch UIDevice.current.userInterfaceIdiom {
-        case .phone: kind = .iPhone
-        case .pad: kind = .iPad
-        default: kind = .unknown
+        case .phone: .iPhone
+        case .pad: .iPad
+        default: .unknown
         }
+    }
+
+    /// `devices/announce`: who this is and its public key, once per connection. The
+    /// Mac gives the record back in whatever state it is in; a device it has never
+    /// heard of is written down unapproved, and `PairingView` says so until somebody
+    /// at the Mac says yes.
+    private func announce() async {
+        guard let key else {
+            pairingProblem = "This device could not make a key, so it cannot be paired."
+            return
+        }
+        do {
+            thisDevice = try await client.call(
+                DaemonAPI.Method.devicesAnnounce,
+                DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
+                                             name: UIDevice.current.name, kind: kind),
+                returning: Device.self)
+            pairingProblem = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.notSupported {
+            pairingProblem = "Your Mac knows this device under a different key. Revoke it there and pair again."
+        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
+            pairingProblem = "Your Mac's Agents is too old to pair with."
+        } catch {
+            thisDevice = nil
+        }
+    }
+
+    /// Whether this device is one the Mac will tell things. Everything else works
+    /// unpaired over the LAN as it did before; what pairing buys is being reached
+    /// when the LAN cannot.
+    var isPaired: Bool { thisDevice?.isApproved == true }
+
+    private func identify() async {
         _ = try? await client.call(DaemonAPI.Method.surfaceIdentify,
                                    DaemonAPI.SurfaceIdentification(id: deviceID, name: UIDevice.current.name, kind: kind))
     }

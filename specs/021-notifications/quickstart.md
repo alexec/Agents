@@ -16,6 +16,20 @@ swift test --package-path Packages/AgentsKit
 `-skipPackagePluginValidation` is required — SwiftTerm ships a build-tool plug-in that
 `xcodebuild` cannot be asked to trust. Build the two schemes one after the other, not at once.
 
+**Slice C only.** The CloudKit container is `iCloud.com.alexecollins.agents`, under team
+`6T4RVD5724`. It must exist in the portal before C-anything: *Certificates, Identifiers &
+Profiles → Identifiers → iCloud Containers → +*, then assign it to the App IDs
+`com.alexecollins.agents.bridge` and `com.alexecollins.agents.remote` (and
+`com.alexecollins.agents.remote.notify` once T068's extension exists). Then prove it:
+
+```sh
+xcodebuild -scheme agents-bridge -configuration Debug -skipPackagePluginValidation -allowProvisioningUpdates build
+build/DD/Build/Products/Debug/agents-bridge.app/Contents/MacOS/agents-bridge --spike
+```
+
+Passing ends `spike: ok — the private database is reachable from this bundle`. Until the
+container exists it ends `"Bad Container" (5/1014)`, which is the portal, not the code.
+
 Run against a throwaway root so none of this touches real agents:
 
 ```sh

@@ -263,11 +263,11 @@ struct AttentionTests {
 
     // MARK: US2, the device in hand (Phase 6, without the hardware)
 
-    /// A phone and a pad, identified and permitted, as the LAN link presents them.
+    /// A phone and a pad, paired and here, as the LAN link presents them.
     private func devices(_ core: DaemonCore) async -> (phone: FakeSurface, pad: FakeSurface) {
         let phone = FakeSurface(.device(UUID())), pad = FakeSurface(.device(UUID()))
-        await phone.identify(core, name: "Phone", kind: .iPhone)
-        await pad.identify(core, name: "Pad", kind: .iPad)
+        await phone.pair(core, name: "Phone", kind: .iPhone)
+        await pad.pair(core, name: "Pad", kind: .iPad)
         return (phone, pad)
     }
 
@@ -323,7 +323,7 @@ struct AttentionTests {
         let core = try core(asking(), locations: locations)
         let heard = AttentionRecorder(); await heard.attach(to: core)
         let pad = FakeSurface(.device(UUID()))
-        await pad.identify(core, name: "Pad", kind: .iPad)
+        await pad.pair(core, name: "Pad", kind: .iPad)
         await pad.report(core, active: true, mayNotify: true)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
         await waitingOnUser(core, id)
@@ -352,7 +352,7 @@ struct AttentionTests {
         let core = try core(asking(), locations: locations)
         let heard = AttentionRecorder(); await heard.attach(to: core)
         let phone = FakeSurface(.device(UUID()))
-        await phone.identify(core, name: "Phone", kind: .iPhone)
+        await phone.pair(core, name: "Phone", kind: .iPhone)
         await phone.report(core, active: true, mayNotify: false)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
         await waitingOnUser(core, id)
@@ -396,5 +396,118 @@ struct AttentionTests {
         let answer = await core.handle(method: DaemonAPI.Method.presenceReport, params: params)
         guard case .failure(let error) = answer else { Issue.record("expected a refusal"); return }
         #expect(error.code == DaemonAPI.Failure.notASurface)
+    }
+
+    // MARK: US5, pairing (Phase 7, against the fake mailbox)
+
+    private func pairing(_ launcher: FakeLauncher, locations: StoreLocations,
+                         mailbox: FakeMailbox) throws -> DaemonCore {
+        DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                   discovery: .findsEverything, launcher: launcher, thresholds: thresholds, mailbox: mailbox)
+    }
+
+    /// US5 scenario 1: a device that never paired is sent nothing, however present it
+    /// says it is.
+    @Test func anUnpairedDeviceIsSentNothing() async throws {
+        let (locations, work) = try temporary()
+        let mailbox = FakeMailbox()
+        let core = try pairing(asking(), locations: locations, mailbox: mailbox)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let stranger = FakeSurface(.device(UUID()))
+        await stranger.identify(core, name: "Stranger", kind: .iPhone)
+        await stranger.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        try await settled()
+        #expect(heard.deliveries.isEmpty)
+        #expect(await mailbox.posted.isEmpty)
+        #expect(await core.allDevices().isEmpty, "identifying does not pair")
+    }
+
+    /// US5 scenario 2: announced and waiting is not paired.
+    @Test func aDeviceWaitingForApprovalIsSentNothing() async throws {
+        let (locations, work) = try temporary()
+        let mailbox = FakeMailbox()
+        let core = try pairing(asking(), locations: locations, mailbox: mailbox)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.announce(core, name: "Phone", kind: .iPhone)
+        await phone.identify(core, name: "Phone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        try await settled()
+        #expect(heard.deliveries.isEmpty)
+        #expect(await mailbox.posted.isEmpty)
+        let listed = await core.allDevices()
+        #expect(listed.count == 1 && listed.first?.isApproved == false)
+
+        // Then the person says yes: the need goes to the phone, sealed to it.
+        await phone.approve(core)
+        await eventually("the phone was told") { heard.deliveries.first?.to == phone.surface }
+        await eventually("and its mailbox holds the sealed headline") { await !mailbox.posted.isEmpty }
+        let item = try #require(await mailbox.posted.first)
+        #expect(item.device == phone.surface.deviceID)
+        let opened = try Envelope.open(try #require(item.envelope), with: phone.key)
+        #expect(opened.h3.hasPrefix("Wants to"))
+    }
+
+    /// US5 scenario 3 and SC-007: revoked is deleted, its mailbox is emptied, and what
+    /// was showing there is decided again without it.
+    @Test func aRevokedDeviceIsSentNothingAndItsMailboxIsEmpty() async throws {
+        let (locations, work) = try temporary()
+        let mailbox = FakeMailbox()
+        let core = try pairing(asking(), locations: locations, mailbox: mailbox)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.pair(core, name: "Phone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, id)
+        await eventually("the phone was told") { heard.deliveries.first?.to == phone.surface }
+        await eventually("posted") { await !mailbox.posted.isEmpty }
+
+        let params = try JSONValue.encoding(DaemonAPI.DeviceRequest(id: try #require(phone.surface.deviceID)))
+        _ = await core.handle(method: DaemonAPI.Method.devicesRevoke, params: params, from: .mac, connection: UUID())
+        await eventually("emptied") { await !mailbox.emptied.isEmpty }
+        #expect(await mailbox.waiting(for: try #require(phone.surface.deviceID)).isEmpty)
+        #expect(await core.allDevices().isEmpty)
+        await eventually("moved off the phone") { heard.changes.last?.to == nil }
+        try await settled()
+        #expect(await mailbox.posted.isEmpty, "nothing more is posted to a device that is gone")
+
+        // A revoked id is nobody: another announce with another key is a new device.
+        let again = await phone.announce(core, name: "Phone", kind: .iPhone)
+        guard case .success = again else { Issue.record("a revoked id may announce afresh"); return }
+    }
+
+    /// A key never changes under an id.
+    @Test func aDeviceWithANewKeyIsRefused() async throws {
+        let (locations, _) = try temporary()
+        let core = try pairing(asking(), locations: locations, mailbox: FakeMailbox())
+        let phone = FakeSurface(.device(UUID()))
+        await phone.announce(core, name: "Phone", kind: .iPhone)
+        let other = DeviceKey.ephemeral()
+        let params = try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: try #require(phone.surface.deviceID),
+                                                                         publicKey: other.publicKey,
+                                                                         name: "Phone", kind: .iPhone))
+        let answer = await core.handle(method: DaemonAPI.Method.devicesAnnounce, params: params,
+                                       from: phone.surface, connection: phone.connection)
+        guard case .failure(let error) = answer else { Issue.record("expected a refusal"); return }
+        #expect(error.code == DaemonAPI.Failure.notSupported)
+        #expect(await core.allDevices().count == 1)
+    }
+
+    /// The store outlives the daemon: a paired device is still paired after a restart.
+    @Test func pairingSurvivesARestart() async throws {
+        let (locations, _) = try temporary()
+        let first = try pairing(asking(), locations: locations, mailbox: FakeMailbox())
+        let phone = FakeSurface(.device(UUID()))
+        await phone.pair(first, name: "Phone", kind: .iPhone)
+        let second = try pairing(asking(), locations: locations, mailbox: FakeMailbox())
+        let listed = await second.allDevices()
+        #expect(listed.first?.id == phone.surface.deviceID)
+        #expect(listed.first?.isApproved == true)
+        #expect(listed.first?.publicKey == phone.key.publicKey)
     }
 }

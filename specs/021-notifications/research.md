@@ -183,6 +183,20 @@ here.
 The project has a real team — `DEVELOPMENT_TEAM: 6T4RVD5724` in `project.yml` — so the portal
 work is possible. The container does not exist yet (005 T001).
 
+**Outcome, 2026-09-20 (T056).** The wrapper works. `agents-bridge` became `type: application`
+with `Bridge/Info.plist` (no principal class, storyboard or delegate; `LSUIElement` and
+`LSBackgroundOnly`), `Bridge/agents-bridge.entitlements` carrying `icloud-services:
+[CloudKit]` and the container identifier, and `CODE_SIGN_ENTITLEMENTS` pointing at it.
+`xcodebuild -scheme agents-bridge -allowProvisioningUpdates` signed it under
+"Mac Team Provisioning Profile: com.alexecollins.agents.bridge" with the profile embedded
+and both iCloud entitlements in the signature. `agents-bridge --spike` then reported
+`accountStatus == available`, saved a zone, and the record write failed with
+`CKError 5/1014 "Bad Container": Couldn't get container configuration from the server
+for "iCloud.com.alexecollins.agents"` — which is the **server** saying the container is
+not registered, not the entitlement being refused. The bundle reached CloudKit as itself;
+what is missing is T057, the portal step. Re-run the spike after the container exists
+and record the record's round trip here.
+
 ## 8. Withdrawing a notification on a device the person is not holding is best-effort
 
 **Decision**: withdraw three ways, and amend SC-003 to say what each is worth.

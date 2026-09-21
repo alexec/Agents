@@ -18,6 +18,23 @@ import Network
 // somebody has decided it should, and stops when they close the terminal. Nothing
 // spawns it and nothing keeps it alive.
 
+// `--spike` is 021's T056, the gate the whole of Slice C hangs on: can *this bundle*,
+// nested and signed the way it is, read and write a record in the CloudKit private
+// database? It answers by doing it and prints the answer, and it exists so that the
+// question is settled by running something rather than by reading Apple's forum.
+if CommandLine.arguments.contains("--spike") {
+    Task {
+        do {
+            try await Spike.run()
+            exit(0)
+        } catch {
+            log("spike failed: \(error)")
+            exit(2)
+        }
+    }
+    dispatchMain()
+}
+
 let port: NWEndpoint.Port = {
     guard let raw = ProcessInfo.processInfo.environment["AGENTS_BRIDGE_PORT"],
           let value = UInt16(raw), let port = NWEndpoint.Port(rawValue: value)

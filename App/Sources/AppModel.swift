@@ -238,6 +238,34 @@ final class AppModel {
 
     func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }
 
+    // MARK: Paired devices (021)
+
+    /// The paired devices, and the ones waiting to be, announced first. Read by the
+    /// Devices pane. Refreshed on connect and kept by `device/changed`.
+    private(set) var devices: [Device] = []
+
+    func refreshDevices() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.devicesList, Optional<String>.none,
+                                                  returning: [Device].self) else { return }
+        devices = listed
+    }
+
+    private func deviceChanged(_ change: DaemonAPI.DeviceNotification) {
+        devices.removeAll { $0.id == change.id }
+        if let device = change.device { devices.append(device) }
+        devices.sort { $0.announcedAt < $1.announcedAt }
+    }
+
+    func approve(_ device: Device) async {
+        _ = try? await client.call(DaemonAPI.Method.devicesApprove, DaemonAPI.DeviceRequest(id: device.id),
+                                   returning: Device.self)
+    }
+
+    func revoke(_ device: Device) async {
+        _ = try? await client.call(DaemonAPI.Method.devicesRevoke, DaemonAPI.DeviceRequest(id: device.id),
+                                   returning: JSONValue.self)
+    }
+
     func refreshWorkflows() async {
         do {
             work.replaceWorkflows(try await client.call(DaemonAPI.Method.workflowsList,
@@ -464,6 +492,11 @@ final class AppModel {
         }
 
         switch method {
+        case DaemonAPI.Notification.deviceChanged:
+            // The Mac's own, like the shells: a phone is never told about other phones.
+            guard let change = try? params?.decode(DaemonAPI.DeviceNotification.self) else { return }
+            deviceChanged(change)
+
         case DaemonAPI.Notification.shellOutput:
             // Read rather than decoded: this one arrives whenever a shell prints, and
             // the general path would re-encode every byte of it here on the main
@@ -505,6 +538,7 @@ final class AppModel {
         await refreshRuntimes()
         await refreshAccounts()
         await refreshWorkflows()
+        await refreshDevices()
         await refreshPermissions()
         await refreshElicitations()
         await refreshAttention()

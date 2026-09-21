@@ -43,8 +43,37 @@ final class AttentionRecorder: @unchecked Sendable {
 struct FakeSurface: Sendable {
     let connection = UUID()
     let surface: Surface
+    /// A device's own key, so what is sealed to it can be opened by it in a test.
+    let key = DeviceKey.ephemeral()
 
     init(_ surface: Surface = .mac) { self.surface = surface }
+
+    /// `devices/announce`, as a device does once: who it is and its public key.
+    @discardableResult
+    func announce(_ core: DaemonCore, name: String, kind: Device.Kind) async -> Result<JSONValue, JSONRPCError> {
+        guard let id = surface.deviceID else { return .failure(.internalError("not a device")) }
+        let params = try? JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: id, publicKey: key.publicKey,
+                                                                          name: name, kind: kind))
+        return await core.handle(method: DaemonAPI.Method.devicesAnnounce, params: params,
+                                 from: surface, connection: connection)
+    }
+
+    /// The person at the Mac saying yes.
+    @discardableResult
+    func approve(_ core: DaemonCore) async -> Result<JSONValue, JSONRPCError> {
+        guard let id = surface.deviceID else { return .failure(.internalError("not a device")) }
+        let params = try? JSONValue.encoding(DaemonAPI.DeviceRequest(id: id))
+        return await core.handle(method: DaemonAPI.Method.devicesApprove, params: params,
+                                 from: .mac, connection: UUID())
+    }
+
+    /// Announced, approved and identified on this connection: a paired device, as the
+    /// daemon will see one after the walk in quickstart C3.
+    func pair(_ core: DaemonCore, name: String, kind: Device.Kind) async {
+        await announce(core, name: name, kind: kind)
+        await approve(core)
+        await identify(core, name: name, kind: kind)
+    }
 
     /// `presence/report`, as this surface. The daemon stamps the time; this sends none.
     @discardableResult

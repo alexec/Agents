@@ -45,6 +45,19 @@ public enum DaemonAPI {
         /// (021 T051). A stand-in until pairing verifies it against the device store —
         /// Phase 7 makes the bridge refuse an unpaired device at accept.
         public static let surfaceIdentify = "surface/identify"
+        /// The paired devices, and the ones waiting to be (021 US5).
+        public static let devicesList = "devices/list"
+        /// A device saying who it is and handing over its public key, once. Returns the
+        /// record, approved or not; the same id with the same key is the same device
+        /// and gets its record back, and the same id with a **different** key is
+        /// refused `notSupported` — a key never changes under an identity.
+        public static let devicesAnnounce = "devices/announce"
+        /// The person at the Mac saying yes. Only an approved device is routed to, or
+        /// sealed to.
+        public static let devicesApprove = "devices/approve"
+        /// Deletion, not a flag: the record goes and the device's mailbox is emptied
+        /// (FR-021).
+        public static let devicesRevoke = "devices/revoke"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
@@ -136,6 +149,9 @@ public enum DaemonAPI {
         /// the person may be buzzed. Broadcast to every connection, not only to `to`,
         /// which is what lets the losers withdraw (021).
         public static let attentionChanged = "attention/changed"
+        /// A device announced, was approved, was heard from, or was revoked. `{ device }`
+        /// for the first three and `{ id, gone: true }` for the last (021).
+        public static let deviceChanged = "device/changed"
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
@@ -1048,6 +1064,47 @@ public enum DaemonAPI {
             self.id = id
             self.name = name
             self.kind = kind
+        }
+    }
+
+    /// `devices/announce`: this device, and the public half of its key.
+    public struct DeviceAnnouncement: Codable, Sendable {
+        public var id: UUID
+        public var publicKey: Data
+        public var name: String
+        public var kind: Device.Kind
+
+        public init(id: UUID, publicKey: Data, name: String, kind: Device.Kind) {
+            self.id = id
+            self.publicKey = publicKey
+            self.name = name
+            self.kind = kind
+        }
+    }
+
+    /// `devices/approve` and `devices/revoke`: which one.
+    public struct DeviceRequest: Codable, Sendable {
+        public var id: UUID
+        public init(id: UUID) { self.id = id }
+    }
+
+    /// `device/changed`. `device` is the whole record when it is still there; `gone`
+    /// with only the id when it was revoked.
+    public struct DeviceNotification: Codable, Sendable, Hashable {
+        public var id: UUID
+        public var device: Device?
+        public var gone: Bool
+
+        public init(_ device: Device) {
+            self.id = device.id
+            self.device = device
+            self.gone = false
+        }
+
+        public init(gone id: UUID) {
+            self.id = id
+            self.device = nil
+            self.gone = true
         }
     }
 

@@ -54,36 +54,21 @@ extension DaemonCore {
 
     // MARK: Where the person is
 
-    /// The devices the ladder may route to: the ones that have identified themselves,
-    /// with what each last said about its own notification permission. A stand-in for
-    /// the device store (T064), and it treats an identified device as approved — which
-    /// is what the LAN link, with no pairing, already does for everything else.
-    var pairedDevices: [Device] {
-        knownDevices.values.map { device in
-            var device = device
-            device.mayNotify = deviceMayNotify[device.id] ?? device.mayNotify
-            return device
-        }
-    }
-
-    /// `surface/identify`, after the server has taken the identity: register the
-    /// device so the ladder can choose it. The connection's surface must already be
-    /// this device — the server sets it first — or the call is not a device's.
+    /// `surface/identify`, after the server has taken the identity: note that the device
+    /// is here. The connection's surface must already be this device — the server sets
+    /// it first — or the call is not a device's. An unknown device is **not** made known
+    /// here: a device becomes one by announcing and being approved (`DaemonCore+Devices`),
+    /// and the ladder never sees one that has not.
     func identify(_ who: DaemonAPI.SurfaceIdentification, from surface: Surface?, connection: UUID?) throws {
         guard connection != nil, surface == .device(who.id) else {
             throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
                                message: "Only a device's own connection may say which device it is.")
         }
-        let now = now()
-        if var known = knownDevices[who.id] {
-            known.name = who.name
-            known.kind = who.kind
-            known.lastSeenAt = now
-            knownDevices[who.id] = known
-        } else {
-            knownDevices[who.id] = Device(id: who.id, name: who.name, kind: who.kind,
-                                          announcedAt: now, approvedAt: now, lastSeenAt: now)
-        }
+        guard var known = device(who.id) else { return }
+        known.name = who.name
+        known.kind = who.kind
+        known.lastSeenAt = now()
+        try? saveDevice(known)
         reconsider()
     }
 
@@ -98,10 +83,12 @@ extension DaemonCore {
         let now = now()
         presences[connection] = Presence(surface: surface, watching: report.watching,
                                          active: report.active, heardAt: now)
-        if let device = surface.deviceID {
-            if let mayNotify = report.mayNotify { deviceMayNotify[device] = mayNotify }
-            // Heard from is used by: the default rung reads it when nobody is in hand.
-            knownDevices[device]?.lastSeenAt = now
+        if let id = surface.deviceID, var known = device(id) {
+            // Heard from is what the default rung reads when nobody is in hand, and what
+            // the device says about its own permission is what makes it eligible at all.
+            if let mayNotify = report.mayNotify { known.mayNotify = mayNotify }
+            known.lastSeenAt = now
+            try? saveDevice(known)
         }
         reconsider()
     }
@@ -161,6 +148,7 @@ extension DaemonCore {
         // Met: answered anywhere, or the agent stopped or archived. Every surface hears
         // it, so the losers withdraw too (FR-016); a withdrawal names only the id.
         for id in deliveries.keys where !live.contains(id) {
+            if let device = deliveries[id]?.to?.deviceID { withdraw(id, from: device, at: now) }
             deliveries.removeValue(forKey: id)
             cancelSettling(id)
             broadcast(DaemonAPI.Notification.attentionChanged,
@@ -169,7 +157,7 @@ extension DaemonCore {
         for id in settlingTimers.keys where !live.contains(id) { cancelSettling(id) }
 
         for need in outstanding {
-            let decision = Routing.decide(need: need, presences: presences, devices: pairedDevices,
+            let decision = Routing.decide(need: need, presences: presences, devices: approvedDevices,
                                           delivery: deliveries[need.id], thresholds: thresholds, now: now)
             if decision.wait {
                 // At the Mac, and given a moment to look before anything is shown. One
@@ -190,6 +178,8 @@ extension DaemonCore {
                     moved.alertCount += 1
                 }
                 deliveries[need.id] = moved
+                if let device = existing.to?.deviceID { withdraw(need.id, from: device, at: now) }
+                if let device = decision.to?.deviceID { post(need, to: device, alert: decision.alert, at: now) }
                 broadcast(DaemonAPI.Notification.attentionChanged,
                           DaemonAPI.AttentionNotification(needID: need.id, need: need,
                                                           to: decision.to, alert: decision.alert))
@@ -199,9 +189,38 @@ extension DaemonCore {
                 // `attention/pending` tells the next surface (FR-010).
                 guard let to = decision.to else { continue }
                 deliveries[need.id] = Delivery(needID: need.id, to: to, alertedAt: now, alertCount: 1)
+                if let device = to.deviceID { post(need, to: device, alert: true, at: now) }
                 broadcast(DaemonAPI.Notification.attentionChanged,
                           DaemonAPI.AttentionNotification(needID: need.id, need: need, to: to, alert: true))
             }
+        }
+    }
+
+    // MARK: Reaching a device that is not here
+
+    /// A need for a device goes to its mailbox as well as over any socket it holds,
+    /// sealed to that device and nobody else (FR-022): a backgrounded or absent device
+    /// is reached by push, not by a socket nobody is holding (research §1). Sealing
+    /// needs the device's key; a record without a usable one is sent nothing, which is
+    /// the truth about it rather than a banner in the clear.
+    private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {
+        guard let device = device(id), device.isApproved,
+              let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else { return }
+        enqueue(MailboxItem(needID: need.id, device: id, envelope: envelope, alert: alert, postedAt: now))
+    }
+
+    /// The need is over here: a withdrawal, naming only the id, replaces whatever was
+    /// waiting for the device under it.
+    private func withdraw(_ id: NeedID, from device: UUID, at now: Date) {
+        enqueue(MailboxItem(needID: id, device: device, envelope: nil, alert: false, postedAt: now))
+    }
+
+    private func enqueue(_ item: MailboxItem) {
+        let previous = mailboxTail
+        let mailbox = mailbox
+        mailboxTail = Task {
+            await previous?.value
+            try? await mailbox.post(item)
         }
     }
 

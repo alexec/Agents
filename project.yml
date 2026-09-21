@@ -159,17 +159,40 @@ targets:
 
   # The Mac end of the direct connection: a door onto the daemon for a device on the
   # same network. Started by hand — it has no pairing and no encryption yet.
+  # The bridge is an *app-like bundle*, not a tool, and that is 021's T056 (005's T002):
+  # only a bundle with an embedded provisioning profile can hold the iCloud
+  # entitlement, and the daemon must not — `agentsd` gains no network code. The
+  # bundle has no principal class, storyboard or delegate; `main.swift` is the whole
+  # program, exactly as it was when this was a `tool`. Per Apple DTS.
   agents-bridge:
-    type: tool
+    type: application
     supportedDestinations: [macOS]
     sources:
       - path: Bridge/Sources
+      # Listed, not owned, for the reason given on the Agents target's entitlements.
+      - path: Bridge/agents-bridge.entitlements
+        buildPhase: none
     dependencies:
       - package: AgentsKit
+    info:
+      path: Bridge/Info.plist
+      properties:
+        CFBundleName: agents-bridge
+        CFBundleDisplayName: Agents Bridge
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        # No Dock tile and no menu bar: nothing here is a window.
+        LSUIElement: true
+        LSBackgroundOnly: true
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
         PRODUCT_NAME: agents-bridge
+        CODE_SIGN_ENTITLEMENTS: Bridge/agents-bridge.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
