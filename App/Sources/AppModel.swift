@@ -230,6 +230,7 @@ final class AppModel {
 
     /// This window's own counts for a project, from the grouping its panel uses.
     func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
+    func unreadCount(in folder: URL?) -> Int { work.unreadCount(in: folder) }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }

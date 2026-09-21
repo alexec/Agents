@@ -170,6 +170,22 @@ struct AgentsModelTests {
         #expect(!model.agents(in: folder, group: .running).contains { $0.id == shown.id })
     }
 
+    /// The unread count is the finished chats the daemon has flagged, and only those
+    /// under Complete: one flagged but wanting eyes is under Needs attention instead.
+    @Test func unreadCountsFlaggedFinishedChatsUnderComplete() throws {
+        let model = AgentsModel()
+        var unread = agent(state: .finished); unread.isUnread = true
+        var read = agent(state: .finished); read.isUnread = false
+        var wanted = agent(state: .finished); wanted.isUnread = true
+        for one in [unread, read, wanted] {
+            model.apply(DaemonAPI.Notification.agentChanged, try notification(one))
+        }
+        model.apply(DaemonAPI.Notification.agentShowFile,
+                    try notification(DaemonAPI.ShowFileNotification(
+                        agentID: wanted.id, file: ShownFile(path: "/tmp/work/api/main.swift"))))
+        #expect(model.unreadCount(in: folder) == 1)
+    }
+
     /// US2: an agent that asked to be looked at and was then stopped wants nobody,
     /// because the grouping consults its state and the count is the grouping.
     @Test func aStoppedAgentThatAskedToBeLookedAtIsNotWanted() throws {

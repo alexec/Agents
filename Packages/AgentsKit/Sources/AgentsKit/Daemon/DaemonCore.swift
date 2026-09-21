@@ -345,6 +345,11 @@ public actor DaemonCore {
         }
         if transition.clearsPickUpCount { agent.restartPickUps = 0 }
         agent.lastActivityAt = Date()
+        // Unread is a fact about finishing: a chat that ends with nobody watching waits
+        // to be looked at, and one that ends in front of the person does not. Any
+        // other move — picked up again, stopped, archived — is not a finish, so the
+        // flag goes.
+        agent.isUnread = next == .finished && !isWatched(agentID)
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
 

@@ -83,6 +83,7 @@ extension DaemonCore {
         let now = now()
         presences[connection] = Presence(surface: surface, watching: report.watching,
                                          active: report.active, heardAt: now)
+        if report.active, let watching = report.watching { markRead(watching) }
         if let id = surface.deviceID, var known = device(id) {
             // Heard from is what the default rung reads when nobody is in hand, and what
             // the device says about its own permission is what makes it eligible at all.
@@ -91,6 +92,21 @@ extension DaemonCore {
             try? saveDevice(known)
         }
         reconsider()
+    }
+
+    /// A conversation is in front of somebody: it has been read. Written only when it
+    /// moves the fact, so a window that keeps saying the same thing does not rewrite
+    /// the record.
+    func markRead(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.isUnread else { return }
+        agent.isUnread = false
+        changed(agent)
+    }
+
+    /// Whether some surface has this conversation in front of an active person right
+    /// now — what makes a chat that finishes while it is being watched already read.
+    func isWatched(_ agentID: UUID) -> Bool {
+        presences.values.contains { $0.active && $0.watching == agentID }
     }
 
     /// A connection has gone. Its record is deleted, not aged out: gone is more truthful

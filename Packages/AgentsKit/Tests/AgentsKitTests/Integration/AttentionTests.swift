@@ -512,3 +512,58 @@ struct AttentionTests {
     }
 }
 
+/// Reading: the daemon flags a chat unread when it finishes with nobody watching, and
+/// clears it when a presence report puts the chat in front of an active person.
+@Suite("Reading", .timeLimit(.minutes(1)))
+struct ReadingTests {
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsReadingTests-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), work)
+    }
+
+    private func makeCore(locations: StoreLocations) throws -> DaemonCore {
+        DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                   discovery: .findsEverything, launcher: FakeLauncher(script: .init()))
+    }
+
+    @Test func aChatThatFinishesWhileWatchedIsRead() async throws {
+        let (locations, work) = try temporary()
+        let core = try makeCore(locations: locations)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "hello"))
+        await FakeSurface(.mac).report(core, watching: id, active: true)
+        await eventually("finished") { await core.agent(id)?.state == .finished }
+        let agent = try #require(await core.agent(id))
+        #expect(!agent.isUnread)
+    }
+
+    @Test func aChatThatFinishesUnwatchedIsUnreadUntilLookedAt() async throws {
+        let (locations, work) = try temporary()
+        let core = try makeCore(locations: locations)
+        let mac = FakeSurface(.mac)
+        await mac.report(core, watching: nil, active: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "hello"))
+        await eventually("finished") { await core.agent(id)?.state == .finished }
+        #expect(await core.agent(id)?.isUnread == true)
+        await mac.report(core, watching: id, active: true)
+        #expect(await core.agent(id)?.isUnread == false)
+        // Read survives the daemon: it is on the record. The record is written after
+        // the fact, so the next daemon is asked until it has it.
+        await eventually("read on disk") {
+            guard let again = try? makeCore(locations: locations) else { return false }
+            _ = await again.recover()
+            return await again.agent(id)?.isUnread == false
+        }
+    }
+
+    @Test func lookingWhileAwayFromTheMacDoesNotRead() async throws {
+        let (locations, work) = try temporary()
+        let core = try makeCore(locations: locations)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "hello"))
+        await eventually("finished") { await core.agent(id)?.state == .finished }
+        await FakeSurface(.mac).report(core, watching: id, active: false)
+        #expect(await core.agent(id)?.isUnread == true)
+    }
+}

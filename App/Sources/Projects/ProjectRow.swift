@@ -72,14 +72,14 @@ struct ProjectRow: View {
     /// asking for something.
     private var subtitle: String? {
         let working = counts[.running] ?? 0
-        let complete = counts[.finished] ?? 0
+        // Unread, not complete: a finished chat somebody has already read is not
+        // news, and a row that counted it would nag about work already looked at.
+        let unread = model.unreadCount(in: summary.folder)
         if needsPerson { return "Needs attention" }
         if working > 0 {
-            return complete > 0 ? "\(working) working · \(complete) complete" : "\(working) working"
+            return unread > 0 ? "\(working) working · \(unread) unread" : "\(working) working"
         }
-        // A project nobody is working in right now still says what is in it, so a
-        // quiet row is a finished project rather than an empty one.
-        if complete > 0 { return "\(complete) complete" }
+        if unread > 0 { return "\(unread) unread" }
         return nil
     }
 

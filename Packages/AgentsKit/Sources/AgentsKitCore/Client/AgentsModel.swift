@@ -344,6 +344,15 @@ public final class AgentsModel {
         return counts
     }
 
+    /// How many finished conversations in this project nobody has looked at since.
+    /// The number a project row shows in place of "complete": a complete chat that
+    /// has been read is not news.
+    public func unreadCount(in folder: URL?) -> Int {
+        guard let folder else { return 0 }
+        let wanted = Project.standardize(folder)
+        return agents.filter { Project.standardize($0.cwd) == wanted && group(of: $0) == .finished && $0.isUnread }.count
+    }
+
     /// The question this agent is blocked on, if it still is.
     public func permission(for agentID: UUID?) -> PermissionRequest? {
         guard let agentID else { return nil }

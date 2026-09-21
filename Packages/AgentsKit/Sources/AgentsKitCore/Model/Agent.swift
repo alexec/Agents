@@ -92,6 +92,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     public var createdAt: Date
     public var lastActivityAt: Date
+    /// A finished conversation nobody has looked at since it finished. Set by the
+    /// daemon when an agent finishes with nobody watching, cleared when a presence
+    /// report puts the conversation in front of an active person. Only ever true of a
+    /// finished agent: a running chat is not something you have "read", and a stopped
+    /// one is under its own heading.
+    public var isUnread: Bool
     public var endedReason: EndedReason?
     public var archivedReason: ArchivedReason?
 
@@ -158,6 +164,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         availableCommands = try c.decodeIfPresent([SlashCommand].self, forKey: .availableCommands) ?? []
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
+        isUnread = try c.decodeIfPresent(Bool.self, forKey: .isUnread) ?? false
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
         // A state we have never heard of, and no reason beside it, is an ending
         // nothing vouched for. Only when there is no reason: a newer build that wrote
@@ -218,6 +225,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(availableCommands, forKey: .availableCommands)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(lastActivityAt, forKey: .lastActivityAt)
+        if isUnread { try c.encode(isUnread, forKey: .isUnread) }
         try c.encodeIfPresent(endedReason, forKey: .endedReason)
         try c.encodeIfPresent(archivedReason, forKey: .archivedReason)
         try c.encodeIfPresent(usage, forKey: .usage)
@@ -247,7 +255,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, runtimeID, cwd, title, state, runtimeSessionID, startOptions
-        case advertisedOptions, availableCommands, createdAt, lastActivityAt
+        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
@@ -274,6 +282,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 availableCommands: [SlashCommand] = [],
                 createdAt: Date = Date(),
                 lastActivityAt: Date = Date(),
+                isUnread: Bool = false,
                 endedReason: EndedReason? = nil,
                 archivedReason: Agent.ArchivedReason? = nil,
                 usage: Usage? = nil,
@@ -302,6 +311,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.availableCommands = availableCommands
         self.createdAt = createdAt
         self.lastActivityAt = lastActivityAt
+        self.isUnread = isUnread
         self.endedReason = endedReason
         self.archivedReason = archivedReason
         self.usage = usage
