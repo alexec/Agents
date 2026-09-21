@@ -194,8 +194,17 @@ and both iCloud entitlements in the signature. `agents-bridge --spike` then repo
 `CKError 5/1014 "Bad Container": Couldn't get container configuration from the server
 for "iCloud.com.alexecollins.agents"` — which is the **server** saying the container is
 not registered, not the entitlement being refused. The bundle reached CloudKit as itself;
-what is missing is T057, the portal step. Re-run the spike after the container exists
-and record the record's round trip here.
+what was missing was T057, the portal step.
+
+**Passed, 2026-09-21 00:32 UTC.** The container turned out to exist already — Xcode's
+`-allowProvisioningUpdates` had registered it with the bridge's App ID — and opening it once
+in the CloudKit Console (`icloud.developer.apple.com`, DEVELOPMENT) was what made it
+answer. The spike then wrote `spike-74F96EE7…`, read it back and deleted it:
+`spike: ok — the private database is reachable from this bundle`. **The gate is open.** A
+device build of `Remote` with `-allowProvisioningUpdates` then registered
+`com.alexecollins.agents.remote` and `.remote.notify` and the App Group
+`group.com.alexecollins.agents` by itself, and both signatures carry aps-environment,
+CloudKit with the container, the App Group and the shared keychain group.
 
 ## 8. Withdrawing a notification on a device the person is not holding is best-effort
 

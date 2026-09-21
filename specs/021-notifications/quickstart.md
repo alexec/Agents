@@ -17,18 +17,19 @@ swift test --package-path Packages/AgentsKit
 `xcodebuild` cannot be asked to trust. Build the two schemes one after the other, not at once.
 
 **Slice C only.** The CloudKit container is `iCloud.com.alexecollins.agents`, under team
-`6T4RVD5724`. It must exist in the portal before C-anything: *Certificates, Identifiers &
-Profiles → Identifiers → iCloud Containers → +*, then assign it to the App IDs
-`com.alexecollins.agents.bridge` and `com.alexecollins.agents.remote` (and
-`com.alexecollins.agents.remote.notify` once T068's extension exists). Then prove it:
+`6T4RVD5724`. It exists (2026-09-21), assigned to `com.alexecollins.agents.bridge`,
+`.remote` and `.remote.notify`, beside the App Group `group.com.alexecollins.agents` — all
+registered by Xcode from the entitlements files with `-allowProvisioningUpdates`. A fresh
+team would repeat that with a device build of `Remote` and a build of `agents-bridge`, then
+open the container once in the CloudKit Console so it answers. Prove it:
 
 ```sh
 xcodebuild -scheme agents-bridge -configuration Debug -skipPackagePluginValidation -allowProvisioningUpdates build
 build/DD/Build/Products/Debug/agents-bridge.app/Contents/MacOS/agents-bridge --spike
 ```
 
-Passing ends `spike: ok — the private database is reachable from this bundle`. Until the
-container exists it ends `"Bad Container" (5/1014)`, which is the portal, not the code.
+Passing ends `spike: ok — the private database is reachable from this bundle`. A container
+never opened in the Console ends `"Bad Container" (5/1014)`, which is the portal, not the code.
 
 Run against a throwaway root so none of this touches real agents:
 
