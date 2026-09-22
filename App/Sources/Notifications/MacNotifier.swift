@@ -1,6 +1,7 @@
 import AgentsKit
 import AppKit
 import Foundation
+import OSLog
 import UserNotifications
 
 /// The Mac's banner for a need the daemon has routed here.
@@ -35,6 +36,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// One `attention/changed`, applied.
     func apply(_ change: DaemonAPI.AttentionNotification, me: Surface = .mac) async {
         let token = change.needID.token
+        note("notifier: change \(token) to=\(String(describing: change.to)) alert=\(change.alert) over=\(change.need == nil)")
         let isShowing = showing[token] != nil
         guard let need = change.need else {
             if isShowing { withdraw(token) }
@@ -49,15 +51,31 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// On coming to the front: anything still delivered that the daemon no longer
-    /// lists is stale and goes. The backstop that makes a missed withdrawal survivable.
-    func sweep(keeping pending: DaemonAPI.AttentionPending) async {
+    /// On connecting and on coming to the front: anything still delivered that the
+    /// daemon no longer lists is stale and goes — the backstop that makes a missed
+    /// withdrawal survivable — and anything the daemon says is showing **here** that
+    /// is not, is shown, silently. That second half is FR-010: a window that was not
+    /// listening when the decision was made is put right rather than left silent.
+    func sweep(keeping pending: DaemonAPI.AttentionPending, me: Surface = .mac) async {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
         let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
             .filter { !live.contains($0) }
-        if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
+        if !stale.isEmpty {
+            note("notifier: sweep removing stale \(stale); live \(Array(live))")
+            center.removeDeliveredNotifications(withIdentifiers: stale)
+        }
         showing = showing.filter { live.contains($0.key) }
+        let status = await center.notificationSettings().authorizationStatus.rawValue
+        Self.log.info("sweep: permission status \(status); \(delivered.count) delivered [\(delivered.joined(separator: " "), privacy: .public)]; \(pending.deliveries.filter { $0.to == me }.count) of \(pending.deliveries.count) deliveries are mine")
+        note("notifier: sweep: permission status \(status); \(delivered.count) delivered \(delivered); \(pending.deliveries.filter { $0.to == me }.count) of \(pending.deliveries.count) deliveries are mine")
+        for delivery in pending.deliveries where delivery.to == me {
+            let token = delivery.needID.token
+            guard showing[token] == nil, !delivered.contains(token),
+                  let need = pending.needs.first(where: { $0.id == delivery.needID }) else { continue }
+            guard await ensureAuthorised() else { return }
+            show(need, token: token, alert: false)
+        }
     }
 
     private func show(_ need: Need, token: String, alert: Bool) {
@@ -74,13 +92,18 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.threadIdentifier = need.agentID.uuidString
         let request = UNNotificationRequest(identifier: token, content: content, trigger: nil)
         showing[token] = need.id
+        Self.log.info("showing \(token, privacy: .public), alert \(alert)")
+        note("notifier: showing \(token) alert=\(alert)")
         center.add(request) { [weak self] error in
-            guard error != nil else { return }
+            guard let error else { return }
+            Self.log.error("could not show \(token, privacy: .public): \(error, privacy: .public)")
+            note("notifier: could not show \(token): \(error)")
             Task { @MainActor in self?.showing.removeValue(forKey: token) }
         }
     }
 
     private func withdraw(_ token: String) {
+        note("notifier: withdrawing \(token)")
         showing.removeValue(forKey: token)
         center.removeDeliveredNotifications(withIdentifiers: [token])
         center.removePendingNotificationRequests(withIdentifiers: [token])
@@ -95,10 +118,22 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         case .denied:
             authorised = false
         default:
-            authorised = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+            do {
+                authorised = try await center.requestAuthorization(options: [.alert, .sound])
+            } catch {
+                // Not remembered as a refusal: the next need asks again, and the log
+                // says why this one could not.
+                Self.log.error("could not ask for notification permission: \(error, privacy: .public)")
+                note("notifier: could not ask for permission: \(error)")
+                return false
+            }
         }
+        Self.log.info("notification permission: status \(settings.authorizationStatus.rawValue), authorised \(self.authorised ?? false)")
+        note("notifier: permission status \(settings.authorizationStatus.rawValue), authorised \(self.authorised ?? false)")
         return authorised ?? false
     }
+
+    private static let log = Logger(subsystem: "com.alexecollins.agents", category: "notifier")
 
     // MARK: UNUserNotificationCenterDelegate
 
@@ -119,4 +154,11 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
             open(agentID)
         }
     }
+}
+
+/// A line on stderr, unbuffered, for a walk that runs the app from a shell. `print`
+/// goes to stdout, which is block-buffered when it is a file, and says nothing until
+/// the app exits.
+func note(_ line: String) {
+    FileHandle.standardError.write(Data((line + "\n").utf8))
 }

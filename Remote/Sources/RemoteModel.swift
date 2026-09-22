@@ -268,6 +268,7 @@ final class RemoteModel {
         await refreshWorkflows()
         await loadTranscript()
         settleSelection()
+        if let pendingOpen { open(pendingOpen) }
     }
 
     // MARK: Where this device is (021)
@@ -293,11 +294,16 @@ final class RemoteModel {
     /// announcing buys is being reached when the LAN cannot.
     private func announce() async {
         guard let key else { return }
-        thisDevice = try? await client.call(
-            DaemonAPI.Method.devicesAnnounce,
-            DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
-                                         name: UIDevice.current.name, kind: kind),
-            returning: Device.self)
+        do {
+            thisDevice = try await client.call(
+                DaemonAPI.Method.devicesAnnounce,
+                DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
+                                             name: UIDevice.current.name, kind: kind),
+                returning: Device.self)
+            note("pairing: announced as \(deviceID)")
+        } catch {
+            note("pairing: announce failed: \(error)")
+        }
         subscribeOnce()
     }
 
@@ -309,7 +315,13 @@ final class RemoteModel {
         Task {
             // Permission first, so the Mac hears `mayNotify` and may choose this device.
             await notifier.requestIfUndetermined()
-            do { try await CloudKitMailbox().subscribe(device: deviceID) } catch { subscribed = false }
+            do {
+                try await CloudKitMailbox().subscribe(device: deviceID)
+                note("mailbox: subscribed")
+            } catch {
+                note("mailbox: subscribe failed: \(error)")
+                subscribed = false
+            }
         }
     }
 
@@ -320,6 +332,7 @@ final class RemoteModel {
     /// system shows them. Everything this does is to local notifications, and it
     /// decides nothing about where the need belongs.
     func receivedPush(_ userInfo: [AnyHashable: Any]) async {
+        note("push: \(userInfo)")
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
         if pushed.withdrawn || pushed.envelope == nil {
             notifier.withdraw(pushed.token)
@@ -329,6 +342,28 @@ final class RemoteModel {
               let headline = try? Envelope.open(envelope, with: key) else { return }
         notifier.show(headline, needID: pushed.needID, alert: pushed.alert)
     }
+
+    /// Open one conversation from a banner: its project first, then the chat.
+    ///
+    /// The chat is pushed on the next turn of the run loop, not in the same one as the
+    /// project change: on a phone the split view collapses, and a path set while the
+    /// detail column is still being pushed is dropped — the tap "went to the right
+    /// project" and stopped there (2026-09-21). A banner tapped before the agents have
+    /// arrived — a cold launch — is kept and honoured once they have.
+    func open(_ agentID: UUID) {
+        guard let agent = work.agent(agentID) else {
+            pendingOpen = agentID
+            return
+        }
+        pendingOpen = nil
+        selectedProject = Project.standardize(agent.cwd)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(80))
+            self.selection = agentID
+        }
+    }
+
+    private var pendingOpen: UUID?
 
     /// Which conversation a banner is about, from the need it names. The Mac's
     /// `attention/pending` is the truth; this reads the copy the model already holds.
@@ -353,11 +388,7 @@ final class RemoteModel {
 
     private func startPresence() {
         guard presence == nil else { return }
-        notifier.open = { [weak self] agentID in
-            guard let self, let agent = self.work.agent(agentID) else { return }
-            self.selectedProject = Project.standardize(agent.cwd)
-            self.selection = agentID
-        }
+        notifier.open = { [weak self] agentID in self?.open(agentID) }
         notifier.openNeed = { [weak self] token in
             guard let self, let agentID = self.agentID(forNeedToken: token) else { return }
             self.notifier.open(agentID)
@@ -377,7 +408,7 @@ final class RemoteModel {
                                                    Optional<String>.none,
                                                    returning: DaemonAPI.AttentionPending.self) else { return }
         work.replaceAttention(pending)
-        await notifier.sweep(keeping: pending)
+        await notifier.sweep(keeping: pending, me: .device(deviceID))
     }
 
     private func refreshAgents() async {

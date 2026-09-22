@@ -125,6 +125,9 @@ extension DaemonCore {
         }
         adoptWorkflows(in: standardized)
         broadcast(DaemonAPI.Notification.projectChanged, summary)
+        // A project's needs go with it when it is archived and come back when it is not;
+        // nothing else about a project moves a need.
+        reconsider()
         return summary
     }
 
@@ -167,6 +170,9 @@ extension DaemonCore {
                                message: "\(standardized.path) is not a project.")
         }
         broadcast(DaemonAPI.Notification.projectChanged, summary)
+        // A project's needs go with it when it is archived and come back when it is not;
+        // nothing else about a project moves a need.
+        reconsider()
         return summary
     }
 
@@ -189,6 +195,9 @@ extension DaemonCore {
                                message: "\(standardized.path) is not a project.")
         }
         broadcast(DaemonAPI.Notification.projectChanged, summary)
+        // A project's needs go with it when it is archived and come back when it is not;
+        // nothing else about a project moves a need.
+        reconsider()
         return summary
     }
 }

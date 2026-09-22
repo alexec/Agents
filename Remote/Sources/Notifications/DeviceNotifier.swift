@@ -33,6 +33,7 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     func apply(_ change: DaemonAPI.AttentionNotification, me: Surface) async {
         let token = change.needID.token
+        note("notifier: change \(token) to=\(String(describing: change.to)) me=\(me) alert=\(change.alert) over=\(change.need == nil)")
         let isShowing = showing[token] != nil
         guard let need = change.need else {
             if isShowing { withdraw(token) }
@@ -47,13 +48,24 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// On coming to the front: anything delivered that the Mac no longer lists is stale.
-    func sweep(keeping pending: DaemonAPI.AttentionPending) async {
+    /// On connecting and on coming to the front: anything delivered that the Mac no
+    /// longer lists is stale and goes, and anything the Mac says is showing **here**
+    /// that is not, is shown, silently (FR-010) — a device that was not listening when
+    /// the decision was made is put right rather than left silent.
+    func sweep(keeping pending: DaemonAPI.AttentionPending, me: Surface) async {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
-        let stale = delivered.filter { !live.contains($0) && showing[$0] != nil }
+        let stale = delivered.filter { !live.contains($0) }
+            .filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
         if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
         showing = showing.filter { live.contains($0.key) }
+        for delivery in pending.deliveries where delivery.to == me {
+            let token = delivery.needID.token
+            guard showing[token] == nil, !delivered.contains(token),
+                  let need = pending.needs.first(where: { $0.id == delivery.needID }) else { continue }
+            guard await ensureAuthorised() else { return }
+            show(need, token: token, alert: false)
+        }
     }
 
     private func show(_ need: Need, token: String, alert: Bool) {
@@ -61,8 +73,12 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// A headline opened from a push, or one the Mac sent in the clear over the LAN.
+    /// Idempotent like `apply`: a need already shown here — or shown and swiped away —
+    /// is not shown again by a later silent push for the same need, which every move
+    /// of it produces. A dismissed banner is a banner gone, not a need met (spec Notes).
     func show(_ headline: Headline, needID: NeedID, alert: Bool, agentID: UUID? = nil) {
         let token = needID.token
+        guard showing[token] == nil else { return }
         let content = UNMutableNotificationContent()
         let headline = headline.truncating()
         content.title = headline.h2
@@ -73,13 +89,16 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         if let agentID { content.userInfo["agentID"] = agentID.uuidString }
         content.threadIdentifier = agentID?.uuidString ?? token
         showing[token] = needID
+        note("notifier: showing \(token) alert=\(alert) \"\(headline.h3)\"")
         center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil)) { [weak self] error in
-            guard error != nil else { return }
+            guard let error else { return }
+            note("notifier: could not show \(token): \(error)")
             Task { @MainActor in self?.showing.removeValue(forKey: token) }
         }
     }
 
     func withdraw(_ token: String) {
+        note("notifier: withdrawing \(token)")
         showing.removeValue(forKey: token)
         center.removeDeliveredNotifications(withIdentifiers: [token])
         center.removePendingNotificationRequests(withIdentifiers: [token])
@@ -92,8 +111,10 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// The answer goes back to the Mac in the next presence report.
     func requestIfUndetermined() async {
         let settings = await center.notificationSettings()
+        note("notifier: permission status \(settings.authorizationStatus.rawValue)")
         guard settings.authorizationStatus == .notDetermined else { return }
         authorised = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        note("notifier: asked, authorised=\(authorised ?? false)")
         authorisationChanged()
     }
 
@@ -117,13 +138,29 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         [.banner, .list, .sound]
     }
 
+    /// On the main actor, deliberately: the async form of this callback resumes UIKit
+    /// on whatever thread it finishes on, and UIKit then updates the scene snapshot for
+    /// the tap — which asserts off the main thread. Marked `nonisolated` it crashed
+    /// the app on every tap of a banner (2026-09-21).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse) async {
+                                            didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping @Sendable () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        if let text = userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
-            await MainActor.run { open(agentID) }
-        } else if let token = userInfo["needToken"] as? String {
-            await MainActor.run { openNeed(token) }
+        let agentID = (userInfo["agentID"] as? String).flatMap(UUID.init(uuidString:))
+        let token = userInfo["needToken"] as? String
+        Task { @MainActor in
+            if let agentID {
+                open(agentID)
+            } else if let token {
+                openNeed(token)
+            }
+            completionHandler()
         }
     }
+}
+
+/// A line on stderr, unbuffered, for a walk that streams the app's console with
+/// `devicectl --console`. `print` goes to stdout, which is block-buffered on a pipe.
+func note(_ line: String) {
+    FileHandle.standardError.write(Data((line + "\n").utf8))
 }

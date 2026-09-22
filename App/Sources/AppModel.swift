@@ -571,9 +571,14 @@ final class AppModel {
     /// What wants a person and where each is showing, on connect and on coming to the
     /// front: the daemon's list is the truth, and a banner it no longer lists is stale.
     func refreshAttention() async {
-        guard let pending = try? await client.call(DaemonAPI.Method.attentionPending,
-                                                   Optional<String>.none,
-                                                   returning: DaemonAPI.AttentionPending.self) else { return }
+        let pending: DaemonAPI.AttentionPending
+        do {
+            pending = try await client.call(DaemonAPI.Method.attentionPending, Optional<String>.none,
+                                            returning: DaemonAPI.AttentionPending.self)
+        } catch {
+            note("attention: pending failed: \(error)")
+            return
+        }
         work.replaceAttention(pending)
         await notifier.sweep(keeping: pending)
     }

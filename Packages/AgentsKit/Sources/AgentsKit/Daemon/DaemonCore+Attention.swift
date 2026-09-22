@@ -20,17 +20,21 @@ extension DaemonCore {
     func needs() -> [Need] {
         let now = now()
         var found: [Need] = []
+        // An archived project is one the person has said they are done with: nothing
+        // in it wants anybody, however its agents ended (2026-09-21, found on the walk).
+        let archived = Set(projectRecords().values.filter(\.isArchived).map(\.folder))
+        func inALiveProject(_ agent: Agent) -> Bool { !archived.contains(Project.standardize(agent.cwd)) }
         for (id, pending) in pendingPermissions {
-            guard let agent = agents[pending.agentID] else { continue }
+            guard let agent = agents[pending.agentID], inALiveProject(agent) else { continue }
             found.append(need(.permission(id), for: agent, kind: .permission,
                               wanted: "Wants to \(pending.request.toolCall.line)", now: now))
         }
         for (id, pending) in elicitations {
-            guard let agent = agents[pending.agentID] else { continue }
+            guard let agent = agents[pending.agentID], inALiveProject(agent) else { continue }
             found.append(need(.elicitation(id), for: agent, kind: .elicitation,
                               wanted: "Asks: \(pending.request.title)", now: now))
         }
-        for agent in agents.values where agent.state == .finished {
+        for agent in agents.values where agent.state == .finished && inALiveProject(agent) {
             guard let report = agent.report, report.outcome.needsAPerson else { continue }
             found.append(need(.report(agent.id, report.at), for: agent, kind: .report,
                               wanted: "\(report.outcome.heading): \(report.message)", now: now))
@@ -194,6 +198,7 @@ extension DaemonCore {
                     moved.alertCount += 1
                 }
                 deliveries[need.id] = moved
+                DaemonLog.shared.write("attention: \(need.id.token) \(existing.to.map(String.init(describing:)) ?? "nowhere") → \(decision.to.map(String.init(describing:)) ?? "nowhere"), alert \(decision.alert); \(presences.count) presences: \(presences.values.map { "\($0.surface) active=\($0.active) watching=\($0.watching?.uuidString.prefix(8) ?? "-")" }.joined(separator: ", "))")
                 if let device = existing.to?.deviceID { withdraw(need.id, from: device, at: now) }
                 if let device = decision.to?.deviceID { post(need, to: device, alert: decision.alert, at: now) }
                 broadcast(DaemonAPI.Notification.attentionChanged,
@@ -205,6 +210,7 @@ extension DaemonCore {
                 // `attention/pending` tells the next surface (FR-010).
                 guard let to = decision.to else { continue }
                 deliveries[need.id] = Delivery(needID: need.id, to: to, alertedAt: now, alertCount: 1)
+                DaemonLog.shared.write("attention: \(need.id.token) first to \(to)")
                 if let device = to.deviceID { post(need, to: device, alert: true, at: now) }
                 broadcast(DaemonAPI.Notification.attentionChanged,
                           DaemonAPI.AttentionNotification(needID: need.id, need: need, to: to, alert: true))

@@ -552,3 +552,38 @@ struct ReadingTests {
         #expect(await core.agent(id)?.isUnread == true)
     }
 }
+
+/// A need in an archived project is no need: archiving is the person saying they are
+/// done with it, whatever its agents were asking.
+@Suite("Archived projects", .timeLimit(.minutes(1)))
+struct ArchivedProjectAttentionTests {
+    @Test func archivingAProjectWithdrawsItsNeeds() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsArchivedNeeds-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let locations = StoreLocations(root: root)
+        // A finished agent whose report wants somebody, on disk before the daemon starts:
+        // only a project with nothing live in it can be archived.
+        let store = try AgentStore(locations: locations)
+        let stuck = Agent(id: UUID(), runtimeID: "claude", cwd: work, title: "Stuck one", state: .finished, endedReason: .endTurn,
+                          report: WorkReport(outcome: .stuck, message: "cannot go on", at: Date()))
+        try await store.save(stuck)
+        let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything,
+                              launcher: FakeLauncher(script: .init()),
+                              thresholds: AttentionThresholds(macIdle: 60, deviceStaleness: 60,
+                                                              settlingPause: 0.05, reAlertInterval: 60))
+        _ = await core.recover()
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        await FakeSurface(.mac).report(core, active: true)
+        await eventually("shown on the Mac") { heard.deliveries.first?.to == .mac }
+        #expect(await core.attentionPending().needs.count == 1)
+
+        _ = try await core.archiveProject(work)
+        await eventually("withdrawn") { !heard.withdrawals.isEmpty }
+        #expect(await core.attentionPending().needs.isEmpty)
+
+        _ = try await core.unarchiveProject(work)
+        await eventually("back") { await core.attentionPending().needs.count == 1 }
+    }
+}
