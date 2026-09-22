@@ -45,18 +45,10 @@ extension DaemonCore {
             // `move` and this is no longer the one caller that went round it.
             await move(id, on: .foundDead)
             // Re-read: `mayBePickedUpAfterRestart` is a question about the record
-            // after the ending, not the one this loop was handed.
-            guard let updated = agents[id] else { continue }
-            // A chat brought back last time and cut off again before it reached the
-            // end of a turn is the likeliest reason this daemon went. It keeps the
-            // ending it actually had — `daemonGone` is what happened to it — and why
-            // it was left where it is goes in the transcript instead.
-            guard updated.mayBePickedUpAfterRestart else {
-                await record(.runtimeNote("This agent was picked back up after the last restart and did not get to the end of a turn, so it has been left alone this time. Send it a message to start it again."),
-                             for: id)
-                DaemonLog.shared.write("left agent \(id) alone: already picked back up once without finishing a turn")
-                continue
-            }
+            // after the ending, not the one this loop was handed. Every chat the
+            // daemon took comes back, however many times it has been through this —
+            // there is no "left alone" any more (Alex, 2026-09-21).
+            guard let updated = agents[id], updated.mayBePickedUpAfterRestart else { continue }
             // What it was doing, kept for as long as it takes to tell it: an agent cut
             // off mid-turn and one cut off holding a question open have different
             // things to be told.

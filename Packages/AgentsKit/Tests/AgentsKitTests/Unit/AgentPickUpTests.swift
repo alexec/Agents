@@ -18,12 +18,12 @@ struct AgentPickUpTests {
               restartPickUps: pickUps)
     }
 
-    @Test func onlyAStoppedChatTheDaemonTookAndHasNotTakenBeforeComesBack() {
+    @Test func onlyAStoppedChatTheDaemonTookComesBack() {
         let reasons: [EndedReason?] = [nil] + EndedReason.allCases.map { $0 }
         for state in AgentState.allCases {
             for reason in reasons {
                 for pickUps in 0...2 {
-                    let expected = state == .stopped && reason == .daemonGone && pickUps == 0
+                    let expected = state == .stopped && reason == .daemonGone
                     #expect(agent(state, reason, pickUps).mayBePickedUpAfterRestart == expected,
                             "\(state) / \(String(describing: reason)) / \(pickUps)")
                 }
@@ -31,11 +31,12 @@ struct AgentPickUpTests {
         }
     }
 
-    /// The threshold is one, because a chat is not picked back up a second time in a
-    /// row. Spelled out on its own so moving it is a deliberate act.
-    @Test func theThresholdIsOne() {
+    /// There is no threshold: a chat is picked back up however many restarts it has
+    /// been through. Spelled out on its own so putting one back is a deliberate act.
+    @Test func thereIsNoThreshold() {
         #expect(agent(.stopped, .daemonGone, 0).mayBePickedUpAfterRestart)
-        #expect(agent(.stopped, .daemonGone, 1).mayBePickedUpAfterRestart == false)
+        #expect(agent(.stopped, .daemonGone, 1).mayBePickedUpAfterRestart)
+        #expect(agent(.stopped, .daemonGone, 5).mayBePickedUpAfterRestart)
     }
 
 

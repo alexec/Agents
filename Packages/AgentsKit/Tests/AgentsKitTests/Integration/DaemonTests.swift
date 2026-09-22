@@ -655,9 +655,11 @@ struct DaemonTests {
                 "each one waited for the one before it: \(launcher.gapsBetweenLaunches)")
     }
 
-    /// The loop guard. A chat cut off on the very turn it was brought back with is
-    /// the likeliest reason the daemon went, and starting it again is not recovery.
-    @Test func anAgentCutOffTwiceInARowIsNotPickedUpAThirdTime() async throws {
+    /// No loop guard (Alex, 2026-09-21): a chat cut off on the very turn it was brought
+    /// back with is picked up again all the same. What used to be "left alone" was
+    /// work abandoned by nobody, and a daemon restarted a few times in a row — every
+    /// build of the app is one — left a trail of them.
+    @Test func anAgentCutOffTwiceInARowIsPickedUpAgain() async throws {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         let tried = Agent(runtimeID: "grok", cwd: work, state: .running,
@@ -668,16 +670,8 @@ struct DaemonTests {
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 
-        // Nothing to wait for. Time passing is the assertion.
-        try await Task.sleep(for: .milliseconds(400))
-        #expect(launcher.launchCount == 0, "it was left where it was")
-        #expect(await core.agent(tried.id)?.state == .stopped)
-        #expect(await core.agent(tried.id)?.endedReason == .daemonGone,
-                "the ending it had is still the ending it had")
-
-        let page = try await core.transcript(.init(agentID: tried.id))
-        #expect(page.entries.contains { ($0.text ?? "").contains("has been left alone this time") },
-                "and why it was left is a line in the transcript rather than a different ending")
+        await eventually("it was started again") { launcher.launchCount == 1 }
+        await eventually("and counted") { await core.agent(tried.id)?.restartPickUps == 2 }
     }
 
     /// Reaching the end of a turn is the whole of what the count asks about.

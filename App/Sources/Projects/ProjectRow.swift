@@ -71,16 +71,24 @@ struct ProjectRow: View {
     /// "Needs attention" goes alone, undiluted — it is the only one of these that is
     /// asking for something.
     private var subtitle: String? {
-        let working = counts[.running] ?? 0
-        // Unread, not complete: a finished chat somebody has already read is not
-        // news, and a row that counted it would nag about work already looked at.
-        let unread = model.unreadCount(in: summary.folder)
         if needsPerson { return "Needs attention" }
-        if working > 0 {
-            return unread > 0 ? "\(working) working · \(unread) unread" : "\(working) working"
+        // Every chat that is not archived is something: the agent working, the agent
+        // waiting, or the person meaning to do something with it. So the row always
+        // carries a number about the unarchived chats — the pressing ones first
+        // (working, unread), and when there are none of those, what is left
+        // (complete, stopped) — and is quiet only for a project with nothing in it.
+        let working = counts[.running] ?? 0
+        let unread = model.unreadCount(in: summary.folder)
+        var parts: [String] = []
+        if working > 0 { parts.append("\(working) working") }
+        if unread > 0 { parts.append("\(unread) unread") }
+        if parts.isEmpty {
+            let complete = counts[.finished] ?? 0
+            let stopped = counts[.stopped] ?? 0
+            if complete > 0 { parts.append("\(complete) complete") }
+            if stopped > 0 { parts.append("\(stopped) stopped") }
         }
-        if unread > 0 { return "\(unread) unread" }
-        return nil
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var abbreviatedPath: String {

@@ -341,13 +341,17 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         return firstLine.count > 80 ? String(firstLine.prefix(79)) + "…" : firstLine
     }
 
-    /// Whether a restarting daemon may bring this chat back by itself.
+    /// Whether a restarting daemon may bring this chat back by itself: it was working
+    /// when the daemon went, whatever it was doing and however many times before.
     ///
-    /// The threshold is one. A chat cut off once was unlucky; a chat cut off again on
-    /// the very turn it was brought back with is the likeliest reason the daemon went,
-    /// and starting it a third time is a loop rather than a recovery.
+    /// There used to be a threshold of one, on the theory that a chat cut off again on
+    /// the very turn it was brought back with was the likeliest reason the daemon went.
+    /// Alex removed it (2026-09-21): a chat left stopped after a restart is work
+    /// abandoned by nobody, and a daemon restarted a few times in a row — every build
+    /// of the app is one — was leaving a trail of them. `restartPickUps` is still
+    /// counted, for the transcript to say.
     public var mayBePickedUpAfterRestart: Bool {
-        state == .stopped && endedReason == .daemonGone && restartPickUps == 0
+        state == .stopped && endedReason == .daemonGone
     }
 
     // MARK: What the reader will allow

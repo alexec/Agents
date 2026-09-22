@@ -265,41 +265,18 @@ struct WorkflowFiringTests {
               state: .running, endedReason: nil, restartPickUps: pickUps)
     }
 
-    /// SC-005, and the whole of what US2 adds.
-    ///
-    /// Before 020, `recover` wrote the state and the reason by hand, so it never
-    /// reached the one place workflow triggers hang off — a workflow set to run when
-    /// an agent stops did not run when four agents stopped because the Mac restarted,
-    /// which is exactly the moment somebody would want it to.
-    ///
-    /// The agent here has already been picked back up once without reaching the end of
-    /// a turn, so `mayBePickedUpAfterRestart` is false: it will be left alone, its
-    /// stopping is final, and the trigger is owed.
-    @Test func aRestartFiresTheStoppedWorkflowThatWasWaiting() async throws {
-        let (locations, root) = try temporary()
-        let work = try project(root)
-        try write(onStopped(), as: "on-stop", in: work)
-
-        let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 1)])
-        // The real startup order, reproduced, because it is the whole difficulty:
-        // `Daemon.start()` closes the gate, recovers, and only then reads a single
-        // workflow file. An ending raised in that window has nothing to fire at yet.
-        await core.holdWorkflowEventsUntilStarted()
-        await core.recover()
-        await core.startWorkflows()
-
-        await eventually("the restart fired the workflow that was waiting") {
-            await core.allAgents().contains { $0.startedByWorkflow == "on-stop" }
-        }
-        let made = await core.allAgents().first { $0.startedByWorkflow == "on-stop" }
-        #expect(made != nil, "the deferred event never arrived")
-    }
+    /// There used to be a test here that a restart fires the stopped workflow for an
+    /// agent left alone after a second cut-off. Alex removed the "left alone" rule on
+    /// 2026-09-21 — every chat the daemon took is picked back up — so a restart never
+    /// ends an agent for good any more, and the trigger it owed is owed by the run
+    /// that carries on instead. The deferral itself is tested below by raising the
+    /// event by hand.
 
     /// FR-016. An agent about to carry on has not finished stopping.
     ///
-    /// Same setup, one field different: this one has not been picked back up before,
-    /// so recovery is seconds away from bringing it back. Saying "an agent stopped"
-    /// about it would be false, and would race the pick-up.
+    /// Recovery is seconds away from bringing this one back — every one, now, however
+    /// many times it has been through this. Saying "an agent stopped" about it would
+    /// be false, and would race the pick-up.
     @Test func anAgentAboutToBePickedBackUpDoesNotFire() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -336,7 +313,12 @@ struct WorkflowFiringTests {
 
         let core = try await core(locations, seeded: [wasWorking(in: work, pickUps: 1)])
         await core.holdWorkflowEventsUntilStarted()
-        await core.recover()
+        let recovered = await core.recover()
+        // Recovery itself raises nothing now — the agent is about to be picked back up
+        // — so the ending is raised by hand, inside the closed window, exactly as
+        // `move` would raise one that was final.
+        let id = try #require(recovered.first)
+        await core.workflowsRespond(to: .stopped, agentID: id)
         // Deliberately not started yet. The ending has happened and nothing has acted.
         #expect(await core.allAgents().contains { $0.startedByWorkflow == "on-stop" } == false)
         #expect(await core.deferredLifecycleEvents.count == 1,
