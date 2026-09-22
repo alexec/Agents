@@ -226,6 +226,16 @@ open it if it is not.
 backgrounded device needs a silent push, and a silent push is throttled by design. If it clears
 instantly every time on a backgrounded device, you have been lucky, not correct.
 
+**Walked 2026-09-21 (Alex's iPhone + the Mac). Pass**, after four fixes it found (`a0ce24b`):
+the Mac idle past `macIdle` moved the needs to the phone (LAN banner and a CloudKit push for
+each); an elicitation answered on the Mac was withdrawn on the phone over the LAN
+(`over=true`) and by push; tapping a banner opened the conversation itself ("that worked").
+Found and fixed on the way: the tap crashed the Remote (async delegate callback finishing
+off the main thread); the tap stopped at the project (path set in the same turn as the
+column); a need in an **archived** project flapped between the phone and nowhere; a silent
+push re-showed a dismissed banner. Also: 15 stale Agents.app build products were registered
+with LaunchServices, so a click on a Mac notification could launch an old copy — unregistered.
+
 ### C5. Revoked is deaf — **struck 2026-09-21**
 
 There is no revoking and no approving (Alex, 2026-09-21): a device that opens Agents on the
