@@ -8,8 +8,7 @@ import Foundation
 ///
 /// Not a `LineTransport`, because nothing comes back down it — a mailbox is written to
 /// and a device is told. It is an ordinary client of the daemon: it connects over the
-/// Unix socket like any window, hears `mailbox/post` and `mailbox/empty`, and does with
-/// CloudKit what those say. The daemon is handed nothing about CloudKit and the bridge
+/// Unix socket like any window, hears `mailbox/post`, and does with CloudKit what it says. The daemon is handed nothing about CloudKit and the bridge
 /// reads nothing from the device store; what to send, and to whom, arrives sealed.
 ///
 /// It stays connected for as long as the bridge runs and comes back when the daemon
@@ -50,11 +49,6 @@ final class MailboxTransport {
                 try await prepareOnce()
                 try await mailbox.post(item)
                 log("mailbox: posted \(item.envelope == nil ? "a withdrawal" : "a need") for \(item.device)")
-            case DaemonAPI.Notification.mailboxEmpty:
-                guard let emptied = try params?.decode(DaemonAPI.MailboxEmptied.self) else { return }
-                try await prepareOnce()
-                try await mailbox.empty(device: emptied.device)
-                log("mailbox: emptied \(emptied.device)")
             default:
                 break
             }

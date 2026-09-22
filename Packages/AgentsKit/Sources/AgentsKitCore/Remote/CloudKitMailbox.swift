@@ -65,29 +65,10 @@ public struct CloudKitMailbox: Mailbox {
         _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
     }
 
-    public func empty(device: UUID) async throws {
-        let query = CKQuery(recordType: Self.recordType,
-                            predicate: NSPredicate(format: "%K == %@", Field.device, device.uuidString))
-        var cursor: CKQueryOperation.Cursor?
-        var ids: [CKRecord.ID] = []
-        repeat {
-            let page: (matchResults: [(CKRecord.ID, Result<CKRecord, any Error>)], queryCursor: CKQueryOperation.Cursor?)
-            if let cursor {
-                page = try await database.records(continuingMatchFrom: cursor, desiredKeys: [])
-            } else {
-                page = try await database.records(matching: query, inZoneWith: zone, desiredKeys: [])
-            }
-            ids += page.matchResults.map { $0.0 }
-            cursor = page.queryCursor
-        } while cursor != nil
-        guard !ids.isEmpty else { return }
-        _ = try await database.modifyRecords(saving: [], deleting: ids)
-    }
-
     // MARK: The device's side
 
     /// The two subscriptions for one device, saved under stable ids so saving them
-    /// again changes nothing. Called by the Remote once it is approved.
+    /// again changes nothing. Called by the Remote once it has announced.
     public func subscribe(device: UUID) async throws {
         let mine = NSPredicate(format: "%K == %@", Field.device, device.uuidString)
         let loud = CKQuerySubscription(recordType: Self.recordType,

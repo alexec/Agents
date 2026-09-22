@@ -20,9 +20,9 @@ struct RoutingTests {
              headline: Headline(h1: "p", h2: "a", h3: "wants"))
     }
 
-    private func device(_ id: UUID, _ kind: Device.Kind, approved: Bool = true, mayNotify: Bool? = true,
+    private func device(_ id: UUID, _ kind: Device.Kind, mayNotify: Bool? = true,
                         lastSeen: Date? = nil) -> Device {
-        Device(id: id, name: "d", kind: kind, announcedAt: t0, approvedAt: approved ? t0 : nil,
+        Device(id: id, name: "d", kind: kind, announcedAt: t0,
                lastSeenAt: lastSeen, mayNotify: mayNotify)
     }
 
@@ -88,7 +88,6 @@ struct RoutingTests {
         #expect(d.to == nil, "a device that cannot show anything is choosing silence")
         let unsaid = device(phoneID, .iPhone, mayNotify: nil)
         #expect(decide(presences: [presence(.device(phoneID), ago: 1)], devices: [unsaid]).to == nil)
-        #expect(decide(presences: [presence(.device(padID))], devices: [device(padID, .iPad, approved: false)]).to == nil)
     }
 
     @Test func rung4TheDefaultIPhone() {

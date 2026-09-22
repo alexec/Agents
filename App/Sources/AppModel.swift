@@ -241,8 +241,8 @@ final class AppModel {
 
     // MARK: Paired devices (021)
 
-    /// The paired devices, and the ones waiting to be, announced first. Read by the
-    /// Devices pane. Refreshed on connect and kept by `device/changed`.
+    /// The paired devices, announced first. Read by the Devices pane. Refreshed on
+    /// connect and kept by `device/changed`.
     private(set) var devices: [Device] = []
 
     func refreshDevices() async {
@@ -253,18 +253,8 @@ final class AppModel {
 
     private func deviceChanged(_ change: DaemonAPI.DeviceNotification) {
         devices.removeAll { $0.id == change.id }
-        if let device = change.device { devices.append(device) }
+        devices.append(change.device)
         devices.sort { $0.announcedAt < $1.announcedAt }
-    }
-
-    func approve(_ device: Device) async {
-        _ = try? await client.call(DaemonAPI.Method.devicesApprove, DaemonAPI.DeviceRequest(id: device.id),
-                                   returning: Device.self)
-    }
-
-    func revoke(_ device: Device) async {
-        _ = try? await client.call(DaemonAPI.Method.devicesRevoke, DaemonAPI.DeviceRequest(id: device.id),
-                                   returning: JSONValue.self)
     }
 
     func refreshWorkflows() async {

@@ -28,25 +28,16 @@ public struct MailboxItem: Hashable, Sendable, Codable {
 /// test is what was posted and to whom, never how it travelled.
 public protocol Mailbox: Sendable {
     func post(_ item: MailboxItem) async throws
-    /// Everything waiting for one device, discarded unread. What revoking a device
-    /// does, and the reason revoking is deletion rather than a flag (FR-021).
-    func empty(device: UUID) async throws
 }
 
 /// A mailbox that goes nowhere, and remembers everything. For tests.
 public actor FakeMailbox: Mailbox {
     public private(set) var posted: [MailboxItem] = []
-    public private(set) var emptied: [UUID] = []
 
     public init() {}
 
     public func post(_ item: MailboxItem) async throws {
         posted.append(item)
-    }
-
-    public func empty(device: UUID) async throws {
-        emptied.append(device)
-        posted.removeAll { $0.device == device }
     }
 
     /// What one device would find waiting, latest per need.

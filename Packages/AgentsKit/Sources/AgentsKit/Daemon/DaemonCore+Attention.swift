@@ -57,8 +57,8 @@ extension DaemonCore {
     /// `surface/identify`, after the server has taken the identity: note that the device
     /// is here. The connection's surface must already be this device — the server sets
     /// it first — or the call is not a device's. An unknown device is **not** made known
-    /// here: a device becomes one by announcing and being approved (`DaemonCore+Devices`),
-    /// and the ladder never sees one that has not.
+    /// here: a device becomes one by announcing its key (`DaemonCore+Devices`), and the
+    /// ladder never sees one that has not.
     func identify(_ who: DaemonAPI.SurfaceIdentification, from surface: Surface?, connection: UUID?) throws {
         guard connection != nil, surface == .device(who.id) else {
             throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
@@ -173,7 +173,7 @@ extension DaemonCore {
         for id in settlingTimers.keys where !live.contains(id) { cancelSettling(id) }
 
         for need in outstanding {
-            let decision = Routing.decide(need: need, presences: presences, devices: approvedDevices,
+            let decision = Routing.decide(need: need, presences: presences, devices: pairedDevices,
                                           delivery: deliveries[need.id], thresholds: thresholds, now: now)
             if decision.wait {
                 // At the Mac, and given a moment to look before anything is shown. One
@@ -220,7 +220,7 @@ extension DaemonCore {
     /// needs the device's key; a record without a usable one is sent nothing, which is
     /// the truth about it rather than a banner in the clear.
     private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {
-        guard let device = device(id), device.isApproved,
+        guard let device = device(id),
               let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else { return }
         enqueue(MailboxItem(needID: need.id, device: id, envelope: envelope, alert: alert, postedAt: now))
     }

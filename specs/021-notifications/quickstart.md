@@ -226,14 +226,13 @@ open it if it is not.
 backgrounded device needs a silent push, and a silent push is throttled by design. If it clears
 instantly every time on a backgrounded device, you have been lucky, not correct.
 
-### C5. Revoked is deaf
+### C5. Revoked is deaf — **struck 2026-09-21**
 
-Revoke a device at the Mac. Provoke a need.
-
-**Expect**: nothing on that device, and nothing readable left in its mailbox.
-
-**Fails if**: it still receives something it cannot open. Revocation deletes the record *and*
-empties the mailbox; a device holding sealed junk is a device that was not properly revoked.
+There is no revoking and no approving (Alex, 2026-09-21): a device that opens Agents on the
+person's own network is paired, and the mailbox is their own iCloud account. A device that
+is gone stops being heard from and the staleness rung stops choosing it; its records stay
+sealed to a key nobody holds. The Devices pane lists devices and says which cannot notify
+(C6); it has no buttons.
 
 ### C6. Permission refused, and said so
 

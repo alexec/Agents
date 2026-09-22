@@ -34,9 +34,9 @@ public enum Routing {
     ///    it: watching on the iPad silences the phone (US3 scenario 3).
     /// 2. **At the Mac** — the Mac is present, active and touched inside `macIdle`: `.mac`.
     ///    Inside the settling pause this is `wait` rather than a delivery.
-    /// 3. **The device in hand** — the approved device that may notify and was heard from
+    /// 3. **The device in hand** — the paired device that may notify and was heard from
     ///    most recently inside `deviceStaleness`.
-    /// 4. **The default** — the most recently used approved iPhone that may notify.
+    /// 4. **The default** — the most recently used paired iPhone that may notify.
     /// 5. **Nowhere** — `to = nil`. Not a failure: the need stays outstanding, and the next
     ///    surface to connect is told through `attention/pending` (FR-010, amended).
     public static func decide(need: Need,

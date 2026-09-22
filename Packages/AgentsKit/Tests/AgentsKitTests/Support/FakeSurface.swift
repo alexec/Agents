@@ -58,20 +58,10 @@ struct FakeSurface: Sendable {
                                  from: surface, connection: connection)
     }
 
-    /// The person at the Mac saying yes.
-    @discardableResult
-    func approve(_ core: DaemonCore) async -> Result<JSONValue, JSONRPCError> {
-        guard let id = surface.deviceID else { return .failure(.internalError("not a device")) }
-        let params = try? JSONValue.encoding(DaemonAPI.DeviceRequest(id: id))
-        return await core.handle(method: DaemonAPI.Method.devicesApprove, params: params,
-                                 from: .mac, connection: UUID())
-    }
-
-    /// Announced, approved and identified on this connection: a paired device, as the
-    /// daemon will see one after the walk in quickstart C3.
+    /// Announced and identified on this connection: a paired device, as the daemon
+    /// sees one after the walk in quickstart C3.
     func pair(_ core: DaemonCore, name: String, kind: Device.Kind) async {
         await announce(core, name: name, kind: kind)
-        await approve(core)
         await identify(core, name: name, kind: kind)
     }
 

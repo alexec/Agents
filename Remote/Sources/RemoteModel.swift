@@ -61,14 +61,10 @@ final class RemoteModel {
     /// ever sees the public half.
     private let key: DeviceKey? = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)
     /// The mailbox's subscriptions are saved once per launch, the first time the Mac
-    /// says this device is approved.
+    /// answers the announce.
     private var subscribed = false
-    /// This device, as the Mac has it: `nil` until the Mac has answered the announce,
-    /// unapproved until somebody says yes there. Read by `PairingView`.
+    /// This device, as the Mac has it: `nil` until the Mac has answered the announce.
     private(set) var thisDevice: Device?
-    /// Why the announce did not take, when it did not — a key the Mac does not
-    /// recognise under this id, or a Mac too old to be asked.
-    private(set) var pairingProblem: String?
     private var listening: Task<Void, Never>?
     /// The loop looking for the Mac, so two of them never run at once.
     private var reconnecting: Task<Void, Never>?
@@ -245,10 +241,8 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.deviceChanged,
                    let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
                    change.id == self.deviceID {
-                    // Approved, or revoked. A revoked device announces again on its
-                    // next connection and waits, as it did the first time.
-                    self.thisDevice = change.gone ? nil : change.device
-                    self.subscribeIfApproved()
+                    self.thisDevice = change.device
+                    self.subscribeOnce()
                 }
             }
             await self?.lostTouch()
@@ -293,43 +287,28 @@ final class RemoteModel {
         }
     }
 
-    /// `devices/announce`: who this is and its public key, once per connection. The
-    /// Mac gives the record back in whatever state it is in; a device it has never
-    /// heard of is written down unapproved, and `PairingView` says so until somebody
-    /// at the Mac says yes.
+    /// `devices/announce`: who this is and its public key, once per connection — which
+    /// is all pairing is. A Mac that knows this id under another key, or one too old to
+    /// be asked, leaves `thisDevice` nil and the LAN link works as it always did; what
+    /// announcing buys is being reached when the LAN cannot.
     private func announce() async {
-        guard let key else {
-            pairingProblem = "This device could not make a key, so it cannot be paired."
-            return
-        }
-        do {
-            thisDevice = try await client.call(
-                DaemonAPI.Method.devicesAnnounce,
-                DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
-                                             name: UIDevice.current.name, kind: kind),
-                returning: Device.self)
-            pairingProblem = nil
-            subscribeIfApproved()
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.notSupported {
-            pairingProblem = "Your Mac knows this device under a different key. Revoke it there and pair again."
-        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
-            pairingProblem = "Your Mac's Agents is too old to pair with."
-        } catch {
-            thisDevice = nil
-        }
+        guard let key else { return }
+        thisDevice = try? await client.call(
+            DaemonAPI.Method.devicesAnnounce,
+            DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
+                                         name: UIDevice.current.name, kind: kind),
+            returning: Device.self)
+        subscribeOnce()
     }
-
-    /// Whether this device is one the Mac will tell things. Everything else works
-    /// unpaired over the LAN as it did before; what pairing buys is being reached
-    /// when the LAN cannot.
-    var isPaired: Bool { thisDevice?.isApproved == true }
 
     /// Ask CloudKit to push this device's mailbox items here. Idempotent on the server
     /// — the subscriptions have stable ids — so once per launch is plenty.
-    private func subscribeIfApproved() {
-        guard isPaired, !subscribed else { return }
+    private func subscribeOnce() {
+        guard thisDevice != nil, !subscribed else { return }
         subscribed = true
         Task {
+            // Permission first, so the Mac hears `mayNotify` and may choose this device.
+            await notifier.requestIfUndetermined()
             do { try await CloudKitMailbox().subscribe(device: deviceID) } catch { subscribed = false }
         }
     }

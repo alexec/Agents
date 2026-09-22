@@ -85,7 +85,19 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         center.removePendingNotificationRequests(withIdentifiers: [token])
     }
 
-    /// Asked the first time a need would be shown here, where the person can see why
+    /// Asked when the Mac has taken this device's announce — the moment it has become
+    /// a device that can be told things, which is where the "why" is plainest (FR-024).
+    /// Not later: the Mac never chooses a device that has not said it can notify
+    /// (FR-023), so a device that only asked when first chosen would never be asked.
+    /// The answer goes back to the Mac in the next presence report.
+    func requestIfUndetermined() async {
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else { return }
+        authorised = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        authorisationChanged()
+    }
+
+    /// Asked the first time a need would be shown here if it somehow was not already
     /// (FR-024); the answer is reported back to the Mac as `mayNotify` (FR-023).
     private func ensureAuthorised() async -> Bool {
         if let authorised { return authorised }

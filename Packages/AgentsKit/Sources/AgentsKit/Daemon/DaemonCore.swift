@@ -34,8 +34,8 @@ public actor DaemonCore {
     /// `DaemonCore+Devices`.
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
-    /// Where a sealed headline goes for a device the LAN cannot reach, and what is
-    /// emptied when a device is revoked. `nil` — the daemon's own case — means it is
+    /// Where a sealed headline goes for a device the LAN cannot reach. `nil` — the
+    /// daemon's own case — means it is
     /// broadcast as `mailbox/post` for the bridge to carry: the daemon has no CloudKit
     /// and must not. A test hands in a `FakeMailbox` and reads what was posted.
     let mailbox: (any Mailbox)?

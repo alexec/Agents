@@ -6,8 +6,8 @@ import Foundation
 ///
 /// The one thing feature 021 writes to disk. **The daemon is the only writer**; the
 /// bridge reads nothing from here and is handed what to send. A missing or unreadable
-/// file is no devices, which is the safe reading: nothing is routed to a device that
-/// cannot be shown to have been approved.
+/// file is no devices, which is the safe reading: nothing is routed to, or sealed to, a
+/// device whose key is not on record.
 public struct DeviceStore: Sendable {
     private let locations: StoreLocations
 

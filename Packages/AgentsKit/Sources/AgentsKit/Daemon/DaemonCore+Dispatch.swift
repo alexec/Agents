@@ -34,15 +34,6 @@ extension DaemonCore {
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
                 return .success(try JSONValue.encoding(try announce(announcement)))
 
-            case DaemonAPI.Method.devicesApprove:
-                let request = try require(params, as: DaemonAPI.DeviceRequest.self)
-                return .success(try JSONValue.encoding(try approveDevice(request.id)))
-
-            case DaemonAPI.Method.devicesRevoke:
-                let request = try require(params, as: DaemonAPI.DeviceRequest.self)
-                try revokeDevice(request.id)
-                return .success([:])
-
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
                 return .success(try JSONValue.encoding(

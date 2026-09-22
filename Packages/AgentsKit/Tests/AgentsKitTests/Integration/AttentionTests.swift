@@ -424,8 +424,9 @@ struct AttentionTests {
         #expect(await core.allDevices().isEmpty, "identifying does not pair")
     }
 
-    /// US5 scenario 2: announced and waiting is not paired.
-    @Test func aDeviceWaitingForApprovalIsSentNothing() async throws {
+    /// US5 scenario 2, as it stands after 2026-09-21: announcing **is** pairing. The
+    /// need goes to the phone, sealed to it, and the phone can open it.
+    @Test func anAnnouncedDeviceIsPairedAndSentTheSealedNeed() async throws {
         let (locations, work) = try temporary()
         let mailbox = FakeMailbox()
         let core = try pairing(asking(), locations: locations, mailbox: mailbox)
@@ -436,25 +437,18 @@ struct AttentionTests {
         await phone.report(core, active: true, mayNotify: true)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
         await waitingOnUser(core, id)
-        try await settled()
-        #expect(heard.deliveries.isEmpty)
-        #expect(await mailbox.posted.isEmpty)
-        let listed = await core.allDevices()
-        #expect(listed.count == 1 && listed.first?.isApproved == false)
-
-        // Then the person says yes: the need goes to the phone, sealed to it.
-        await phone.approve(core)
         await eventually("the phone was told") { heard.deliveries.first?.to == phone.surface }
         await eventually("and its mailbox holds the sealed headline") { await !mailbox.posted.isEmpty }
         let item = try #require(await mailbox.posted.first)
         #expect(item.device == phone.surface.deviceID)
         let opened = try Envelope.open(try #require(item.envelope), with: phone.key)
         #expect(opened.h3.hasPrefix("Wants to"))
+        #expect(await core.allDevices().count == 1)
     }
 
-    /// US5 scenario 3 and SC-007: revoked is deleted, its mailbox is emptied, and what
-    /// was showing there is decided again without it.
-    @Test func aRevokedDeviceIsSentNothingAndItsMailboxIsEmpty() async throws {
+    /// A need that is met leaves a withdrawal in the phone's mailbox under the same
+    /// name, so a stale banner is replaced rather than left.
+    @Test func aMetNeedIsWithdrawnFromTheMailbox() async throws {
         let (locations, work) = try temporary()
         let mailbox = FakeMailbox()
         let core = try pairing(asking(), locations: locations, mailbox: mailbox)
@@ -464,21 +458,13 @@ struct AttentionTests {
         await phone.report(core, active: true, mayNotify: true)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
         await waitingOnUser(core, id)
-        await eventually("the phone was told") { heard.deliveries.first?.to == phone.surface }
         await eventually("posted") { await !mailbox.posted.isEmpty }
-
-        let params = try JSONValue.encoding(DaemonAPI.DeviceRequest(id: try #require(phone.surface.deviceID)))
-        _ = await core.handle(method: DaemonAPI.Method.devicesRevoke, params: params, from: .mac, connection: UUID())
-        await eventually("emptied") { await !mailbox.emptied.isEmpty }
-        #expect(await mailbox.waiting(for: try #require(phone.surface.deviceID)).isEmpty)
-        #expect(await core.allDevices().isEmpty)
-        await eventually("moved off the phone") { heard.changes.last?.to == nil }
-        try await settled()
-        #expect(await mailbox.posted.isEmpty, "nothing more is posted to a device that is gone")
-
-        // A revoked id is nobody: another announce with another key is a new device.
-        let again = await phone.announce(core, name: "Phone", kind: .iPhone)
-        guard case .success = again else { Issue.record("a revoked id may announce afresh"); return }
+        let need = try #require(heard.deliveries.first?.needID)
+        guard case .permission(let permissionID) = need else { Issue.record("expected a permission"); return }
+        try await core.answerPermission(DaemonAPI.AnswerRequest(permissionID: permissionID, optionID: "allow"))
+        await eventually("withdrawn") { await mailbox.posted.contains { $0.needID == need && $0.envelope == nil } }
+        let waiting = await mailbox.waiting(for: try #require(phone.surface.deviceID))
+        #expect(waiting.first { $0.needID == need }?.envelope == nil)
     }
 
     /// A key never changes under an id.
@@ -507,7 +493,6 @@ struct AttentionTests {
         let second = try pairing(asking(), locations: locations, mailbox: FakeMailbox())
         let listed = await second.allDevices()
         #expect(listed.first?.id == phone.surface.deviceID)
-        #expect(listed.first?.isApproved == true)
         #expect(listed.first?.publicKey == phone.key.publicKey)
     }
 }
