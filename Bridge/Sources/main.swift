@@ -22,10 +22,14 @@ import Network
 // nested and signed the way it is, read and write a record in the CloudKit private
 // database? It answers by doing it and prints the answer, and it exists so that the
 // question is settled by running something rather than by reading Apple's forum.
-if CommandLine.arguments.contains("--spike") {
+if CommandLine.arguments.contains("--spike") || CommandLine.arguments.contains("--peek") {
     Task {
         do {
-            try await Spike.run()
+            if let at = CommandLine.arguments.firstIndex(of: "--peek"), CommandLine.arguments.count > at + 1 {
+                try await Peek.run(device: CommandLine.arguments[at + 1])
+            } else {
+                try await Spike.run()
+            }
             exit(0)
         } catch {
             log("spike failed: \(error)")

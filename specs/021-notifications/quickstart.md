@@ -201,8 +201,19 @@ low-priority push, which is delivered at the system's discretion.
 
 Inspect the CloudKit record in the dashboard.
 
-**Expect**: `to`, `from`, `kind`, `seq` and `createdAt` in plaintext, and nothing else. No
-project name, no agent name, no folder, no tool, no command, anywhere.
+**Expect**: `device`, `needToken`, `need` (an id), `alert`, `withdrawn` and `postedAt` in
+plaintext, and `envelope` as ciphertext — nothing else. No project name, no agent name, no
+folder, no tool, no command, anywhere. (005's field names were `to`/`from`/`kind`/`seq`;
+the record that was built is keyed by need and device instead, see `CloudKitMailbox`.)
+
+`agents-bridge --peek <device id>` prints every field of every item for one device, as
+CloudKit holds it — the check without the dashboard.
+
+**Walked 2026-09-21 20:00 (Alex's iPhone, `F79AD0F1…`)**: three live items — an
+elicitation (`alert = 1`) and two reports (`alert = 0`, moved silently inside the
+re-alert interval) — each `envelope` a JSON of base64 `ciphertext` + `encapsulated`, the
+other fields as listed. **Pass.** Also seen: a need that moved back to the Mac left a
+`withdrawn = 1` record with an empty envelope under the same name, replacing the item.
 
 ### C4. Answered on one, gone on the other
 
