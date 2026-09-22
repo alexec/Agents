@@ -251,6 +251,13 @@ Deny notification permission on a device. Look at the devices list on the Mac.
 **Expect**: that device is shown as unable to notify, and the ladder skips it — the need goes
 to the next rung rather than to a device that will silently drop it.
 
+**Walked 2026-09-21, in part.** With notifications off on the iPhone and the app brought to the
+front, the daemon's record read `mayNotify: false` (`devices/list`), which is what the Devices
+pane's line is drawn from; with them back on it read `true` and the next need went to the
+phone with sound (`daemon.log` 04:05:21Z). The skip itself was not seen live — the toggle came
+back before the Mac went idle — and rests on `RoutingTests.rung3SkipsADeviceThatMayNotNotify…`.
+The pane's wording was not confirmed by eye.
+
 ---
 
 ## Measuring the success criteria
