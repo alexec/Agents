@@ -116,9 +116,15 @@ struct PromptBar: View {
                                             set: { model.draftServers = $0 }))
         }
         .onChange(of: model.selection) {
-            text = ""
             selectedSuggestion = 0
             dismissedSuggestions = false
+            // The project page's bar stays under the chat while one is open, so
+            // opening a chat is not a reason to throw away what was half typed there.
+            // The chat's own bar starts each chat empty, files and all: words meant for
+            // one agent must not be sent to the next.
+            guard !folderIsFixed else { return }
+            text = ""
+            attachments = []
         }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.
@@ -260,6 +266,7 @@ struct PromptBar: View {
                 .font(.footnote)
                 .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
                 .help("Conversations this runtime is already holding here")
+                .accessibilityLabel("Sessions")
 
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
@@ -376,6 +383,7 @@ struct PromptBar: View {
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .help("Attach a file or a picture")
+            .accessibilityLabel("Attach")
 
             Button(action: toggleDictation) {
                 Image(systemName: dictation.isListening ? "waveform" : "microphone")
@@ -386,6 +394,7 @@ struct PromptBar: View {
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .help(dictation.isListening ? "Stop dictating" : "Dictate")
+            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
 
             Button(action: send) {
                 Image(systemName: willQueue ? "arrow.up.to.line" : "arrow.up")
@@ -397,6 +406,7 @@ struct PromptBar: View {
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
             .help(willQueue ? "Queue this, to go when the turn ends" : "Send")
+            .accessibilityLabel(willQueue ? "Queue" : "Send")
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
@@ -810,10 +820,18 @@ struct PromptBar: View {
         // back to its end even if you were reading three screens up.
         model.scrollToEnd()
         Task {
+            let went: Bool
             if agent == nil {
-                await model.startDraft(prompt: outgoing, attachments: going)
+                went = await model.startDraft(prompt: outgoing, attachments: going)
             } else {
-                await model.send(outgoing, attachments: going)
+                went = await model.send(outgoing, attachments: going)
+            }
+            // The field empties at once so sending feels immediate, but a prompt that
+            // did not go is given back rather than lost, unless something new has been
+            // typed in the meantime.
+            if !went, text.isEmpty, attachments.isEmpty {
+                text = outgoing
+                attachments = going
             }
         }
     }

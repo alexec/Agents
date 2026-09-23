@@ -203,9 +203,10 @@ struct ElicitationSheet: View {
                       content: [String: JSONValue] = [:]) {
         chosen = what
         Task {
-            await model.answer(request, action: action, content: content)
             // Left showing what was sent. What becomes of it arrives as the daemon
-            // withdrawing the question, which takes this whole view away.
+            // withdrawing the question, which takes this whole view away. An answer
+            // that did not go gives the buttons back, so it can be given again.
+            if !(await model.answer(request, action: action, content: content)) { chosen = nil }
         }
     }
 }

@@ -128,12 +128,16 @@ struct RemoteChatView: View {
     @ViewBuilder
     private var question: some View {
         if let request = model.questionForSelection {
+            // A fresh sheet per question, so a tap in flight on the last one is not
+            // carried over to the next.
             PermissionSheet(request: request)
+                .id(request.id)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let form = model.formForSelection {
             // The other kind of blocked, and it takes the bar for the same reason: an
             // agent waiting on an answer wants the answer, not a way to type past it.
             ElicitationSheet(request: form)
+                .id(form.id)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let agent, agent.state != .archived {
             // Nothing to say to an agent that has been put away. Bringing it back is

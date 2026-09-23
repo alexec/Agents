@@ -58,7 +58,11 @@ struct AgentCard: View {
     /// describing work nothing is doing.
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
-        if let step = agent.currentStep { return step }
+        // Only while a turn is going. A plan left with a step in progress by a turn that
+        // was stopped or ended is not something the agent is doing now.
+        if agent.state == .running || agent.state == .starting, let step = agent.currentStep {
+            return step
+        }
         // The agent's own words about the turn that just ended, in preference to
         // anything we would otherwise derive (FR-013). The same branch, in the same
         // place, as the Mac's row.

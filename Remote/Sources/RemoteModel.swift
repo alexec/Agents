@@ -124,6 +124,10 @@ final class RemoteModel {
 
     func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedProject, group: group) }
 
+    /// A project's counts from the same grouping its page uses, so the list and the
+    /// page cannot disagree about what needs attention.
+    func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
+
     /// Whether the Mac is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 
@@ -490,6 +494,9 @@ final class RemoteModel {
         guard let page = try? await client.call(DaemonAPI.Method.agentsTranscript,
                                                 DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize),
                                                 returning: TranscriptPage.self) else { return }
+        // A chat left before its page arrived does not get that page shown under the
+        // next one's name.
+        guard self.selection == selection else { return }
         work.replaceTranscript(with: page)
     }
 
@@ -504,6 +511,7 @@ final class RemoteModel {
             DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
                                         limit: firstPageSize),
             returning: TranscriptPage.self) else { return }
+        guard self.selection == selection else { return }
         work.prepend(page)
     }
 
@@ -513,17 +521,20 @@ final class RemoteModel {
     ///
     /// Refused here and now when the Mac is not answering, rather than accepted and
     /// quietly dropped (FR-033). An answer that cannot be delivered is not an answer.
-    func answer(_ request: PermissionRequest, optionID: String) async {
+    @discardableResult
+    func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
-            return
+            return false
         }
         do {
             try await client.call(DaemonAPI.Method.permissionsAnswer,
                                   DaemonAPI.AnswerRequest(permissionID: request.id,
                                                           optionID: optionID))
+            return true
         } catch {
             problem = "That question could not be answered."
+            return false
         }
     }
 
@@ -532,22 +543,25 @@ final class RemoteModel {
     /// Refused here when the Mac is not answering, exactly as a permission is: an
     /// answer that cannot be delivered is not an answer, and an agent left waiting
     /// while the person believes they replied is the worst of both.
+    @discardableResult
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
-                content: [String: JSONValue] = [:]) async {
+                content: [String: JSONValue] = [:]) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
-            return
+            return false
         }
         do {
             try await client.call(DaemonAPI.Method.elicitationsAnswer,
                                   DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                      action: action,
                                                                      content: content))
+            return true
         } catch {
             // The daemon refuses an answer that does not fit the shape the agent asked
             // for, and says why. Its words, not ours: it knows which field was wrong.
             problem = (error as? JSONRPCError)?.message ?? "That question could not be answered."
+            return false
         }
     }
 

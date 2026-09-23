@@ -64,7 +64,10 @@ struct ChatView: View {
             }
             // A form waits the same way a permission question does, and floats with it.
             if let request = model.elicitationForSelection {
+                // A fresh card per form, so the answers and the step reached on one
+                // are not carried into the next.
                 ElicitationView(request: request)
+                    .id(request.id)
             }
             PromptBar()
         }
