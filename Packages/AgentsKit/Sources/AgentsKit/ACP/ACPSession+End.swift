@@ -28,7 +28,7 @@ extension ACPSession {
     public static func launch(executable: URL,
                               arguments: [String],
                               cwd: URL,
-                              environment: [String: String] = ProcessInfo.processInfo.environment,
+                              environment: [String: String] = RuntimeEnvironment.forRuntimes(),
                               capabilities: ACP.ClientCapabilities = .none) throws -> ACPSession {
         let relay = ExitRelay()
         let process = try RuntimeProcess(
