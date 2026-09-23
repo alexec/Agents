@@ -960,6 +960,9 @@ public enum DaemonAPI {
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
         public static let notASurface = -32022
+        /// A new agent asked for while the per-agent limit is zero. Every agent would
+        /// be at it before its first word, and a new one has no queue to hold on.
+        public static let agentLimitReached = -32023
     }
 
     // MARK: Workflows

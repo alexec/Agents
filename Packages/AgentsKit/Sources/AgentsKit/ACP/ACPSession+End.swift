@@ -55,7 +55,16 @@ extension ACPSession {
     public func end(gracePeriod: Duration = .seconds(5)) async {
         await cancel()
         if let sessionID {
-            _ = try? await callClose(sessionID: sessionID)
+            // Asked, and waited on for no longer than the grace period. A runtime that
+            // never answers would otherwise hold this here for good — and with it a
+            // stop, the queue draining behind a turn, and the daemon's own shutdown.
+            // Closing the connection below fails the call if it is still outstanding.
+            let answered = Flag()
+            Task { _ = try? await self.callClose(sessionID: sessionID); answered.set() }
+            let deadline = ContinuousClock.now.advanced(by: gracePeriod)
+            while !answered.isSet, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
         }
         await closeConnection()
         guard let process = runtimeProcess else { return }
@@ -81,4 +90,12 @@ extension ACPSession {
     public func killRuntime() {
         runtimeProcess?.kill()
     }
+}
+
+/// Set once, read from anywhere.
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    func set() { lock.lock(); value = true; lock.unlock() }
 }

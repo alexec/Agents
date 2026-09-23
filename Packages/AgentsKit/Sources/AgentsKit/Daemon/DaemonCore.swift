@@ -42,6 +42,8 @@ public actor DaemonCore {
     /// Posts to the mailbox in the order they were decided: a withdrawal must not
     /// overtake the banner it withdraws.
     var mailboxTail: Task<Void, Never>?
+    /// The last write of an agent's record, so the next one goes after it.
+    var saveTail: Task<Void, Never>?
     /// The four numbers routing turns on. Injected so a test names its own and sleeps
     /// for none of the real ones.
     let thresholds: AttentionThresholds
@@ -63,6 +65,10 @@ public actor DaemonCore {
     /// Agents whose next queued prompt is already on its way to a runtime. See
     /// `sendNextQueued`: without this the same words can go twice.
     var sending: Set<UUID> = []
+    /// How many times each agent has been stopped or archived. A start is a long
+    /// await, and one that finds this moved while it waited was overtaken by the
+    /// person saying stop: it hands its runtime back rather than beginning a turn.
+    var stops: [UUID: Int] = [:]
     /// What each runtime last told us about itself: signed in or not, how to sign in,
     /// which provider is answering. One per runtime, shared by every agent using it.
     var accounts: [String: RuntimeAccount] = [:]
@@ -284,7 +290,7 @@ public actor DaemonCore {
 
     func changed(_ agent: Agent) {
         agents[agent.id] = agent
-        try? saveQuietly(agent)
+        saveQuietly(agent)
         broadcast(DaemonAPI.Notification.agentChanged, agent)
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
@@ -292,8 +298,16 @@ public actor DaemonCore {
         projectChanged(forAgentIn: agent.cwd)
     }
 
-    private func saveQuietly(_ agent: Agent) throws {
-        Task { [store] in try? await store.save(agent) }
+    /// Each write waits for the one before it. Separate tasks reach the store in no
+    /// promised order, and an older copy landing last is a record that says an agent
+    /// is running when it finished, or still has words queued that already went — both
+    /// of which the next daemon acts on.
+    private func saveQuietly(_ agent: Agent) {
+        let previous = saveTail
+        saveTail = Task { [store] in
+            await previous?.value
+            try? await store.save(agent)
+        }
     }
 
     /// Append to the record first, then tell the windows. That order is the whole
@@ -514,8 +528,13 @@ public actor DaemonCore {
             // has no cost field at all — so banking at the end of the turn, as 010
             // research §2 chose to, banked nothing and left every agent reading
             // "Not measured". Here is where the money is.
+            let spentBefore = agent.costToDate
             if let cost = usage.cost { bank(cost, into: &agent) }
             agents[agentID] = agent
+            // Money is written down as it is spent, not at the end of the turn. The
+            // ledger already has it; a daemon killed mid-turn must not come back with
+            // an agent that spent less than the day did.
+            if agent.costToDate != spentBefore { saveQuietly(agent) }
             // Usage arrives several times a turn, so it is broadcast on its own rather
             // than as a whole agent, and the record is written at the end of the turn.
             broadcast(DaemonAPI.Notification.agentUsage,
@@ -583,6 +602,15 @@ public actor DaemonCore {
                 broadcast(DaemonAPI.Notification.agentPermission,
                           DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
             }
+            // A form dies with the runtime that asked it, the same as a permission
+            // does. Kept, it would go on asking on the Mac and the phone for an agent
+            // that can no longer hear the answer, and refuse its next outcome report
+            // over a question it cannot see.
+            for (id, pending) in elicitations where pending.agentID == agentID {
+                elicitations.removeValue(forKey: id)
+                broadcast(DaemonAPI.Notification.agentElicitation,
+                          DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
+            }
             if agents[agentID]?.state.holdsRuntime == true {
                 await move(agentID, on: .processDied)
             }
@@ -621,6 +649,10 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
+        // A runtime's cost is a running total for its process, and the next process
+        // counts from nothing. Kept, the next one's first reading would be banked only
+        // for what it exceeds this one's last, and the difference would go uncounted.
+        costReadings.removeValue(forKey: agentID)
         // The MCP helper the runtime started dies with it. Its token stops working
         // here at the same moment, rather than whenever that process gets round to it.
         dropAppTokens(for: agentID)
@@ -655,6 +687,8 @@ public actor DaemonCore {
         for (_, task) in eventTasks { await task.value }
         eventTasks.removeAll()
         live.removeAll()
+        // Every record written, in order, before the daemon goes.
+        await saveTail?.value
         await store.closeAll()
     }
 }

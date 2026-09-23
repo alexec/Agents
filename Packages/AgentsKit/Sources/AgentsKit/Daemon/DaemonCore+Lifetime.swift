@@ -13,6 +13,10 @@ extension DaemonCore {
         if !resuming.isEmpty { return true }
         if !pendingPermissions.isEmpty { return true }
         if !drafts.isEmpty { return true }
+        // A queued prompt whose runtime is still starting. Nothing is in `live` yet
+        // and the agent reads as settled, so without this a slow start with no window
+        // open lets the daemon go, and the words are never sent.
+        if !sending.isEmpty { return true }
         // A shell with a build running in it is work, the same as an agent mid-turn.
         // Exiting under one would kill the build, which is the whole thing FR-026
         // promises will not happen (FR-027).

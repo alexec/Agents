@@ -123,6 +123,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// Only `byUser` exists in this feature: nothing archives itself.
     public enum ArchivedReason: String, Codable, Hashable, Sendable {
         case byUser
+
+        /// Archived for a reason this build does not know is still archived.
+        public init(from decoder: any Decoder) throws {
+            let written = try decoder.singleValueContainer().decode(String.self)
+            self = ArchivedReason(rawValue: written) ?? .byUser
+        }
     }
 
     public init(from decoder: any Decoder) throws {

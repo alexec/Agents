@@ -127,6 +127,15 @@ extension DaemonCore {
                 message: "Today has cost \(spent), which reaches the \(ceiling) you allowed for a day. "
                     + "Nothing new starts until the day rolls over, or until you raise the limit.")
         }
+        // A zero is a limit every agent has reached before it spends anything. The
+        // gate in `sendNextQueued` cannot see that — a new agent has measured nothing
+        // yet — so it is said here, where the start is still only a request.
+        if let perAgent = limits.perAgent, perAgent.amount <= 0 {
+            throw JSONRPCError(
+                code: DaemonAPI.Failure.agentLimitReached,
+                message: "The limit for each agent is set to nothing, so no agent can start. "
+                    + "Raise it to start this one.")
+        }
         let session: ACPSession
         let sessionID: String
         let appToken: String
@@ -258,8 +267,10 @@ extension DaemonCore {
                                message: "\(runtime.name) is not installed, or is not where we looked.",
                                data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
         }
+        var launched: ACPSession?
         do {
             let session = try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+            launched = session
             let handshake = try await session.initialize()
             // Recorded here rather than after the session is made, because the reason
             // to have it is the case where making the session fails: what comes back
@@ -271,23 +282,33 @@ extension DaemonCore {
                                                       meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
-        } catch let error as JSONRPCError where error.isAuthRequired {
+        } catch {
+            // A runtime that would not make a session is still a running process.
+            await launched?.end(gracePeriod: .seconds(1))
+            throw startFailure(error, runtime: runtime, runtimeID: runtimeID)
+        }
+    }
+
+    /// What a runtime that would not make a session is said to have done.
+    private func startFailure(_ error: Error, runtime: Runtime, runtimeID: String) -> Error {
+        switch error {
+        case let error as JSONRPCError where error.isAuthRequired:
             markNeedsSignIn(runtimeID: runtimeID)
             // Not a fault. The runtime is there and needs signing in, which is
             // something the app can show and offer to fix.
-            throw signInNeeded(runtime: runtime, because: error.message)
-        } catch ACPSessionError.needsSignIn {
+            return signInNeeded(runtime: runtime, because: error.message)
+        case ACPSessionError.needsSignIn:
             markNeedsSignIn(runtimeID: runtimeID)
-            throw signInNeeded(runtime: runtime, because: "it is not signed in")
-        } catch ACPSessionError.unsupportedProtocolVersion(let version) {
-            throw JSONRPCError(code: DaemonAPI.Failure.wrongProtocolVersion,
-                               message: "\(runtime.name) speaks protocol version \(version), and this app speaks \(ACP.protocolVersion).")
-        } catch let error as JSONRPCError {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
-                               message: "\(runtime.name) would not start a session: \(error.message)")
-        } catch {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
-                               message: "\(runtime.name) would not start: \(error.localizedDescription)")
+            return signInNeeded(runtime: runtime, because: "it is not signed in")
+        case ACPSessionError.unsupportedProtocolVersion(let version):
+            return JSONRPCError(code: DaemonAPI.Failure.wrongProtocolVersion,
+                                message: "\(runtime.name) speaks protocol version \(version), and this app speaks \(ACP.protocolVersion).")
+        case let error as JSONRPCError:
+            return JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
+                                message: "\(runtime.name) would not start a session: \(error.message)")
+        default:
+            return JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
+                                message: "\(runtime.name) would not start: \(error.localizedDescription)")
         }
     }
 
@@ -412,7 +433,15 @@ extension DaemonCore {
         // without an await between them, which on an actor is the whole of the lock.
         sending.insert(agentID)
         defer { sending.remove(agentID) }
+        let stopsBefore = stops[agentID, default: 0]
         let session = try await liveSession(for: agent)
+        // Stopped or archived while the runtime was starting. `stop` found nothing
+        // to cancel then — no runtime yet, no turn — so this is where it is heard:
+        // the runtime goes back and the words stay queued, as stop promises.
+        guard stops[agentID, default: 0] == stopsBefore else {
+            await releaseRuntime(for: agentID)
+            return
+        }
         guard var agent = agents[agentID],
               let index = agent.queuedPrompts.firstIndex(where: { $0.id == next.id }) else { return }
         agent.queuedPrompts.remove(at: index)
@@ -501,7 +530,11 @@ extension DaemonCore {
     /// whole of "it becomes promptable again where it stands".
     func drainEverythingHolding() async {
         held.removeAll()
-        for id in agents.keys where !(agents[id]?.queuedPrompts.isEmpty ?? true) {
+        for (id, agent) in agents where !agent.queuedPrompts.isEmpty {
+            // Put away is put away. A held prompt on an agent archived since would
+            // otherwise take it out of the archive at midnight and spend money on it.
+            // `held` alone is not the test: it is memory, and a restart forgets it.
+            guard agent.state != .archived else { continue }
             await drainQueue(after: id)
         }
     }
@@ -565,6 +598,18 @@ extension DaemonCore {
         }
         await record(.runtimeNote("Starting \(runtime.name)…"), for: agent.id)
         let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        do {
+            return try await connect(session, runtime: runtime, for: agent)
+        } catch {
+            // Nothing holds a session that never made it into `live`, and a process
+            // left behind here is a runtime nobody will ever end.
+            dropAppTokens(for: agent.id)
+            await session.end(gracePeriod: .seconds(1))
+            throw error
+        }
+    }
+
+    private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
         _ = try await session.initialize()
 
         // A new process is a new MCP server, so a new token. The old one stopped
@@ -577,7 +622,10 @@ extension DaemonCore {
         // quietly wider than one started this minute (FR-012).
         let meta = ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta
 
-        var updated = agent
+        // Only what this start learns is carried across the awaits below. The rest of
+        // the record is read again at the end: a start takes seconds, and a prompt
+        // queued, withdrawn or archived in them is newer than the copy we began with.
+        var newSessionID: String?
         if let sessionID = agent.runtimeSessionID {
             do {
                 try await session.continueSession(id: sessionID, cwd: agent.cwd,
@@ -594,7 +642,7 @@ extension DaemonCore {
                                                           additionalDirectories: agent.additionalDirectories,
                                                           mcpServers: servers,
                                                           meta: meta)
-                updated.runtimeSessionID = result.sessionId
+                newSessionID = result.sessionId
                 // A conversation beginning again, so the briefing goes again: it
                 // lived in the history this runtime has just told us it no longer has.
                 needsBriefing.insert(agent.id)
@@ -604,7 +652,7 @@ extension DaemonCore {
                                                       additionalDirectories: agent.additionalDirectories,
                                                       mcpServers: servers,
                                                       meta: meta)
-            updated.runtimeSessionID = result.sessionId
+            newSessionID = result.sessionId
             needsBriefing.insert(agent.id)
         }
         // Empty is not an answer, for either of them. A runtime that sends its options
@@ -615,8 +663,12 @@ extension DaemonCore {
         // once and a picked-up session never says it again.
         // `ACPSession.setOption` already guards the same assignment the same way.
         let refreshed = await session.options
-        if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         let commands = await session.commands
+        guard var updated = agents[agent.id] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        if let newSessionID { updated.runtimeSessionID = newSessionID }
+        if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         if !commands.isEmpty { updated.availableCommands = commands }
         changed(updated)
         await session.apply(updated.startOptions)
@@ -832,6 +884,7 @@ extension DaemonCore {
         // flight — and the resume loop starts it seconds later. `interrupted` alone
         // stops the pick-up, but `resuming` must go too or the daemon stays alive for
         // a chat nobody is bringing back.
+        stops[agentID, default: 0] += 1
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
@@ -889,6 +942,7 @@ extension DaemonCore {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        stops[agentID, default: 0] += 1
         if agent.state.holdsRuntime { try await stop(agentID) }
         await move(agentID, on: .archivedByUser)
     }

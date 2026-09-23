@@ -195,8 +195,17 @@ public actor AgentStore {
         if !FileManager.default.fileExists(atPath: url.path) {
             FileManager.default.createFile(atPath: url.path, contents: nil)
         }
-        let handle = try FileHandle(forWritingTo: url)
-        try handle.seekToEnd()
+        let handle = try FileHandle(forUpdating: url)
+        let end = try handle.seekToEnd()
+        // A daemon killed mid-write leaves half a line. The next entry would be glued
+        // to it and both lost to the reader, so the fragment is ended first — it stays
+        // unreadable on its own, and everything after it reads.
+        if end > 0 {
+            try handle.seek(toOffset: end - 1)
+            let last = try handle.read(upToCount: 1)
+            try handle.seekToEnd()
+            if last != Data([0x0A]) { try handle.write(contentsOf: Data([0x0A])) }
+        }
         appendHandles[agentID] = handle
         return handle
     }

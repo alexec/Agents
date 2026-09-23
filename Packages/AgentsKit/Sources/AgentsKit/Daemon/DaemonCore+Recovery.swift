@@ -136,9 +136,9 @@ extension DaemonCore {
         // `wordsAboutTheRestart` exists.
         let stillHasItsFirstWords = was == .starting && !agent.queuedPrompts.isEmpty
         let text = Self.wordsAboutTheRestart(was)
-        // Written down before the words go, never after. A daemon killed part-way
-        // through starting a runtime has already recorded that it tried, and the next
-        // daemon does not try the same chat again.
+        // Counted before the words go, so a daemon killed part-way through starting a
+        // runtime has already recorded that it tried. The count is a record and not a
+        // guard: since the threshold went, every restart picks the chat up again.
         agent.restartPickUps += 1
         changed(agent)
         do {
@@ -146,6 +146,16 @@ extension DaemonCore {
                 try await sendNextQueued(to: id)
             } else {
                 try await promptFirst(DaemonAPI.PromptRequest(agentID: id, text: text))
+            }
+            // Returning is not the same as sending. A limit holds the queue, and a stop
+            // that landed while the runtime started hands it back unsent; either way our
+            // words about this minute are still there, and are not ones to keep.
+            if !stillHasItsFirstWords, var agent = agents[id],
+               agent.queuedPrompts.contains(where: { $0.text == text }) {
+                agent.queuedPrompts.removeAll { $0.text == text }
+                changed(agent)
+                DaemonLog.shared.write("did not pick agent \(id) back up: held or stopped before it went")
+                return
             }
             DaemonLog.shared.write("picked agent \(id) back up after the restart")
         } catch {

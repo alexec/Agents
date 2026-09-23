@@ -115,7 +115,7 @@ extension DaemonCore {
         var agent = Agent(runtimeID: runtimeID,
                           cwd: cwd,
                           title: nil,
-                          state: .stopped,
+                          state: .finished,
                           runtimeSessionID: sessionID,
                           endedReason: .endTurn)
         agents[agent.id] = agent
@@ -166,12 +166,21 @@ extension DaemonCore {
                                                    additionalDirectories: agent.additionalDirectories,
                                                    meta: ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta)
 
-        var copy = agent
-        copy.id = UUID()
-        copy.runtimeSessionID = forked
-        copy.title = agent.title.map { "\($0) (branch)" }
-        copy.createdAt = Date()
-        copy.lastActivityAt = Date()
+        // A new agent carrying the conversation, not a copy of the record. What the
+        // original was doing, owes, has queued or was started by is the original's: a
+        // branch taken from a running agent copied `running` with no runtime behind it,
+        // which queued its prompts for ever and kept the daemon open.
+        let copy = Agent(runtimeID: agent.runtimeID,
+                         cwd: agent.cwd,
+                         title: agent.title.map { "\($0) (branch)" },
+                         state: .finished,
+                         runtimeSessionID: forked,
+                         startOptions: agent.startOptions,
+                         advertisedOptions: agent.advertisedOptions,
+                         availableCommands: agent.availableCommands,
+                         endedReason: .endTurn,
+                         additionalDirectories: agent.additionalDirectories,
+                         mcpServers: agent.mcpServers)
         agents[copy.id] = copy
         try await store.save(copy)
         // The history so far is ours, so the branch starts with a copy of it rather

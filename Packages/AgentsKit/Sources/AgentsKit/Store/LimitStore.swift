@@ -17,8 +17,9 @@ public struct LimitStore: Sendable {
     }
 
     public func load() -> CostLimits {
-        guard let data = try? Data(contentsOf: locations.limits),
-              let limits = try? StoreCoding.decoder.decode(CostLimits.self, from: data) else {
+        guard let data = try? Data(contentsOf: locations.limits) else { return CostLimits() }
+        guard let limits = try? StoreCoding.decoder.decode(CostLimits.self, from: data) else {
+            StoreCoding.setAside(locations.limits)
             return CostLimits()
         }
         return limits
