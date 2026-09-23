@@ -15,7 +15,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .files: return "Files"
         case .terminal: return "Terminal"
         case .browser: return "Browser"
-        case .artifacts: return "Artifacts"
+        case .artifacts: return "Exchanged"
         }
     }
 

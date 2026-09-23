@@ -155,7 +155,7 @@ struct SidebarToggle: View {
         }
         .disabled(!fits && !frame.isOpen)
         .help(fits
-              ? (frame.isOpen ? "Close the sidebar" : "Show the agent's files, a shell, a browser and what it handed over")
+              ? (frame.isOpen ? "Close the sidebar" : "Show the agent's files, a shell, a browser and what has been exchanged")
               : "The window is too narrow to show the sidebar and the conversation at once. Make it wider.")
     }
 }

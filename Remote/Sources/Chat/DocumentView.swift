@@ -1,10 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A document the agent handed over, read as paper rather than as source.
+/// A document named in the conversation, read as paper rather than as source.
 ///
-/// The Mac draws this in the artifacts pane of its inspector (007). An iPad has no
-/// inspector, so the same two surfaces — the list of what was handed over, and the
+/// The Mac draws this in the Exchanged pane of its inspector (007). An iPad has no
+/// inspector, so the same two surfaces — the list of what was exchanged, and the
 /// document itself — are reached from the conversation's menu and pushed.
 ///
 /// Read only, structurally: no save, no export, no share sheet. FR-020b asks for the
@@ -83,12 +83,13 @@ private struct Elsewhere: View {
     }
 }
 
-/// What the agent handed over, in one list, away from the messages it arrived in.
+/// Everything named in the conversation, in one list, away from the messages it
+/// arrived in: what was attached to a prompt, and what an agent handed back.
 ///
 /// Derived on read from the transcript, exactly as the Mac's pane derives it, so it
 /// lasts as long as the transcript does and needs no notification of its own. The
-/// iPad holds a page of transcript rather than all of it, so this is what the agent
-/// handed over *in what has been read* — said at the foot rather than left to be
+/// iPad holds a page of transcript rather than all of it, so this is what was
+/// exchanged *in what has been read* — said at the foot rather than left to be
 /// discovered.
 struct ArtifactsList: View {
     @Environment(RemoteModel.self) private var model
@@ -98,10 +99,10 @@ struct ArtifactsList: View {
     var body: some View {
         Group {
             if artifacts.isEmpty {
-                ContentUnavailableView("Nothing handed over",
+                ContentUnavailableView("Nothing exchanged",
                                        systemImage: "doc",
-                                       description: Text("A document the agent hands over shows up here. "
-                                                         + "No runtime installed sends one yet."))
+                                       description: Text("A file attached to a prompt, or one an agent "
+                                                         + "hands back by name, shows up here."))
             } else {
                 List {
                     ForEach(artifacts) { artifact in
@@ -119,7 +120,7 @@ struct ArtifactsList: View {
                 }
             }
         }
-        .navigationTitle("Handed over")
+        .navigationTitle("Exchanged")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
     }

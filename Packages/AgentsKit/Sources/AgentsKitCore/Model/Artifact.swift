@@ -1,15 +1,17 @@
 import Foundation
 
-/// Something an agent handed over.
+/// Something named in the conversation rather than merely said: a file attached to a
+/// prompt, or one an agent handed back.
 ///
 /// FR-046, answered narrow: an artifact is a `resource_link` block or an embedded
 /// `resource` block, and nothing else. A file a tool call merely touched is not one.
 /// That question has a better home in the files pane, which marks what the agent
 /// changed, and putting it in both would make the sidebar say the same thing twice.
 ///
-/// The consequence is accepted rather than worked around: no runtime installed here
-/// sends these blocks yet, so the pane is ordinarily empty, and its empty state is the
-/// screen people will actually see.
+/// Both directions count. No runtime installed here hands anything over yet, so an
+/// attachment is in practice the only artifact there is, and a file is worth finding
+/// again whichever way it went. The pane is named for the exchange, not for the
+/// agent's half of it.
 public struct Artifact: Sendable, Hashable, Identifiable {
     public var id: String
     public var uri: String
@@ -66,7 +68,7 @@ public struct Artifact: Sendable, Hashable, Identifiable {
 }
 
 extension Artifact {
-    /// Everything an agent handed over, newest first.
+    /// Everything exchanged, newest first: sent and handed back alike.
     ///
     /// A pure function over transcript entries, so it is derived on read and never
     /// stored. That is what makes FR-044 free: artifacts last exactly as long as the

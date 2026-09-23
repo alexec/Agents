@@ -3,14 +3,28 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-@Suite("What the agent handed over")
+@Suite("What was exchanged")
 struct ArtifactTests {
     private func message(_ blocks: [ContentBlock], at: Date = Date()) -> TranscriptEntry {
         TranscriptEntry(at: at, kind: .agentMessage(messageID: nil, text: "", blocks: blocks))
     }
 
+    private func prompt(_ blocks: [ContentBlock], at: Date = Date()) -> TranscriptEntry {
+        TranscriptEntry(at: at, kind: .userMessage("", blocks: blocks))
+    }
+
     private let link = ContentBlock.resourceLink(uri: "file:///tmp/report.md", name: "report.md",
                                                  mimeType: "text/markdown", size: 400)
+
+    /// Both directions, on purpose. A file you attached is the one artifact the list is
+    /// sure to have while no runtime hands anything over, and it is worth finding again
+    /// whichever way it went.
+    @Test func aFileAttachedToAPromptIsAnArtifactToo() {
+        let sent = Attachment.file(URL(fileURLWithPath: "/tmp/brief.md")).block
+        let artifacts = Artifact.all(in: [prompt([.text("have a look"), sent])])
+        #expect(artifacts.count == 1)
+        #expect(artifacts[0].name == "brief.md")
+    }
 
     @Test func aResourceLinkIsAnArtifact() {
         let artifacts = Artifact.all(in: [message([link])])

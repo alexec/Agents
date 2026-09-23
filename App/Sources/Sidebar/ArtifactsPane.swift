@@ -1,12 +1,14 @@
 import AgentsKit
 import SwiftUI
 
-/// What the agent handed over, in one list, away from the messages it arrived in.
+/// Everything named in the conversation, in one list, away from the messages it
+/// arrived in: what you attached to a prompt, and what an agent handed back.
 ///
-/// Only what the runtime marked: a `resource_link` or an embedded `resource`, and
-/// nothing else (FR-046). No runtime installed here sends those blocks yet, so the
-/// empty state below is this pane's ordinary screen rather than an edge case, and it is
-/// written to read as a fact rather than as a failure.
+/// Only what is named as a thing rather than said: a `resource_link` or an embedded
+/// `resource`, and nothing else (FR-046). Both directions count, because a file is
+/// worth finding again whichever way it went, and an attachment you sent is the one
+/// entry this list is sure to have — no runtime installed here hands anything over
+/// yet, so until one does, this pane is a record of what you gave it.
 struct ArtifactsPane: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
@@ -99,19 +101,19 @@ struct ArtifactsPane: View {
     }
 }
 
-/// The pane's ordinary screen, and the one people will actually see.
+/// The pane before anything has been named, which for a fresh agent is every time.
 ///
 /// Written as a statement about what will appear here, not an apology and not an error.
-/// Nothing has gone wrong: the agents simply have not started handing things over yet.
+/// Nothing has gone wrong: nothing has been passed either way yet.
 private struct Nothing: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "tray")
                 .font(.largeTitle)
                 .foregroundStyle(.tertiary)
-            Text("Nothing handed over yet")
+            Text("Nothing exchanged yet")
                 .font(.headline)
-            Text("When an agent completes something and hands it over by name, it appears here, so you can find it again without scrolling back through the conversation.")
+            Text("A file you attach to a prompt, or one an agent hands back by name, appears here, so you can find it again without scrolling back through the conversation.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

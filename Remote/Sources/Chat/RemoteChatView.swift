@@ -206,7 +206,7 @@ private struct ChatMenu: View {
 
     var body: some View {
         Menu {
-            Button("Handed over", systemImage: "doc") { isShowingArtifacts = true }
+            Button("Exchanged", systemImage: "doc") { isShowingArtifacts = true }
             Divider()
             if agent.state.holdsRuntime {
                 Button("Stop", systemImage: "stop.circle") {
