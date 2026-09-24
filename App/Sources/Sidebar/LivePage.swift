@@ -10,12 +10,14 @@ import SwiftUI
 /// uses and inherits that renderer's shape; the split is `Passage`'s, in the kit, where
 /// the tests can reach it.
 ///
-/// It follows the agent. When `text` changes, the passages that changed are tinted for
-/// a moment and the first of them is scrolled into view — unless the person is typing
-/// (FR-013), in which case the marks land and the view stays put. That the view always
-/// follows otherwise, even when the reader has scrolled off to read something else, is
-/// the proof of concept's rule, and whether it should be softer is one of the things
-/// it exists to find out (spec, US1 scenario 6).
+/// It follows the agent. When `text` changes, a caret with the agent's name over it
+/// appears at the first block that changed and types it in, then moves to the next,
+/// with the view going along with it — unless the person is typing (FR-013), in which
+/// case the agent's caret carries on and the view stays put. The person's own caret,
+/// in the passage they have open, carries their name, so the two are never confused.
+/// That the view always follows otherwise, even when the reader has scrolled off to
+/// read something else, is the proof of concept's rule, and whether it should be
+/// softer is one of the things it exists to find out (spec, US1 scenario 6).
 ///
 /// What is real here is `PageMetrics`: the width comes from the pane, the measure and
 /// the padding from the kit, and the page centres itself once the pane is wider than
@@ -33,6 +35,8 @@ struct LivePage: View {
     /// Whose page this is: the daemon writes the person's typing inside this agent's
     /// folders and remembers it for this agent's next turn.
     let agentID: UUID
+    /// What the agent is called, for the name over its caret: its runtime's name.
+    var agentName = "Agent"
     /// Bumped by the pane on every folder event, including the ones that leave the
     /// document's text alone. That is when a picture beside it may have changed, and
     /// a picture is not in the text (FR-020).
@@ -63,25 +67,52 @@ struct LivePage: View {
     @State private var passages: [Passage] = []
     /// Which passages are marked, and when each mark was set. A mark is not a flag
     /// but a moment, so a passage marked twice in a second fades from the second.
+    ///
+    /// Only the line an agent names is marked now (FR-007). A write is not: the caret
+    /// typing it in is how the page says where it changed, and a tint flashing behind
+    /// each block as well was one signal too many.
     @State private var marked: [Int: Date] = [:]
     /// The text `passages` came from: the base for the next diff.
     @State private var lastLoaded = ""
-    /// Passages being revealed as if typed: index → how many characters are shown.
-    /// A passage the agent changed does not appear whole; it is typed out from where
-    /// it diverges from what was there, at a pace that finishes in a couple of
-    /// seconds however long it is. The eye follows a caret where it would not notice
-    /// a paragraph replaced.
-    @State private var typing: [Int: Int] = [:]
+    /// The one passage the caret is in, and the ones waiting their turn.
+    ///
+    /// There is exactly one caret on a page. A write that changes six passages does
+    /// not start six of them typing at once, which is what this used to do and what
+    /// read as six hands on one document. They queue in document order, the caret
+    /// goes to each in turn, and until its turn comes a passage shows what was there
+    /// before the write — nothing at all, for a passage that is new. So the document
+    /// grows a block at a time instead of arriving whole and being typed over.
+    @State private var revealing: Reveal?
+    @State private var pending: [Reveal] = []
     @State private var typist: Task<Void, Never>?
     /// The pictures on the page and when each file last changed.
     @State private var images = ImageStamps()
 
-    /// The typing pace: at least this many characters a frame, and never so slow that
-    /// a passage takes more than `typingFrames` frames — a long paragraph types faster
-    /// rather than for longer, because the agent's next write is seconds away.
-    private static let typingStep = 4
-    private static let typingFrames = 90
-    private static let typingCaret = "▍"
+    /// A passage being typed, or waiting to be: where the caret began and how far it
+    /// has got. It begins where the passage stopped agreeing with what was there
+    /// before, so a rewritten sentence types from the sentence rather than from the
+    /// top of the paragraph.
+    private struct Reveal {
+        var index: Int
+        /// The agreed prefix: what was already on the page when this began.
+        var from: Int
+        /// How many characters are drawn now.
+        var shown: Int
+        /// What this block said before the write. Drawn while it waits its turn, so
+        /// the page goes on looking like the page until the caret reaches it — an
+        /// appended block has nothing here and shows nothing, and a rewritten one
+        /// keeps its old words rather than being cut back to the few characters the
+        /// two versions happen to share.
+        var before: String
+    }
+
+    /// The caret's pace: `typingStep` characters every `typingTick`, fifty a second —
+    /// a quick read. 240 words a minute was tried first and was too slow to sit
+    /// through. Nothing hurries a long block along; what keeps a long document from
+    /// taking a long time is the agent's next write, which completes whatever is still
+    /// on its way rather than racing it.
+    private static let typingTick: Duration = .milliseconds(40)
+    private static let typingStep = 2
 
     /// How long a mark stays before it starts to fade, and how long the fade takes.
     /// Long enough to be found by an eye that was elsewhere; short enough that a
@@ -119,10 +150,17 @@ struct LivePage: View {
                     let (fresh, changed) = images.refreshed()
                     images = fresh
                     guard let first = changed.first else { return }
-                    mark(Array(changed).filter { $0 != editing?.index })
                     guard !isEditing else { return }
                     Task { await go(to: first, proxy: proxy) }
                 }
+                // The view follows the caret from block to block, which is the whole
+                // of what a reader has to do to read along with it. It stays put while
+                // the person is typing, the same as every other move this page makes.
+                .onChange(of: revealing?.index) { _, new in
+                    guard let new, !isEditing else { return }
+                    Task { await go(to: new, proxy: proxy) }
+                }
+                .onDisappear { complete() }
                 .task(id: line) {
                     guard let line, let index = Passage.index(containing: line, in: passages) else { return }
                     await go(to: index, proxy: proxy)
@@ -139,7 +177,12 @@ struct LivePage: View {
         return Group {
             if editing?.index == index {
                 VStack(alignment: .leading, spacing: 4) {
-                    PassageEditor(draft: draftBinding, onCommit: commit, onClose: close)
+                    PassageEditor(draft: draftBinding, onCommit: commit, onClose: {
+                        // Only this passage's editor may close itself. Focus leaving it
+                        // because another passage was opened arrives after that one is
+                        // open, and must not close it.
+                        if editing?.index == index { close() }
+                    })
                     if let saveProblem {
                         Text(saveProblem)
                             .appText(.fine)
@@ -159,7 +202,8 @@ struct LivePage: View {
                 Button {
                     begin(index)
                 } label: {
-                    MarkdownText(markdown: shown(index), base: url)
+                    MarkdownText(markdown: shown(index), base: url,
+                                 caret: revealing?.index == index ? .agent(agentName) : nil)
                         // A new identity when a picture in it changed on disk,
                         // which is what makes the file be read again rather than
                         // redrawn.
@@ -230,6 +274,10 @@ struct LivePage: View {
         // Opening another passage closes this one, writing it first.
         if editing != nil { close() }
         guard passages.indices.contains(index) else { return }
+        // Opened while the agent's caret is in it, or waiting for it: the person gets
+        // the whole of it at once, and the agent's caret moves on to the next block.
+        pending.removeAll { $0.index == index }
+        if revealing?.index == index { next() }
         editing = Editing(index: index, base: passages[index].source, draft: passages[index].source)
         saveProblem = nil
     }
@@ -257,37 +305,75 @@ struct LivePage: View {
 
     // MARK: Typing it out
 
-    /// What the passage shows right now: all of it, or as much as has been typed
-    /// with a caret after it.
+    /// What the passage shows right now: all of it; or, when the caret is in it, as
+    /// much as has been typed (the caret itself is drawn by `MarkdownText`, with the
+    /// agent's name over it); or, when it is still waiting its turn, only what was
+    /// there before the write.
     private func shown(_ index: Int) -> String {
-        guard let count = typing[index] else { return passages[index].source }
-        return String(passages[index].source.prefix(count)) + Self.typingCaret
+        if let current = revealing, current.index == index {
+            return String(passages[index].source.prefix(current.shown))
+        }
+        if let waiting = pending.first(where: { $0.index == index }) {
+            return waiting.before
+        }
+        return passages[index].source
     }
 
-    /// Begin typing these passages out, each from where it stopped agreeing with
-    /// what was there before at the same place — a rewritten sentence types from the
-    /// sentence, not from the top of the paragraph.
-    private func reveal(_ indices: [Int], previous: [Passage]) {
-        for index in indices where passages.indices.contains(index) {
+    /// Queue these passages to be typed, in document order, and put the caret in the
+    /// first of them. Returns the ones it took, so the caller knows whether the caret
+    /// will take the view there or it has to go by hand.
+    @discardableResult
+    private func reveal(_ indices: [Int], previous: [Passage]) -> Set<Int> {
+        // Whatever is still on its way is completed rather than raced. This is the
+        // rule that keeps one caret on the page: the agent writing again is what
+        // finishes the block being typed, so text never types over text that is
+        // itself still typing.
+        complete()
+        var queue: [Reveal] = []
+        for index in indices.sorted() where passages.indices.contains(index) {
             let new = passages[index].source
             let old = previous.indices.contains(index) ? previous[index].source : ""
             let agreed = zip(old, new).prefix { $0 == $1 }.count
-            typing[index] = min(agreed, max(0, new.count - 1))
+            guard agreed < new.count else { continue }
+            queue.append(Reveal(index: index, from: agreed, shown: agreed, before: old))
         }
-        guard !typing.isEmpty else { return }
+        guard !queue.isEmpty else { return [] }
+        let first = queue.removeFirst()
+        revealing = first
+        pending = queue
+        start()
+        return Set([first.index] + queue.map(\.index))
+    }
+
+    /// Everything on its way is shown whole, now: the caret goes, and every queued
+    /// passage draws in full.
+    private func complete() {
+        typist?.cancel()
+        typist = nil
+        revealing = nil
+        pending = []
+    }
+
+    private func start() {
         typist?.cancel()
         typist = Task {
-            while !Task.isCancelled, !typing.isEmpty {
-                try? await Task.sleep(for: .milliseconds(16))
-                for (index, count) in typing {
-                    guard passages.indices.contains(index) else { typing[index] = nil; continue }
-                    let total = passages[index].source.count
-                    let step = max(Self.typingStep, total / Self.typingFrames)
-                    let next = count + step
-                    typing[index] = next >= total ? nil : next
+            while !Task.isCancelled, revealing != nil {
+                try? await Task.sleep(for: Self.typingTick)
+                guard !Task.isCancelled, var current = revealing else { return }
+                guard passages.indices.contains(current.index) else { next(); continue }
+                current.shown += Self.typingStep
+                if current.shown >= passages[current.index].source.count {
+                    next()
+                } else {
+                    revealing = current
                 }
             }
         }
+    }
+
+    /// The caret has finished a block: on to the next one, or off the page.
+    private func next() {
+        revealing = pending.isEmpty ? nil : pending.removeFirst()
     }
 
     // MARK: Following
@@ -325,9 +411,11 @@ struct LivePage: View {
             lastLoaded = new
             images = ImageStamps.take(passages: passages, base: url)
             guard let first = change.first else { return }
-            mark(Array(change.changed))
-            reveal(Array(change.changed), previous: previous)
-            Task { await go(to: first, proxy: proxy) }
+            let typed = reveal(Array(change.changed), previous: previous)
+            // A block being typed is taken to by the caret, which moves the view to
+            // each one as it reaches it. Only a change with nothing to type — a
+            // deletion — needs the view moved by hand.
+            if typed.isEmpty { Task { await go(to: first, proxy: proxy) } }
             return
         }
         // Somebody else wrote while a passage is open. The draft is carried across:
@@ -349,7 +437,6 @@ struct LivePage: View {
         lastLoaded = merged
         images = ImageStamps.take(passages: passages, base: url)
         editing = Editing(index: index, base: current.draft, draft: current.draft)
-        mark(Array(change.changed).filter { $0 != index })
         reveal(Array(change.changed).filter { $0 != index }, previous: previous)
         if merged != new {
             lastWritten = merged

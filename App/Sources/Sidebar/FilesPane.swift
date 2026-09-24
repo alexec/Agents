@@ -176,7 +176,9 @@ struct FilesPane: View {
                     Divider()
                 }
                 LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
-                         agentID: agent.id, folderEvent: folderEvents)
+                         agentID: agent.id,
+                         agentName: RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID,
+                         folderEvent: folderEvents)
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")

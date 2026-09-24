@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// The four sizes text is drawn at in either app, and the monospace one.
 ///
@@ -70,6 +73,33 @@ enum TextStep {
         case .code: return .subheadline.monospaced()
         }
         #endif
+    }
+}
+
+#if os(macOS)
+extension TextStep {
+    /// The same step for an AppKit text view, which takes an `NSFont` rather than a
+    /// `Font`. Resolved here for the reason every other step is: this is the one place
+    /// a step becomes a size.
+    var nsFont: NSFont {
+        switch self {
+        case .title: return .preferredFont(forTextStyle: .title1)
+        case .reading: return .preferredFont(forTextStyle: .title3)
+        case .supporting: return .preferredFont(forTextStyle: .body)
+        case .fine: return .preferredFont(forTextStyle: .subheadline)
+        case .code: return .monospacedSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .body).pointSize,
+                                                  weight: .regular)
+        }
+    }
+}
+#endif
+
+extension Text {
+    /// A step of the scale on a `Text` that has to stay a `Text` — one resolved inside
+    /// a `GraphicsContext`, or interpolated into another. `appText` returns a view, and
+    /// a text renderer cannot draw a view.
+    func stepped(_ step: TextStep) -> Text {
+        font(step.font)
     }
 }
 
