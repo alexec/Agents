@@ -54,6 +54,13 @@ public actor DaemonCore {
     /// output. In memory and nowhere else: a hold does not survive this process, and a
     /// remembered one could only mislead the next daemon (FR-013, FR-014).
     var lastWakeVerdict: WakeVerdict?
+    /// When the current hold was taken, for `WakeState.since`. Moved only when a hold
+    /// is taken, not on every revise, so it means what it says.
+    var holdingSince: Date?
+    /// The last power reading actually taken, so reporting the charge to a window that
+    /// has just connected costs nothing. Readings happen rarely by design — see the
+    /// guard in `reviseWakefulness`.
+    var lastPowerReading: PowerReading?
 
     /// The four numbers routing turns on. Injected so a test names its own and sleeps
     /// for none of the real ones.

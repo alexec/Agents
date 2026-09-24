@@ -46,7 +46,16 @@ struct ProjectListView: View {
         // numbers to add up in your head, which is the sort of thing you only do after
         // the bill. Pinned rather than scrolled with the projects: it is about all of
         // them, and a list long enough to scroll is exactly when you want it.
-        .safeAreaInset(edge: .bottom) { SpendingRow(selection: $selection) }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                // Above Spending, and a row of its own rather than a second line
+                // inside it: that row is a button into Spending, and why the Mac is
+                // awake is not spending. It is absent entirely when there is nothing
+                // to say, which is most of the time (024 FR-015).
+                WakefulnessRow()
+                SpendingRow(selection: $selection)
+            }
+        }
         // Named only when it is not the ordinary daemon. Two copies of this app can
         // be running against two roots, and an unlabelled window is the one you
         // archive the wrong project in.
@@ -238,5 +247,79 @@ private struct SpendingRow: View {
         if isPicked { return AnyShapeStyle(.primary) }
         return (model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
             .style(or: .secondary)
+    }
+}
+
+/// Why the Mac is not asleep, when it is not asleep because of us.
+///
+/// A machine behaving unusually with no visible cause is how an app loses the benefit of
+/// the doubt. This is the whole of 024's answer to that: it connects two facts the person
+/// can already see separately — an agent is working, and the Mac has not slept.
+///
+/// **Absent, not empty, when there is nothing to say.** Nil `wakeState` (a daemon too old
+/// to know, or one not yet heard from) and a state with neither flag set are drawn the
+/// same way: no row at all. A row that says "not keeping your Mac awake" is a row that
+/// trains people to stop reading the footer.
+private struct WakefulnessRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let state = model.wakeState, state.hasSomethingToSay {
+            // Stacked rather than headline-left/detail-right, which is the shape
+            // `SpendingRow` uses below. That shape wrapped: this column is about
+            // 226pt wide and "Keeping this Mac awake" plus a trailing count is a few
+            // points over, so it broke mid-phrase and read as a mistake. Two lines on
+            // purpose, left-aligned, survives a narrower sidebar too.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: state.isHolding ? "sun.max" : "battery.25")
+                    .foregroundStyle(state.isHolding ? AnyShapeStyle(.secondary)
+                                                     : StateTint.attention.style(or: .secondary))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(headline(state)).fixedSize(horizontal: false, vertical: true)
+                    if let detail = detail(state) {
+                        Text(detail).monospacedDigit().foregroundStyle(.tertiary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .appText(.fine)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
+            .help(help(state))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(help(state))
+        }
+    }
+
+    /// The two situations must not read alike. "Nothing is running" and "running, but
+    /// your battery is low" are different news, and a person who cannot tell them apart
+    /// learns nothing from either (FR-016).
+    private func headline(_ state: DaemonAPI.WakeState) -> String {
+        state.isHolding ? "Keeping this Mac awake" : "Letting this Mac sleep"
+    }
+
+    /// The count lives here rather than in the power assertion's reason, which is
+    /// written once when the verdict moves and would go stale the moment a second agent
+    /// started. This is re-sent whenever anything changes, so it can afford to be exact.
+    private func detail(_ state: DaemonAPI.WakeState) -> String? {
+        if state.isHolding {
+            return state.agentsInFlight == 1 ? "1 working" : "\(state.agentsInFlight) working"
+        }
+        return state.batteryPercent.map { "\($0)%" }
+    }
+
+    private func help(_ state: DaemonAPI.WakeState) -> String {
+        if state.isHolding {
+            let n = state.agentsInFlight
+            return n == 1
+                ? "This Mac will not sleep while 1 agent is mid-turn."
+                : "This Mac will not sleep while \(n) agents are mid-turn."
+        }
+        let charge = state.batteryPercent.map { " The battery is at \($0)%." } ?? ""
+        return "Work is still in flight, but the battery is low, so this Mac is being "
+             + "allowed to sleep." + charge
     }
 }

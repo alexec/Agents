@@ -125,6 +125,15 @@ public enum DaemonAPI {
         // limit is not stopped.
         public static let costState = "cost/state"
         public static let costSetLimits = "cost/setLimits"
+
+        /// Why the Mac is, or is not, being kept awake (024). A question about state,
+        /// which is why it is `wake/state` while the notification below is
+        /// `wake/changed` — the same pairing `cost` uses.
+        ///
+        /// Asked once on connecting: a window opened while a hold is already in place
+        /// has heard no broadcast, and for a long turn would otherwise show nothing
+        /// for half an hour.
+        public static let wakeState = "wake/state"
     }
 
     public enum Notification {
@@ -180,6 +189,11 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+
+        /// The Mac is now being kept awake, or is not. Sent only when the verdict
+        /// moves — `reviseWakefulness` is reached on every streamed token, and a
+        /// notification per token would be a flood (024 FR-015, FR-016).
+        public static let wakeChanged = "wake/changed"
     }
 
     // MARK: Requests

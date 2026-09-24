@@ -480,4 +480,121 @@ struct WakefulnessTests {
         #expect(wake.releases == 0)
         #expect(wake.holds == 0)
     }
+
+    // MARK: US4 — what the window is told
+
+    /// Everything said on `wake/changed`, in order.
+    private final class WakeRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var heard: [DaemonAPI.WakeState] = []
+
+        func attach(to core: DaemonCore) async {
+            await core.setBroadcaster { [weak self] method, params in
+                guard method == DaemonAPI.Notification.wakeChanged, let params,
+                      let state = try? params.decode(DaemonAPI.WakeState.self) else { return }
+                self?.append(state)
+            }
+        }
+
+        private func append(_ state: DaemonAPI.WakeState) {
+            lock.lock(); defer { lock.unlock() }
+            heard.append(state)
+        }
+
+        var all: [DaemonAPI.WakeState] { lock.lock(); defer { lock.unlock() }; return heard }
+        var last: DaemonAPI.WakeState? { all.last }
+        var count: Int { all.count }
+    }
+
+    @Test("The window is told when the verdict moves, and not otherwise")
+    func broadcastOnChangeOnly() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+        let heard = WakeRecorder()
+        await heard.attach(to: core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the window was told about the hold") { heard.last?.isHolding == true }
+
+        let afterHold = heard.count
+        #expect(heard.last?.agentsInFlight == 1)
+
+        // The flood case. `changed(_:)` is what every streamed token reaches, and a
+        // broadcast per token would put a notification on the socket for every word an
+        // agent says. Nothing has moved, so nothing should be said.
+        guard let agent = await core.agent(id) else {
+            Issue.record("the agent vanished"); return
+        }
+        for _ in 0..<8 { await core.changed(agent) }
+        #expect(heard.count == afterHold)
+
+        try await core.stop(id)
+        await eventually("the window was told it was let go") { heard.last?.isHolding == false }
+    }
+
+    @Test("What the window is told about a battery that ran down")
+    func broadcastSaysWhyWhenTheBatteryIsLow() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(Wake.batteryFloorPercent + 30)
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: power, wakefulness: RecordingWakefulness())
+        let heard = WakeRecorder()
+        await heard.attach(to: core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("held while the charge is comfortable") { heard.last?.isHolding == true }
+
+        power.onBattery(Wake.batteryFloorPercent - 3)
+        await core.tickWorkflows(now: Date())
+
+        // The distinction FR-016 exists for. Not holding *and* work still in flight is
+        // a different thing to say from not holding because nothing is running, and the
+        // window cannot tell them apart without this flag.
+        let state = try #require(heard.last)
+        #expect(!state.isHolding)
+        #expect(state.heldBackByBattery)
+        #expect(state.agentsInFlight == 1)
+        #expect(state.batteryPercent == Wake.batteryFloorPercent - 3)
+        #expect(state.hasSomethingToSay)
+
+        try await core.stop(id)
+    }
+
+    @Test("With nothing running there is nothing to say")
+    func idleSaysNothing() async throws {
+        let (locations, _) = try temporary()
+        let core = try core(working(), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: RecordingWakefulness())
+
+        let state = await core.wakeState()
+        #expect(!state.isHolding)
+        #expect(!state.heldBackByBattery)
+        #expect(state.agentsInFlight == 0)
+        // Which is what the row reads to decide to draw nothing at all, rather than a
+        // line saying the Mac is not being kept awake (FR-015).
+        #expect(!state.hasSomethingToSay)
+    }
+
+    @Test("A window that connects mid-hold can ask, and is told")
+    func askingOnConnectFindsAHoldAlreadyInPlace() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: RecordingWakefulness())
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the hold is in place") { await core.wakeState().isHolding }
+
+        // No broadcast was heard by this caller — it is asking, the way a window opened
+        // after the turn began has to. Without `wake/state` it would show nothing until
+        // the verdict next moved, which for a long turn is half an hour.
+        let state = await core.wakeState()
+        #expect(state.isHolding)
+        #expect(state.agentsInFlight == 1)
+        #expect(state.since != nil)
+
+        try await core.stop(id)
+    }
 }

@@ -83,6 +83,12 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// Why the Mac is, or is not, being kept awake (024).
+    ///
+    /// Nil means *not yet heard from*, which is a different fact from *not holding* and
+    /// is drawn the same way — as nothing. It stays nil against a daemon too old to
+    /// know `wake/state`, which is what lets a new window work against an old daemon.
+    public private(set) var wakeState: DaemonAPI.WakeState?
 
     public init() {}
 
@@ -105,6 +111,7 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
+        case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
@@ -129,6 +136,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         default: return nil
@@ -198,6 +206,9 @@ public final class AgentsModel {
         case .costChanged(let state):
             costState = state
 
+        case .wakeChanged(let state):
+            wakeState = state
+
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
 
@@ -266,6 +277,7 @@ public final class AgentsModel {
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
 
     /// What this agent has left before it stops, under the limits as they stand.
     /// Nil when uncapped, when unmeasured, or before the daemon has said.

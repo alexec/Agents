@@ -71,7 +71,9 @@ extension DaemonCore {
         // behalf of another agent's token.
         if !forcePowerRead, let last = lastWakeVerdict, last != .idle { return }
 
-        apply(Wake.verdict(workInFlight: true, power: power.read()))
+        let reading = power.read()
+        lastPowerReading = reading
+        apply(Wake.verdict(workInFlight: true, power: reading))
     }
 
     /// Act on a verdict, and only when it has moved.
@@ -85,6 +87,10 @@ extension DaemonCore {
         lastWakeVerdict = verdict
 
         if verdict.isHolding {
+            // Set before the broadcast below reads it. Only moved when the hold is
+            // *taken*, not on every revise, so "since" means since this hold began and
+            // not since the last time anything was reconsidered.
+            holdingSince = now()
             wakefulness.hold(reason: Self.wakeReason)
             // No count here either, for the reason `wakeReason` gives: this line is
             // written when the *verdict* moves, so a count in it is the count at the
@@ -92,9 +98,15 @@ extension DaemonCore {
             // joined afterwards. The walk found it reading "1 agent" while three ran.
             DaemonLog.shared.write("holding the Mac awake: a turn is in flight")
         } else {
+            holdingSince = nil
             wakefulness.release()
             DaemonLog.shared.write("letting the Mac sleep: \(Self.wakeWords(for: verdict))")
         }
+
+        // Here and only here — the change branch. `reviseWakefulness` is reached on
+        // every token of every stream, so a broadcast on the early-return path would
+        // be a notification per token (T036, FR-015).
+        broadcastWakeState()
     }
 
     /// Let the Mac go, whatever the agents' records still say.
@@ -115,8 +127,46 @@ extension DaemonCore {
         guard lastWakeVerdict?.isHolding == true else { return }
         wakefulness.release()
         lastWakeVerdict = nil
+        holdingSince = nil
         DaemonLog.shared.write("letting the Mac sleep: the daemon is going")
+        // Any window still connected is about to lose the socket anyway, but a window
+        // that outlives this daemon and reconnects to another must not be left showing
+        // a hold that nobody holds.
+        broadcastWakeState()
     }
+
+    /// What the windows are told, and what `wake/state` answers.
+    ///
+    /// Derived fresh every time rather than stored. The count is exact here precisely
+    /// because this can be re-sent as often as it likes — unlike the assertion's reason
+    /// string, which is written once and would go stale (see `wakeReason`).
+    func currentWakeState() -> DaemonAPI.WakeState {
+        let verdict = lastWakeVerdict ?? .idle
+        var heldBack = false
+        // The charge from the last reading we actually took, not a fresh one: this is
+        // called for every window that connects, and asking IOKit here would put a
+        // synchronous read on that path for a number that moves by the minute.
+        var percent = lastPowerReading?.batteryPercent
+        if case .batteryTooLow(let charge) = verdict {
+            heldBack = true
+            // The verdict's own figure wins when there is one, because it is the charge
+            // the decision was made on.
+            percent = charge
+        }
+        return DaemonAPI.WakeState(isHolding: verdict.isHolding,
+                                   agentsInFlight: agentsInFlight,
+                                   heldBackByBattery: heldBack,
+                                   batteryPercent: percent,
+                                   since: verdict.isHolding ? holdingSince : nil)
+    }
+
+    func broadcastWakeState() {
+        broadcast(DaemonAPI.Notification.wakeChanged, currentWakeState())
+    }
+
+    /// The window asking on connect, because it heard no broadcast for a hold that was
+    /// already in place when it opened.
+    public func wakeState() -> DaemonAPI.WakeState { currentWakeState() }
 
     /// What `pmset -g assertions` will show, verbatim.
     ///

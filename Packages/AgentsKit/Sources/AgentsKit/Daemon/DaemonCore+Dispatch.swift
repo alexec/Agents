@@ -181,6 +181,12 @@ extension DaemonCore {
             case DaemonAPI.Method.costState:
                 return .success(try JSONValue.encoding(await costState()))
 
+            // Asked once by a window on connecting. A window opened while a hold was
+            // already in place heard no broadcast, and would otherwise say nothing
+            // about it until the verdict next moved (024 T037).
+            case DaemonAPI.Method.wakeState:
+                return .success(try JSONValue.encoding(await wakeState()))
+
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
                 return .success(try JSONValue.encoding(await setLimits(request)))
