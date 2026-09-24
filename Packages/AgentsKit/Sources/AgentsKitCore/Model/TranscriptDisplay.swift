@@ -67,7 +67,20 @@ extension TranscriptEntry {
             }
         }
         closeRun()
-        return items
+        return withoutSupersededPassingLines(items)
+    }
+
+    /// A passing line is kept only while it is the latest thing on the page.
+    ///
+    /// "Working", "Starting Claude…", "mode is now auto": each is true of the moment it
+    /// was written and of nothing after, and the line that follows it is what makes it
+    /// old. So the newest passing line stays, since nothing has yet superseded it, and
+    /// every earlier one goes. The record keeps them all; this is only what is drawn.
+    static func withoutSupersededPassingLines(_ items: [TranscriptItem]) -> [TranscriptItem] {
+        guard let latest = items.lastIndex(where: \.isDrawn) else { return items }
+        return items.enumerated().compactMap { offset, item in
+            item.isPassing && offset != latest ? nil : item
+        }
     }
 
     /// An update is the same call further along, and it carries only what changed.
@@ -92,6 +105,21 @@ extension TranscriptEntry {
 }
 
 extension TranscriptItem {
+    /// Whether the chat puts anything on the page for this item.
+    ///
+    /// An entry written by a newer build is kept in the record and drawn as nothing,
+    /// so it cannot be the line that makes a passing one old.
+    var isDrawn: Bool {
+        if case .entry(let entry) = self, case .unrecognised = entry.kind { return false }
+        return true
+    }
+
+    /// Whether this item says only where things stand right now.
+    var isPassing: Bool {
+        if case .entry(let entry) = self { return entry.isPassing }
+        return false
+    }
+
     /// The one line a collapsed run shows: what it is doing now.
     public var latestToolCall: ToolCall? {
         if case .toolRun(_, let calls) = self { return calls.last }
@@ -102,5 +130,29 @@ extension TranscriptItem {
     public var hiddenToolCallCount: Int {
         if case .toolRun(_, let calls) = self { return max(0, calls.count - 1) }
         return 0
+    }
+}
+
+extension TranscriptEntry {
+    /// Whether this entry is about a moment rather than about what happened.
+    ///
+    /// The agent starting, the agent working, a mode switched, the runtime being
+    /// brought back: each is superseded by whatever comes next. An ending, an answer
+    /// and a message are not, and stay. One ending is here all the same: an agent
+    /// stopped because the daemon did is picked back up straight after, and once it
+    /// has been, that stop is a moment too.
+    public var isPassing: Bool {
+        switch kind {
+        case .stateChanged(.starting, _), .stateChanged(.running, _):
+            return true
+        case .stateChanged(.stopped, reason: .daemonGone):
+            return true
+        case .optionChanged:
+            return true
+        case .runtimeNote(let text):
+            return RuntimeNote.isPassing(text)
+        default:
+            return false
+        }
     }
 }

@@ -79,4 +79,111 @@ struct TranscriptDisplayTests {
         ])
         #expect(items.count == 3)
     }
+
+    // MARK: - Lines about a moment go once the moment has
+
+    private func state(_ state: AgentState, _ reason: EndedReason? = nil) -> TranscriptEntry {
+        TranscriptEntry(kind: .stateChanged(state, reason: reason))
+    }
+
+    private func note(_ text: String) -> TranscriptEntry {
+        TranscriptEntry(kind: .runtimeNote(text))
+    }
+
+    private func texts(_ items: [TranscriptItem]) -> [String] {
+        items.compactMap { item in
+            guard case .entry(let entry) = item else { return "<tools>" }
+            switch entry.kind {
+            case .stateChanged(let s, let r): return "state:\(s):\(r.map { "\($0)" } ?? "-")"
+            case .optionChanged(let id, let value): return "\(id)=\(value.stringValue ?? "?")"
+            case .unrecognised: return "<unrecognised>"
+            default: return entry.text ?? "?"
+            }
+        }
+    }
+
+    @Test func aPassingLineStaysWhileItIsTheLatestThing() {
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            state(.running),
+        ])
+        #expect(texts(items) == ["do it", "state:running:-"])
+    }
+
+    @Test func aPassingLineGoesOnceAnythingFollowsIt() {
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            state(.running),
+            message("On it"),
+        ])
+        #expect(texts(items) == ["do it", "On it"])
+    }
+
+    @Test func onlyTheNewestOfARunOfPassingLinesStays() {
+        // A restart, as the record has it: the explanation, the ending it explains,
+        // the runtime coming up, the conversation taken back, and work resuming.
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            note(RuntimeNote.stoppedWithDaemon),
+            state(.stopped, .daemonGone),
+            note(RuntimeNote.starting("Claude")),
+            note(RuntimeNote.pickedBackUp),
+            state(.running),
+        ])
+        #expect(texts(items) == ["do it", "state:running:-"])
+    }
+
+    @Test func aModeSwitchIsAMoment() {
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("auto"))),
+            TranscriptEntry(kind: .userMessage("go")),
+            TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("plan"))),
+        ])
+        #expect(texts(items) == ["go", "mode=plan"])
+    }
+
+    @Test func endingsAndExplanationsAreNotMoments() {
+        let items = TranscriptEntry.display([
+            state(.finished, .endTurn),
+            note("Branched from Fix the build."),
+            state(.stopped, .cancelled),
+            state(.waitingOnUser),
+            TranscriptEntry(kind: .permissionAnswered(optionID: "allow", optionName: "Allow")),
+            note("\(RuntimeNote.starting("Claude")) and then some"),
+            message("Done"),
+        ])
+        #expect(items.count == 7, "an ending, a branch, a wait, an answer and a note in its own words all stay")
+    }
+
+    @Test func theDaemonStoppingIsAMomentOnlyOnceItHasBeenPickedBackUp() {
+        // Stopped for good: the line is the last word and stays.
+        let stopped = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            note(RuntimeNote.stoppedWithDaemon),
+            state(.stopped, .daemonGone),
+        ])
+        #expect(texts(stopped) == ["do it", "state:stopped:daemonGone"])
+        // A crash, by contrast, is never a moment: it stays however the story goes on.
+        let crashed = TranscriptEntry.display([
+            state(.stopped, .processDied),
+            message("Back"),
+        ])
+        #expect(texts(crashed) == ["state:stopped:processDied", "Back"])
+    }
+
+    @Test func aLineDrawnAsNothingDoesNotSupersedeAnything() {
+        let items = TranscriptEntry.display([
+            state(.running),
+            TranscriptEntry(kind: .unrecognised(.string("from a newer build"))),
+        ])
+        #expect(texts(items) == ["state:running:-", "<unrecognised>"])
+    }
+
+    @Test func aRunOfToolCallsSupersedesAPassingLine() {
+        let items = TranscriptEntry.display([
+            state(.running),
+            call("t1", "Read the file"),
+        ])
+        #expect(texts(items) == ["<tools>"])
+    }
 }

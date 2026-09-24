@@ -596,7 +596,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "\(runtime.name) is not installed any more.")
         }
-        await record(.runtimeNote("Starting \(runtime.name)…"), for: agent.id)
+        await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
         let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         do {
             return try await connect(session, runtime: runtime, for: agent)
@@ -632,7 +632,7 @@ extension DaemonCore {
                                                   additionalDirectories: agent.additionalDirectories,
                                                   mcpServers: servers,
                                                   meta: meta)
-                await record(.runtimeNote("Picked the conversation back up."), for: agent.id)
+                await record(.runtimeNote(RuntimeNote.pickedBackUp), for: agent.id)
             } catch {
                 // The runtime no longer has it. The agent is not lost: it carries on as
                 // the same agent, with our transcript, in a new runtime session.

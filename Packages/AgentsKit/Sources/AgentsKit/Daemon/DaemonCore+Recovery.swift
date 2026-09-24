@@ -37,8 +37,7 @@ extension DaemonCore {
             let id = agent.id
             // Before the move, so the transcript reads in the order it happened: the
             // explanation, and then the ending it explains.
-            await record(.runtimeNote("This agent was working when the daemon stopped, so it stopped too."),
-                         for: id)
+            await record(.runtimeNote(RuntimeNote.stoppedWithDaemon), for: id)
             // Through the funnel, like every other ending. This is the whole of what
             // 020 closes: the record, the broadcast, the transcript line, the project
             // counts and the triggers all happen here now, because they all hang off
