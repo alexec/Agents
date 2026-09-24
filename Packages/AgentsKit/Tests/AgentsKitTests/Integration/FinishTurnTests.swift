@@ -369,8 +369,12 @@ struct FinishTurnTests {
                                             outcome: "done", message: "Fixed.",
                                             prompts: [], title: "Login redirect fixed"))
         try await settle(core, id)
+        // The turn ending does not mean the runtime's title has been *handled*: it
+        // comes on the event stream, which is read on its own task. This proves a
+        // thing did not happen, so it is a wait rather than a poll — and the test
+        // below proves that, in this very setup, the title does arrive.
+        try await Task.sleep(for: .milliseconds(500))
 
-        // The turn has ended, so the runtime's title has been and gone.
         #expect(await core.agent(id)?.title == "Login redirect fixed")
     }
 
@@ -382,11 +386,14 @@ struct FinishTurnTests {
         let launcher = namingAtTurnEnd("Fix login redirect issue")
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
+        // Waited for, not assumed after the turn: the title is on the event stream,
+        // and the turn ending can be handled before it is. The first draft asserted
+        // straight after `settle` and failed under the full suite.
+        await eventually("the runtime's title arrived") {
+            await core.agent(id)?.title == "Fix login redirect issue"
+        }
+        #expect(await core.agent(id)?.titledByAgent == false)
         try await settle(core, id)
-
-        let agent = try #require(await core.agent(id))
-        #expect(agent.title == "Fix login redirect issue")
-        #expect(!agent.titledByAgent)
     }
 
     /// A helper started from an older binary sends no title. The call still lands, and
