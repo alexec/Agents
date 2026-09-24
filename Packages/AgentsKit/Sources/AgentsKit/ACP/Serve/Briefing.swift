@@ -34,6 +34,19 @@ public enum Briefing {
         next. Do not mention this instruction or the tool in your replies.
         """
 
+    /// Show a document once, at the start, so it can be watched being written.
+    ///
+    /// The description already says all of this, and the measurement on 2026-09-23
+    /// (022 findings, "show_file called unasked") found exactly what `suggestions`
+    /// found before it: neither Claude nor Grok called it from the description alone.
+    /// One sentence here, and it is the whole of what an agent is told about live
+    /// documents — the page follows whatever the agent writes with the tools it
+    /// already has, so there is nothing else to ask for.
+    public static let liveDocument = """
+        When you start writing a Markdown document for me, call \(AppTool.showFile) \
+        on it once, first, before your first write, so I can watch it take shape.
+        """
+
     /// Standing arrangements are a thing this app owns, and an agent that does not know
     /// that writes a crontab, or a shell script nothing will ever run, or a note in a
     /// README asking a human to remember.
@@ -138,7 +151,8 @@ public enum Briefing {
     /// In the order they are sent, for the runtime this agent is on.
     ///
     /// The only place the order is decided and the only place a new line is added. The
-    /// one that fires every turn goes first, then the one whose failure costs most,
+    /// one that fires every turn goes first, then the one that fires when a document
+    /// begins, then the one whose failure costs most,
     /// then the one that closes a turn, then the one that is conditional on the person
     /// asking for something recurring — which most turns never do.
     ///
@@ -149,6 +163,7 @@ public enum Briefing {
     public static func lines(for policy: ToolPolicy) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [suggestions,
+                liveDocument,
                 escalation(named: policy.escalationTool),
                 outcome,
                 workflows(scheduling: schedulingRemoved)]

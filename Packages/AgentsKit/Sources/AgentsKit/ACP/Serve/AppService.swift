@@ -267,9 +267,18 @@ public actor AppService {
             follow what you are saying: the function you are about to change, the \
             config that explains the failure, the test that is wrong.
 
-            It shows; it does not edit, select or run anything, and the pane it opens \
-            in is read-only. The file has to be inside the folders this agent was \
-            given, and has to exist.
+            A Markdown file opens as a page the person reads and can type on, and the \
+            page follows your edits: each time you change the file, the page shows \
+            what changed and goes there. So when you begin writing a document, show \
+            it once, at the start, and then just write — a Markdown file does not \
+            have to exist yet; the page opens empty and fills as you write it. A \
+            line you name on a Markdown file takes them to the part of the page that \
+            holds it. For a diagram or a graph, write an SVG file beside the \
+            document and reference it as an image.
+
+            It shows; it does not edit, select or run anything. Any other file has \
+            to exist, and every file has to be inside the folders this agent was \
+            given.
 
             Not for every file you touch. Files you changed are already marked in that \
             pane, and every edit you make is already in the conversation, so calling \

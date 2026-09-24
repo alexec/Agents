@@ -119,6 +119,33 @@ struct ShowFileTests {
         #expect(await heard.first(DaemonAPI.Notification.agentShowFile) == nil)
     }
 
+    /// 022: a Markdown file is a page that fills as it is written, so showing it
+    /// before the first write is the right moment, not a mistake. The folder has to
+    /// be there; the file does not.
+    @Test func aMarkdownFileNotYetWrittenIsShownEmpty() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let heard = Broadcasts()
+        let core = try await core(launcher, locations: locations, watching: heard)
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        let path = work.appendingPathComponent("notes.md").path
+        let reply = try await core.showFile(.init(token: await mintedToken(launcher),
+                                                  file: ShownFile(path: path)))
+        #expect(reply.contains("empty"))
+        #expect(reply.contains("fill"))
+        let sent = await heard.wait(for: DaemonAPI.Notification.agentShowFile)
+        #expect(sent?["file"]?["path"]?.stringValue == path)
+
+        // But not in a folder that is not there: that is a path the agent cannot
+        // write to either, and the page would wait for ever.
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.showFile(.init(
+                token: await mintedToken(launcher),
+                file: ShownFile(path: work.appendingPathComponent("nowhere/notes.md").path)))
+        }
+    }
+
     @Test func aFolderIsNotAFile() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()

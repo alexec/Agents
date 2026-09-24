@@ -23,6 +23,7 @@ struct BriefingTests {
     /// it is called; an agent told the name can call it.
     @Test func theToolsItNamesAreNamedExactly() {
         #expect(Briefing.suggestions.contains(AppTool.suggestPrompts))
+        #expect(Briefing.liveDocument.contains(AppTool.showFile))
         #expect(Briefing.workflows(scheduling: false).contains(AppTool.manageWorkflows))
         #expect(Briefing.workflows(scheduling: true).contains(AppTool.manageWorkflows))
     }
@@ -90,8 +91,10 @@ struct BriefingTests {
     /// words about it go too, so three of the four now read shorter than they did.
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
-            #expect(Briefing.text(for: policy).count < 1_500)
-            #expect(Briefing.lines(for: policy).count <= 5)
+            // 022 added the live-document line: one sentence, and the ceiling moved
+            // by about its length rather than being left with no room at all.
+            #expect(Briefing.text(for: policy).count < 1_650)
+            #expect(Briefing.lines(for: policy).count <= 6)
         }
     }
 

@@ -158,9 +158,21 @@ extension DaemonCore {
                                message: scope.refusal(for: request.file.path))
         }
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: request.file.path, isDirectory: &isDirectory) else {
-            throw JSONRPCError(code: JSONRPCError.invalidParams,
-                               message: "There is no file at \(request.file.path).")
+        let exists = FileManager.default.fileExists(atPath: request.file.path, isDirectory: &isDirectory)
+        // A Markdown file is a page that fills as it is written (022), so an agent
+        // may show it before its first write — that is exactly when it should. The
+        // folder it will go in has to be there, or the agent is naming a place it
+        // cannot write to either. Anything else still has to exist: a source file
+        // that is not there is a mistake, not a page about to begin.
+        if !exists {
+            let folder = request.file.url.deletingLastPathComponent().path
+            var folderIsDirectory: ObjCBool = false
+            guard request.file.isMarkdown,
+                  FileManager.default.fileExists(atPath: folder, isDirectory: &folderIsDirectory),
+                  folderIsDirectory.boolValue else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams,
+                                   message: "There is no file at \(request.file.path).")
+            }
         }
         guard !isDirectory.boolValue else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
@@ -175,6 +187,13 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.agentShowFile,
                   DaemonAPI.ShowFileNotification(agentID: agentID, file: request.file))
         let place = request.file.line.map { " at line \($0)" } ?? ""
+        guard exists else {
+            return """
+                \(request.file.name) is open, empty, in the files pane beside this \
+                conversation, and will fill as you write it. Just write; do not paste \
+                the file back.
+                """
+        }
         return """
             \(request.file.name) is open\(place) in the files pane beside this \
             conversation. Say what they are looking at; do not paste the file back.

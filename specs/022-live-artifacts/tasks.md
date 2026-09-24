@@ -73,7 +73,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [X] T015 [US1] In `FilesPane.swift`, change the `FolderWatch` callback so that when the open file's re-read produces the **same** text, nothing is republished (a build touching a sibling file must not mark the page). Compare on the probe's text, not the file's date.
 - [X] T016 [US1] Update `App/Sources/Sidebar/DocumentView.swift`'s doc comment: it is now the renderer `LivePage` was grown from, kept for the `Remote` target's use and for nothing on the Mac; if nothing on the Mac references it after T014, delete the Mac copy rather than leaving two.
 - [X] T017 [US1] `xcodegen generate`, then `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build` and `swift test --package-path Packages/AgentsKit`. Both clean.
-- [ ] T018 [US1] **The gate.** Walk quickstart Slice A in the built app under `env -i … open -n … --args --root /tmp/agents-022`: an agent writes `notes.md` in four steps with `show_file` called first. Screenshot each step to `specs/022-live-artifacts/walk/A-<n>.png`. Then drag the sidebar to 900 pt and screenshot. Write what was seen at the foot of this file under "Slice A walk" — whether the page reads as paper, whether the marks land on the right passage, whether it follows, and whether it wants a window of its own. **Do not begin Phase 4 until this is written and Alex has seen the screenshots.**
+- [X] T018 [US1] **The gate.** Walk quickstart Slice A in the built app under `env -i … open -n … --args --root /tmp/agents-022`: an agent writes `notes.md` in four steps with `show_file` called first. Screenshot each step to `specs/022-live-artifacts/walk/A-<n>.png`. Then drag the sidebar to 900 pt and screenshot. Write what was seen at the foot of this file under "Slice A walk" — whether the page reads as paper, whether the marks land on the right passage, whether it follows, and whether it wants a window of its own. **Do not begin Phase 4 until this is written and Alex has seen the screenshots.**
 
 **Checkpoint**: The page is live and follows. US1 is deliverable on its own.
 
@@ -85,12 +85,12 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 
 **Independent Test**: quickstart Slice B — "show me the Plan section" lands on that passage on the page; a line past the end lands on the last passage; a fresh conversation asked for a document opens the page by itself, or does not, and that is recorded.
 
-- [ ] T019 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AppServiceTests.swift`, extend `everyToolIsListedWithASchemaTheAgentCanFill` (or add `theShowFileSchemaHasNotGrown`) to assert `show_file`'s `inputSchema.properties` has exactly the keys `path` and `line` and `required == ["path"]`, with a comment citing [contracts/show-file-tool.md](./contracts/show-file-tool.md): the schema is the contract and an argument added here is a contract change.
-- [ ] T020 [P] [US1] In `AppServiceTests.swift`, add a test that `show_file`'s description contains the phrases "opens as a page", "follows your edits" and "show it once", so the sentence cannot be edited away without the test saying so.
-- [ ] T021 [US1] In `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppService.swift`, replace `showFileTool`'s description with the four paragraphs in [contracts/show-file-tool.md](./contracts/show-file-tool.md) — the second paragraph is the whole change; the schema is not touched. Update the `showFile` reply in `DaemonCore+AppTools.swift` only if its wording no longer matches the contract's "Result text" (it should already).
+- [X] T019 [P] [US1] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AppServiceTests.swift`, extend `everyToolIsListedWithASchemaTheAgentCanFill` (or add `theShowFileSchemaHasNotGrown`) to assert `show_file`'s `inputSchema.properties` has exactly the keys `path` and `line` and `required == ["path"]`, with a comment citing [contracts/show-file-tool.md](./contracts/show-file-tool.md): the schema is the contract and an argument added here is a contract change.
+- [X] T020 [P] [US1] In `AppServiceTests.swift`, add a test that `show_file`'s description contains the phrases "opens as a page", "follows your edits" and "show it once", so the sentence cannot be edited away without the test saying so.
+- [X] T021 [US1] In `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppService.swift`, replace `showFileTool`'s description with the four paragraphs in [contracts/show-file-tool.md](./contracts/show-file-tool.md) — the second paragraph is the whole change; the schema is not touched. Update the `showFile` reply in `DaemonCore+AppTools.swift` only if its wording no longer matches the contract's "Result text" (it should already).
 - [ ] T022 [US1] Walk quickstart Slice B steps 1 and 2 in the built app. Record at the foot of this file whether the passage landed on was the right one.
-- [ ] T023 [US1] **Measurement.** Walk quickstart Slice B step 3 with Claude and with one of Grok, Copilot or Cursor: a fresh conversation, "write me a short design note as notes.md", nothing said about showing it. Fill the findings row "`show_file` called unasked at the start of a document" in `specs/022-live-artifacts/findings.md` per runtime.
-- [ ] T024 [US1] Only if T023 found no runtime calls it: add `public static let liveDocument` to `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` with the sentence in the contract's "Briefing" section, append it in `Briefing.text(for:)` after `suggestions`, extend `BriefingTests.everyLineIsInTheBlockThatIsSent` and `itStaysShortEnoughToBeRead`, and re-run T023's measurement once. Record both results in the same findings row.
+- [X] T023 [US1] **Measurement.** Walk quickstart Slice B step 3 with Claude and with one of Grok, Copilot or Cursor: a fresh conversation, "write me a short design note as notes.md", nothing said about showing it. Fill the findings row "`show_file` called unasked at the start of a document" in `specs/022-live-artifacts/findings.md` per runtime.
+- [X] T024 [US1] Only if T023 found no runtime calls it: add `public static let liveDocument` to `Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift` with the sentence in the contract's "Briefing" section, append it in `Briefing.text(for:)` after `suggestions`, extend `BriefingTests.everyLineIsInTheBlockThatIsSent` and `itStaysShortEnoughToBeRead`, and re-run T023's measurement once. Record both results in the same findings row.
 
 **Checkpoint**: Nothing the agent is given has changed but words, and the findings say whether words were enough.
 
@@ -253,6 +253,14 @@ app is running against `/tmp/agents-022`; the conversation is open with Files sh
 `notes.md`.
 
 ### Slice B walk
+
+*2026-09-23.* The measurement (T023) was run over the scratch daemon's socket with the
+window connected, once per runtime, before and after the briefing line: see the findings row.
+The daemon change this walk needed first — a Markdown file may be shown before it exists —
+is in `showFile` with its test. Step 1 of the quickstart, asked over the socket, produced no
+`show_file` call at all: Claude read the file and pasted the Plan section into its reply.
+So the visual half of step 1, and step 2 (a line past the end), are still to be seen on
+screen, and T022 stays open for that.
 
 ### Slice C walk
 

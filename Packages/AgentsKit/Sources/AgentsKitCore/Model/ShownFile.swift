@@ -26,6 +26,16 @@ public struct ShownFile: Codable, Hashable, Sendable {
     public var url: URL { URL(filePath: path) }
     public var name: String { url.lastPathComponent }
 
+    /// Whether the files pane will show this as a live page (022) rather than as
+    /// numbered source. One list, here, so the daemon and the pane agree on it.
+    public var isMarkdown: Bool { Self.isMarkdown(url) }
+
+    public static let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
+
+    public static func isMarkdown(_ url: URL) -> Bool {
+        markdownExtensions.contains(url.pathExtension.lowercased())
+    }
+
     /// What an agent sent, made fit to use, or nothing.
     ///
     /// Stricter than `SuggestedPrompt`, which forgives a bad entry because the row is

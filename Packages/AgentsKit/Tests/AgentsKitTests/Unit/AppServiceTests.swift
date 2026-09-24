@@ -65,6 +65,13 @@ struct AppServiceTests {
         // The line is the optional half: an agent that only knows the file still has
         // a call it can make.
         #expect(showFile?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["path"])
+        // And nothing else. 022 made a Markdown file a live page and changed nothing
+        // the agent is given but the description: a line lands on the passage that
+        // holds it, so there is no `heading`, and the contract in
+        // specs/022-live-artifacts/contracts/show-file-tool.md says the schema is not
+        // to grow. An argument added here is a contract change, and this is what
+        // says so.
+        #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["line", "path"])
 
         let workflows = tools[2]["inputSchema"]
         #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?
@@ -229,6 +236,20 @@ struct AppServiceTests {
         #expect(await box.file?.line == 12)
         #expect(result["isError"]?.boolValue == false)
         #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == "README.md is open at line 12.")
+        await service.close()
+    }
+
+    /// The one thing 022 gives the agent is a sentence. The description is what an
+    /// agent reads when it reaches for the tool, and these are the words that make a
+    /// Markdown file a page it shows once and then writes on.
+    @Test func theShowFileDescriptionSaysAMarkdownFileIsALivePage() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        let result = try await client.call("tools/list", .object([:]))
+        let description = result["tools"]?.arrayValue?[1]["description"]?.stringValue ?? ""
+        #expect(description.contains("opens as a page"))
+        #expect(description.contains("follows your edits"))
+        #expect(description.contains("show it once"))
+        #expect(description.contains("does not have to exist yet"))
         await service.close()
     }
 

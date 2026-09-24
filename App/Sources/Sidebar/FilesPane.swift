@@ -141,7 +141,22 @@ struct FilesPane: View {
 
     @ViewBuilder
     private func fileView(_ url: URL) -> some View {
-        if let fileProblem {
+        if let fileProblem, isMarkdown(url) {
+            // A page, not a `Gone`. Before the first write the agent has shown a
+            // file that is not there yet, and the page opens empty and fills when it
+            // appears; after a delete, the page keeps the last content it had, so
+            // nothing the person was reading vanishes. Said in a line either way.
+            VStack(alignment: .leading, spacing: 0) {
+                Text(probe == nil ? "Not written yet. It will appear here as it is." : fileProblem)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                Divider()
+                LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
+                         isEditing: false)
+            }
+        } else if let fileProblem {
             Gone(message: fileProblem)
         } else if let probe {
             switch probe.kind {
@@ -255,7 +270,9 @@ struct FilesPane: View {
             probe = fresh
             fileProblem = nil
         } catch FileProbe.Failure.gone {
-            probe = nil
+            // A Markdown page keeps what it last had (022); source has nothing to
+            // keep that the listing does not say better.
+            if !isMarkdown(url) { probe = nil }
             fileProblem = "\(url.lastPathComponent) is not there any more."
         } catch FileProbe.Failure.notReadable {
             probe = nil
@@ -266,12 +283,8 @@ struct FilesPane: View {
         }
     }
 
-    /// Prototype stand-in for `DocumentKind`, which the plan puts in the kit with the
-    /// binary check and the tests. Here so the surface can be looked at; not here for
-    /// long.
-    private func isMarkdown(_ url: URL) -> Bool {
-        ["md", "markdown", "mdown", "mkd"].contains(url.pathExtension.lowercased())
-    }
+    /// The kit's list, so the daemon's idea of a page and the pane's are one.
+    private func isMarkdown(_ url: URL) -> Bool { ShownFile.isMarkdown(url) }
 
     /// Folded from the transcript the window is holding. It grows as entries arrive,
     /// and as earlier pages are loaded, which is why it is recomputed rather than
