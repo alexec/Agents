@@ -165,7 +165,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [X] T052 [US3] Add `public static func artifactEdited(_ edits: [ArtifactEdit]) -> String?` to `Briefing.swift` producing the contract's wording, grouped by path in first-seen order, blocks in `lines` order, the first 20 then the "…and more" line. Until T048 passes.
 - [X] T053 [US3] In `DaemonCore+Commands.swift` `beginTurn`, after the briefing append at the `needsBriefing` line: `if let note = Briefing.artifactEdited(artifactEdits[agentID] ?? []) { outgoing.append(.text(note)); artifactEdits[agentID] = nil }`. Only for `from == .person`? **No** — a workflow's prompt should carry it too; the agent needs to know either way. Until T049 passes.
 - [X] T054 [US3] Add `artifactEdits[agentID] = nil` wherever `dropAppTokens(for:)` is called on an agent's removal, so a deleted agent's notes do not linger.
-- [ ] T055 [US3] Build, test, walk quickstart Slice F step 1 with Claude, and step 2 (an edit mid-turn) with every installed runtime. Fill the findings rows "The turn note reaching the agent", "The agent respecting the note" and "Mid-turn edit: runtime's own stale-file guard" per runtime in `findings.md`. If any runtime overwrote the person's mid-turn edit, write one paragraph under "What the real feature needs" saying so — that is the one place a real tool might earn its place.
+- [X] T055 [US3] Build, test, walk quickstart Slice F step 1 with Claude, and step 2 (an edit mid-turn) with every installed runtime. Fill the findings rows "The turn note reaching the agent", "The agent respecting the note" and "Mid-turn edit: runtime's own stale-file guard" per runtime in `findings.md`. If any runtime overwrote the person's mid-turn edit, write one paragraph under "What the real feature needs" saying so — that is the one place a real tool might earn its place.
 
 **Checkpoint**: The agent is told. US3 complete.
 
@@ -289,5 +289,12 @@ in `DaemonCore+Artifacts.swift`, and `Briefing.ArtifactEdit`, without one, so th
 is testable with no daemon in the room. T054 turned out to have no site: the daemon never
 removes an agent's record, only its session, and the note must survive a session ending —
 the person may edit while the agent is idle and prompt it an hour later.
+
+*The measurement (T055), over the scratch socket with a script answering write
+permissions:* between turns, all four runtimes kept the person's passage on their next
+write (4/4). Mid-turn, Claude, Grok and Cursor overwrote it (0/3); Copilot re-read the file
+after its pause and then stopped before writing again, which is not a merge. Full rows in
+`findings.md`. Grok's writes pass through the daemon's `fs/write_text_file`, which is the
+one place a merge on the way to disk could live without the agent's help.
 
 ### Success criteria

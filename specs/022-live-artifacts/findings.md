@@ -11,8 +11,10 @@ again.
 
 | Runtime | Date | Slices |
 |---|---|---|
-| Claude | 2026-09-23 | A (page seen, follow not yet), B measurement |
-| Grok | 2026-09-23 | B measurement |
+| Claude | 2026-09-23 | A (page seen, follow not yet), B, F measurements over the socket |
+| Copilot | 2026-09-23 | F measurement over the socket |
+| Cursor | 2026-09-23 | F measurement over the socket |
+| Grok | 2026-09-23 | B and F measurements over the socket, write permissions answered by a script |
 
 ## Capabilities
 
@@ -24,10 +26,10 @@ again.
 | Marks placed on the right passage | | | |
 | The person's edit surviving an agent write elsewhere | | | |
 | The collision card | | | |
-| The turn note reaching the agent, next turn | | | |
-| The agent respecting the note (not restoring its text) | | | |
-| Mid-turn edit: runtime's own stale-file guard | | | |
-| A "what changed since I wrote" tool, callable mid-turn | not built | | |
+| The turn note reaching the agent, next turn | measured 2026-09-23 | Daemon tests show the block goes out after the person's words, once, and not into the transcript. Live, over the scratch socket: a passage of `between-claude.md` replaced by `artifact/write` between turns, then "continue with one more section" — the agent's write kept the edit and added the section (Claude 1/1, Grok 1/1, Copilot 1/1, Cursor 1/1; Grok's write permission answered over the socket). | Works. Whether the agent kept it because of the note or because it re-read the file first is not separable from outside; either is the behaviour wanted. |
+| The agent respecting the note (not restoring its text) | measured 2026-09-23 | Claude, Grok, Copilot and Cursor, 1/1 each: the original paragraph did not come back. (Grok asks permission for every write and the first run stalled at `waitingOnUser` until the permission was answered over the socket.) | Holds for both. |
+| Mid-turn edit: runtime's own stale-file guard | measured 2026-09-23 | Claude and Grok, each asked to write a file in three separate writes with a `sleep 25` between: a passage replaced by `artifact/write` after the first write was **overwritten** by the second (Claude 0/1, Grok 0/1, Cursor 0/1 survived). All three write the whole file from their own version; no guard fired in any. Copilot is the odd one: after its `sleep` it **viewed the file again** before the next write, then its shell steps failed and it ended the turn without writing more — so the edit "survived" by the turn ending, not by a merge, and whether Copilot would have honoured what it re-read is not known. Grok's write went through the daemon's own `fs/write_text_file`, so the daemon saw the overwrite go by and could have merged; Claude's did not pass through anything of ours. | **This is where a tool would earn its place.** A whole-file write mid-turn cannot know the file moved. Either the agent is told mid-turn (a tool it can call, or a tool result that carries the change), or the daemon merges the person's passages back into the agent's write on the way to disk — which for Grok it could, since it serves the write; for Claude it cannot. |
+| A "what changed since I wrote" tool, callable mid-turn | not built | The mid-turn row above is the evidence: with no way to learn of the person's edit inside a turn, Claude overwrote it. Between turns the note suffices. | Needed for the real feature, in one of two shapes: a tool the agent calls before each write, which it will not call unasked (see suggestions and show_file); or the app merging on the way to disk, which needs the write to pass through the app and only Grok's does. The second is the stronger, because it does not depend on the agent remembering. |
 | Passage-level editing as the shape of editing | | | |
 | The sidebar as the page's home vs a window of its own | | | |
 | Finer-grained agent edits (replace section, append) | not built | | |
