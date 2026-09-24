@@ -44,6 +44,17 @@ public actor DaemonCore {
     var mailboxTail: Task<Void, Never>?
     /// The last write of an agent's record, so the next one goes after it.
     var saveTail: Task<Void, Never>?
+    /// What the machine says about its own power, and the claim on its idle sleep.
+    /// Injected together so a test can cross the battery floor without a laptop and
+    /// assert on holds without touching the real one (024).
+    let power: any PowerSource
+    let wakefulness: any Wakefulness
+    /// The last verdict acted on, so `reviseWakefulness` can do nothing when nothing
+    /// moved. It is called from `changed(_:)`, which runs on every token of streamed
+    /// output. In memory and nowhere else: a hold does not survive this process, and a
+    /// remembered one could only mislead the next daemon (FR-013, FR-014).
+    var lastWakeVerdict: WakeVerdict?
+
     /// The four numbers routing turns on. Injected so a test names its own and sleeps
     /// for none of the real ones.
     let thresholds: AttentionThresholds
@@ -232,7 +243,9 @@ public actor DaemonCore {
                 launcher: (any SessionLauncher)? = nil,
                 now: (@Sendable () -> Date)? = nil,
                 thresholds: AttentionThresholds = .standard,
-                mailbox: (any Mailbox)? = nil) {
+                mailbox: (any Mailbox)? = nil,
+                power: (any PowerSource)? = nil,
+                wakefulness: (any Wakefulness)? = nil) {
         self.store = store
         self.locations = locations
         self.discovery = discovery
@@ -240,6 +253,8 @@ public actor DaemonCore {
         self.now = now ?? { Date() }
         self.thresholds = thresholds
         self.mailbox = mailbox
+        self.power = power ?? IOKitPowerSource()
+        self.wakefulness = wakefulness ?? ProcessInfoWakefulness()
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.
@@ -305,6 +320,16 @@ public actor DaemonCore {
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
         projectChanged(forAgentIn: agent.cwd)
+        // Here and **not** in `move(_:on:)`, though that is the single transition
+        // writer and the tidier-looking hook. An agent is created with
+        // `agents[agent.id] = agent` directly in `start(_:)` before any transition
+        // exists, so a hook on `move` alone would miss every agent's `starting`
+        // moments — which FR-002 counts as work in flight.
+        //
+        // This runs on every token of streamed output, which is why
+        // `reviseWakefulness` compares before acting and returns doing nothing when
+        // nothing has moved (024 FR-001, FR-004).
+        reviseWakefulness()
     }
 
     /// Each write waits for the one before it. Separate tasks reach the store in no
