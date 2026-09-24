@@ -248,6 +248,11 @@ follow, because the second prompt (four more writes) was typed while Alex was us
 and never reached the agent. `walk/A-project-page-while-writing.png` is what the person saw
 while the agent wrote: the project page, nothing live.
 
+*2026-09-24.* The typed reveal (T016b) is built and the scratch app relaunched on it, but the
+Mac was locked, so nobody has yet watched a passage type itself. Two things to look for: whether
+a half-typed `**bold` or `## heading` flickers as the marks close, and whether the caret and
+the tint together are too much — the caret may be enough on its own.
+
 Still to see before the gate: four more writes with the page open — the tint landing on the
 changed passage, the view moving to it, and the jump back to the first paragraph. The scratch
 app is running against `/tmp/agents-022`; the conversation is open with Files showing
