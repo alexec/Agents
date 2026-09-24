@@ -76,6 +76,12 @@ The window says which one it is in the title of its projects column, when it is 
 ordinary one. Keep the path short: a Unix socket may be named with 104 bytes and no
 more, and a root nested a few folders deep will say so rather than fail quietly.
 
+That is also how an agent working on this repository tries its own change: the `run-app`
+skill under `.claude/skills` builds, launches a copy on a root of its own, drives it over
+that root's socket — every method the window has — screenshots the window without taking
+the screen off you, and stops the window and its daemon afterwards. Nothing it does
+reaches the agents you are running.
+
 ## What the app does with a runtime
 
 Everything the protocol defines, decided by what each runtime advertises rather than by
