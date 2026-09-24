@@ -5,7 +5,8 @@ import Testing
 
 /// An agent saying, at the end, how the work actually went.
 ///
-/// The fourth tool on the app's own MCP server. These are the daemon's half: that a
+/// The older name for the outcome half of `finish_turn`, still served (023). These
+/// are the daemon's half of it, and they are never edited: that a
 /// report moves the agent into the group its outcome names, that the person's next
 /// prompt settles it, and that a report nobody can honour is refused in a sentence
 /// rather than a code.

@@ -262,7 +262,7 @@ extension DaemonCore {
         changed(agent)
     }
 
-    /// Answer the permission question for our own tools ourselves.
+    /// Answer the permission question for the app's own tools ourselves.
     ///
     /// Copilot asks before every tool call, including these. A sheet asking whether
     /// the app may show the app's own suggestions is a question with no information in
@@ -276,7 +276,9 @@ extension DaemonCore {
     /// also the thing that stopped an agent dead whenever nobody was looking. The
     /// answer is after the fact instead: a workflow is written, appears on the project
     /// page, and can be archived there by somebody who can see what it does.
-    /// Allowed only where the runtime offered allowing it, and only for these three.
+    /// Allowed only where the runtime offered allowing it, and only for the app's
+    /// own tools — the one that ends a turn, the two that act mid-turn, and the two
+    /// older names.
     func autoAllowed(_ request: PermissionRequest) -> PermissionOption? {
         guard request.toolCall.isAutoAllowable else { return nil }
         return request.options.first { $0.kind == .allowAlways }

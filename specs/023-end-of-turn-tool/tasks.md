@@ -144,11 +144,11 @@ Three lanes share this tree. If the package will not build, `git worktree add --
 
 **Purpose**: The comments that still say "four tools", the by-eye walk, and the record.
 
-- [ ] T039 [P] `grep -rn "four tools\|fourth\|three tools\|All three" Packages/AgentsKit/Sources Daemon/Sources` and fix every comment that counts the app's tools, including the `AppService` header ("This speaks MCP itself... it is four methods of JSON-RPC" is about MCP methods and stays), `AppTool.swift`'s "And the fourth", and the `autoAllowed` comment in `DaemonCore+AppTools.swift`
-- [ ] T040 [P] In `specs/014-agent-outcomes/contracts/agent-tool.md`, add a one-line note at the top: superseded by 023's `finish_turn`; `report_outcome` remains as an alias with this contract
-- [ ] T041 Run the full suite `swift test --package-path Packages/AgentsKit` and both app builds (`xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, then the Remote scheme, sequentially per memory). Record the counts at the foot of this file. The two flaky tests named in memory (`stoppingAnAgentBeforeItIsPickedUpWithdrawsIt`, `aConversationResumedAfterARestartIsNotBriefedAgain`) are pre-existing
+- [x] T039 [P] `grep -rn "four tools\|fourth\|three tools\|All three" Packages/AgentsKit/Sources Daemon/Sources` and fix every comment that counts the app's tools, including the `AppService` header ("This speaks MCP itself... it is four methods of JSON-RPC" is about MCP methods and stays), `AppTool.swift`'s "And the fourth", and the `autoAllowed` comment in `DaemonCore+AppTools.swift`
+- [x] T040 [P] In `specs/014-agent-outcomes/contracts/agent-tool.md`, add a one-line note at the top: superseded by 023's `finish_turn`; `report_outcome` remains as an alias with this contract
+- [x] T041 Run the full suite `swift test --package-path Packages/AgentsKit` and both app builds (`xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`, then the Remote scheme, sequentially per memory). Record the counts at the foot of this file. The two flaky tests named in memory (`stoppingAnAgentBeforeItIsPickedUpWithdrawsIt`, `aConversationResumedAfterARestartIsNotBriefedAgain`) are pre-existing
 - [ ] T042 Walk `quickstart.md` check 7 by eye: launch the app with `env -i … open`, run one short turn on Claude, and confirm chips above the prompt, the row reading the agent's sentence, no `finish_turn` line in the transcript, and no "Finished without saying how it went". Screenshot on a delay per memory
-- [ ] T043 Update the memory file `next-up-017-workflow-settings.md` and `MEMORY.md`'s 023 line: built, walked or not, commits, and the alias-removal condition still open
+- [x] T043 Update the memory file `next-up-017-workflow-settings.md` and `MEMORY.md`'s 023 line: built, walked or not, commits, and the alias-removal condition still open
 
 ---
 
@@ -264,3 +264,17 @@ and five lines.
 
 Counts: the seven affected suites, 113 tests, three runs green; the whole package, 1,113 tests,
 green.
+
+### Polish, 2026-09-24
+
+T039, T040, T041 and T043 done; T038 (the live run) and T042 (the by-eye walk) are Alex's.
+
+- **T039** found five comments still counting the app's tools the old way, in `DaemonAPI.swift`
+  (the two older methods and the older request), `DaemonCore+AppTools.swift` (`autoAllowed`), and
+  the header of `OutcomeReportTests`. The `AppService` header and `AppTool.swift` had already been
+  rewritten in US2 and Setup. Nothing under `App/` or `Remote/` counts them.
+- **T041 record.** Package suite: 1,113 tests in 121 suites, green, one run. `swift build`,
+  `agentsd` and `Remote` schemes build. The `Agents` scheme does not build at any commit on this
+  branch, for the reason memory records (`LivePage.appText` exists only in the shared tree's
+  uncommitted type-scale lane); nothing under `App/` changed here. The two flaky pick-up tests
+  memory names did not fire in this run.

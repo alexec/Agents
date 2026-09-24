@@ -1,5 +1,10 @@
 # Contract: what the agent sees
 
+> **Superseded by 023.** `finish_turn` (`specs/023-end-of-turn-tool/contracts/agent-tool.md`)
+> carries this tool's outcome and message together with the next prompts. `report_outcome`
+> remains served as an older name with exactly this contract, for conversations briefed
+> with it.
+
 The fourth tool on the MCP server the app serves every session, beside
 `suggest_next_prompts`, `show_file` and `manage_workflows`. Offered by
 `AppService.handle(method:params:)` under `tools/list`; matched on the **end** of the name, because a
