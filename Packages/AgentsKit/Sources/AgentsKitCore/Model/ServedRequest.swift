@@ -25,6 +25,14 @@ public struct ServedRequest: Codable, Hashable, Sendable {
         self.outcome = outcome
     }
 
+    /// Whether the chat says nothing about this. A read that went through changes
+    /// nothing, so the page has nothing to say about it; anything that changed
+    /// something, or went wrong, is said.
+    public var isQuiet: Bool {
+        if case .readFile = kind, case .served = outcome { return true }
+        return false
+    }
+
     /// One line, for the transcript.
     public var summary: String {
         switch kind {

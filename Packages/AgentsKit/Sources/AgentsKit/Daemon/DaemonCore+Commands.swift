@@ -770,6 +770,9 @@ extension DaemonCore {
         if let known = result.reason {
             reason = known
         } else {
+            // Written down as given. The ending line says only that the reason is
+            // one we do not know; the wire's own word for it is the one thing worth
+            // having when that ending is reported, and one word is not a dump.
             await record(.runtimeNote("The runtime ended the turn with a stop reason we do not know: \(result.rawStopReason ?? "none")."),
                          for: agentID)
             reason = .unrecognised
@@ -854,7 +857,12 @@ extension DaemonCore {
 
     private func turnFailed(agentID: UUID, error: any Error) async {
         turnTasks.removeValue(forKey: agentID)
-        await record(.runtimeNote("The runtime stopped answering: \(error)."), for: agentID)
+        // A plain sentence on the page, and the error itself in the log. What the
+        // transport threw is for whoever is debugging the runtime, not for the
+        // person reading the conversation.
+        let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+        await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
+        DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
         await move(agentID, on: .processDied)
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still

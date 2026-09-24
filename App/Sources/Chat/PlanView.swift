@@ -40,29 +40,6 @@ struct PlanView: View {
     }
 }
 
-/// What a turn consumed. Only what the runtime sent: Grok sends none of this, and then
-/// nothing is shown rather than a zero.
-struct UsageLine: View {
-    let usage: TurnUsage
-
-    var body: some View {
-        Text(summary)
-            .chatText(.fine)
-            .foregroundStyle(.tertiary)
-    }
-
-    private var summary: String {
-        var parts: [String] = []
-        if usage.totalTokens > 0 {
-            parts.append("\(usage.totalTokens.formatted()) tokens")
-        }
-        if let cost = usage.cost {
-            parts.append(cost.amount.money(in: cost.currency))
-        }
-        return parts.joined(separator: " · ")
-    }
-}
-
 /// Something the agent asked the app to do. Reads are quiet; a write says what it did.
 struct ServedRequestLine: View {
     let request: ServedRequest

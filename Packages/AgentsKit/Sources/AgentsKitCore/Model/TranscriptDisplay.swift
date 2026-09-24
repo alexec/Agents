@@ -25,6 +25,10 @@ extension TranscriptEntry {
     /// Two things happen here. Chunks of one message are joined back into the message.
     /// And a run of tool calls becomes one item: a tool call and its later updates are
     /// the same call, so the run holds each call once, at its latest state.
+    ///
+    /// Some of the record is not conversation and is not drawn at all: a mode or
+    /// model switched, a read the app served, the turn ending, what the turn cost.
+    /// The record keeps them; the page is what was said and done.
     public static func display(_ entries: [TranscriptEntry]) -> [TranscriptItem] {
         var items: [TranscriptItem] = []
         var run: [ToolCall] = []
@@ -61,6 +65,30 @@ extension TranscriptEntry {
                 } else {
                     run.append(call)
                 }
+            case .optionChanged:
+                // Plumbing, not conversation. The mode or model in force is on the
+                // prompt controls, which is where anyone looks for it; a line saying
+                // "mode is now auto" told the reader nothing they could not already
+                // see, and every runtime that announces its own setting at start put
+                // one on the page before a word was said. Kept in the record, drawn
+                // as nothing, and not a break in a run of tool calls either: a mode
+                // switched mid-turn is still the same job of work.
+                continue
+            case .servedRequest(let request) where request.isQuiet:
+                // A read the app served. On the record, because what an agent
+                // touched is worth being able to find; not on the page, because a
+                // read changes nothing and the reply that follows is what the read
+                // was for. A write, a refusal and a failure all still say so.
+                continue
+            case .stateChanged(.finished, _), .usageRecorded:
+                // The turn ending, and what it cost. Neither is drawn: the reply
+                // ending is what says the turn did, and the money is counted where
+                // money is looked for. Not a silent skip, though. A turn that ends
+                // still ends the run of tool calls it was, and it still makes
+                // "Working" untrue, so it does what any drawn line would do to the
+                // page and puts nothing on it.
+                closeRun()
+                while let last = items.last, last.isPassing { items.removeLast() }
             default:
                 closeRun()
                 items.append(.entry(entry))
@@ -72,7 +100,7 @@ extension TranscriptEntry {
 
     /// A passing line is kept only while it is the latest thing on the page.
     ///
-    /// "Working", "Starting Claude…", "mode is now auto": each is true of the moment it
+    /// "Working", "Starting Claude…", "Picked the conversation back up.": each is true of the moment it
     /// was written and of nothing after, and the line that follows it is what makes it
     /// old. So the newest passing line stays, since nothing has yet superseded it, and
     /// every earlier one goes. The record keeps them all; this is only what is drawn.
@@ -136,18 +164,16 @@ extension TranscriptItem {
 extension TranscriptEntry {
     /// Whether this entry is about a moment rather than about what happened.
     ///
-    /// The agent starting, the agent working, a mode switched, the runtime being
-    /// brought back: each is superseded by whatever comes next. An ending, an answer
-    /// and a message are not, and stay. One ending is here all the same: an agent
-    /// stopped because the daemon did is picked back up straight after, and once it
-    /// has been, that stop is a moment too.
+    /// The agent starting, the agent working, the runtime being brought back: each
+    /// is superseded by whatever comes next. An ending, an answer and a message are
+    /// not, and stay. One ending is here all the same: an agent stopped because the
+    /// daemon did is picked back up straight after, and once it has been, that stop
+    /// is a moment too. An option change is not here because it is never drawn.
     public var isPassing: Bool {
         switch kind {
         case .stateChanged(.starting, _), .stateChanged(.running, _):
             return true
         case .stateChanged(.stopped, reason: .daemonGone):
-            return true
-        case .optionChanged:
             return true
         case .runtimeNote(let text):
             return RuntimeNote.isPassing(text)

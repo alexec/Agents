@@ -312,10 +312,14 @@ private struct EntryRow: View {
         case .planUpdated(let plan):
             PlanView(plan: plan)
 
-        case .usageRecorded(let usage):
-            UsageLine(usage: usage)
+        case .usageRecorded:
+            // Dropped by `TranscriptEntry.display` before it gets here. The cost of a
+            // turn is counted where money is looked for, not said under each reply.
+            EmptyView()
 
         case .servedRequest(let request):
+            // A read that went through is dropped by `TranscriptEntry.display`; only
+            // a write, a refusal or a failure reaches here.
             ServedRequestLine(request: request)
 
         case .elicitationAsked(let request):
@@ -345,12 +349,14 @@ private struct EntryRow: View {
                 .chatText(.supporting)
                 .foregroundStyle(.secondary)
 
-        case .optionChanged(let id, let value):
-            Text("\(id) is now \(value.stringValue ?? "changed")")
-                .chatText(.fine)
-                .foregroundStyle(.secondary)
+        case .optionChanged:
+            // Dropped by `TranscriptEntry.display` before it gets here. Plumbing: the
+            // setting in force is on the prompt controls, not in the conversation.
+            EmptyView()
 
         case .stateChanged(let state, let reason):
+            // `.finished` is dropped by `TranscriptEntry.display`: the reply ending is
+            // what says the turn did. The endings that mean something all reach here.
             StateLine(state: state, reason: reason)
 
         case .workReported(let report):
