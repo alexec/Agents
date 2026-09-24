@@ -31,7 +31,16 @@ struct ProjectListView: View {
 /// One folder: its name, what is going on in it, and the dot that is the whole reason
 /// to look at this list.
 struct ProjectRow: View {
+    @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
+
+    /// The phone's own counts, not `summary.counts`: the daemon's are made without
+    /// knowing which agents have asked to be looked at, and the page under this row
+    /// uses the phone's. The Mac's row does the same, for the same reason.
+    private var counts: [AgentGroup: Int] { model.counts(in: summary.folder) }
+
+    /// Exactly when something in it is under Needs attention on its page.
+    private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -51,7 +60,7 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if summary.needsInput {
+            if needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 8, height: 8)
@@ -66,9 +75,8 @@ struct ProjectRow: View {
     /// What is going on in there, in as few words as it takes. The same two facts the
     /// Mac shows, in the same order.
     private var subtitle: String? {
-        let working = summary.counts[.running] ?? 0
-        let waiting = summary.counts[.needsAttention] ?? 0
-        if waiting > 0 { return "Needs attention" }
+        let working = counts[.running] ?? 0
+        if needsPerson { return "Needs attention" }
         if working > 0 { return working == 1 ? "1 working" : "\(working) working" }
         return nil
     }
@@ -77,7 +85,7 @@ struct ProjectRow: View {
     private var accessibilityLabel: String {
         var parts = [summary.name]
         if !summary.exists { parts.append("folder is missing") }
-        if summary.needsInput { parts.append("needs attention") }
+        if needsPerson { parts.append("needs attention") }
         return parts.joined(separator: ", ")
     }
 }

@@ -121,7 +121,7 @@ struct ContentView: View {
         .environment(frame)
         .environment(sidebarStates)
         .environment(webHolders)
-        .task { await model.connect() }
+        .task { await model.stayConnected() }
         // An agent asking to be looked at is the one thing that opens this column by
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.

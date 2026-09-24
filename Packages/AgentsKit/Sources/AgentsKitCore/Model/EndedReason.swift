@@ -51,6 +51,14 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// A reason written by a newer build reads as `unrecognised`, never as a failure
+    /// to read the whole agent. Thrown from here, one new ending made every record
+    /// carrying it vanish from an older app and every agent list fail on an older phone.
+    public init(from decoder: any Decoder) throws {
+        let written = try decoder.singleValueContainer().decode(String.self)
+        self = EndedReason(rawValue: written) ?? .unrecognised
+    }
+
     /// The protocol's own spelling, which is what arrives on the wire.
     public init?(stopReason: String) {
         switch stopReason {

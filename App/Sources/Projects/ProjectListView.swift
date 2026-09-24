@@ -30,7 +30,14 @@ struct ProjectListView: View {
                 }
             }
 
-            if model.projects.isEmpty {
+            if !model.isConnected {
+                // Said rather than left to look like a quiet afternoon: what is listed
+                // may have moved on, and the window is going back for it by itself.
+                Text(model.hasLoadedProjects ? "Not connected to the daemon. Trying again…"
+                                             : "Connecting…")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else if model.projects.isEmpty, model.hasLoadedProjects {
                 EmptyProjectList(isChoosingFolder: $isChoosingFolder)
             }
         }

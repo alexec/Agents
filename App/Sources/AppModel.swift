@@ -31,10 +31,15 @@ final class AppModel {
     /// What the terminals the daemon is running for an agent have printed so far.
     private(set) var terminalOutput: [String: String] = [:]
     private(set) var isConnected = false
+    /// Whether the daemon's list of projects has arrived at least once. Until it has,
+    /// an empty sidebar means "not yet", not "none".
+    private(set) var hasLoadedProjects = false
     /// 021: the Mac's banner, and the window's report of where the person is. Neither
     /// decides anything; the daemon routes and these two obey.
     private let notifier = MacNotifier()
     private var presence: PresenceReporter?
+    /// The loop going back for a lost daemon, while there is one.
+    private var reconnecting: Task<Void, Never>?
     private(set) var problem: String?
 
     // What the window reads, which is the shared model under another name. Forwarded
@@ -367,6 +372,7 @@ final class AppModel {
             work.replaceProjects(try await client.call(DaemonAPI.Method.projectsList,
                                                        DaemonAPI.ProjectsListRequest(),
                                                        returning: [DaemonAPI.ProjectSummary].self))
+            hasLoadedProjects = true
             settleProjectSelection()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
@@ -435,9 +441,36 @@ final class AppModel {
     private func lostConnection() async {
         isConnected = false
         listening = nil
-        try? await Task.sleep(for: .seconds(1))
-        guard !isConnected else { return }
+        await reconnect()
+    }
+
+    /// Connect, and keep trying if that fails, which is what the window does when it
+    /// opens.
+    func stayConnected() async {
         await connect()
+        if !isConnected { await reconnect() }
+    }
+
+    /// Keep going back until the daemon answers.
+    ///
+    /// One try used to be all there was, and a daemon slow to come back left a window
+    /// that looked alive and never would be again. The same loop as the phone's:
+    /// backing off to half a minute, and only one of it at a time.
+    private func reconnect() async {
+        guard reconnecting == nil else { return }
+        reconnecting = Task { [weak self] in
+            var wait = Duration.seconds(1)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: wait)
+                guard let self else { return }
+                if self.isConnected { break }
+                await self.connect()
+                if self.isConnected { break }
+                wait = min(wait * 2, .seconds(30))
+            }
+            self?.reconnecting = nil
+        }
+        await reconnecting?.value
     }
 
     func connect() async {
@@ -590,6 +623,12 @@ final class AppModel {
         notifier.open = { [weak self] agentID in
             guard let self else { return }
             self.showsSpending = false
+            // Its own project first, because picking a project empties the selection:
+            // a chat opened from a banner under some other project's heading is a
+            // sidebar and a page that disagree about where you are.
+            if let agent = self.agents.first(where: { $0.id == agentID }) {
+                self.selectedProject = Project.standardize(agent.cwd)
+            }
             self.openWorkflow = nil
             self.selection = agentID
         }
@@ -629,10 +668,14 @@ final class AppModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         await attempt {
-            self.work.replaceTranscript(
-                with: try await self.client.call(DaemonAPI.Method.agentsTranscript,
-                                                 DaemonAPI.TranscriptRequest(agentID: selection),
-                                                 returning: TranscriptPage.self))
+            let page = try await self.client.call(DaemonAPI.Method.agentsTranscript,
+                                                  DaemonAPI.TranscriptRequest(agentID: selection),
+                                                  returning: TranscriptPage.self)
+            // Clicking through chats quickly can have the answer for the last one
+            // arrive after the next was picked. It is dropped, not shown under the
+            // wrong name.
+            guard self.selection == selection else { return }
+            self.work.replaceTranscript(with: page)
         }
     }
 
@@ -641,11 +684,14 @@ final class AppModel {
     func loadEarlier() async {
         guard let selection, work.hasMoreBefore else { return }
         await attempt {
-            self.work.prepend(
-                try await self.client.call(
-                    DaemonAPI.Method.agentsTranscript,
-                    DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
-                    returning: TranscriptPage.self))
+            let page = try await self.client.call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
+                returning: TranscriptPage.self)
+            // The same as `loadTranscript`: an earlier page of a chat no longer open
+            // does not belong on top of the one that is.
+            guard self.selection == selection else { return }
+            self.work.prepend(page)
         }
     }
 
@@ -733,8 +779,11 @@ final class AppModel {
         show(options: notification.options, commands: notification.commands, opening: false)
     }
 
-    func startDraft(prompt: String, attachments: [Attachment] = []) async {
-        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
+    /// Whether the agent was started, so the prompt bar can give back what it sent
+    /// when it was not.
+    @discardableResult
+    func startDraft(prompt: String, attachments: [Attachment] = []) async -> Bool {
+        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
         let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
                                              cwd: cwd,
                                              prompt: prompt,
@@ -752,17 +801,20 @@ final class AppModel {
             // asking to watch it: the agent appears in the project's list and you stay
             // where you were, free to say the next thing. Starting three pieces of work
             // in a row should not mean coming back twice.
+            return true
         } catch {
             problem = describe(error)
+            return false
         }
     }
 
     /// Sent now if the agent is free, and queued by the daemon if it is not. Either
     /// way this is the same call: whether there is room for it is not the window's
     /// question to answer.
-    func send(_ text: String, attachments: [Attachment] = []) async {
-        guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        await attempt {
+    @discardableResult
+    func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
+        guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return await attempt {
             try await self.client.call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
@@ -1094,17 +1146,22 @@ final class AppModel {
     /// daemon says.
     func show(problem: String) { self.problem = problem }
 
-    private func attempt(_ work: () async throws -> Void) async {
+    /// Whether the work went through, for the callers that must undo something when
+    /// it did not.
+    @discardableResult
+    private func attempt(_ work: () async throws -> Void) async -> Bool {
         do {
             try await work()
+            return true
         } catch {
             // One retry through a fresh connection: the daemon having gone idle is not
             // something the user should have to know about.
             if !isConnected {
                 await connect()
-                if isConnected, (try? await work()) != nil { return }
+                if isConnected, (try? await work()) != nil { return true }
             }
             problem = describe(error)
+            return false
         }
     }
 

@@ -429,6 +429,7 @@ private struct QueuedPromptRow: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.tertiary)
             .help("Do not send this")
+            .accessibilityLabel("Remove queued prompt")
         }
     }
 }

@@ -158,3 +158,23 @@ enum StoreCoding {
         return d
     }()
 }
+
+extension StoreCoding {
+    /// Move a file that exists and cannot be read out of the way, keeping it beside
+    /// the original. The stores that read such a file as empty go on to write that
+    /// empty value back, and without this the only copy of what somebody set is gone.
+    static func setAside(_ url: URL) {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let aside = url.appendingPathExtension("unreadable-\(stamp)")
+        try? FileManager.default.moveItem(at: url, to: aside)
+    }
+}
+
+/// One element of a list that is kept only if it decodes, so that one bad entry costs
+/// that entry rather than the list.
+struct Lossy<Element: Decodable>: Decodable {
+    let value: Element?
+    init(from decoder: Decoder) throws {
+        value = try? Element(from: decoder)
+    }
+}
