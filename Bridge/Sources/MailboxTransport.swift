@@ -15,6 +15,11 @@ import Foundation
 /// does. Nothing here is retried across a restart: a post that was lost while the
 /// bridge was down is posted again by the daemon's next decision, and a device that
 /// missed a banner finds the need in `attention/pending` when it next connects.
+///
+/// Withdrawals are the exception, and the daemon keeps them rather than this: a
+/// withdrawal is about a need being over, so there is no next decision to repeat it.
+/// The daemon holds each one in `attention.json` until a connection has said
+/// `mailbox/carry`, which is the first thing this does on connecting (025).
 @MainActor
 final class MailboxTransport {
     private let mailbox = CloudKitMailbox()
@@ -29,6 +34,11 @@ final class MailboxTransport {
         while !Task.isCancelled {
             do {
                 try await client.connect(startIfNeeded: false)
+                // Say what this connection is for. The daemon cannot otherwise tell it
+                // from a window, and a withdrawal broadcast while nothing carries mail is
+                // lost for good — the need it withdraws is over, so nothing will post it
+                // again. It waits in the daemon until this has been said (025 US2).
+                _ = try await client.call(DaemonAPI.Method.mailboxCarry)
                 log("mailbox: connected to the daemon")
                 for await notification in client.notifications() {
                     await carry(notification.method, notification.params)

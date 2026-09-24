@@ -53,6 +53,41 @@ struct WorkflowRecords: Codable, Sendable {
     /// When the scheduler last looked. The heartbeat that makes a missed fire
     /// decidable: without it, "was anything listening at 9am?" has no honest answer.
     var lastTickAt: Date?
+    /// The runs in flight when this was written (025).
+    ///
+    /// The one piece of workflow bookkeeping that used to live only in memory. A daemon
+    /// that went while a run was going picked its agent back up and let it finish — and
+    /// then nothing waiting on that workflow's completion was told, because the run it
+    /// would have been told about had gone, and the depth that stops a chain looping went
+    /// with it. Written wherever `DaemonCore.workflowRuns` moves.
+    var runs: [WorkflowRun] = []
+
+    /// How long a run is believed. A run in flight for a week is a run whose agent will
+    /// not be finishing, and holding its workflow any longer only stops it firing.
+    static let runHorizon: TimeInterval = 7 * 24 * 60 * 60
+
+    enum CodingKeys: String, CodingKey {
+        case states, lastTickAt, runs
+    }
+}
+
+extension WorkflowRecords {
+    /// Read leniently, key by key.
+    ///
+    /// This file already existed when `runs` was added, and `WorkflowStore.load()` reads
+    /// a file it cannot decode as empty — so a synthesized decoder, which requires every
+    /// key, would have read every file written before this one as nothing, and quietly
+    /// un-archived every workflow the person had put away. One run that will not decode
+    /// costs that run: a trigger from a newer build is not worth the archive beside it.
+    ///
+    /// In an extension, so the memberwise initialiser the rest of this file uses stays.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        states = try c.decodeIfPresent([WorkflowState].self, forKey: .states) ?? []
+        lastTickAt = try c.decodeIfPresent(Date.self, forKey: .lastTickAt)
+        runs = (try c.decodeIfPresent([Lossy<WorkflowRun>].self, forKey: .runs) ?? [])
+            .compactMap(\.value)
+    }
 }
 
 /// Where that state is kept.

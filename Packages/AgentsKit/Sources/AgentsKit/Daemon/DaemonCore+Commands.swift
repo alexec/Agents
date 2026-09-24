@@ -861,6 +861,12 @@ extension DaemonCore {
 
     private func turnFailed(agentID: UUID, error: any Error) async {
         turnTasks.removeValue(forKey: agentID)
+        // Before anything else is said, so the record reads: the question, that nobody
+        // answered it, why the agent stopped, and that it did. And at all, which it was
+        // not until 025: a turn that fails ahead of the process-exit event reaches here
+        // first, releases the runtime, and the exit arm's own close never ran — leaving
+        // the question pending, still asking on the Mac and the phone.
+        await closeQuestionsOfAGoneRuntime(agentID)
         // A plain sentence on the page, and the error itself in the log. What the
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
@@ -872,6 +878,34 @@ extension DaemonCore {
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)
+    }
+
+    /// Close every question this agent has open, because the runtime that asked them has
+    /// gone and none of them can be answered now.
+    ///
+    /// The one place for it, reached by both ways a runtime goes: its process exiting, and
+    /// its turn failing — which can get there first and release the runtime before the
+    /// exit is heard. A question kept past that would go on asking on the Mac and the
+    /// phone for an agent that can no longer hear the answer, and refuse its next outcome
+    /// report over a question it cannot see.
+    ///
+    /// Each says so in the conversation, once per question (025 US4). Without it the record
+    /// reads "Asked: …" and then simply stops, and whether anybody answered is left to be
+    /// worked out from an absence. Taken off the list before the line is written, so an
+    /// answer arriving in the same moment finds it gone rather than closing it twice.
+    func closeQuestionsOfAGoneRuntime(_ agentID: UUID) async {
+        for (id, pending) in pendingPermissions where pending.agentID == agentID {
+            pendingPermissions.removeValue(forKey: id)
+            await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
+            broadcast(DaemonAPI.Notification.agentPermission,
+                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+        }
+        for (id, pending) in elicitations where pending.agentID == agentID {
+            elicitations.removeValue(forKey: id)
+            await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
+            broadcast(DaemonAPI.Notification.agentElicitation,
+                      DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
+        }
     }
 
     /// Hand a runtime back.
@@ -910,19 +944,26 @@ extension DaemonCore {
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
+        // Each open question is taken off the list before anything is awaited, then said
+        // in the conversation to have gone unanswered, then refused to the runtime. In
+        // that order: an answer arriving in the same moment finds it gone rather than
+        // closing it a second time, and the line lands before anything the refusal sets
+        // off — the runtime ending its turn, say — so the record reads as it happened.
         for (id, pending) in pendingPermissions where pending.agentID == agentID {
+            pendingPermissions.removeValue(forKey: id)
+            await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             if let session = live[agentID] {
                 await session.answerPermission(id: pending.request.id, optionID: nil)
             }
-            pendingPermissions.removeValue(forKey: id)
             broadcast(DaemonAPI.Notification.agentPermission,
                       DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
+            elicitations.removeValue(forKey: id)
+            await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             if let session = live[agentID] {
                 await session.answerElicitation(id: pending.request.id, outcome: .cancel)
             }
-            elicitations.removeValue(forKey: id)
             broadcast(DaemonAPI.Notification.agentElicitation,
                       DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
         }

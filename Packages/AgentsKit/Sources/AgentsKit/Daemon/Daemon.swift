@@ -47,7 +47,12 @@ public final class Daemon: @unchecked Sendable {
                 Task { await core.setConnectionCount(count) }
             },
             onDisconnected: { connection in
-                Task { await core.forgetPresence(connection: connection) }
+                Task {
+                    await core.forgetPresence(connection: connection)
+                    // A bridge that has gone carries nothing. Left on the list, the next
+                    // withdrawal would be handed to nobody and forgotten (025 US2).
+                    await core.forgetCarrier(connection: connection)
+                }
             },
             handler: { context, method, params in
                 await core.handle(method: method, params: params,

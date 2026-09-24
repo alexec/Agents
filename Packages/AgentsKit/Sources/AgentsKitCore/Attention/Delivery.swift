@@ -10,7 +10,14 @@ import Foundation
 /// Changing `to` is a **move**, and a move does not touch `alertedAt` unless the re-alert
 /// interval has passed. That sentence is the whole of FR-018: a need that follows the
 /// person from the Mac to the iPad to the phone is shown on each, and buzzes on the first.
-public struct Delivery: Hashable, Sendable {
+///
+/// `Codable` since 025, because this is written down now: the daemon restarts on every
+/// build of this app, and a delivery lost with it is a person alerted a second time about
+/// something that has not changed. What is stored is these four fields and nothing more —
+/// **no headline, no title, no tool name**. What the need *says* lives on `Need`, which is
+/// derived every time it is asked for; a second copy of it on disk would be the one thing
+/// 021's FR-001 forbids.
+public struct Delivery: Hashable, Sendable, Codable {
     public var needID: NeedID
     /// Where it should be showing. `nil` means nowhere can be reached, or the person is
     /// watching the conversation and nothing should show.

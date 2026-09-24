@@ -3,12 +3,77 @@ import Foundation
 /// Where a need goes. The one place that decides (FR-012): no surface may work out for
 /// itself whether it is the right one to alert.
 ///
-/// Three things live here and none is written to disk. `presences` is one record per
-/// connection, keyed by the connection rather than by surface, so two windows are two
-/// records and one going does not erase the other's knowledge. `deliveries` is one per
-/// outstanding need, and dies with it. `needRaisedAt` is the one fact about a need that
-/// must not move: when the daemon first saw it.
+/// Three things live here, and since 025 two of them are written down.
+///
+/// `presences` is one record per connection, keyed by the connection rather than by
+/// surface, so two windows are two records and one going does not erase the other's
+/// knowledge. It stays in memory: where somebody is right now is not a fact worth
+/// keeping, and a remembered one could only mislead the next daemon.
+///
+/// `deliveries` is one per outstanding need, and dies with it. `needRaisedAt` is the one
+/// fact about a need that must not move: when the daemon first saw it. Both of those
+/// **do** survive now, in `attention.json`, because they are about a need rather than
+/// about a live process — and a need built from the agent record outlives the daemon
+/// perfectly well. What used to die with it was only the memory of having already told
+/// somebody, which is how a restart came to buzz a person twice about one thing.
 extension DaemonCore {
+    // MARK: What survives the daemon
+
+    /// Read the notes back, keeping only what can be acted on.
+    ///
+    /// Called from `recover()` rather than from `Daemon.start()`, so that anything
+    /// driving a `DaemonCore` directly — which is every test, and any future embedder —
+    /// gets it too. `recover()` is already "read the record and tell the truth about it",
+    /// and these are part of that record.
+    ///
+    /// Deliberately **not** followed by a `reconsider()` here. Nothing is connected this
+    /// early: a decision taken now would find nobody reachable, move every restored
+    /// delivery to nowhere, and then move it back the moment a window appeared — two
+    /// notifications and a file rewritten, to arrive exactly where it started. The first
+    /// presence report does it, which is moments later and is when there is somebody to
+    /// tell.
+    func loadAttention() {
+        let known = Set(devices.keys)
+        let onDisk = attentionStore.load()
+        let usable = onDisk.pruned(knownDevices: known, now: now())
+        deliveries = Dictionary(usable.deliveries.map { ($0.needID, $0) },
+                                uniquingKeysWith: { first, _ in first })
+        needRaisedAt = Dictionary(usable.raised.map { ($0.need, $0.at) },
+                                  uniquingKeysWith: { first, _ in first })
+        pendingWithdrawals = usable.withdrawing
+        lastWrittenAttention = usable
+        // What was dropped is dropped now rather than at the next thing that happens to
+        // move, so the file does not keep offering a device that has gone.
+        if usable != onDisk { attentionStore.save(usable) }
+    }
+
+    /// Write the notes, and only when they have actually changed.
+    ///
+    /// The guard is the whole point. `reconsider()` is called on every state change, on
+    /// every question held or answered, and on **every presence report** — which arrives
+    /// periodically from every window and every device. An unconditional write here would
+    /// put a file rewrite in a path that runs several times a second with nobody doing
+    /// anything.
+    ///
+    /// Everything is sorted by the need's token before comparing, because the two sources
+    /// are dictionaries and a dictionary's order is nobody's: unsorted, the comparison
+    /// would differ on almost every pass and the guard would never once hold.
+    func writeAttentionIfMoved() {
+        let records = AttentionRecords(
+            raised: needRaisedAt
+                .map { RaisedNote(need: $0.key, at: $0.value) }
+                .sorted { $0.need.token < $1.need.token },
+            deliveries: deliveries.values.sorted { $0.needID.token < $1.needID.token },
+            withdrawing: pendingWithdrawals.sorted { $0.need.token < $1.need.token })
+        // Nothing is written by a core that has not read the file. Without this, a
+        // decision taken before `loadAttention()` — by anything driving a `DaemonCore`
+        // without recovering it first — writes its empty memory over what the last
+        // daemon left, and every note in it is lost to a daemon that never looked.
+        guard let last = lastWrittenAttention, records != last else { return }
+        attentionStore.save(records)
+        lastWrittenAttention = records
+    }
+
     // MARK: What wants a person
 
     /// The outstanding needs, derived and never stored — exactly as `AgentGroup` is.
@@ -216,6 +281,12 @@ extension DaemonCore {
                           DaemonAPI.AttentionNotification(needID: need.id, need: need, to: to, alert: true))
             }
         }
+
+        // Last, once every decision above has landed. What is owed goes out if anything
+        // will carry it; then, only if any of this moved anything, it is written down —
+        // whatever the next daemon is told, it is told here.
+        drainWithdrawals()
+        writeAttentionIfMoved()
     }
 
     // MARK: Reaching a device that is not here
@@ -226,6 +297,11 @@ extension DaemonCore {
     /// needs the device's key; a record without a usable one is sent nothing, which is
     /// the truth about it rather than a banner in the clear.
     private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {
+        // A newer decision about this need on this device voids any withdrawal still
+        // waiting for a carrier. Otherwise a banner taken off the phone and put back while
+        // the bridge was away would be taken off again the moment the bridge arrived —
+        // for a question that is still asking.
+        pendingWithdrawals.removeAll { $0.need == need.id && $0.device == id }
         guard let device = device(id),
               let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else { return }
         enqueue(MailboxItem(needID: need.id, device: id, envelope: envelope, alert: alert, postedAt: now))
@@ -233,8 +309,46 @@ extension DaemonCore {
 
     /// The need is over here: a withdrawal, naming only the id, replaces whatever was
     /// waiting for the device under it.
+    ///
+    /// **Owed, not sent.** It goes on `pendingWithdrawals` and leaves from
+    /// `drainWithdrawals()` once something that carries mail is listening. This is the
+    /// one post with no second chance: every other post is repeated by the next
+    /// decision about its need, but this one is about the need being *over*, so there is
+    /// no next decision. Broadcast into a room with no bridge in it, it is gone, and the
+    /// phone keeps a question nobody can answer (025 US2).
     private func withdraw(_ id: NeedID, from device: UUID, at now: Date) {
-        enqueue(MailboxItem(needID: id, device: device, envelope: nil, alert: false, postedAt: now))
+        guard !pendingWithdrawals.contains(where: { $0.need == id && $0.device == device }) else { return }
+        pendingWithdrawals.append(PendingWithdrawal(need: id, device: device, decidedAt: now))
+    }
+
+    /// Whether anything is listening that will take a post to the devices.
+    ///
+    /// A mailbox of the daemon's own — a test's, or an embedder's — always is. The
+    /// daemon's own case has none, and depends on a connection having said
+    /// `mailbox/carry`: the bridge, which is indistinguishable from a window until it
+    /// does.
+    var hasCarrier: Bool { mailbox != nil || !carriers.isEmpty }
+
+    /// Hand every owed withdrawal to whatever carries mail, if anything does.
+    ///
+    /// What is handed over is forgotten: it has gone the same way as every other post,
+    /// with the same guarantee. What cannot be — nobody carrying, the device no longer
+    /// on record, a week gone by — is dealt with by the same rules `pruned` applies to
+    /// the file, so what is in memory and what is on disk cannot disagree about it.
+    func drainWithdrawals() {
+        guard !pendingWithdrawals.isEmpty else { return }
+        let now = now()
+        let usable = AttentionRecords(withdrawing: pendingWithdrawals)
+            .pruned(knownDevices: Set(devices.keys), now: now).withdrawing
+        guard hasCarrier else {
+            pendingWithdrawals = usable
+            return
+        }
+        for owed in usable {
+            enqueue(MailboxItem(needID: owed.need, device: owed.device, envelope: nil,
+                                alert: false, postedAt: now))
+        }
+        pendingWithdrawals = []
     }
 
     private func enqueue(_ item: MailboxItem) {
@@ -267,5 +381,28 @@ extension DaemonCore {
 
     private func cancelSettling(_ id: NeedID) {
         settlingTimers.removeValue(forKey: id)?.cancel()
+    }
+}
+
+// MARK: - Who carries mail
+
+extension DaemonCore {
+    /// `mailbox/carry`: this connection hears `mailbox/post` and takes it to the devices.
+    func becomeCarrier(connection: UUID?) throws {
+        guard let connection else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
+                               message: "Only a connection can carry mail.")
+        }
+        carriers.insert(connection)
+        // Now there is somebody to hand things to. Reconsidering rather than only
+        // draining, because after a restart with no window this may be the first thing
+        // that has happened at all: the withdrawals for questions that died with the
+        // last daemon have not even been decided yet.
+        reconsider()
+    }
+
+    /// The connection has gone. Called beside `forgetPresence`, from the same place.
+    func forgetCarrier(connection: UUID) {
+        carriers.remove(connection)
     }
 }

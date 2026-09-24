@@ -45,6 +45,16 @@ public enum DaemonAPI {
         /// (021 T051). A stand-in until pairing verifies it against the device store —
         /// Phase 7 makes the bridge refuse an unpaired device at accept.
         public static let surfaceIdentify = "surface/identify"
+        /// A connection saying it carries mail: that it hears `mailbox/post` and takes
+        /// what it hears to the devices' mailboxes. Said once, by the bridge, right after
+        /// it connects (025).
+        ///
+        /// It exists because nothing else can tell the daemon so. Every connection starts
+        /// as the Mac and the bridge never says otherwise, and a withdrawal broadcast
+        /// while no carrier is listening is lost for good — the need it withdraws is
+        /// over, so there is no later decision to post it again. A withdrawal waits in
+        /// `attention.json` until a connection has said this.
+        public static let mailboxCarry = "mailbox/carry"
         /// The paired devices (021 US5).
         public static let devicesList = "devices/list"
         /// A device saying who it is and handing over its public key, once — which is

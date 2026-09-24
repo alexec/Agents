@@ -23,7 +23,26 @@ public enum RuntimeNote {
     /// and then by the agent being picked back up, which is when it stops mattering.
     public static let stoppedWithDaemon = "This agent was working when the daemon stopped, so it stopped too."
 
+    /// A question the agent asked that ended without an answer, because its runtime
+    /// exited, the person stopped it, or the daemon went.
+    ///
+    /// **Not passing, and must never be added to `isPassing`.** Every note above is true
+    /// of the moment it was written and false a line later, which is what earns them
+    /// being dropped once something follows. This one is permanent: it is the difference,
+    /// for somebody reading back in six months, between a question that was answered and
+    /// one that was never going to be. It is always followed immediately by the ending it
+    /// belongs to, so a passing note here would be a note that is never once drawn.
+    ///
+    /// Written after the `permissionAsked` or `elicitationAsked` entry it closes and
+    /// before the `stateChanged` entry recording the ending. Position is what says which
+    /// question; the line does not name one, because the three places that write it do
+    /// not all know (after a restart the pending questions died with the last daemon —
+    /// what is left is the agent's state).
+    public static let questionWentUnanswered = "Nobody answered this question before the agent ended."
+
     /// Whether this note is about the moment it was written and nothing after.
+    ///
+    /// `questionWentUnanswered` is deliberately absent. See the note on it.
     public static func isPassing(_ text: String) -> Bool {
         if text == pickedBackUp || text == stoppedWithDaemon { return true }
         return text.hasPrefix(startingPrefix) && text.hasSuffix(startingSuffix)

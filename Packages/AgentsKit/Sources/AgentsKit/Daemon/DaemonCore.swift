@@ -21,19 +21,47 @@ public actor DaemonCore {
     /// Forms an agent is blocked on, held here for the same reason permissions are:
     /// the question can arrive while no window is open.
     var elicitations: [UUID: PendingElicitation] = [:]
-    /// 021: where the person is, per connection, and what is showing where. Held in
-    /// memory and never written down — what a person is doing right now is not a fact
-    /// worth keeping, and neither survives a restart by design. See `DaemonCore+Attention`.
+    /// 021: where the person is, per connection. Held in memory and never written down —
+    /// what somebody is doing right now is not a fact worth keeping, and a remembered one
+    /// could only mislead the next daemon. See `DaemonCore+Attention`.
     var presences: [UUID: Presence] = [:]
+    /// What has already been put in front of the person, and where.
+    ///
+    /// Written down since 025, in `attention.json`. It used to live and die with the
+    /// process, which meant every restart — and this app restarts on every build of it —
+    /// decided afresh that an outstanding need had never been delivered, and buzzed the
+    /// person again about something that had not changed.
     var deliveries: [NeedID: Delivery] = [:]
     /// When each need was first seen, so a re-routed need keeps its `raisedAt`.
+    ///
+    /// Written down beside the deliveries and for the same reason. This is the one fact
+    /// about a need that must not move, and a restart used to move it — which restarted
+    /// the settling pause and the re-alert clock along with it.
     var needRaisedAt: [NeedID: Date] = [:]
+    /// Banners that have to come down on a device, waiting for something to carry them.
+    /// On disk in `attention.json`, so a daemon that goes before a bridge arrives hands
+    /// the debt to the next one. See `DaemonCore+Attention`.
+    var pendingWithdrawals: [PendingWithdrawal] = []
+    /// The connections that have said they carry mail — in practice the bridge, and at
+    /// most one. In memory only: a carrier is a live connection, and the next daemon
+    /// learns of its own when the bridge reconnects and says so again.
+    var carriers: Set<UUID> = []
+    /// The last thing written to `attention.json`, so `writeAttentionIfMoved` can do
+    /// nothing when nothing moved. `nil` until `loadAttention()` has read the file, and
+    /// nothing is written while it is: a core that never read the notes must not
+    /// overwrite them. `reconsider()` runs on every presence report from
+    /// every window and device — several times a second with nobody doing anything — and
+    /// an unconditional write there would be a file rewritten for no reason all day.
+    var lastWrittenAttention: AttentionRecords?
     var settlingTimers: [NeedID: Task<Void, Never>] = [:]
     /// The paired devices, read from `devices.json` the first time they are wanted and
     /// written whole on every change. The daemon is the only writer. See
     /// `DaemonCore+Devices`.
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
+    /// What has already been told to whom, read once by `loadAttention()` and written
+    /// whenever it moves. See `DaemonCore+Attention`.
+    lazy var attentionStore = AttentionStore(locations: locations)
     /// Where a sealed headline goes for a device the LAN cannot reach. `nil` — the
     /// daemon's own case — means it is
     /// broadcast as `mailbox/post` for the bridge to carry: the daemon has no CloudKit
@@ -654,20 +682,7 @@ public actor DaemonCore {
             reconsider()
 
         case .processExited:
-            for (id, pending) in pendingPermissions where pending.agentID == agentID {
-                pendingPermissions.removeValue(forKey: id)
-                broadcast(DaemonAPI.Notification.agentPermission,
-                          DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
-            }
-            // A form dies with the runtime that asked it, the same as a permission
-            // does. Kept, it would go on asking on the Mac and the phone for an agent
-            // that can no longer hear the answer, and refuse its next outcome report
-            // over a question it cannot see.
-            for (id, pending) in elicitations where pending.agentID == agentID {
-                elicitations.removeValue(forKey: id)
-                broadcast(DaemonAPI.Notification.agentElicitation,
-                          DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
-            }
+            await closeQuestionsOfAGoneRuntime(agentID)
             if agents[agentID]?.state.holdsRuntime == true {
                 await move(agentID, on: .processDied)
             }

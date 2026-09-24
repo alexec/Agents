@@ -21,6 +21,15 @@ extension DaemonCore {
     /// run when six agents stopped because the Mac restarted.
     @discardableResult
     public func recover() async -> [UUID] {
+        // Before the agents, because `loadFromDisk` and the endings below both reach
+        // `reconsider()`, and a decision taken against an empty set of notes would
+        // conclude that nothing had ever been delivered — which is the whole of what
+        // 025 US1 fixes.
+        loadAttention()
+        // Before anything is moved, for the same reason and one more: recovery's
+        // lifecycle events carry the depth of the run that caused them, read from here.
+        // See `loadWorkflowRuns`.
+        loadWorkflowRuns()
         await loadFromDisk()
         // `agents` is a Dictionary, whose order is nobody's. Most recently active
         // first, because pick-up is one at a time and the chat the person last left
@@ -35,6 +44,14 @@ extension DaemonCore {
         var recovered: [UUID] = []
         for agent in wereWorking {
             let id = agent.id
+            // A question the agent was holding open died with the last daemon. The
+            // question itself cannot be named — the pending ones went with the process —
+            // but the state says one was open, since a question is the only thing that
+            // puts an agent in `waitingOnUser`. The line follows the question in the
+            // transcript, and position says which (025 US4).
+            if agent.state == .waitingOnUser {
+                await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: id)
+            }
             // Before the move, so the transcript reads in the order it happened: the
             // explanation, and then the ending it explains.
             await record(.runtimeNote(RuntimeNote.stoppedWithDaemon), for: id)
