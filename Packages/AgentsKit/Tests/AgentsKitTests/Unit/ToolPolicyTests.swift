@@ -76,7 +76,8 @@ struct ToolPolicyTests {
             #expect(!category.instead.isEmpty)
         }
         #expect(RemitCategory.standingArrangements.instead.contains(AppTool.manageWorkflows))
-        #expect(RemitCategory.suggestions.instead.contains(AppTool.suggestPrompts))
+        #expect(RemitCategory.suggestions.instead.contains(AppTool.finishTurn))
+        #expect(!RemitCategory.suggestions.instead.contains(AppTool.suggestPrompts))
     }
 
     /// The one tool this feature could break that would matter most. Every runtime the

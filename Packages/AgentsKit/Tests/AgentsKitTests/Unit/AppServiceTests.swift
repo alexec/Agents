@@ -389,6 +389,30 @@ struct AppServiceTests {
         }
     }
 
+    /// The two older names are listed — a runtime that checks a name against the
+    /// list before calling it still finds what it was told — and described as the
+    /// older names for the one tool, so a fresh agent reading the whole list is
+    /// pointed at the right one (FR-011, FR-013). Their schemas are what they were.
+    @Test func theOldNamesAreListedAsAliasesOfTheOneTool() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        let result = try await client.call("tools/list", .object([:]))
+        let tools = result["tools"]?.arrayValue ?? []
+        let older = Array(tools.suffix(2))
+        #expect(older.compactMap { $0["name"]?.stringValue }
+            == [AppService.toolName, AppService.reportOutcomeToolName])
+        for tool in older {
+            let description = tool["description"]?.stringValue ?? ""
+            #expect(description.contains(AppTool.finishTurn))
+            #expect(description.lowercased().contains("older"))
+            #expect(tool["title"]?.stringValue?.contains("older name") == true)
+        }
+        #expect(older[0]["inputSchema"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
+            == ["prompts"])
+        #expect(older[1]["inputSchema"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
+            == ["outcome", "message"])
+        await service.close()
+    }
+
     // MARK: Ending the turn in one call
 
     private actor FinishBox {

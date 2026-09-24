@@ -241,4 +241,89 @@ struct FinishTurnTests {
         let outcome = await launcher.lastAgent?.permissionOutcome
         #expect(outcome?["outcome"]?["optionId"]?.stringValue == "allow")
     }
+
+    // MARK: A conversation that was told the old names keeps working
+
+    private func suggest(_ core: DaemonCore, _ launcher: FakeLauncher,
+                         _ labels: String...) async throws {
+        _ = try await core.suggestPrompts(.init(token: await mintedToken(launcher),
+                                                prompts: chips(labels)))
+    }
+
+    private func report(_ core: DaemonCore, _ launcher: FakeLauncher,
+                        _ outcome: String, _ message: String) async throws {
+        _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
+                                               outcome: outcome, message: message))
+    }
+
+    /// What an agent looks like after the ending, by whichever door it came.
+    private struct Account: Equatable {
+        var outcome: WorkOutcome?
+        var message: String?
+        var labels: [String]
+        init(_ agent: Agent) {
+            outcome = agent.report?.outcome
+            message = agent.report?.message
+            labels = agent.suggestedPrompts.map(\.label)
+        }
+    }
+
+    /// US2, whole: the two old names, in either order, leave the agent exactly where
+    /// the one call would (FR-012, SC-006). Three agents, same values.
+    @Test func theOldNamesInEitherOrderLeaveTheSameStateAsOneCall() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+
+        let one = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await finish(core, launcher, "partly_done", "Five of six.", "A", "B")
+        try await settle(core, one)
+
+        let suggestThenReport = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await suggest(core, launcher, "A", "B")
+        try await report(core, launcher, "partly_done", "Five of six.")
+        try await settle(core, suggestThenReport)
+
+        let reportThenSuggest = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        try await report(core, launcher, "partly_done", "Five of six.")
+        try await suggest(core, launcher, "A", "B")
+        try await settle(core, reportThenSuggest)
+
+        let expected = Account(try #require(await core.agent(one)))
+        #expect(expected.outcome == .partlyDone)
+        #expect(expected.labels == ["A", "B"])
+        #expect(Account(try #require(await core.agent(suggestThenReport))) == expected)
+        #expect(Account(try #require(await core.agent(reportThenSuggest))) == expected)
+    }
+
+    /// An old name after the one call replaces only its half.
+    @Test func theOldSuggestionNameAloneTouchesOnlyTheChips() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        try await finish(core, launcher, "done", "All done.", "A", "B")
+        try await suggest(core, launcher, "C")
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.suggestedPrompts.map(\.label) == ["C"])
+        #expect(agent.report?.outcome == .done)
+        #expect(agent.report?.message == "All done.")
+    }
+
+    @Test func theOldOutcomeNameAloneTouchesOnlyTheReport() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        try await finish(core, launcher, "done", "All done.", "A", "B")
+        try await report(core, launcher, "stuck", "No signing certificate.")
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.report?.outcome == .stuck)
+        #expect(agent.report?.message == "No signing certificate.")
+        #expect(agent.suggestedPrompts.map(\.label) == ["A", "B"])
+    }
 }

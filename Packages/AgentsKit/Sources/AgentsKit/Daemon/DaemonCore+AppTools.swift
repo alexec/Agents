@@ -1,6 +1,7 @@
 import Foundation
 
-/// Where a suggested prompt, and a file the agent wants looked at, come from.
+/// Where an agent's account of its turn, a file it wants looked at, and its say over
+/// the project's workflows come from.
 ///
 /// The app hands every session an MCP server of its own. It is not a process we start:
 /// the runtime starts it, the way it starts any stdio MCP server, by running the same
@@ -60,6 +61,10 @@ extension DaemonCore {
     }
 
     /// An agent has said what you might want to ask next.
+    ///
+    /// The older door for the chips half of `finishTurn` (023). It stays because the
+    /// helper relays the older tool name here, and a conversation briefed with that
+    /// name is still calling it. It touches the chips and nothing else.
     public func suggestPrompts(_ request: DaemonAPI.SuggestPromptsRequest) async throws -> String {
         guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
             // Said plainly, because the agent reads this. A runtime that kept a helper

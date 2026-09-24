@@ -56,7 +56,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
         case .artefacts:
             "Put it in the conversation or in a file in this project."
         case .suggestions:
-            "Use `\(AppTool.suggestPrompts)` at the end of the turn."
+            "Use `\(AppTool.finishTurn)` at the end of the turn."
         }
     }
 }
