@@ -62,8 +62,24 @@ struct UnreportedEndingTests {
         #expect(try await asks(core, id) == 1)
         // Visibly the app's, and never attributed to the person.
         let asked = try await prompts(core, id).first { $0.1 == .app }
-        #expect(asked?.0.contains(AppTool.reportOutcome) == true)
+        #expect(asked?.0.contains(AppTool.finishTurn) == true)
         #expect(await core.agent(id)?.outcomeAsked == true)
+    }
+
+    /// The ask names the one tool a fresh conversation was told about, and neither of
+    /// the older names — an agent briefed with those answers by them all the same,
+    /// because the aliases are accepted everywhere (023, FR-018).
+    @Test func theQuestionNamesTheOneTool() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(FakeLauncher(), locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
+        try await settle(core, id)
+        let asked = try #require(try await prompts(core, id).first { $0.1 == .app }?.0)
+        #expect(asked.contains(AppTool.finishTurn))
+        #expect(!asked.contains(AppTool.reportOutcome))
+        #expect(!asked.contains(AppTool.suggestPrompts))
     }
 
     /// SC-009, counted. The turn the question causes comes back through the same

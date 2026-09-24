@@ -151,10 +151,15 @@ public struct ToolCall: Codable, Hashable, Sendable {
         return title
     }
 
-    /// Whether this is the app's own suggestion tool rather than the agent's work.
+    /// Whether this is the app's own end-of-turn tool rather than the agent's work.
     ///
     /// Matched on the end of the name because a runtime is free to prefix it: the
-    /// Claude adapter shows it as `mcp__agents__suggest_next_prompts`.
+    /// Claude adapter shows it as `mcp__agents__finish_turn`.
+    public var isFinishingTurn: Bool {
+        (name ?? title).hasSuffix(AppTool.finishTurn)
+    }
+
+    /// Whether this is the older suggestion name, the chips half of `finish_turn`.
     public var isSuggestingPrompts: Bool {
         (name ?? title).hasSuffix(AppTool.suggestPrompts)
     }
@@ -169,19 +174,20 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.manageWorkflows)
     }
 
-    /// Whether this is the app's own outcome tool.
+    /// Whether this is the older outcome name, the report half of `finish_turn`.
     public var isReportingOutcome: Bool {
         (name ?? title).hasSuffix(AppTool.reportOutcome)
     }
 
     /// Whether this call is the app's own rather than the agent's work at all.
     public var isTheApps: Bool {
-        isSuggestingPrompts || isShowingFile || isManagingWorkflows || isReportingOutcome
+        isFinishingTurn || isSuggestingPrompts || isShowingFile || isManagingWorkflows
+            || isReportingOutcome
     }
 
     /// Whether the app may answer the runtime's permission question itself.
     ///
-    /// All three of the app's own tools, because none of them is a question worth
+    /// Every one of the app's own tools, because none of them is a question worth
     /// putting to somebody. Suggestions and a read-only pane carry no information to
     /// decide on; a workflow is answerable *after* it exists, on the project page,
     /// where it can be paused or archived by somebody who has seen what it does. A

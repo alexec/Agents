@@ -847,8 +847,12 @@ extension DaemonCore {
     /// The whole of what a silent agent is asked. Short, and closed: an agent invited
     /// to explain itself in prose would explain itself in prose, and prose is not an
     /// outcome.
+    ///
+    /// It names the one tool a fresh conversation was told about (023). An agent
+    /// briefed with the older name answers by that name all the same, because the
+    /// older names are accepted everywhere the new one is.
     static let askForOutcome = """
-        That turn ended without a report. Call \(AppTool.reportOutcome) now with how it \
+        That turn ended without a report. Call \(AppTool.finishTurn) now with how it \
         actually went, and say nothing else. If the work is done, that is done.
         """
 

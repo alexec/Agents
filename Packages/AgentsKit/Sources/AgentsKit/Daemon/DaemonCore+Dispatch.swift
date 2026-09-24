@@ -206,6 +206,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ReportOutcomeRequest.self)
                 return .success(["note": .string(try await reportOutcome(request))])
 
+            case DaemonAPI.Method.agentsFinishTurn:
+                let request = try require(params, as: DaemonAPI.FinishTurnRequest.self)
+                return .success(["note": .string(try await finishTurn(request))])
+
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))
 

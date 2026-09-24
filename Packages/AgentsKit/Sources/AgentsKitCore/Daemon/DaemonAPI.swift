@@ -96,6 +96,10 @@ public enum DaemonAPI {
         /// end of it. The app cannot know this any other way — a turn giving itself
         /// back says nothing about whether the work is finished.
         public static let agentsReportOutcome = "agents/reportOutcome"
+        /// Both of those at once (023): the one call that ends a turn, relayed by the
+        /// helper when an agent calls `finish_turn`. The two above stay for the older
+        /// names the helper still relays.
+        public static let agentsFinishTurn = "agents/finishTurn"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -461,6 +465,27 @@ public enum DaemonAPI {
 
         public init(token: String, prompts: [SuggestedPrompt]) {
             self.token = token
+            self.prompts = prompts
+        }
+    }
+
+    /// What the MCP helper sends when an agent ends its turn with the one call (023).
+    ///
+    /// The token does the work it does for a report. The outcome is the wire
+    /// spelling, checked at the daemon and never rounded. The prompts have already
+    /// been cleaned by the service — trimmed, cut to four, empties dropped — and may
+    /// be empty, which means no chips: the call is the whole account of the turn.
+    public struct FinishTurnRequest: Codable, Sendable {
+        public var token: String
+        public var outcome: String
+        public var message: String
+        public var prompts: [SuggestedPrompt]
+
+        public init(token: String, outcome: String, message: String,
+                    prompts: [SuggestedPrompt]) {
+            self.token = token
+            self.outcome = outcome
+            self.message = message
             self.prompts = prompts
         }
     }
