@@ -183,7 +183,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [X] T059 [P] [US5] Fill "A 'what changed since I wrote' tool, callable mid-turn" from T055: needed, or not, per runtime, and why.
 - [ ] T060 [P] [US5] Fill "Passage-level editing as the shape of editing" and "The sidebar as the page's home vs a window of its own" from the Slice A and C walks and from what Alex said at the gate.
 - [X] T061 [P] [US5] Fill "Finer-grained agent edits", "Mermaid written by an agent unasked" and "Inserting an image from the page" — each either observed or "not reached for, in N documents across M runtimes".
-- [ ] T062 [US5] Write "Things that grated" and "What the real feature needs" in `findings.md`: each entry one or two sentences with the walk it came from. Set the file's status line to "walked, <date>".
+- [X] T062 [US5] Write "Things that grated" and "What the real feature needs" in `findings.md`: each entry one or two sentences with the walk it came from. Set the file's status line to "walked, <date>".
 - [ ] T063 [US5] Re-read `spec.md`'s SC-001 to SC-008 against the walks and write, at the foot of this file under "Success criteria", which held, which did not, and the number seen for each.
 
 **Checkpoint**: The PoC has said what it learned. US5 complete; the feature is done.
@@ -193,7 +193,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 ## Phase 10: Polish
 
 - [X] T064 [P] Run `swift test --package-path Packages/AgentsKit` in a detached worktree at HEAD ([[three-lanes-one-tree]]) and confirm the only failures are the known flakes named in memory.
-- [ ] T065 [P] Re-read every doc comment added in `Passage.swift`, `LivePage.swift`, `DaemonCore+Artifacts.swift` and `Briefing.swift` against the house rule that a comment says why, and cite the FR or research section each decision came from.
+- [X] T065 [P] Re-read every doc comment added in `Passage.swift`, `LivePage.swift`, `DaemonCore+Artifacts.swift` and `Briefing.swift` against the house rule that a comment says why, and cite the FR or research section each decision came from.
 - [X] T066 Update `README.md`'s "A file, shown" bullet: a Markdown file opens as a page that follows the agent's edits and can be typed on, and the person's edits are told to the agent on its next turn. Two sentences, no more.
 
 ---
@@ -298,3 +298,16 @@ after its pause and then stopped before writing again, which is not a merge. Ful
 one place a merge on the way to disk could live without the agent's help.
 
 ### Success criteria
+
+*2026-09-23.* Assessed as far as the socket can see; the table is at the foot of
+`findings.md`. SC-006 and SC-008 hold outright; SC-007 is the findings file; the rest
+wait on the screen.
+
+### What is left, and how to do it
+
+The scratch app is running in the background against `/tmp/agents-022`, built from
+`/tmp/w022` (a detached worktree at 4b61403 with every later 022 file copied in — the full
+A–F code). Its project `/tmp/scratch-022` holds `notes.md` and a dozen documents the
+measurements wrote. To walk: open the scratch window, open any conversation, open Files,
+click a `.md`. T022, T034, T040 and T047 are the quickstart's Slices B–E; T056–T058, T060
+and T063 are the findings rows they fill.

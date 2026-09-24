@@ -1,6 +1,6 @@
 # Findings: Live Artifacts, A Proof Of Concept
 
-**Feature**: `022-live-artifacts` | **Status**: not yet walked
+**Feature**: `022-live-artifacts` | **Status**: measured over the socket 2026-09-23 for four runtimes; the on-screen walks (marks, typing, the collision card, the image redraw) are still to be seen
 
 This is the proof of concept's actual output (FR-017). Each row is a capability the agent
 used, needed, or was missing, with the observation behind it. A row is not deleted when a
@@ -48,7 +48,50 @@ again.
   first write. Fixed in Slice B; recorded because the spec's edge case was right and the
   daemon was not.
 - "Show me the Plan section" got the section pasted into the chat, not shown on the page.
+- Grok asks permission for every write. On a live page that is a card per save while the
+  person is trying to watch a document take shape; the walk should say whether it is
+  bearable, and "accept edits" for Grok is a question for its policy.
+- Three lanes in one working tree meant every commit here was staged as blobs and verified
+  in a detached worktree; one commit still swept in another lane's staged deletion and had
+  to be put back. Not the feature's fault, but it cost an hour.
 
 ## What the real feature needs
 
-- 
+- **A merge on the way to disk, or a tool the agent calls before each write.** The
+  mid-turn measurement is the whole case: three of four runtimes overwrote a passage the
+  person had just changed, because a whole-file write cannot know the file moved. Between
+  turns the note is enough and every runtime honoured it. For Grok the daemon already
+  serves the write and could fold the person's passages back in; for the others the write
+  never passes through anything of ours, so the agent would have to ask — and the
+  suggestions and show_file measurements say an agent does not call a tool it is only
+  offered. Which shape, and whether the briefing can carry a "before each write" rule an
+  agent will actually follow, is the first thing the real feature should measure.
+- **The page must be on screen when the document begins.** A document started from the
+  project page is written entirely off-screen because the conversation is not open. Either
+  starting a chat opens it, or a live document's first show is allowed to pull the window
+  to the conversation — a deliberate exception to the rule that a file shown in a
+  conversation you are not reading waits.
+- **"Show me X" as a second moment in the briefing.** Asked to show a section, Claude
+  pasted it. If the page is meant for reading as well as writing, the sentence has to say
+  so; if it is for writing, the reply text is fine and nothing is needed.
+- **Nothing new for editing or drawing.** Every runtime edited with its own tools, drew a
+  graph as an SVG beside the document when the description said to, and wrote no Mermaid.
+  No tool, no chart format.
+- **Still to be seen on screen** before any of the page's own shape is settled: the marks
+  landing on the right passage, the follow, the caret holding through a merge, the
+  collision card, and whether passage-level editing is the right way to type.
+
+## Success criteria, as far as the socket can see
+
+- SC-001 (change visible within a second): not measurable without the screen; the folder
+  watch coalesces at 0.2 s and the file is re-read whole, so nothing in the path is slow.
+- SC-002 (final content every time, changes nameable): final content held in every socket
+  run; nameable needs the screen.
+- SC-003 (typed text on disk within two seconds): the editor waits one second and the
+  daemon writes at once; not timed on screen.
+- SC-004, SC-005 (alternating edits; collisions): the merge is exhausted in unit tests;
+  the fifty-edit walk and the card are not yet seen.
+- SC-006 (the agent builds on the edited paragraph): 4/4 runtimes between turns.
+- SC-007 (findings usable by someone who did not watch): this file.
+- SC-008 (a diagram as an SVG unasked): 2/2 runtimes.
+
