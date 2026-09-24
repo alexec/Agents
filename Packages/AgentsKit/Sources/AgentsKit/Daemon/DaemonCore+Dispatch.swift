@@ -43,6 +43,13 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await addProject(request.folder)))
 
+            case DaemonAPI.Method.projectsClone:
+                let request = try require(params, as: DaemonAPI.CloneRequest.self)
+                return .success(try JSONValue.encoding(try await cloneProject(request.url)))
+
+            case DaemonAPI.Method.projectsClones:
+                return .success(try JSONValue.encoding(allClones()))
+
             case DaemonAPI.Method.projectsArchive:
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await archiveProject(request.folder)))

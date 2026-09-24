@@ -33,6 +33,9 @@ public final class Daemon: @unchecked Sendable {
         // what they raise rather than firing it into a layer that cannot act — see
         // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
         await core.holdWorkflowEventsUntilStarted()
+        // Whatever a previous daemon was cloning when it went is half a repository.
+        // It was never in the home folder, so this is the whole of cleaning up (027).
+        await core.clearCloneStaging()
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")

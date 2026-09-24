@@ -11,6 +11,7 @@ struct ProjectListView: View {
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     @State private var isChoosingFolder = false
+    @State private var isCloning = false
 
     var body: some View {
         List(selection: $selection) {
@@ -18,6 +19,10 @@ struct ProjectListView: View {
                 ProjectRow(summary: summary)
                     .tag(SidebarItem.project(summary.folder))
                     .contextMenu { menu(for: summary) }
+            }
+            // Where the project will be once it is one (027).
+            ForEach(model.clones) { clone in
+                CloningRow(clone: clone)
             }
 
             if !model.archivedProjects.isEmpty {
@@ -37,8 +42,8 @@ struct ProjectListView: View {
                                              : "Connecting…")
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
-            } else if model.projects.isEmpty, model.hasLoadedProjects {
-                EmptyProjectList(isChoosingFolder: $isChoosingFolder)
+            } else if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects {
+                EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
             }
         }
         .listStyle(.sidebar)
@@ -66,19 +71,24 @@ struct ProjectListView: View {
             // One button. Agents are started by telling a project what you want done,
             // so a button for starting one by hand would be a second way to do the
             // same thing, in the column that is not even about agents.
+            //
+            // Two ways in, one button: a folder already on the Mac, or a repository
+            // that is not yet (027).
             ToolbarItem {
-                Button {
-                    isChoosingFolder = true
+                Menu {
+                    Button("Choose Folder…") { isChoosingFolder = true }
+                    Button("Clone Git URL…") { isCloning = true }
                 } label: {
                     Label("New project", systemImage: "plus")
                 }
-                .help("Add a folder as a project")
+                .help("Add a folder, or clone a repository, as a project")
             }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
             Task { await model.addProject(folder) }
         }
+        .sheet(isPresented: $isCloning) { CloneSheet() }
     }
 
     @ViewBuilder
@@ -127,6 +137,7 @@ private struct ArchivedProjectRow: View {
 private struct EmptyProjectList: View {
     @Environment(AppModel.self) private var model
     @Binding var isChoosingFolder: Bool
+    @Binding var isCloning: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -143,8 +154,11 @@ private struct EmptyProjectList: View {
                     .appText(.reading).fontWeight(.semibold)
                 Text("A project is a folder you work in. Pick one and say what you want done.")
                     .foregroundStyle(.secondary)
-                Button("Add a project") { isChoosingFolder = true }
-                    .buttonStyle(.borderedProminent)
+                HStack {
+                    Button("Add a folder") { isChoosingFolder = true }
+                        .buttonStyle(.borderedProminent)
+                    Button("Clone a Git URL") { isCloning = true }
+                }
             }
         }
         .padding(.vertical, 8)
