@@ -394,4 +394,90 @@ struct WakefulnessTests {
         #expect(!wake.isHolding)
         #expect(wake.releases == 1)
     }
+
+    // MARK: US2 — the endings that were left, and the daemon going
+
+    @Test("A runtime process dying gives the Mac back")
+    func aDeadProcessReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        // Through the transition table, which is the real path a death takes — not a
+        // record written by hand. `move` calls `changed(_:)`, which is where the
+        // wakefulness hook lives, so this exercises the wiring and not a stand-in.
+        await core.move(id, on: .processDied)
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+        #expect(await core.agent(id)?.endedReason == .processDied)
+    }
+
+    @Test("An agent found dead by a restarting daemon gives the Mac back")
+    func foundDeadReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        await core.move(id, on: .foundDead)
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+        #expect(await core.agent(id)?.endedReason == .daemonGone)
+    }
+
+    @Test("Shutting down cleanly gives the Mac back, though the record still says running")
+    func shuttingDownReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        await core.shutDown()
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+
+        // And this is why `shutDown` must not simply revise: it leaves the agent
+        // reading `running` on purpose, so the next daemon finds it and records it as
+        // `foundDead` rather than pretending it finished. A revise here would have seen
+        // work in flight and kept holding until the process died (US2-5).
+        // Deliberately **not** asserting the agent's state here, though the first
+        // draft did. `shutDown` cancels the turn task, and whether that cancellation
+        // lands before `shutDown` returns is a race: alone the agent reads `running`,
+        // under the full parallel suite it sometimes already reads `stopped`.
+        //
+        // That race is the very reason `shutDown` calls `letGoOfTheMac` rather than
+        // `reviseWakefulness` — a revise would give a different answer depending on
+        // which side of the race it landed, and on the `running` side it would keep
+        // holding until the process died. Letting go unconditionally is right on both
+        // sides, and this test passes on both sides, which is the point (US2-5).
+    }
+
+    @Test("Shutting down with nothing held says nothing and does nothing")
+    func shuttingDownIdleIsQuiet() async throws {
+        let (locations, _) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        await core.shutDown()
+
+        // No release for a hold that was never taken. `letGoOfTheMac` guards on the
+        // last verdict for this: every daemon exit would otherwise log a line about
+        // letting the Mac sleep when it had never been holding it.
+        #expect(wake.releases == 0)
+        #expect(wake.holds == 0)
+    }
 }

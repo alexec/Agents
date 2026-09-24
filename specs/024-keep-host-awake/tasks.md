@@ -205,31 +205,31 @@ Mac alone, and confirm it sleeps on schedule from the moment the turn ended.
 **Note**: This is the same `reviseWakefulness()` Phase 3 built — no new production code
 beyond T026. The tasks are tests, because release is where this feature fails silently.
 
-- [ ] T023 [P] [US2] Add to `WakefulnessTests.swift`: a turn that ends normally releases the
+- [X] T023 [P] [US2] Add to `WakefulnessTests.swift`: a turn that ends normally releases the
       hold, and the release happens in the same call that records the ending rather than on a
       timer (FR-004's five seconds is met by construction).
 
-- [ ] T024 [P] [US2] Add the test that matters most: an agent taken to `waitingOnUser` —
+- [X] T024 [P] [US2] Add the test that matters most: an agent taken to `waitingOnUser` —
       blocked on a permission question — **never causes a hold**, and releases one it was
       holding (FR-003, US2-2). `isHoldingAgents` answers the opposite way for this same agent,
       which is exactly why this test exists.
 
-- [ ] T025 [P] [US2] Add tests for the three remaining endings, each releasing the hold:
+- [X] T025 [P] [US2] Add tests for the three remaining endings, each releasing the hold:
       stopped by hand mid-turn (US2-3), the runtime process dying (US2-4), and an agent found
       dead by a restarting daemon.
 
-- [ ] T026 [US2] Add a `reviseWakefulness()` call — or confirm one is already reached — on the
+- [X] T026 [US2] Add a `reviseWakefulness()` call — or confirm one is already reached — on the
       path where the daemon shuts down cleanly in `Daemon.shutDown()`, so the assertion is
       let go before the process goes rather than relying on the kernel (US2-5). Belt and
       braces; T027 is the braces.
 
-- [ ] T027 [US2] Add a comment in `Wakefulness.swift` recording that **no cleanup path, no
+- [X] T027 [US2] Add a comment in `Wakefulness.swift` recording that **no cleanup path, no
       persistence and no start-up sweep** is to be written for a hold left by a dead daemon:
       the kernel drops it, verified with `kill -9` in research §2. This comment is the task —
       the instinct to write that recovery code is strong and every line of it would be a
       liability (FR-013).
 
-- [ ] T028 [US2] Add a comment at `DaemonCore+Lifetime.swift:8` on `isHoldingAgents` pointing
+- [X] T028 [US2] Add a comment at `DaemonCore+Lifetime.swift:8` on `isHoldingAgents` pointing
       at `hasWorkInFlight` and saying the two are deliberately different sets. The pair now
       exists in both directions (T014 is the other half), so neither can be "fixed" into the
       other by someone who finds only one.
@@ -664,3 +664,34 @@ five seconds is being met by a fifteen-second timer, which is to say not met.
 Still open: Phase 4's T026–T028, Phase 6 (the UI), Phase 7. **T050, the battery walk on a
 real laptop below 20%, remains Alex's** — `FakePowerSource` covers the truth table and the
 tick wiring; only hardware covers the real IOKit reading.
+
+
+### Phase 4 finished, 2026-09-24
+
+T023–T028 done; Phase 4 is complete. 18 tests in `WakefulnessTests`, 1165 in the package.
+Both schemes build.
+
+**T026's task text suggested the wrong implementation, and the code says so.** It asked for
+a `reviseWakefulness()` call in `shutDown()`. That would have been a bug: `shutDown`
+deliberately leaves an agent that was mid-turn reading `running` on disk, so the next daemon
+finds it and records it as `foundDead` rather than pretending it finished. A revise there
+sees work in flight, decides to keep holding, and holds until the process dies. So
+`letGoOfTheMac()` releases unconditionally instead, guarded on the last verdict so an idle
+daemon exiting does not log a line about letting go of something it never held.
+
+**The shutdown test asserts less than its first draft did.** It originally checked the agent
+still read `running` afterwards — true in isolation, false about a third of the time under
+the full parallel suite, because `shutDown` cancels the turn task and whether that
+cancellation lands before `shutDown` returns is a race. That race is *why* unconditional
+release is right: a revise would answer differently depending on which side it landed on.
+The test asserts the thing that is invariant.
+
+**T027 was already satisfied** by the comment written during Phase 3.
+
+**A flakiness scare, measured and dismissed.** A first sample showed 3 of 4 branch runs
+failing against 1 of 6 on main, which looked like a regression. Re-running the branch six
+times under the same conditions gave 1 of 6, the same rate as main, and the only failure was
+the known `aStoppedAgentIsPickedUpRatherThanCopied`. The earlier sample was machine load from
+other lanes. Samples taken minutes apart on this Mac are not comparable — see the memory note.
+
+Still open: Phase 6 (the UI), Phase 7. **T050, the battery walk on a real laptop, is Alex's.**

@@ -5,6 +5,18 @@ extension DaemonCore {
     ///
     /// A permission waiting on an answer counts, and that is the point: the question
     /// can arrive while no window is open, and something has to stay alive holding it.
+    ///
+    /// **Not to be confused with `hasWorkInFlight`** (`DaemonCore+Wakefulness.swift`),
+    /// which is one line long, looks like this one, and deliberately answers the
+    /// opposite way about the very state named above. This asks *may the daemon exit*,
+    /// so an agent blocked on a person counts — exiting under an unanswered question
+    /// would abandon it. That one asks *is the CPU busy*, so the same agent does not
+    /// count: holding the Mac awake all night for a permission prompt nobody answered
+    /// is the one thing 024 must not do.
+    ///
+    /// Neither is a bug to be fixed into the other. The pair is cross-referenced in
+    /// both directions on purpose, because whoever finds only one of them will assume
+    /// the other is a mistake (024 FR-003).
     public var isHoldingAgents: Bool {
         if !live.isEmpty { return true }
         // An agent on its way back up after a restart has no runtime yet and is not in

@@ -724,6 +724,9 @@ public actor DaemonCore {
         // Every record written, in order, before the daemon goes.
         await saveTail?.value
         await store.closeAll()
+        // Last, so the Mac is held for as long as there is shutting down to do. See
+        // `letGoOfTheMac` for why this is not `reviseWakefulness()` (024 US2-5).
+        letGoOfTheMac()
     }
 }
 
