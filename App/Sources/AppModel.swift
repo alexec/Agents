@@ -988,6 +988,22 @@ final class AppModel {
                               returning: DaemonAPI.ShellAttachResponse.self)
     }
 
+    /// What the person typed on a live page, sent to the daemon to put on disk (022).
+    /// The daemon writes rather than the window so that it knows the person did. Nil
+    /// on success; on failure, the sentence to show beside the passage, with the draft
+    /// kept.
+    func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
+        do {
+            try await client.call(DaemonAPI.Method.artifactWrite,
+                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     /// Detaching never stops anything. A build carries on (FR-026).
     func detachShell(agentID: UUID) async {
         try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.AgentRequest(agentID: agentID))

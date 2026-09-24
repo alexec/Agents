@@ -53,6 +53,66 @@ struct ArtifactWriteTests {
         } ?? ""
     }
 
+    private func started(_ launcher: FakeLauncher, _ core: DaemonCore, in work: URL) async throws -> UUID {
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = await mintedToken(launcher)
+        return id
+    }
+
+    @Test func aWriteInsideTheAgentsFolderLandsOnDisk() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try await core(launcher, locations: locations, watching: Broadcasts())
+        let id = try await started(launcher, core, in: work)
+
+        let path = work.appendingPathComponent("notes.md").path
+        try await core.artifactWrite(.init(agentID: id, path: path, text: "# One\n\nTwo.\n"))
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "# One\n\nTwo.\n")
+
+        // Again, with the same text: not an error, and not a second version.
+        try await core.artifactWrite(.init(agentID: id, path: path, text: "# One\n\nTwo.\n"))
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "# One\n\nTwo.\n")
+    }
+
+    @Test func aWriteOutsideTheAgentsFolderIsRefusedAndNothingIsWritten() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try await core(launcher, locations: locations, watching: Broadcasts())
+        let id = try await started(launcher, core, in: work)
+
+        let outside = locations.root.appendingPathComponent("elsewhere.md").path
+        await #expect(throws: JSONRPCError.self) {
+            try await core.artifactWrite(.init(agentID: id, path: outside, text: "x"))
+        }
+        #expect(!FileManager.default.fileExists(atPath: outside))
+
+        await #expect(throws: JSONRPCError.self) {
+            try await core.artifactWrite(.init(agentID: id, path: "relative.md", text: "x"))
+        }
+    }
+
+    @Test func anAgentThatIsNotHereIsRefused() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(midTurn(), locations: locations, watching: Broadcasts())
+        let path = work.appendingPathComponent("notes.md").path
+        await #expect(throws: JSONRPCError.self) {
+            try await core.artifactWrite(.init(agentID: UUID(), path: path, text: "x"))
+        }
+        #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test func aFileThatIsNotThereYetIsCreated() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try await core(launcher, locations: locations, watching: Broadcasts())
+        let id = try await started(launcher, core, in: work)
+
+        let path = work.appendingPathComponent("new.md").path
+        #expect(!FileManager.default.fileExists(atPath: path))
+        try await core.artifactWrite(.init(agentID: id, path: path, text: "Begun."))
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "Begun.")
+    }
+
     /// Everything the daemon told the windows, in order.
     private actor Broadcasts {
         private var sent: [(String, JSONValue?)] = []

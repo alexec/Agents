@@ -69,6 +69,10 @@ public enum DaemonAPI {
         /// Nor this one. The other half of that MCP server: the agent asking that a
         /// file be put in front of the user.
         public static let agentsShowFile = "agents/showFile"
+        /// A window asking the daemon to write what the person typed on a live page
+        /// (022). The daemon writes rather than the window, so that it knows the
+        /// person did — that is what lets it tell the agent on its next turn.
+        public static let artifactWrite = "artifact/write"
         // A project is a folder. These four are everything that can be done to one,
         // which is to say: notice it, and put it away.
         public static let projectsList = "projects/list"
@@ -464,6 +468,22 @@ public enum DaemonAPI {
     /// What the MCP helper sends when an agent calls the show-file tool. The token
     /// does the same work it does for a suggestion, and the path is checked against
     /// that agent's folders before any window hears about it.
+    /// The whole document, as the page now has it, for the daemon to put on disk.
+    /// Whole rather than a patch: the page is the one thing that knows how the
+    /// passages join back up, and the daemon diffs the two versions itself to learn
+    /// which passages the person changed.
+    public struct ArtifactWriteRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        public var text: String
+
+        public init(agentID: UUID, path: String, text: String) {
+            self.agentID = agentID
+            self.path = path
+            self.text = text
+        }
+    }
+
     public struct ShowFileRequest: Codable, Sendable {
         public var token: String
         public var file: ShownFile

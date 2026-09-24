@@ -22,15 +22,36 @@ import SwiftUI
 /// it needs to be. FR-004 of 007 still holds: no sheet edge, no shadow, no drawn border
 /// — the paper is the space and the type.
 struct LivePage: View {
+    @Environment(AppModel.self) private var model
+
     let text: String
     /// Where the document is, so an image beside it can be found.
     let url: URL
     /// The line an agent named, or nil. Read once when it changes: the view goes to
     /// the passage holding it and marks it (FR-007), and then the line is spent.
     let line: Int?
-    /// True while the person has a passage open for typing. Marks still land; the
-    /// view does not move.
-    let isEditing: Bool
+    /// Whose page this is: the daemon writes the person's typing inside this agent's
+    /// folders and remembers it for this agent's next turn.
+    let agentID: UUID
+
+    /// The one passage open for typing, if any. It holds only its own source, so an
+    /// agent's write elsewhere in the file re-renders around it and never replaces
+    /// what is under the caret (FR-012).
+    private struct Editing {
+        var index: Int
+        /// The passage as it was when the editor opened, or as last saved: what
+        /// `draft` is compared against to know whether there is anything to write.
+        var base: String
+        var draft: String
+    }
+
+    @State private var editing: Editing?
+    /// The whole document as last handed to the daemon, so its own echo through the
+    /// folder watch is recognised and not treated as news.
+    @State private var lastWritten: String?
+    @State private var saveProblem: String?
+
+    private var isEditing: Bool { editing != nil }
 
     @State private var passages: [Passage] = []
     /// Which passages are marked, and when each mark was set. A mark is not a flag
@@ -83,7 +104,25 @@ struct LivePage: View {
 
     private func passage(_ index: Int, metrics: PageMetrics) -> some View {
         let isMarked = marked[index] != nil
-        return MarkdownText(markdown: passages[index].source, base: url)
+        return Group {
+            if editing?.index == index {
+                VStack(alignment: .leading, spacing: 4) {
+                    PassageEditor(draft: draftBinding, onCommit: commit, onClose: close)
+                    if let saveProblem {
+                        Text(saveProblem)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                MarkdownText(markdown: passages[index].source, base: url)
+                    // The whole passage is the click target, gaps included, so a
+                    // click beside a short line still opens it. A `Button` would eat
+                    // the drag that selects text; a tap gesture does not.
+                    .contentShape(Rectangle())
+                    .onTapGesture { begin(index) }
+            }
+        }
             .frame(maxWidth: metrics.measure, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -99,6 +138,42 @@ struct LivePage: View {
             .frame(maxWidth: .infinity)
     }
 
+    // MARK: Typing
+
+    private var draftBinding: Binding<String> {
+        Binding(get: { editing?.draft ?? "" },
+                set: { editing?.draft = $0 })
+    }
+
+    private func begin(_ index: Int) {
+        // Opening another passage closes this one, writing it first.
+        if editing != nil { close() }
+        guard passages.indices.contains(index) else { return }
+        editing = Editing(index: index, base: passages[index].source, draft: passages[index].source)
+        saveProblem = nil
+    }
+
+    /// The draft is due on disk: the document with this passage's draft in place of
+    /// its source, whole, handed to the daemon (FR-011).
+    private func commit() {
+        guard let current = editing, current.draft != current.base,
+              passages.indices.contains(current.index) else { return }
+        var edited = passages
+        edited[current.index].source = current.draft
+        let document = Passage.join(edited)
+        lastWritten = document
+        Task {
+            let problem = await model.writeArtifact(agentID: agentID, path: url.path, text: document)
+            saveProblem = problem
+            if problem == nil { editing?.base = current.draft }
+        }
+    }
+
+    private func close() {
+        commit()
+        editing = nil
+    }
+
     // MARK: Following
 
     private func load(_ text: String) {
@@ -109,11 +184,30 @@ struct LivePage: View {
     /// New text on disk: what changed is marked, and the view goes to the first of it
     /// unless the person is typing.
     private func follow(_ new: String, proxy: ScrollViewProxy) {
+        if new == lastWritten {
+            // The person's own save, back through the folder watch. Not news: no
+            // mark, no scroll. The passages are re-split because the draft may have
+            // gained or lost a blank line; if it did, the editor's index no longer
+            // names one passage and it closes rather than guess.
+            let fresh = Passage.split(new)
+            if let current = editing,
+               fresh.indices.contains(current.index), fresh[current.index].source == current.draft {
+                passages = fresh
+            } else {
+                passages = fresh
+                editing = nil
+            }
+            lastLoaded = new
+            return
+        }
         let change = PassageChange.between(old: lastLoaded, new: new)
+        // Somebody else wrote while a passage is open: Slice D (T037) carries the
+        // draft across with `PassageMerge`. Until then the draft is kept, the page
+        // re-splits, and the editor stays on its index.
         passages = Passage.split(new)
         lastLoaded = new
         guard let first = change.first else { return }
-        mark(Array(change.changed))
+        mark(Array(change.changed).filter { $0 != editing?.index })
         guard !isEditing else { return }
         Task { await go(to: first, proxy: proxy) }
     }

@@ -3,9 +3,10 @@ import SwiftUI
 
 /// The agent's folder, and what is in it.
 ///
-/// Read-only, deliberately and completely (FR-017). There is no create, rename, delete
-/// or edit anywhere in here. The terminal pane is the escape hatch until a later
-/// feature says otherwise.
+/// Read-only, deliberately (004 FR-017), with one exception that 022 made: a Markdown
+/// file opens as a live page the person can type on, and what they type goes to disk
+/// through the daemon. Nothing else here creates, renames, deletes or edits; the
+/// terminal pane is still the escape hatch for the rest.
 struct FilesPane: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
@@ -154,7 +155,7 @@ struct FilesPane: View {
                     .padding(.vertical, 6)
                 Divider()
                 LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
-                         isEditing: false)
+                         agentID: agent.id)
             }
         } else if let fileProblem {
             Gone(message: fileProblem)
@@ -169,7 +170,7 @@ struct FilesPane: View {
                     // Everything else is untouched: numbered source, as it was.
                     if isMarkdown(url) {
                         LivePage(text: probe.text ?? "", url: url, line: state.openLine,
-                                 isEditing: false)
+                                 agentID: agent.id)
                     } else {
                         FileLines(text: probe.text ?? "", line: state.openLine)
                     }

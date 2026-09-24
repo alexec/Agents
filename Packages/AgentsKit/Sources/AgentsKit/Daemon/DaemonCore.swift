@@ -56,6 +56,11 @@ public actor DaemonCore {
     /// runtime loses one and we have to begin a new one — the briefing lives in the
     /// runtime's history, so that is the only time it is gone.
     var needsBriefing: Set<UUID> = []
+    /// The passages the person changed on a live page since the agent last took a
+    /// turn, keyed by agent. Handed to the agent as a block after the person's next
+    /// words, then cleared. Not persisted: the edit itself is on disk in the file,
+    /// and a daemon that restarts has nothing to apologise for (022 FR-016).
+    var artifactEdits: [UUID: [ArtifactEdit]] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]
