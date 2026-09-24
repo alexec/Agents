@@ -80,6 +80,12 @@ public enum DaemonAPI {
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
+        /// Clone a Git URL into the home folder and add it (027). Answers when the
+        /// project exists, which for a big repository is minutes: the window shows the
+        /// clone from `clone/changed`, not from waiting on this.
+        public static let projectsClone = "projects/clone"
+        /// The clones under way, for a window that connects in the middle of one.
+        public static let projectsClones = "projects/clones"
 
         // Workflows: the prompts a project keeps that run themselves.
         public static let workflowsList = "workflows/list"
@@ -172,6 +178,9 @@ public enum DaemonAPI {
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
+        /// A clone began, or ended either way (027). Every window hears it, because a
+        /// clone belongs to the Mac and not to the window that asked for it.
+        public static let cloneChanged = "clone/changed"
 
         /// A workflow appeared, changed, ran, was refused, or was archived. Carries the
         /// whole resolved summary rather than a delta, for the reason `project/changed`
@@ -214,6 +223,38 @@ public enum DaemonAPI {
     public struct ProjectRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
+    }
+
+    /// A Git URL, as pasted (027).
+    public struct CloneRequest: Codable, Sendable {
+        public var url: String
+        public init(url: String) { self.url = url }
+    }
+
+    /// One clone under way: what it is of, and where it is going.
+    public struct CloneSummary: Codable, Hashable, Sendable, Identifiable {
+        public var id: UUID
+        public var url: String
+        /// Where the project will be. Nothing is there until the clone has finished.
+        public var folder: URL
+        public var startedAt: Date
+        public init(id: UUID, url: String, folder: URL, startedAt: Date) {
+            self.id = id
+            self.url = url
+            self.folder = folder
+            self.startedAt = startedAt
+        }
+    }
+
+    public struct CloneNotification: Codable, Sendable {
+        public var clone: CloneSummary
+        /// Ended, whichever way. Success is the `project/changed` that follows; failure
+        /// is the error the caller was answered with.
+        public var finished: Bool
+        public init(clone: CloneSummary, finished: Bool) {
+            self.clone = clone
+            self.finished = finished
+        }
     }
 
     /// A project, plus the parts only the daemon can know.
@@ -1031,6 +1072,13 @@ public enum DaemonAPI {
         /// A new agent asked for while the per-agent limit is zero. Every agent would
         /// be at it before its first word, and a new one has no queue to hold on.
         public static let agentLimitReached = -32023
+        /// Text that is not an HTTPS or SSH Git URL, or has no name to give a folder (027).
+        public static let notACloneURL = -32024
+        /// The folder a clone would become is already there and is not a checkout of
+        /// that repository. The message names it; nothing in it is touched.
+        public static let folderInTheWay = -32025
+        /// Git could not clone it. The message says why in a sentence.
+        public static let cloneFailed = -32026
     }
 
     // MARK: Workflows

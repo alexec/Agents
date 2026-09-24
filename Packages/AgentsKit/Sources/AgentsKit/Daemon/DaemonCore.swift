@@ -102,6 +102,16 @@ public actor DaemonCore {
     /// only writer, and `allProjects` — which runs each time any agent changes —
     /// used to read the file every time.
     var projectRecordsCache: [URL: Project]?
+    /// Clones under way, by id (027). Memory only: a clone the daemon did not live to
+    /// finish is not resumed, and its staging folder is removed on the next start.
+    var clones: [UUID: RunningClone] = [:]
+    /// Where a clone becomes a project: the home folder, unless `AGENTS_CLONE_PARENT`
+    /// says otherwise — which only tests and scratch runs do, so that trying the
+    /// feature never writes into somebody's real home folder.
+    var cloneParent: URL = DaemonCore.defaultCloneParent()
+    /// Tests only: turns the URL a person would paste into one git can reach offline.
+    /// The URL is still checked as pasted; only what git is handed changes.
+    var cloneURLRewrite: (@Sendable (String) -> String)?
     /// What each runtime last advertised, so a start form does not wait for a runtime
     /// to say what it said last time. Read from disk the first time it is wanted.
     lazy var optionCache = OptionCache(locations: locations)
@@ -712,6 +722,9 @@ public actor DaemonCore {
     // MARK: Shutting down
 
     public func shutDown() async {
+        // A clone cut short is deleted on the next start, which is the same whether it
+        // was stopped here or the daemon simply died (027 FR-011).
+        for clone in clones.values { clone.process?.terminate() }
         workflowTicker?.cancel()
         workflowTicker = nil
         for (_, task) in workflowRescans { task.cancel() }

@@ -41,6 +41,9 @@ final class AppModel {
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
     private(set) var problem: String?
+    /// Clones under way on this Mac, from whichever window started them (027). Each is
+    /// a row in the Projects column until it becomes a project or fails.
+    private(set) var clones: [DaemonAPI.CloneSummary] = []
 
     // What the window reads, which is the shared model under another name. Forwarded
     // rather than mirrored: a copy is a thing that can fall behind.
@@ -425,6 +428,30 @@ final class AppModel {
         }
     }
 
+    /// Clone a Git URL into the home folder and select the project it becomes (027).
+    ///
+    /// Returns as soon as the daemon answers, which is when the clone has finished; the
+    /// row the window draws meanwhile comes from `clone/changed`, not from waiting here.
+    func cloneProject(_ url: String) async {
+        do {
+            let summary = try await client.call(DaemonAPI.Method.projectsClone,
+                                                DaemonAPI.CloneRequest(url: url),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            upsert(summary)
+            selectedProject = summary.folder
+            settleProjectSelection()
+        } catch {
+            // Written for the person already: which host, which folder, what to do.
+            problem = describe(error)
+        }
+    }
+
+    func refreshClones() async {
+        guard let running = try? await client.call(DaemonAPI.Method.projectsClones,
+                                                   returning: [DaemonAPI.CloneSummary].self) else { return }
+        clones = running
+    }
+
     func archiveProject(_ folder: URL) async {
         await callProject(DaemonAPI.Method.projectsArchive, folder)
     }
@@ -570,6 +597,11 @@ final class AppModel {
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
 
+        case DaemonAPI.Notification.cloneChanged:
+            guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }
+            clones.removeAll { $0.id == change.clone.id }
+            if !change.finished { clones.append(change.clone) }
+
         case DaemonAPI.Notification.agentTerminalOutput:
             guard let notification = try? params?.decode(DaemonAPI.TerminalOutputNotification.self) else { return }
             terminalOutput[notification.terminalID, default: ""] += notification.chunk
@@ -598,10 +630,11 @@ final class AppModel {
         async let attention: Void = refreshAttention()
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
+        async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, wake, transcript)
+                   elicitations, attention, resuming, cost, cloning, wake, transcript)
     }
 
     func refreshElicitations() async {

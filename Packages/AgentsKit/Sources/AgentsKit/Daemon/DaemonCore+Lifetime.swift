@@ -33,6 +33,9 @@ extension DaemonCore {
         // Exiting under one would kill the build, which is the whole thing FR-026
         // promises will not happen (FR-027).
         if shells.busyCount > 0 { return true }
+        // A clone with no window open is still somebody's project on its way. Exiting
+        // under it would throw the download away (027).
+        if !clones.isEmpty { return true }
         return agents.values.contains { $0.state.holdsRuntime }
     }
 
