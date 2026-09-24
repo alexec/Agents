@@ -147,13 +147,14 @@ struct FilesPane: View {
             switch probe.kind {
             case .text:
                 VStack(alignment: .leading, spacing: 0) {
-                    // Prototype: markdown reads as a document, everything else is
-                    // untouched. No toggle yet and no source view for a `.md` file —
-                    // both are in the plan, neither is what the surface is being
-                    // looked at for. A line an agent named still wins, because a
-                    // rendered page has no line 412.
-                    if isMarkdown(url), state.openLine == nil {
-                        DocumentView(text: probe.text ?? "", url: url)
+                    // Markdown reads as a page, and the page is live: it follows the
+                    // file as the agent writes it (022). A line an agent named no
+                    // longer forces the source view — the page has a passage for
+                    // every line, and goes to the one that holds it (FR-007).
+                    // Everything else is untouched: numbered source, as it was.
+                    if isMarkdown(url) {
+                        LivePage(text: probe.text ?? "", url: url, line: state.openLine,
+                                 isEditing: false)
                     } else {
                         FileLines(text: probe.text ?? "", line: state.openLine)
                     }
@@ -243,7 +244,15 @@ struct FilesPane: View {
     private func reloadFile(_ url: URL) {
         loaded = url
         do {
-            probe = try FileProbe.read(url)
+            let fresh = try FileProbe.read(url)
+            // The watch is on the whole folder, so a build writing beside this file
+            // lands here too. Unchanged bytes are not news: the page would diff two
+            // equal texts and find nothing, but it need not be asked to.
+            if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size {
+                fileProblem = nil
+                return
+            }
+            probe = fresh
             fileProblem = nil
         } catch FileProbe.Failure.gone {
             probe = nil
