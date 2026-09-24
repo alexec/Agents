@@ -98,6 +98,15 @@ live somewhere, and the file is where.
 Seven days matches the spend ledger's horizon and exists so this cannot become a queue
 that grows forever.
 
+**Amended while building (2026-09-24): who counts as "somebody".** The retry first
+planned here — re-post whenever a connection appears — does not survive contact with the
+code. The daemon cannot tell the bridge from a window, because every connection starts as
+the Mac and the bridge never says otherwise; and `agentsd mcp` connects and disconnects on
+every tool call, so a connection appears several times a turn per agent. So the bridge now
+says `mailbox/carry` on connecting, and a withdrawal is handed over only while a
+connection that said it is listening. That is the same guarantee every other post has,
+which is all this section ever asked for.
+
 **Alternatives considered**:
 
 - *Decide the withdrawal later, once something is connected*. Rejected: it makes the

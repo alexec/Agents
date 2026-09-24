@@ -46,7 +46,9 @@ additive, and nothing here changes it.
    at `alertedAt`. The ordinary re-alert rule applies from that moment, unchanged.
 3. A need named in `deliveries` that is **not** outstanding is over: its surface is
    withdrawn from, and if that surface is a device the withdrawal is added to
-   `withdrawing` until it has been handed to somebody.
+   `withdrawing` until it has been handed to a connection that has said `mailbox/carry`
+   — the bridge — or to a mailbox of the daemon's own. A later post of the same need to
+   the same device voids it.
 4. A `deliveries` or `withdrawing` entry naming a device the daemon does not know is
    dropped on load. Nothing is sealed to, or withdrawn from, a device that is not on
    record.

@@ -27,6 +27,10 @@ extension DaemonCore {
                 try identify(who, from: surface, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.mailboxCarry:
+                try becomeCarrier(connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.devicesList:
                 return .success(try JSONValue.encoding(allDevices()))
 

@@ -38,11 +38,18 @@ public actor DaemonCore {
     /// about a need that must not move, and a restart used to move it — which restarted
     /// the settling pause and the re-alert clock along with it.
     var needRaisedAt: [NeedID: Date] = [:]
-    /// Banners that have to come down on a device that could not be told at the time.
-    /// Loaded and written back from US1; acted on in US2.
+    /// Banners that have to come down on a device, waiting for something to carry them.
+    /// On disk in `attention.json`, so a daemon that goes before a bridge arrives hands
+    /// the debt to the next one. See `DaemonCore+Attention`.
     var pendingWithdrawals: [PendingWithdrawal] = []
+    /// The connections that have said they carry mail — in practice the bridge, and at
+    /// most one. In memory only: a carrier is a live connection, and the next daemon
+    /// learns of its own when the bridge reconnects and says so again.
+    var carriers: Set<UUID> = []
     /// The last thing written to `attention.json`, so `writeAttentionIfMoved` can do
-    /// nothing when nothing moved. `reconsider()` runs on every presence report from
+    /// nothing when nothing moved. `nil` until `loadAttention()` has read the file, and
+    /// nothing is written while it is: a core that never read the notes must not
+    /// overwrite them. `reconsider()` runs on every presence report from
     /// every window and device — several times a second with nobody doing anything — and
     /// an unconditional write there would be a file rewritten for no reason all day.
     var lastWrittenAttention: AttentionRecords?

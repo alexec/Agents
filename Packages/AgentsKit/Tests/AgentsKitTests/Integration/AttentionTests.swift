@@ -817,3 +817,267 @@ struct AttentionRestartTests {
         #expect(await second.attentionPending().deliveries.isEmpty)
     }
 }
+
+// MARK: - 025 US2: a question that is gone stops asking
+//
+// When a question dies with the daemon, the next daemon has to take its banner down —
+// and the withdrawal is the one post with no second chance. Every other post is
+// repeated by the daemon's next decision about that need; this one is *about* the need
+// being over, so there is no next decision. Posted into a room with nobody carrying
+// mail in it, it is simply gone, and the phone keeps a question nobody can answer.
+//
+// The daemon cannot tell the bridge from a window — every connection starts as the Mac,
+// and the bridge never says otherwise — so the bridge now says `mailbox/carry`, and a
+// withdrawal waits in `attention.json` until something that will carry it is listening.
+
+/// Every `mailbox/post` a daemon broadcasts, for the daemon's own case: no mailbox of
+/// its own, so what it has for a device goes out for the bridge to carry.
+final class MailboxRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var heard: [MailboxItem] = []
+
+    func attach(to core: DaemonCore) async {
+        await core.setBroadcaster { [weak self] method, params in
+            guard method == DaemonAPI.Notification.mailboxPost, let params,
+                  let item = try? params.decode(MailboxItem.self) else { return }
+            self?.append(item)
+        }
+    }
+
+    private func append(_ item: MailboxItem) {
+        lock.lock(); defer { lock.unlock() }
+        heard.append(item)
+    }
+
+    var items: [MailboxItem] {
+        lock.lock(); defer { lock.unlock() }
+        return heard
+    }
+
+    func withdrawals(of need: NeedID) -> [MailboxItem] {
+        items.filter { $0.needID == need && $0.envelope == nil }
+    }
+}
+
+@Suite("Withdrawals across a restart", .timeLimit(.minutes(1)))
+struct WithdrawalRestartTests {
+    private let thresholds = AttentionThresholds(macIdle: 60, deviceStaleness: 60,
+                                                 settlingPause: 0.15, reAlertInterval: 60)
+
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsWithdrawalRestart-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), work)
+    }
+
+    private func core(locations: StoreLocations, mailbox: (any Mailbox)? = nil,
+                      launcher: FakeLauncher = FakeLauncher(script: .init())) throws -> DaemonCore {
+        DaemonCore(store: try AgentStore(locations: locations),
+                   locations: locations,
+                   discovery: .findsEverything,
+                   launcher: launcher,
+                   thresholds: thresholds,
+                   mailbox: mailbox)
+    }
+
+    /// A runtime that asks permission mid-turn and waits on the answer.
+    private func asking() -> FakeLauncher {
+        var script = FakeACPAgent.Script()
+        script.permission = ["toolCall": ["title": "Delete build/", "rawInput": ["description": "Delete the build folder"]],
+                             "options": [["optionId": "allow", "name": "Allow", "kind": "allow_once"],
+                                         ["optionId": "no", "name": "Reject", "kind": "reject_once"]]]
+        return FakeLauncher(script: script)
+    }
+
+    /// The first daemon: a question held, and put in front of a phone the person has in
+    /// hand, with nobody at the Mac. Returns the need, so the next daemon can be asked
+    /// about it.
+    private func aQuestionOnThePhone(_ locations: StoreLocations, in work: URL,
+                                     phone: FakeSurface, mailbox: (any Mailbox)? = nil) async throws -> NeedID {
+        let first = try core(locations: locations, mailbox: mailbox, launcher: asking())
+        _ = await first.recover()
+        let heard = AttentionRecorder(); await heard.attach(to: first)
+        await phone.pair(first, name: "iPhone", kind: .iPhone)
+        await phone.report(first, active: true, mayNotify: true)
+        let id = try await first.start(.init(runtimeID: "claude", cwd: work, prompt: "tidy up"))
+        await eventually("the agent is waiting on its question") {
+            await first.agent(id)?.state == .waitingOnUser
+        }
+        let shown = try #require(await eventuallySome("the phone was shown it") {
+            heard.deliveries.first { $0.to == phone.surface }
+        })
+        return shown.needID
+    }
+
+    private func onDisk(_ locations: StoreLocations) -> AttentionRecords {
+        AttentionStore(locations: locations).load()
+    }
+
+    /// Scenario 1: with a mailbox to post to, the next daemon takes the banner down, and
+    /// nothing about it is left in the file afterwards.
+    @Test func aWithdrawalReachesTheMailboxAfterARestart() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let phone = FakeSurface(.device(UUID()))
+        let need = try await aQuestionOnThePhone(locations, in: work, phone: phone, mailbox: FakeMailbox())
+
+        let mailbox = FakeMailbox()
+        let second = try core(locations: locations, mailbox: mailbox)
+        _ = await second.recover()
+        await FakeSurface(.mac).report(second, active: true)
+
+        let posted = try #require(await eventuallySome("a withdrawal was posted for the question") {
+            await mailbox.posted.first { $0.needID == need && $0.envelope == nil }
+        })
+        #expect(posted.device == phone.surface.deviceID)
+        await eventually("nothing about it is left in the file") {
+            let records = onDisk(locations)
+            return records.withdrawing.isEmpty && !records.deliveries.contains { $0.needID == need }
+        }
+    }
+
+    /// Scenario 2, and the reason US2 is more than one line: the daemon's own case has no
+    /// mailbox, so a withdrawal goes out for the bridge — and until something that
+    /// carries mail is listening, it must wait rather than be shouted into the room.
+    /// A window is not a carrier, however many of them there are.
+    @Test func aWithdrawalWaitsForSomethingThatWillCarryIt() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let phone = FakeSurface(.device(UUID()))
+        let need = try await aQuestionOnThePhone(locations, in: work, phone: phone)
+
+        let second = try core(locations: locations)
+        let heard = MailboxRecorder(); await heard.attach(to: second)
+        _ = await second.recover()
+        // A window arrives. It is not a carrier.
+        await FakeSurface(.mac).report(second, active: true)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(heard.withdrawals(of: need).isEmpty, "nobody was listening who could carry it")
+        #expect(onDisk(locations).withdrawing.map(\.need) == [need], "so it waits, on disk")
+        #expect(onDisk(locations).withdrawing.first?.device == phone.surface.deviceID)
+
+        // The bridge arrives and says what it is for.
+        let bridge = UUID()
+        _ = await second.handle(method: DaemonAPI.Method.mailboxCarry, params: nil,
+                                from: .mac, connection: bridge)
+
+        await eventually("the withdrawal went out once there was a carrier") {
+            heard.withdrawals(of: need).count == 1
+        }
+        #expect(heard.withdrawals(of: need).first?.device == phone.surface.deviceID)
+        await eventually("and was forgotten once handed over") { onDisk(locations).withdrawing.isEmpty }
+    }
+
+    /// FR-005 across a daemon exit: a withdrawal no carrier heard is still owed, and the
+    /// next daemon pays it.
+    @Test func aWithdrawalNobodyCarriedIsCarriedByTheNextDaemon() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let phone = FakeSurface(.device(UUID()))
+        let need = try await aQuestionOnThePhone(locations, in: work, phone: phone)
+
+        // The second daemon decides it, and goes before any bridge arrives.
+        let second = try core(locations: locations)
+        _ = await second.recover()
+        await FakeSurface(.mac).report(second, active: true)
+        await eventually("it waits on disk") { onDisk(locations).withdrawing.map(\.need) == [need] }
+
+        let third = try core(locations: locations)
+        let heard = MailboxRecorder(); await heard.attach(to: third)
+        _ = await third.recover()
+        _ = await third.handle(method: DaemonAPI.Method.mailboxCarry, params: nil,
+                               from: .mac, connection: UUID())
+
+        await eventually("the third daemon carried what the second could not") {
+            heard.withdrawals(of: need).count == 1
+        }
+        await eventually("and the debt is cleared") { onDisk(locations).withdrawing.isEmpty }
+    }
+
+    /// A carrier that has gone carries nothing. Its disconnect must take it off the list,
+    /// or a withdrawal decided afterwards is handed to a bridge that is not there — and
+    /// forgotten, as though it had been.
+    @Test func aCarrierThatHasGoneCarriesNothing() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let core = try core(locations: locations, launcher: asking())
+        _ = await core.recover()
+        let heard = MailboxRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.pair(core, name: "iPhone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "tidy up"))
+        await eventually("waiting on its question") { await core.agent(id)?.state == .waitingOnUser }
+        let need = try #require(await core.attentionPending().needs.first?.id)
+
+        // The bridge comes, and goes.
+        let bridge = UUID()
+        _ = await core.handle(method: DaemonAPI.Method.mailboxCarry, params: nil,
+                              from: .mac, connection: bridge)
+        await core.forgetCarrier(connection: bridge)
+
+        // Then the question is over, with nothing left to carry it.
+        try await core.stop(id)
+        await eventually("the withdrawal is owed") { onDisk(locations).withdrawing.map(\.need) == [need] }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(heard.withdrawals(of: need).isEmpty, "handed to a bridge that had gone")
+    }
+
+    /// FR-006: a device this daemon no longer has on record is sent nothing — not a
+    /// banner, and not a withdrawal.
+    @Test func aWithdrawalForADeviceNoLongerKnownIsDropped() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let phone = FakeSurface(.device(UUID()))
+        let need = try await aQuestionOnThePhone(locations, in: work, phone: phone, mailbox: FakeMailbox())
+        try FileManager.default.removeItem(at: locations.devices)
+
+        let mailbox = FakeMailbox()
+        let second = try core(locations: locations, mailbox: mailbox)
+        _ = await second.recover()
+        await FakeSurface(.mac).report(second, active: true)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(await mailbox.posted.filter { $0.needID == need }.isEmpty)
+        #expect(onDisk(locations).withdrawing.isEmpty)
+    }
+
+    /// A newer decision about the same need on the same device supersedes a withdrawal
+    /// still waiting for a carrier. Without this, a banner taken off the phone and put
+    /// back while the bridge was away would be taken off again when the bridge arrived —
+    /// for a question that is still asking.
+    @Test func aNewerPostToTheSameDeviceSupersedesAWaitingWithdrawal() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let core = try core(locations: locations, launcher: asking())
+        _ = await core.recover()
+        let heard = MailboxRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.pair(core, name: "iPhone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "tidy up"))
+        await eventually("waiting on its question") { await core.agent(id)?.state == .waitingOnUser }
+        let need = try #require(await core.attentionPending().needs.first?.id)
+        await eventually("posted to the phone") {
+            heard.items.contains { $0.needID == need && $0.envelope != nil }
+        }
+
+        // The person comes to the Mac: the banner leaves the phone, with no carrier to
+        // take the withdrawal. Then they walk away and it goes back.
+        let mac = FakeSurface(.mac)
+        await mac.report(core, active: true)
+        await eventually("a withdrawal waits") { onDisk(locations).withdrawing.map(\.need) == [need] }
+        await mac.disconnect(core)
+        await eventually("back on the phone, and the waiting withdrawal is void") {
+            onDisk(locations).withdrawing.isEmpty
+        }
+
+        _ = await core.handle(method: DaemonAPI.Method.mailboxCarry, params: nil,
+                              from: .mac, connection: UUID())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.withdrawals(of: need).isEmpty, "the question is still asking; its banner stays")
+    }
+}

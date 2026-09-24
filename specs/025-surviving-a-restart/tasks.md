@@ -173,43 +173,75 @@ posted for it.
 
 ### Tests for User Story 2
 
-- [ ] T015 [US2] Add to
+- [X] T015 [US2] Add to
       `Packages/AgentsKit/Tests/AgentsKitTests/Integration/AttentionTests.swift` a case
       using `FakeMailbox`: a permission delivered to a fake device, the core dropped, a
       second core built on the same root, and a withdrawal posted for that need id with
       the note then gone from the file (FR-004).
-- [ ] T016 [US2] Add a case for the retry: with no mailbox and no broadcaster set, the
+- [X] T016 [US2] Add a case for the retry: with no mailbox and no broadcaster set, the
       withdrawal stays in `withdrawing`, and goes out on the next `reconsider()` once a
       connection exists (FR-005). This is the case that would not exist if the obvious
       implementation had been written.
-- [ ] T017 [P] [US2] Add a case asserting a withdrawal for an unpaired device is dropped
+- [X] T017 [P] [US2] Add a case asserting a withdrawal for an unpaired device is dropped
       rather than posted (FR-006), and one asserting a `withdrawing` entry older than
       seven days is dropped on load.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] In
+- [X] T018 [US2] In
       `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift`, add
       `var pendingWithdrawals: [PendingWithdrawal]` to `DaemonCore` and populate it in
       `loadAttention()`.
-- [ ] T019 [US2] In `reconsider()`'s existing first loop — "for every delivery whose need
+- [X] T019 [US2] In `reconsider()`'s existing first loop — "for every delivery whose need
       is no longer outstanding" — record a `PendingWithdrawal` alongside calling
       `withdraw(_:from:at:)` when the surface is a device. **Do not add a second
       restart-only withdrawal path**: 021's FR-012 says one place decides, and the loaded
       dictionary running through the existing loop is that same place (research §4).
-- [ ] T020 [US2] Add `drainWithdrawals()`: re-post every pending withdrawal when there is
+- [X] T020 [US2] Add `drainWithdrawals()`: re-post every pending withdrawal when there is
       somewhere to post to (`mailbox != nil` or the broadcaster is set and
       `connectionCount > 0`), drop each once handed over, drop any whose device is unknown,
       and drop any older than seven days. Call it from `reconsider()`.
-- [ ] T021 [US2] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/Daemon.swift`, have the
+- [X] T021 [US2] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/Daemon.swift`, have the
       server's `onConnectionCountChanged` call `reconsider()` when the count rises, so a
       bridge that connects five seconds after start-up drains the withdrawals rather than
       leaving them for the next thing that happens to change.
-- [ ] T022 [US2] Include `withdrawing` in the records written by `writeAttentionIfMoved()`,
+- [X] T022 [US2] Include `withdrawing` in the records written by `writeAttentionIfMoved()`,
       so a daemon that exits before anything connects hands the retry to the next one.
 
-**Checkpoint**: Both P1 stories are done. A restart neither repeats itself nor leaves a
-banner behind.
+**What changed while building** (2026-09-24):
+
+- **T015 passed on US1 alone.** With a mailbox of its own, the daemon's existing met-need
+  loop already withdraws a restored delivery — research §4's "no new mechanism" held
+  exactly. What US2 actually had to fix was the daemon's own case, which has no mailbox.
+- **A carrier is said, not guessed — `mailbox/carry`.** The plan had T020/T021 re-post on
+  every connection that appeared. The code says why that is wrong: every connection starts
+  as the Mac and the bridge never says otherwise, so the daemon cannot tell it from a
+  window; and `agentsd mcp` connects and disconnects on *every tool call*, so "a
+  connection appeared" is several times a turn per agent. Instead the bridge says
+  `mailbox/carry` on connecting (`Bridge/Sources/MailboxTransport.swift`, one call), the
+  daemon keeps `carriers` and forgets one on disconnect (`Daemon.swift`), and
+  `drainWithdrawals()` runs at the end of every `reconsider()` and hands everything owed
+  over only when a carrier is there. A carrier arriving reconsiders, so after a restart
+  with no window the bridge connecting is enough to decide and send the withdrawals.
+- **Every withdrawal is owed, including moves.** `withdraw(_:from:at:)` now only records
+  the debt, so a banner moved off a phone while the bridge was away is taken down too, not
+  just one whose need died. A later `post` of the same need to the same device voids a
+  waiting withdrawal, or a banner put back while the bridge was away would be taken down
+  again for a question still asking.
+- **A core that has not read `attention.json` never writes it.** Found by a test that
+  connected a carrier before `recover()`: `reconsider()` wrote its empty memory over the
+  first daemon's notes. Production cannot reach that order — the socket opens after
+  recovery — but nothing should overwrite a file it never read. `lastWrittenAttention ==
+  nil` already meant "not loaded"; the write now refuses while it is.
+
+**Checkpoint**: ✅ Reached 2026-09-24. Six cases in `WithdrawalRestartTests`; the four
+about the daemon's own case were red before the implementation. Against the real `agentsd`
+and its socket, with a dead question and a live stuck report both shown on a paired phone:
+a window arriving broadcast **no** withdrawals and left both owed on disk; the bridge
+saying `mailbox/carry` heard both and the debt cleared; with the bridge and window gone,
+the report fell back to the phone, and archiving its agent left that withdrawal owed and
+unbroadcast — which is `forgetCarrier` wired through the real server's disconnect. Full
+suite green three runs running (1192 tests); the bridge, Mac and iOS schemes all build.
 
 ---
 

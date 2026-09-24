@@ -65,7 +65,11 @@ extension DaemonCore {
                 .sorted { $0.need.token < $1.need.token },
             deliveries: deliveries.values.sorted { $0.needID.token < $1.needID.token },
             withdrawing: pendingWithdrawals.sorted { $0.need.token < $1.need.token })
-        guard records != lastWrittenAttention else { return }
+        // Nothing is written by a core that has not read the file. Without this, a
+        // decision taken before `loadAttention()` — by anything driving a `DaemonCore`
+        // without recovering it first — writes its empty memory over what the last
+        // daemon left, and every note in it is lost to a daemon that never looked.
+        guard let last = lastWrittenAttention, records != last else { return }
         attentionStore.save(records)
         lastWrittenAttention = records
     }
@@ -278,8 +282,10 @@ extension DaemonCore {
             }
         }
 
-        // Last, once every decision above has landed, and only if any of them moved
-        // anything. Whatever the next daemon is told, it is told here.
+        // Last, once every decision above has landed. What is owed goes out if anything
+        // will carry it; then, only if any of this moved anything, it is written down —
+        // whatever the next daemon is told, it is told here.
+        drainWithdrawals()
         writeAttentionIfMoved()
     }
 
@@ -291,6 +297,11 @@ extension DaemonCore {
     /// needs the device's key; a record without a usable one is sent nothing, which is
     /// the truth about it rather than a banner in the clear.
     private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {
+        // A newer decision about this need on this device voids any withdrawal still
+        // waiting for a carrier. Otherwise a banner taken off the phone and put back while
+        // the bridge was away would be taken off again the moment the bridge arrived —
+        // for a question that is still asking.
+        pendingWithdrawals.removeAll { $0.need == need.id && $0.device == id }
         guard let device = device(id),
               let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else { return }
         enqueue(MailboxItem(needID: need.id, device: id, envelope: envelope, alert: alert, postedAt: now))
@@ -298,8 +309,46 @@ extension DaemonCore {
 
     /// The need is over here: a withdrawal, naming only the id, replaces whatever was
     /// waiting for the device under it.
+    ///
+    /// **Owed, not sent.** It goes on `pendingWithdrawals` and leaves from
+    /// `drainWithdrawals()` once something that carries mail is listening. This is the
+    /// one post with no second chance: every other post is repeated by the next
+    /// decision about its need, but this one is about the need being *over*, so there is
+    /// no next decision. Broadcast into a room with no bridge in it, it is gone, and the
+    /// phone keeps a question nobody can answer (025 US2).
     private func withdraw(_ id: NeedID, from device: UUID, at now: Date) {
-        enqueue(MailboxItem(needID: id, device: device, envelope: nil, alert: false, postedAt: now))
+        guard !pendingWithdrawals.contains(where: { $0.need == id && $0.device == device }) else { return }
+        pendingWithdrawals.append(PendingWithdrawal(need: id, device: device, decidedAt: now))
+    }
+
+    /// Whether anything is listening that will take a post to the devices.
+    ///
+    /// A mailbox of the daemon's own — a test's, or an embedder's — always is. The
+    /// daemon's own case has none, and depends on a connection having said
+    /// `mailbox/carry`: the bridge, which is indistinguishable from a window until it
+    /// does.
+    var hasCarrier: Bool { mailbox != nil || !carriers.isEmpty }
+
+    /// Hand every owed withdrawal to whatever carries mail, if anything does.
+    ///
+    /// What is handed over is forgotten: it has gone the same way as every other post,
+    /// with the same guarantee. What cannot be — nobody carrying, the device no longer
+    /// on record, a week gone by — is dealt with by the same rules `pruned` applies to
+    /// the file, so what is in memory and what is on disk cannot disagree about it.
+    func drainWithdrawals() {
+        guard !pendingWithdrawals.isEmpty else { return }
+        let now = now()
+        let usable = AttentionRecords(withdrawing: pendingWithdrawals)
+            .pruned(knownDevices: Set(devices.keys), now: now).withdrawing
+        guard hasCarrier else {
+            pendingWithdrawals = usable
+            return
+        }
+        for owed in usable {
+            enqueue(MailboxItem(needID: owed.need, device: owed.device, envelope: nil,
+                                alert: false, postedAt: now))
+        }
+        pendingWithdrawals = []
     }
 
     private func enqueue(_ item: MailboxItem) {
@@ -332,5 +381,28 @@ extension DaemonCore {
 
     private func cancelSettling(_ id: NeedID) {
         settlingTimers.removeValue(forKey: id)?.cancel()
+    }
+}
+
+// MARK: - Who carries mail
+
+extension DaemonCore {
+    /// `mailbox/carry`: this connection hears `mailbox/post` and takes it to the devices.
+    func becomeCarrier(connection: UUID?) throws {
+        guard let connection else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notASurface,
+                               message: "Only a connection can carry mail.")
+        }
+        carriers.insert(connection)
+        // Now there is somebody to hand things to. Reconsidering rather than only
+        // draining, because after a restart with no window this may be the first thing
+        // that has happened at all: the withdrawals for questions that died with the
+        // last daemon have not even been decided yet.
+        reconsider()
+    }
+
+    /// The connection has gone. Called beside `forgetPresence`, from the same place.
+    func forgetCarrier(connection: UUID) {
+        carriers.remove(connection)
     }
 }
