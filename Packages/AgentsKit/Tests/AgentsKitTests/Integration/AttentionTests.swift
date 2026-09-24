@@ -19,12 +19,13 @@ struct AttentionTests {
         return (StoreLocations(root: root), work)
     }
 
-    private func core(_ launcher: FakeLauncher, locations: StoreLocations) throws -> DaemonCore {
+    private func core(_ launcher: FakeLauncher, locations: StoreLocations,
+                      thresholds: AttentionThresholds? = nil) throws -> DaemonCore {
         DaemonCore(store: try AgentStore(locations: locations),
                    locations: locations,
                    discovery: .findsEverything,
                    launcher: launcher,
-                   thresholds: thresholds)
+                   thresholds: thresholds ?? self.thresholds)
     }
 
     /// A runtime that asks permission mid-turn and waits on the answer.
@@ -585,5 +586,234 @@ struct ArchivedProjectAttentionTests {
 
         _ = try await core.unarchiveProject(work)
         await eventually("back") { await core.attentionPending().needs.count == 1 }
+    }
+}
+
+// MARK: - 025 US1: what a restart must not undo
+//
+// The daemon restarts on every build of this app. A need built from the agent record —
+// a finished agent whose report says it cannot get further alone — survives that
+// perfectly well, because it is read straight off disk. What used to die with the
+// daemon was the memory of having *already told somebody*, and the moment the need was
+// first raised.
+//
+// Every test here builds a second `DaemonCore` on the same `StoreLocations`, which is
+// what a restart is. A test that exercises one core proves nothing about this at all.
+
+@Suite("Attention across a restart", .timeLimit(.minutes(1)))
+struct AttentionRestartTests {
+    private let thresholds = AttentionThresholds(macIdle: 60, deviceStaleness: 60,
+                                                 settlingPause: 0.15, reAlertInterval: 60)
+
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsAttentionRestart-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), work)
+    }
+
+    /// The same moment, to the precision the record keeps.
+    ///
+    /// `StoreCoding` writes ISO 8601 with three decimal places, on purpose, so every
+    /// file in this app stays readable with `cat`. A date that has been through one is
+    /// the same *moment* and not the same `Double`, and a test that asked for the second
+    /// would be testing the encoder rather than this feature. Two milliseconds is an
+    /// order of magnitude under the smallest thing that would mean a bug here: the
+    /// failure this guards against resets `raisedAt` to now, which is whole seconds away.
+    private func isSameMoment(_ a: Date?, _ b: Date?) -> Bool {
+        guard let a, let b else { return false }
+        return abs(a.timeIntervalSince(b)) < 0.002
+    }
+
+    private func core(locations: StoreLocations, thresholds: AttentionThresholds? = nil,
+                      launcher: FakeLauncher = FakeLauncher(script: .init())) throws -> DaemonCore {
+        DaemonCore(store: try AgentStore(locations: locations),
+                   locations: locations,
+                   discovery: .findsEverything,
+                   launcher: launcher,
+                   thresholds: thresholds ?? self.thresholds)
+    }
+
+    /// A finished agent that says it is stuck, put on disk before any daemon exists.
+    ///
+    /// Written rather than acted out, so these tests are about the restart and not about
+    /// a fake runtime's timing. It is the same shape `archivingAProjectWithdrawsItsNeeds`
+    /// already uses, and it is the one kind of need that outlives a daemon.
+    @discardableResult
+    private func stuckAgent(_ locations: StoreLocations, in work: URL,
+                            reportedAt: Date = Date()) async throws -> Agent {
+        let agent = Agent(id: UUID(), runtimeID: "claude", cwd: work, title: "The stuck one",
+                          state: .finished, endedReason: .endTurn,
+                          report: WorkReport(outcome: .stuck, message: "No signing certificate here.",
+                                             at: reportedAt))
+        try await AgentStore(locations: locations).save(agent)
+        return agent
+    }
+
+    /// US1 scenarios 1 and 2, and the whole of the feature: the second daemon knows the
+    /// person has already been told, so it does not tell them again, and it knows when
+    /// the need was first raised, so the clock does not start over.
+    @Test func aDeliveredNeedIsNotAlertedAgainAfterARestart() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        try await stuckAgent(locations, in: work)
+
+        // The first daemon: the need is raised, and the Mac is told about it once.
+        let first = try core(locations: locations)
+        _ = await first.recover()
+        let heardFirst = AttentionRecorder(); await heardFirst.attach(to: first)
+        await FakeSurface(.mac).report(first, active: true)
+        await eventually("the Mac was told") { heardFirst.deliveries.first?.to == .mac }
+        let raisedAt = try #require(await first.attentionPending().needs.first?.raisedAt)
+        #expect(heardFirst.deliveries.count == 1)
+
+        // The daemon goes, and another takes its place on the same root.
+        let second = try core(locations: locations)
+        _ = await second.recover()
+        let heardSecond = AttentionRecorder(); await heardSecond.attach(to: second)
+        await FakeSurface(.mac).report(second, active: true)
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(heardSecond.changes.isEmpty,
+                "nothing moved, so nobody is told anything: \(heardSecond.changes.map(\.needID))")
+        let pending = await second.attentionPending()
+        #expect(pending.needs.count == 1, "the need itself survives, as it always did")
+        #expect(pending.deliveries.first?.to == .mac, "and it is still showing where it was")
+        let moved = (pending.needs.first?.raisedAt).map { abs($0.timeIntervalSince(raisedAt)) } ?? -1
+        #expect(isSameMoment(pending.needs.first?.raisedAt, raisedAt),
+                "the moment it was first raised is the first daemon's, not this one's — moved by \(moved)s")
+    }
+
+    /// US1 scenario 3: the pause that lets somebody look at their own screen before
+    /// anything is shown is measured from when the need was raised — not from when the
+    /// daemon happened to restart.
+    ///
+    /// A generous pause, and a generous allowance, on purpose: the broken behaviour is a
+    /// *whole fresh pause* from the restart, so the two are two seconds apart. A slow
+    /// machine makes this pass more readily, not less.
+    @Test func theSettlingPauseIsNotStartedAgainByARestart() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let slowToSettle = AttentionThresholds(macIdle: 60, deviceStaleness: 60,
+                                               settlingPause: 2, reAlertInterval: 60)
+        try await stuckAgent(locations, in: work)
+
+        let first = try core(locations: locations, thresholds: slowToSettle)
+        _ = await first.recover()
+        let heardFirst = AttentionRecorder(); await heardFirst.attach(to: first)
+        await FakeSurface(.mac).report(first, active: true)
+        await eventually("the need is outstanding") { await first.attentionPending().needs.count == 1 }
+        let raisedAt = try #require(await first.attentionPending().needs.first?.raisedAt)
+        // Most of the way through the pause, with nothing delivered yet.
+        try await Task.sleep(for: .milliseconds(1_500))
+        #expect(heardFirst.deliveries.isEmpty, "still settling when the daemon went")
+
+        let second = try core(locations: locations, thresholds: slowToSettle)
+        _ = await second.recover()
+        let heardSecond = AttentionRecorder(); await heardSecond.attach(to: second)
+        await FakeSurface(.mac).report(second, active: true)
+
+        let restored = await second.attentionPending().needs.first?.raisedAt
+        #expect(isSameMoment(restored, raisedAt),
+                "moved by \(restored.map { abs($0.timeIntervalSince(raisedAt)) } ?? -1)s")
+        await eventually("delivered on the original pause, not a fresh one", within: .seconds(1)) {
+            heardSecond.deliveries.first?.to == .mac
+        }
+    }
+
+    /// US1 scenario 5: the ordinary re-alert rule applies across a restart — the restart
+    /// neither suppresses an alert nor brings one forward.
+    ///
+    /// A move inside the interval is silent. This is the test that stops the fix from
+    /// becoming a mute: without it, "never alert after a restart" would pass everything
+    /// above.
+    @Test func aMoveJustAfterARestartIsSilentWhenTheIntervalHasNotPassed() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        try await stuckAgent(locations, in: work)
+        let phone = FakeSurface(.device(UUID()))
+
+        let first = try core(locations: locations)
+        _ = await first.recover()
+        let heardFirst = AttentionRecorder(); await heardFirst.attach(to: first)
+        // The Mac first, and it wins every rung below it, so the need is delivered
+        // there and stays there while the phone pairs behind it.
+        await FakeSurface(.mac).report(first, active: true)
+        await eventually("the Mac was told") { heardFirst.deliveries.first?.to == .mac }
+        await phone.pair(first, name: "iPhone", kind: .iPhone)
+        await phone.report(first, active: true, mayNotify: true)
+        #expect(heardFirst.changes.count == 1, "the phone arriving does not move it off the Mac")
+
+        // Restart, with only the phone about: the need has to move.
+        let second = try core(locations: locations)
+        _ = await second.recover()
+        let heardSecond = AttentionRecorder(); await heardSecond.attach(to: second)
+        await phone.report(second, active: true, mayNotify: true)
+
+        let moved = try #require(await eventuallySome("the need moved to the phone") {
+            heardSecond.changes.first { $0.to == .device(phone.surface.deviceID!) }
+        })
+        #expect(moved.alert == false,
+                "a move inside the re-alert interval moves the notification and does not buzz")
+    }
+
+    /// The other half of the rule: once the interval really has passed, a move alerts,
+    /// restart or no restart.
+    @Test func aMoveAfterARestartAlertsOnceTheIntervalHasPassed() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let quickToRepeat = AttentionThresholds(macIdle: 60, deviceStaleness: 60,
+                                                settlingPause: 0.05, reAlertInterval: 0.05)
+        try await stuckAgent(locations, in: work)
+        let phone = FakeSurface(.device(UUID()))
+
+        let first = try core(locations: locations, thresholds: quickToRepeat)
+        _ = await first.recover()
+        let heardFirst = AttentionRecorder(); await heardFirst.attach(to: first)
+        await FakeSurface(.mac).report(first, active: true)
+        await eventually("the Mac was told") { heardFirst.deliveries.first?.to == .mac }
+        await phone.pair(first, name: "iPhone", kind: .iPhone)
+        await phone.report(first, active: true, mayNotify: true)
+        // Past the re-alert interval, so the move below is due a fresh alert.
+        try await Task.sleep(for: .milliseconds(200))
+
+        let second = try core(locations: locations, thresholds: quickToRepeat)
+        _ = await second.recover()
+        let heardSecond = AttentionRecorder(); await heardSecond.attach(to: second)
+        await phone.report(second, active: true, mayNotify: true)
+
+        let moved = try #require(await eventuallySome("the need moved to the phone") {
+            heardSecond.changes.first { $0.to == .device(phone.surface.deviceID!) }
+        })
+        #expect(moved.alert == true, "the interval has passed, so the move buzzes")
+    }
+
+    /// A need that is met while the daemon is down leaves nothing behind in the file.
+    /// The withdrawal itself is US2; this is only that the note does not outlive its need.
+    @Test func aNoteDoesNotOutliveTheNeedItIsAbout() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let agent = try await stuckAgent(locations, in: work)
+
+        let first = try core(locations: locations)
+        _ = await first.recover()
+        let heardFirst = AttentionRecorder(); await heardFirst.attach(to: first)
+        await FakeSurface(.mac).report(first, active: true)
+        await eventually("the Mac was told") { heardFirst.deliveries.first?.to == .mac }
+
+        // Archived while nothing is running, which is one of the ways a need is met.
+        var put = try #require(await first.agent(agent.id))
+        put.state = .archived
+        put.archivedReason = .byUser
+        try await AgentStore(locations: locations).save(put)
+
+        let second = try core(locations: locations)
+        _ = await second.recover()
+        await FakeSurface(.mac).report(second, active: true)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(await second.attentionPending().needs.isEmpty)
+        #expect(await second.attentionPending().deliveries.isEmpty)
     }
 }

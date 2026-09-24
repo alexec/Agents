@@ -21,6 +21,11 @@ extension DaemonCore {
     /// run when six agents stopped because the Mac restarted.
     @discardableResult
     public func recover() async -> [UUID] {
+        // Before the agents, because `loadFromDisk` and the endings below both reach
+        // `reconsider()`, and a decision taken against an empty set of notes would
+        // conclude that nothing had ever been delivered — which is the whole of what
+        // 025 US1 fixes.
+        loadAttention()
         await loadFromDisk()
         // `agents` is a Dictionary, whose order is nobody's. Most recently active
         // first, because pick-up is one at a time and the chat the person last left

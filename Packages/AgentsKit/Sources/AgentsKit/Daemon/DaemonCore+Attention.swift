@@ -3,12 +3,73 @@ import Foundation
 /// Where a need goes. The one place that decides (FR-012): no surface may work out for
 /// itself whether it is the right one to alert.
 ///
-/// Three things live here and none is written to disk. `presences` is one record per
-/// connection, keyed by the connection rather than by surface, so two windows are two
-/// records and one going does not erase the other's knowledge. `deliveries` is one per
-/// outstanding need, and dies with it. `needRaisedAt` is the one fact about a need that
-/// must not move: when the daemon first saw it.
+/// Three things live here, and since 025 two of them are written down.
+///
+/// `presences` is one record per connection, keyed by the connection rather than by
+/// surface, so two windows are two records and one going does not erase the other's
+/// knowledge. It stays in memory: where somebody is right now is not a fact worth
+/// keeping, and a remembered one could only mislead the next daemon.
+///
+/// `deliveries` is one per outstanding need, and dies with it. `needRaisedAt` is the one
+/// fact about a need that must not move: when the daemon first saw it. Both of those
+/// **do** survive now, in `attention.json`, because they are about a need rather than
+/// about a live process — and a need built from the agent record outlives the daemon
+/// perfectly well. What used to die with it was only the memory of having already told
+/// somebody, which is how a restart came to buzz a person twice about one thing.
 extension DaemonCore {
+    // MARK: What survives the daemon
+
+    /// Read the notes back, keeping only what can be acted on.
+    ///
+    /// Called from `recover()` rather than from `Daemon.start()`, so that anything
+    /// driving a `DaemonCore` directly — which is every test, and any future embedder —
+    /// gets it too. `recover()` is already "read the record and tell the truth about it",
+    /// and these are part of that record.
+    ///
+    /// Deliberately **not** followed by a `reconsider()` here. Nothing is connected this
+    /// early: a decision taken now would find nobody reachable, move every restored
+    /// delivery to nowhere, and then move it back the moment a window appeared — two
+    /// notifications and a file rewritten, to arrive exactly where it started. The first
+    /// presence report does it, which is moments later and is when there is somebody to
+    /// tell.
+    func loadAttention() {
+        let known = Set(devices.keys)
+        let onDisk = attentionStore.load()
+        let usable = onDisk.pruned(knownDevices: known, now: now())
+        deliveries = Dictionary(usable.deliveries.map { ($0.needID, $0) },
+                                uniquingKeysWith: { first, _ in first })
+        needRaisedAt = Dictionary(usable.raised.map { ($0.need, $0.at) },
+                                  uniquingKeysWith: { first, _ in first })
+        pendingWithdrawals = usable.withdrawing
+        lastWrittenAttention = usable
+        // What was dropped is dropped now rather than at the next thing that happens to
+        // move, so the file does not keep offering a device that has gone.
+        if usable != onDisk { attentionStore.save(usable) }
+    }
+
+    /// Write the notes, and only when they have actually changed.
+    ///
+    /// The guard is the whole point. `reconsider()` is called on every state change, on
+    /// every question held or answered, and on **every presence report** — which arrives
+    /// periodically from every window and every device. An unconditional write here would
+    /// put a file rewrite in a path that runs several times a second with nobody doing
+    /// anything.
+    ///
+    /// Everything is sorted by the need's token before comparing, because the two sources
+    /// are dictionaries and a dictionary's order is nobody's: unsorted, the comparison
+    /// would differ on almost every pass and the guard would never once hold.
+    func writeAttentionIfMoved() {
+        let records = AttentionRecords(
+            raised: needRaisedAt
+                .map { RaisedNote(need: $0.key, at: $0.value) }
+                .sorted { $0.need.token < $1.need.token },
+            deliveries: deliveries.values.sorted { $0.needID.token < $1.needID.token },
+            withdrawing: pendingWithdrawals.sorted { $0.need.token < $1.need.token })
+        guard records != lastWrittenAttention else { return }
+        attentionStore.save(records)
+        lastWrittenAttention = records
+    }
+
     // MARK: What wants a person
 
     /// The outstanding needs, derived and never stored — exactly as `AgentGroup` is.
@@ -216,6 +277,10 @@ extension DaemonCore {
                           DaemonAPI.AttentionNotification(needID: need.id, need: need, to: to, alert: true))
             }
         }
+
+        // Last, once every decision above has landed, and only if any of them moved
+        // anything. Whatever the next daemon is told, it is told here.
+        writeAttentionIfMoved()
     }
 
     // MARK: Reaching a device that is not here
