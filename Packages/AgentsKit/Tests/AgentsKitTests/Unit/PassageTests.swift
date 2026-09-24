@@ -234,3 +234,41 @@ struct PassageChangeTests {
         #expect(change.first == nil)
     }
 }
+
+/// The pictures a passage references, so the page can watch their files.
+///
+/// The page's line diff cannot see a redrawn image — the document's text did not
+/// change — so it has to know which files to keep an eye on (022 FR-020). This is the
+/// list; what to do about a remote address or a path outside the folder is the page's
+/// decision, not the split's.
+@Suite("Images in a passage")
+struct PassageImageTests {
+    private func sources(_ text: String) -> [String] {
+        Passage.split(text).flatMap(\.imageSources)
+    }
+
+    @Test func aRelativeImageIsListed() {
+        #expect(sources("![A diagram](./diagram.svg)") == ["./diagram.svg"])
+    }
+
+    @Test func twoImagesAreListedInOrder() {
+        #expect(sources("Before ![one](a.png) and ![two](b.svg) after.") == ["a.png", "b.svg"])
+    }
+
+    @Test func proseWithNoImageListsNothing() {
+        #expect(sources("Just a [link](https://example.org) and text.") == [])
+    }
+
+    @Test func anImageInsideAFenceIsNotAnImage() {
+        #expect(sources("```\n![not really](x.png)\n```") == [])
+    }
+
+    @Test func aRemoteImageIsListedToo() {
+        // Listed; the page is what declines to fetch it.
+        #expect(sources("![alt](https://x/y.png)") == ["https://x/y.png"])
+    }
+
+    @Test func anImageWithATitleKeepsOnlyTheDestination() {
+        #expect(sources("![alt](pic.png \"The title\")") == ["pic.png"])
+    }
+}

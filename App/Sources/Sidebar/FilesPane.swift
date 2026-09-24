@@ -21,6 +21,9 @@ struct FilesPane: View {
     /// The file `probe` was read from, so a file opened from elsewhere is loaded once
     /// and not once for every pass.
     @State private var loaded: URL?
+    /// Counted up on every folder event and handed to the page, which re-reads its
+    /// pictures' stamps on each: a redrawn image changes no text (022 FR-020).
+    @State private var folderEvents = 0
 
     private var folder: URL { state.folder ?? agent.cwd }
 
@@ -164,7 +167,7 @@ struct FilesPane: View {
                     Divider()
                 }
                 LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
-                         agentID: agent.id)
+                         agentID: agent.id, folderEvent: folderEvents)
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
@@ -224,6 +227,7 @@ struct FilesPane: View {
         // build writing thousands of files is a handful of events, not thousands.
         watch = FolderWatch(root: agent.cwd) { _ in
             Task { @MainActor in
+                folderEvents += 1
                 reloadListing()
                 if let openFile = state.openFile { reloadFile(openFile) }
             }

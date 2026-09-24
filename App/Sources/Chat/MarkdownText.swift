@@ -148,9 +148,13 @@ struct MarkdownText: View {
     /// its alternative text — which is what alternative text is for.
     @ViewBuilder
     private func image(source: String, alt: String) -> some View {
+        // A file beside the document, inside its folder tree, and nothing else: no
+        // address on the network and no path that climbs out (022 FR-019). Anything
+        // refused here shows its alternative text below, as it always has.
         if let base,
            let url = URL(string: source, relativeTo: base)?.standardizedFileURL,
            url.isFileURL,
+           url.path.hasPrefix(base.deletingLastPathComponent().standardizedFileURL.path),
            let loaded = NSImage(contentsOf: url) {
             Image(nsImage: loaded)
                 .resizable()

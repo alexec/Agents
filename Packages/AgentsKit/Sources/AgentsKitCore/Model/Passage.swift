@@ -337,3 +337,36 @@ public enum PassageMerge {
         return .collided(text: Passage.join(merged), passageIndex: index, theirs: replaced.source)
     }
 }
+
+extension Passage {
+    /// The destinations of the images this passage references, in order, outside any
+    /// fence. Listed as written — relative, absolute or remote — because which of
+    /// them to load is the page's decision (FR-019), and which of them to watch is
+    /// why this exists at all (FR-020): a redrawn picture changes no text, so the
+    /// line diff cannot see it, and the page has to know which files to keep an eye on.
+    ///
+    /// One regular expression over the source. The alt text is not parsed and a
+    /// title after the destination is dropped; the destination is what is wanted.
+    public var imageSources: [String] {
+        var sources: [String] = []
+        var inFence = false
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.drop(while: { $0 == " " })
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                inFence.toggle()
+                continue
+            }
+            guard !inFence else { continue }
+            for match in line.matches(of: image) {
+                sources.append(String(match.output.1))
+            }
+        }
+        return sources
+    }
+
+    /// `![anything](destination "optional title")`. The destination runs to the first
+    /// space or closing bracket; a title in quotes after it is not the destination.
+    /// Built per call rather than held in a static: a `Regex` is not `Sendable`, and
+    /// a passage is a few lines.
+    private var image: Regex<(Substring, Substring)> { /!\[[^\]]*\]\(\s*([^\s)]+)[^)]*\)/ }
+}

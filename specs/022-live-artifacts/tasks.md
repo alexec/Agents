@@ -140,12 +140,12 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 
 **Independent Test**: quickstart Slice E — the agent draws a diagram as an SVG file, then changes it; a missing image shows its alternative text.
 
-- [ ] T041 [P] [US4] In `PassageTests.swift`, write a test for `Passage.imageSources` (before it exists): a passage `![alt](./a.svg)` yields `["./a.svg"]`; a passage with two images yields both in order; a paragraph with none yields `[]`; an image inside a fenced block yields `[]`; `![alt](https://x/y.png)` yields it too (the page decides not to fetch, not the split).
-- [ ] T042 [P] [US4] Add `public var imageSources: [String]` to `Passage` in `Passage.swift`: the destinations of `![...](...)` matches in `source` outside fences, by a single regex over the passage; no parsing of the alt text. Until T041 passes.
-- [ ] T043 [US4] Create `App/Sources/Sidebar/ImageStamps.swift`: `struct ImageStamps` holding `[Int: Stamp]` where `Stamp` is `url: URL, modified: Date?, size: Int?, token: UUID`. `static func take(passages: [Passage], base: URL) -> ImageStamps` resolves each `imageSources` entry against `base` (file URLs only, `standardizedFileURL`, and only inside `base.deletingLastPathComponent()`'s tree — FR-019 says nothing outside is fetched) and reads `.contentModificationDateKey` and `.fileSizeKey`. `func refreshed() -> (ImageStamps, changed: IndexSet)` re-reads and bumps `token` where date or size differ.
-- [ ] T044 [US4] In `LivePage.swift`, hold `@State images: ImageStamps`, rebuilt whenever `passages` change. Give each `MarkdownText` `.id(images[index]?.token)` so a bumped token reloads the picture. Add an `onFolderEvent` closure that `FilesPane` calls from its `FolderWatch` callback **even when the document's text is unchanged**: call `images.refreshed()`, mark every changed index, and follow the first under the same `isEditing` rule (FR-020).
-- [ ] T045 [US4] In `FilesPane.swift`, pass the folder event through to `LivePage` (T044) alongside the existing re-read, so an SVG rewritten beside an unchanged document still reaches the page.
-- [ ] T046 [US4] Check `App/Sources/Chat/MarkdownText.swift`'s `image(source:alt:)` against FR-019: a non-file URL already falls to the alt text; confirm a path resolving outside the document's folder also does (add the check if not — one `hasPrefix` on the standardized path), and that an SVG loads through `NSImage(contentsOf:)`. No other change to `MarkdownText`.
+- [X] T041 [P] [US4] In `PassageTests.swift`, write a test for `Passage.imageSources` (before it exists): a passage `![alt](./a.svg)` yields `["./a.svg"]`; a passage with two images yields both in order; a paragraph with none yields `[]`; an image inside a fenced block yields `[]`; `![alt](https://x/y.png)` yields it too (the page decides not to fetch, not the split).
+- [X] T042 [P] [US4] Add `public var imageSources: [String]` to `Passage` in `Passage.swift`: the destinations of `![...](...)` matches in `source` outside fences, by a single regex over the passage; no parsing of the alt text. Until T041 passes.
+- [X] T043 [US4] Create `App/Sources/Sidebar/ImageStamps.swift`: `struct ImageStamps` holding `[Int: Stamp]` where `Stamp` is `url: URL, modified: Date?, size: Int?, token: UUID`. `static func take(passages: [Passage], base: URL) -> ImageStamps` resolves each `imageSources` entry against `base` (file URLs only, `standardizedFileURL`, and only inside `base.deletingLastPathComponent()`'s tree — FR-019 says nothing outside is fetched) and reads `.contentModificationDateKey` and `.fileSizeKey`. `func refreshed() -> (ImageStamps, changed: IndexSet)` re-reads and bumps `token` where date or size differ.
+- [X] T044 [US4] In `LivePage.swift`, hold `@State images: ImageStamps`, rebuilt whenever `passages` change. Give each `MarkdownText` `.id(images[index]?.token)` so a bumped token reloads the picture. Add an `onFolderEvent` closure that `FilesPane` calls from its `FolderWatch` callback **even when the document's text is unchanged**: call `images.refreshed()`, mark every changed index, and follow the first under the same `isEditing` rule (FR-020).
+- [X] T045 [US4] In `FilesPane.swift`, pass the folder event through to `LivePage` (T044) alongside the existing re-read, so an SVG rewritten beside an unchanged document still reaches the page.
+- [X] T046 [US4] Check `App/Sources/Chat/MarkdownText.swift`'s `image(source:alt:)` against FR-019: a non-file URL already falls to the alt text; confirm a path resolving outside the document's folder also does (add the check if not — one `hasPrefix` on the standardized path), and that an SVG loads through `NSImage(contentsOf:)`. No other change to `MarkdownText`.
 - [ ] T047 [US4] `xcodegen generate`, build, test, walk quickstart Slice E steps 1–3. Screenshot the redraw landing. Record at the foot of this file. Then walk step 4 with two runtimes and fill the findings rows "SVG images beside the document" and "A graph asked for: what the agent drew it as" in `findings.md`.
 
 **Checkpoint**: Pictures are live. US4 complete.
@@ -274,6 +274,12 @@ view above it — if it does not, the passage becomes a `Button` and the walk sa
 ### Slice D walk
 
 ### Slice E walk
+
+*2026-09-23.* Code only; the on-screen walk (T047) is still to do. One thing for whoever
+merges: another lane is adding an `NSCache` of images keyed by URL to `MarkdownText`. With
+it, a redrawn picture would be served from the cache for ever, whatever the page does with
+its identity. The cache should be keyed by URL plus modification date, or evicted when
+`ImageStamps` sees the file change; the page cannot reach a private cache from outside.
 
 ### Slice F walk
 

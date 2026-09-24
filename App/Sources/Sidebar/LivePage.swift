@@ -33,6 +33,10 @@ struct LivePage: View {
     /// Whose page this is: the daemon writes the person's typing inside this agent's
     /// folders and remembers it for this agent's next turn.
     let agentID: UUID
+    /// Bumped by the pane on every folder event, including the ones that leave the
+    /// document's text alone. That is when a picture beside it may have changed, and
+    /// a picture is not in the text (FR-020).
+    var folderEvent = 0
 
     /// The one passage open for typing, if any. It holds only its own source, so an
     /// agent's write elsewhere in the file re-renders around it and never replaces
@@ -62,6 +66,8 @@ struct LivePage: View {
     @State private var marked: [Int: Date] = [:]
     /// The text `passages` came from: the base for the next diff.
     @State private var lastLoaded = ""
+    /// The pictures on the page and when each file last changed.
+    @State private var images = ImageStamps()
 
     /// How long a mark stays before it starts to fade, and how long the fade takes.
     /// Long enough to be found by an eye that was elsewhere; short enough that a
@@ -88,11 +94,19 @@ struct LivePage: View {
                 // of 60. A relative style rather than a fixed size, so Dynamic Type
                 // still moves it. Headings, code and chrome stay on the sans and mono
                 // faces the rest of the app uses.
-                .font(.system(.callout, design: .serif))
+                .appText(.reading)
                 .textSelection(.enabled)
                 .onAppear { load(text) }
                 .onChange(of: text) { _, new in
                     follow(new, proxy: proxy)
+                }
+                .onChange(of: folderEvent) {
+                    let (fresh, changed) = images.refreshed()
+                    images = fresh
+                    guard let first = changed.first else { return }
+                    mark(Array(changed).filter { $0 != editing?.index })
+                    guard !isEditing else { return }
+                    Task { await go(to: first, proxy: proxy) }
                 }
                 .task(id: line) {
                     guard let line, let index = Passage.index(containing: line, in: passages) else { return }
@@ -113,7 +127,7 @@ struct LivePage: View {
                     PassageEditor(draft: draftBinding, onCommit: commit, onClose: close)
                     if let saveProblem {
                         Text(saveProblem)
-                            .font(.footnote)
+                            .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
                     if let collision {
@@ -122,6 +136,9 @@ struct LivePage: View {
                 }
             } else {
                 MarkdownText(markdown: passages[index].source, base: url)
+                    // A new identity when a picture in it changed on disk, which is
+                    // what makes the file be read again rather than redrawn.
+                    .id(images.token(for: index))
                     // The whole passage is the click target, gaps included, so a
                     // click beside a short line still opens it. A `Button` would eat
                     // the drag that selects text; a tap gesture does not.
@@ -152,14 +169,14 @@ struct LivePage: View {
     private func collisionCard(_ theirs: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("The agent changed this passage while you were typing. Yours is kept; theirs is below.")
-                .font(.footnote)
+                .appText(.fine)
                 .foregroundStyle(.secondary)
             if !theirs.isEmpty {
                 MarkdownText(markdown: theirs, base: url)
                     .foregroundStyle(.secondary)
             } else {
                 Text("They had removed it.")
-                    .font(.footnote)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
             }
             HStack(spacing: 8) {
@@ -220,6 +237,7 @@ struct LivePage: View {
     private func load(_ text: String) {
         passages = Passage.split(text)
         lastLoaded = text
+        images = ImageStamps.take(passages: passages, base: url)
     }
 
     /// New text on disk: what changed is marked, and the view goes to the first of it
@@ -239,12 +257,14 @@ struct LivePage: View {
                 editing = nil
             }
             lastLoaded = new
+            images = ImageStamps.take(passages: passages, base: url)
             return
         }
         let change = PassageChange.between(old: lastLoaded, new: new)
         guard let current = editing, passages.indices.contains(current.index) else {
             passages = Passage.split(new)
             lastLoaded = new
+            images = ImageStamps.take(passages: passages, base: url)
             guard let first = change.first else { return }
             mark(Array(change.changed))
             Task { await go(to: first, proxy: proxy) }
@@ -267,6 +287,7 @@ struct LivePage: View {
         }
         passages = Passage.split(merged)
         lastLoaded = merged
+        images = ImageStamps.take(passages: passages, base: url)
         editing = Editing(index: index, base: current.draft, draft: current.draft)
         mark(Array(change.changed).filter { $0 != index })
         if merged != new {
