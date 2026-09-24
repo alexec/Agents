@@ -355,3 +355,108 @@ struct TranscriptReadingTests {
         #expect(TranscriptEntry.coalesced(entries).count == 2)
     }
 }
+
+@Suite("Agent store: the line index grows with the file")
+struct TranscriptIndexTests {
+    private func temporaryStore() throws -> (AgentStore, StoreLocations) {
+        let root = URL(filePath: NSTemporaryDirectory())
+            .appending(path: "TranscriptIndexTests-\(UUID().uuidString)")
+        let locations = StoreLocations(root: root)
+        return (try AgentStore(locations: locations), locations)
+    }
+
+    @Test func aPageReadAfterMoreWasAppendedSeesTheNewLines() async throws {
+        let (store, _) = try temporaryStore()
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"), state: .running)
+        try await store.save(agent)
+        for i in 0..<30 {
+            try await store.append(TranscriptEntry(kind: .agentMessage(messageID: nil, text: "\(i)")), for: agent.id)
+        }
+        let first = try await store.transcript(for: agent.id, limit: 10)
+        #expect(first.total == 30)
+        #expect(first.entries.map(\.text) == (20..<30).map { "\($0)" })
+
+        // Appended while the index is held: the next page counts them.
+        for i in 30..<45 {
+            try await store.append(TranscriptEntry(kind: .agentMessage(messageID: nil, text: "\(i)")), for: agent.id)
+        }
+        let second = try await store.transcript(for: agent.id, limit: 10)
+        #expect(second.total == 45)
+        #expect(second.firstIndex == 35)
+        #expect(second.entries.map(\.text) == (35..<45).map { "\($0)" })
+
+        // And earlier pages are still where they were.
+        let earlier = try await store.transcript(for: agent.id, before: second.firstIndex, limit: 10)
+        #expect(earlier.entries.map(\.text) == (25..<35).map { "\($0)" })
+        #expect(try await store.transcriptCount(for: agent.id) == 45)
+    }
+
+    @Test func aFragmentEndedLaterBecomesALine() async throws {
+        let (store, locations) = try temporaryStore()
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"), state: .running)
+        try await store.save(agent)
+        try await store.append(TranscriptEntry(kind: .runtimeNote("one")), for: agent.id)
+        await store.closeTranscript(for: agent.id)
+        let url = locations.transcript(agent.id)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        let whole = try StoreCoding.encoder.encode(TranscriptEntry(kind: .runtimeNote("two")))
+        try handle.write(contentsOf: whole)
+        try handle.close()
+
+        #expect(try await store.transcript(for: agent.id).total == 1, "no newline yet: not a line")
+        // The store ends the fragment when it next appends, exactly as a daemon does.
+        try await store.append(TranscriptEntry(kind: .runtimeNote("three")), for: agent.id)
+        let page = try await store.transcript(for: agent.id)
+        #expect(page.total == 3)
+        #expect(page.entries.map(\.text) == ["one", "two", "three"])
+    }
+
+    @Test func aFileReplacedUnderTheIndexIsReadAgainFromTheTop() async throws {
+        let (store, locations) = try temporaryStore()
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"), state: .running)
+        try await store.save(agent)
+        for i in 0..<5 {
+            try await store.append(TranscriptEntry(kind: .runtimeNote("\(i)")), for: agent.id)
+        }
+        #expect(try await store.transcript(for: agent.id).total == 5)
+        await store.closeTranscript(for: agent.id)
+        let one = try StoreCoding.encoder.encode(TranscriptEntry(kind: .runtimeNote("only"))) + Data([0x0A])
+        try one.write(to: locations.transcript(agent.id))
+        let page = try await store.transcript(for: agent.id)
+        #expect(page.total == 1)
+        #expect(page.entries.first?.text == "only")
+    }
+}
+
+@Suite("Agent store: the stamp on a record")
+struct StoreDateTests {
+    private struct Stamped: Codable, Equatable { var at: Date }
+
+    @Test func aStampIsWrittenAsItAlwaysWas() throws {
+        // Rounded to the millisecond, as `ISO8601DateFormatter` wrote every record
+        // before this: .123 is not a double, and cut short it would read .122.
+        for (seconds, text) in [(1_758_000_000.123, "2025-09-16T05:20:00.123Z"),
+                                (1_758_000_000.1236, "2025-09-16T05:20:00.124Z"),
+                                (1_758_000_000.0, "2025-09-16T05:20:00.000Z")] {
+            let written = String(decoding: try StoreCoding.encoder.encode(
+                Stamped(at: Date(timeIntervalSince1970: seconds))), as: UTF8.self)
+            #expect(written == #"{"at":"\#(text)"}"#)
+        }
+    }
+
+    @Test func everyStampEverWrittenStillReads() throws {
+        let cases: [(String, TimeInterval)] = [
+            ("2025-09-16T05:20:00.123Z", 1_758_000_000.123),
+            ("2025-09-16T05:20:00Z", 1_758_000_000),
+            ("2025-09-16T05:20:00.123+00:00", 1_758_000_000.123),
+        ]
+        for (text, seconds) in cases {
+            let read = try StoreCoding.decoder.decode(Stamped.self, from: Data(#"{"at":"\#(text)"}"#.utf8))
+            #expect(abs(read.at.timeIntervalSince1970 - seconds) < 0.001, Comment(rawValue: text))
+        }
+        #expect(throws: (any Error).self) {
+            try StoreCoding.decoder.decode(Stamped.self, from: Data(#"{"at":"yesterday"}"#.utf8))
+        }
+    }
+}

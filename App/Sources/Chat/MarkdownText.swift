@@ -155,7 +155,7 @@ struct MarkdownText: View {
            let url = URL(string: source, relativeTo: base)?.standardizedFileURL,
            url.isFileURL,
            url.path.hasPrefix(base.deletingLastPathComponent().standardizedFileURL.path),
-           let loaded = NSImage(contentsOf: url) {
+           let loaded = Self.image(at: url) {
             Image(nsImage: loaded)
                 .resizable()
                 .scaledToFit()
@@ -168,6 +168,18 @@ struct MarkdownText: View {
             }
             .chatText(.supporting)
         }
+    }
+
+    /// Decoded once per file. `body` runs whenever the page redraws — a passage
+    /// being marked, say — and reading the picture off the disk each time was the
+    /// one slow thing on a page of text.
+    private static let images = NSCache<NSURL, NSImage>()
+
+    private static func image(at url: URL) -> NSImage? {
+        if let cached = images.object(forKey: url as NSURL) { return cached }
+        guard let loaded = NSImage(contentsOf: url) else { return nil }
+        images.setObject(loaded, forKey: url as NSURL)
+        return loaded
     }
 
     /// What the dashes under the header said about this column.

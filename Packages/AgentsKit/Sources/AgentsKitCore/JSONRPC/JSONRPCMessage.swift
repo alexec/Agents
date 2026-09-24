@@ -54,16 +54,36 @@ public enum JSONRPCCodec {
     /// Decode one line. Throws rather than returning nil so a caller can log the line
     /// that was wrong; a malformed line must never end the connection.
     public static func decode(line: String) throws -> JSONRPCMessage {
-        guard let data = line.data(using: .utf8) else {
-            throw JSONRPCError(code: JSONRPCError.parseError, message: "line is not UTF-8")
+        // Read as one open-ended value and taken apart by key, rather than decoded
+        // into the envelope: the envelope's `params` and `result` are `JSONValue`,
+        // and a `JSONValue` read by `JSONDecoder` is read by guesswork. See
+        // `JSONValue.parse`.
+        let whole: JSONValue
+        do {
+            whole = try JSONValue.parse(Data(line.utf8))
+        } catch {
+            throw JSONRPCError(code: JSONRPCError.parseError, message: "line is not JSON")
         }
-        let e = try JSONDecoder().decode(Envelope.self, from: data)
-        if let error = e.error { return .failure(id: e.id, error: error) }
-        if let method = e.method {
-            if let id = e.id { return .request(id: id, method: method, params: e.params) }
-            return .notification(method: method, params: e.params)
+        guard let object = whole.objectValue else {
+            throw JSONRPCError(code: JSONRPCError.invalidRequest, message: "not a JSON object")
         }
-        if let id = e.id { return .success(id: id, result: e.result ?? .null) }
+        let id: JSONRPCID? = switch object["id"] {
+        case .int(let n): .number(n)
+        case .double(let d): Int(exactly: d).map(JSONRPCID.number)
+        case .string(let s): .string(s)
+        default: nil
+        }
+        if let error = object["error"] {
+            return .failure(id: id, error: JSONRPCError(code: error["code"]?.intValue ?? JSONRPCError.internalError,
+                                                        message: error["message"]?.stringValue ?? "",
+                                                        data: error["data"]))
+        }
+        if let method = object["method"]?.stringValue {
+            let params = object["params"].flatMap { $0.isNull ? nil : $0 }
+            if let id { return .request(id: id, method: method, params: params) }
+            return .notification(method: method, params: params)
+        }
+        if let id { return .success(id: id, result: object["result"] ?? .null) }
         throw JSONRPCError(code: JSONRPCError.invalidRequest, message: "neither request, response nor notification")
     }
 

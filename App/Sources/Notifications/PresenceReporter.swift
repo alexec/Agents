@@ -26,6 +26,7 @@ final class PresenceReporter {
     private let macIdle = AttentionThresholds.standard.macIdle
     private var last: (watching: UUID?, active: Bool)?
     private var lastReportedAt = Date.distantPast
+    private var lastCheckedAt = Date.distantPast
     private var watching: UUID?
     private var observers: [any NSObjectProtocol] = []
     private var inputMonitor: Any?
@@ -80,6 +81,16 @@ final class PresenceReporter {
     }
 
     private func send(force: Bool = false) {
+        // Every keystroke, click and scroll tick lands here, and each look at the
+        // session is a call to the window server. A Mac already known to be in use,
+        // showing what it was showing, is looked at twice a second at most; the
+        // change that matters — a Mac gone quiet coming back — is never held.
+        let checkedAt = Date()
+        if !force, let last, last.active, last.watching == (NSApp.isActive ? watching : nil),
+           checkedAt.timeIntervalSince(lastCheckedAt) < 0.5 {
+            return
+        }
+        lastCheckedAt = checkedAt
         let inUse = MacActivity.isInUse(within: macIdle)
         let now = (watching: NSApp.isActive && inUse ? watching : nil, active: inUse)
         // Unchanged, and heard from recently enough: nothing to say. The daemon ages a

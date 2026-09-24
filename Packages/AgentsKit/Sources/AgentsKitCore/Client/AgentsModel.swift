@@ -36,6 +36,20 @@ public final class AgentsModel {
     public private(set) var entries: [TranscriptEntry] = []
     public private(set) var firstEntryIndex = 0
     public private(set) var hasMoreBefore = false
+    /// The page as the chat draws it: chunks joined, tool calls folded into runs.
+    ///
+    /// Kept here, folded once as each entry lands, rather than folded by the view on
+    /// every redraw. A reply arrives several chunks a second and the fold grows with
+    /// the page, so folding per redraw was the page's whole length of work, again,
+    /// for every word.
+    public private(set) var transcriptItems: [TranscriptItem] = []
+    @ObservationIgnored private var display = TranscriptDisplayBuilder()
+    /// Each agent's folder in the form projects compare by, worked out once.
+    ///
+    /// `Project.standardize` resolves symlinks, which is the file system being asked
+    /// about every component of the path. An agent's folder never changes, and every
+    /// project row asks for every agent's on every redraw, so it is asked once.
+    @ObservationIgnored private var folders: [UUID: URL] = [:]
 
     /// Which agent's transcript is in hand. Entries for anything else are not ours to
     /// keep: the reader is not looking at them and the next selection reloads anyway.
@@ -74,6 +88,53 @@ public final class AgentsModel {
 
     // MARK: What each notification means
 
+    /// One notification from the daemon, read.
+    ///
+    /// Reading is the expensive half of applying one — a tool call's output can be
+    /// a hundred kilobytes of JSON — and it needs nothing of the model, so a client
+    /// may read off the main actor and hand over the result. What each one *means*
+    /// is still written once, in `apply`.
+    public enum Update: Sendable {
+        case agentChanged(Agent)
+        case projectChanged(DaemonAPI.ProjectSummary)
+        case entry(DaemonAPI.EntryNotification)
+        case permission(DaemonAPI.PermissionNotification)
+        case elicitation(DaemonAPI.ElicitationNotification)
+        case attention(DaemonAPI.AttentionNotification)
+        case usage(DaemonAPI.UsageNotification)
+        case workflowChanged(WorkflowSummary)
+        case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
+        case costChanged(DaemonAPI.CostState)
+        case showFile(DaemonAPI.ShowFileNotification)
+        case resuming(DaemonAPI.ResumingNotification)
+        /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
+        case unreadable
+    }
+
+    /// Read a notification, anywhere. Nil for anything this model does not know, so
+    /// a client with notifications of its own — the Mac has shells and terminals —
+    /// can go on and handle them.
+    public nonisolated static func read(_ method: String, _ params: JSONValue?) -> Update? {
+        func decode<T: Decodable>(_ type: T.Type, _ wrap: (T) -> Update) -> Update {
+            (try? params?.decode(type)).map(wrap) ?? .unreadable
+        }
+        switch method {
+        case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)
+        case DaemonAPI.Notification.projectChanged: return decode(DaemonAPI.ProjectSummary.self, Update.projectChanged)
+        case DaemonAPI.Notification.agentEntry: return decode(DaemonAPI.EntryNotification.self, Update.entry)
+        case DaemonAPI.Notification.agentPermission: return decode(DaemonAPI.PermissionNotification.self, Update.permission)
+        case DaemonAPI.Notification.agentElicitation: return decode(DaemonAPI.ElicitationNotification.self, Update.elicitation)
+        case DaemonAPI.Notification.attentionChanged: return decode(DaemonAPI.AttentionNotification.self, Update.attention)
+        case DaemonAPI.Notification.agentUsage: return decode(DaemonAPI.UsageNotification.self, Update.usage)
+        case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
+        case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
+        case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
+        case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
+        default: return nil
+        }
+    }
+
     /// Apply one notification from the daemon.
     ///
     /// Returns false for anything this does not know, so a client with notifications
@@ -81,33 +142,37 @@ public final class AgentsModel {
     /// notification nobody claims is skipped, never guessed at.
     @discardableResult
     public func apply(_ method: String, _ params: JSONValue?) -> Bool {
-        switch method {
-        case DaemonAPI.Notification.agentChanged:
-            guard let agent = try? params?.decode(Agent.self) else { return true }
+        guard let update = Self.read(method, params) else { return false }
+        apply(update)
+        return true
+    }
+
+    /// Apply one notification already read. See `read`.
+    public func apply(_ update: Update) {
+        switch update {
+        case .agentChanged(let agent):
             upsert(agent)
 
-        case DaemonAPI.Notification.projectChanged:
-            guard let summary = try? params?.decode(DaemonAPI.ProjectSummary.self) else { return true }
+        case .projectChanged(let summary):
             upsert(summary)
 
-        case DaemonAPI.Notification.agentEntry:
-            guard let notification = try? params?.decode(DaemonAPI.EntryNotification.self) else { return true }
-            if notification.agentID == watching { entries.append(notification.entry) }
+        case .entry(let notification):
+            guard notification.agentID == watching else { return }
+            entries.append(notification.entry)
+            display.add(notification.entry)
+            transcriptItems = display.items
 
-        case DaemonAPI.Notification.agentPermission:
-            guard let notification = try? params?.decode(DaemonAPI.PermissionNotification.self) else { return true }
+        case .permission(let notification):
             // One question per agent at a time, so the agent's old one goes whether
             // this is a new question or the news that it was answered.
             permissions.removeAll { $0.agentID == notification.agentID }
             if let request = notification.request { permissions.append(request) }
 
-        case DaemonAPI.Notification.agentElicitation:
-            guard let notification = try? params?.decode(DaemonAPI.ElicitationNotification.self) else { return true }
+        case .elicitation(let notification):
             elicitations.removeAll { $0.id == notification.requestID }
             if let request = notification.request { elicitations.append(request) }
 
-        case DaemonAPI.Notification.attentionChanged:
-            guard let notification = try? params?.decode(DaemonAPI.AttentionNotification.self) else { return true }
+        case .attention(let notification):
             if let need = notification.need {
                 needs[notification.needID] = need
                 deliveries[notification.needID] = notification.to
@@ -116,43 +181,36 @@ public final class AgentsModel {
                 deliveries.removeValue(forKey: notification.needID)
             }
 
-        case DaemonAPI.Notification.agentUsage:
-            guard let notification = try? params?.decode(DaemonAPI.UsageNotification.self) else { return true }
+        case .usage(let notification):
             if let index = agents.firstIndex(where: { $0.id == notification.agentID }) {
                 agents[index].usage = notification.usage
             }
 
-        case DaemonAPI.Notification.workflowChanged:
-            guard let summary = try? params?.decode(WorkflowSummary.self) else { return true }
+        case .workflowChanged(let summary):
             upsert(summary)
 
-        case DaemonAPI.Notification.workflowRemoved:
-            guard let notification = try? params?.decode(DaemonAPI.WorkflowRemovedNotification.self) else { return true }
+        case .workflowRemoved(let notification):
             let folder = Project.standardize(notification.folder)
             workflows.removeAll {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
 
-        case DaemonAPI.Notification.costChanged:
-            guard let state = try? params?.decode(DaemonAPI.CostState.self) else { return true }
+        case .costChanged(let state):
             costState = state
 
-        case DaemonAPI.Notification.agentShowFile:
-            guard let notification = try? params?.decode(DaemonAPI.ShowFileNotification.self) else { return true }
+        case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
 
-        case DaemonAPI.Notification.agentResuming:
-            guard let notification = try? params?.decode(DaemonAPI.ResumingNotification.self) else { return true }
+        case .resuming(let notification):
             if notification.isResuming {
                 resuming.insert(notification.agentID)
             } else {
                 resuming.remove(notification.agentID)
             }
 
-        default:
-            return false
+        case .unreadable:
+            break
         }
-        return true
     }
 
     // MARK: Filing what arrives
@@ -238,6 +296,7 @@ public final class AgentsModel {
         entries = page.entries
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.hasMoreBefore
+        refold()
     }
 
     /// An earlier page, put in front of what is already held.
@@ -245,12 +304,22 @@ public final class AgentsModel {
         entries.insert(contentsOf: page.entries, at: 0)
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.hasMoreBefore
+        refold()
     }
 
     public func clearTranscript() {
         entries = []
         firstEntryIndex = 0
         hasMoreBefore = false
+        refold()
+    }
+
+    /// The page folded again from the top: a page replaced or grown at the front is
+    /// not a page grown at the end, and only the latter can be folded a step at a time.
+    private func refold() {
+        display = TranscriptDisplayBuilder()
+        for entry in entries { display.add(entry) }
+        transcriptItems = display.items
     }
 
     /// Taken out once it has been acted on. This is "look at this now", and a client
@@ -309,7 +378,15 @@ public final class AgentsModel {
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         let wanted = Project.standardize(folder)
-        return agents.filter { Project.standardize($0.cwd) == wanted && self.group(of: $0) == group }
+        return agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+    }
+
+    /// The agent's folder as projects compare it, remembered after the first ask.
+    private func projectFolder(of agent: Agent) -> URL {
+        if let known = folders[agent.id] { return known }
+        let standardized = Project.standardize(agent.cwd)
+        folders[agent.id] = standardized
+        return standardized
     }
 
     /// Where an agent sits, counting a file it has asked the person to look at.
@@ -338,7 +415,7 @@ public final class AgentsModel {
         guard let folder else { return [:] }
         let wanted = Project.standardize(folder)
         var counts: [AgentGroup: Int] = [:]
-        for agent in agents where Project.standardize(agent.cwd) == wanted {
+        for agent in agents where projectFolder(of: agent) == wanted {
             counts[group(of: agent), default: 0] += 1
         }
         return counts
@@ -350,7 +427,7 @@ public final class AgentsModel {
     public func unreadCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
         let wanted = Project.standardize(folder)
-        return agents.filter { Project.standardize($0.cwd) == wanted && group(of: $0) == .finished && $0.isUnread }.count
+        return agents.filter { projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread }.count
     }
 
     /// The question this agent is blocked on, if it still is.

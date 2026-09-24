@@ -19,6 +19,8 @@ struct PromptBar: View {
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
     @State private var mentions: [FileMention] = []
+    /// The walk for the term typed so far. Each keystroke cancels the last.
+    @State private var mentionSearch: Task<Void, Never>?
     @State private var selectedMention = 0
     @State private var dismissedMentionTerm: String?
     /// Set when the list is dismissed, so Escape hides it until the word changes.
@@ -539,6 +541,7 @@ struct PromptBar: View {
     }
 
     private func updateMentions() {
+        mentionSearch?.cancel()
         guard let mentionQuery, !mentionFolders.isEmpty else {
             mentions = []
             return
@@ -549,7 +552,18 @@ struct PromptBar: View {
             mentions = []
             return
         }
-        mentions = FileMention.matching(mentionQuery.term, in: mentionFolders)
+        // Off the main actor, because even the capped walk is twenty thousand stat
+        // calls, and the field must take the next character while it runs. What was
+        // typed since is the search that matters, so the walk is cancelled by it.
+        let term = mentionQuery.term
+        let folders = mentionFolders
+        mentionSearch = Task {
+            let found = await Task.detached(priority: .userInitiated) {
+                FileMention.matching(term, in: folders)
+            }.value
+            guard !Task.isCancelled else { return }
+            mentions = found
+        }
     }
 
     private func accept(_ mention: FileMention) {

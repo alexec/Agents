@@ -119,7 +119,7 @@ extension TranscriptEntry {
         return result
     }
 
-    private static func join(_ entry: TranscriptEntry, onto previous: TranscriptEntry?) -> TranscriptEntry? {
+    static func join(_ entry: TranscriptEntry, onto previous: TranscriptEntry?) -> TranscriptEntry? {
         guard let previous else { return nil }
         switch (previous.kind, entry.kind) {
         case (.agentMessage(let firstID, let text, let blocks),

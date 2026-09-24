@@ -30,7 +30,7 @@ struct RemoteChatView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 8)
                     }
-                    ForEach(TranscriptEntry.display(model.entries)) { item in
+                    ForEach(model.transcriptItems) { item in
                         EntryView(item: item).id(item.id)
                     }
                     // Live, and so at the foot rather than in the record: the chat
@@ -191,7 +191,7 @@ struct RemoteChatView: View {
     private func loadEarlier(keeping scroller: ScrollViewProxy) {
         guard hasSettled, !isLoadingEarlier, model.hasMoreBefore else { return }
         isLoadingEarlier = true
-        let anchor = TranscriptEntry.display(model.entries).first?.id
+        let anchor = model.transcriptItems.first?.id
         Task {
             await model.loadEarlier()
             if let anchor { scroller.scrollTo(anchor, anchor: .top) }

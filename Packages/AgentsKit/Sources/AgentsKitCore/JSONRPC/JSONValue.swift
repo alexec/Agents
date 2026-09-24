@@ -18,12 +18,17 @@ public enum JSONValue: Codable, Hashable, Sendable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.singleValueContainer()
         if c.decodeNil() { self = .null; return }
+        // Each wrong guess is a thrown `DecodingError`, with its message formatted
+        // and its coding path copied, so the order is the order things turn up in
+        // what runtimes send: text and objects far ahead of numbers and flags. A
+        // string used to cost three misses and an object four; now neither costs one.
+        // Whole documents are read without guessing at all: see `parse(_:)`.
+        if let v = try? c.decode(String.self) { self = .string(v); return }
+        if let v = try? c.decode([String: JSONValue].self) { self = .object(v); return }
+        if let v = try? c.decode([JSONValue].self) { self = .array(v); return }
         if let v = try? c.decode(Bool.self) { self = .bool(v); return }
         if let v = try? c.decode(Int.self) { self = .int(v); return }
         if let v = try? c.decode(Double.self) { self = .double(v); return }
-        if let v = try? c.decode(String.self) { self = .string(v); return }
-        if let v = try? c.decode([JSONValue].self) { self = .array(v); return }
-        if let v = try? c.decode([String: JSONValue].self) { self = .object(v); return }
         throw DecodingError.dataCorruptedError(in: c, debugDescription: "not JSON")
     }
 
@@ -72,8 +77,51 @@ public enum JSONValue: Codable, Hashable, Sendable {
 
     /// Turn a known shape into an open-ended value.
     public static func encoding(_ value: some Encodable) throws -> JSONValue {
-        let data = try JSONEncoder().encode(value)
-        return try JSONDecoder().decode(JSONValue.self, from: data)
+        try parse(try JSONEncoder().encode(value))
+    }
+
+    // MARK: Reading a whole document
+
+    /// Read JSON text into a value, without `Decodable`.
+    ///
+    /// `JSONDecoder` can only find out what a value is by trying each kind in turn,
+    /// and every wrong try is a thrown error with a message. Every line on every
+    /// wire — a runtime's, the daemon's — comes through here, and a tool's output
+    /// can be a hundred kilobytes of it, so it is read the direct way: Foundation's
+    /// parser says what each value is, and this writes it down.
+    public static func parse(_ data: Data) throws -> JSONValue {
+        JSONValue(foundation: try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]))
+    }
+
+    /// From what `JSONSerialization` hands back. Anything it never produces is null.
+    init(foundation object: Any) {
+        switch object {
+        case let string as String:
+            self = .string(string)
+        case let number as NSNumber:
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                self = .bool(number.boolValue)
+            } else if number is NSDecimalNumber {
+                self = .double(number.doubleValue)
+            } else {
+                switch UInt8(bitPattern: number.objCType.pointee) {
+                case UInt8(ascii: "f"), UInt8(ascii: "d"):
+                    self = .double(number.doubleValue)
+                case UInt8(ascii: "Q"):
+                    // Past what `Int` holds, which a double at least says the size of.
+                    let wide = number.uint64Value
+                    self = wide <= UInt64(Int.max) ? .int(Int(wide)) : .double(number.doubleValue)
+                default:
+                    self = .int(number.intValue)
+                }
+            }
+        case let array as [Any]:
+            self = .array(array.map(JSONValue.init(foundation:)))
+        case let object as [String: Any]:
+            self = .object(object.mapValues(JSONValue.init(foundation:)))
+        default:
+            self = .null
+        }
     }
 }
 

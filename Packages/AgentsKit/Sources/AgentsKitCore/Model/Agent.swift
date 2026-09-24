@@ -210,9 +210,17 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // it, and is why neither of these is a completion.
         report = try c.decodeIfPresent(WorkReport.self, forKey: .report)
         outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
+        // Only the keys this build does not know are read as open-ended values.
+        // Reading the whole record that way too — which is what this did — decoded
+        // every option, command and plan a second time, for every agent, on every
+        // change a window hears about.
         let known = Set(CodingKeys.allCases.map(\.stringValue))
-        let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
-        unknownFields = whole.filter { !known.contains($0.key) }
+        unknownFields = [:]
+        if let extra = try? decoder.container(keyedBy: AnyKey.self) {
+            for key in extra.allKeys where !known.contains(key.stringValue) {
+                unknownFields[key.stringValue] = (try? extra.decode(JSONValue.self, forKey: key)) ?? .null
+            }
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {

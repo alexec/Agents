@@ -85,6 +85,7 @@ final class RemoteModel {
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
+    var transcriptItems: [TranscriptItem] { work.transcriptItems }
     /// What the reader will allow, as the Mac has it. The phone shows limits and
     /// never sets them, so there is no setter beside this.
     var costState: DaemonAPI.CostState? { work.costState }

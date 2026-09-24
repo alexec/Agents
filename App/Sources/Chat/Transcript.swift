@@ -44,7 +44,9 @@ struct Transcript: View {
                             .controlSize(.small)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    ForEach(TranscriptEntry.display(model.entries)) { item in
+                    // Folded once by the model as each entry lands, not here on every
+                    // redraw: a reply arrives several chunks a second.
+                    ForEach(model.transcriptItems) { item in
                         row(for: item).id(item.id)
                     }
                     ForEach(agent.queuedPrompts) { queued in
@@ -237,7 +239,7 @@ struct Transcript: View {
     private func loadEarlier(keeping scroller: ScrollViewProxy) {
         guard hasSettled, !isLoadingEarlier, model.transcriptHasMore else { return }
         isLoadingEarlier = true
-        let anchor = TranscriptEntry.display(model.entries).first?.id
+        let anchor = model.transcriptItems.first?.id
         Task {
             await model.loadEarlier()
             if let anchor { scroller.scrollTo(anchor, anchor: .top) }
@@ -590,8 +592,14 @@ private struct ToolCallLine: View {
     }
 
     /// Whether there is anything behind the line worth unfolding it for.
+    ///
+    /// Asked of every line on every redraw, so it asks whether the runtime sent
+    /// anything and not what — `raw` pretty-prints the lot, which for a run of
+    /// thirty calls with their outputs was a good deal of JSON formatted to answer
+    /// a yes or no.
     private var hasDetail: Bool {
-        !call.content.isEmpty || !call.locations.isEmpty || raw != nil
+        !call.content.isEmpty || !call.locations.isEmpty
+            || call.rawInput != nil || call.rawOutput != nil || call.raw != nil
     }
 
     /// What the runtime sent, as it sent it. Every runtime describes its tools
