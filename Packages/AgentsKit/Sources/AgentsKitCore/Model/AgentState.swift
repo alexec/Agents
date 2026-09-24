@@ -63,6 +63,18 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
     /// `enqueue` and `sendNextQueued` both gate on this, so a second prompt arriving
     /// while an agent starts joins the queue rather than racing the first — FR-004, and
     /// it costs no new code at all.
+    ///
+    /// **A third near-identical predicate lives outside this file and must not be
+    /// confused with either of these**: `DaemonCore.hasWorkInFlight`
+    /// (`DaemonCore+Wakefulness.swift`) asks *is the CPU busy*, and so excludes
+    /// `waitingOnUser` — the one state the two above include. It is what decides
+    /// whether the Mac is held awake, and using this property there would hold it all
+    /// night for a permission prompt nobody answered (024 FR-003).
+    ///
+    /// Four predicates of this shape now exist — `holdsRuntime`, this one,
+    /// `DaemonCore.isHoldingAgents` and `DaemonCore.hasWorkInFlight` — and they give
+    /// three different answers about `waitingOnUser`. Each is right for its own
+    /// question. None is a bug to be fixed into another.
     public var hasTurnInFlight: Bool {
         switch self {
         case .starting, .running, .waitingOnUser: return true

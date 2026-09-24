@@ -360,29 +360,29 @@ and unlocked before driving a scratch copy, and prefer `daemon.sock` for anythin
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T045 [P] Run the full package suite in a detached worktree:
+- [X] T045 [P] Run the full package suite in a detached worktree:
       `git worktree add --detach /tmp/wake HEAD`, copy your files in,
       `swift test --package-path /tmp/wake/Packages/AgentsKit`. Expect
       `DaemonTests.stoppingAnAgentBeforeItIsPickedUpWithdrawsIt` to fail on `launchCount == 1`
       — it is **pre-existing and not this feature's**. Any other failure is yours.
 
-- [ ] T046 [P] Build both schemes sequentially with
+- [X] T046 [P] Build both schemes sequentially with
       `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build`
       and the same for the Remote scheme. The flag is needed because SwiftTerm ships a
       build-tool plug-in and `xcodebuild` has nobody to ask about trusting it — without it you
       get three unexplained build commands and no useful error.
 
-- [ ] T047 Re-read `hasWorkInFlight`, `isHoldingAgents` and `AgentState.hasTurnInFlight`
+- [X] T047 Re-read `hasWorkInFlight`, `isHoldingAgents` and `AgentState.hasTurnInFlight`
       together and confirm all three carry comments pointing at the other two. Three
       near-identical predicates with three different answers for `waitingOnUser` is the single
       most likely place this feature is broken by a later change.
 
-- [ ] T048 [P] Confirm nothing was persisted: no new file under
+- [X] T048 [P] Confirm nothing was persisted: no new file under
       `~/Library/Application Support/Agents/`, no new key on `agent.json`, nothing about the
       hold surviving a restart. If any appeared, delete it — FR-013 and data-model "What is
       deliberately absent".
 
-- [ ] T049 [P] Confirm no agent-facing surface changed: no new MCP tool, no change to
+- [X] T049 [P] Confirm no agent-facing surface changed: no new MCP tool, no change to
       `show_file` / `manage_workflows` / the briefing. An agent has no business knowing whether
       the Mac is held awake for it.
 
@@ -391,7 +391,7 @@ and unlocked before driving a scratch copy, and prefer `daemon.sock` for anythin
       covers the truth table; this covers the real IOKit reading and nothing else can. Record
       the result in the notes below.
 
-- [ ] T051 Write the Implementation Notes section at the foot of this file: what was amended
+- [X] T051 Write the Implementation Notes section at the foot of this file: what was amended
       after the fact and why, following the pattern at the foot of 020's and 022's tasks.md.
 
 ---
@@ -729,3 +729,80 @@ and the exact charge) and by the verdict truth table. **Quickstart check 6's thi
 T050 both still want a real laptop, and are Alex's.**
 
 Phase 6 is the last of the building. Only Phase 7 remains.
+
+
+---
+
+## Implementation Notes
+
+**024 is built and merged, except T050.** Phases 1–7 done across five commits; `main` carries
+all of it. 1169 tests pass, both schemes build. What follows is what the documents got wrong
+and what the walks found, in the order it was discovered.
+
+### What the spec and tasks got wrong
+
+**T026 asked for the wrong implementation.** It said to call `reviseWakefulness()` in
+`shutDown()`. That is a bug: `shutDown` leaves an agent that was mid-turn reading `running`
+on disk on purpose, so the next daemon finds it and records `foundDead` rather than
+pretending it finished. A revise there sees work in flight and keeps holding until the
+process dies. `letGoOfTheMac()` releases unconditionally instead.
+
+**The contract had the notification named wrong.** It said `wake/state` for both the method
+and the notification. The house convention, from `cost`, is a method named for the state and
+a notification named for the change: `wake/state` and `wake/changed`. Corrected before any
+code was written against it.
+
+**T029's placement was not where the task implied.** The call goes at the very top of
+`tickWorkflows(now:)`, above the `guard let since, since < now else { return }`. That guard
+fires on the first tick after starting and whenever the clock has not moved — neither has
+anything to do with the battery, and below it a Mac unplugged in the first fifteen seconds
+stays held until the tick after.
+
+**T047 found a real gap**, which is what it was for. `hasWorkInFlight` and `isHoldingAgents`
+pointed at each other, but `AgentState.hasTurnInFlight` pointed at neither. There are in fact
+**four** predicates of this shape — `holdsRuntime`, `hasTurnInFlight`, `isHoldingAgents`,
+`hasWorkInFlight` — giving three different answers about `waitingOnUser`. All four are now
+cross-referenced.
+
+### What only a walk could find
+
+**The assertion's reason string cannot carry a count.** It read "1 agent" while three agents
+ran, because the hold is revised only when the *verdict* moves, and the verdict is `.hold`
+whether one agent works or five. Keeping it true would mean ending and re-beginning the
+assertion on every count change — a gap opened in the one place a gap must not open, for a
+number in a diagnostic tool. The count lives in `WakeState`, which is re-sent freely. **Every
+unit test passed with the stale count, because each test had one agent.**
+
+**The footer row wrapped.** Headline-left/count-right — the shape `SpendingRow` uses — is a
+few points too wide for a ~226pt sidebar, so "Keeping this Mac awake" broke mid-phrase and
+read as a mistake. Stacked left-aligned instead.
+
+**`ProcessInfoWakefulness` needed a `deinit`.** Running the suite left real assertions on the
+developer's Mac: tests that build a `DaemonCore` without passing `wakefulness:` get the real
+one, and an abandoned holder inside a **live** process is not something the kernel cleans up
+— it only drops assertions when the process *dies*. That is the opposite case from the
+forbidden start-up sweep, and needs the opposite treatment.
+
+### Verified rather than assumed
+
+- `ProcessInfo.beginActivity(.idleSystemSleepDisabled)` registers a real
+  `PreventUserIdleSystemSleep` from a non-GUI helper, with the reason string carried verbatim
+  into `pmset -g assertions`.
+- The assertion **dies with the process** on `kill -9`, so FR-013 needed no code.
+- T048 was checked on a running daemon, not only by reading: a real turn held and released
+  the Mac, and the root afterwards held `agent.json`, `transcript.jsonl`, `daemon.lock`,
+  `daemon.log` and `spend.json` — nothing else. No wakefulness key on the record.
+- T049: 024's commits touch **no** agent-facing file, and an agent reaches the daemon only
+  through the five methods the MCP helper relays. `wake/state` is not among them.
+
+### Still open
+
+- **T050, the battery walk, is Alex's.** A real laptop taken below 20% on battery with a turn
+  in flight, then plugged back in. `FakePowerSource` covers the truth table and the tick
+  wiring; only hardware covers the real IOKit reading.
+- **Quickstart check 6's third wording has never been seen on screen** for the same reason —
+  this Mac is on mains, so `heldBackByBattery` is unreachable without unplugging it. Covered
+  by `broadcastSaysWhyWhenTheBatteryIsLow`, which asserts the flag, the count and the charge.
+- The follow-up named in research §6 and not taken: **a long build in a terminal does not hold
+  the Mac**, because a build is not a turn. `isHoldingAgents` counts busy shells; this does
+  not. Deliberate, and the obvious next question if it ever bites.
