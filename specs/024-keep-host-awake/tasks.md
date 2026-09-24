@@ -252,26 +252,26 @@ power source moves.
 **Independent Test**: On battery below the floor, start an agent and confirm the Mac is
 allowed to sleep. Plug in and confirm a turn in flight holds it again.
 
-- [ ] T029 [US3] Call `reviseWakefulness()` from `tickWorkflows(now:)` in
+- [X] T029 [US3] Call `reviseWakefulness()` from `tickWorkflows(now:)` in
       `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, which already
       runs every 15 seconds (`workflowTickInterval`, `:273`) and already carries a second job
       of this exact shape — it notices the local day rolling over without a timer of its own.
       **No new timer.** Research §4 records why the `notify(3)` route was rejected.
 
-- [ ] T030 [P] [US3] Add to `WakefulnessTests.swift`: with a turn in flight and
+- [X] T030 [P] [US3] Add to `WakefulnessTests.swift`: with a turn in flight and
       `FakePowerSource` on battery above the floor, the hold is taken; move the fake below the
       floor, tick, and the hold is released **even though the turn is still running**
       (US3-3, FR-010).
 
-- [ ] T031 [P] [US3] Add the reverse: below the floor with a turn in flight, then back on
+- [X] T031 [P] [US3] Add the reverse: below the floor with a turn in flight, then back on
       mains, then tick — the hold is taken up again **without waiting for the next turn**
       (US3-4, FR-011).
 
-- [ ] T032 [P] [US3] Add: on mains at 5% battery, the hold is taken (US3-1, FR-009); and with
+- [X] T032 [P] [US3] Add: on mains at 5% battery, the hold is taken (US3-1, FR-009); and with
       `batteryPercent` nil — a desktop — the hold is taken with no battery rule applying
       (US3-5, FR-012).
 
-- [ ] T033 [US3] Confirm by reading that the 15-second tick is only ever a **backstop** for
+- [X] T033 [US3] Confirm by reading that the 15-second tick is only ever a **backstop** for
       agent-side causes: the release on a turn ending comes from T017's `changed(_:)` call and
       is immediate. If a test has to wait 15 seconds for an agent-side change, T017 is wired
       wrong.
@@ -636,3 +636,31 @@ no-cleanup comment, and the `isHoldingAgents` back-reference).
   identically.** Pre-existing, not 024's.
 - `xcodegen generate` is **not** needed for AgentsKit sources — the package picks files up by
   directory and the pbxproj does not list them. T002's concern applies only to `App/`.
+
+
+### Phase 5 built, 2026-09-24
+
+T029–T033 done. 14 tests in `WakefulnessTests`, 1161 in the package; three of four full
+runs clean, the fourth only the known pre-existing flakes
+(`aStoppedAgentIsPickedUpRatherThanCopied`, `andNotAgainOnEveryPromptAfterThat`). Both
+schemes build.
+
+**T029's call goes at the very top of `tickWorkflows(now:)`, above the
+`guard let since, since < now else { return }`.** That guard returns on the first tick
+after starting and whenever the clock has not moved, and neither has anything to do with
+the battery — below it, a Mac unplugged in the first fifteen seconds stays held until the
+tick after. The obvious placement, next to the day-rollover block, would have been wrong in
+a way no test written from the task text would have caught.
+
+**The battery tests assert the state *before* the tick as well as after.** Held, then
+unplugged, then *still held*, then ticked, then released. Without that middle assertion the
+test would pass just as happily if the hold had been dropped for an unrelated reason, and
+would not actually be guarding the wiring T029 adds. Same shape in reverse for plugging in.
+
+T033 is an assertion rather than a reading: `theTickIsOnlyABackstop` proves the release on a
+turn ending has already happened with no tick at all. If that ever needs a tick, FR-004's
+five seconds is being met by a fifteen-second timer, which is to say not met.
+
+Still open: Phase 4's T026–T028, Phase 6 (the UI), Phase 7. **T050, the battery walk on a
+real laptop below 20%, remains Alex's** — `FakePowerSource` covers the truth table and the
+tick wiring; only hardware covers the real IOKit reading.

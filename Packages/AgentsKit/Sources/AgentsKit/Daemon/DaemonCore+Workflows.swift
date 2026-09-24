@@ -290,6 +290,26 @@ extension DaemonCore {
     /// One pass of the clock. `now` is a parameter so a test can drive a week through
     /// this in a millisecond rather than waiting for one.
     public func tickWorkflows(now: Date) async {
+        // The power source, noticed on the heartbeat that is already running rather
+        // than on a timer of its own — the same trick the day rollover below uses, and
+        // the reason 024 needs no clock of its own (024 FR-011).
+        //
+        // `readingPower: true` is the whole point of the call: every other caller
+        // reaches `reviseWakefulness` because an *agent* moved and is allowed to skip
+        // the IOKit read, so this is the only thing that ever notices a laptop being
+        // unplugged, or its charge crossing the floor, under a turn that is still
+        // running.
+        //
+        // **Above the `guard let since` below, deliberately.** That guard returns on the
+        // first tick after starting and whenever the clock has not moved, and neither
+        // has anything to do with the battery. Put this after it and a Mac unplugged in
+        // the first fifteen seconds is held awake until the tick after that.
+        //
+        // It is only ever a backstop for agent-side causes: a turn ending releases the
+        // hold from `changed(_:)`, in the same call that records the ending. Nothing
+        // here waits fifteen seconds for that (024 T033).
+        reviseWakefulness(readingPower: true)
+
         // The day rolling over, noticed on the heartbeat that is already running
         // rather than on a timer of its own. `now` is the parameter this already
         // takes, so midnight is testable without waiting for it.
