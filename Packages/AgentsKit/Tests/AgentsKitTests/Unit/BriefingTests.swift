@@ -160,4 +160,47 @@ struct BriefingTests {
         #expect(!Briefing.text(for: ToolPolicyCatalog.grok).contains("cron entries"))
         #expect(Briefing.text(for: ToolPolicyCatalog.cursor).contains("cron entries"))
     }
+
+    // MARK: What the person changed on the page
+
+    /// The note that tells an agent the document changed under it (022 FR-016). The
+    /// wording is the contract in specs/022-live-artifacts/contracts/daemon-api.md, and
+    /// the shape is what makes it usable: the path once, each passage's lines, the
+    /// passage itself in a fence, and the sentence that says what to do about it.
+    @Test func theArtifactNoteSaysWhatChangedAndWhatToDo() throws {
+        let edit = Briefing.ArtifactEdit(path: "/p/notes.md", lines: 12...15, text: "Second paragraph, as I put it.")
+        let note = try #require(Briefing.artifactEdited([edit]))
+        #expect(note.hasPrefix("Since your last turn I edited `/p/notes.md`. Lines 12–15 now read:"))
+        #expect(note.contains("```\nSecond paragraph, as I put it.\n```"))
+        #expect(note.hasSuffix("Work from what is there now; do not restore what you wrote before."))
+    }
+
+    @Test func twoPassagesInOneFileAreOneFileLineAndTwoBlocksInOrder() throws {
+        let later = Briefing.ArtifactEdit(path: "/p/notes.md", lines: 20...21, text: "Later.")
+        let earlier = Briefing.ArtifactEdit(path: "/p/notes.md", lines: 3...3, text: "Earlier.")
+        let note = try #require(Briefing.artifactEdited([later, earlier]))
+        #expect(note.components(separatedBy: "I edited `/p/notes.md`").count == 2)
+        let first = try #require(note.range(of: "Lines 3–3 now read:"))
+        let second = try #require(note.range(of: "Lines 20–21 now read:"))
+        #expect(first.lowerBound < second.lowerBound)
+    }
+
+    @Test func twoFilesAreTwoParagraphs() throws {
+        let a = Briefing.ArtifactEdit(path: "/p/a.md", lines: 1...1, text: "A.")
+        let b = Briefing.ArtifactEdit(path: "/p/b.md", lines: 1...1, text: "B.")
+        let note = try #require(Briefing.artifactEdited([a, b]))
+        #expect(note.contains("I edited `/p/a.md`"))
+        #expect(note.contains("I edited `/p/b.md`"))
+    }
+
+    @Test func pastTwentyTheNoteSaysToReadTheFile() throws {
+        let edits = (1...21).map { Briefing.ArtifactEdit(path: "/p/n.md", lines: $0...$0, text: "Line \($0).") }
+        let note = try #require(Briefing.artifactEdited(edits))
+        #expect(note.components(separatedBy: "now read:").count == 21)
+        #expect(note.contains("…and more. Read the file before changing it."))
+    }
+
+    @Test func nothingEditedIsNoNote() {
+        #expect(Briefing.artifactEdited([]) == nil)
+    }
 }

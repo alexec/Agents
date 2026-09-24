@@ -148,6 +148,51 @@ public enum Briefing {
             .joined(separator: " ")
     }
 
+    /// One passage the person changed on a live page, for the note below. Its own
+    /// small type here rather than the daemon's, so the wording can be tested without
+    /// a daemon in the room; the daemon builds these from what it remembered.
+    public struct ArtifactEdit: Hashable, Sendable {
+        public var path: String
+        public var lines: ClosedRange<Int>
+        public var text: String
+
+        public init(path: String, lines: ClosedRange<Int>, text: String) {
+            self.path = path
+            self.lines = lines
+            self.text = text
+        }
+    }
+
+    /// The most passages the note will quote before telling the agent to read the
+    /// file instead. Past this the note is longer than the document.
+    public static let artifactEditsQuoted = 20
+
+    /// The document changed under you, and here is how (022 FR-016).
+    ///
+    /// Sent as a block after the person's next words, the way the briefing is, and
+    /// not recorded in the transcript. It quotes each changed passage rather than
+    /// naming it, because an agent told "lines 12–15 changed" has to go and read
+    /// them, and one that reads its own last version instead will put it back — the
+    /// exact thing the last sentence forbids.
+    public static func artifactEdited(_ edits: [ArtifactEdit]) -> String? {
+        guard !edits.isEmpty else { return nil }
+        let quoted = edits.prefix(artifactEditsQuoted)
+        var paths: [String] = []
+        for edit in quoted where !paths.contains(edit.path) { paths.append(edit.path) }
+        var paragraphs: [String] = []
+        for path in paths {
+            let blocks = quoted.filter { $0.path == path }
+                .sorted { $0.lines.lowerBound < $1.lines.lowerBound }
+                .map { "Lines \($0.lines.lowerBound)–\($0.lines.upperBound) now read:\n\n```\n\($0.text)\n```" }
+            paragraphs.append("Since your last turn I edited `\(path)`. " + blocks.joined(separator: "\n\n"))
+        }
+        if edits.count > artifactEditsQuoted {
+            paragraphs.append("…and more. Read the file before changing it.")
+        }
+        paragraphs.append("Work from what is there now; do not restore what you wrote before.")
+        return paragraphs.joined(separator: "\n\n")
+    }
+
     /// In the order they are sent, for the runtime this agent is on.
     ///
     /// The only place the order is decided and the only place a new line is added. The

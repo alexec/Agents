@@ -711,6 +711,16 @@ extension DaemonCore {
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
             outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID))))
         }
+        // What the person changed on a live page since this agent last took a turn
+        // (022 FR-016). Told once, here, after their words and in the briefing's
+        // slot, and then forgotten: the edit itself is in the file. Whoever sent the
+        // prompt — the person, a workflow — the agent needs to know either way.
+        if let edits = artifactEdits.removeValue(forKey: agentID),
+           let note = Briefing.artifactEdited(edits.map {
+               Briefing.ArtifactEdit(path: $0.path, lines: $0.lines, text: $0.text)
+           }) {
+            outgoing.append(.text(note))
+        }
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
             do {
