@@ -66,8 +66,22 @@ struct LivePage: View {
     @State private var marked: [Int: Date] = [:]
     /// The text `passages` came from: the base for the next diff.
     @State private var lastLoaded = ""
+    /// Passages being revealed as if typed: index → how many characters are shown.
+    /// A passage the agent changed does not appear whole; it is typed out from where
+    /// it diverges from what was there, at a pace that finishes in a couple of
+    /// seconds however long it is. The eye follows a caret where it would not notice
+    /// a paragraph replaced.
+    @State private var typing: [Int: Int] = [:]
+    @State private var typist: Task<Void, Never>?
     /// The pictures on the page and when each file last changed.
     @State private var images = ImageStamps()
+
+    /// The typing pace: at least this many characters a frame, and never so slow that
+    /// a passage takes more than `typingFrames` frames — a long paragraph types faster
+    /// rather than for longer, because the agent's next write is seconds away.
+    private static let typingStep = 4
+    private static let typingFrames = 90
+    private static let typingCaret = "▍"
 
     /// How long a mark stays before it starts to fade, and how long the fade takes.
     /// Long enough to be found by an eye that was elsewhere; short enough that a
@@ -135,7 +149,7 @@ struct LivePage: View {
                     }
                 }
             } else {
-                MarkdownText(markdown: passages[index].source, base: url)
+                MarkdownText(markdown: shown(index), base: url)
                     // A new identity when a picture in it changed on disk, which is
                     // what makes the file be read again rather than redrawn.
                     .id(images.token(for: index))
@@ -232,6 +246,41 @@ struct LivePage: View {
         editing = nil
     }
 
+    // MARK: Typing it out
+
+    /// What the passage shows right now: all of it, or as much as has been typed
+    /// with a caret after it.
+    private func shown(_ index: Int) -> String {
+        guard let count = typing[index] else { return passages[index].source }
+        return String(passages[index].source.prefix(count)) + Self.typingCaret
+    }
+
+    /// Begin typing these passages out, each from where it stopped agreeing with
+    /// what was there before at the same place — a rewritten sentence types from the
+    /// sentence, not from the top of the paragraph.
+    private func reveal(_ indices: [Int], previous: [Passage]) {
+        for index in indices where passages.indices.contains(index) {
+            let new = passages[index].source
+            let old = previous.indices.contains(index) ? previous[index].source : ""
+            let agreed = zip(old, new).prefix { $0 == $1 }.count
+            typing[index] = min(agreed, max(0, new.count - 1))
+        }
+        guard !typing.isEmpty else { return }
+        typist?.cancel()
+        typist = Task {
+            while !Task.isCancelled, !typing.isEmpty {
+                try? await Task.sleep(for: .milliseconds(16))
+                for (index, count) in typing {
+                    guard passages.indices.contains(index) else { typing[index] = nil; continue }
+                    let total = passages[index].source.count
+                    let step = max(Self.typingStep, total / Self.typingFrames)
+                    let next = count + step
+                    typing[index] = next >= total ? nil : next
+                }
+            }
+        }
+    }
+
     // MARK: Following
 
     private func load(_ text: String) {
@@ -261,12 +310,14 @@ struct LivePage: View {
             return
         }
         let change = PassageChange.between(old: lastLoaded, new: new)
+        let previous = passages
         guard let current = editing, passages.indices.contains(current.index) else {
             passages = Passage.split(new)
             lastLoaded = new
             images = ImageStamps.take(passages: passages, base: url)
             guard let first = change.first else { return }
             mark(Array(change.changed))
+            reveal(Array(change.changed), previous: previous)
             Task { await go(to: first, proxy: proxy) }
             return
         }
@@ -290,6 +341,7 @@ struct LivePage: View {
         images = ImageStamps.take(passages: passages, base: url)
         editing = Editing(index: index, base: current.draft, draft: current.draft)
         mark(Array(change.changed).filter { $0 != index })
+        reveal(Array(change.changed).filter { $0 != index }, previous: previous)
         if merged != new {
             lastWritten = merged
             Task {
