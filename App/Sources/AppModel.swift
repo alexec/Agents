@@ -57,6 +57,11 @@ final class AppModel {
     var costState: DaemonAPI.CostState? { work.costState }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
 
+    /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
+    /// said — and for ever against one too old to know the method, which is drawn the
+    /// same way as nothing to say.
+    var wakeState: DaemonAPI.WakeState? { work.wakeState }
+
     /// Which project this window is looking at.
     ///
     /// Kept here and in `UserDefaults` rather than in the daemon: the daemon owns what
@@ -328,6 +333,21 @@ final class AppModel {
     /// What today has cost and what the reader will allow. A daemon too old to know
     /// the method answers method-not-found, which leaves `costState` nil and every
     /// surface showing what it showed before this feature.
+    /// Whether the Mac is being kept awake, asked once on connecting.
+    ///
+    /// A window that opens while a hold is already in place has heard no broadcast, and
+    /// for a long turn would otherwise say nothing about it for half an hour.
+    ///
+    /// Tolerates method-not-found exactly as `refreshCostState` does: a daemon too old
+    /// to know `wake/state` leaves `wakeState` nil, and the window simply says nothing
+    /// about sleep rather than failing to open.
+    func refreshWakeState() async {
+        guard let state = try? await client.call(DaemonAPI.Method.wakeState,
+                                                 Optional<String>.none,
+                                                 returning: DaemonAPI.WakeState.self) else { return }
+        work.replaceWakeState(state)
+    }
+
     func refreshCostState() async {
         guard let state = try? await client.call(DaemonAPI.Method.costState,
                                                  Optional<String>.none,
@@ -575,9 +595,10 @@ final class AppModel {
         async let attention: Void = refreshAttention()
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
+        async let wake: Void = refreshWakeState()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, transcript)
+                   elicitations, attention, resuming, cost, wake, transcript)
     }
 
     func refreshElicitations() async {

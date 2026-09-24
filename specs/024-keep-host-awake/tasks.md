@@ -295,58 +295,58 @@ HEAD. T041–T043 touch `ProjectListView.swift`, which is in that lane's blast r
 the shared tree (where the file is present), and do not commit `ProjectListView.swift` hunks
 that belong to the type-scale lane.
 
-- [ ] T034 [P] [US4] Create
+- [X] T034 [P] [US4] Create
       `Packages/AgentsKit/Sources/AgentsKitCore/Model/WakeState.swift` with
       `DaemonAPI.WakeState` exactly as contracts/daemon-api.md specifies: `isHolding: Bool`,
       `agentsInFlight: Int`, `heldBackByBattery: Bool`, `batteryPercent: Int?`, `since: Date?`.
       `isHolding` and `heldBackByBattery` are **never both true**.
 
-- [ ] T035 [US4] Add to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
+- [X] T035 [US4] Add to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
       `Method.wakeState = "wake/state"` (beside `costState` at `:120`) and
       `Notification.wakeChanged = "wake/changed"` (beside `costChanged` at `:176`). **The two
       strings differ**, following the cost convention — a method is a question about state, a
       notification is news that it changed.
 
-- [ ] T036 [US4] Add `currentWakeState()` and `broadcastWakeState()` to
+- [X] T036 [US4] Add `currentWakeState()` and `broadcastWakeState()` to
       `DaemonCore+Wakefulness.swift`, mirroring `broadcastCostState()`
       (`DaemonCore+Commands.swift:491`), and call the broadcast from `reviseWakefulness()`
       **only on the change branch** — never on the early return, or a window is flooded per
       streamed token.
 
-- [ ] T037 [US4] Add `case DaemonAPI.Method.wakeState: return .success(try JSONValue.encoding(await wakeState()))`
+- [X] T037 [US4] Add `case DaemonAPI.Method.wakeState: return .success(try JSONValue.encoding(await wakeState()))`
       to `DaemonCore+Dispatch.swift`, beside the cost cases at `:181`.
 
-- [ ] T038 [US4] Add all three client pieces in
+- [X] T038 [US4] Add all three client pieces in
       `Packages/AgentsKit/Sources/AgentsKitCore/Client/AgentsModel.swift`: a
       `case wakeChanged(DaemonAPI.WakeState)` on `Update` (`:107`), a decoder line (`:131`),
       and an applier line setting `wakeState` (`:198`). **Missing the decoder line is the
       silent failure** — the notification simply never arrives and nothing says so.
 
-- [ ] T039 [US4] Add `public private(set) var wakeState: DaemonAPI.WakeState?` and
+- [X] T039 [US4] Add `public private(set) var wakeState: DaemonAPI.WakeState?` and
       `public func replaceWakeState(_:)` to `AgentsModel`, matching `costState` /
       `replaceCostState` at `:85` and `:268`.
 
-- [ ] T040 [US4] Add `refreshWakeState()` to `App/Sources/AppModel.swift`, modelled on
+- [X] T040 [US4] Add `refreshWakeState()` to `App/Sources/AppModel.swift`, modelled on
       `refreshCostState()` (`:329`) **including its tolerance of method-not-found** so a new
       window against an old daemon leaves `wakeState` nil and simply says nothing. Call it
       where `refreshCostState()` is called on connect — a window opened mid-hold has heard no
       broadcast and would otherwise show nothing for half an hour.
 
-- [ ] T041 [US4] Add a `wakeState` passthrough to `AppModel` beside `costState` (`:57`).
+- [X] T041 [US4] Add a `wakeState` passthrough to `AppModel` beside `costState` (`:57`).
 
-- [ ] T042 [US4] Add a `WakefulnessRow` to `App/Sources/Projects/ProjectListView.swift` as a
+- [X] T042 [US4] Add a `WakefulnessRow` to `App/Sources/Projects/ProjectListView.swift` as a
       sibling **above** `SpendingRow` in the bottom `.safeAreaInset` (`:49`). A row of its own
       rather than a second line inside `SpendingRow`, because that row is a button into
       Spending and wakefulness is not spending. It is **absent entirely** when
       `wakeState` is nil or neither flag is set (FR-015).
 
-- [ ] T043 [US4] Give `WakefulnessRow` its three wordings per data-model §5: holding →
+- [X] T043 [US4] Give `WakefulnessRow` its three wordings per data-model §5: holding →
       "Keeping this Mac awake" with the agent count; held back by battery → a visibly
       *different* line naming the percentage; otherwise → nothing. FR-016 exists because
       "nothing is running" and "running, but your battery is low" must not read the same, or
       the person learns nothing from either.
 
-- [ ] T044 [P] [US4] Add a test to `WakefulnessTests.swift` that `wake/changed` is broadcast
+- [X] T044 [P] [US4] Add a test to `WakefulnessTests.swift` that `wake/changed` is broadcast
       when the verdict moves and **not** broadcast when an unchanged `changed(_:)` runs.
 
 **⛔ GATE — quickstart checks 6 and 7.** All three wordings by eye; a second window opened
@@ -695,3 +695,37 @@ the known `aStoppedAgentIsPickedUpRatherThanCopied`. The earlier sample was mach
 other lanes. Samples taken minutes apart on this Mac are not comparable — see the memory note.
 
 Still open: Phase 6 (the UI), Phase 7. **T050, the battery walk on a real laptop, is Alex's.**
+
+
+### Phase 6 built and walked, 2026-09-24
+
+T034–T044 done. 22 tests in `WakefulnessTests`, 1169 in the package, both schemes build.
+Checks 6 and 7 walked against a real Claude agent on scratch roots.
+
+**What was seen.** Nothing running: the footer showed only Spending, no row at all. An agent
+mid-turn: a sun icon, "Keeping this Mac awake", "1 working" beneath it — with
+`wake/state` reporting `agentsInFlight: 1, batteryPercent: 80, since: …` and `pmset` naming
+`agentsd` holding `PreventUserIdleSystemSleep` at the same moment. Turn over: the row gone,
+only "Today $1" left.
+
+**The walk changed the layout.** The first version put the headline left and the count right,
+the shape `SpendingRow` uses. It wrapped: the column is about 226pt and "Keeping this Mac
+awake" plus a trailing count is a few points over, so it broke mid-phrase as "Keeping this /
+Mac awake" and read as a mistake. Now stacked left-aligned — two lines on purpose, and it
+survives a narrower sidebar. Nothing a test would have caught.
+
+**Check 7 was walked properly, which took two attempts.** The first run started the
+pre-Phase-6 daemon and then launched the new window, but the old daemon exited on its
+ten-second idle grace in between and the *new* app started a daemon of its own — so the check
+proved nothing. Holding a socket connection open across the launch keeps the old one alive.
+With the window genuinely on a daemon that answers `wake/state` with
+`-32601 Method not found`, it opened normally, showed only Spending, raised no error, and
+stayed alive.
+
+**Not seen on screen: the battery wording.** This Mac is on AC power at 80%, so
+`heldBackByBattery` is unreachable without unplugging it or faking the floor in a scratch
+build. It is covered by `broadcastSaysWhyWhenTheBatteryIsLow` (asserting the flag, the count,
+and the exact charge) and by the verdict truth table. **Quickstart check 6's third wording and
+T050 both still want a real laptop, and are Alex's.**
+
+Phase 6 is the last of the building. Only Phase 7 remains.
