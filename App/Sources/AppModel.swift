@@ -246,6 +246,9 @@ final class AppModel {
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 
+    /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
+    func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+
     // MARK: Workflows
 
     func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }

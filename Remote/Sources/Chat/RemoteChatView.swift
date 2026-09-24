@@ -212,7 +212,7 @@ private struct ChatMenu: View {
         Menu {
             Button("Exchanged", systemImage: "doc") { isShowingArtifacts = true }
             Divider()
-            if agent.state.holdsRuntime {
+            if model.canStop(agent) {
                 Button("Stop", systemImage: "stop.circle") {
                     Task { await model.stop(agent.id) }
                 }

@@ -53,7 +53,7 @@ struct AgentRow: View {
             Spacer(minLength: 0)
         }
         .contextMenu {
-            if agent.state.holdsRuntime {
+            if model.canStop(agent) {
                 Button("Stop") { Task { await model.stop(agent.id) } }
             }
             if agent.state == .archived {

@@ -40,6 +40,20 @@ struct ChatView: View {
         // One click, and back to the project. The context menu on the card has the same
         // word; this is for when you are already reading the thing you are putting away.
         .toolbar {
+            // Beside Archive, and unlike it the page stays: someone who stops a chat
+            // that has gone the wrong way wants to keep reading it and say what next.
+            // ⌘. lives on the button, so it exists exactly when the button does.
+            if let agent, model.canStop(agent) {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Label("Stop", systemImage: "stop.circle")
+                    }
+                    .keyboardShortcut(".", modifiers: .command)
+                    .help("Stop this agent and stay on the chat")
+                }
+            }
             if let agent, agent.state != .archived {
                 ToolbarItem(placement: .automatic) {
                     Button {
