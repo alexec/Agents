@@ -75,8 +75,13 @@ final class SidebarFrame {
         // Clamped on the way in as well as on the way out. A width stored on a larger
         // screen would otherwise be honoured on a smaller one and leave the
         // conversation with nothing.
+        // 460 rather than the 380 it opened at through 022: the document pane is set
+        // at the app's `reading` step now, and 60 characters of it needs 410 points of
+        // text plus its padding. `PageMetrics.comfortablePane` is the same number for
+        // the same reason. A width already stored is somebody's own choice and is left
+        // alone; only the first open moves.
         let stored = defaults.object(forKey: Key.width) as? Double
-        width = Self.clamp(stored ?? 380)
+        width = Self.clamp(stored ?? 460)
         pane = (defaults.string(forKey: Key.pane).flatMap(SidebarPane.init(rawValue:))) ?? .files
     }
 

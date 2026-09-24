@@ -23,7 +23,7 @@ struct ContextMeter: View {
                     .help(helpText(usage))
             }
             Text(cost)
-                .font(.footnote)
+                .appText(.fine)
                 .monospacedDigit()
                 // Colour means the limit is about to bite, on the app's one existing
                 // threshold rather than a second number for readers to learn.

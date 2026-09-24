@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// A directory the user works in.
 ///
@@ -32,12 +33,28 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// made from a string with a trailing slash keeps it, and `file:///work/api/` and
     /// `file:///work/api` are not equal however standardised they are.
     public static func standardize(_ folder: URL) -> URL {
+        let key = folder.absoluteString
+        if let known = standardized.withLock({ $0[key] }) { return known }
         let resolved = folder.standardizedFileURL.resolvingSymlinksInPath()
         // `path` is the one accessor that drops the trailing slash for a directory.
         let path = resolved.path
-        guard !path.isEmpty else { return resolved }
-        return URL(filePath: path, directoryHint: .notDirectory)
+        let answer = path.isEmpty ? resolved : URL(filePath: path, directoryHint: .notDirectory)
+        standardized.withLock { known in
+            // Bounded, and simply emptied when it fills: this is a memo, not a record.
+            if known.count >= 4096 { known.removeAll(keepingCapacity: true) }
+            known[key] = answer
+        }
+        return answer
     }
+
+    /// Every folder this process has standardised, by how it was written.
+    ///
+    /// Resolving symlinks asks the file system about every component of the path,
+    /// and this is asked for every agent by every project row on every redraw, and
+    /// by the daemon for every agent each time any agent changes. A folder resolves
+    /// the same way for as long as the process runs — a symlink re-pointed under a
+    /// running app is not a case this app serves — so the answer is kept.
+    private static let standardized = Mutex<[String: URL]>([:])
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
                 unknownFields: [String: JSONValue] = [:]) {
@@ -53,8 +70,12 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
         let known = Set(CodingKeys.allCases.map(\.stringValue))
-        let whole = (try? JSONValue(from: decoder).objectValue) ?? [:]
-        unknownFields = whole.filter { !known.contains($0.key) }
+        unknownFields = [:]
+        if let extra = try? decoder.container(keyedBy: AnyKey.self) {
+            for key in extra.allKeys where !known.contains(key.stringValue) {
+                unknownFields[key.stringValue] = (try? extra.decode(JSONValue.self, forKey: key)) ?? .null
+            }
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {

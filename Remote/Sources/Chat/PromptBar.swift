@@ -47,7 +47,7 @@ struct PromptBar: View {
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
                 .focused($focused)
-                .font(.callout)
+                .appText(.reading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
@@ -161,17 +161,17 @@ private struct CommandList: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("/" + command.name)
-                    .font(.footnote.monospaced())
+                    .appText(.code)
                 if let hint = command.inputHint, !hint.isEmpty {
                     Text(hint)
-                        .font(.caption.monospaced())
+                        .appText(.code)
                         .foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 0)
             }
             if let description = command.description, !description.isEmpty {
                 Text(description)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -197,7 +197,7 @@ private struct SuggestionRow: View {
                 ForEach(prompts) { prompt in
                     Button { take(prompt) } label: {
                         Text(prompt.label)
-                            .font(.footnote)
+                            .appText(.fine)
                             .lineLimit(1)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)

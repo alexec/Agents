@@ -13,9 +13,9 @@ struct PermissionView: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(request.toolCall.title).font(.headline)
+                Text(request.toolCall.title).appText(.reading).fontWeight(.semibold)
                 if let kind = request.toolCall.kind {
-                    Text(kind).font(.caption).foregroundStyle(.secondary)
+                    Text(kind).appText(.fine).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 8) {
                     // The agent's own wording, on the agent's own options.

@@ -61,7 +61,7 @@ struct TerminalPane: View {
             Image(systemName: "exclamationmark.circle")
                 .foregroundStyle(.secondary)
             Text(client.state.explanation ?? "The shell is no longer running.")
-                .font(.callout)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("New shell") {
@@ -82,7 +82,7 @@ private struct Note: View {
 
     var body: some View {
         Text(text)
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
@@ -99,10 +99,10 @@ private struct Trouble: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Try again") { Task { await retry() } }

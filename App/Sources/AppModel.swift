@@ -49,6 +49,7 @@ final class AppModel {
     var permissions: [PermissionRequest] { work.permissions }
     var elicitations: [ElicitationRequest] { work.elicitations }
     var entries: [TranscriptEntry] { work.entries }
+    var transcriptItems: [TranscriptItem] { work.transcriptItems }
     var transcriptHasMore: Bool { work.hasMoreBefore }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
     /// What the reader will allow and what today has cost. Nil until the daemon has
@@ -491,9 +492,14 @@ final class AppModel {
     private func listen() {
         listening?.cancel()
         let notifications = client.notifications()
-        listening = Task { [weak self] in
+        // Detached, so that reading each notification — the JSON of a tool call's
+        // output can be a hundred kilobytes — happens off the main actor, and only
+        // what it means is applied there. Each one is applied before the next is
+        // read, so the order the daemon said them in is the order they land.
+        listening = Task.detached(priority: .userInitiated) { [weak self] in
             for await notification in notifications {
-                await self?.received(notification.method, notification.params)
+                let update = AgentsModel.read(notification.method, notification.params)
+                await self?.received(notification.method, notification.params, update)
             }
             // The daemon went, or the connection did. A list that has quietly stopped
             // being true is worse than an empty one, so the window says so and goes
@@ -502,16 +508,14 @@ final class AppModel {
         }
     }
 
-    private func received(_ method: String, _ params: JSONValue?) async {
+    private func received(_ method: String, _ params: JSONValue?, _ update: AgentsModel.Update?) async {
         // What every notification about the work means is written once, in the kit,
         // so the window and the phone cannot drift apart. What is left here is the
         // Mac's own: the shells and terminals a phone has no business with.
-        if work.apply(method, params) {
-            if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
-            if method == DaemonAPI.Notification.attentionChanged,
-               let change = try? params?.decode(DaemonAPI.AttentionNotification.self) {
-                await notifier.apply(change)
-            }
+        if let update {
+            work.apply(update)
+            if case .projectChanged = update { settleProjectSelection() }
+            if case .attention(let change) = update { await notifier.apply(change) }
             return
         }
 
@@ -559,16 +563,21 @@ final class AppModel {
         // After the agents, because a project's counts are worked out from them and a
         // sidebar drawn before them would say every project is empty.
         await refreshProjects()
-        await refreshRuntimes()
-        await refreshAccounts()
-        await refreshWorkflows()
-        await refreshDevices()
-        await refreshPermissions()
-        await refreshElicitations()
-        await refreshAttention()
-        await refreshResuming()
-        await refreshCostState()
-        await loadTranscript()
+        // The rest at once. Each is its own round trip to the daemon and none
+        // depends on another, so one after the other was ten waits where the window
+        // sat with a list and no conversation.
+        async let runtimes: Void = refreshRuntimes()
+        async let accounts: Void = refreshAccounts()
+        async let workflows: Void = refreshWorkflows()
+        async let devices: Void = refreshDevices()
+        async let permissions: Void = refreshPermissions()
+        async let elicitations: Void = refreshElicitations()
+        async let attention: Void = refreshAttention()
+        async let resuming: Void = refreshResuming()
+        async let cost: Void = refreshCostState()
+        async let transcript: Void = loadTranscript()
+        _ = await (runtimes, accounts, workflows, devices, permissions,
+                   elicitations, attention, resuming, cost, transcript)
     }
 
     func refreshElicitations() async {

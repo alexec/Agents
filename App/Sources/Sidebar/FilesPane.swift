@@ -18,6 +18,14 @@ struct FilesPane: View {
     @State private var fileProblem: String?
     @State private var watch: FolderWatch?
     @State private var touched = TouchedPaths()
+    /// How much of the page `touched` has folded, and which page: entries past
+    /// `touchedThrough` are new and are folded in, and a page that was replaced or
+    /// grown at the front is folded again from the top.
+    @State private var touchedThrough = 0
+    @State private var touchedPageStart = 0
+    /// Which re-listing is the current one, so a slower earlier read landing after a
+    /// later one does not put the older listing on screen.
+    @State private var listingRequest = 0
     /// The file `probe` was read from, so a file opened from elsewhere is loaded once
     /// and not once for every pass.
     @State private var loaded: URL?
@@ -75,7 +83,7 @@ struct FilesPane: View {
             }
 
             Text(state.openFile?.lastPathComponent ?? folder.lastPathComponent)
-                .font(.callout.weight(.medium))
+                .appText(.reading).fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer()
@@ -97,7 +105,7 @@ struct FilesPane: View {
                 }
                 if listing.isTruncated {
                     Text("\(listing.omitted) more, not shown")
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -125,6 +133,7 @@ struct FilesPane: View {
                     // What the agent touched since it started (FR-013). The point of
                     // the pane: its work is findable without reading the conversation.
                     Image(systemName: "circle.fill")
+                        // Decorative: a dot sized to the row, not text (FR-015).
                         .font(.system(size: 6))
                         .foregroundStyle(.tint)
                         .help("The agent changed this")
@@ -132,7 +141,7 @@ struct FilesPane: View {
                 Spacer()
                 if entry.isDirectory {
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
+                        .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -160,7 +169,7 @@ struct FilesPane: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let fileProblem {
                     Text(probe == nil ? "Not written yet. It will appear here as it is." : fileProblem)
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -171,7 +180,7 @@ struct FilesPane: View {
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .padding(10)
                 }
@@ -187,7 +196,7 @@ struct FilesPane: View {
                     if probe.isTruncated {
                         Divider()
                         Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
-                            .font(.footnote)
+                            .appText(.fine)
                             .foregroundStyle(.secondary)
                             .padding(10)
                     }
@@ -228,7 +237,10 @@ struct FilesPane: View {
         watch = FolderWatch(root: agent.cwd) { _ in
             Task { @MainActor in
                 folderEvents += 1
-                reloadListing()
+                // Off the main actor: a folder of thousands of entries is thousands
+                // of stat calls, and a build writing beside the pane fires this
+                // every fifth of a second.
+                reloadListing(inBackground: true)
                 if let openFile = state.openFile { reloadFile(openFile) }
             }
         }
@@ -251,18 +263,42 @@ struct FilesPane: View {
         reloadFile(url)
     }
 
-    private func reloadListing() {
-        do {
-            listing = try DirectoryReader.read(folder)
+    /// Read the folder now, or — for a change the disk reported rather than one the
+    /// person made — on another thread, with the old listing kept up until the new
+    /// one is in hand. Opening a folder stays on this thread so it appears in the
+    /// same frame as the click.
+    private func reloadListing(inBackground: Bool = false) {
+        listingRequest += 1
+        guard inBackground else {
+            show(Result { try DirectoryReader.read(folder) }, of: folder)
+            return
+        }
+        let folder = folder
+        let request = listingRequest
+        Task {
+            let read = await Task.detached(priority: .userInitiated) {
+                Result { try DirectoryReader.read(folder) }
+            }.value
+            // The pane moved on — to another folder, or to a later read — while this
+            // one was reading.
+            guard request == listingRequest else { return }
+            show(read, of: folder)
+        }
+    }
+
+    private func show(_ read: Result<DirectoryListing, any Error>, of folder: URL) {
+        switch read {
+        case .success(let fresh):
+            listing = fresh
             problem = nil
-        } catch DirectoryReader.Failure.gone {
+        case .failure(DirectoryReader.Failure.gone):
             // Never leave contents on screen that cannot be vouched for (FR-016).
             listing = nil
             problem = "\(folder.lastPathComponent) is not there any more."
-        } catch DirectoryReader.Failure.notReadable {
+        case .failure(DirectoryReader.Failure.notReadable):
             listing = nil
             problem = "\(folder.lastPathComponent) cannot be opened."
-        } catch {
+        case .failure:
             listing = nil
             problem = "\(folder.lastPathComponent) could not be read."
         }
@@ -298,11 +334,22 @@ struct FilesPane: View {
     /// The kit's list, so the daemon's idea of a page and the pane's are one.
     private func isMarkdown(_ url: URL) -> Bool { ShownFile.isMarkdown(url) }
 
-    /// Folded from the transcript the window is holding. It grows as entries arrive,
-    /// and as earlier pages are loaded, which is why it is recomputed rather than
-    /// appended to.
+    /// Folded from the transcript the window is holding.
+    ///
+    /// Entries that arrived since the last fold are folded in; a page replaced, or
+    /// grown at the front by an earlier page, is folded again from the top. Folding
+    /// the whole page for every chunk resolved every path the agent had touched
+    /// against the disk again, several times a second, while the agent talked.
     private func refreshTouched() {
-        touched = TouchedPaths(entries: model.entries)
+        let entries = model.entries
+        let pageStart = model.work.firstEntryIndex
+        if pageStart == touchedPageStart, entries.count >= touchedThrough {
+            for entry in entries[touchedThrough...] { touched.absorb(entry) }
+        } else {
+            touched = TouchedPaths(entries: entries)
+        }
+        touchedThrough = entries.count
+        touchedPageStart = pageStart
     }
 }
 
@@ -313,10 +360,10 @@ private struct Gone: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "questionmark.folder")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

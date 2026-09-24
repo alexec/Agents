@@ -232,6 +232,11 @@ each says what was observed that made it necessary or unnecessary.
   newest content; an older version MUST never be drawn after a newer one.
 - **FR-005**: The page MUST mark what most recently changed, briefly, so the change can be
   told from what was already there. The mark MUST fade on its own.
+- **FR-005b**: A passage the agent changed MUST NOT appear whole. It MUST be revealed as if
+  typed, from the point where it stops agreeing with what was there, at a pace that
+  finishes within a couple of seconds however long the passage is. (Added 2026-09-24 at
+  Alex's request: a paragraph that is replaced is a paragraph the eye misses; one that is
+  typed is one it follows.)
 
 **Following the agent**
 

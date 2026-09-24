@@ -26,14 +26,14 @@ struct ElicitationSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(request.title)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 // The question itself often lives here rather than in the schema: a
                 // one-question form arrives with an untitled field and the whole
                 // question in `message`.
                 if let message = request.message, message != request.title {
                     Text(message)
-                        .font(.callout)
+                        .appText(.reading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -102,7 +102,7 @@ struct ElicitationSheet: View {
         VStack(spacing: 8) {
             if let description = schema.description {
                 Text(description)
-                    .font(.callout)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -159,7 +159,7 @@ struct ElicitationSheet: View {
     private var needsTheMac: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("This one asks for more than a single choice, so it wants your Mac.")
-                .font(.callout)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -187,7 +187,7 @@ struct ElicitationSheet: View {
             Text(title)
             if let note, !note.isEmpty {
                 Text(note)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(onFill ? AnyShapeStyle(.white.opacity(0.85))
                                             : AnyShapeStyle(.secondary))
             }
@@ -219,7 +219,7 @@ private struct Sending: View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
             Text("\(what) — telling your Mac")
-                .font(.callout)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
         }

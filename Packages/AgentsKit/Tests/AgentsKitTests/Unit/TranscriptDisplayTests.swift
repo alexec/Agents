@@ -96,9 +96,57 @@ struct TranscriptDisplayTests {
         let items = TranscriptEntry.display([
             TranscriptEntry(kind: .userMessage("do it")),
             call("t1", "Write a file"),
-            TranscriptEntry(kind: .stateChanged(.finished, reason: .endTurn)),
+            TranscriptEntry(kind: .stateChanged(.waitingOnUser, reason: nil)),
         ])
         #expect(items.count == 3)
+    }
+
+    // MARK: - Plumbing is kept in the record and left off the page
+
+    @Test func theTurnEndingAndItsCostAreNotDrawn() {
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            message("Done"),
+            state(.finished, .endTurn),
+            TranscriptEntry(kind: .usageRecorded(TurnUsage(totalTokens: 1234, cost: nil))),
+        ])
+        #expect(texts(items) == ["do it", "Done"])
+    }
+
+    @Test func theTurnEndingStillMakesWorkingOld() {
+        // Nothing was said in the turn, so nothing drawn followed "Working". The
+        // ending is not drawn either, but it is still the end of the working.
+        let items = TranscriptEntry.display([
+            TranscriptEntry(kind: .userMessage("do it")),
+            state(.running),
+            state(.finished, .endTurn),
+        ])
+        #expect(texts(items) == ["do it"])
+    }
+
+    @Test func theTurnEndingStillClosesARunOfToolCalls() {
+        let items = TranscriptEntry.display([
+            call("t1", "Read the file"),
+            state(.finished, .endTurn),
+            TranscriptEntry(kind: .userMessage("and again")),
+            call("t2", "Read the file"),
+        ])
+        #expect(texts(items) == ["<tools>", "and again", "<tools>"])
+    }
+
+    @Test func aReadTheAppServedIsQuietAndAWriteIsNot() {
+        let read = ServedRequest(kind: .readFile(path: "/tmp/a.md"), outcome: .served)
+        let refusedRead = ServedRequest(kind: .readFile(path: "/tmp/b.md"), outcome: .refused(reason: "outside the folder"))
+        let write = ServedRequest(kind: .writeFile(path: "/tmp/c.md", byteCount: 3), outcome: .served)
+        let items = TranscriptEntry.display([
+            call("t1", "Look"),
+            TranscriptEntry(kind: .servedRequest(read)),
+            call("t2", "Look again"),
+            TranscriptEntry(kind: .servedRequest(refusedRead)),
+            TranscriptEntry(kind: .servedRequest(write)),
+        ])
+        #expect(texts(items) == ["<tools>", "Read b.md", "Wrote c.md"])
+        #expect(items[0].hiddenToolCallCount == 1, "a quiet read does not split the run")
     }
 
     // MARK: - Lines about a moment go once the moment has
@@ -118,6 +166,7 @@ struct TranscriptDisplayTests {
             case .stateChanged(let s, let r): return "state:\(s):\(r.map { "\($0)" } ?? "-")"
             case .optionChanged(let id, let value): return "\(id)=\(value.stringValue ?? "?")"
             case .unrecognised: return "<unrecognised>"
+            case .servedRequest(let request): return request.summary
             default: return entry.text ?? "?"
             }
         }
@@ -154,18 +203,34 @@ struct TranscriptDisplayTests {
         #expect(texts(items) == ["do it", "state:running:-"])
     }
 
-    @Test func aModeSwitchIsAMoment() {
+    @Test func aModeSwitchIsNotDrawnAtAll() {
+        // Plumbing. The setting in force is on the prompt controls; the record keeps
+        // the change, the page does not say it, and it is not the line that makes an
+        // earlier passing line old either.
         let items = TranscriptEntry.display([
             TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("auto"))),
             TranscriptEntry(kind: .userMessage("go")),
+            state(.running),
             TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("plan"))),
         ])
-        #expect(texts(items) == ["go", "mode=plan"])
+        #expect(texts(items) == ["go", "state:running:-"])
+    }
+
+    @Test func aModeSwitchDoesNotSplitARunOfToolCalls() {
+        let items = TranscriptEntry.display([
+            call("t1", "Read the file"),
+            TranscriptEntry(kind: .optionChanged(id: "mode", value: .string("plan"))),
+            call("t2", "Write the file"),
+        ])
+        #expect(texts(items) == ["<tools>"])
+        #expect(items[0].hiddenToolCallCount == 1)
     }
 
     @Test func endingsAndExplanationsAreNotMoments() {
+        // `.finished` is not among them: it is not drawn at all, so it is neither a
+        // moment nor a line that stays.
         let items = TranscriptEntry.display([
-            state(.finished, .endTurn),
+            state(.stopped, .maxTokens),
             note("Branched from Fix the build."),
             state(.stopped, .cancelled),
             state(.waitingOnUser),

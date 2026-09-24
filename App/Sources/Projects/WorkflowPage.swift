@@ -100,7 +100,7 @@ struct WorkflowPage: View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary.workflow.name)
-                    .font(.largeTitle.weight(.semibold))
+                    .appText(.title).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 // Not when the file is broken. `Workflow.summary` falls back to the
                 // problem's own sentence then, and the red line below says the same
@@ -108,7 +108,7 @@ struct WorkflowPage: View {
                 // and the grey copy is the one carrying less.
                 if summary.workflow.problem == nil {
                     Text(summary.workflow.summary)
-                        .font(.callout)
+                        .appText(.supporting)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -129,7 +129,7 @@ struct WorkflowPage: View {
                             .buttonStyle(.link)
                         }
                     }
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
                     .fixedSize(horizontal: false, vertical: true)
                 }
@@ -182,7 +182,7 @@ struct WorkflowPage: View {
     private func broken(_ problem: WorkflowProblem, workflow: Workflow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(problem.message, systemImage: "exclamationmark.triangle")
-                .font(.callout)
+                .appText(.reading)
                 .tinted(problem.needsAPerson ? .failure : .none)
                 .fixedSize(horizontal: false, vertical: true)
             if let rawText {
@@ -272,7 +272,7 @@ struct WorkflowPage: View {
                     .lineLimit(1)
             }
             .buttonStyle(.glass)
-            .font(.footnote)
+            .appText(.fine)
             .help("\(url(workflow).path) — click to show in Finder")
             Spacer(minLength: 8)
             runtimeControl(summary)
@@ -328,7 +328,7 @@ struct WorkflowPage: View {
                 }
             } else {
                 Text("\(name): \(value ?? "runtime default")")
-                    .font(.footnote)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                 if remembered != nil {
                     note("The choices are not known until \(runtime.name) has been used in this project.")
@@ -364,7 +364,7 @@ struct WorkflowPage: View {
 
     private func marked(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.triangle")
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(StateTint.attention.style(or: .secondary))
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -405,7 +405,7 @@ struct WorkflowPage: View {
                     shownRuns += Self.runsPerMore
                 }
                 .buttonStyle(.glass)
-                .font(.callout)
+                .appText(.reading)
             }
         }
     }
@@ -414,13 +414,13 @@ struct WorkflowPage: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.subheadline.weight(.semibold))
+            .appText(.fine).fontWeight(.semibold)
             .foregroundStyle(.secondary)
     }
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -432,7 +432,7 @@ struct WorkflowPage: View {
     /// what an agent does with it.
     private func block(_ text: String) -> some View {
         Text(text)
-            .font(.callout.monospaced())
+            .appText(.code)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)

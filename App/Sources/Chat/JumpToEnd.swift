@@ -25,7 +25,7 @@ struct JumpToEnd: View {
             .padding(.vertical, 7)
         }
         .buttonStyle(.plain)
-        .font(.footnote)
+        .appText(.fine)
         .fixedSize()
         .glassEffect(.regular.interactive(), in: .capsule)
         .help(hasNewBelow ? "Go to the end, where something new is" : "Go to the end")

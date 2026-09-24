@@ -17,17 +17,17 @@ struct AgentReachView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Folders").font(.headline)
+                Text("Folders").appText(.reading).fontWeight(.semibold)
                 if let cwd {
                     Label(cwd.lastPathComponent, systemImage: "folder")
-                        .font(.callout)
+                        .appText(.reading)
                         .foregroundStyle(.secondary)
                         .help(cwd.path(percentEncoded: false))
                 }
                 ForEach(folders, id: \.self) { folder in
                     HStack {
                         Label(folder.lastPathComponent, systemImage: "folder")
-                            .font(.callout)
+                            .appText(.reading)
                             .help(folder.path(percentEncoded: false))
                         Spacer()
                         Button {
@@ -41,16 +41,16 @@ struct AgentReachView: View {
                 }
                 Button("Add a folder", action: addFolder)
                     .buttonStyle(.glass)
-                    .font(.footnote)
+                    .appText(.fine)
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("MCP servers").font(.headline)
+                Text("MCP servers").appText(.reading).fontWeight(.semibold)
                 ForEach(servers) { server in
                     HStack {
-                        Text(server.name).font(.callout)
+                        Text(server.name).appText(.reading)
                         Spacer()
                         Button {
                             servers.removeAll { $0.id == server.id }
@@ -72,7 +72,7 @@ struct AgentReachView: View {
                         .disabled(serverName.isEmpty || serverCommand.isEmpty)
                 }
                 Text("A server that will not start is reported against the agent and does not stop it.")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             }
 

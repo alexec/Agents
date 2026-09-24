@@ -99,7 +99,8 @@ no way to sign out, so the app shows neither.
   this as carries the suggestions below, and the same rule applies as to everything
   else an agent reaches for: inside the folders it was given, or refused. A request for
   a conversation you are not reading waits until you open it rather than taking the
-  window off you.
+  window off you. A Markdown file opens as a page that follows the agent's edits and
+  can be typed on, and what you type is told to the agent on its next turn.
 - **Cost and context.** A meter follows the turn, and what each turn used goes on the
   record. Cost is shown as the runtime reported it, per currency, never estimated.
 - **Serving the agent.** The app reads and writes files on an agent's behalf and runs

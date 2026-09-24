@@ -6,6 +6,17 @@ import Foundation
 public actor AgentStore {
     public let locations: StoreLocations
     private var appendHandles: [UUID: FileHandle] = [:]
+    /// Where each line of a transcript starts, for the ones a window has read.
+    ///
+    /// Grown rather than rebuilt: this actor is the only writer of those files, so
+    /// the next page of a conversation costs a scan of what was appended since the
+    /// last one, not of the whole file. A window flicking back through an hour of
+    /// transcript used to have the daemon read the whole file for every page, with
+    /// every append to every transcript waiting behind it.
+    private var lineIndexes: [UUID: TranscriptReader.Index] = [:]
+    /// How many transcripts are indexed at once. Eight bytes a line, so an index is
+    /// small, but the daemon lives for weeks and this is a memo, not a record.
+    private static let indexedTranscripts = 16
 
     public init(locations: StoreLocations = .default) throws {
         self.locations = locations
@@ -222,10 +233,23 @@ public actor AgentStore {
 
     /// A page of a transcript, newest last. Never the whole thing.
     public func transcript(for agentID: UUID, before: Int? = nil, limit: Int = 200) throws -> TranscriptPage {
-        try TranscriptReader(url: locations.transcript(agentID)).page(before: before, limit: limit)
+        let reader = TranscriptReader(url: locations.transcript(agentID))
+        let index = try lineIndex(for: agentID, with: reader)
+        return try reader.page(index, before: before, limit: limit)
     }
 
     public func transcriptCount(for agentID: UUID) throws -> Int {
-        try TranscriptReader(url: locations.transcript(agentID)).count
+        try lineIndex(for: agentID, with: TranscriptReader(url: locations.transcript(agentID))).count
+    }
+
+    /// The transcript's line index, brought up to the end of the file.
+    private func lineIndex(for agentID: UUID, with reader: TranscriptReader) throws -> TranscriptReader.Index {
+        var index = lineIndexes[agentID] ?? TranscriptReader.Index()
+        try reader.extend(&index)
+        if lineIndexes[agentID] == nil, lineIndexes.count >= Self.indexedTranscripts {
+            lineIndexes.removeAll(keepingCapacity: true)
+        }
+        lineIndexes[agentID] = index
+        return index
     }
 }

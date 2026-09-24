@@ -77,12 +77,15 @@ extension DaemonCore {
 
     /// The kept records, by folder.
     func projectRecords() -> [URL: Project] {
+        if let projectRecordsCache { return projectRecordsCache }
         var byFolder: [URL: Project] = [:]
         for project in projectStore.load() { byFolder[project.folder] = project }
+        projectRecordsCache = byFolder
         return byFolder
     }
 
     func saveProjectRecords(_ records: [URL: Project]) {
+        projectRecordsCache = records
         try? projectStore.save(Array(records.values))
     }
 

@@ -23,10 +23,10 @@ struct PermissionSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(request.toolCall.title)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 if let kind = request.toolCall.kind {
-                    Text(kind).font(.caption).foregroundStyle(.secondary)
+                    Text(kind).appText(.fine).foregroundStyle(.secondary)
                 }
             }
 
@@ -61,7 +61,7 @@ struct PermissionSheet: View {
                         DiffView(diff: diff)
                     case .content(let block):
                         BlocksView(blocks: [block])
-                            .font(.callout)
+                            .appText(.reading)
                     case .terminal, .unknown:
                         EmptyView()
                     }
@@ -119,7 +119,7 @@ private struct Sending: View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
             Text("\(option.name) — telling your Mac")
-                .font(.callout)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
         }

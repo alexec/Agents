@@ -43,10 +43,10 @@ struct SpendingView: View {
     private var grandTotal: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("All time")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
             Text(Cost.total(of: spending.grandTotal) ?? "")
-                .font(.largeTitle.weight(.semibold))
+                .appText(.title).fontWeight(.semibold)
                 .monospacedDigit()
                 .textSelection(.enabled)
         }
@@ -63,7 +63,7 @@ struct SpendingView: View {
         VStack(alignment: .leading, spacing: 8) {
             if showsHeading {
                 Text(currency)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
             }
             ForEach(spending.shares(in: currency)) { share in
@@ -77,7 +77,7 @@ struct SpendingView: View {
     private var nothingSpent: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nothing has been spent yet")
-                .font(.title2.weight(.semibold))
+                .appText(.title).fontWeight(.semibold)
             Text("What the work costs appears here once a runtime reports a price for it.")
                 .foregroundStyle(.secondary)
         }
@@ -88,7 +88,7 @@ struct SpendingView: View {
         let chats = spending.unmeasuredAgents == 1 ? "1 chat" : "\(spending.unmeasuredAgents) chats"
         return Label("At least this much: \(chats) ran on a runtime that reported no price.",
                      systemImage: "questionmark.circle")
-            .font(.callout)
+            .appText(.reading)
             .foregroundStyle(.secondary)
             .padding(.top, 4)
     }
@@ -109,7 +109,7 @@ private struct ShareRow: View {
                 .foregroundStyle(share.isArchived ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
             if share.isArchived {
                 Text("Archived")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 24)

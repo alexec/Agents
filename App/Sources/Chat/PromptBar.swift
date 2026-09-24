@@ -19,6 +19,8 @@ struct PromptBar: View {
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
     @State private var mentions: [FileMention] = []
+    /// The walk for the term typed so far. Each keystroke cancels the last.
+    @State private var mentionSearch: Task<Void, Never>?
     @State private var selectedMention = 0
     @State private var dismissedMentionTerm: String?
     /// Set when the list is dismissed, so Escape hides it until the word changes.
@@ -165,21 +167,21 @@ struct PromptBar: View {
                     .tinted(.failure)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("This agent has reached its cost limit")
-                        .font(.footnote.weight(.medium))
+                        .appText(.fine).fontWeight(.medium)
                     Text("\(Cost.total(of: agent.costToDate) ?? "") spent. "
                          + "Anything you send waits until you allow more.")
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 SettingsLink { Text("Raise the limit") }
                     .buttonStyle(.glass)
-                    .font(.footnote)
+                    .appText(.fine)
                 Button("Let this one go on") {
                     Task { await model.letThisAgentGoOn(agent) }
                 }
                 .buttonStyle(.glass)
-                .font(.footnote)
+                .appText(.fine)
                 .help("Raises this agent's own ceiling. No other agent is changed.")
             }
             .padding(.horizontal, 12)
@@ -191,15 +193,15 @@ struct PromptBar: View {
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("The day's spending limit has been reached")
-                        .font(.footnote.weight(.medium))
+                        .appText(.fine).fontWeight(.medium)
                     Text("What you send waits here, and goes when the day rolls over.")
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 SettingsLink { Text("Raise the limit") }
                     .buttonStyle(.glass)
-                    .font(.footnote)
+                    .appText(.fine)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -217,7 +219,7 @@ struct PromptBar: View {
                 // labels rather than controls. They still sit on glass: the
                 // transcript scrolls under this row.
                 Label(agent.cwd.lastPathComponent, systemImage: "folder")
-                    .font(.footnote)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .padding(.horizontal, 10)
@@ -230,7 +232,7 @@ struct PromptBar: View {
                     .padding(.vertical, 5)
                     .glassEffect(.regular, in: Capsule())
                 Text(runtimeName(agent.runtimeID))
-                    .font(.footnote)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -246,7 +248,7 @@ struct PromptBar: View {
                     }
                 }
                 .buttonStyle(.glass)
-                .font(.footnote)
+                .appText(.fine)
                 // On a project page the folder is the project. Changing it there would
                 // start the agent somewhere else and file it under a different project,
                 // which is not something a prompt on this page should be able to do.
@@ -263,7 +265,7 @@ struct PromptBar: View {
                     Image(systemName: "clock.arrow.circlepath")
                 }
                 .buttonStyle(.glass)
-                .font(.footnote)
+                .appText(.fine)
                 .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
                 .help("Conversations this runtime is already holding here")
                 .accessibilityLabel("Sessions")
@@ -297,7 +299,7 @@ struct PromptBar: View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField(placeholder, text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.title3)
+                .appText(.reading)
                 .lineLimit(2...12)
                 .focused($focused)
                 // Return sends. Option and Return is left alone, and the field
@@ -377,7 +379,7 @@ struct PromptBar: View {
 
             Button(action: chooseAttachment) {
                 Image(systemName: "paperclip")
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.glass)
@@ -387,7 +389,7 @@ struct PromptBar: View {
 
             Button(action: toggleDictation) {
                 Image(systemName: dictation.isListening ? "waveform" : "microphone")
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
                     .symbolEffect(.variableColor, isActive: dictation.isListening)
             }
@@ -398,7 +400,7 @@ struct PromptBar: View {
 
             Button(action: send) {
                 Image(systemName: willQueue ? "arrow.up.to.line" : "arrow.up")
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.glassProminent)
@@ -434,11 +436,11 @@ struct PromptBar: View {
     /// Our own words before the system's alert, the first time only.
     private var dictationPrimer: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Say it instead of typing it").font(.headline)
+            Text("Say it instead of typing it").appText(.reading).fontWeight(.semibold)
             Text("The Mac listens while you hold the button on, and what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.")
                 .foregroundStyle(.secondary)
             Text("macOS will ask for the microphone and for speech recognition next.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
             HStack {
                 Spacer()
@@ -539,6 +541,7 @@ struct PromptBar: View {
     }
 
     private func updateMentions() {
+        mentionSearch?.cancel()
         guard let mentionQuery, !mentionFolders.isEmpty else {
             mentions = []
             return
@@ -549,7 +552,18 @@ struct PromptBar: View {
             mentions = []
             return
         }
-        mentions = FileMention.matching(mentionQuery.term, in: mentionFolders)
+        // Off the main actor, because even the capped walk is twenty thousand stat
+        // calls, and the field must take the next character while it runs. What was
+        // typed since is the search that matters, so the walk is cancelled by it.
+        let term = mentionQuery.term
+        let folders = mentionFolders
+        mentionSearch = Task {
+            let found = await Task.detached(priority: .userInitiated) {
+                FileMention.matching(term, in: folders)
+            }.value
+            guard !Task.isCancelled else { return }
+            mentions = found
+        }
     }
 
     private func accept(_ mention: FileMention) {
@@ -657,7 +671,7 @@ struct PromptBar: View {
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -667,14 +681,14 @@ struct PromptBar: View {
     private func optionsFailure(_ reason: String) -> some View {
         HStack(spacing: 8) {
             Text(reason)
-                .font(.footnote)
+                .appText(.fine)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
             Button("Try again") {
                 Task { await model.loadDraftOptions() }
             }
             .buttonStyle(.glass)
-            .font(.footnote)
+            .appText(.fine)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -713,7 +727,7 @@ struct PromptBar: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .font(.footnote)
+                    .appText(.fine)
                     .fixedSize()
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)

@@ -20,7 +20,7 @@ struct AttachmentStrip: View {
                                 .lineLimit(1)
                             if let refusal = refusal(attachment) {
                                 // Said before it is sent, not after.
-                                Text(refusal).chatText(.fine).tinted(.failure)
+                                Text(refusal).appText(.fine).tinted(.failure)
                             }
                         }
                         Button {
@@ -33,7 +33,7 @@ struct AttachmentStrip: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                     }
-                    .chatText(.supporting)
+                    .appText(.supporting)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .glassEffect(.regular, in: .capsule)
@@ -67,9 +67,9 @@ struct MentionList: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(mentions.enumerated()), id: \.element.id) { index, mention in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(mention.name).chatText(.supporting)
+                            Text(mention.name).appText(.supporting)
                             Text(mention.relativePath)
-                                .chatText(.fine)
+                                .appText(.fine)
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                             Spacer(minLength: 8)

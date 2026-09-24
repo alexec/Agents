@@ -96,38 +96,35 @@ struct ConsistencyTests {
 
     // MARK: 2. Type scale (FR-025)
 
-    /// The transcript entry renderers. The prompt bar, the readers and the capsule
-    /// chrome are not entries and keep their own sizes.
-    private static let entryRenderers = [
-        "App/Sources/Chat/Transcript.swift",
-        "App/Sources/Chat/BlocksView.swift",
-        "App/Sources/Chat/MarkdownText.swift",
-        "App/Sources/Chat/PlanView.swift",
-        "App/Sources/Chat/DiffView.swift",
-        "App/Sources/Chat/CommandList.swift",
-        "App/Sources/Chat/AttachmentStrip.swift",
-        "Remote/Sources/Chat/EntryView.swift",
-        "Remote/Sources/Chat/BlocksView.swift",
-        "Remote/Sources/Chat/MarkdownText.swift",
-        "Remote/Sources/Chat/PlanView.swift",
-    ]
+    /// Every view in both apps, which is the point. 018 wrote this rule for eleven
+    /// transcript entry renderers and it held there; the forty views around them went
+    /// on choosing among eight semantic styles by hand until `.callout` was the app's
+    /// body font and `.body` appeared nowhere. The list of files the rule applied to
+    /// was the bug. There is no list now.
+    ///
+    /// `Shared/UI/TypeScale.swift` is where a step is resolved, so it is the one file
+    /// allowed to name a font.
+    private static let scaleDefinition = "Shared/UI/TypeScale.swift"
 
-    /// A `.font(` line is allowed when it is a markdown heading — those keep their own
-    /// relative sizes and are not a step — or when it, or the line above it, says the
-    /// glyph is decorative (FR-015).
+    private static let viewDirectories = ["App/Sources", "Remote/Sources", "Shared/UI"]
+
+    /// A `.font(` line is allowed when it draws a Markdown heading — those need three
+    /// levels where the scale has one above `reading`, so `TextStep.heading` keeps a
+    /// ladder of its own and resolves it for both apps — or when it, or the line above
+    /// it, says the glyph is decorative (FR-015).
     private static func fontIsAllowed(in source: Source, at index: Int) -> Bool {
         let line = source.lines[index]
-        if source.path.hasSuffix("MarkdownText.swift"), line.contains(".font(level") { return true }
+        if line.contains("TextStep.heading(") { return true }
         let above = index > 0 ? source.lines[index - 1] : ""
         return line.localizedCaseInsensitiveContains("decorative")
             || above.localizedCaseInsensitiveContains("decorative")
     }
 
-    @Test func noTranscriptEntryNamesAFontItself() throws {
+    @Test func noViewNamesAFontItself() throws {
         var violations: [String] = []
         var read = 0
-        for source in try Self.sources(under: ["App/Sources/Chat", "Remote/Sources/Chat"]) {
-            guard Self.entryRenderers.contains(source.path) else { continue }
+        for source in try Self.sources(under: Self.viewDirectories) {
+            guard source.path != Self.scaleDefinition else { continue }
             read += 1
             for (index, line) in source.lines.enumerated() {
                 guard Self.code(line).contains(".font(") else { continue }
@@ -135,24 +132,27 @@ struct ConsistencyTests {
                 violations.append("\(Self.at(source, index)): \(line.trimmingCharacters(in: .whitespaces))")
             }
         }
-        #expect(read == Self.entryRenderers.count, "an entry renderer has moved; update the list")
+        #expect(read > 50, "too few sources were read; the repository root is wrong")
         #expect(violations.isEmpty, """
-            A transcript entry names a font. Entries draw from the chat scale: use \
-            `.chatText(.prose)` for a message, `.chatText(.supporting)` for a thought, \
-            a tool title or a placeholder, `.chatText(.fine)` for a timestamp or label, \
-            and `.chatText(.code)` for anything monospaced. A weight goes on afterwards \
-            with `.fontWeight(_:)`. A glyph that is not text may keep a fixed size if the \
-            line above it says it is decorative.
+            A view names a font. Everything in both apps draws from one scale: use \
+            `.appText(.reading)` for anything read — a message, a row title, a form \
+            label, body copy, the document page — `.appText(.supporting)` for what sits \
+            under one of those and describes it, `.appText(.fine)` for timestamps, \
+            counts, section headers and the chrome on small buttons, `.appText(.code)` \
+            for anything monospaced, and `.appText(.title)` for a page's own title. A \
+            weight goes on afterwards with `.fontWeight(_:)`; there is no heading step \
+            because a heading is `reading` with a weight. A glyph that is not text may \
+            keep a fixed size if the line above it says it is decorative.
             \(violations.joined(separator: "\n"))
             """)
     }
 
-    @Test func noChatTextIsPinnedToAPointSize() throws {
-        // FR-015: everything in the chat scales with the reader's text size. The
-        // fixed sizes left are glyphs in capsules and badges, and each says so.
+    @Test func noTextIsPinnedToAPointSize() throws {
+        // FR-015: everything scales with the reader's text size. The fixed sizes left
+        // are glyphs in capsules, wells and badges, and each says so on the line above.
         let pinned = try Regex(#"\.system\(size:"#)
         var violations: [String] = []
-        for source in try Self.sources(under: ["App/Sources/Chat", "Remote/Sources/Chat"]) {
+        for source in try Self.sources(under: Self.viewDirectories) {
             for (index, line) in source.lines.enumerated() {
                 guard Self.code(line).contains(pinned) else { continue }
                 guard !Self.fontIsAllowed(in: source, at: index) else { continue }
@@ -160,10 +160,37 @@ struct ConsistencyTests {
             }
         }
         #expect(violations.isEmpty, """
-            Chat text is pinned to a point size, which the reader's text-size setting \
-            cannot move. Use a step of the chat scale. If it is a glyph in a capsule or \
-            a badge rather than text, say so on the line above: `// Decorative: …`.
+            Text is pinned to a point size, which the reader's text-size setting cannot \
+            move. Use a step of the scale. If it is a glyph in a capsule, a well or a \
+            badge rather than text, say so on the line above: `// Decorative: …`.
             \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    /// The scale is four steps and a monospace one. It is worth a check of its own
+    /// because the failure it guards is not a call site drifting — it is somebody
+    /// adding a fifth step to avoid choosing between two that exist, which is how the
+    /// app got to eight in the first place.
+    @Test func theScaleStaysFourStepsAndCode() throws {
+        let definition = try Self.sources(under: ["Shared/UI"])
+            .first { $0.path == Self.scaleDefinition }
+        // The enum's own cases, not the switch labels that resolve them: a `case` line
+        // that is a bare name and nothing else.
+        let declaration = try Regex(#"^case [a-z][A-Za-z]*$"#)
+        let cases = try #require(definition).lines
+            .map { Self.code($0).trimmingCharacters(in: .whitespaces) }
+            .filter { try! declaration.wholeMatch(in: $0) != nil }
+        #expect(cases.contains("case title"))
+        #expect(cases.contains("case reading"))
+        #expect(cases.contains("case supporting"))
+        #expect(cases.contains("case fine"))
+        #expect(cases.contains("case code"))
+        #expect(cases.count == 5, """
+            The scale has \(cases.count) steps rather than five. Five is the number \
+            somebody asked for after reading the app with eight: title, reading, \
+            supporting, fine, code. A sixth is a decision, not a refactor — if one is \
+            genuinely needed, change this test deliberately and say why in TypeScale.
+            \(cases.joined(separator: "\n"))
             """)
     }
 

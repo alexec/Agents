@@ -72,6 +72,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [X] T014 [US1] In `App/Sources/Sidebar/FilesPane.swift`, add a `@State private var lastText: String?` and make `reloadFile(_:)` keep the previous probe's text; in `fileView(_:)`, route `isMarkdown(url)` to `LivePage(text: probe.text ?? "", url: url, line: state.openLine, isEditing: false)` **whether or not `state.openLine` is set**, and update the "a line an agent named still wins" comment to say the page now has a passage for every line (FR-007). Everything else keeps `FileLines`.
 - [X] T015 [US1] In `FilesPane.swift`, change the `FolderWatch` callback so that when the open file's re-read produces the **same** text, nothing is republished (a build touching a sibling file must not mark the page). Compare on the probe's text, not the file's date.
 - [X] T016 [US1] Update `App/Sources/Sidebar/DocumentView.swift`'s doc comment: it is now the renderer `LivePage` was grown from, kept for the `Remote` target's use and for nothing on the Mac; if nothing on the Mac references it after T014, delete the Mac copy rather than leaving two.
+- [X] T016b [US1] In `LivePage.swift`, reveal a changed passage as if typed (FR-005b, added 2026-09-24): `typing[index]` counts characters shown, starting where the new source stops agreeing with the old at that index; a 16 ms loop advances it by at least four characters a frame and never slower than the whole passage in ninety frames; a caret follows the reveal. The person's own save and a passage being edited are not typed.
 - [X] T017 [US1] `xcodegen generate`, then `xcodebuild -scheme Agents -destination 'platform=macOS' -skipPackagePluginValidation build` and `swift test --package-path Packages/AgentsKit`. Both clean.
 - [X] T018 [US1] **The gate.** Walk quickstart Slice A in the built app under `env -i … open -n … --args --root /tmp/agents-022`: an agent writes `notes.md` in four steps with `show_file` called first. Screenshot each step to `specs/022-live-artifacts/walk/A-<n>.png`. Then drag the sidebar to 900 pt and screenshot. Write what was seen at the foot of this file under "Slice A walk" — whether the page reads as paper, whether the marks land on the right passage, whether it follows, and whether it wants a window of its own. **Do not begin Phase 4 until this is written and Alex has seen the screenshots.**
 
@@ -165,7 +166,7 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [X] T052 [US3] Add `public static func artifactEdited(_ edits: [ArtifactEdit]) -> String?` to `Briefing.swift` producing the contract's wording, grouped by path in first-seen order, blocks in `lines` order, the first 20 then the "…and more" line. Until T048 passes.
 - [X] T053 [US3] In `DaemonCore+Commands.swift` `beginTurn`, after the briefing append at the `needsBriefing` line: `if let note = Briefing.artifactEdited(artifactEdits[agentID] ?? []) { outgoing.append(.text(note)); artifactEdits[agentID] = nil }`. Only for `from == .person`? **No** — a workflow's prompt should carry it too; the agent needs to know either way. Until T049 passes.
 - [X] T054 [US3] Add `artifactEdits[agentID] = nil` wherever `dropAppTokens(for:)` is called on an agent's removal, so a deleted agent's notes do not linger.
-- [ ] T055 [US3] Build, test, walk quickstart Slice F step 1 with Claude, and step 2 (an edit mid-turn) with every installed runtime. Fill the findings rows "The turn note reaching the agent", "The agent respecting the note" and "Mid-turn edit: runtime's own stale-file guard" per runtime in `findings.md`. If any runtime overwrote the person's mid-turn edit, write one paragraph under "What the real feature needs" saying so — that is the one place a real tool might earn its place.
+- [X] T055 [US3] Build, test, walk quickstart Slice F step 1 with Claude, and step 2 (an edit mid-turn) with every installed runtime. Fill the findings rows "The turn note reaching the agent", "The agent respecting the note" and "Mid-turn edit: runtime's own stale-file guard" per runtime in `findings.md`. If any runtime overwrote the person's mid-turn edit, write one paragraph under "What the real feature needs" saying so — that is the one place a real tool might earn its place.
 
 **Checkpoint**: The agent is told. US3 complete.
 
@@ -180,10 +181,10 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [ ] T056 [US5] Walk quickstart Slices A–F end to end with a second runtime (whichever of Grok, Copilot or Cursor was not used in T023), and fill the "Runtimes walked" table in `specs/022-live-artifacts/findings.md`.
 - [ ] T057 [P] [US5] Fill the findings rows "The page following whole-file writes (line diff)" and "Marks placed on the right passage" from the Slice A and D walks, with counts (marks right / marks tried).
 - [ ] T058 [P] [US5] Fill "The person's edit surviving an agent write elsewhere" and "The collision card" from the Slice D walk, against SC-004 and SC-005's numbers (fifty alternating edits; every collision).
-- [ ] T059 [P] [US5] Fill "A 'what changed since I wrote' tool, callable mid-turn" from T055: needed, or not, per runtime, and why.
+- [X] T059 [P] [US5] Fill "A 'what changed since I wrote' tool, callable mid-turn" from T055: needed, or not, per runtime, and why.
 - [ ] T060 [P] [US5] Fill "Passage-level editing as the shape of editing" and "The sidebar as the page's home vs a window of its own" from the Slice A and C walks and from what Alex said at the gate.
-- [ ] T061 [P] [US5] Fill "Finer-grained agent edits", "Mermaid written by an agent unasked" and "Inserting an image from the page" — each either observed or "not reached for, in N documents across M runtimes".
-- [ ] T062 [US5] Write "Things that grated" and "What the real feature needs" in `findings.md`: each entry one or two sentences with the walk it came from. Set the file's status line to "walked, <date>".
+- [X] T061 [P] [US5] Fill "Finer-grained agent edits", "Mermaid written by an agent unasked" and "Inserting an image from the page" — each either observed or "not reached for, in N documents across M runtimes".
+- [X] T062 [US5] Write "Things that grated" and "What the real feature needs" in `findings.md`: each entry one or two sentences with the walk it came from. Set the file's status line to "walked, <date>".
 - [ ] T063 [US5] Re-read `spec.md`'s SC-001 to SC-008 against the walks and write, at the foot of this file under "Success criteria", which held, which did not, and the number seen for each.
 
 **Checkpoint**: The PoC has said what it learned. US5 complete; the feature is done.
@@ -192,9 +193,9 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 
 ## Phase 10: Polish
 
-- [ ] T064 [P] Run `swift test --package-path Packages/AgentsKit` in a detached worktree at HEAD ([[three-lanes-one-tree]]) and confirm the only failures are the known flakes named in memory.
-- [ ] T065 [P] Re-read every doc comment added in `Passage.swift`, `LivePage.swift`, `DaemonCore+Artifacts.swift` and `Briefing.swift` against the house rule that a comment says why, and cite the FR or research section each decision came from.
-- [ ] T066 Update `README.md`'s "A file, shown" bullet: a Markdown file opens as a page that follows the agent's edits and can be typed on, and the person's edits are told to the agent on its next turn. Two sentences, no more.
+- [X] T064 [P] Run `swift test --package-path Packages/AgentsKit` in a detached worktree at HEAD ([[three-lanes-one-tree]]) and confirm the only failures are the known flakes named in memory.
+- [X] T065 [P] Re-read every doc comment added in `Passage.swift`, `LivePage.swift`, `DaemonCore+Artifacts.swift` and `Briefing.swift` against the house rule that a comment says why, and cite the FR or research section each decision came from.
+- [X] T066 Update `README.md`'s "A file, shown" bullet: a Markdown file opens as a page that follows the agent's edits and can be typed on, and the person's edits are told to the agent on its next turn. Two sentences, no more.
 
 ---
 
@@ -247,6 +248,21 @@ follow, because the second prompt (four more writes) was typed while Alex was us
 and never reached the agent. `walk/A-project-page-while-writing.png` is what the person saw
 while the agent wrote: the project page, nothing live.
 
+*2026-09-24.* The typed reveal (T016b) is built and the scratch app relaunched on it, but the
+Mac was locked, so nobody has yet watched a passage type itself. Two things to look for: whether
+a half-typed `**bold` or `## heading` flickers as the marks close, and whether the caret and
+the tint together are too much — the caret may be enough on its own.
+
+*2026-09-24, walked with Alex away.* `walk/A-*.png`. With the conversation open, the
+agent's `show_file` opened the page at once (A-1). Four writes: the new Method passage typed
+itself out with a caret (A-2); the rewritten summary was tinted and the view stayed on it
+(A-3); the table change tinted the table, and the agent's knock-on edits to the summary and
+Notes tinted those too — every tinted passage was one that changed (A-4); the Caveats section
+at the bottom was followed to and typed (A-5). Then the agent rewrote the SVG beside the
+document, and the page followed back up to the picture (E-1) — the image-stamp path works.
+The picture itself renders as a black rectangle: the agent's SVG adapts to light and dark with
+CSS, which `NSImage` does not evaluate. Findings row updated.
+
 Still to see before the gate: four more writes with the page open — the tint landing on the
 changed passage, the view moving to it, and the jump back to the first paragraph. The scratch
 app is running against `/tmp/agents-022`; the conversation is open with Files showing
@@ -263,6 +279,15 @@ So the visual half of step 1, and step 2 (a line past the end), are still to be 
 screen, and T022 stays open for that.
 
 ### Slice C walk
+
+*2026-09-24.* Two things wrong, both seen (`walk/C-*.png`). A click on a rendered passage did
+nothing at first: the tap gesture under the page's text selection never fired, as the note
+below feared. The passage became a plain `Button` and the click then opened the editor. The
+editor opened one line high — `TextEditor` in a stack needs `fixedSize` vertically — and the
+keystrokes went into the chat's prompt box, which holds first responder and takes it back when
+focus is asked for in the same pass; the editor now asks a beat later. Neither fix has been
+walked yet: Alex came back to the Mac. The typed sentence is sitting in the scratch app's
+prompt box, unsent.
 
 *2026-09-23.* Code built and 1065 tests pass, including four for `artifact/write`. The
 walk itself (T034: click, type, pause, `cat`) is not done: Alex was at the Mac and my
@@ -290,4 +315,24 @@ is testable with no daemon in the room. T054 turned out to have no site: the dae
 removes an agent's record, only its session, and the note must survive a session ending —
 the person may edit while the agent is idle and prompt it an hour later.
 
+*The measurement (T055), over the scratch socket with a script answering write
+permissions:* between turns, all four runtimes kept the person's passage on their next
+write (4/4). Mid-turn, Claude, Grok and Cursor overwrote it (0/3); Copilot re-read the file
+after its pause and then stopped before writing again, which is not a merge. Full rows in
+`findings.md`. Grok's writes pass through the daemon's `fs/write_text_file`, which is the
+one place a merge on the way to disk could live without the agent's help.
+
 ### Success criteria
+
+*2026-09-23.* Assessed as far as the socket can see; the table is at the foot of
+`findings.md`. SC-006 and SC-008 hold outright; SC-007 is the findings file; the rest
+wait on the screen.
+
+### What is left, and how to do it
+
+The scratch app is running in the background against `/tmp/agents-022`, built from
+`/tmp/w022` (a detached worktree at 4b61403 with every later 022 file copied in — the full
+A–F code). Its project `/tmp/scratch-022` holds `notes.md` and a dozen documents the
+measurements wrote. To walk: open the scratch window, open any conversation, open Files,
+click a `.md`. T022, T034, T040 and T047 are the quickstart's Slices B–E; T056–T058, T060
+and T063 are the findings rows they fill.

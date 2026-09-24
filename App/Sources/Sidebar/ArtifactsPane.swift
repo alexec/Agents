@@ -15,11 +15,16 @@ struct ArtifactsPane: View {
     let agent: Agent
     let state: AgentPaneState
 
-    /// Derived on read, every time, and never stored. That is what makes artifacts last
-    /// exactly as long as the transcript does, across restarts and for a stopped or
-    /// archived agent (FR-044), and it is why the list updates on `agent/entry` with no
-    /// new notification of its own (FR-041).
-    private var artifacts: [Artifact] { Artifact.all(in: model.entries) }
+    /// Derived from the transcript and never stored anywhere else. That is what makes
+    /// artifacts last exactly as long as the transcript does, across restarts and for
+    /// a stopped or archived agent (FR-044), and it is why the list updates on
+    /// `agent/entry` with no new notification of its own (FR-041).
+    ///
+    /// Folded when the page changes rather than on every redraw: the page grows
+    /// several times a second while an agent talks, and each fold asked the disk
+    /// whether every file was still there.
+    @State private var artifacts: [Artifact] = []
+    @State private var missing: Set<String> = []
 
     var body: some View {
         Group {
@@ -32,6 +37,13 @@ struct ArtifactsPane: View {
                 .listStyle(.inset)
             }
         }
+        .task(id: model.entries.count) { fold() }
+    }
+
+    private func fold() {
+        let found = Artifact.all(in: model.entries)
+        artifacts = found
+        missing = Set(found.filter(\.isMissing).map(\.id))
     }
 
     private func row(_ artifact: Artifact) -> some View {
@@ -52,7 +64,7 @@ struct ArtifactsPane: View {
                 if let size = artifact.size {
                     Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
                 }
-                if artifact.isMissing {
+                if missing.contains(artifact.id) {
                     // It stays in the list. The record that it arrived is still true
                     // (FR-045). Red, not orange: a missing artifact is the same news
                     // as a missing folder, and nobody is being asked anything.
@@ -60,7 +72,7 @@ struct ArtifactsPane: View {
                         .tinted(.failure)
                 }
             }
-            .font(.caption)
+            .appText(.fine)
             .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
@@ -109,16 +121,16 @@ private struct Nothing: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "tray")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing exchanged yet")
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
             Text("A file you attach to a prompt, or one an agent hands back by name, appears here, so you can find it again without scrolling back through the conversation.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Text("Files the agent merely changed are marked in Files instead.")
-                .font(.footnote)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
         }

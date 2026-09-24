@@ -36,7 +36,7 @@ struct ImageFile: View {
                         .accessibilityLabel(url.lastPathComponent)
                     Divider()
                     Text(caption(for: image))
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .padding(10)
                 }

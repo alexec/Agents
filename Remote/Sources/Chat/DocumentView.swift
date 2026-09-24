@@ -27,9 +27,10 @@ struct DocumentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .readableWidth()
         }
-        // Prose in New York, the system serif, the same face and the same relative
-        // style the Mac's document view uses, so Dynamic Type still moves it (FR-037).
-        .font(.system(.callout, design: .serif))
+        // The same step the Mac's document view uses, so the two read alike and
+        // Dynamic Type still moves both (FR-037). New York until the type scale became
+        // the whole app's; a document is read at the app's reading size now.
+        .appText(.reading)
         .textSelection(.enabled)
         .navigationTitle(artifact.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -70,11 +71,11 @@ private struct Elsewhere: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(name).font(.headline)
-            Text(detail).font(.callout).foregroundStyle(.secondary)
+            Text(name).appText(.reading).fontWeight(.semibold)
+            Text(detail).appText(.supporting).foregroundStyle(.secondary)
             if let link {
                 Link(link.absoluteString, destination: link)
-                    .font(.footnote)
+                    .appText(.fine)
                     .lineLimit(2)
                     .truncationMode(.middle)
             }
@@ -114,7 +115,7 @@ struct ArtifactsList: View {
                     }
                     if model.hasMoreBefore {
                         Text("Only what is in the part of the conversation read so far.")
-                            .font(.caption)
+                            .appText(.fine)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -137,7 +138,7 @@ struct ArtifactsList: View {
                     Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
                 }
             }
-            .font(.caption)
+            .appText(.fine)
             .foregroundStyle(.secondary)
         }
     }

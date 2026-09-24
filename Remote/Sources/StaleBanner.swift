@@ -14,10 +14,10 @@ struct StaleBanner: View {
         if model.isStale {
             HStack(spacing: 8) {
                 Image(systemName: "wifi.slash")
-                    .font(.footnote)
+                    .appText(.fine)
                     .accessibilityHidden(true)
                 Text(line)
-                    .font(.footnote)
+                    .appText(.fine)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.secondary)

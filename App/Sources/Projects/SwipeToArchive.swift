@@ -49,7 +49,7 @@ struct SwipeToArchive: ViewModifier {
     private var reveal: some View {
         if offset < 0 {
             Label("Archive", systemImage: "archivebox")
-                .font(.callout.weight(.medium))
+                .appText(.reading).fontWeight(.medium)
                 .foregroundStyle(offset <= -Self.commit ? Color.primary : Color.secondary)
                 .opacity(min(1, -offset / Self.commit))
                 .padding(.trailing, 18)

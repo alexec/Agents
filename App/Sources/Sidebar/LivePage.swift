@@ -66,8 +66,22 @@ struct LivePage: View {
     @State private var marked: [Int: Date] = [:]
     /// The text `passages` came from: the base for the next diff.
     @State private var lastLoaded = ""
+    /// Passages being revealed as if typed: index → how many characters are shown.
+    /// A passage the agent changed does not appear whole; it is typed out from where
+    /// it diverges from what was there, at a pace that finishes in a couple of
+    /// seconds however long it is. The eye follows a caret where it would not notice
+    /// a paragraph replaced.
+    @State private var typing: [Int: Int] = [:]
+    @State private var typist: Task<Void, Never>?
     /// The pictures on the page and when each file last changed.
     @State private var images = ImageStamps()
+
+    /// The typing pace: at least this many characters a frame, and never so slow that
+    /// a passage takes more than `typingFrames` frames — a long paragraph types faster
+    /// rather than for longer, because the agent's next write is seconds away.
+    private static let typingStep = 4
+    private static let typingFrames = 90
+    private static let typingCaret = "▍"
 
     /// How long a mark stays before it starts to fade, and how long the fade takes.
     /// Long enough to be found by an eye that was elsewhere; short enough that a
@@ -89,11 +103,12 @@ struct LivePage: View {
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
-                // Prose in New York, the system serif, at 12pt. Measured for 007: 13pt
-                // gives 57 characters at the default pane width and misses the floor
-                // of 60. A relative style rather than a fixed size, so Dynamic Type
-                // still moves it. Headings, code and chrome stay on the sans and mono
-                // faces the rest of the app uses.
+                // Prose on the app's reading step: the same face and the same size as
+                // everything else, because a document is a thing you read and that is
+                // what the step is for. It was New York at 12pt for 007, which read as
+                // paper but as a different app's paper. The pane widened to 460 rather
+                // than the text shrinking back, so the 60-character floor still holds;
+                // `PageMetrics` carries that arithmetic.
                 .appText(.reading)
                 .textSelection(.enabled)
                 .onAppear { load(text) }
@@ -135,15 +150,23 @@ struct LivePage: View {
                     }
                 }
             } else {
-                MarkdownText(markdown: passages[index].source, base: url)
-                    // A new identity when a picture in it changed on disk, which is
-                    // what makes the file be read again rather than redrawn.
-                    .id(images.token(for: index))
-                    // The whole passage is the click target, gaps included, so a
-                    // click beside a short line still opens it. A `Button` would eat
-                    // the drag that selects text; a tap gesture does not.
-                    .contentShape(Rectangle())
-                    .onTapGesture { begin(index) }
+                // The passage is the button. A tap gesture under the page's text
+                // selection never fired — selection takes the click — which the
+                // 2026-09-24 walk saw: a click, no caret, keystrokes gone. So the
+                // rendered passage is a plain `Button` whose label is the text, the
+                // shape that keeps its clicks (see the SwiftUI card memory), and
+                // copying from the page is done from the editor it opens.
+                Button {
+                    begin(index)
+                } label: {
+                    MarkdownText(markdown: shown(index), base: url)
+                        // A new identity when a picture in it changed on disk,
+                        // which is what makes the file be read again rather than
+                        // redrawn.
+                        .id(images.token(for: index))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
             .frame(maxWidth: metrics.measure, alignment: .leading)
@@ -232,6 +255,41 @@ struct LivePage: View {
         editing = nil
     }
 
+    // MARK: Typing it out
+
+    /// What the passage shows right now: all of it, or as much as has been typed
+    /// with a caret after it.
+    private func shown(_ index: Int) -> String {
+        guard let count = typing[index] else { return passages[index].source }
+        return String(passages[index].source.prefix(count)) + Self.typingCaret
+    }
+
+    /// Begin typing these passages out, each from where it stopped agreeing with
+    /// what was there before at the same place — a rewritten sentence types from the
+    /// sentence, not from the top of the paragraph.
+    private func reveal(_ indices: [Int], previous: [Passage]) {
+        for index in indices where passages.indices.contains(index) {
+            let new = passages[index].source
+            let old = previous.indices.contains(index) ? previous[index].source : ""
+            let agreed = zip(old, new).prefix { $0 == $1 }.count
+            typing[index] = min(agreed, max(0, new.count - 1))
+        }
+        guard !typing.isEmpty else { return }
+        typist?.cancel()
+        typist = Task {
+            while !Task.isCancelled, !typing.isEmpty {
+                try? await Task.sleep(for: .milliseconds(16))
+                for (index, count) in typing {
+                    guard passages.indices.contains(index) else { typing[index] = nil; continue }
+                    let total = passages[index].source.count
+                    let step = max(Self.typingStep, total / Self.typingFrames)
+                    let next = count + step
+                    typing[index] = next >= total ? nil : next
+                }
+            }
+        }
+    }
+
     // MARK: Following
 
     private func load(_ text: String) {
@@ -261,12 +319,14 @@ struct LivePage: View {
             return
         }
         let change = PassageChange.between(old: lastLoaded, new: new)
+        let previous = passages
         guard let current = editing, passages.indices.contains(current.index) else {
             passages = Passage.split(new)
             lastLoaded = new
             images = ImageStamps.take(passages: passages, base: url)
             guard let first = change.first else { return }
             mark(Array(change.changed))
+            reveal(Array(change.changed), previous: previous)
             Task { await go(to: first, proxy: proxy) }
             return
         }
@@ -290,6 +350,7 @@ struct LivePage: View {
         images = ImageStamps.take(passages: passages, base: url)
         editing = Editing(index: index, base: current.draft, draft: current.draft)
         mark(Array(change.changed).filter { $0 != index })
+        reveal(Array(change.changed).filter { $0 != index }, previous: previous)
         if merged != new {
             lastWritten = merged
             Task {

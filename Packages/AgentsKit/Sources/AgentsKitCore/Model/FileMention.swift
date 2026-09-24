@@ -65,6 +65,9 @@ extension FileMention {
                 // A cap on how much of the tree is walked, not on what is shown, so a
                 // huge folder cannot make typing slow.
                 if seen > 20_000 { break }
+                // Run off the main actor by the prompt bar, and cancelled by the next
+                // keystroke: what was typed since is the search that matters.
+                if seen % 256 == 0, Task.isCancelled { return [] }
                 if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                     if url.lastPathComponent == ".git" || url.lastPathComponent == "node_modules" {
                         walker.skipDescendants()

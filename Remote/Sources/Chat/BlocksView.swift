@@ -31,24 +31,24 @@ struct BlocksView: View {
 
         case .resourceLink(_, let name, _, _, _):
             Label(name, systemImage: "doc")
-                .chatText(.supporting)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
 
         case .resource(let uri, let text, _, _, _):
             VStack(alignment: .leading, spacing: 4) {
                 Text(URL(string: uri)?.lastPathComponent ?? uri)
-                    .chatText(.fine)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
                 if let text { MarkdownText(markdown: text) }
             }
 
         case .audio:
-            Text("Audio").chatText(.supporting).foregroundStyle(.tertiary)
+            Text("Audio").appText(.supporting).foregroundStyle(.tertiary)
 
         case .unknown:
             // Kept in the record, not guessed at here.
             Text("Something this version does not know how to show")
-                .chatText(.fine)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -65,7 +65,7 @@ struct DiffView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(diff.fileName)
-                .chatText(.fine)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -74,10 +74,10 @@ struct DiffView: View {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(line.mark)
-                                .chatText(.code)
+                                .appText(.code)
                                 .foregroundStyle(.tertiary)
                             Text(line.text.isEmpty ? " " : line.text)
-                                .chatText(.code)
+                                .appText(.code)
                                 .foregroundStyle(line.isRemoved ? AnyShapeStyle(.tertiary)
                                                                 : AnyShapeStyle(.primary))
                                 .strikethrough(line.isRemoved)

@@ -129,6 +129,14 @@ enum StoreCoding {
     /// ISO 8601 with fractional seconds: the record stays readable with `cat`, and a
     /// timestamp survives a round trip to the millisecond. Anything finer than that
     /// does not, which matters nowhere and is worth knowing anyway.
+    ///
+    /// Written and read with `Date.ISO8601FormatStyle`, which produces the same text
+    /// `ISO8601DateFormatter` did and reads it in a sixth of the time. The formatter is
+    /// what every record was written with until now, and it stays as the last resort
+    /// on the way in: a stamp the style will not take is still read the old way
+    /// rather than costing somebody a record.
+    private static let style = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let wholeSecondStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: false)
     nonisolated(unsafe) private static let dateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -139,7 +147,10 @@ enum StoreCoding {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .custom { date, encoder in
             var c = encoder.singleValueContainer()
-            try c.encode(dateFormatter.string(from: date))
+            // The style cuts the fraction off at the millisecond where the formatter
+            // rounded it, so half a millisecond is added first: what is written is
+            // then the same text for the same date as every record before it.
+            try c.encode(style.format(date.addingTimeInterval(0.0005)))
         }
         e.outputFormatting = [.withoutEscapingSlashes, .sortedKeys]
         return e
@@ -149,6 +160,8 @@ enum StoreCoding {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
+            if let date = try? style.parse(text) { return date }
+            if let date = try? wholeSecondStyle.parse(text) { return date }
             guard let date = dateFormatter.date(from: text) else {
                 throw DecodingError.dataCorruptedError(
                     in: try decoder.singleValueContainer(), debugDescription: "not an ISO 8601 date: \(text)")

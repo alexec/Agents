@@ -80,6 +80,10 @@ public actor DaemonCore {
     /// The two facts about a project that its folder cannot tell us. Everything else
     /// about a project is derived from the agents in it.
     lazy var projectStore = ProjectStore(locations: locations)
+    /// The kept project records, read from disk once and held. The daemon is their
+    /// only writer, and `allProjects` — which runs each time any agent changes —
+    /// used to read the file every time.
+    var projectRecordsCache: [URL: Project]?
     /// What each runtime last advertised, so a start form does not wait for a runtime
     /// to say what it said last time. Read from disk the first time it is wanted.
     lazy var optionCache = OptionCache(locations: locations)

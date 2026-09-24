@@ -68,7 +68,7 @@ struct WorkflowsSection: View {
                 .foregroundStyle(.tertiary)
             Spacer()
         }
-        .font(.subheadline.weight(.medium))
+        .appText(.fine).fontWeight(.medium)
         .foregroundStyle(.secondary)
         .padding(.top, 14)
         .padding(.leading, 2)
@@ -86,7 +86,7 @@ struct WorkflowsSection: View {
              : """
                 \(limit.sentence) — as many as it may. Archive one to make room for another.
                 """)
-            .font(.caption)
+            .appText(.fine)
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 6)
@@ -102,7 +102,7 @@ struct WorkflowsSection: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: showsArchived ? "chevron.down" : "chevron.right")
-                    .font(.caption2)
+                    .appText(.fine)
                 Text("Archived")
                 Text("\(archived.count)")
                     .monospacedDigit()
@@ -112,7 +112,7 @@ struct WorkflowsSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .font(.subheadline.weight(.medium))
+        .appText(.fine).fontWeight(.medium)
         .foregroundStyle(.secondary)
         .padding(.top, 10)
         .padding(.leading, 2)
@@ -123,7 +123,7 @@ struct WorkflowsSection: View {
     /// page does not read as though the workflows were lost.
     private var allArchived: some View {
         Text("Nothing running. This project's workflows are all archived.")
-            .font(.callout)
+            .appText(.reading)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 6)
@@ -143,7 +143,7 @@ struct WorkflowsSection: View {
                 schedule, or when an agent finishes. Ask an agent to set one up, or \
                 write one into \(WorkflowFile.folderName).
                 """)
-                .font(.callout)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -151,7 +151,7 @@ struct WorkflowsSection: View {
                 model.offeredPrompt = WorkflowExample.prompt
             } label: {
                 Text("“\(WorkflowExample.prompt)”")
-                    .font(.callout)
+                    .appText(.reading)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -19,18 +19,18 @@ struct AgentCard: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(agent.title ?? "Untitled")
-                        .font(.headline)
+                        .appText(.reading).fontWeight(.semibold)
                         .lineLimit(2)
 
                     Text(description)
-                        .font(.callout)
+                        .appText(.supporting)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let detail {
                         Text(detail)
-                            .font(.caption)
+                            .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                     }
@@ -145,6 +145,7 @@ struct StatusIcon: View {
                     .controlSize(.small)
             } else {
                 Image(systemName: symbol)
+                    // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .font(.system(size: 16))
                     .foregroundStyle(tint.style(or: .secondary))
             }

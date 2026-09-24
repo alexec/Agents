@@ -69,7 +69,7 @@ struct ProjectPageView: View {
 
                 if isEmpty {
                     Text("Nothing here yet. Start an agent on the Mac and it appears here.")
-                        .font(.callout)
+                        .appText(.reading)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }
@@ -101,15 +101,15 @@ struct ProjectPageView: View {
             }
             if archived.count > archivedShown {
                 Button("Show more") { archivedShown += pageSize }
-                    .font(.callout)
+                    .appText(.reading)
                     .padding(.top, 4)
             }
             Button("Hide archived") { showsArchived = false }
-                .font(.callout)
+                .appText(.reading)
                 .padding(.top, 6)
         } else if !archived.isEmpty {
             Button("Archived (\(archived.count))") { showsArchived = true }
-                .font(.callout)
+                .appText(.reading)
                 .padding(.top, 10)
         }
     }
@@ -121,7 +121,7 @@ private struct MissingFolder: View {
 
     var body: some View {
         Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
-            .font(.callout)
+            .appText(.reading)
             .tinted(.failure)
             .padding(.top, 4)
             .accessibilityHint(path)
@@ -140,7 +140,7 @@ struct GroupHeading: View {
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
-        .font(.subheadline.weight(.medium))
+        .appText(.fine).fontWeight(.medium)
         .foregroundStyle(.secondary)
         .padding(.top, 14)
         .padding(.leading, 2)

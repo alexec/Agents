@@ -25,7 +25,7 @@ struct SelectCapsule<Content: View>: View {
             }
         }
         .buttonStyle(.plain)
-        .font(.footnote)
+        .appText(.fine)
         .fixedSize()
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -34,7 +34,7 @@ struct SelectCapsule<Content: View>: View {
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(name)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.top, 4)
@@ -69,7 +69,7 @@ struct BooleanCapsule: View {
             }
         }
         .buttonStyle(.plain)
-        .font(.footnote)
+        .appText(.fine)
         .fixedSize()
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -92,13 +92,13 @@ struct SelectChoice: View {
         Button(action: choose) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(isChosen ? "✓" : " ")
-                    .font(.footnote.monospaced())
+                    .appText(.code)
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.footnote)
+                    Text(title).appText(.fine)
                     if let description, !description.isEmpty {
                         Text(description)
-                            .font(.caption)
+                            .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
                 }

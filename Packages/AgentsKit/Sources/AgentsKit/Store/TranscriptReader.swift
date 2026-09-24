@@ -2,44 +2,89 @@ import Foundation
 
 /// Reads a transcript by the line, without loading it whole.
 ///
-/// One pass builds an index of where each line starts; after that a page is a seek and
-/// a read. An agent that has been going for hours has a transcript in the tens of
+/// An index of where each line starts is built once and then only grown: the daemon
+/// is the file's only writer and only ever appends, so what was indexed last time is
+/// still true and the scan picks up where it left off. After that a page is a seek
+/// and a read. An agent that has been going for hours has a transcript in the tens of
 /// megabytes, and the window only ever shows the end of it.
 struct TranscriptReader {
     let url: URL
 
     init(url: URL) { self.url = url }
 
-    /// Byte offsets of the start of every complete line.
+    /// Where every complete line starts, and how far the file was read to find out.
     ///
-    /// A trailing fragment with no newline is left out: that is a daemon that died
-    /// mid-write, and half an entry is not an entry.
-    private func lineOffsets() throws -> [UInt64] {
-        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    /// A trailing fragment with no newline is not in it: that is a daemon that died
+    /// mid-write, and half an entry is not an entry. `scanned` stays at the start of
+    /// the fragment, so the newline that later ends it is found by the next scan.
+    struct Index: Sendable {
+        /// The byte after each newline, which is where the next line starts. The
+        /// first line starts at zero and is not listed; `count` is the number of
+        /// complete lines, one per newline found.
+        var lineEnds: [UInt64] = []
+        var scanned: UInt64 = 0
+
+        var count: Int { lineEnds.count }
+
+        /// Where line `index` starts.
+        func start(of index: Int) -> UInt64 {
+            index == 0 ? 0 : lineEnds[index - 1]
+        }
+    }
+
+    /// Bring an index up to the end of the file.
+    ///
+    /// A file shorter than the index says was scanned is not the file the index was
+    /// built for — somebody truncated or replaced it — and is read again from the top.
+    func extend(_ index: inout Index) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            index = Index()
+            return
+        }
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
-        var offsets: [UInt64] = [0]
-        var position: UInt64 = 0
+        let size = try handle.seekToEnd()
+        if size < index.scanned { index = Index() }
+        guard size > index.scanned else { return }
+
+        try handle.seek(toOffset: index.scanned)
+        var position = index.scanned
         while let chunk = try handle.read(upToCount: 256 * 1024), !chunk.isEmpty {
-            for (i, byte) in chunk.enumerated() where byte == 0x0A {
-                offsets.append(position + UInt64(i) + 1)
+            chunk.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                guard var cursor = bytes.baseAddress else { return }
+                let end = cursor + bytes.count
+                // `memchr` rather than a loop over the bytes: a byte at a time through
+                // `Data` is the slow part of opening a long conversation.
+                while cursor < end, let found = memchr(cursor, 0x0A, end - cursor) {
+                    let next = UnsafeRawPointer(found) + 1
+                    index.lineEnds.append(position + UInt64(next - bytes.baseAddress!))
+                    cursor = next
+                }
             }
             position += UInt64(chunk.count)
         }
-        // The final offset is either the end of the file or the start of a fragment
-        // with no newline after it. Neither is the start of a complete line, and a
-        // fragment is a daemon that died mid-write rather than an entry.
-        offsets.removeLast()
-        return offsets
+        // Only up to the last newline. What follows it is a fragment until it is
+        // ended, and it is scanned again then.
+        index.scanned = index.lineEnds.last ?? 0
     }
 
     var count: Int {
-        get throws { try lineOffsets().count }
+        get throws {
+            var index = Index()
+            try extend(&index)
+            return index.count
+        }
     }
 
     func page(before: Int?, limit: Int) throws -> TranscriptPage {
-        let offsets = try lineOffsets()
-        let total = offsets.count
+        var index = Index()
+        try extend(&index)
+        return try page(index, before: before, limit: limit)
+    }
+
+    /// A page out of an index that is already up to date.
+    func page(_ index: Index, before: Int?, limit: Int) throws -> TranscriptPage {
+        let total = index.count
         guard total > 0 else { return TranscriptPage(firstIndex: 0, total: 0, entries: []) }
 
         let end = min(before ?? total, total)
@@ -48,15 +93,12 @@ struct TranscriptReader {
 
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
-        try handle.seek(toOffset: offsets[start])
-        let data: Data
-        if end < total {
-            data = try handle.read(upToCount: Int(offsets[end] - offsets[start])) ?? Data()
-        } else {
-            data = try handle.readToEnd() ?? Data()
-        }
+        let from = index.start(of: start)
+        try handle.seek(toOffset: from)
+        let data = try handle.read(upToCount: Int(index.lineEnds[end - 1] - from)) ?? Data()
 
         var entries: [TranscriptEntry] = []
+        entries.reserveCapacity(end - start)
         for line in data.split(separator: 0x0A) where !line.isEmpty {
             // A line that will not decode is skipped, not fatal: the record is more
             // use with a gap in it than not at all.

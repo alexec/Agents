@@ -350,3 +350,52 @@ struct AgentsModelTests {
         #expect(model.isAtCostLimit(spender))
     }
 }
+
+@MainActor
+@Suite("The fold the chat draws is kept by the model")
+struct AgentsModelDisplayTests {
+    private func entry(_ agentID: UUID, _ text: String, id: String? = "m") throws -> JSONValue {
+        try JSONValue.encoding(DaemonAPI.EntryNotification(
+            agentID: agentID, entry: TranscriptEntry(kind: .agentMessage(messageID: id, text: text))))
+    }
+
+    @Test func itemsFollowTheEntriesAChunkAtATime() throws {
+        let model = AgentsModel()
+        let watched = UUID()
+        model.watching = watched
+        model.apply(DaemonAPI.Notification.agentEntry, try entry(watched, "Hel"))
+        model.apply(DaemonAPI.Notification.agentEntry, try entry(watched, "lo"))
+        model.apply(DaemonAPI.Notification.agentEntry, try entry(UUID(), "not mine"))
+        #expect(model.transcriptItems.count == 1)
+        #expect(model.transcriptItems == TranscriptEntry.display(model.entries))
+    }
+
+    @Test func aReplacedOrGrownPageIsFoldedAgain() throws {
+        let model = AgentsModel()
+        model.replaceTranscript(with: TranscriptPage(
+            firstIndex: 10, total: 20,
+            entries: [TranscriptEntry(kind: .agentMessage(messageID: "b", text: "Later"))]))
+        #expect(model.transcriptItems.count == 1)
+        model.prepend(TranscriptPage(
+            firstIndex: 0, total: 20,
+            entries: [TranscriptEntry(kind: .agentMessage(messageID: "a", text: "Earlier"))]))
+        #expect(model.transcriptItems.map { $0.id } == model.entries.map(\.id))
+        model.clearTranscript()
+        #expect(model.transcriptItems.isEmpty)
+    }
+
+    @Test func readingHappensAnywhereAndMeaningInOnePlace() throws {
+        let model = AgentsModel()
+        let id = UUID()
+        let agent = Agent(id: id, runtimeID: "claude", cwd: URL(filePath: "/tmp/work/api"), state: .running)
+        let update = AgentsModel.read(DaemonAPI.Notification.agentChanged, try JSONValue.encoding(agent))
+        guard case .agentChanged(let read) = update else { Issue.record("not read"); return }
+        #expect(read.id == id)
+        model.apply(update!)
+        #expect(model.agent(id) != nil)
+        #expect(AgentsModel.read(DaemonAPI.Notification.shellOutput, nil) == nil, "not ours")
+        guard case .unreadable = AgentsModel.read(DaemonAPI.Notification.agentChanged, .string("no")) else {
+            Issue.record("ours, and unreadable, is claimed"); return
+        }
+    }
+}
