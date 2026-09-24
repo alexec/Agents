@@ -33,12 +33,23 @@ struct PassageEditor: View {
             .appText(.reading)
             .scrollContentBackground(.hidden)
             .scrollDisabled(true)
+            // As tall as its text and no taller. Without this the editor is one line
+            // high inside the page's stack, which the 2026-09-24 walk saw.
+            .fixedSize(horizontal: false, vertical: true)
             // `TextEditor` insets its text by a few points that a `Text` does not;
             // pulled back so the first character sits where the rendered one did.
             .padding(.horizontal, -5)
             .padding(.vertical, -1)
             .focused($isFocused)
-            .onAppear { isFocused = true }
+            .onAppear {
+                // A beat later, not at once. The prompt bar holds first responder and
+                // takes it back if asked in the same pass; the walk saw a sentence
+                // typed at the page land in the prompt box.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(80))
+                    isFocused = true
+                }
+            }
             .onChange(of: draft) {
                 pause?.cancel()
                 pause = Task {

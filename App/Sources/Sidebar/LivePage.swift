@@ -150,15 +150,23 @@ struct LivePage: View {
                     }
                 }
             } else {
-                MarkdownText(markdown: shown(index), base: url)
-                    // A new identity when a picture in it changed on disk, which is
-                    // what makes the file be read again rather than redrawn.
-                    .id(images.token(for: index))
-                    // The whole passage is the click target, gaps included, so a
-                    // click beside a short line still opens it. A `Button` would eat
-                    // the drag that selects text; a tap gesture does not.
-                    .contentShape(Rectangle())
-                    .onTapGesture { begin(index) }
+                // The passage is the button. A tap gesture under the page's text
+                // selection never fired — selection takes the click — which the
+                // 2026-09-24 walk saw: a click, no caret, keystrokes gone. So the
+                // rendered passage is a plain `Button` whose label is the text, the
+                // shape that keeps its clicks (see the SwiftUI card memory), and
+                // copying from the page is done from the editor it opens.
+                Button {
+                    begin(index)
+                } label: {
+                    MarkdownText(markdown: shown(index), base: url)
+                        // A new identity when a picture in it changed on disk,
+                        // which is what makes the file be read again rather than
+                        // redrawn.
+                        .id(images.token(for: index))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
             .frame(maxWidth: metrics.measure, alignment: .leading)

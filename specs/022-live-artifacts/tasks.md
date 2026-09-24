@@ -253,6 +253,16 @@ Mac was locked, so nobody has yet watched a passage type itself. Two things to l
 a half-typed `**bold` or `## heading` flickers as the marks close, and whether the caret and
 the tint together are too much — the caret may be enough on its own.
 
+*2026-09-24, walked with Alex away.* `walk/A-*.png`. With the conversation open, the
+agent's `show_file` opened the page at once (A-1). Four writes: the new Method passage typed
+itself out with a caret (A-2); the rewritten summary was tinted and the view stayed on it
+(A-3); the table change tinted the table, and the agent's knock-on edits to the summary and
+Notes tinted those too — every tinted passage was one that changed (A-4); the Caveats section
+at the bottom was followed to and typed (A-5). Then the agent rewrote the SVG beside the
+document, and the page followed back up to the picture (E-1) — the image-stamp path works.
+The picture itself renders as a black rectangle: the agent's SVG adapts to light and dark with
+CSS, which `NSImage` does not evaluate. Findings row updated.
+
 Still to see before the gate: four more writes with the page open — the tint landing on the
 changed passage, the view moving to it, and the jump back to the first paragraph. The scratch
 app is running against `/tmp/agents-022`; the conversation is open with Files showing
@@ -269,6 +279,15 @@ So the visual half of step 1, and step 2 (a line past the end), are still to be 
 screen, and T022 stays open for that.
 
 ### Slice C walk
+
+*2026-09-24.* Two things wrong, both seen (`walk/C-*.png`). A click on a rendered passage did
+nothing at first: the tap gesture under the page's text selection never fired, as the note
+below feared. The passage became a plain `Button` and the click then opened the editor. The
+editor opened one line high — `TextEditor` in a stack needs `fixedSize` vertically — and the
+keystrokes went into the chat's prompt box, which holds first responder and takes it back when
+focus is asked for in the same pass; the editor now asks a beat later. Neither fix has been
+walked yet: Alex came back to the Mac. The typed sentence is sitting in the scratch app's
+prompt box, unsent.
 
 *2026-09-23.* Code built and 1065 tests pass, including four for `artifact/write`. The
 walk itself (T034: click, type, pause, `cat`) is not done: Alex was at the Mac and my
