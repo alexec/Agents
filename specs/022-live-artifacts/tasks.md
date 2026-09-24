@@ -180,9 +180,9 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 - [ ] T056 [US5] Walk quickstart Slices A–F end to end with a second runtime (whichever of Grok, Copilot or Cursor was not used in T023), and fill the "Runtimes walked" table in `specs/022-live-artifacts/findings.md`.
 - [ ] T057 [P] [US5] Fill the findings rows "The page following whole-file writes (line diff)" and "Marks placed on the right passage" from the Slice A and D walks, with counts (marks right / marks tried).
 - [ ] T058 [P] [US5] Fill "The person's edit surviving an agent write elsewhere" and "The collision card" from the Slice D walk, against SC-004 and SC-005's numbers (fifty alternating edits; every collision).
-- [ ] T059 [P] [US5] Fill "A 'what changed since I wrote' tool, callable mid-turn" from T055: needed, or not, per runtime, and why.
+- [X] T059 [P] [US5] Fill "A 'what changed since I wrote' tool, callable mid-turn" from T055: needed, or not, per runtime, and why.
 - [ ] T060 [P] [US5] Fill "Passage-level editing as the shape of editing" and "The sidebar as the page's home vs a window of its own" from the Slice A and C walks and from what Alex said at the gate.
-- [ ] T061 [P] [US5] Fill "Finer-grained agent edits", "Mermaid written by an agent unasked" and "Inserting an image from the page" — each either observed or "not reached for, in N documents across M runtimes".
+- [X] T061 [P] [US5] Fill "Finer-grained agent edits", "Mermaid written by an agent unasked" and "Inserting an image from the page" — each either observed or "not reached for, in N documents across M runtimes".
 - [ ] T062 [US5] Write "Things that grated" and "What the real feature needs" in `findings.md`: each entry one or two sentences with the walk it came from. Set the file's status line to "walked, <date>".
 - [ ] T063 [US5] Re-read `spec.md`'s SC-001 to SC-008 against the walks and write, at the foot of this file under "Success criteria", which held, which did not, and the number seen for each.
 

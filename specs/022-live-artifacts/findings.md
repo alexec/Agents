@@ -32,11 +32,11 @@ again.
 | A "what changed since I wrote" tool, callable mid-turn | not built | The mid-turn row above is the evidence: with no way to learn of the person's edit inside a turn, Claude overwrote it. Between turns the note suffices. | Needed for the real feature, in one of two shapes: a tool the agent calls before each write, which it will not call unasked (see suggestions and show_file); or the app merging on the way to disk, which needs the write to pass through the app and only Grok's does. The second is the stronger, because it does not depend on the agent remembering. |
 | Passage-level editing as the shape of editing | | | |
 | The sidebar as the page's home vs a window of its own | | | |
-| Finer-grained agent edits (replace section, append) | not built | | |
-| SVG images beside the document, drawn and marked on change | | | |
-| A graph asked for: what the agent drew it as | | | |
-| Mermaid written by an agent unasked (a renderer would be needed) | not built | | |
-| Inserting an image from the page | not built | | |
+| Finer-grained agent edits (replace section, append) | not built | Not reached for. Every runtime wrote the whole file on every step, even Claude, whose edit tool can replace a passage; the mid-turn overwrite is the cost of that. | Not a tool to give the agent — it has one and does not use it for documents. If anything, the fix is on our side of the write (see the mid-turn row). |
+| SVG images beside the document, drawn and marked on change | half measured 2026-09-23 | Asked for a report "with a graph of those five numbers" and nothing about how, Claude wrote `test-counts.svg` beside the document and referenced it as an image; Grok wrote `graph-grok.svg` and did the same (2/2). Both also put the numbers in a table. Whether the picture draws and whether a redraw is marked is not yet seen on screen. | Agents draw SVG unprompted once the description mentions it. The rendering and the mark need the walk. |
+| A graph asked for: what the agent drew it as | measured 2026-09-23 | Claude: an SVG file plus a Markdown table. Grok: an SVG file plus a Markdown table. Neither wrote Mermaid or ASCII. | SVG-as-file is what they reach for; a chart format is not missed. |
+| Mermaid written by an agent unasked (a renderer would be needed) | measured 2026-09-23 | 0/2 (Claude, Grok), with the description saying to write an SVG for a diagram or graph. Not measured without that sentence. | Not needed while the description says SVG. |
+| Inserting an image from the page | not built | Not reached for by anyone; the person cannot, by design. | Out of scope for the PoC; unchanged. |
 
 ## Things that grated
 
