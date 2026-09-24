@@ -35,10 +35,11 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     }
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
-                             finishTurn: { outcome, message, prompts in
+                             finishTurn: { outcome, message, prompts, title in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
-                                                message: message, prompts: prompts),
+                                                message: message, prompts: prompts,
+                                                title: title),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,

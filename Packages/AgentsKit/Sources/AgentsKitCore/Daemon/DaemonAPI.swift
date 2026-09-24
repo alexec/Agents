@@ -496,13 +496,20 @@ public enum DaemonAPI {
         public var outcome: String
         public var message: String
         public var prompts: [SuggestedPrompt]
+        /// What the conversation is about now, in the agent's words. Required by the
+        /// tool, optional here: an agent's MCP helper is started from whatever binary
+        /// was on disk when its session began, so one begun before this field existed
+        /// relays a call without it, and that call still lands — with the title left
+        /// as it was.
+        public var title: String?
 
         public init(token: String, outcome: String, message: String,
-                    prompts: [SuggestedPrompt]) {
+                    prompts: [SuggestedPrompt], title: String? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
+            self.title = title
         }
     }
 

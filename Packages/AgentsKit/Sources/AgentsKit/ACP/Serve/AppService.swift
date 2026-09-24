@@ -63,11 +63,11 @@ public actor AppService {
     /// daemon that has to refuse one it does not.
     public typealias OutcomeSink = @Sendable (String, String) async -> Outcome
 
-    /// Where the one call goes: the outcome's wire spelling, the sentence, and the
-    /// chips, which may be none. One sink rather than the two above in turn, because
-    /// the daemon refuses the whole call or lands the whole call, and two sinks could
-    /// do half of each.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt]) async -> Outcome
+    /// Where the one call goes: the outcome's wire spelling, the sentence, the chips,
+    /// which may be none, and the conversation's new title. One sink rather than the
+    /// two above in turn, because the daemon refuses the whole call or lands the whole
+    /// call, and two sinks could do half of each.
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String) async -> Outcome
 
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
@@ -78,7 +78,7 @@ public actor AppService {
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
-                finishTurn: @escaping FinishSink = { _, _, _ in
+                finishTurn: @escaping FinishSink = { _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
                 sink: @escaping Sink,
@@ -160,8 +160,14 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
+                // The title is checked here too, for the same reason the message is:
+                // an agent that left it out is told so while it can still send it,
+                // rather than the row keeping a name for work it is no longer doing.
+                guard let title = Agent.cleanedTitle(arguments?["title"]?.stringValue ?? "") else {
+                    return .success(Self.reply(Self.noTitle, isError: true))
+                }
                 let prompts = SuggestedPrompt.list(in: arguments?["next_prompts"])
-                return .success(Self.reply(await finishSink(raw, message, prompts)))
+                return .success(Self.reply(await finishSink(raw, message, prompts, title)))
             }
 
             if name.hasSuffix(Self.toolName) {
@@ -233,6 +239,11 @@ public actor AppService {
         is no more use than the turn simply ending.
         """
 
+    static let noTitle = """
+        Nothing was recorded: give the conversation a title — a few words saying what \
+        it is doing now. It is the name the person sees on its row.
+        """
+
     /// A tool result is content plus a flag, and a failure inside the tool is reported
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
     private static func reply(_ text: String, isError: Bool = false) -> JSONValue {
@@ -281,6 +292,12 @@ public actor AppService {
             somebody who has not read the conversation. For needs_answer, the message \
             is the question itself.
 
+            The title is the name on that row: a few words saying what this \
+            conversation is doing now, like "Login redirect fixed" or "Choosing a \
+            test account". Give a fresh one every time, as the work moves on; it \
+            replaces the last one. Keep it short and specific, and do not repeat the \
+            outcome in it.
+
             With it, offer two to four things the person might want to say next, shown \
             as buttons above their prompt. Take them from the work you just did: what \
             you did not do, a check worth running, a decision you had to guess at, the \
@@ -309,6 +326,13 @@ public actor AppService {
                         conversation. For needs_answer, the question itself.
                         """,
                 ],
+                "title": [
+                    "type": "string",
+                    "description": """
+                        A few words naming what this conversation is doing now. \
+                        Replaces the name on its row.
+                        """,
+                ],
                 "next_prompts": [
                     "type": "array",
                     "minItems": .int(0),
@@ -329,7 +353,7 @@ public actor AppService {
                     ],
                 ],
             ],
-            "required": .array(["outcome", "message"]),
+            "required": .array(["outcome", "message", "title"]),
         ],
     ]
 

@@ -558,6 +558,12 @@ public actor DaemonCore {
 
         case .titleChanged(let title):
             guard var agent = agents[agentID] else { return }
+            // The agent's own name for the work wins. Claude's adapter generates a
+            // title when the turn goes idle — after the agent's last tool call — so
+            // without this the name the agent just gave would be replaced a moment
+            // later by one it did not choose. A runtime title still fills in until the
+            // agent has named the conversation itself.
+            guard !agent.titledByAgent else { return }
             agent.title = title
             changed(agent)
 
