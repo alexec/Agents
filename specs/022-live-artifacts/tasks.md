@@ -192,9 +192,9 @@ Run `xcodegen generate` after adding any source file to the app target; the pbxp
 
 ## Phase 10: Polish
 
-- [ ] T064 [P] Run `swift test --package-path Packages/AgentsKit` in a detached worktree at HEAD ([[three-lanes-one-tree]]) and confirm the only failures are the known flakes named in memory.
+- [X] T064 [P] Run `swift test --package-path Packages/AgentsKit` in a detached worktree at HEAD ([[three-lanes-one-tree]]) and confirm the only failures are the known flakes named in memory.
 - [ ] T065 [P] Re-read every doc comment added in `Passage.swift`, `LivePage.swift`, `DaemonCore+Artifacts.swift` and `Briefing.swift` against the house rule that a comment says why, and cite the FR or research section each decision came from.
-- [ ] T066 Update `README.md`'s "A file, shown" bullet: a Markdown file opens as a page that follows the agent's edits and can be typed on, and the person's edits are told to the agent on its next turn. Two sentences, no more.
+- [X] T066 Update `README.md`'s "A file, shown" bullet: a Markdown file opens as a page that follows the agent's edits and can be typed on, and the person's edits are told to the agent on its next turn. Two sentences, no more.
 
 ---
 
