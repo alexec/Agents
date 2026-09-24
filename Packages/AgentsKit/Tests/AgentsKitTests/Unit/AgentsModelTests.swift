@@ -261,6 +261,24 @@ struct AgentsModelTests {
         #expect(model.isComingBack(second) == false)
     }
 
+    /// Stop is offered wherever the daemon has something to stop: a runtime it holds,
+    /// or a pick-up it is about to make. A chat coming back is `stopped` on the record,
+    /// which is why `holdsRuntime` alone left it with no way to say no.
+    @Test func stopIsOfferedForEveryChatTheDaemonHasSomethingToStop() {
+        let model = AgentsModel()
+        let coming = agent(state: .stopped)
+        let others = AgentState.allCases.map { agent(state: $0) }
+        model.replaceAgents(others + [coming])
+        model.setResuming([coming.id])
+
+        for other in others {
+            #expect(model.canStop(other) == other.state.holdsRuntime, "\(other.state)")
+        }
+        #expect(model.canStop(coming), "a chat on its way back can be stopped before it arrives")
+        model.setResuming([])
+        #expect(model.canStop(coming) == false, "and not once it is no longer coming")
+    }
+
     /// The existing "a notification nobody claims is skipped, never guessed at" rule,
     /// asserted over the new one.
     @Test func anOlderClientIgnoresTheResumingNotification() {

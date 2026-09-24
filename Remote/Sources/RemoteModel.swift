@@ -132,6 +132,9 @@ final class RemoteModel {
     /// Whether the Mac is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 
+    /// Whether the menu offers Stop: the same answer the Mac gives.
+    func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 

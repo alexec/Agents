@@ -352,6 +352,13 @@ public final class AgentsModel {
         resuming.contains(agent.id)
     }
 
+    /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
+    /// it, or is about to pick it back up. The window's toolbar, the card's menu and
+    /// the phone's menu all ask this, so no two of them can disagree about it.
+    public func canStop(_ agent: Agent) -> Bool {
+        agent.state.holdsRuntime || isComingBack(agent)
+    }
+
     /// The one thing every client says about a chat on its way back, so the window
     /// and the phone cannot drift apart saying it.
     public static let comingBackDescription = "Coming back after a restart"
