@@ -255,48 +255,88 @@ agent finish, and confirm the workflow chained on its completion fires.
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Create
+- [X] T023 [P] [US3] Create
       `Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkflowRunStoreTests.swift`: `runs`
       round-trips through `WorkflowRecords`; a file written without `runs` reads as no runs
       (the leniency this file already has); a run older than seven days is dropped on load.
-- [ ] T024 [US3] Add to
+- [X] T024 [US3] Add to
       `Packages/AgentsKit/Tests/AgentsKitTests/Integration/WorkflowFiringTests.swift` a
       case that fires a workflow, builds a second core on the same root, finishes the
       agent, and expects the workflow chained on completion to fire (FR-009).
-- [ ] T025 [US3] Add a case asserting depth: a chain restarted part-way down stops at the
+- [X] T025 [US3] Add a case asserting depth: a chain restarted part-way down stops at the
       same ceiling rather than starting again at zero (FR-010). **This is the test that
       catches the ordering bug in T028** — write it before that task, and watch it fail if
       the runs are loaded in `startWorkflows()` instead.
-- [ ] T026 [P] [US3] Add cases for the pruning rules: a run whose agent is archived is
+- [X] T026 [P] [US3] Add cases for the pruning rules: a run whose agent is archived is
       released and fires **nothing** chained on it (FR-012); a run whose workflow file has
       gone is released the same way; a restored run still refuses a second fire of its
       workflow (FR-013); `isRunning` is true on the summary until the run is over (FR-011).
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Add `var runs: [WorkflowRun] = []` to `WorkflowRecords` in
+- [X] T027 [US3] Add `var runs: [WorkflowRun] = []` to `WorkflowRecords` in
       `Packages/AgentsKit/Sources/AgentsKit/Workflows/WorkflowStore.swift`, and persist on
       each of the five places `workflowRuns` is mutated in
       `DaemonCore+Workflows.swift` — claimed at `fire`, again once `agentID` is known, and
       the three removals. `WorkflowRun` is already `Codable` and needs no change.
-- [ ] T028 [US3] Add `loadWorkflowRuns()` to
+- [X] T028 [US3] Add `loadWorkflowRuns()` to
       `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, keyed by
       `folder + workflowID` as in memory, and call it from `Daemon.start()` **before
       `recover()`**. Not in `startWorkflows()`: recovery defers its lifecycle events with
       the depth computed at that moment, so loading later records depth zero for every one
       of them and silently loses the ceiling this story exists to save (research §7,
       contracts/stored-files.md).
-- [ ] T029 [US3] Add `pruneWorkflowRuns()` and call it from `startWorkflows()`, after the
+- [X] T029 [US3] Add `pruneWorkflowRuns()` and call it from `startWorkflows()`, after the
       projects are adopted and the agents are loaded: release any run whose agent is
       missing or archived, whose workflow file has gone, or which is more than seven days
       old — each **without** firing anything chained on its completion, because it did not
       complete.
-- [ ] T030 [US3] Leave `move`'s `.foundDead` early return exactly as it is. It is why a run
+- [X] T030 [US3] Leave `move`'s `.foundDead` early return exactly as it is. It is why a run
       carried across a restart is not released during recovery, and it is already correct
       (research §8). Read it, confirm it, change nothing.
 
-**Checkpoint**: A chain interrupted by a restart completes. `workflows.json` shows `runs`
-while an agent works and empty after.
+**What changed while building** (2026-09-24):
+
+- **`WorkflowRecords` needed a decoder of its own before `runs` could exist.** A
+  synthesized decoder requires every key, and `WorkflowStore.load()` reads a file it cannot
+  decode as empty — so adding the field the obvious way would have read every
+  `workflows.json` already on disk as nothing, and quietly un-archived every workflow the
+  person had put away. It now decodes key by key, `runs` through `Lossy`, so one run a
+  newer build wrote costs that run and not the archive beside it.
+- **`loadWorkflowRuns()` is at the top of `recover()`, not in `Daemon.start()`,** for
+  US1's reason: every test and any embedder calls `recover()`. The ordering research §7
+  warns about is kept — the runs are in memory before anything is moved — though the trap
+  is not reachable today: since every agent recovery finds is picked back up, recovery
+  raises no lifecycle event at all. Kept because the order should not depend on that.
+- **A kept run needs an agent that will carry on, not merely one that exists.** An agent
+  can finish and have its record written, and the daemon go before its run is let go;
+  restored, that run would wait for a finish that already happened and refuse its workflow
+  as "a run is still going" for a week. It is released like the others, without firing:
+  whether its completion should have fired a chain is not something the daemon can now
+  honestly say.
+- **A run is found from its agent two ways.** The run is written the moment its agent is
+  known; the agent's record, which names the run back, a moment later by a queued task.
+  A daemon killed between the two left a run nothing could find — found by the chain test
+  failing 3 in 3 under the full suite. First fix tried: have `fire()` wait for the record
+  write before writing the run. Rejected on evidence: it made "Run now" wait on every
+  queued record write, and took `WorkflowFiringTests` from 1 failure in 8 runs to 7 in 8.
+  What stayed: `runInFlight(for:)` finds the run by the agent's `startedByRun`, and — only
+  when the agent carries none — by the run's `agentID`, which is reachable only after a
+  restart. `aRunWhoseAgentDoesNotNameItBackIsStillFound` pins it.
+- **T030 confirmed, unchanged.** `move` on `.foundDead` does not release a run whose agent
+  is about to be picked back up.
+
+**Checkpoint**: ✅ Reached 2026-09-24. Ten cases across `WorkflowRestartTests` and
+`WorkflowRunStoreTests`; the five restart cases written first were red against the data
+shape alone. Verified in a detached worktree at `5ec63f9` with only US3's files in it —
+the shared tree did not compile at the time, mid-edit by the 027 lane: full suite **5 of 5
+runs green**, against 3 of 5 on the unmodified base (whose two failures were
+`aConnectionBecomesTheDeviceItIdentifiesAs` and `eachNewProcessIsCountedFromNothing`, both
+known-flaky and outside this story); `WorkflowFiringTests` 7 of 8 on both. Against the real
+`agentsd` built from that worktree, on a seeded root: three restored runs — agent finished,
+agent archived, workflow file gone — were each let go with that reason in `daemon.log`, and
+the archived workflow in `states` and `lastTickAt` came through the new decoder untouched.
+The Mac and iOS schemes build.
 
 ---
 

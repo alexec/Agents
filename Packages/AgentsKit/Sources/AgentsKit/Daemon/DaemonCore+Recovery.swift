@@ -26,6 +26,10 @@ extension DaemonCore {
         // conclude that nothing had ever been delivered — which is the whole of what
         // 025 US1 fixes.
         loadAttention()
+        // Before anything is moved, for the same reason and one more: recovery's
+        // lifecycle events carry the depth of the run that caused them, read from here.
+        // See `loadWorkflowRuns`.
+        loadWorkflowRuns()
         await loadFromDisk()
         // `agents` is a Dictionary, whose order is nobody's. Most recently active
         // first, because pick-up is one at a time and the chat the person last left

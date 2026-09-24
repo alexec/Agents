@@ -97,13 +97,19 @@ changes.
    one deeper, and the chain ceiling counts from here rather than from zero.
 3. It is what a second fire of the same workflow collides with, so a workflow that was
    running before the restart is still refused a second run after it.
-4. A run whose agent no longer exists, or is archived, or whose workflow file has been
-   deleted, is released on load. **Nothing chained on its completion fires** — it did not
-   complete, and firing on it would be the app inventing a completion nobody saw.
-5. A run older than seven days is released on load, the same way and for the same reason.
-6. An older build reading this file ignores `runs` and loses nothing it had. A newer one
+4. A run is kept only while its agent will carry on — working, or about to be picked
+   back up. A run whose agent no longer exists, is archived, or has already ended, or
+   whose workflow file has been deleted, is released on load. **Nothing chained on its
+   completion fires** — the daemon did not see it complete, and firing on it would be the
+   app inventing a completion nobody saw.
+5. A run is found from its agent by the agent's `startedByRun`, or — only when the agent
+   carries none, which is the moment between the two writes — by the run's `agentID`.
+6. A run older than seven days is released on load, the same way and for the same reason.
+7. An older build reading this file ignores `runs` and loses nothing it had. A newer one
    writing it and an older one reading it back is the existing leniency of this file; the
-   states and the tick are read as before.
+   states and the tick are read as before. A file written before `runs` existed is read
+   key by key, so it keeps every state it had — a decoder that required the new key would
+   have read it as empty and un-archived every workflow in it.
 
 ### Ordering, which is part of the contract
 

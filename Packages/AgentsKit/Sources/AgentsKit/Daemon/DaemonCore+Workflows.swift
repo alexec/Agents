@@ -19,6 +19,10 @@ extension DaemonCore {
         for project in allProjects(includeArchived: false) where project.exists {
             adoptWorkflows(in: project.folder)
         }
+        // After adoption, because a run is judged against the workflow files, and before
+        // the held events are replayed, so nothing they fire collides with a run that is
+        // already over.
+        pruneWorkflowRuns()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it
@@ -400,12 +404,17 @@ extension DaemonCore {
         // starts a second agent. The check above and this line have no await between
         // them, which on an actor is the whole of the lock.
         workflowRuns[workflow.id] = run
+        // Written the moment it is claimed, not once its agent exists: a daemon that goes
+        // while the runtime is still starting leaves a run the next one can find its
+        // agent for, by `startedByRun`, rather than one it never knew was in flight.
+        persistWorkflowRuns()
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
 
         do {
             let agentID = try await runAgent(for: workflow, run: run)
             run.agentID = agentID
             workflowRuns[workflow.id] = run
+            persistWorkflowRuns()
             record(.ran(agentID: agentID, at: now), for: workflow)
             return nil
         } catch let refused as SettingRefused {
@@ -414,12 +423,14 @@ extension DaemonCore {
             // one word in it sends them looking in the wrong place. This one also
             // collapses on the setting, so a weekend of the same refusal is one row.
             workflowRuns.removeValue(forKey: workflow.id)
+            persistWorkflowRuns()
             let refusal = WorkflowRefusal.settingRefused(setting: refused.setting,
                                                          detail: refused.detail)
             record(.refused(refusal, at: now, repeats: 1), for: workflow)
             return refusal
         } catch {
             workflowRuns.removeValue(forKey: workflow.id)
+            persistWorkflowRuns()
             let message = (error as? JSONRPCError)?.message ?? error.localizedDescription
             record(.refused(.unreadable(message), at: now, repeats: 1), for: workflow)
             return .unreadable(message)
@@ -628,9 +639,26 @@ extension DaemonCore {
     /// a finished agent's depth unfindable — and a depth that silently resets to zero is
     /// a loop the limit never stops.
     func workflowChainDepth(causedBy agentID: UUID) -> Int {
-        guard let runID = agents[agentID]?.startedByRun,
-              let run = workflowRuns.values.first(where: { $0.id == runID }) else { return 0 }
+        guard let (_, run) = runInFlight(for: agentID) else { return 0 }
         return run.depth + 1
+    }
+
+    /// The run in flight that this agent is doing the work of, if any.
+    ///
+    /// By the agent's own `startedByRun` — and, only when the agent carries none, by the
+    /// run's `agentID`. The second is for one window and nothing else (025): the run is
+    /// written the moment its agent is known, and the agent's record, which names the run
+    /// back, a moment later by a queued task. A daemon killed between the two leaves a
+    /// run pointing at an agent that does not point back, and without this that run is
+    /// never found again — it holds its workflow as "a run is still going" for a week,
+    /// and nothing waiting on it ever hears. Never consulted when `startedByRun` is set,
+    /// so an agent reused down a chain cannot be matched to a run that is not its own.
+    func runInFlight(for agentID: UUID) -> (key: String, run: WorkflowRun)? {
+        guard let agent = agents[agentID] else { return nil }
+        if let runID = agent.startedByRun {
+            return workflowRuns.first { $0.value.id == runID }.map { ($0.key, $0.value) }
+        }
+        return workflowRuns.first { $0.value.agentID == agentID }.map { ($0.key, $0.value) }
     }
 
     /// Called from the one funnel every agent state change goes through.
@@ -673,9 +701,9 @@ extension DaemonCore {
 
     /// A run is over. Release the workflow, and let anything chained off it go.
     func workflowRunFinished(agentID: UUID) {
-        guard let agent = agents[agentID], let runID = agent.startedByRun,
-              let (key, run) = workflowRuns.first(where: { $0.value.id == runID }) else { return }
+        guard let (key, run) = runInFlight(for: agentID) else { return }
         workflowRuns.removeValue(forKey: key)
+        persistWorkflowRuns()
         if let workflow = workflow(run.workflowID, in: run.folder) {
             broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
         }
@@ -789,5 +817,93 @@ extension DaemonCore {
                                message: "\(request.workflowID) went while it was being changed.")
         }
         return summary(for: reread)
+    }
+}
+
+// MARK: - Runs that outlive the daemon (025 US3)
+
+extension DaemonCore {
+    /// Read back the runs the last daemon had in flight.
+    ///
+    /// Called from the top of `recover()`, before anything is moved — and that order is
+    /// the one thing here that must not be tidied. Recovery defers each lifecycle event
+    /// it raises **with its depth computed at that moment**, from `workflowRuns`; loaded
+    /// any later, every one of them is recorded at depth zero and the ceiling this exists
+    /// to keep is lost in the act of keeping it. (Today recovery raises no such event —
+    /// every agent it finds is about to be picked back up, and says nothing — but that is
+    /// a fact about 011's rules, and the order should not depend on it staying true.)
+    ///
+    /// Only loaded, not judged. Whether a run can still complete depends on the agents
+    /// and the workflow files, which are not read yet; `pruneWorkflowRuns()` decides that
+    /// once they are.
+    func loadWorkflowRuns() {
+        for run in workflowStore.load().runs {
+            // Keyed as `Workflow.id` is, from a folder standardised the same way. The
+            // record was standardised when it was written, but a file is only text.
+            let folder = Project.standardize(run.folder)
+            workflowRuns[folder.path + "/" + run.workflowID] = run
+        }
+    }
+
+    /// Write the runs in flight, whenever they move.
+    ///
+    /// The whole file is read and written, as every writer of it does, so the states and
+    /// the tick beside the runs go back exactly as they were. Sorted, so a file compared
+    /// by eye — or by `git diff` on somebody's root — does not reorder itself each time.
+    func persistWorkflowRuns() {
+        var records = workflowStore.load()
+        records.runs = workflowRuns.values.sorted {
+            ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString)
+        }
+        workflowStore.save(records)
+    }
+
+    /// Let go of every restored run that cannot complete, and fire nothing for it.
+    ///
+    /// Nothing waiting on one of these is told it finished, because it did not: the app
+    /// would be inventing a completion nobody saw (FR-012). A run is kept only if its
+    /// workflow is still there, it is younger than `WorkflowRecords.runHorizon`, and its
+    /// agent is still going to carry on — working, or about to be picked back up.
+    ///
+    /// That last rule is wider than "the agent still exists", on purpose. An agent can
+    /// finish and have its record written, and the daemon go before the run it belonged
+    /// to is let go; restored, that run would wait for a finish that has already
+    /// happened, and refuse its workflow as "a run is still going" for a week. It is
+    /// released like the others. Whether its completion should have fired a chain is not
+    /// something the daemon can now honestly say, so it says nothing.
+    func pruneWorkflowRuns() {
+        let now = now()
+        var released: [WorkflowRun] = []
+        for (key, run) in workflowRuns {
+            let agentID = run.agentID ?? agents.values.first { $0.startedByRun == run.id }?.id
+            let agent = agentID.flatMap { agents[$0] }
+            let why: String?
+            if now.timeIntervalSince(run.startedAt) >= WorkflowRecords.runHorizon {
+                why = "it was more than a week old"
+            } else if workflow(run.workflowID, in: run.folder) == nil {
+                why = "its workflow is no longer there"
+            } else if let agent {
+                if agent.state == .archived {
+                    why = "its agent was archived"
+                } else if agent.state.holdsRuntime || agent.mayBePickedUpAfterRestart {
+                    why = nil
+                } else {
+                    why = "its agent had already ended"
+                }
+            } else {
+                why = "its agent is gone"
+            }
+            guard let why else { continue }
+            workflowRuns.removeValue(forKey: key)
+            released.append(run)
+            DaemonLog.shared.write("let go of the \(run.workflowID) run from before the restart: \(why)")
+        }
+        guard !released.isEmpty else { return }
+        persistWorkflowRuns()
+        for run in released {
+            if let workflow = workflow(run.workflowID, in: run.folder) {
+                broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
+            }
+        }
     }
 }
