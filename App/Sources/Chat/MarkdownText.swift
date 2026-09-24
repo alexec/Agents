@@ -15,9 +15,25 @@ struct MarkdownText: View {
     /// found. Nil in the conversation, where there is no document to be relative to —
     /// and an image then shows its alternative text rather than being fetched (FR-013).
     var base: URL?
+    /// Somebody's caret, drawn after the last character with their name above it. Only
+    /// a live page passes one, for the passage an agent is typing into; everywhere else
+    /// this is nil and the text is drawn as it always was.
+    var caret: CursorFlag?
 
     var body: some View {
-        blocks(MarkdownBlock.parse(markdown))
+        if caret != nil {
+            content.textRenderer(CaretFlagRenderer())
+        } else {
+            content
+        }
+    }
+
+    private var content: AnyView {
+        let parsed = MarkdownBlock.parse(markdown)
+        // A passage whose first characters have not arrived yet — nothing, or a `#` that
+        // is not a heading until its text follows — is still somewhere the caret is.
+        if parsed.isEmpty, let caret { return AnyView(caret.caret) }
+        return blocks(parsed, caret: caret)
     }
 
     /// Erased on purpose, and this is the only place it is.
@@ -27,33 +43,35 @@ struct MarkdownText: View {
     /// functions define their opaque types in terms of themselves and do not compile.
     /// One concrete type in the cycle breaks it. A document is tens of blocks, not
     /// thousands, so the cost is not worth a cleverer shape.
-    private func blocks(_ blocks: [MarkdownBlock]) -> AnyView {
-        AnyView(stack(blocks))
+    private func blocks(_ blocks: [MarkdownBlock], caret: CursorFlag? = nil) -> AnyView {
+        AnyView(stack(blocks, caret: caret))
     }
 
     @ViewBuilder
-    private func stack(_ blocks: [MarkdownBlock]) -> some View {
+    private func stack(_ blocks: [MarkdownBlock], caret: CursorFlag?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             // Indexed, not keyed by content. Two identical paragraphs are two
             // paragraphs, and a document with two horizontal rules used to hand
             // `ForEach` the same id twice.
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                view(for: block)
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                // The caret is at the end of the text, so it goes to the last block and
+                // down into whatever that block holds last.
+                view(for: block, caret: index == blocks.count - 1 ? caret : nil)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private func view(for block: MarkdownBlock) -> some View {
+    private func view(for block: MarkdownBlock, caret: CursorFlag?) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(text).textSelection(.enabled)
+            self.text(text, caret: caret).textSelection(.enabled)
 
         case .heading(let level, let text):
             // Not a step of the scale: `TextStep.heading` says why, and resolves the
             // ladder once for both apps. The consistency check allows it by name.
-            Text(text)
+            self.text(text, caret: caret)
                 .font(TextStep.heading(level: level))
                 .textSelection(.enabled)
 
@@ -63,7 +81,7 @@ struct MarkdownText: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         marker(ordered: ordered, number: start + index, checked: item.checked)
                         // An item holds blocks, because that is what nesting is.
-                        blocks(item.blocks)
+                        blocks(item.blocks, caret: index == items.count - 1 ? caret : nil)
                     }
                 }
             }
@@ -72,7 +90,7 @@ struct MarkdownText: View {
         case .quote(let inner):
             HStack(alignment: .top, spacing: 10) {
                 Rectangle().frame(width: 2).foregroundStyle(.quaternary)
-                blocks(inner).foregroundStyle(.secondary)
+                blocks(inner, caret: caret).foregroundStyle(.secondary)
             }
             .textSelection(.enabled)
 
@@ -83,7 +101,7 @@ struct MarkdownText: View {
                 }
                 // Code keeps its own shape, so it scrolls rather than wraps.
                 ScrollView(.horizontal, showsIndicators: false) {
-                    Text(text)
+                    self.text(AttributedString(text), caret: caret)
                         .appText(.code)
                         .textSelection(.enabled)
                         .padding(10)
@@ -92,12 +110,12 @@ struct MarkdownText: View {
             }
 
         case .image(let source, let alt):
-            image(source: source, alt: alt)
+            trailed(image(source: source, alt: alt), by: caret)
 
         case .table(let table):
             // Columns keep their width, so a wide table scrolls rather than
             // squeezing its text into a stack of single words.
-            ScrollView(.horizontal, showsIndicators: false) {
+            trailed(ScrollView(.horizontal, showsIndicators: false) {
                 Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 6) {
                     GridRow {
                         ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
@@ -117,10 +135,30 @@ struct MarkdownText: View {
                 }
                 .padding(2)
             }
-            .textSelection(.enabled)
+            .textSelection(.enabled), by: caret)
 
         case .rule:
-            Divider()
+            trailed(Divider(), by: caret)
+        }
+    }
+
+    /// A block's text, with the caret after its last character when there is one.
+    private func text(_ text: AttributedString, caret: CursorFlag?) -> Text {
+        guard let caret else { return Text(text) }
+        return Text("\(Text(text))\(caret.caret)")
+    }
+
+    /// A block that is not text — a picture, a table, a rule — with the caret on the
+    /// line after it, which is where the next character typed would go.
+    @ViewBuilder
+    private func trailed<Content: View>(_ content: Content, by caret: CursorFlag?) -> some View {
+        if let caret {
+            VStack(alignment: .leading, spacing: 4) {
+                content
+                caret.caret
+            }
+        } else {
+            content
         }
     }
 

@@ -62,6 +62,8 @@ struct ConsistencyTests {
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
         (file: "Remote/Sources/Chat/EntryView.swift", contains: ".foregroundStyle(Color.accentColor)",
          why: "a button that opens a diff, drawn as the system draws controls (FR-006b)"),
+        (file: "App/Sources/Sidebar/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
+         why: "the person's caret flag on a live page, in the colour the system draws their own insertion point"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {
