@@ -349,38 +349,68 @@ conversation carries the line, after the question and before the ending.
 
 ### Tests for User Story 4
 
-- [ ] T031 [US4] Create
+- [X] T031 [US4] Create
       `Packages/AgentsKit/Tests/AgentsKitTests/Integration/UnansweredQuestionTests.swift`
       with three cases — the runtime exits, the person stops the agent, the daemon restarts
       — each expecting a `runtimeNote` with the closing wording, positioned after the
       `permissionAsked` entry and before the `stateChanged` one (FR-014, FR-015).
-- [ ] T032 [P] [US4] Add a case for a form rather than a permission, covering all three
+- [X] T032 [P] [US4] Add a case for a form rather than a permission, covering all three
       endings (scenario 4).
-- [ ] T033 [P] [US4] Add the negative cases: a question that was answered, declined,
+- [X] T033 [P] [US4] Add the negative cases: a question that was answered, declined,
       cancelled, or withdrawn by the runtime gets **no** extra line (FR-016). Four
       assertions, because four paths already close themselves.
-- [ ] T034 [P] [US4] Add a case asserting the line is still drawn after the ending line
+- [X] T034 [P] [US4] Add a case asserting the line is still drawn after the ending line
       follows it — that it has not been treated as a passing note.
 
 ### Implementation for User Story 4
 
-- [ ] T035 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, in the
+- [X] T035 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift`, in the
       `.processExited` arm that clears `pendingPermissions` and `elicitations`, record the
       line once per question before `move(agentID, on: .processDied)`.
-- [ ] T036 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`,
+- [X] T036 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`,
       in `stop`'s two loops over the pending dictionaries, record the line once per
       question before the agent is moved.
-- [ ] T037 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Recovery.swift`,
+- [X] T037 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Recovery.swift`,
       in `recover()`, record the line for an agent whose state was `waitingOnUser` —
       before the `stoppedWithDaemon` note and before `move(id, on: .foundDead)`. The
       pending dictionaries are empty by then; the state is how the daemon knows, and
       position in the transcript is how the reader knows which question (research §9).
-- [ ] T038 [P] [US4] Check `Remote/Sources/Chat/EntryView.swift` and
+- [X] T038 [P] [US4] Check `Remote/Sources/Chat/EntryView.swift` and
       `App/Sources/Chat/Transcript.swift` draw the line as an ordinary runtime note. Both
       already have a `.runtimeNote` arm, so this is a confirmation, not a change.
 
-**Checkpoint**: `grep "Nobody answered" transcript.jsonl` finds it after all three endings,
-and the conversation reads in order.
+**What changed while building** (2026-09-24):
+
+- **A second way a runtime dies, which closed nothing — found by this story's tests.**
+  When a turn fails before the process-exit event is heard, `turnFailed` records "Claude
+  stopped answering.", marks the agent stopped and releases the runtime; the exit arm's
+  loop over the pending questions never runs. The runtime's permission or form was left in
+  `pendingPermissions` / `elicitations` — a need with nothing behind it, still asking on
+  the Mac and the phone. That predates 025. Both routes now go through one
+  `closeQuestionsOfAGoneRuntime(_:)` in `DaemonCore+Commands.swift`, which takes each
+  question off the list, writes the line, and tells the windows; the exit arm is one call.
+- **`stop()` takes each question off the list before anything is awaited**, then writes the
+  line, then refuses it to the runtime. Otherwise an answer arriving in the same moment
+  could close one question twice — "You chose Allow" and "Nobody answered" both.
+- **After a restart the line rests on the record's state**, and a daemon killed between a
+  question reaching the transcript and the record saying `waitingOnUser` leaves no line.
+  Accepted: reading the transcript's tail instead would put a misplaced line after a
+  question some older build never closed. The restart test waits for the record on disk,
+  which is what "the daemon went while it waited" means.
+- **T038 confirmed, unchanged.** Both apps draw `.runtimeNote` plainly, and nothing filters
+  notes by wording except `RuntimeNote.isPassing`, which this line is not in.
+
+**Checkpoint**: ✅ Reached 2026-09-24. `UnansweredQuestionTests`, 12 cases: each of the
+three endings for a permission and for a form — all six red before the implementation —
+the five ways a question closes itself, which get no line, and the line still being drawn
+once its ending follows it. Each ending also asserts nothing of the agent is still pending.
+Verified in a detached worktree at `a6c3b5e` with only US4's changes, the shared tree being
+mid-edit by the 027 lane: full suite 4 of 6 runs green against 6 of 6 on the base in the
+same batch, both failures `eachNewProcessIsCountedFromNothing` — a test that raises no
+question, whose path US4 does not change, which failed twice in five base runs earlier the
+same day and not once in eight isolated runs after. Against the real `agentsd` on a seeded
+root, an agent left waiting on a question got, in order: the line, the daemon-stopped note,
+the ending.
 
 ---
 

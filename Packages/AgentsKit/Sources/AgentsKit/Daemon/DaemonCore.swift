@@ -666,20 +666,7 @@ public actor DaemonCore {
             reconsider()
 
         case .processExited:
-            for (id, pending) in pendingPermissions where pending.agentID == agentID {
-                pendingPermissions.removeValue(forKey: id)
-                broadcast(DaemonAPI.Notification.agentPermission,
-                          DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
-            }
-            // A form dies with the runtime that asked it, the same as a permission
-            // does. Kept, it would go on asking on the Mac and the phone for an agent
-            // that can no longer hear the answer, and refuse its next outcome report
-            // over a question it cannot see.
-            for (id, pending) in elicitations where pending.agentID == agentID {
-                elicitations.removeValue(forKey: id)
-                broadcast(DaemonAPI.Notification.agentElicitation,
-                          DaemonAPI.ElicitationNotification(agentID: agentID, requestID: id, request: nil))
-            }
+            await closeQuestionsOfAGoneRuntime(agentID)
             if agents[agentID]?.state.holdsRuntime == true {
                 await move(agentID, on: .processDied)
             }

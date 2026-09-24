@@ -44,6 +44,14 @@ extension DaemonCore {
         var recovered: [UUID] = []
         for agent in wereWorking {
             let id = agent.id
+            // A question the agent was holding open died with the last daemon. The
+            // question itself cannot be named — the pending ones went with the process —
+            // but the state says one was open, since a question is the only thing that
+            // puts an agent in `waitingOnUser`. The line follows the question in the
+            // transcript, and position says which (025 US4).
+            if agent.state == .waitingOnUser {
+                await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: id)
+            }
             // Before the move, so the transcript reads in the order it happened: the
             // explanation, and then the ending it explains.
             await record(.runtimeNote(RuntimeNote.stoppedWithDaemon), for: id)
