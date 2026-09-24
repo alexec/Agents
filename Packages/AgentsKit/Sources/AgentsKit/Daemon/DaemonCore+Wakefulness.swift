@@ -97,6 +97,27 @@ extension DaemonCore {
         }
     }
 
+    /// Let the Mac go, whatever the agents' records still say.
+    ///
+    /// Called from `shutDown()` and nowhere else. **Deliberately not
+    /// `reviseWakefulness()`**, and the difference is the whole point of it existing:
+    /// `shutDown` leaves an agent that was mid-turn reading `running` on disk on
+    /// purpose, so the next daemon finds it and records it as `foundDead` rather than
+    /// pretending it finished. Revising here would see work in flight, decide to keep
+    /// holding, and hold right up until the process died.
+    ///
+    /// The kernel would take the assertion away a moment later anyway — that is
+    /// verified, and it is why no cleanup path exists for the *unclean* case (FR-013).
+    /// This is the belt to that braces: on the path where we are going knowingly, we
+    /// say so ourselves, so `pmset` tells the truth for the seconds a shutdown takes
+    /// rather than naming a process that is on its way out (US2-5).
+    func letGoOfTheMac() {
+        guard lastWakeVerdict?.isHolding == true else { return }
+        wakefulness.release()
+        lastWakeVerdict = nil
+        DaemonLog.shared.write("letting the Mac sleep: the daemon is going")
+    }
+
     /// What `pmset -g assertions` will show, verbatim.
     ///
     /// Not a log line: this string is carried into the system's own assertion list, so

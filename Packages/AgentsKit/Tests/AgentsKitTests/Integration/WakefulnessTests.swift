@@ -249,4 +249,235 @@ struct WakefulnessTests {
             #expect(await core.agentsInFlight == (expected ? 1 : 0))
         }
     }
+
+    // MARK: US3 — the battery floor
+    //
+    // The whole truth table lives in `WakeVerdictTests` with no daemon in sight. What
+    // these add is the half a pure function cannot cover: that the 15-second tick is
+    // wired to notice the machine moving under a turn that is still running, and that
+    // a laptop is let go of rather than held to empty (FR-010, FR-011).
+
+    @Test("Crossing the floor mid-turn gives the Mac back, though the turn runs on")
+    func crossingTheFloorReleasesMidTurn() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(Wake.batteryFloorPercent + 40)
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)),
+                            locations: locations, power: power, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("held while the charge is comfortable") { wake.isHolding }
+
+        // The sofa case: unplugged, and the battery runs down under a turn that has not
+        // finished. Nothing about the *agent* changes, so `changed(_:)` will not notice
+        // — only the tick reads the power.
+        power.onBattery(Wake.batteryFloorPercent - 1)
+        // Still held: the machine moved but nothing has looked yet. This line is what
+        // makes the next one mean something — without it the test would pass just as
+        // happily if the hold had been dropped for some entirely different reason.
+        #expect(wake.isHolding)
+
+        await core.tickWorkflows(now: Date())
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+        // And the turn really is still going. The point of FR-010 is that the work is
+        // abandoned to the Mac's own idle timer rather than the battery being spent to
+        // the end — not that the work stopped.
+        #expect(await core.agent(id)?.state == .running)
+
+        try await core.stop(id)
+    }
+
+    @Test("At the floor exactly is already too low")
+    func atTheFloorReleases() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(Wake.batteryFloorPercent + 1)
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)),
+                            locations: locations, power: power, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("held one percent above the floor") { wake.isHolding }
+
+        // FR-010 says "reaches or falls below", so the floor itself is too low. `>` and
+        // `>=` both read plausibly in the source and only one matches the requirement.
+        power.onBattery(Wake.batteryFloorPercent)
+        await core.tickWorkflows(now: Date())
+        #expect(!wake.isHolding)
+
+        try await core.stop(id)
+    }
+
+    @Test("Plugging back in takes the hold up again, without waiting for the next turn")
+    func plugginqBackInReHolds() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(Wake.batteryFloorPercent - 5)
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)),
+                            locations: locations, power: power, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the turn is running") { await core.agent(id)?.state == .running }
+        // Started below the floor, so it was never held at all.
+        #expect(!wake.isHolding)
+        #expect(wake.holds == 0)
+
+        // Plugged in, with the same turn still going. FR-011: the hold comes back on
+        // the tick, not on the next agent to do something.
+        power.onMains(Wake.batteryFloorPercent - 5)
+        // Not yet: plugging in is invisible until something reads the power, and the
+        // agent has not moved. If this were already holding, the tick below would be
+        // proving nothing.
+        #expect(!wake.isHolding)
+
+        await core.tickWorkflows(now: Date())
+
+        #expect(wake.isHolding)
+        #expect(wake.holds == 1)
+        #expect(await core.agent(id)?.state == .running)
+
+        try await core.stop(id)
+    }
+
+    @Test("On mains the charge is not our business, even at 5%")
+    func mainsHoldsAtAnyCharge() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onMains(5)
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power, wakefulness: wake)
+
+        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        // FR-009. A charge below the floor means nothing while the wall is supplying it.
+        await eventually("held on mains at 5%") { wake.isHolding }
+    }
+
+    @Test("A Mac with no battery is held whatever the tick says")
+    func desktopHolds() async throws {
+        let (locations, work) = try temporary()
+        // A desktop: no battery at all, which is not the same fact as a flat one.
+        let power = FakePowerSource(.init(batteryPercent: nil, isOnMains: true))
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)),
+                            locations: locations, power: power, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("held on a machine with no battery") { wake.isHolding }
+
+        // FR-012: ticking must not talk a desktop out of it. If `batteryPercent` were a
+        // non-optional 0 this would read as flat and release here.
+        await core.tickWorkflows(now: Date())
+        #expect(wake.isHolding)
+        #expect(wake.releases == 0)
+
+        try await core.stop(id)
+    }
+
+    @Test("The tick is a backstop, never the thing that ends a hold when a turn ends")
+    func theTickIsOnlyABackstop() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource.mains
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+
+        // T033, as an assertion rather than a reading. The release must already have
+        // happened, from `changed(_:)`, without any tick at all — if this needs a tick
+        // then FR-004's five seconds is being met by a fifteen-second timer, which is
+        // to say not met.
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+    }
+
+    // MARK: US2 — the endings that were left, and the daemon going
+
+    @Test("A runtime process dying gives the Mac back")
+    func aDeadProcessReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        // Through the transition table, which is the real path a death takes — not a
+        // record written by hand. `move` calls `changed(_:)`, which is where the
+        // wakefulness hook lives, so this exercises the wiring and not a stand-in.
+        await core.move(id, on: .processDied)
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+        #expect(await core.agent(id)?.endedReason == .processDied)
+    }
+
+    @Test("An agent found dead by a restarting daemon gives the Mac back")
+    func foundDeadReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        await core.move(id, on: .foundDead)
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+        #expect(await core.agent(id)?.endedReason == .daemonGone)
+    }
+
+    @Test("Shutting down cleanly gives the Mac back, though the record still says running")
+    func shuttingDownReleases() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+
+        await core.shutDown()
+
+        #expect(!wake.isHolding)
+        #expect(wake.releases == 1)
+
+        // And this is why `shutDown` must not simply revise: it leaves the agent
+        // reading `running` on purpose, so the next daemon finds it and records it as
+        // `foundDead` rather than pretending it finished. A revise here would have seen
+        // work in flight and kept holding until the process died (US2-5).
+        // Deliberately **not** asserting the agent's state here, though the first
+        // draft did. `shutDown` cancels the turn task, and whether that cancellation
+        // lands before `shutDown` returns is a race: alone the agent reads `running`,
+        // under the full parallel suite it sometimes already reads `stopped`.
+        //
+        // That race is the very reason `shutDown` calls `letGoOfTheMac` rather than
+        // `reviseWakefulness` — a revise would give a different answer depending on
+        // which side of the race it landed, and on the `running` side it would keep
+        // holding until the process died. Letting go unconditionally is right on both
+        // sides, and this test passes on both sides, which is the point (US2-5).
+    }
+
+    @Test("Shutting down with nothing held says nothing and does nothing")
+    func shuttingDownIdleIsQuiet() async throws {
+        let (locations, _) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+
+        await core.shutDown()
+
+        // No release for a hold that was never taken. `letGoOfTheMac` guards on the
+        // last verdict for this: every daemon exit would otherwise log a line about
+        // letting the Mac sleep when it had never been holding it.
+        #expect(wake.releases == 0)
+        #expect(wake.holds == 0)
+    }
 }

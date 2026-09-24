@@ -205,31 +205,31 @@ Mac alone, and confirm it sleeps on schedule from the moment the turn ended.
 **Note**: This is the same `reviseWakefulness()` Phase 3 built — no new production code
 beyond T026. The tasks are tests, because release is where this feature fails silently.
 
-- [ ] T023 [P] [US2] Add to `WakefulnessTests.swift`: a turn that ends normally releases the
+- [X] T023 [P] [US2] Add to `WakefulnessTests.swift`: a turn that ends normally releases the
       hold, and the release happens in the same call that records the ending rather than on a
       timer (FR-004's five seconds is met by construction).
 
-- [ ] T024 [P] [US2] Add the test that matters most: an agent taken to `waitingOnUser` —
+- [X] T024 [P] [US2] Add the test that matters most: an agent taken to `waitingOnUser` —
       blocked on a permission question — **never causes a hold**, and releases one it was
       holding (FR-003, US2-2). `isHoldingAgents` answers the opposite way for this same agent,
       which is exactly why this test exists.
 
-- [ ] T025 [P] [US2] Add tests for the three remaining endings, each releasing the hold:
+- [X] T025 [P] [US2] Add tests for the three remaining endings, each releasing the hold:
       stopped by hand mid-turn (US2-3), the runtime process dying (US2-4), and an agent found
       dead by a restarting daemon.
 
-- [ ] T026 [US2] Add a `reviseWakefulness()` call — or confirm one is already reached — on the
+- [X] T026 [US2] Add a `reviseWakefulness()` call — or confirm one is already reached — on the
       path where the daemon shuts down cleanly in `Daemon.shutDown()`, so the assertion is
       let go before the process goes rather than relying on the kernel (US2-5). Belt and
       braces; T027 is the braces.
 
-- [ ] T027 [US2] Add a comment in `Wakefulness.swift` recording that **no cleanup path, no
+- [X] T027 [US2] Add a comment in `Wakefulness.swift` recording that **no cleanup path, no
       persistence and no start-up sweep** is to be written for a hold left by a dead daemon:
       the kernel drops it, verified with `kill -9` in research §2. This comment is the task —
       the instinct to write that recovery code is strong and every line of it would be a
       liability (FR-013).
 
-- [ ] T028 [US2] Add a comment at `DaemonCore+Lifetime.swift:8` on `isHoldingAgents` pointing
+- [X] T028 [US2] Add a comment at `DaemonCore+Lifetime.swift:8` on `isHoldingAgents` pointing
       at `hasWorkInFlight` and saying the two are deliberately different sets. The pair now
       exists in both directions (T014 is the other half), so neither can be "fixed" into the
       other by someone who finds only one.
@@ -252,26 +252,26 @@ power source moves.
 **Independent Test**: On battery below the floor, start an agent and confirm the Mac is
 allowed to sleep. Plug in and confirm a turn in flight holds it again.
 
-- [ ] T029 [US3] Call `reviseWakefulness()` from `tickWorkflows(now:)` in
+- [X] T029 [US3] Call `reviseWakefulness()` from `tickWorkflows(now:)` in
       `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Workflows.swift`, which already
       runs every 15 seconds (`workflowTickInterval`, `:273`) and already carries a second job
       of this exact shape — it notices the local day rolling over without a timer of its own.
       **No new timer.** Research §4 records why the `notify(3)` route was rejected.
 
-- [ ] T030 [P] [US3] Add to `WakefulnessTests.swift`: with a turn in flight and
+- [X] T030 [P] [US3] Add to `WakefulnessTests.swift`: with a turn in flight and
       `FakePowerSource` on battery above the floor, the hold is taken; move the fake below the
       floor, tick, and the hold is released **even though the turn is still running**
       (US3-3, FR-010).
 
-- [ ] T031 [P] [US3] Add the reverse: below the floor with a turn in flight, then back on
+- [X] T031 [P] [US3] Add the reverse: below the floor with a turn in flight, then back on
       mains, then tick — the hold is taken up again **without waiting for the next turn**
       (US3-4, FR-011).
 
-- [ ] T032 [P] [US3] Add: on mains at 5% battery, the hold is taken (US3-1, FR-009); and with
+- [X] T032 [P] [US3] Add: on mains at 5% battery, the hold is taken (US3-1, FR-009); and with
       `batteryPercent` nil — a desktop — the hold is taken with no battery rule applying
       (US3-5, FR-012).
 
-- [ ] T033 [US3] Confirm by reading that the 15-second tick is only ever a **backstop** for
+- [X] T033 [US3] Confirm by reading that the 15-second tick is only ever a **backstop** for
       agent-side causes: the release on a turn ending comes from T017's `changed(_:)` call and
       is immediate. If a test has to wait 15 seconds for an agent-side change, T017 is wired
       wrong.
@@ -636,3 +636,62 @@ no-cleanup comment, and the `isHoldingAgents` back-reference).
   identically.** Pre-existing, not 024's.
 - `xcodegen generate` is **not** needed for AgentsKit sources — the package picks files up by
   directory and the pbxproj does not list them. T002's concern applies only to `App/`.
+
+
+### Phase 5 built, 2026-09-24
+
+T029–T033 done. 14 tests in `WakefulnessTests`, 1161 in the package; three of four full
+runs clean, the fourth only the known pre-existing flakes
+(`aStoppedAgentIsPickedUpRatherThanCopied`, `andNotAgainOnEveryPromptAfterThat`). Both
+schemes build.
+
+**T029's call goes at the very top of `tickWorkflows(now:)`, above the
+`guard let since, since < now else { return }`.** That guard returns on the first tick
+after starting and whenever the clock has not moved, and neither has anything to do with
+the battery — below it, a Mac unplugged in the first fifteen seconds stays held until the
+tick after. The obvious placement, next to the day-rollover block, would have been wrong in
+a way no test written from the task text would have caught.
+
+**The battery tests assert the state *before* the tick as well as after.** Held, then
+unplugged, then *still held*, then ticked, then released. Without that middle assertion the
+test would pass just as happily if the hold had been dropped for an unrelated reason, and
+would not actually be guarding the wiring T029 adds. Same shape in reverse for plugging in.
+
+T033 is an assertion rather than a reading: `theTickIsOnlyABackstop` proves the release on a
+turn ending has already happened with no tick at all. If that ever needs a tick, FR-004's
+five seconds is being met by a fifteen-second timer, which is to say not met.
+
+Still open: Phase 4's T026–T028, Phase 6 (the UI), Phase 7. **T050, the battery walk on a
+real laptop below 20%, remains Alex's** — `FakePowerSource` covers the truth table and the
+tick wiring; only hardware covers the real IOKit reading.
+
+
+### Phase 4 finished, 2026-09-24
+
+T023–T028 done; Phase 4 is complete. 18 tests in `WakefulnessTests`, 1165 in the package.
+Both schemes build.
+
+**T026's task text suggested the wrong implementation, and the code says so.** It asked for
+a `reviseWakefulness()` call in `shutDown()`. That would have been a bug: `shutDown`
+deliberately leaves an agent that was mid-turn reading `running` on disk, so the next daemon
+finds it and records it as `foundDead` rather than pretending it finished. A revise there
+sees work in flight, decides to keep holding, and holds until the process dies. So
+`letGoOfTheMac()` releases unconditionally instead, guarded on the last verdict so an idle
+daemon exiting does not log a line about letting go of something it never held.
+
+**The shutdown test asserts less than its first draft did.** It originally checked the agent
+still read `running` afterwards — true in isolation, false about a third of the time under
+the full parallel suite, because `shutDown` cancels the turn task and whether that
+cancellation lands before `shutDown` returns is a race. That race is *why* unconditional
+release is right: a revise would answer differently depending on which side it landed on.
+The test asserts the thing that is invariant.
+
+**T027 was already satisfied** by the comment written during Phase 3.
+
+**A flakiness scare, measured and dismissed.** A first sample showed 3 of 4 branch runs
+failing against 1 of 6 on main, which looked like a regression. Re-running the branch six
+times under the same conditions gave 1 of 6, the same rate as main, and the only failure was
+the known `aStoppedAgentIsPickedUpRatherThanCopied`. The earlier sample was machine load from
+other lanes. Samples taken minutes apart on this Mac are not comparable — see the memory note.
+
+Still open: Phase 6 (the UI), Phase 7. **T050, the battery walk on a real laptop, is Alex's.**
