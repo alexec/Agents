@@ -62,8 +62,53 @@ struct UnreportedEndingTests {
         #expect(try await asks(core, id) == 1)
         // Visibly the app's, and never attributed to the person.
         let asked = try await prompts(core, id).first { $0.1 == .app }
-        #expect(asked?.0.contains(AppTool.reportOutcome) == true)
+        #expect(asked?.0.contains(AppTool.finishTurn) == true)
         #expect(await core.agent(id)?.outcomeAsked == true)
+    }
+
+    /// The ask names `finish_turn`; an agent answers it by that name or, if it was
+    /// briefed before 023, by `report_outcome`. The older name is
+    /// `anAnsweredQuestionLeavesNothingMarkingItAsHavingBeenAsked` above; this is the
+    /// new one, and the ending is accounted for either way (FR-018).
+    @Test func anAnswerByEitherNameAccountsForTheEnding() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(300)
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
+        let token = await eventuallySome("the asked turn has a token of its own") {
+            guard await core.agent(id)?.state == .running else { return nil }
+            return await core.appTokens.first { $0.value == id }?.key
+        } ?? ""
+        _ = try await core.finishTurn(.init(token: token, outcome: "done",
+                                            message: "Renamed 14 call sites.",
+                                            prompts: [.init(label: "Push", prompt: "Push it")]))
+        try await settle(core, id)
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.report?.outcome == .done)
+        #expect(agent.suggestedPrompts.map(\.label) == ["Push"])
+        #expect(agent.endingIsUnaccountedFor == false)
+        #expect(try await asks(core, id) == 1)
+    }
+
+    /// The ask names the one tool a fresh conversation was told about, and neither of
+    /// the older names — an agent briefed with those answers by them all the same,
+    /// because the aliases are accepted everywhere (023, FR-018).
+    @Test func theQuestionNamesTheOneTool() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(FakeLauncher(), locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+
+        await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
+        try await settle(core, id)
+        let asked = try #require(try await prompts(core, id).first { $0.1 == .app }?.0)
+        #expect(asked.contains(AppTool.finishTurn))
+        #expect(!asked.contains(AppTool.reportOutcome))
+        #expect(!asked.contains(AppTool.suggestPrompts))
     }
 
     /// SC-009, counted. The turn the question causes comes back through the same

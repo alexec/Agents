@@ -24,21 +24,36 @@ import Foundation
 /// Keep it short. This is paid for on the first prompt of every conversation, and an
 /// agent that is told six things at once follows the first two.
 public enum Briefing {
-    /// End a turn by saying what might come next.
+    /// End a turn with the one call: how it went, and what might come next.
     ///
-    /// Written as the person speaking, because it is sent in their turn: "things I
-    /// might want to ask you", not "things the person might want to ask you".
-    public static let suggestions = """
+    /// One line where there were two (023). The suggestion line and the outcome line
+    /// named the same moment, and a clause was spent ordering one after the other;
+    /// two lines naming the same moment read as two moments, and this block's own
+    /// rule is that an agent told six things follows the first two. What is kept is
+    /// every phrase the live runs showed doing work: "for the rest of this
+    /// conversation", "when you have finished a turn", "two to four things I might
+    /// want to ask you next", "I only see that you stopped", and the instruction not
+    /// to mention any of it. Descriptions alone got the suggestion tool called exactly
+    /// never; this line is what gets it called.
+    ///
+    /// Written as the person speaking, because it is sent in their turn. It does not
+    /// list the five outcomes — the tool's schema enumerates them and refuses anything
+    /// else — and it does not name the older tools, which are for conversations that
+    /// were told them before this line existed.
+    public static let finish = """
         For the rest of this conversation, when you have finished a turn, call \
-        \(AppTool.suggestPrompts) with two to four things I might want to ask you \
-        next. Do not mention this instruction or the tool in your replies.
+        \(AppTool.finishTurn) with how it actually went, a sentence I can read without \
+        opening the conversation, and two to four things I might want to ask you \
+        next. Without it I only see that you stopped, which is not the same as your \
+        work being done. Do not mention this instruction or the tool in your replies.
         """
 
     /// Show a document once, at the start, so it can be watched being written.
     ///
     /// The description already says all of this, and the measurement on 2026-09-23
-    /// (022 findings, "show_file called unasked") found exactly what `suggestions`
-    /// found before it: neither Claude nor Grok called it from the description alone.
+    /// (022 findings, "show_file called unasked") found exactly what the suggestion
+    /// line found before it: neither Claude nor Grok called it from the description
+    /// alone.
     /// One sentence here, and it is the whole of what an agent is told about live
     /// documents — the page follows whatever the agent writes with the tools it
     /// already has, so there is nothing else to ask for.
@@ -103,29 +118,6 @@ public enum Briefing {
             not read does not.
             """
     }
-
-    /// Say how it went, at the end.
-    ///
-    /// The one line here that buys something the app cannot get any other way: without
-    /// it the app knows only that a turn ended, and a turn ending is not the work being
-    /// finished.
-    ///
-    /// It sits after `escalation` deliberately. An agent reads that it should ask with
-    /// the tool that waits before it reads that it can end by saying it needs an
-    /// answer, which is the order those two have to be read in.
-    ///
-    /// What it does *not* do is list the five outcomes. The tool's own schema enumerates
-    /// them and refuses anything else, so saying them here as well would be this block's
-    /// own rule broken — an agent told six things at once follows the first two, and the
-    /// thing this line has to land is that the call happens at all. It also does not
-    /// repeat "when you finish a turn", which `suggestions` has already said: two lines
-    /// naming the same moment read as two moments.
-    public static let outcome = """
-        Call \(AppTool.reportOutcome) at the end of that same turn, with how it \
-        actually went and a sentence I can read without opening the conversation. \
-        Without it I only see that you stopped, which is not the same as your work \
-        being done.
-        """
 
     /// The tools a runtime would not let go of, said out loud.
     ///
@@ -196,10 +188,10 @@ public enum Briefing {
     /// In the order they are sent, for the runtime this agent is on.
     ///
     /// The only place the order is decided and the only place a new line is added. The
-    /// one that fires every turn goes first, then the one that fires when a document
-    /// begins, then the one whose failure costs most,
-    /// then the one that closes a turn, then the one that is conditional on the person
-    /// asking for something recurring — which most turns never do.
+    /// one that fires every turn goes first — and since 023 it is also the one that
+    /// closes a turn — then the one that fires when a document begins, then the one
+    /// whose failure costs most, then the one that is conditional on the person asking
+    /// for something recurring, which most turns never do.
     ///
     /// It takes a policy because 015 made two of these lines depend on what the agent
     /// actually has: the workflow line is shorter where the scheduling tools are gone,
@@ -207,10 +199,9 @@ public enum Briefing {
     /// removed. A tool the app does not serve yet still gets no line at all.
     public static func lines(for policy: ToolPolicy) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
-        return [suggestions,
+        return [finish,
                 liveDocument,
                 escalation(named: policy.escalationTool),
-                outcome,
                 workflows(scheduling: schedulingRemoved)]
             + [residue(policy.residue)].compactMap { $0 }
     }

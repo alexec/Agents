@@ -12,7 +12,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     let token = CommandLine.arguments[2]
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
-    // Both tools do the same thing with what they are given: hand it to the daemon
+    // Every tool does the same thing with what it is given: hand it to the daemon
     // and repeat what the daemon says back to the agent. Nothing is decided here.
     @Sendable func relay(_ method: String, _ request: some Encodable & Sendable,
                          fallback: String) async -> AppService.Outcome {
@@ -34,7 +34,13 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
         }
     }
 
-    let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1)) { prompts in
+    let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
+                             finishTurn: { outcome, message, prompts in
+        await relay(DaemonAPI.Method.agentsFinishTurn,
+                    DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
+                                                message: message, prompts: prompts),
+                    fallback: "Noted.")
+    }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
                     DaemonAPI.SuggestPromptsRequest(token: token, prompts: prompts),
                     fallback: "Shown above the prompt.")

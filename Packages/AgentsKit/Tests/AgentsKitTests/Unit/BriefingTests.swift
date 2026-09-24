@@ -22,10 +22,32 @@ struct BriefingTests {
     /// Named, not described. An agent told "use the workflow tool" has to guess at what
     /// it is called; an agent told the name can call it.
     @Test func theToolsItNamesAreNamedExactly() {
-        #expect(Briefing.suggestions.contains(AppTool.suggestPrompts))
+        #expect(Briefing.finish.contains(AppTool.finishTurn))
         #expect(Briefing.liveDocument.contains(AppTool.showFile))
         #expect(Briefing.workflows(scheduling: false).contains(AppTool.manageWorkflows))
         #expect(Briefing.workflows(scheduling: true).contains(AppTool.manageWorkflows))
+    }
+
+    /// The older names are for conversations that were told them; a fresh one is told
+    /// the one tool and nothing older (023 FR-016).
+    @Test func theFinishLineNamesNeitherOldName() {
+        #expect(!Briefing.finish.contains(AppTool.suggestPrompts))
+        #expect(!Briefing.finish.contains(AppTool.reportOutcome))
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(!Briefing.text(for: policy).contains(AppTool.suggestPrompts))
+            #expect(!Briefing.text(for: policy).contains(AppTool.reportOutcome))
+        }
+    }
+
+    /// The file's own rule: the line that fires every turn goes first. 014 put the
+    /// outcome line after `escalation` so an agent read "ask with the tool that waits"
+    /// before "you may end by saying you need an answer"; the merged line does not
+    /// mention `needs_answer` at all, and the tool's description carries that order
+    /// now, at the moment it matters (023 Research R6).
+    @Test func theFinishLineGoesFirst() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.lines(for: policy).first == Briefing.finish)
+        }
     }
 
     /// The escalation line asks for the act first, whatever the runtime, because the act
@@ -89,12 +111,14 @@ struct BriefingTests {
     /// Held against the longest of the four in 015, which is the runtime with the most
     /// residue. That feature pushes the other way: where a tool is actually gone the
     /// words about it go too, so three of the four now read shorter than they did.
+    ///
+    /// Lowered in 023, from 1,650 and six lines. The suggestion line and the outcome
+    /// line became one, and the clause ordering them went with it, so the ceiling
+    /// comes down rather than up — still a ceiling to notice, not a rule.
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
-            // 022 added the live-document line: one sentence, and the ceiling moved
-            // by about its length rather than being left with no room at all.
-            #expect(Briefing.text(for: policy).count < 1_650)
-            #expect(Briefing.lines(for: policy).count <= 6)
+            #expect(Briefing.text(for: policy).count < 1_500)
+            #expect(Briefing.lines(for: policy).count <= 5)
         }
     }
 

@@ -273,7 +273,7 @@ struct SuggestedPromptTests {
         for fake in launcher.allAgents {
             guard let blocks = await fake.promptContent?.arrayValue else { continue }
             let texts = blocks.compactMap { $0["text"]?.stringValue }
-            if texts.contains(where: { $0.contains(AppTool.reportOutcome) && $0.hasPrefix("That turn") }) {
+            if texts.contains(where: { $0.contains(AppTool.finishTurn) && $0.hasPrefix("That turn") }) {
                 continue
             }
             sent.append(texts)

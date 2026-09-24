@@ -3,21 +3,27 @@ import Foundation
 /// The MCP server the app serves every agent: the things an agent can ask of the
 /// window rather than of the machine.
 ///
-/// ACP has no way to send a suggested prompt, and no way to say "look at this file".
-/// Every `suggest` in its schema is a code edit, no session update carries a follow-up,
-/// and a `resource_link` is a thing handed over rather than a thing opened. What ACP
-/// does have is MCP servers, attached when a session is made, and all four runtimes
-/// take them. So the app offers the agent tools of its own: what one passes to
-/// `suggest_next_prompts` becomes the row of chips above the prompt, and what it
-/// passes to `show_file` becomes the file open in the sidebar.
+/// ACP has no way to say how the work went, no way to send a suggested prompt, and
+/// no way to say "look at this file". Every `suggest` in its schema is a code edit, no
+/// session update carries a follow-up, and a `resource_link` is a thing handed over
+/// rather than a thing opened. What ACP does have is MCP servers, attached when a
+/// session is made, and all four runtimes take them. So the app offers the agent
+/// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
+/// the line under the agent's name and the row of chips above the prompt — and two
+/// that act mid-turn, `show_file` and `manage_workflows`. Two older names for the
+/// halves of the first are still served, for conversations briefed with them.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
 public actor AppService {
-    /// The suggestion tool's name, which is also how the app knows a tool call is
-    /// ours. A runtime may prefix it — the Claude adapter shows it as
-    /// `mcp__agents__suggest_next_prompts` — so it is matched on the end rather than
-    /// whole.
+    /// The one call that ends a turn (023): how it went, and what to ask next. A
+    /// runtime may prefix it — the Claude adapter shows it as
+    /// `mcp__agents__finish_turn` — so every name here is matched on the end rather
+    /// than whole.
+    public static let finishTurnToolName = AppTool.finishTurn
+
+    /// The older name for the chips half of `finishTurnToolName`, still served so a
+    /// conversation briefed with it finds what it was told.
     public static let toolName = AppTool.suggestPrompts
 
     /// The other one: show the user a file.
@@ -26,13 +32,8 @@ public actor AppService {
     /// And the third: read and write the project's standing arrangements.
     public static let workflowToolName = AppTool.manageWorkflows
 
-    /// And the fourth, which is the last thing an agent does: say how the work went.
+    /// And the older name for the outcome half: say how the work went, on its own.
     public static let reportOutcomeToolName = AppTool.reportOutcome
-
-    /// The line about this tool that the daemon sends after the user's own words on
-    /// the first prompt of a conversation. See `Briefing`, which holds it and the rest
-    /// of what an agent is told, and says why saying it in words is necessary at all.
-    public static let askForSuggestions = Briefing.suggestions
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -62,7 +63,14 @@ public actor AppService {
     /// daemon that has to refuse one it does not.
     public typealias OutcomeSink = @Sendable (String, String) async -> Outcome
 
+    /// Where the one call goes: the outcome's wire spelling, the sentence, and the
+    /// chips, which may be none. One sink rather than the two above in turn, because
+    /// the daemon refuses the whole call or lands the whole call, and two sinks could
+    /// do half of each.
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt]) async -> Outcome
+
     private let connection: JSONRPCConnection
+    private let finishSink: FinishSink
     private let sink: Sink
     private let fileSink: FileSink
     private let workflowSink: WorkflowSink
@@ -70,6 +78,9 @@ public actor AppService {
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
+                finishTurn: @escaping FinishSink = { _, _, _ in
+                    .refused("This app cannot end a turn.")
+                },
                 sink: @escaping Sink,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 workflows: @escaping WorkflowSink = { _, _, _ in
@@ -79,6 +90,7 @@ public actor AppService {
                     .refused("This app cannot record an outcome.")
                 }) {
         let box = self.box
+        self.finishSink = finishTurn
         self.sink = sink
         self.fileSink = showFile
         self.workflowSink = workflows
@@ -120,7 +132,10 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array([Self.tool, Self.showFileTool, Self.workflowTool,
+            // The one that ends a turn first, the two that act mid-turn, and the two
+            // older names last, described as such (023).
+            return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
+                                              Self.workflowTool, Self.tool,
                                               Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -129,6 +144,26 @@ public actor AppService {
 
             // Longest suffix wins, though nothing here shares one: a runtime is free
             // to prefix a tool's name and none of them changes what follows it.
+            if name.hasSuffix(Self.finishTurnToolName) {
+                // The outcome's checks are the report's, and they run here as well as
+                // at the daemon so an agent that got the word wrong is told which five
+                // there are before the call goes any further. The chips are cleaned
+                // the way the older tool cleans them, and may come to nothing: the
+                // call is the outcome; the chips ride along (FR-003).
+                let raw = (arguments?["outcome"]?.stringValue ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard WorkOutcome(wire: raw) != nil else {
+                    return .success(Self.reply(Self.unknownOutcome, isError: true))
+                }
+                let message = (arguments?["message"]?.stringValue ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !message.isEmpty else {
+                    return .success(Self.reply(Self.noWords, isError: true))
+                }
+                let prompts = SuggestedPrompt.list(in: arguments?["next_prompts"])
+                return .success(Self.reply(await finishSink(raw, message, prompts)))
+            }
+
             if name.hasSuffix(Self.toolName) {
                 let prompts = SuggestedPrompt.list(in: arguments?["prompts"])
                 guard !prompts.isEmpty else {
@@ -169,18 +204,12 @@ public actor AppService {
                 let raw = (arguments?["outcome"]?.stringValue ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard WorkOutcome(wire: raw) != nil else {
-                    return .success(Self.reply("""
-                        Nothing was recorded: outcome has to be one of done, \
-                        nothing_to_do, needs_answer, partly_done or stuck.
-                        """, isError: true))
+                    return .success(Self.reply(Self.unknownOutcome, isError: true))
                 }
                 let message = (arguments?["message"]?.stringValue ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !message.isEmpty else {
-                    return .success(Self.reply("""
-                        Nothing was recorded: say in a sentence how it went. An outcome \
-                        with no words is no more use than the turn simply ending.
-                        """, isError: true))
+                    return .success(Self.reply(Self.noWords, isError: true))
                 }
                 return .success(Self.reply(await outcomeSink(raw, message)))
             }
@@ -192,6 +221,17 @@ public actor AppService {
             return .failure(.methodNotFound(method))
         }
     }
+
+    /// The two refusals an outcome can meet before it reaches the daemon, by either
+    /// door. Said once here so the one call and the older name cannot drift.
+    static let unknownOutcome = """
+        Nothing was recorded: outcome has to be one of done, nothing_to_do, \
+        needs_answer, partly_done or stuck.
+        """
+    static let noWords = """
+        Nothing was recorded: say in a sentence how it went. An outcome with no words \
+        is no more use than the turn simply ending.
+        """
 
     /// A tool result is content plus a flag, and a failure inside the tool is reported
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
@@ -206,27 +246,112 @@ public actor AppService {
         }
     }
 
-    /// What the agent is told the tool is for.
+    /// The one call that ends a turn (023).
     ///
-    /// This description is the only lever there is. Nothing in MCP or ACP makes a
-    /// runtime call a tool at the end of a turn, so what is written here decides
-    /// whether the row ever appears.
+    /// It says what 014's outcome tool said, and then asks for the chips the older
+    /// suggestion tool asked for, in the same breath. The paragraph 014 had ordering
+    /// this after `suggest_next_prompts` is gone, because there is nothing left to
+    /// order. The last paragraph is 014's verbatim: the line between ending a turn
+    /// and asking a question that waits still has to be drawn, and this is the one
+    /// place an agent reads it at the moment it matters.
+    ///
+    /// `Briefing` says the harder truth about descriptions — one alone got the
+    /// suggestion tool called exactly never — so this is written for an agent already
+    /// told, in the briefing, to call it. The description's job is to say which of
+    /// the five is true and what the chips are for.
+    static let finishTurnTool: JSONValue = [
+        "name": .string(finishTurnToolName),
+        "title": "Finish the turn",
+        "description": """
+            Call this once, as the very last thing you do before you stop. It says how \
+            the work actually went, and it is the only thing that does: without it the \
+            app can only say your turn ended, which it will show as an ending nobody \
+            accounted for.
+
+            Pick the one that is true:
+
+              done            You did what was asked. Nothing is left for anyone.
+              nothing_to_do   You looked, and there was nothing that needed doing.
+              needs_answer    You cannot go further until the person answers something.
+              partly_done     You did some of it. The rest needs a decision that is not yours.
+              stuck           You could not do it, and you know why.
+
+            The message is one or two sentences in your own words, and it is what the \
+            person reads on the row before they open anything — so write it for \
+            somebody who has not read the conversation. For needs_answer, the message \
+            is the question itself.
+
+            With it, offer two to four things the person might want to say next, shown \
+            as buttons above their prompt. Take them from the work you just did: what \
+            you did not do, a check worth running, a decision you had to guess at, the \
+            obvious next step. Write each one as a prompt the person would send you, in \
+            the second person ("Run the tests and fix what fails"). Leave them out only \
+            if there is genuinely nothing worth asking next. Say nothing in your reply \
+            about having called this.
+
+            If you can carry on once you have an answer, do not use this: ask with your \
+            question or form tool, which stops and waits for them. This one does not \
+            wait. It is how you end.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "outcome": [
+                    "type": "string",
+                    "enum": .array(["done", "nothing_to_do", "needs_answer",
+                                    "partly_done", "stuck"]),
+                    "description": "The one that is true.",
+                ],
+                "message": [
+                    "type": "string",
+                    "description": """
+                        One or two sentences, for somebody who has not read the \
+                        conversation. For needs_answer, the question itself.
+                        """,
+                ],
+                "next_prompts": [
+                    "type": "array",
+                    "minItems": .int(0),
+                    "maxItems": .int(SuggestedPrompt.limit),
+                    "description": """
+                        Two to four things the person might say next, best first. \
+                        Leave out if there is nothing worth asking.
+                        """,
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "label": ["type": "string",
+                                      "description": "Two to five words for the button, e.g. \"Run the tests\"."],
+                            "prompt": ["type": "string",
+                                       "description": "The prompt itself, addressed to you, which goes into their prompt box when they tap it."],
+                        ],
+                        "required": .array(["label", "prompt"]),
+                    ],
+                ],
+            ],
+            "required": .array(["outcome", "message"]),
+        ],
+    ]
+
+    // The two older names. Kept because the briefing that named them is sent once
+    // and lives in the runtime's history, so a conversation begun before 2026-09-23
+    // and resumed after it calls these and has to find them. Listed, because some
+    // runtimes check a name against the list before calling it; described as the
+    // older names, because a fresh agent reading the whole list should be pointed at
+    // the one tool rather than left to pick. Their schemas and rules are untouched.
+    //
+    // Removing them is deleting these two entries, their two branches in `handle`,
+    // their two sinks in the helper, and their two predicates in `PermissionRequest`.
+    // Nothing else may come to depend on them (023 FR-014).
+
+    /// The older name for the chips half of `finishTurnTool`.
     static let tool: JSONValue = [
         "name": .string(toolName),
-        "title": "Suggest what to ask next",
+        "title": "Suggest what to ask next (older name)",
         "description": """
-            Call this at the end of every turn, as the last thing you do before you \
-            stop. It offers the person two to four things they might want to say next, \
-            shown as buttons above their prompt, and it is how this app ends a turn.
-
-            Take them from the work you just did: what you did not do, a check worth \
-            running, a decision you had to guess at, the obvious next step. Write each \
-            one as a prompt the person would send you, in the second person \
-            ("Run the tests and fix what fails"), never as a description of one. Say \
-            nothing in your reply about having called this.
-
-            The only turn that does not end with a call to this is one where you \
-            genuinely cannot think of anything worth asking next.
+            The older name for the suggestions half of finish_turn. Use finish_turn \
+            instead: it takes the same prompts and the outcome together. This still \
+            works, and shows the prompts as buttons above the person's prompt.
             """,
         "inputSchema": [
             "type": "object",
@@ -379,43 +504,14 @@ public actor AppService {
         ],
     ]
 
-    /// Say how the work actually went, at the very end of it.
-    ///
-    /// The wording matters more than the schema, and more here than anywhere: without
-    /// this call the app can only say a turn ended, which is not the same sentence as
-    /// the work being done. `Briefing` says the harder truth about descriptions — one
-    /// alone got `suggest_next_prompts` called exactly never by three runtimes — so
-    /// this is written to be read by an agent already told, in the briefing, to call
-    /// it. The description's job is then to say which of the five is true.
-    ///
-    /// It also draws the line against the tools that interrupt, because the failure it
-    /// prevents is an agent using this to ask a question it could have had answered
-    /// mid-turn: this one does not wait.
+    /// The older name for the outcome half of `finishTurnTool`. See `tool`.
     static let reportOutcomeTool: JSONValue = [
         "name": .string(reportOutcomeToolName),
-        "title": "Say how the work went",
+        "title": "Say how the work went (older name)",
         "description": """
-            Call this once, at the very end of your work, after everything else \
-            including suggest_next_prompts. It says how the work actually went, and it \
-            is the only thing that does: without it the app can only say your turn \
-            ended, which it will show as an ending nobody accounted for.
-
-            Pick the one that is true:
-
-              done            You did what was asked. Nothing is left for anyone.
-              nothing_to_do   You looked, and there was nothing that needed doing.
-              needs_answer    You cannot go further until the person answers something.
-              partly_done     You did some of it. The rest needs a decision that is not yours.
-              stuck           You could not do it, and you know why.
-
-            The message is one or two sentences in your own words, and it is what the \
-            person reads on the row before they open anything — so write it for \
-            somebody who has not read the conversation. For needs_answer, the message \
-            is the question itself.
-
-            If you can carry on once you have an answer, do not use this: ask with \
-            your question or form tool, which stops and waits for them. This one does \
-            not wait. It is how you end.
+            The older name for the outcome half of finish_turn. Use finish_turn \
+            instead: it takes the same outcome and message and your suggestions \
+            together. This still works, and records how the work went.
             """,
         "inputSchema": [
             "type": "object",

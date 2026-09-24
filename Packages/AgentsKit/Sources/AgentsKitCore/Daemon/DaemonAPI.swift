@@ -64,9 +64,10 @@ public enum DaemonAPI {
         /// tighter ceiling of its own. The reader's call, never an agent's.
         public static let agentsSetCeiling = "agents/setCeiling"
         /// Not the app's to call. This is how the MCP server we hand to every agent
-        /// gets what the agent passed it back to the agent's own record.
+        /// gets what the agent passed it back to the agent's own record. Since 023
+        /// the older door for the chips half of `agentsFinishTurn`.
         public static let agentsSuggestPrompts = "agents/suggestPrompts"
-        /// Nor this one. The other half of that MCP server: the agent asking that a
+        /// Nor this one. Another of that MCP server's tools: the agent asking that a
         /// file be put in front of the user.
         public static let agentsShowFile = "agents/showFile"
         /// A window asking the daemon to write what the person typed on a live page
@@ -92,10 +93,15 @@ public enum DaemonAPI {
         public static let workflowsSettings = "workflows/settings"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
-        /// And the last of them: the agent saying how the work actually went, at the
-        /// end of it. The app cannot know this any other way — a turn giving itself
-        /// back says nothing about whether the work is finished.
+        /// The agent saying how the work actually went, at the end of it. The app
+        /// cannot know this any other way — a turn giving itself back says nothing
+        /// about whether the work is finished. Since 023 the older door for the
+        /// outcome half of `agentsFinishTurn`.
         public static let agentsReportOutcome = "agents/reportOutcome"
+        /// Both of those at once (023): the one call that ends a turn, relayed by the
+        /// helper when an agent calls `finish_turn`. The two above stay for the older
+        /// names the helper still relays.
+        public static let agentsFinishTurn = "agents/finishTurn"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -430,7 +436,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What the MCP helper sends when an agent calls the suggestion tool.
+    /// What the MCP helper sends when an agent calls the older suggestion tool.
     ///
     /// The token, not an agent id: the helper is a process the runtime started, and
     /// anything on this Mac can reach the daemon's socket. A token the daemon minted
@@ -461,6 +467,27 @@ public enum DaemonAPI {
 
         public init(token: String, prompts: [SuggestedPrompt]) {
             self.token = token
+            self.prompts = prompts
+        }
+    }
+
+    /// What the MCP helper sends when an agent ends its turn with the one call (023).
+    ///
+    /// The token does the work it does for a report. The outcome is the wire
+    /// spelling, checked at the daemon and never rounded. The prompts have already
+    /// been cleaned by the service — trimmed, cut to four, empties dropped — and may
+    /// be empty, which means no chips: the call is the whole account of the turn.
+    public struct FinishTurnRequest: Codable, Sendable {
+        public var token: String
+        public var outcome: String
+        public var message: String
+        public var prompts: [SuggestedPrompt]
+
+        public init(token: String, outcome: String, message: String,
+                    prompts: [SuggestedPrompt]) {
+            self.token = token
+            self.outcome = outcome
+            self.message = message
             self.prompts = prompts
         }
     }

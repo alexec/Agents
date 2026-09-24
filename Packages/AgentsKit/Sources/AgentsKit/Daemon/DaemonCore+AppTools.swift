@@ -1,6 +1,7 @@
 import Foundation
 
-/// Where a suggested prompt, and a file the agent wants looked at, come from.
+/// Where an agent's account of its turn, a file it wants looked at, and its say over
+/// the project's workflows come from.
 ///
 /// The app hands every session an MCP server of its own. It is not a process we start:
 /// the runtime starts it, the way it starts any stdio MCP server, by running the same
@@ -60,6 +61,10 @@ extension DaemonCore {
     }
 
     /// An agent has said what you might want to ask next.
+    ///
+    /// The older door for the chips half of `finishTurn` (023). It stays because the
+    /// helper relays the older tool name here, and a conversation briefed with that
+    /// name is still calling it. It touches the chips and nothing else.
     public func suggestPrompts(_ request: DaemonAPI.SuggestPromptsRequest) async throws -> String {
         guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
             // Said plainly, because the agent reads this. A runtime that kept a helper
@@ -73,9 +78,7 @@ extension DaemonCore {
         }
         agent.suggestedPrompts = prompts
         changed(agent)
-        return prompts.count == 1
-            ? "Shown above the prompt. The person may tap it, edit it, or ignore it."
-            : "\(prompts.count) shown above the prompt. The person may tap one, edit it, or ignore them."
+        return Self.shownNote(count: prompts.count)
     }
 
     /// An agent has said how the work actually went.
@@ -84,16 +87,51 @@ extension DaemonCore {
     /// back from the work being finished. Everything refused here is refused in a
     /// sentence rather than a code, because the agent is what reads it.
     ///
-    /// The one refusal worth the words: a report while a question of the agent's own is
-    /// still outstanding. Claiming the work is settled while the app is holding a form
-    /// or a permission for the person would tell them the opposite of the truth, so the
-    /// agent is sent back to its own question first.
+    /// Since 023 this is the older of two doors to the same record. `finishTurn` is
+    /// the one a fresh conversation is told about; this stays because the helper
+    /// relays the older name to it, and a conversation briefed with that name is still
+    /// calling it. Both go through `checkedReport` and `land`, so the refusals and the
+    /// order of the writes cannot drift between them.
     public func reportOutcome(_ request: DaemonAPI.ReportOutcomeRequest) async throws -> String {
-        guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
+        let checked = try checkedReport(token: request.token, outcome: request.outcome,
+                                        message: request.message)
+        return await land(checked.report, prompts: nil, on: checked.agent, id: checked.agentID)
+    }
+
+    /// The one call that ends a turn: how it went, and what to ask next (023).
+    ///
+    /// The merge is here and not in the helper because a call is refused whole or
+    /// lands whole. Two relayed calls could show the chips and then refuse the outcome
+    /// for a form still waiting, which is exactly the picture — suggestions beneath an
+    /// ending nobody accounted for — this tool exists to remove. So every check runs
+    /// before either write, and the two writes go out in one `changed`.
+    ///
+    /// No prompts is an empty row, not "leave them": the last call is the whole
+    /// account of the turn, chips included, so a call without any clears whatever an
+    /// earlier call in the same turn left.
+    public func finishTurn(_ request: DaemonAPI.FinishTurnRequest) async throws -> String {
+        let checked = try checkedReport(token: request.token, outcome: request.outcome,
+                                        message: request.message)
+        let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
+        let noted = await land(checked.report, prompts: prompts, on: checked.agent,
+                               id: checked.agentID)
+        return prompts.isEmpty ? noted : noted + " " + Self.shownNote(count: prompts.count)
+    }
+
+    /// The refusals a report can meet, in the order it meets them, each a sentence the
+    /// agent reads: a token that no longer speaks for an agent, a word that is not one
+    /// of the five, a question of the agent's own still outstanding, and no words.
+    ///
+    /// The one worth the words is the third. Claiming the work is settled while the
+    /// app is holding a form or a permission for the person would tell them the
+    /// opposite of the truth, so the agent is sent back to its own question first.
+    private func checkedReport(token: String, outcome rawOutcome: String, message: String)
+        throws -> (agentID: UUID, agent: Agent, report: WorkReport) {
+        guard let agentID = appTokens[token], let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "That conversation is not open any more, so nothing was recorded.")
         }
-        guard let outcome = WorkOutcome(wire: request.outcome) else {
+        guard let outcome = WorkOutcome(wire: rawOutcome) else {
             // Never rounded to the nearest one we know. An unrecognised word read as
             // `done` is the unearned tick this whole feature exists to remove.
             throw JSONRPCError(code: JSONRPCError.invalidParams,
@@ -112,7 +150,7 @@ extension DaemonCore {
                                 let it be answered.
                                 """)
         }
-        guard let report = WorkReport(outcome: outcome, wire: request.message) else {
+        guard let report = WorkReport(outcome: outcome, wire: message) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: """
                                 Nothing was recorded: say in a sentence how it went. An \
@@ -120,8 +158,17 @@ extension DaemonCore {
                                 ending.
                                 """)
         }
+        return (agentID, agent, report)
+    }
+
+    /// Put a report on the agent — and a row of chips, where the call carried one —
+    /// and say what became of it.
+    private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, on agent: Agent,
+                      id agentID: UUID) async -> String {
+        var agent = agent
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
+        if let prompts { agent.suggestedPrompts = prompts }
         // The record before the windows, which is the order that leaves something true
         // behind when the daemon is killed mid-call.
         await record(.workReported(report), for: agentID)
@@ -129,12 +176,19 @@ extension DaemonCore {
         // A report that says the agent is stuck begins a need without a state change,
         // which is why this is the one place besides `move` that has to ask (021).
         reconsider()
-        return outcome.needsAPerson
+        return report.outcome.needsAPerson
             ? """
                 Noted. The person will see this conversation under "Needs attention", \
                 with your message on it.
                 """
-            : "Noted. This conversation now reads as \"\(outcome.heading)\" wherever the person looks."
+            : "Noted. This conversation now reads as \"\(report.outcome.heading)\" wherever the person looks."
+    }
+
+    /// What an agent is told about its chips, by either door.
+    static func shownNote(count: Int) -> String {
+        count == 1
+            ? "Shown above the prompt. The person may tap it, edit it, or ignore it."
+            : "\(count) shown above the prompt. The person may tap one, edit it, or ignore them."
     }
 
     /// An agent has asked that a file be put in front of the user.
@@ -208,7 +262,7 @@ extension DaemonCore {
         changed(agent)
     }
 
-    /// Answer the permission question for our own tools ourselves.
+    /// Answer the permission question for the app's own tools ourselves.
     ///
     /// Copilot asks before every tool call, including these. A sheet asking whether
     /// the app may show the app's own suggestions is a question with no information in
@@ -222,7 +276,9 @@ extension DaemonCore {
     /// also the thing that stopped an agent dead whenever nobody was looking. The
     /// answer is after the fact instead: a workflow is written, appears on the project
     /// page, and can be archived there by somebody who can see what it does.
-    /// Allowed only where the runtime offered allowing it, and only for these three.
+    /// Allowed only where the runtime offered allowing it, and only for the app's
+    /// own tools — the one that ends a turn, the two that act mid-turn, and the two
+    /// older names.
     func autoAllowed(_ request: PermissionRequest) -> PermissionOption? {
         guard request.toolCall.isAutoAllowable else { return nil }
         return request.options.first { $0.kind == .allowAlways }

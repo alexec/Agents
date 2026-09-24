@@ -17,6 +17,27 @@ struct TranscriptDisplayTests {
         TranscriptEntry(kind: .toolCallUpdate(ToolCall(toolCallID: id, title: title, status: status)))
     }
 
+    /// The end-of-turn call is drawn twice already — the chips above the prompt and
+    /// the report at the foot — so the call itself is not (023). The finished update
+    /// the Claude adapter sends carries neither name nor title, so it is suppressed
+    /// by id, not by name.
+    @Test func theFinishCallIsNotDrawn() {
+        let ours = ToolCall(toolCallID: "1", title: "finish_turn", name: "mcp__agents__finish_turn")
+        let oursFinished = ToolCall(toolCallID: "1", title: "Tool call", status: "completed")
+        let theirs = ToolCall(toolCallID: "2", title: "Read a file", name: "read_file")
+        let items = TranscriptEntry.display([
+            message("Done."),
+            TranscriptEntry(kind: .toolCall(ours)),
+            TranscriptEntry(kind: .toolCallUpdate(oursFinished)),
+            TranscriptEntry(kind: .toolCall(theirs)),
+        ])
+        let drawn = items.compactMap { item -> [ToolCall]? in
+            if case .toolRun(_, let calls) = item { return calls }
+            return nil
+        }.flatMap { $0 }
+        #expect(drawn.map(\.name) == ["read_file"])
+    }
+
     @Test func oneToolCallIsOneLine() {
         let items = TranscriptEntry.display([call("t1", "Write hello.txt")])
         #expect(items.count == 1)
