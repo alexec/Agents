@@ -142,20 +142,36 @@ struct FilesPane: View {
 
     @ViewBuilder
     private func fileView(_ url: URL) -> some View {
-        if let fileProblem, isMarkdown(url) {
-            // A page, not a `Gone`. Before the first write the agent has shown a
-            // file that is not there yet, and the page opens empty and fills when it
-            // appears; after a delete, the page keeps the last content it had, so
-            // nothing the person was reading vanishes. Said in a line either way.
+        if isMarkdown(url), fileProblem != nil || probe?.kind.isText == true {
+            // Markdown reads as a page, and the page is live: it follows the file as
+            // the agent writes it (022). A line an agent named no longer forces the
+            // source view — the page has a passage for every line, and goes to the
+            // one that holds it (FR-007).
+            //
+            // One view whether the file is there or not, so that its state — a
+            // passage the person is typing in — survives the file going. Before the
+            // first write the agent has shown a file that is not there yet, and the
+            // page opens empty and fills when it appears; after a delete, the page
+            // keeps the last content it had, so nothing the person was reading or
+            // typing vanishes. Said in a line either way.
             VStack(alignment: .leading, spacing: 0) {
-                Text(probe == nil ? "Not written yet. It will appear here as it is." : fileProblem)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                Divider()
+                if let fileProblem {
+                    Text(probe == nil ? "Not written yet. It will appear here as it is." : fileProblem)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                    Divider()
+                }
                 LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
                          agentID: agent.id)
+                if let probe, probe.isTruncated {
+                    Divider()
+                    Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(10)
+                }
             }
         } else if let fileProblem {
             Gone(message: fileProblem)
@@ -163,17 +179,8 @@ struct FilesPane: View {
             switch probe.kind {
             case .text:
                 VStack(alignment: .leading, spacing: 0) {
-                    // Markdown reads as a page, and the page is live: it follows the
-                    // file as the agent writes it (022). A line an agent named no
-                    // longer forces the source view — the page has a passage for
-                    // every line, and goes to the one that holds it (FR-007).
-                    // Everything else is untouched: numbered source, as it was.
-                    if isMarkdown(url) {
-                        LivePage(text: probe.text ?? "", url: url, line: state.openLine,
-                                 agentID: agent.id)
-                    } else {
-                        FileLines(text: probe.text ?? "", line: state.openLine)
-                    }
+                    // Everything that is not Markdown: numbered source, as it was.
+                    FileLines(text: probe.text ?? "", line: state.openLine)
                     if probe.isTruncated {
                         Divider()
                         Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")

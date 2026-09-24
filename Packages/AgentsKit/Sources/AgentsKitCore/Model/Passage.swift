@@ -273,3 +273,67 @@ public struct PassageChange: Hashable, Sendable {
                              first: changed.first)
     }
 }
+
+/// The person is typing in one passage and somebody else wrote the file.
+///
+/// One moving part. The person can only have one passage open, so the general
+/// three-way problem collapses to a single question: did the other side touch my
+/// lines? If not, the edit is spliced in where those lines now are. If so, the
+/// person's text is kept and put where the other side's replacement sits, and that
+/// replacement is handed back for the page to show beside it — nothing typed vanishes
+/// without the page saying so (022 FR-014, FR-015).
+///
+/// Line-exact matching, deliberately. A CRDT solves a problem this page does not
+/// have: one person, one passage, whole-file writes at second granularity.
+public enum PassageMerge {
+    public enum Result: Hashable, Sendable {
+        /// The edit is in `text` at `passageIndex`, and nothing of theirs was lost.
+        case merged(text: String, passageIndex: Int)
+        /// The edit is in `text` at `passageIndex`, in place of what they wrote there,
+        /// which is `theirs` — empty if they had deleted the passage outright.
+        case collided(text: String, passageIndex: Int, theirs: String)
+    }
+
+    /// - Parameters:
+    ///   - base: the document as it was when the editor opened, which `mine` is a
+    ///     passage of.
+    ///   - theirs: the document as it is on disk now.
+    ///   - mine: the passage the person is editing, as it was in `base`.
+    ///   - edited: what the person has typed for it.
+    public static func apply(base: String, theirs: String, mine: Passage, edited: String) -> Result {
+        let theirPassages = Passage.split(theirs)
+
+        // Untouched: my passage's exact source still occurs as a passage of theirs.
+        // The one nearest its old place, in case the same paragraph appears twice.
+        let candidates = theirPassages.indices.filter { theirPassages[$0].source == mine.source }
+        if let index = candidates.min(by: {
+            abs(theirPassages[$0].lines.lowerBound - mine.lines.lowerBound)
+                < abs(theirPassages[$1].lines.lowerBound - mine.lines.lowerBound)
+        }) {
+            var merged = theirPassages
+            merged[index].source = edited
+            return .merged(text: Passage.join(merged), passageIndex: index)
+        }
+
+        // Touched. Where my lines were is where the person's text goes: the passage
+        // of theirs that now holds my first line, or the end if the document has
+        // grown shorter than that.
+        guard !theirPassages.isEmpty else {
+            return .collided(text: edited, passageIndex: 0, theirs: "")
+        }
+        let index = Passage.index(containing: mine.lines.lowerBound, in: theirPassages) ?? theirPassages.count - 1
+        var merged = theirPassages
+        let replaced = merged[index]
+        // A deletion: what sits at my old line is a passage that was already there in
+        // base, after mine. Mine goes in before it rather than over it.
+        if let basePassages = Optional(Passage.split(base)),
+           basePassages.contains(where: { $0.source == replaced.source && $0.lines.lowerBound > mine.lines.lowerBound }) {
+            // With a blank line of its own after it; the passage it goes in front
+            // of keeps whatever followed it, which may be the document's end.
+            merged.insert(Passage(source: edited, lines: mine.lines, separator: "\n\n", isHeading: false), at: index)
+            return .collided(text: Passage.join(merged), passageIndex: index, theirs: "")
+        }
+        merged[index].source = edited
+        return .collided(text: Passage.join(merged), passageIndex: index, theirs: replaced.source)
+    }
+}

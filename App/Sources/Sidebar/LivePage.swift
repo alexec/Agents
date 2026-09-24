@@ -50,6 +50,9 @@ struct LivePage: View {
     /// folder watch is recognised and not treated as news.
     @State private var lastWritten: String?
     @State private var saveProblem: String?
+    /// The agent rewrote the very passage the person was typing in. Theirs is shown
+    /// under the editor until the person takes it or dismisses it (FR-014).
+    @State private var collision: String?
 
     private var isEditing: Bool { editing != nil }
 
@@ -113,6 +116,9 @@ struct LivePage: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
+                    if let collision {
+                        collisionCard(collision)
+                    }
                 }
             } else {
                 MarkdownText(markdown: passages[index].source, base: url)
@@ -136,6 +142,41 @@ struct LivePage: View {
             .animation(.easeOut(duration: Self.markFade), value: isMarked)
             .padding(.horizontal, metrics.padding - 8)
             .frame(maxWidth: .infinity)
+    }
+
+    // MARK: When the agent wrote the same passage
+
+    /// Said in a line, with theirs rendered under it and one way to take it. The
+    /// person's text is already on disk by the time this shows; the card is what
+    /// keeps the agent's version from vanishing without a word (FR-014, FR-015).
+    private func collisionCard(_ theirs: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("The agent changed this passage while you were typing. Yours is kept; theirs is below.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if !theirs.isEmpty {
+                MarkdownText(markdown: theirs, base: url)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("They had removed it.")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+            HStack(spacing: 8) {
+                if !theirs.isEmpty {
+                    Button("Use theirs") {
+                        editing?.draft = theirs
+                        collision = nil
+                        commit()
+                    }
+                }
+                Button("Keep mine") { collision = nil }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: Typing
@@ -201,15 +242,39 @@ struct LivePage: View {
             return
         }
         let change = PassageChange.between(old: lastLoaded, new: new)
-        // Somebody else wrote while a passage is open: Slice D (T037) carries the
-        // draft across with `PassageMerge`. Until then the draft is kept, the page
-        // re-splits, and the editor stays on its index.
-        passages = Passage.split(new)
-        lastLoaded = new
-        guard let first = change.first else { return }
-        mark(Array(change.changed).filter { $0 != editing?.index })
-        guard !isEditing else { return }
-        Task { await go(to: first, proxy: proxy) }
+        guard let current = editing, passages.indices.contains(current.index) else {
+            passages = Passage.split(new)
+            lastLoaded = new
+            guard let first = change.first else { return }
+            mark(Array(change.changed))
+            Task { await go(to: first, proxy: proxy) }
+            return
+        }
+        // Somebody else wrote while a passage is open. The draft is carried across:
+        // spliced in where its lines now are, or kept in place of what they wrote
+        // there with theirs shown beside it. Either way the result goes to disk, so
+        // the file holds both (FR-012), and the view does not move (FR-013).
+        let result = PassageMerge.apply(base: lastLoaded, theirs: new,
+                                        mine: passages[current.index], edited: current.draft)
+        let merged: String
+        let index: Int
+        switch result {
+        case .merged(let text, let at):
+            merged = text; index = at
+        case .collided(let text, let at, let theirs):
+            merged = text; index = at
+            collision = theirs
+        }
+        passages = Passage.split(merged)
+        lastLoaded = merged
+        editing = Editing(index: index, base: current.draft, draft: current.draft)
+        mark(Array(change.changed).filter { $0 != index })
+        if merged != new {
+            lastWritten = merged
+            Task {
+                saveProblem = await model.writeArtifact(agentID: agentID, path: url.path, text: merged)
+            }
+        }
     }
 
     private func mark(_ indices: [Int]) {
