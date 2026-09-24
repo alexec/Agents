@@ -28,7 +28,7 @@ struct WorkflowsSection: View {
             }
             if live.isEmpty, !archived.isEmpty {
                 Text("All of this project's workflows are archived.")
-                    .font(.callout)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
             }
@@ -39,11 +39,11 @@ struct WorkflowsSection: View {
                         WorkflowRow(summary: summary)
                     }
                     Button("Hide archived workflows") { showsArchived = false }
-                        .font(.callout)
+                        .appText(.reading)
                         .padding(.top, 6)
                 } else {
                     Button("Archived workflows (\(archived.count))") { showsArchived = true }
-                        .font(.callout)
+                        .appText(.reading)
                         .padding(.top, 10)
                 }
             }
@@ -69,18 +69,18 @@ private struct WorkflowRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(workflow.name)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
 
                 Text(workflow.summary)
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let happening {
                     Text(happening)
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -122,6 +122,7 @@ private struct StatusMark: View {
                 ProgressView().controlSize(.small)
             } else {
                 Image(systemName: symbol)
+                    // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .font(.system(size: 16))
                     .foregroundStyle(.secondary)
             }

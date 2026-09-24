@@ -103,11 +103,12 @@ struct LivePage: View {
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
-                // Prose in New York, the system serif, at 12pt. Measured for 007: 13pt
-                // gives 57 characters at the default pane width and misses the floor
-                // of 60. A relative style rather than a fixed size, so Dynamic Type
-                // still moves it. Headings, code and chrome stay on the sans and mono
-                // faces the rest of the app uses.
+                // Prose on the app's reading step: the same face and the same size as
+                // everything else, because a document is a thing you read and that is
+                // what the step is for. It was New York at 12pt for 007, which read as
+                // paper but as a different app's paper. The pane widened to 460 rather
+                // than the text shrinking back, so the 60-character floor still holds;
+                // `PageMetrics` carries that arithmetic.
                 .appText(.reading)
                 .textSelection(.enabled)
                 .onAppear { load(text) }

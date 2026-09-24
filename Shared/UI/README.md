@@ -5,8 +5,10 @@ under `sources:` for each of them in `project.yml`; XcodeGen compiles one file i
 apps.
 
 What belongs here: the definitions both apps must agree on and that need SwiftUI to
-say — a colour, a font step, a view modifier. `StateTint`, `ChatTypeScale` and
-`ChatColumn` are the three that started it.
+say — a colour, a font step, a view modifier. `StateTint`, `TypeScale` and
+`ChatColumn` are the three that started it. `TypeScale` was `ChatTypeScale` and held
+only the transcript; it holds both apps entire now, and every `.font(` outside it is a
+marked decorative glyph.
 
 What does not: arithmetic. A number that came out of a measurement goes in
 `Packages/AgentsKit/Sources/AgentsKitCore`, where the one test target can hold it

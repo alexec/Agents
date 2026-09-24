@@ -19,9 +19,9 @@ struct RuntimeAccountView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(name).font(.headline)
+            Text(name).appText(.reading).fontWeight(.semibold)
             Text(state)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle((account.state == .needsSignIn ? StateTint.failure : .none)
                                     .style(or: .secondary))
 
@@ -37,7 +37,7 @@ struct RuntimeAccountView: View {
                         // command. See ACP.AuthMethod.guidance: Cursor's advice names a
                         // binary that on this Mac belongs to Grok.
                         if let guidance = method.guidance {
-                            Text(guidance).font(.caption).foregroundStyle(.secondary)
+                            Text(guidance).appText(.fine).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -46,9 +46,9 @@ struct RuntimeAccountView: View {
             if let terminalCommand {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("\(name) signs in from a terminal. Run this:")
-                        .font(.callout)
+                        .appText(.reading)
                     Text(terminalCommand)
-                        .font(.footnote.monospaced())
+                        .appText(.code)
                         .textSelection(.enabled)
                         .padding(8)
                         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
@@ -69,17 +69,17 @@ struct RuntimeAccountView: View {
 
             if !account.providers.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Who answers").font(.callout)
+                    Text("Who answers").appText(.reading)
                     ForEach(account.providers, id: \.id) { provider in
                         Button {
                             Task { await model.setProvider(runtimeID: runtimeID, providerID: provider.id) }
                         } label: {
                             HStack {
                                 Text(provider.id == account.currentProviderID ? "✓" : " ")
-                                    .font(.footnote.monospaced())
+                                    .appText(.code)
                                 Text(provider.name ?? provider.id)
                                 if let wire = provider.protocol {
-                                    Text(wire).font(.caption).foregroundStyle(.tertiary)
+                                    Text(wire).appText(.fine).foregroundStyle(.tertiary)
                                 }
                             }
                         }

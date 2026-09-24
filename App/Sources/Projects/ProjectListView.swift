@@ -95,7 +95,7 @@ private struct ArchivedProjectRow: View {
                 Text(summary.name).lineLimit(1).foregroundStyle(.secondary)
                 if let archivedAt = summary.project.archivedAt {
                     Text("Archived \(archivedAt.formatted(.relative(presentation: .named)))")
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -104,7 +104,7 @@ private struct ArchivedProjectRow: View {
                 Task { await model.unarchiveProject(summary.folder) }
             }
             .buttonStyle(.link)
-            .font(.caption)
+            .appText(.fine)
         }
         .contextMenu {
             Button("Unarchive") {
@@ -123,7 +123,7 @@ private struct EmptyProjectList: View {
         VStack(alignment: .leading, spacing: 12) {
             if model.availableRuntimes.isEmpty {
                 Text("No agent runtime found")
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                 Text("Agents runs the coding CLIs you already have. Install one and it appears here.")
                     .foregroundStyle(.secondary)
                 ForEach(model.runtimes) { status in
@@ -131,7 +131,7 @@ private struct EmptyProjectList: View {
                 }
             } else {
                 Text("No projects yet")
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                 Text("A project is a folder you work in. Pick one and say what you want done.")
                     .foregroundStyle(.secondary)
                 Button("Add a project") { isChoosingFolder = true }
@@ -148,18 +148,18 @@ private struct RuntimeMissingLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(status.runtime.name).font(.callout.weight(.medium))
+            Text(status.runtime.name).appText(.reading).fontWeight(.medium)
             switch status.availability {
             case .missing(let lookedIn):
                 Text("Looked for \(status.runtime.executable) in \(lookedIn.prefix(4).joined(separator: ", "))…")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             case .needsSignIn(_, let fixCommand):
                 Text(fixCommand.map { "Signed out. Run \($0)." } ?? "Signed out.")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             case .failed(let reason):
-                Text(reason).font(.caption).foregroundStyle(.secondary)
+                Text(reason).appText(.fine).foregroundStyle(.secondary)
             case .available:
                 EmptyView()
             }
@@ -207,11 +207,11 @@ private struct SpendingRow: View {
                     if let state = model.costState, let left = state.dayHeadroom,
                        let daily = state.limits.daily {
                         Text("\(left.money(in: daily.currency)) left")
-                            .font(.caption2)
+                            .appText(.fine)
                     }
                 }
             }
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(foreground)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)

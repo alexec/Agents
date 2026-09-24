@@ -62,7 +62,7 @@ struct BrowserPane: View {
 
             TextField("localhost:3000", text: $typed)
                 .textFieldStyle(.roundedBorder)
-                .font(.callout)
+                .appText(.reading)
                 .onSubmit(go)
         }
         .padding(.horizontal, 8)
@@ -91,12 +91,12 @@ private struct Empty: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "globe")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing loaded")
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
             Text("Type an address above. If the agent started a server in \(folder), this is where to look at it.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -115,10 +115,10 @@ private struct Failed: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Try again", action: retry)

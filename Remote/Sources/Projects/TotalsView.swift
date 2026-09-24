@@ -50,10 +50,10 @@ struct TotalsView: View {
     private var grandTotal: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("All time")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
             Text(Cost.total(of: spending.grandTotal) ?? "")
-                .font(.largeTitle.weight(.semibold))
+                .appText(.title).fontWeight(.semibold)
                 .monospacedDigit()
                 .textSelection(.enabled)
         }
@@ -64,7 +64,7 @@ struct TotalsView: View {
         VStack(alignment: .leading, spacing: 8) {
             if showsHeading {
                 Text(currency)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
             }
             ForEach(spending.shares(in: currency)) { share in
@@ -83,16 +83,16 @@ struct TotalsView: View {
         if let state = model.costState, !state.today.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Today")
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                 Text(todayLine(state))
-                    .font(.title3.weight(.medium))
+                    .appText(.reading).fontWeight(.medium)
                     .monospacedDigit()
                     .foregroundStyle((state.dayLimitReached ? StateTint.failure : .none)
                                         .style(or: .primary))
                 if state.dayLimitReached {
                     Text("Nothing new will start until tomorrow. The limit is set on your Mac.")
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -111,7 +111,7 @@ struct TotalsView: View {
         let chats = spending.unmeasuredAgents == 1 ? "1 chat" : "\(spending.unmeasuredAgents) chats"
         return Label("At least this much: \(chats) ran on a runtime that reported no price.",
                      systemImage: "questionmark.circle")
-            .font(.callout)
+            .appText(.supporting)
             .foregroundStyle(.secondary)
             .padding(.top, 4)
     }
@@ -119,9 +119,9 @@ struct TotalsView: View {
     private var nothingSpent: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nothing has been spent yet")
-                .font(.title3.weight(.semibold))
+                .appText(.reading).fontWeight(.semibold)
             Text("What the work costs appears here once a runtime reports a price for it.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
         }
     }
@@ -143,7 +143,7 @@ private struct ShareRow: View {
                                                   : AnyShapeStyle(.primary))
             if share.isArchived {
                 Text("Archived")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
@@ -151,7 +151,7 @@ private struct ShareRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
-        .font(.callout)
+        .appText(.reading)
         .accessibilityElement(children: .combine)
     }
 }
@@ -177,7 +177,7 @@ struct ProjectTotal: View {
                 }
                 Spacer(minLength: 0)
             }
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(summary.unmeasuredAgents > 0

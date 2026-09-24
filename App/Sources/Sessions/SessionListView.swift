@@ -18,13 +18,13 @@ struct SessionListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Conversations in \(cwd.lastPathComponent)")
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
 
             if isLoading {
-                Text("Asking \(name)…").font(.callout).foregroundStyle(.secondary)
+                Text("Asking \(name)…").appText(.supporting).foregroundStyle(.secondary)
             } else if sessions.isEmpty {
                 Text("\(name) is holding nothing here.")
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
@@ -74,7 +74,7 @@ struct SessionListView: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title ?? session.sessionID)
-                    .font(.callout)
+                    .appText(.reading)
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     if let updatedAt = session.updatedAt {
@@ -84,7 +84,7 @@ struct SessionListView: View {
                         Text("already here")
                     }
                 }
-                .font(.caption)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 12)

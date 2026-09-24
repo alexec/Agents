@@ -50,11 +50,11 @@ struct ProjectRow: View {
                     .foregroundStyle(summary.exists ? .primary : .secondary)
                 if !summary.exists {
                     Text("Folder is missing")
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 } else if let subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

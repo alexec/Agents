@@ -262,7 +262,7 @@ struct ContextMeter: View {
                 .foregroundStyle((isCloseToItsLimit ? StateTint.failure : .none)
                                     .style(or: .secondary))
         }
-        .font(.footnote)
+        .appText(.fine)
     }
 
     /// The running total and what is left of the limit, matching the window exactly.
@@ -339,7 +339,7 @@ private struct JumpToEnd: View {
             .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .font(.footnote)
+        .appText(.fine)
         .fixedSize()
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel(hasNewBelow

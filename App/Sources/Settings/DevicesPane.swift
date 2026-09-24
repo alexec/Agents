@@ -44,7 +44,7 @@ private struct DeviceLine: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
                 Text(standing)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             }
             Spacer()

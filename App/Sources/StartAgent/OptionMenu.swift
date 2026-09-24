@@ -20,7 +20,7 @@ struct OptionMenu: View {
                     // common case and looks exactly as it did before.
                     if let name = group.name, !name.isEmpty {
                         Text(name)
-                            .font(.caption)
+                            .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 8)
                             .padding(.top, 6)

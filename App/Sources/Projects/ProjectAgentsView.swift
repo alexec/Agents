@@ -59,18 +59,18 @@ struct ProjectAgentsView: View {
     private var heading: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(summary?.name ?? "Project")
-                .font(.largeTitle.weight(.semibold))
+                .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
             if let summary, !summary.exists {
                 Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
-                    .font(.callout)
+                    .appText(.supporting)
                     .tinted(.failure)
                     .lineLimit(1)
                     .help(summary.folder.path)
             }
             if let summary, let spent = spent(summary) {
                 Text(spent)
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .help(spentInWords)
@@ -137,7 +137,7 @@ struct ProjectAgentsView: View {
 
                 if isEmpty {
                     Text("Nothing here yet. Say what you want done and an agent starts on it.")
-                        .font(.callout)
+                        .appText(.reading)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 6)
                 }
@@ -165,7 +165,7 @@ struct ProjectAgentsView: View {
             GroupHeading(title: "Archived", count: archived.count)
             if archived.isEmpty {
                 Text("Nothing archived in this project yet.")
-                    .font(.callout)
+                    .appText(.reading)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
             } else {
@@ -183,12 +183,12 @@ struct ProjectAgentsView: View {
             // the buttons on this page are for the work.
             Button("Hide archived") { showsArchived = false }
                 .buttonStyle(.link)
-                .font(.callout)
+                .appText(.reading)
                 .padding(.top, 6)
         } else if folder != nil, !archived.isEmpty {
             Button("Show archived (\(archived.count))") { showsArchived = true }
                 .buttonStyle(.link)
-                .font(.callout)
+                .appText(.reading)
                 .padding(.top, 10)
         }
     }
@@ -230,7 +230,7 @@ private struct GroupHeading: View {
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
-        .font(.subheadline.weight(.medium))
+        .appText(.fine).fontWeight(.medium)
         .foregroundStyle(.secondary)
         .padding(.top, 14)
         .padding(.leading, 2)

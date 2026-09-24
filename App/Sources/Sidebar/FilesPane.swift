@@ -83,7 +83,7 @@ struct FilesPane: View {
             }
 
             Text(state.openFile?.lastPathComponent ?? folder.lastPathComponent)
-                .font(.callout.weight(.medium))
+                .appText(.reading).fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer()
@@ -105,7 +105,7 @@ struct FilesPane: View {
                 }
                 if listing.isTruncated {
                     Text("\(listing.omitted) more, not shown")
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -133,6 +133,7 @@ struct FilesPane: View {
                     // What the agent touched since it started (FR-013). The point of
                     // the pane: its work is findable without reading the conversation.
                     Image(systemName: "circle.fill")
+                        // Decorative: a dot sized to the row, not text (FR-015).
                         .font(.system(size: 6))
                         .foregroundStyle(.tint)
                         .help("The agent changed this")
@@ -140,7 +141,7 @@ struct FilesPane: View {
                 Spacer()
                 if entry.isDirectory {
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
+                        .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -168,7 +169,7 @@ struct FilesPane: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let fileProblem {
                     Text(probe == nil ? "Not written yet. It will appear here as it is." : fileProblem)
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -179,7 +180,7 @@ struct FilesPane: View {
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
-                        .font(.footnote)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                         .padding(10)
                 }
@@ -195,7 +196,7 @@ struct FilesPane: View {
                     if probe.isTruncated {
                         Divider()
                         Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
-                            .font(.footnote)
+                            .appText(.fine)
                             .foregroundStyle(.secondary)
                             .padding(10)
                     }
@@ -359,10 +360,10 @@ private struct Gone: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "questionmark.folder")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

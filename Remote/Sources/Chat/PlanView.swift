@@ -22,7 +22,7 @@ struct PlanView: View {
             }
             if plan.state == .withdrawn {
                 Text("The agent dropped this plan")
-                    .chatText(.fine)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -42,11 +42,11 @@ private struct PlanLine: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: symbol)
-                .chatText(.fine)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
             Text(entry.content)
-                .chatText(.supporting)
+                .appText(.supporting)
                 .foregroundStyle(entry.status == .completed ? .tertiary : .secondary)
                 .strikethrough(entry.status == .completed || withdrawn)
         }
@@ -93,12 +93,12 @@ struct CurrentPlanStrip: View {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "chevron.right")
-                            .chatText(.fine)
+                            .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
                             .accessibilityHidden(true)
                         Text(summary(plan))
-                            .chatText(.supporting)
+                            .appText(.supporting)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)

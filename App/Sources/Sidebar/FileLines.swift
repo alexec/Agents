@@ -38,7 +38,7 @@ struct FileLines: View {
                     // rather than left as a view that quietly did not move.
                     if let line, line > lines.count {
                         Text("Line \(line) is past what is shown here.")
-                            .font(.footnote)
+                            .appText(.fine)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 10)
                             .padding(.bottom, 6)
@@ -74,7 +74,7 @@ struct FileLines: View {
             Text(content.isEmpty ? " " : String(content))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.system(.body, design: .monospaced))
+        .appText(.code)
         .padding(.horizontal, 10)
         .padding(.vertical, 1)
         .background(number == line ? AnyShapeStyle(.tint.opacity(0.18)) : AnyShapeStyle(.clear))

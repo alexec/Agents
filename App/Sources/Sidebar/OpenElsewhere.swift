@@ -19,11 +19,11 @@ struct OpenElsewhere: View {
                 .resizable()
                 .frame(width: 64, height: 64)
             Text(url.lastPathComponent)
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
                 .lineLimit(2)
                 .truncationMode(.middle)
             Text(description)
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 if let app = defaultApp {

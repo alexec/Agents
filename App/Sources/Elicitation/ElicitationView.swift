@@ -20,15 +20,15 @@ struct ElicitationView: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(request.title).font(.headline)
+                Text(request.title).appText(.reading).fontWeight(.semibold)
                 if let message = request.message, message != request.title {
-                    Text(message).font(.callout)
+                    Text(message).appText(.reading)
                 }
 
                 switch request.mode {
                 case .form(let schema) where schema.singleChoice != nil:
                     if let description = schema.description {
-                        Text(description).font(.callout).foregroundStyle(.secondary)
+                        Text(description).appText(.supporting).foregroundStyle(.secondary)
                     }
                     oneClick(schema)
 
@@ -80,7 +80,7 @@ struct ElicitationView: View {
         let last = pages.count - 1
         let page = min(max(step, 0), last)
         if let description = schema.description {
-            Text(description).font(.callout).foregroundStyle(.secondary)
+            Text(description).appText(.supporting).foregroundStyle(.secondary)
         }
         // Every page is laid out, hidden, under the one that shows, so the card is as
         // tall as its tallest question whichever page is up. Answering the first
@@ -97,7 +97,7 @@ struct ElicitationView: View {
             if last > 0 {
                 turn(to: page - 1, "chevron.backward", "Previous question", enabled: page > 0)
                 Text("\(page + 1)/\(pages.count)")
-                    .font(.caption)
+                    .appText(.fine)
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
             }
@@ -106,7 +106,7 @@ struct ElicitationView: View {
             // which is why Submit will not go.
             if page == last, let problem = schema.problems(with: values).first {
                 Text(problem)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -229,14 +229,14 @@ struct ElicitationView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(property.title ?? property.name)
-                    .font(.callout)
+                    .appText(.reading)
                     .fontWeight(.medium)
                 if property.isRequired {
-                    Text("needed").font(.caption).foregroundStyle(.tertiary)
+                    Text("needed").appText(.fine).foregroundStyle(.tertiary)
                 }
             }
             if let description = property.description {
-                Text(description).font(.callout).foregroundStyle(.secondary)
+                Text(description).appText(.supporting).foregroundStyle(.secondary)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -261,7 +261,7 @@ struct ElicitationView: View {
             Text(title)
             if let description, !description.isEmpty {
                 Text(description)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             }
         }
@@ -332,7 +332,7 @@ struct ElicitationView: View {
             Text(title)
             if let description, !description.isEmpty {
                 Text(description)
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.secondary)
             }
         }
@@ -348,8 +348,8 @@ struct ElicitationView: View {
     private func field(for property: ElicitationSchema.Property) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                Text(property.title ?? property.name).font(.callout)
-                if property.isRequired { Text("needed").font(.caption).foregroundStyle(.tertiary) }
+                Text(property.title ?? property.name).appText(.reading)
+                if property.isRequired { Text("needed").appText(.fine).foregroundStyle(.tertiary) }
             }
             switch property.kind {
             case .string(_, _, _, let choices):
@@ -361,7 +361,7 @@ struct ElicitationView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(choice.title)
                                 if let description = choice.description {
-                                    Text(description).font(.caption).foregroundStyle(.secondary)
+                                    Text(description).appText(.supporting).foregroundStyle(.secondary)
                                 }
                             }
                             .tag(JSONValue.string(choice.value))
@@ -400,7 +400,7 @@ struct ElicitationView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title)
                                 if let description = item.description {
-                                    Text(description).font(.caption).foregroundStyle(.secondary)
+                                    Text(description).appText(.supporting).foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -408,10 +408,10 @@ struct ElicitationView: View {
                 }
             }
             if let description = property.description {
-                Text(description).font(.caption).foregroundStyle(.secondary)
+                Text(description).appText(.supporting).foregroundStyle(.secondary)
             }
             if let problem = property.problem(with: values[property.name]), values[property.name] != nil {
-                Text(problem).font(.caption).tinted(.failure)
+                Text(problem).appText(.supporting).tinted(.failure)
             }
         }
     }

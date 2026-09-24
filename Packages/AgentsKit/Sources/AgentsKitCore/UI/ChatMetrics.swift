@@ -13,10 +13,12 @@ import Foundation
 ///
 /// The two anchors the constants were fixed against, at the default 1,100-point window
 /// (`AgentsApp`), with the project list at its ideal 240 (`ContentView`) and the sidebar
-/// at its stored default of 380 (`SidebarState`):
+/// at its stored default, which was 380 when these were set and is 460 now that the
+/// document pane needs the room (`SidebarState`):
 ///
-/// - sidebar open: the chat pane is 480 points. It must yield far more text than
-///   margin. It now gets 425 of text inside 27 a side.
+/// - sidebar open: the chat pane was 480 points and is 400 at the wider sidebar. It
+///   must yield far more text than margin. It gets 357 of text inside 22 a side —
+///   fewer characters than before, which is what opening a document pane costs.
 /// - sidebar shut: the pane is 860 points. The old gutter gave 572 of text there, and
 ///   that is the look the app has been read at, so the cap is set beside it: 580.
 ///
@@ -25,9 +27,12 @@ import Foundation
 /// dragged, so the numbers are typical rather than exact; the invariants below hold at
 /// every width regardless.
 ///
-/// The cap is a property of text, not of this app. At the body face 580 points is
-/// about ninety characters, which is where a line becomes one the eye loses its place
-/// on between the end of it and the start of the next.
+/// The cap is a property of text, not of this app: ninety characters is where a line
+/// becomes one the eye loses its place on between the end of it and the start of the
+/// next. 580 points was ninety at the old body face and is eighty-five at the
+/// `reading` step the transcript moved to, so it still sits inside the bound and is
+/// left where it is rather than chased upwards — `PageMetrics` had to move because a
+/// test holds its floor; this one did not.
 public struct ChatMetrics: Hashable, Sendable {
     /// The widest the text may run, in points. Past this the column centres and the
     /// surplus becomes margin either side (FR-017, FR-020).
@@ -40,8 +45,8 @@ public struct ChatMetrics: Hashable, Sendable {
         self.padding = padding
     }
 
-    /// Ninety characters at the body face, and within a few points of what the old
-    /// gutter gave at the default window with the sidebar shut, so the default view
+    /// Eighty-five characters at the reading face, and within a few points of what the
+    /// old gutter gave at the default window with the sidebar shut, so the default view
     /// barely changes. Only the narrow and the very wide cases do.
     public static let measureCap: Double = 580
 

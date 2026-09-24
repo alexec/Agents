@@ -32,11 +32,11 @@ struct WorkflowRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(workflow.name)
-                    .font(.headline)
+                    .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
 
                 Text(workflow.summary)
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -110,7 +110,7 @@ struct WorkflowRow: View {
                 Text(outcome)
             }
         }
-        .font(.caption)
+        .appText(.fine)
         // Grey unless somebody is needed. The attention tint is `StateTint`'s to name,
         // and spending it on a workflow that skipped a single fire would be spending
         // it on nothing. An agent that said it cannot get further without a person
@@ -148,11 +148,11 @@ struct WorkflowRow: View {
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.glass)
-                    .font(.caption)
+                    .appText(.fine)
             } else {
                 if summary.isRunning {
                     Text("Running…")
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.secondary)
                 } else {
                     // Offered on every row, always — including one whose triggers this
@@ -215,7 +215,7 @@ private struct WorkflowStatusIcon: View {
 
     var body: some View {
         Image(systemName: name)
-            .font(.callout)
+            .appText(.reading)
             .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
             .accessibilityLabel(label)
     }

@@ -30,7 +30,7 @@ struct PassageEditor: View {
 
     var body: some View {
         TextEditor(text: $draft)
-            .font(.system(.callout, design: .serif))
+            .appText(.reading)
             .scrollContentBackground(.hidden)
             .scrollDisabled(true)
             // `TextEditor` insets its text by a few points that a `Text` does not;

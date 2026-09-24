@@ -72,7 +72,7 @@ struct ArtifactsPane: View {
                         .tinted(.failure)
                 }
             }
-            .font(.caption)
+            .appText(.fine)
             .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
@@ -121,16 +121,16 @@ private struct Nothing: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "tray")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing exchanged yet")
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
             Text("A file you attach to a prompt, or one an agent hands back by name, appears here, so you can find it again without scrolling back through the conversation.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Text("Files the agent merely changed are marked in Files instead.")
-                .font(.footnote)
+                .appText(.fine)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
         }

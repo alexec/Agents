@@ -76,7 +76,7 @@ struct CostSettingsView: View {
                     .monospacedDigit()
                 if let left = state.dayHeadroom, let daily = state.limits.daily {
                     Text("\(left.money(in: daily.currency)) left")
-                        .font(.caption)
+                        .appText(.fine)
                         // Colour means the limit is about to bite, on the app's one
                         // existing threshold rather than a second number to learn.
                         .foregroundStyle((state.dayIsCloseToFull ? StateTint.failure : .none)
@@ -167,11 +167,11 @@ private struct LimitField: View {
                 }
             }
             Text(caption)
-                .font(.caption)
+                .appText(.fine)
                 .foregroundStyle(.secondary)
             if let warning {
                 Label(warning, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
+                    .appText(.fine)
                     .tinted(.failure)
             }
         }

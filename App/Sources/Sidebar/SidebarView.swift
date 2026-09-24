@@ -92,12 +92,12 @@ private struct NoAgent: View {
             // Deliberately not the sidebar glyph: that one means the control in the
             // toolbar, and repeating it here reads as a button that does nothing.
             Image(systemName: "square.dashed")
-                .font(.largeTitle)
+                .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("No agent chosen")
-                .font(.headline)
+                .appText(.reading).fontWeight(.semibold)
             Text("Start an agent, or pick one from the list, and its folder, a shell in that folder, and what it hands over all appear here.")
-                .font(.callout)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

@@ -20,14 +20,14 @@ struct AgentRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(agent.title ?? "Untitled")
-                        .font(.headline)
+                        .appText(.reading).fontWeight(.semibold)
                         .lineLimit(1)
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
                     // between something you asked for and something that ran itself.
                     if let workflowName = startedByWorkflowName {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.caption)
+                            .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .help("Started by the workflow \(workflowName)")
                             .accessibilityLabel("started by the workflow \(workflowName)")
@@ -35,14 +35,14 @@ struct AgentRow: View {
                 }
 
                 Text(description)
-                    .font(.callout)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let detail {
                     Text(detail)
-                        .font(.caption)
+                        .appText(.fine)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
@@ -161,6 +161,7 @@ struct StatusIcon: View {
                     .scaleEffect(0.7)
             } else {
                 Image(systemName: symbol)
+                    // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
                     .foregroundStyle(tint.style(or: .secondary))
             }

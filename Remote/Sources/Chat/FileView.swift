@@ -75,7 +75,7 @@ private struct Provenance: View {
         Text(count == 1
              ? "As the agent left it. One change, in this conversation."
              : "As the agent left it. \(count) changes, newest first.")
-            .font(.footnote)
+            .appText(.fine)
             .foregroundStyle(.secondary)
     }
 }
@@ -112,19 +112,19 @@ private struct FileLines: View {
             ForEach(Array(shown.enumerated()), id: \.offset) { index, line in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("\(index + 1)")
-                        .font(.caption2.monospacedDigit())
+                        .appText(.fine).monospacedDigit()
                         .foregroundStyle(.tertiary)
                         .frame(width: 34, alignment: .trailing)
                         .accessibilityHidden(true)
                     Text(line.isEmpty ? " " : String(line))
-                        .font(.caption.monospaced())
+                        .appText(.code)
                         .textSelection(.enabled)
                     Spacer(minLength: 0)
                 }
             }
             if lines.count > Self.limit {
                 Text("\(lines.count - Self.limit) more lines, on your Mac")
-                    .font(.caption)
+                    .appText(.fine)
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
             }
@@ -143,10 +143,10 @@ private struct Unseen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nothing in this conversation changed \(name).")
-                .font(.callout)
+                .appText(.reading)
             Text("The iPad shows a file as the agent's own changes describe it. "
                  + "A file it only read is on your Mac.")
-                .font(.footnote)
+                .appText(.fine)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

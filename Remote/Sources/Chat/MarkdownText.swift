@@ -44,11 +44,10 @@ private struct BlockView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
         case .heading(let level, let text):
-            // Not a step of the chat scale. Headings keep their own relative sizes,
-            // the same on both apps, and the consistency check allows them by name.
+            // Not a step of the scale: `TextStep.heading` says why, and resolves the
+            // ladder once for both apps. The consistency check allows it by name.
             Text(text)
-                .font(level <= 1 ? .title3.weight(.semibold)
-                                 : level == 2 ? .headline : .subheadline.weight(.semibold))
+                .font(TextStep.heading(level: level))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -71,12 +70,12 @@ private struct BlockView: View {
         case .code(let language, let text):
             VStack(alignment: .leading, spacing: 4) {
                 if let language, !language.isEmpty {
-                    Text(language).chatText(.fine).foregroundStyle(.tertiary)
+                    Text(language).appText(.fine).foregroundStyle(.tertiary)
                 }
                 // Code keeps its own shape, so it scrolls rather than wraps.
                 ScrollView(.horizontal, showsIndicators: false) {
                     Text(text)
-                        .chatText(.code)
+                        .appText(.code)
                         .textSelection(.enabled)
                         .padding(10)
                 }
@@ -91,7 +90,7 @@ private struct BlockView: View {
                     GridRow {
                         ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
                             Text(cell)
-                                .chatText(.supporting).fontWeight(.semibold)
+                                .appText(.supporting).fontWeight(.semibold)
                                 .gridColumnAlignment(alignment(table, index))
                         }
                     }
@@ -99,7 +98,7 @@ private struct BlockView: View {
                     ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
                         GridRow {
                             ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                                Text(cell).chatText(.supporting)
+                                Text(cell).appText(.supporting)
                             }
                         }
                     }
@@ -113,7 +112,7 @@ private struct BlockView: View {
             // remote that went and got it would be reaching past the mailbox.
             Label(alt.isEmpty ? URL(string: source)?.lastPathComponent ?? source : alt,
                   systemImage: "photo")
-                .chatText(.supporting)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
 
         case .rule:
@@ -126,7 +125,7 @@ private struct BlockView: View {
     private func marker(ordered: Bool, number: Int, checked: Bool?) -> some View {
         if let checked {
             Image(systemName: checked ? "checkmark.square" : "square")
-                .chatText(.fine)
+                .appText(.fine)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(checked ? "Done" : "Not done")
         } else if ordered {
