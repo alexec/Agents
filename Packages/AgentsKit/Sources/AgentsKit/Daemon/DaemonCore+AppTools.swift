@@ -113,8 +113,13 @@ extension DaemonCore {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
                                         message: request.message)
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
-        let noted = await land(checked.report, prompts: prompts, on: checked.agent,
-                               id: checked.agentID)
+        // Cleaned again here, not trusted from the helper: the daemon is what writes
+        // the record, and a helper from an older binary sends no title at all — which
+        // leaves the name as it was rather than refusing a call the agent was never
+        // told needed one.
+        let title = request.title.flatMap(Agent.cleanedTitle)
+        let noted = await land(checked.report, prompts: prompts, title: title,
+                               on: checked.agent, id: checked.agentID)
         return prompts.isEmpty ? noted : noted + " " + Self.shownNote(count: prompts.count)
     }
 
@@ -163,12 +168,18 @@ extension DaemonCore {
 
     /// Put a report on the agent — and a row of chips, where the call carried one —
     /// and say what became of it.
-    private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, on agent: Agent,
-                      id agentID: UUID) async -> String {
+    private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, title: String? = nil,
+                      on agent: Agent, id agentID: UUID) async -> String {
         var agent = agent
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
         if let prompts { agent.suggestedPrompts = prompts }
+        // In the same write as the report, so no window ever sees the new account of
+        // the work under the old name for it.
+        if let title {
+            agent.title = title
+            agent.titledByAgent = true
+        }
         // The record before the windows, which is the order that leaves something true
         // behind when the daemon is killed mid-call.
         await record(.workReported(report), for: agentID)

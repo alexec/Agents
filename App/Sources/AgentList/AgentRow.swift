@@ -14,7 +14,8 @@ struct AgentRow: View {
         HStack(alignment: .top, spacing: 12) {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,
-                       isUnaccountedFor: agent.endingIsUnaccountedFor)
+                       isUnaccountedFor: agent.endingIsUnaccountedFor,
+                       ending: agent.endedReason?.summary)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -34,17 +35,19 @@ struct AgentRow: View {
                     }
                 }
 
-                Text(description)
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let detail {
-                    Text(detail)
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+                // The agent's own account of its last turn, and nothing else. This line
+                // used to be whichever of five things was true — a plan step, the
+                // report, "Waiting for your answer", why it stopped — with the runtime
+                // and a step count under it, and a row that says a different kind of
+                // thing depending on state is a row nobody can read at a glance. The
+                // state is the icon's; what it is doing is the title, which the agent
+                // keeps current; this is what it said.
+                if let report = agent.report?.message {
+                    Text(report)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)
@@ -76,94 +79,42 @@ struct AgentRow: View {
         guard let id = agent.startedByWorkflow else { return nil }
         return model.workflows(in: agent.cwd).first { $0.workflow.workflowID == id }?.workflow.name ?? id
     }
-
-    /// What it is doing, in its own words where it has said them.
-    ///
-    /// Coming back wins over everything, including whatever step the agent last named:
-    /// that step is from the turn the daemon took with it, and saying it now would be
-    /// describing work nothing is doing.
-    private var description: String {
-        if isComingBack { return AgentsModel.comingBackDescription }
-        // Only while a turn is going. A plan left with a step in progress by a turn that
-        // was stopped or ended is not something the agent is doing now.
-        if agent.state == .running || agent.state == .starting, let step = agent.currentStep {
-            return step
-        }
-        // The agent's own words about the turn that just ended, in preference to
-        // anything we would otherwise derive (FR-013). It wrote them for somebody who
-        // has not read the conversation, which is exactly who is reading this row.
-        if let message = agent.report?.message { return message }
-        // Ours, because nobody said. A turn that ended cleanly, was asked how it went,
-        // and still said nothing is a thing to know rather than a thing to do — so it
-        // is marked, and left where it is (FR-019).
-        if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
-        switch agent.state {
-        case .running: return "Working"
-        case .starting: return AgentState.startingLabel
-        case .waitingOnUser: return "Waiting for your answer"
-        // Never "Complete" on the strength of the turn ending. That word belongs to
-        // `AgentGroup.finished`, which is the heading, and to an agent that reported
-        // `done`, which is a claim somebody made (FR-012).
-        case .finished: return "Finished"
-        case .stopped: return ending ?? "Stopped"
-        case .archived: return "Archived"
-        }
-    }
-
-    /// The runtime, and how far through its plan it is.
-    private var detail: String? {
-        var parts = [runtimeName]
-        if agent.state.holdsRuntime, let progress = agent.planProgress {
-            // Clamped, because the last step being done would read "step 6 of 5".
-            let step = min(progress.done + 1, progress.total)
-            parts.append("step \(step) of \(progress.total)")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private var runtimeName: String {
-        RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID
-    }
-
-    /// Stopped short, and why. The words live on `EndedReason`, so this row and the
-    /// phone's card say the same thing about the same agent.
-    private var ending: String? { agent.endedReason?.summary }
 }
 
-/// What state an agent is in, as one symbol.
+/// What state an agent is in, as one of four shapes.
 ///
-/// Grey, all of it, except the one that wants you: the only colour in this app means
-/// something needs a person.
+/// The shape is `StatusShape`'s, which the phone's card draws from too. Grey, all of
+/// it, except the one that wants you: the only colour in this app means something
+/// needs a person. The finer distinctions — which outcome, why it stopped, whether
+/// anyone vouched for the ending — are still said, in the tooltip and to a screen
+/// reader, rather than drawn.
 struct StatusIcon: View {
     let state: AgentState
-    /// Its own symbol rather than a spinner: nothing is running yet, and the row
-    /// stays under "Stopped" until the chat's own state moves it.
+    /// The daemon is bringing this chat back by itself after a restart.
     var isComingBack = false
-    /// What the agent said about the work, where it said anything. Filled means
-    /// somebody said so, hollow means nobody did, and orange means you.
+    /// What the agent said about the work, where it said anything.
     var outcome: WorkOutcome?
     /// A turn that ended cleanly, was asked how it went, and still said nothing.
-    /// Hollow and grey: nobody vouched for it, which is worth seeing and not worth
-    /// spending the app's one colour on.
     var isUnaccountedFor = false
+    /// Why it stopped, where it did, in `EndedReason`'s words.
+    var ending: String?
+
+    private var shape: StatusShape {
+        StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
+    }
 
     var body: some View {
         Group {
-            // `.starting` spins too. The `symbol` switch below is only reached in
-            // this branch's `else`, so the working *icon* is this spinner and not the
-            // `circle.dotted` that `case .running` nominally returns — meaning a
-            // starting agent drawn from `symbol` would show a static circle and then
-            // flip to a spinner the moment its first turn began. That is the same
-            // flicker 020 exists to remove, one layer down.
-            if state == .running || state == .starting {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.7)
-            } else {
+            if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
-                    .foregroundStyle(tint.style(or: .secondary))
+                    .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
+                        .style(or: .secondary))
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.7)
             }
         }
         .frame(width: 18, height: 18)
@@ -172,60 +123,13 @@ struct StatusIcon: View {
     }
 
     /// The outcome, where the turn it describes is the one the agent is settled on.
-    /// A stopped or archived agent keeps its own symbol whatever it last claimed,
-    /// which is the rule `AgentGroup` follows for the same reason.
     private var settledOutcome: WorkOutcome? {
         state == .finished && !isComingBack ? outcome : nil
     }
 
-    private var symbol: String {
-        if isComingBack { return AgentsModel.comingBackSymbol }
-        if let settledOutcome {
-            switch settledOutcome {
-            case .done: return "checkmark.circle.fill"
-            case .nothingToDo: return "checkmark.circle"
-            case .needsAnswer: return "questionmark.circle.fill"
-            case .partlyDone: return "circle.lefthalf.filled"
-            case .stuck: return "exclamationmark.triangle.fill"
-            }
-        }
-        if isUnaccountedFor && state == .finished { return "questionmark.circle" }
-        switch state {
-        case .running: return "circle.dotted"
-        // The working icon. A state that lasts a moment and is grouped under Working
-        // does not earn a symbol of its own, and one that flashed a different shape on
-        // every start would be the flicker this feature removes, wearing a coat.
-        case .starting: return "circle.dotted"
-        case .waitingOnUser: return "questionmark.circle.fill"
-        // Hollow, because nobody vouched for it. Green and filled is now reserved for
-        // an agent that said `done` itself (FR-012).
-        case .finished: return "checkmark.circle"
-        case .stopped: return "stop.circle"
-        case .archived: return "archivebox"
-        }
-    }
-
-    private var tint: StateTint {
-        if let settledOutcome {
-            if settledOutcome.needsAPerson { return .attention }
-            return settledOutcome == .done ? .vouched : .none
-        }
-        // This switch has a `default:`, so the compiler does not ask it to answer for a
-        // new state. `.starting` was checked against it by hand when 020 added the
-        // state: `.none` is the wanted answer, because an agent whose conversation has
-        // not begun is neither asking for a person nor vouched for by one.
-        //
-        // Left as a `default:` rather than made exhaustive, because the rule here is
-        // genuinely "one state is special and the rest are not" — but the next person
-        // to add a state gets no warning from this line, and now knows it.
-        switch state {
-        case .waitingOnUser: return .attention
-        default: return .none
-        }
-    }
-
-    /// What a screen reader hears, and what the tooltip says. The outcome's words come
-    /// from `WorkOutcome.heading`, so they are the same words the phone uses.
+    /// What a screen reader hears, and what the tooltip says. Precise where the shape
+    /// is not: the outcome's words come from `WorkOutcome.heading`, which the phone
+    /// reads too, and a stopped agent says why.
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
         if let settledOutcome { return settledOutcome.heading }
@@ -235,7 +139,7 @@ struct StatusIcon: View {
         case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting on you"
         case .finished: return "Finished"
-        case .stopped: return "Stopped"
+        case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
         }
     }

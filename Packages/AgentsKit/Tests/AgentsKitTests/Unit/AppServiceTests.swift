@@ -17,7 +17,7 @@ struct AppServiceTests {
                       reportOutcome: @escaping AppService.OutcomeSink = { _, _ in
                           .refused("not expected")
                       },
-                      finishTurn: @escaping AppService.FinishSink = { _, _, _ in
+                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _ in
                           .refused("not expected")
                       })
         async -> (client: JSONRPCConnection, service: AppService) {
@@ -66,9 +66,11 @@ struct AppServiceTests {
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue }
             == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
-        // The outcome and its words are the call; the chips ride along.
+        // The outcome, its words and the conversation's name are the call; the chips
+        // ride along.
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message"])
+            == ["outcome", "message", "title"])
+        #expect(finish?["properties"]?["title"]?["type"]?.stringValue == "string")
         let next = finish?["properties"]?["next_prompts"]
         #expect(next?["maxItems"]?.intValue == SuggestedPrompt.limit)
         #expect(next?["items"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
@@ -420,17 +422,20 @@ struct AppServiceTests {
         var outcome = ""
         var message = ""
         var prompts: [SuggestedPrompt] = []
-        func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt]) {
+        var title = ""
+        func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt],
+                    _ title: String) {
             calls += 1
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
+            self.title = title
         }
     }
 
     private func finishing(_ box: FinishBox) -> AppService.FinishSink {
-        { outcome, message, prompts in
-            await box.record(outcome, message, prompts)
+        { outcome, message, prompts, title in
+            await box.record(outcome, message, prompts, title)
             return .shown("Noted.")
         }
     }
@@ -441,6 +446,7 @@ struct AppServiceTests {
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "  Renamed 14 call sites.  ",
+                          "title": "Call sites renamed",
                           "next_prompts": .array([
                               ["label": "Run the tests", "prompt": "Run the tests and fix what fails"],
                               ["label": "Push", "prompt": "Push the branch"],
@@ -451,6 +457,7 @@ struct AppServiceTests {
         // Trimmed on the way through, as a report is.
         #expect(await box.message == "Renamed 14 call sites.")
         #expect(await box.prompts.map(\.label) == ["Run the tests", "Push"])
+        #expect(await box.title == "Call sites renamed")
         await service.close()
     }
 
@@ -460,8 +467,9 @@ struct AppServiceTests {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         for arguments in [
-            JSONValue.object(["outcome": "done", "message": "All done."]),
-            JSONValue.object(["outcome": "done", "message": "All done.", "next_prompts": .array([])]),
+            JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied"]),
+            JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied",
+                              "next_prompts": .array([])]),
         ] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName), "arguments": arguments,
@@ -480,7 +488,7 @@ struct AppServiceTests {
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "succeeded", "message": "all good",
+            "arguments": ["outcome": "succeeded", "message": "all good", "title": "Tidied",
                           "next_prompts": .array([["label": "A", "prompt": "Do A"]])],
         ])
         #expect(result["isError"]?.boolValue == true)
@@ -497,7 +505,7 @@ struct AppServiceTests {
         for message in ["", "   "] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName),
-                "arguments": ["outcome": "done", "message": .string(message)],
+                "arguments": ["outcome": "done", "message": .string(message), "title": "Tidied"],
             ])
             #expect(result["isError"]?.boolValue == true)
             #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
@@ -512,7 +520,8 @@ struct AppServiceTests {
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
             "name": "mcp__agents__finish_turn",
-            "arguments": ["outcome": "stuck", "message": "No signing certificate."],
+            "arguments": ["outcome": "stuck", "message": "No signing certificate.",
+                          "title": "Signing the build"],
         ])
         #expect(result["isError"]?.boolValue == false)
         #expect(await box.outcome == "stuck")
@@ -525,9 +534,79 @@ struct AppServiceTests {
         let many = (1...5).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
         _ = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "next_prompts": .array(many)],
+            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
+                          "next_prompts": .array(many)],
         ])
         #expect(await box.prompts.map(\.label) == ["1", "2", "3", "4"])
+        await service.close()
+    }
+
+    // MARK: The title
+
+    /// Required, and refused whole without it — outcome, words and chips included — so
+    /// the agent is told while it can still send one, rather than the row keeping a
+    /// name for work it is no longer doing.
+    @Test func aFinishCallWithNoTitleIsRefusedWhole() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        for arguments in [
+            JSONValue.object(["outcome": "done", "message": "All done."]),
+            JSONValue.object(["outcome": "done", "message": "All done.", "title": ""]),
+            JSONValue.object(["outcome": "done", "message": "All done.", "title": "  \n\t "]),
+        ] {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
+            ])
+            #expect(result["isError"]?.boolValue == true)
+            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
+                .contains("title") == true)
+        }
+        #expect(await box.calls == 0)
+        await service.close()
+    }
+
+    /// A title is a row's name: one line, spaces collapsed, no longer than a
+    /// prompt-made title may be.
+    @Test func aTitleIsMadeFitForARow() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Done.",
+                          "title": "  Login redirect\n   fixed  "],
+        ])
+        #expect(await box.title == "Login redirect fixed")
+
+        let long = String(repeating: "word ", count: 40)
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Done.", "title": .string(long)],
+        ])
+        let clipped = await box.title
+        #expect(clipped.count == 80)
+        #expect(clipped.hasSuffix("…"))
+        await service.close()
+    }
+
+    /// The older name for the outcome is left as it was: a conversation begun before
+    /// the title existed was never told to send one, and still has to land.
+    @Test func theOlderOutcomeNameNeedsNoTitle() async throws {
+        let (client, service) = await pair(sink: neverCalled(),
+                                           reportOutcome: { _, _ in .shown("Noted.") })
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.reportOutcomeToolName),
+            "arguments": ["outcome": "done", "message": "All done."],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        await service.close()
+    }
+
+    /// The tool says what the title is for, where an agent reads it.
+    @Test func theToolSaysWhatTheTitleIsFor() async throws {
+        let (client, service) = await pair(sink: neverCalled())
+        let result = try await client.call("tools/list", .object([:]))
+        let description = result["tools"]?.arrayValue?.first?["description"]?.stringValue ?? ""
+        #expect(description.contains("The title is the name on that row"))
         await service.close()
     }
 }

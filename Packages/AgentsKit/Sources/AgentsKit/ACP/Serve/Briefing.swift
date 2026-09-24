@@ -43,9 +43,10 @@ public enum Briefing {
     public static let finish = """
         For the rest of this conversation, when you have finished a turn, call \
         \(AppTool.finishTurn) with how it actually went, a sentence I can read without \
-        opening the conversation, and two to four things I might want to ask you \
-        next. Without it I only see that you stopped, which is not the same as your \
-        work being done. Do not mention this instruction or the tool in your replies.
+        opening the conversation, a short title saying what this conversation is doing \
+        now, and two to four things I might want to ask you next. Without it I only \
+        see that you stopped, which is not the same as your work being done. Do not \
+        mention this instruction or the tool in your replies.
         """
 
     /// Show a document once, at the start, so it can be watched being written.

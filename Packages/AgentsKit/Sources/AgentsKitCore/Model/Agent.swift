@@ -90,6 +90,14 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// person. One ask per silence, and the agent cannot write it.
     public var outcomeAsked: Bool
 
+    /// Whether the title is the agent's own, given with the call that ends its turn.
+    ///
+    /// Once it is, a title from the runtime no longer replaces it. That is not a
+    /// nicety: Claude's adapter generates a title of its own *when the turn ends*,
+    /// which is after the agent's last tool call, so without this the agent's name for
+    /// the work would be overwritten a moment after it was given.
+    public var titledByAgent: Bool
+
     public var createdAt: Date
     public var lastActivityAt: Date
     /// A finished conversation nobody has looked at since it finished. Set by the
@@ -210,6 +218,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // it, and is why neither of these is a completion.
         report = try c.decodeIfPresent(WorkReport.self, forKey: .report)
         outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
+        // New with the title on `finish_turn`. An older record's title came from the
+        // runtime or the prompt, so a runtime title may still replace it.
+        titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -258,6 +269,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
+        if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -276,6 +288,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case startedByWorkflow, startedByRun
         case restartPickUps
         case report, outcomeAsked
+        case titledByAgent
     }
 
     struct AnyKey: CodingKey {
@@ -313,6 +326,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
+                titledByAgent: Bool = false,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -342,6 +356,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked
+        self.titledByAgent = titledByAgent
         self.unknownFields = unknownFields
     }
 
@@ -353,6 +368,15 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
             .map(String.init)?
             .trimmingCharacters(in: .whitespaces) ?? "Untitled"
         return firstLine.count > 80 ? String(firstLine.prefix(79)) + "…" : firstLine
+    }
+
+    /// An agent's own title, made fit for a row: one line, spaces collapsed, and no
+    /// longer than a prompt-made title may be. Nil when nothing is left, which the
+    /// daemon refuses rather than drawing a blank row.
+    public static func cleanedTitle(_ raw: String) -> String? {
+        let oneLine = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !oneLine.isEmpty else { return nil }
+        return oneLine.count > 80 ? String(oneLine.prefix(79)) + "…" : oneLine
     }
 
     /// Whether a restarting daemon may bring this chat back by itself: it was working
