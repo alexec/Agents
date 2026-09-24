@@ -38,9 +38,19 @@ struct PromptBar: View {
     /// matters.
     @State private var optionsWidth: CGFloat = 0
     @FocusState private var focused: Bool
+    /// A draft came back without something it held by value — a pasted picture too large
+    /// to keep — and the bar says so until the next thing is sent (025 US5).
+    @State private var draftLostSomething = false
 
     private var agent: Agent? { model.selectedAgent }
     private var isNew: Bool { agent == nil }
+
+    /// Which conversation the words in this bar belong to, and are kept against. A project
+    /// page's bar is that project's; the chat's is its agent's.
+    private var draftKey: DraftKey {
+        if let agent { return .agent(agent.id) }
+        return .newAgent(folder: folderIsFixed ? model.selectedProject : nil)
+    }
 
     // MARK: What the agent thinks you might ask
 
@@ -83,6 +93,11 @@ struct PromptBar: View {
                                         attachments.removeAll { $0.id == attachment.id }
                                     })
                 }
+                if draftLostSomething {
+                    Text("A picture you had pasted was too large to keep, so it did not come back with the rest.")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
                 if isCompleting {
                     CommandList(commands: matchingCommands, selected: selectedCommand,
                                 choose: accept)
@@ -120,13 +135,10 @@ struct PromptBar: View {
         .onChange(of: model.selection) {
             selectedSuggestion = 0
             dismissedSuggestions = false
-            // The project page's bar stays under the chat while one is open, so
-            // opening a chat is not a reason to throw away what was half typed there.
-            // The chat's own bar starts each chat empty, files and all: words meant for
-            // one agent must not be sent to the next.
-            guard !folderIsFixed else { return }
-            text = ""
-            attachments = []
+            // What was half typed is no longer thrown away here. It is kept against the
+            // conversation it was typed for, and each conversation's own comes back, files
+            // and all — see `KeepsDrafts`. Words meant for one agent still never reach
+            // the next: the bar only ever holds what belongs to where it is.
         }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.
@@ -145,6 +157,8 @@ struct PromptBar: View {
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
         .onChange(of: model.agents.count) { prepare() }
+        .modifier(KeepsDrafts(text: $text, attachments: $attachments,
+                              lostSomething: $draftLostSomething, key: draftKey))
     }
 
     // MARK: A limit reached
@@ -826,6 +840,9 @@ struct PromptBar: View {
         let going = attachments
         text = ""
         attachments = []
+        // A draft exists only until it becomes a prompt. Given back below if it did not go.
+        DraftKeeper.shared.clear(draftKey)
+        draftLostSomething = false
         // Whatever was suggested has been answered, by being taken or by being typed
         // past. The daemon clears it when the turn begins, but the field empties now,
         // and an emptied field must not offer last turn's words back.
@@ -882,6 +899,8 @@ struct PromptBar: View {
     /// asking for something the app knows.
     private func prepare() {
         guard isNew else { return }
+        // What was left on the form, before anything fills in a default over it.
+        DraftKeeper.shared.putBackStartForm(into: model)
         if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             model.draftRuntimeID = model.availableRuntimes.first?.id
         }

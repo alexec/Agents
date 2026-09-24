@@ -425,52 +425,95 @@ of scope here (research §12).
 
 ### Tests for User Story 5
 
-- [ ] T039 [P] [US5] Create
+- [X] T039 [P] [US5] Create
       `Packages/AgentsKit/Tests/AgentsKitTests/Unit/DraftStoreTests.swift` against an
       injected `UserDefaults(suiteName:)`: a draft round-trips; clearing removes it;
       sweeping removes one whose agent is gone or archived (FR-022); sweeping removes one
       untouched for thirty days; an entry that will not decode is discarded rather than
       throwing.
-- [ ] T040 [P] [US5] Add a case for the inline-data cap: a draft carrying more inline
+- [X] T040 [P] [US5] Add a case for the inline-data cap: a draft carrying more inline
       attachment data than the cap keeps its text and every by-reference attachment, drops
       the inline blocks, and sets `droppedInlineData`.
-- [ ] T041 [P] [US5] Add a case for `DraftKey` rendering: `.agent(uuid)` and
+- [X] T041 [P] [US5] Add a case for `DraftKey` rendering: `.agent(uuid)` and
       `.newAgent(folder:)` produce stable, distinct defaults keys, and `.newAgent(nil)` is
       distinct from a folder.
 
 ### Implementation for User Story 5
 
-- [ ] T042 [P] [US5] Create
+- [X] T042 [P] [US5] Create
       `Packages/AgentsKit/Sources/AgentsKitCore/Model/Draft.swift` with `DraftKey`
       (`.agent(UUID)`, `.newAgent(folder: URL?)`), `Draft` (`text`, `attachments`,
       `mentions`, `start`, `editedAt`, `droppedInlineData`) and `StartDraft` (`cwd`,
       `runtimeID`, `folders`, `servers`, `chosen`). Every `StartDraft` field mirrors one
       `AppModel` already holds.
-- [ ] T043 [US5] Create
+- [X] T043 [US5] Create
       `Packages/AgentsKit/Sources/AgentsKitCore/Store/DraftStore.swift`, taking its
       `UserDefaults` as an init parameter the way `SidebarFrame` does: `draft(for:)`,
       `save(_:for:)`, `clear(_:)`, and `sweep(liveAgents:now:)`. It goes in `AgentsKitCore`
       rather than `App/Sources` because the package's suite is the only one the schemes
       run — in the app target this logic is covered by nothing (research §10).
-- [ ] T044 [US5] In `App/Sources/Chat/PromptBar.swift`: restore `text`, `attachments` and
+- [X] T044 [US5] In `App/Sources/Chat/PromptBar.swift`: restore `text`, `attachments` and
       `mentions` from the store when the bar appears for a conversation; save as typing
       settles rather than on every keystroke; and **clear the draft where the prompt is
       sent** — the two places at the end of `send` that already empty `text` and
       `attachments` (FR-021).
-- [ ] T045 [US5] In `App/Sources/AppModel.swift`, restore the start-form fields
+- [X] T045 [US5] In `App/Sources/AppModel.swift`, restore the start-form fields
       (`draftCwd`, `draftRuntimeID`, `draftFolders`, `draftServers`, `draftChosen`) from
       the stored `StartDraft` and write them back when they change. Be careful with
       `refreshDraftOptions`, which clears `draftChosen` on a runtime change — restoring
       must not resurrect choices for options the new runtime does not offer, which the
       existing `offered` filter already handles.
-- [ ] T046 [US5] Call `sweep` from `AppModel` when the agent list arrives from the daemon,
+- [X] T046 [US5] Call `sweep` from `AppModel` when the agent list arrives from the daemon,
       so a draft whose conversation has been archived or deleted goes rather than
       reappearing against nothing (FR-022).
-- [ ] T047 [US5] Show in `App/Sources/Chat/AttachmentStrip.swift` that something by value
+- [X] T047 [US5] Show in `App/Sources/Chat/AttachmentStrip.swift` that something by value
       was dropped, when `droppedInlineData` is set. One line, in the app's voice — a
       restored draft that quietly lost a pasted screenshot is worse than one that says so.
 
-**Checkpoint**: Type, quit, reopen, and it is there. Send, quit, reopen, and it is not.
+**What changed while building** (2026-09-24):
+
+- **File mentions are not a draft.** `PromptBar.mentions` is the list of matches in the
+  "@" popup; taking one appends the file to `attachments`. So a `Draft` is text and
+  attachments, and nothing else — keeping `mentions` would have been keeping a popup.
+- **One start form for the whole app, under `draft.start`**, not one per new-agent draft:
+  `AppModel` holds one set of start-form fields, shared by every bar that can start an
+  agent. Put back in two parts — folder, extra folders and servers at once (the folder
+  only if nothing has chosen one, so a project page's own folder wins); the runtime once
+  the runtimes are known, and only one that is still offered. The choices go back after
+  the runtime says what it offers, kept only where they are still choices — the same rule
+  `show(options:)` keeps a choice by — because loading options clears them. The mode was
+  already remembered per runtime by `ModeMemory`, and the folder by the selected project.
+- **The sweep only lets go of what is known to be over.** There is no "the agent list has
+  arrived" signal, so an agent the window has not heard of costs nothing: a draft goes when
+  its agent is known and archived, or after thirty days, which also catches a conversation
+  gone altogether. Agents are archived, never deleted, so nothing else is needed.
+- **Scoped by root — found by running it.** A copy of the app on a scratch root has the
+  same bundle id, so it shares the ordinary app's defaults; unscoped, every `run-app` test
+  and branch build would write its start form over the real one's. The ordinary root keeps
+  `draft.` keys; any other root keeps to `draft.root:<name>.`, and no store reads, writes
+  or sweeps outside its scope. `aScratchRootsDraftsAreItsOwn` pins it.
+- **`AppModel.swift` is untouched** — another lane has it open. `DraftKeeper` (one for the
+  app) holds the store, the pause-then-write and the start-form put-back; a `KeepsDrafts`
+  modifier is the whole of the bar's side. The notice for a picture too large to keep is a
+  line in `PromptBar`, not in `AttachmentStrip`, because it must show when no attachment
+  is left to draw a strip for.
+- **The chat's bar no longer empties when you move to another conversation.** It keeps
+  what was typed against the conversation it was typed for and brings back the one you
+  arrive at. Words meant for one agent still never reach the next.
+
+**Checkpoint**: ⚠️ Reached 2026-09-24, **all but one look**. `DraftStoreTests`, 13 cases:
+round trip, clear and empty, stable keys, the archive sweep, an unheard-of agent costing
+nothing, thirty days, an undecodable entry discarded, the inline cap both ways, the start
+form, and scopes kept apart. Full suite in a worktree at `db6f51f` with only US5: 3 of 5
+runs green, the same as the base, both failing only on the known-flaky
+`eachNewProcessIsCountedFromNothing`. The Mac and iOS schemes build. Walked with `run-app`
+on `/tmp/run-drafts`: three paragraphs set into the project page's bar were on screen and
+written under `draft.root:run-drafts.new./tmp/run-drafts/work`, with the start form beside
+them and nothing unscoped touched; the window was quit through its own menu and relaunched
+on the same root, and the draft was still on disk. **Not seen: the relaunched bar showing
+it** — the Mac locked a minute into the walk, and a locked screen gives neither a capture
+nor an accessibility tree. Send-clears was not walked for the same reason. Both rerun in
+seconds on the kept worktree build: `launch.sh --slug drafts --no-build` from `/tmp/w025`.
 
 ---
 
