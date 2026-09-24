@@ -234,9 +234,23 @@ file on disk is the four-step document. The window stayed on the project page th
 so the pending `show_file` waited for the conversation to be opened (FR-009) and **the page
 was never on screen during the agent's turn**. First observation for the findings: a
 document started from the project page is written before anyone can watch, because the
-conversation it belongs to is not the one on screen. The walk stopped there because the
-Mac's screen locked; the frames are in `/tmp/agents-022/frame-*.png`. To be resumed: open
-the conversation, let the pending `show_file` land, ask for four more writes, and screenshot.
+conversation it belongs to is not the one on screen. Second observation: the agent called
+`show_file` **before its first write**, as asked, and the daemon refused it because the file
+did not exist yet ("There is no file at …") — so even with the conversation open the page
+would not have appeared. The spec's edge case ("the file does not exist yet … the page opens
+empty and fills") is not what the daemon does today; that is Slice B's first job.
+
+Seen, once the conversation and the Files pane were opened by hand
+(`walk/A-page-open.png`): the document on the paper surface, serif, title and three sections,
+the pane at its default width, no chrome. It reads as a page. Not yet seen: the marks and the
+follow, because the second prompt (four more writes) was typed while Alex was using the Mac
+and never reached the agent. `walk/A-project-page-while-writing.png` is what the person saw
+while the agent wrote: the project page, nothing live.
+
+Still to see before the gate: four more writes with the page open — the tint landing on the
+changed passage, the view moving to it, and the jump back to the first paragraph. The scratch
+app is running against `/tmp/agents-022`; the conversation is open with Files showing
+`notes.md`.
 
 ### Slice B walk
 
