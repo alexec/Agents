@@ -132,6 +132,9 @@ public actor DaemonCore {
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
     var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The plan files each agent has had shown, which a device may read although they
+    /// sit outside the agent's folders (`~/.claude/plans`). The file, never its folder.
+    var shownPlanFiles: [UUID: Set<String>] = [:]
     /// The phones and iPads that have an agent's shell open, by agent (034). A device
     /// hears a shell's output only while it is here; a window on the Mac hears them all.
     var shellWatchers: [UUID: Set<UUID>] = [:]
@@ -763,6 +766,7 @@ public actor DaemonCore {
             // counted as the agent doing something.
             guard !kind.isInvisibleAgentText else { return }
             await record(kind, for: agentID)
+            notePlanning(kind, agentID: agentID)
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }
@@ -862,6 +866,12 @@ public actor DaemonCore {
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
             workflowsRespond(to: .askedPermission, agentID: agentID)
+            // The plan, as a page beside the question about it. Asked to approve
+            // something is asked to read it first.
+            if let plan = request.toolCall.planFile,
+               FileManager.default.fileExists(atPath: plan.path) {
+                showPlan(plan, for: agentID)
+            }
             reconsider()
 
         case .processExited:

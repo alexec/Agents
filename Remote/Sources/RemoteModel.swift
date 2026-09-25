@@ -660,6 +660,13 @@ final class RemoteModel {
         _ = work.takeFileToShow(for: selection)
     }
 
+    /// A plan being approved, reopened from its question card: the same page the
+    /// daemon opened when it was asked.
+    func openPlan(_ file: ShownFile) {
+        guard let selection else { return }
+        open(file, for: selection)
+    }
+
     private func open(_ file: ShownFile, for agentID: UUID) {
         if macLacksPanes {
             fileOnScreen = file.path

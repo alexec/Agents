@@ -206,6 +206,42 @@ public struct ToolCall: Codable, Hashable, Sendable {
         return called.hasSuffix(AppTool.pushPullRequest) || called.hasSuffix(AppTool.replyOnPullRequest)
     }
 
+    /// Whether this is a runtime asking to leave plan mode: "here is the plan, may I
+    /// start?". Claude's adapter sends `ExitPlanMode` this way.
+    public var isPlanApproval: Bool { kind == "switch_mode" }
+
+    /// The plan being approved, as a file, when the runtime wrote it to one.
+    ///
+    /// Claude's adapter names it in `rawInput.planFilePath` (`~/.claude/plans/…md`).
+    /// Only an absolute Markdown path, because this is opened as a page and granted
+    /// to a device: a path that is not one is refused rather than guessed at.
+    public var planFile: ShownFile? {
+        guard isPlanApproval,
+              let file = ShownFile(wire: .object(["path": rawInput?["planFilePath"] ?? .null])),
+              file.isMarkdown else { return nil }
+        return file
+    }
+
+    /// The plan's text, as the runtime handed it over with the question.
+    public var planText: String? {
+        guard isPlanApproval, let plan = rawInput?["plan"]?.stringValue,
+              !plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return plan
+    }
+
+    /// The Markdown files this call writes, by absolute path: where its locations and
+    /// diffs say it writes, for an edit.
+    public var markdownWritten: [ShownFile] {
+        guard kind == "edit" else { return [] }
+        let paths = locations.map(\.path) + diffs.map(\.path)
+        var seen: Set<String> = []
+        return paths.compactMap { path in
+            guard let file = ShownFile(wire: .object(["path": .string(path)])), file.isMarkdown,
+                  seen.insert(file.path).inserted else { return nil }
+            return file
+        }
+    }
+
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {
         content.compactMap { if case .diff(let diff) = $0 { return diff } else { return nil } }
