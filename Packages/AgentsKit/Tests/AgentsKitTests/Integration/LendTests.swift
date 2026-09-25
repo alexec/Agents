@@ -190,6 +190,7 @@ struct LendTests {
         }
         #expect(notes.contains("Claude refused the token in Settings. Replace it in Settings ▸ Servers."))
         #expect(!notes.contains { $0.contains("stopped answering") })
+        #expect(await setup.core.agent(id)?.endedReason == .signInRefused, "not \"The runtime crashed\"")
     }
 
     @Test func onlyAnAuthenticationFailureCounts() {

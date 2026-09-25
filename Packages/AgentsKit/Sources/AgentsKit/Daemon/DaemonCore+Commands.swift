@@ -1079,7 +1079,8 @@ extension DaemonCore {
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
-        if let refused = credentialRefusal(agentID: agentID, error: error) {
+        let refused = credentialRefusal(agentID: agentID, error: error)
+        if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
                 ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
@@ -1089,7 +1090,7 @@ extension DaemonCore {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        await move(agentID, on: .processDied)
+        await move(agentID, on: refused == nil ? .processDied : .turnEnded(.signInRefused))
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
