@@ -95,7 +95,8 @@ prompt and check the agent works in that worktree and is filed under the project
 
 ### User Story 3 - Worktrees are cleaned up by choice, never by accident (Priority: P2)
 
-Archiving an agent never deletes its worktree: the work in it may not be merged yet. On the project
+Archiving an agent never deletes work: a worktree goes with its last agent only when everything in
+it is committed, and its branch only when that is merged (changed 2026-09-25). On the project
 page the person can see the worktrees the app made and remove one when they are done with it. The
 app refuses, and says why, while an agent is working there, and warns before removing one that holds
 changes that are not committed or a branch that is not merged into the one it came from.
@@ -103,13 +104,14 @@ changes that are not committed or a branch that is not merged into the one it ca
 **Why this priority**: Without it, worktrees pile up on disk. But nothing is lost if this comes
 later, because the person can remove them by hand in the meantime.
 
-**Independent Test**: Archive an agent that worked in a worktree and check the worktree and its
+**Independent Test**: Archive an agent that left an uncommitted edit in a worktree and check the worktree and its
 branch remain. Remove it from the project page and check both are gone. Try again with an
 uncommitted edit and check the warning appears first.
 
 **Acceptance Scenarios**:
 
-1. **Given** an agent working in a worktree, **When** it is archived, **Then** the worktree and its branch are left exactly as they are.
+1. **Given** the only agent that is not archived in a worktree the app made, with everything in it committed, **When** it is archived, **Then** the worktree's folder is removed, and its branch too if it is the app's and merged; otherwise the branch is left as it is.
+1a. **Given** an agent in a worktree with uncommitted changes, or another agent still working there, **When** it is archived, **Then** the worktree and its branch are left exactly as they are.
 2. **Given** a worktree the app made with no agent working in it, **When** the person removes it from the project page, **Then** its folder is removed, and its branch too if it is merged.
 3. **Given** a worktree with uncommitted changes or an unmerged branch, **When** the person asks to remove it, **Then** they are told what would be lost and must confirm.
 4. **Given** an agent that is not archived is working in a worktree, **When** the person asks to remove it, **Then** removal is refused with the agent's name.
@@ -184,7 +186,7 @@ under the project, marked as started by the first agent, and working in its own 
 
 **Cleaning up**
 
-- **FR-018**: Archiving or deleting an agent MUST NOT remove its worktree or branch.
+- **FR-018**: Archiving an agent MUST remove its worktree when the app made it, no other agent that is not archived works in it, and nothing in it is uncommitted; its branch goes only on FR-020's terms without confirmation (the app's, and merged). In any other case archiving or deleting an agent MUST NOT remove its worktree or branch. (Changed 2026-09-25: it used to leave every worktree.)
 - **FR-019**: The project page MUST list the worktrees the app made for that project, with the agents in each, and MUST offer to remove each one.
 - **FR-020**: Removal MUST be refused while any agent that is not archived works in the worktree. Before removing a worktree with uncommitted changes or an unmerged branch, the app MUST say what would be lost and wait for confirmation. The branch MUST be deleted only if it is merged, or if the person confirmed.
 - **FR-021**: The app MUST NOT remove worktrees it did not make.
@@ -206,7 +208,7 @@ under the project, marked as started by the first agent, and working in its own 
 - **SC-001**: Starting an agent in a new worktree takes one choice more than starting one today, and no typing beyond the prompt.
 - **SC-002**: Each of the four runtimes, started in a new worktree, makes every file change in that worktree and none in the project folder. Checked by one run per runtime.
 - **SC-003**: Two agents started in separate new worktrees from the same project at the same moment get two different worktrees and branches, every time.
-- **SC-004**: No worktree or branch is ever lost by archiving an agent, restarting the app or resuming an agent. Checked by archiving, restarting and resuming with uncommitted work in a worktree.
+- **SC-004**: No uncommitted change or unmerged commit is ever lost by archiving an agent, restarting the app or resuming an agent. Checked by archiving, restarting and resuming with uncommitted work in a worktree.
 - **SC-005**: A person can tell which worktree an agent is in from the project's agent list, without opening the agent.
 - **SC-006**: After worktrees are in use, the project folder's git status shows nothing that the app made.
 

@@ -7,8 +7,8 @@ import SwiftUI
 /// All of them are listed, because an agent working in one made in a terminal, or by a
 /// runtime, is still working on this project. Only the app's own can be removed: the
 /// others are somebody else's. Hidden when there are none, because an empty heading is
-/// a question nobody asked. Archiving an agent never removes its worktree — the work in
-/// it may not be merged — so this is where they go when you are finished with them.
+/// a question nobody asked. One goes with its last agent's archive only when everything
+/// in it is committed, so this is where the rest go when you are finished with them.
 struct WorktreesSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
@@ -58,10 +58,12 @@ struct WorktreeRow: View {
             .help(worktree.root.path(percentEncoded: false))
             Spacer(minLength: 8)
             if worktree.madeByApp {
+                // Not while anyone works in it: archive them first.
                 Button("Remove…") { Task { await remove() } }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                    .disabled(isChecking)
+                    .disabled(isChecking || !worktree.agents.isEmpty)
+                    .help(worktree.agents.isEmpty ? "" : "Archive the agents working here to remove it.")
             }
         }
         .padding(.horizontal, 16)

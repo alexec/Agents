@@ -329,7 +329,7 @@ struct WorkflowPage: View {
                                 chosen: Binding<JSONValue?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let option {
-                OptionMenu(option: withDefault(option, named: name, labelled: !Self.namedOnItsOwn(setting)),
+                OptionMenu(option: withDefault(option, named: name),
                            chosen: chosen)
                 if let value, !(option.options ?? []).contains(where: { $0.value.stringValue == value }) {
                     // The same sentence the row carries for the refusal, so the page
@@ -381,11 +381,6 @@ struct WorkflowPage: View {
         }
     }
 
-    private static func namedOnItsOwn(_ setting: String) -> Bool {
-        [WorkflowSettings.Setting.permissionMode, WorkflowSettings.Setting.model,
-         WorkflowSettings.Setting.effort].contains(setting)
-    }
-
     /// A boolean the file wrote as `yes` or `on` is the menu's `true`, which is how the
     /// start path reads it too — not a value to mark as refused.
     private func shown(_ value: String?, for option: ConfigOption) -> String? {
@@ -409,14 +404,14 @@ struct WorkflowPage: View {
     /// The runtime's option with a way to say nothing: the first choice leaves the key
     /// out of the file, which is what a workflow that never mentioned it has.
     ///
-    /// The mode, the model and the effort read for themselves — `Plan`, `High`. Any
-    /// other option carries its name in the default, because `Runtime default` beside
-    /// three others says nothing about which one it is.
-    private func withDefault(_ option: ConfigOption, named name: String, labelled: Bool = false) -> ConfigOption {
+    /// Every one carries its name in the default, the mode, the model and the effort
+    /// too: a chosen value reads for itself — `Plan`, `High` — but `Runtime default`
+    /// three times over says nothing about which menu is which.
+    private func withDefault(_ option: ConfigOption, named name: String) -> ConfigOption {
         var copy = option
         copy.name = name
         copy.currentValue = .null
-        let label = labelled ? "\(name): runtime default" : "Runtime default"
+        let label = "\(name): runtime default"
         let leading = ConfigChoiceGroup(name: nil, choices: [ConfigChoice(value: .null, name: label)])
         copy.kind = .select([leading] + option.groups)
         return copy
