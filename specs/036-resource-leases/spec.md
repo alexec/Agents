@@ -26,14 +26,17 @@ This feature gives agents a shared way to take turns. An agent asks the app for 
 thing, holds it while it works, and gives it back. If someone else holds it, the agent waits in
 line. When the thing is free, the agent is let through. That happens even if it has stopped and
 has to be started again. The person can see who holds what and who is waiting, both in one place
-and on each agent's chat and card. They can also take a lease themselves, and take one back.
+and on each agent's chat and card. They can end any lease, and take anyone out of a line. They
+never hold a lease themselves: only agents do.
 
 ## Clarifications
 
 ### Session 2026-09-24
 
 - Q: When an agent's turn ends while it still holds a lease, what happens? → A: The lease is kept until it expires. It is also released on release, stop, archive, or when the person ends it. The end of a turn never releases it.
-- Q: How much goes on the phone and iPad? → A: The status line and card only. The Resources view, and taking or ending leases, are on the Mac only for now.
+- Q: How much goes on the phone and iPad? → A: The status line and card only. The Resources view, and ending leases, are on the Mac only for now.
+- Q: Can the person hold a lease? → A: No. Only agents hold leases. There is no way in the app to take one. The person can end an agent's lease and remove an agent from a line.
+- Q: Is a lease chosen when a chat is started? → A: No. Starting a chat, on the Mac, phone or iPad, or by an agent through `start_agent`, has no lease option. The agent takes a lease itself, with its tools, when it needs one.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -113,28 +116,25 @@ waiter shows it is waiting for it.
 
 ---
 
-### User Story 4 - The person takes a lease, or takes one back (Priority: P2)
+### User Story 4 - The person takes a lease back (Priority: P2)
 
-The person wants to use the simulator, or the Mac's screen and keyboard, without an agent taking it
-from under them. They lease it themselves from the Resources view, and agents that ask for it wait
-behind them. If an agent is holding something it should not, the person can end that agent's lease
-at once.
+If an agent is holding something it should not, the person can end that agent's lease at once. If
+an agent is waiting for something it no longer needs, the person can take it out of the line. The
+person never holds a lease themselves.
 
 **Why this priority**: The person is the one most harmed by an agent clicking in the wrong window.
 Ending a lease by hand is the way out when an agent holds something and has stopped paying
 attention. It depends on Stories 1–3.
 
-**Independent Test**: Lease the screen from the Resources view, then ask an agent to lease it.
-Confirm the agent waits behind the person. Release it and confirm the agent is granted it. Then end
-the agent's lease from the view. Confirm the agent is told its lease was ended by the person, and
+**Independent Test**: Have agent A lease the screen and agent B ask for it. End A's lease from the
+Resources view. Confirm the agent is told its lease was ended by the person, and
 the next agent in line gets the resource.
 
 **Acceptance Scenarios**:
 
-1. **Given** a free resource, **When** the person leases it from the Resources view, **Then** they hold it, shown as held by the person, with an expiry they chose or the default.
-2. **Given** the person holds a resource, **When** an agent asks for it, **Then** the agent waits in line exactly as it would behind another agent.
-3. **Given** any lease, **When** the person ends it, **Then** the resource passes to the next in line at once, and the agent that lost it is told the person ended its lease the next time it uses any lease tool. It is not interrupted mid-turn.
-4. **Given** anyone in line, **When** the person removes them from the line, **Then** they leave it as if they had withdrawn.
+1. **Given** a free resource in the Resources view, **When** the person looks at it, **Then** there is no way to take it. Only agents hold leases.
+2. **Given** any lease, **When** the person ends it, **Then** the resource passes to the next in line at once, and the agent that lost it is told the person ended its lease the next time it uses any lease tool. It is not interrupted mid-turn.
+3. **Given** anyone in line, **When** the person removes them from the line, **Then** they leave it as if they had withdrawn.
 
 ---
 
@@ -147,9 +147,10 @@ the app restarted.
 **Why this priority**: The main risk of any locking scheme is a lock nobody releases. Time limits
 exist to make that impossible.
 
-**Independent Test**: Take a short lease and let it expire. Confirm it frees on time and the next
-in line gets it. Take a lease and stop the agent. Confirm it frees. Take a lease, restart the app,
-and confirm the lease is still there with the same expiry.
+**Independent Test**: Have an agent take a short lease and let it expire. Confirm it frees on time
+and the next in line gets it. Have an agent take a lease, then stop the agent. Confirm it frees.
+Have an agent take a lease, restart the app, and confirm the lease is still there with the same
+expiry.
 
 **Acceptance Scenarios**:
 
@@ -211,18 +212,19 @@ name. Lease a made-up name and confirm that works too and appears in the view as
 - **FR-008**: Leases, lines and their order MUST survive a restart of the app and its background service.
 - **FR-009**: The app MUST have a Resources view showing every known resource and every resource currently leased or requested. For each it MUST show the state, the holder, the time held, the expiry, and the line in order. It MUST update within a second of any change.
 - **FR-010**: Each agent's chat MUST show a status line naming each lease it holds with the time left, and each lease it is waiting for with the holder and its place in line. Each agent's card MUST show the same thing in short form. Both MUST show nothing when the agent holds and waits for nothing.
-- **FR-011**: The phone and iPad apps MUST show the status line and card information. The Resources view, and the person's power to take and end leases and to remove anyone from a line, are on the Mac only in this feature.
-- **FR-012**: The person MUST be able to take a lease from the Resources view, end any lease, and remove anyone from a line. An agent whose lease the person ended MUST be told so the next time it uses a lease tool.
+- **FR-011**: The phone and iPad apps MUST show the status line and card information. The Resources view, and the person's power to end leases and to remove anyone from a line, are on the Mac only in this feature.
+- **FR-012**: The person MUST be able to end any lease and remove anyone from a line, from the Resources view. The person MUST NOT be able to take a lease: only agents hold leases. An agent whose lease the person ended MUST be told so the next time it uses a lease tool.
 - **FR-013**: The app MUST find the Mac's simulators, its installed browsers and its screen as resources, each under a stable name, and MUST also accept any other name an agent gives, compared without regard to case or surrounding spaces.
 - **FR-014**: Every refusal or wait MUST be explained in plain words the agent can repeat to the person: who holds the resource, until when, and the agent's place in line.
 - **FR-015**: The briefing an agent receives MUST describe the lease tools and when to use them. It MUST say to lease a known resource before using it, release it as soon as it is done, keep leases short and extend them, and take several resources in a steady order.
 - **FR-016**: An agent's transcript MUST record each lease it was granted, released, lost to expiry, or had ended by the person, so the history can be read afterwards.
+- **FR-017**: Starting an agent MUST NOT offer any way to lease a resource for it: not the start form on any platform, and not the `start_agent` tool. An agent MUST take its leases itself, through the lease tools, when it needs them.
 
 ### Key Entities
 
-- **Resource**: Something on the Mac that one holder uses at a time. It has a stable name and a kind (simulator, browser, screen, or named by an agent). It is either found by the app or created by an agent's request. It is free or held, and has a line.
+- **Resource**: Something on the Mac that one agent uses at a time. It has a stable name and a kind (simulator, browser, screen, or named by an agent). It is either found by the app or created by an agent's request. It is free or held, and has a line.
 - **Lease**: One holder's right to a resource for a period. It has a holder, a resource, when it was granted, when it expires, and how it ended (released, expired, ended by the person, holder stopped or archived).
-- **Holder**: An agent, or the person.
+- **Holder**: Always an agent. The person never holds a lease.
 - **Line**: The ordered requests waiting for a resource. Each request has the agent, when it asked, and whether its call is still open or the agent will need starting again.
 
 ## Success Criteria *(mandatory)*
