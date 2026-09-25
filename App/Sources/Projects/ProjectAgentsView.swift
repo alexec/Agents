@@ -168,12 +168,18 @@ struct ProjectAgentsView: View {
         // Parking moves a chat without changing its state (040).
         .animation(.default, value: model.agents.map(\.parking))
         // Who is working in which worktree changes when an agent is archived or
-        // brought back, so the list is asked for again then. Not polled.
-        .onChange(of: archived.count) { Task { await model.loadDraftWorktrees() } }
+        // brought back, and a worktree's git status as a turn ends, so the list is
+        // asked for again whenever an agent here changes state. Not polled.
+        .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
     }
 
     private var hasSessions: Bool {
         AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
+    }
+
+    /// Every agent's state on this page, archived ones included.
+    private var states: [AgentState] {
+        AgentGroup.allCases.flatMap { model.agents(in: folder, group: $0) }.map(\.state)
     }
 
     private var archived: [Agent] {

@@ -1735,11 +1735,13 @@ public enum DaemonAPI {
         public var madeByApp: Bool
         /// Agents not archived whose folder is in it.
         public var agents: [UUID]
+        /// What git says about it. Nil when its folder is gone, or from an older daemon.
+        public var status: WorktreeStatus?
 
         public var id: URL { root }
 
         public init(name: String, root: URL, branch: String?, isProjectFolder: Bool,
-                    exists: Bool, madeByApp: Bool, agents: [UUID]) {
+                    exists: Bool, madeByApp: Bool, agents: [UUID], status: WorktreeStatus? = nil) {
             self.name = name
             self.root = root
             self.branch = branch
@@ -1747,6 +1749,7 @@ public enum DaemonAPI {
             self.exists = exists
             self.madeByApp = madeByApp
             self.agents = agents
+            self.status = status
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1758,6 +1761,40 @@ public enum DaemonAPI {
             exists = try c.decodeIfPresent(Bool.self, forKey: .exists) ?? true
             madeByApp = try c.decodeIfPresent(Bool.self, forKey: .madeByApp) ?? false
             agents = try c.decodeIfPresent([UUID].self, forKey: .agents) ?? []
+            status = try c.decodeIfPresent(WorktreeStatus.self, forKey: .status)
+        }
+    }
+
+    /// A worktree's git status, as its row on the project page says it.
+    public struct WorktreeStatus: Codable, Hashable, Sendable {
+        /// Lines of `git status --porcelain`.
+        public var uncommitted: Int
+        /// Against what its branch tracks; nil when it tracks nothing.
+        public var ahead: Int?
+        public var behind: Int?
+        /// Commits on its branch the project folder's branch doesn't have. Nil for the
+        /// project folder itself, and when its HEAD is detached.
+        public var unmerged: Int?
+
+        public init(uncommitted: Int, ahead: Int? = nil, behind: Int? = nil, unmerged: Int? = nil) {
+            self.uncommitted = uncommitted
+            self.ahead = ahead
+            self.behind = behind
+            self.unmerged = unmerged
+        }
+
+        /// Work that would be lost, or not yet merged: the part worth drawing the eye to.
+        public var hasPendingWork: Bool { uncommitted > 0 || (unmerged ?? 0) > 0 }
+
+        /// "3 uncommitted · 2 unmerged · ↑1 ↓2", or "clean" when nothing is pending.
+        public var summary: String {
+            var parts: [String] = []
+            if uncommitted > 0 { parts.append("\(uncommitted) uncommitted") }
+            if let unmerged, unmerged > 0 { parts.append("\(unmerged) unmerged") }
+            let arrows = [(ahead ?? 0) > 0 ? "↑\(ahead!)" : nil, (behind ?? 0) > 0 ? "↓\(behind!)" : nil]
+                .compactMap { $0 }
+            if !arrows.isEmpty { parts.append(arrows.joined(separator: " ")) }
+            return parts.isEmpty ? "clean" : parts.joined(separator: " · ")
         }
     }
 

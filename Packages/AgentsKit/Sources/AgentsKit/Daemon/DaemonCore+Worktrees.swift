@@ -162,7 +162,7 @@ extension DaemonCore {
         let entries = (try? await GitWorktrees.list(in: project)) ?? []
         let here = Project.standardize(repository.toplevel)
         let working = agents.values.filter { $0.state != .archived }
-        let summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
+        var summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
             let root = Self.canonical(entry.path)
             let inside = root.path + "/"
             let agentsHere = working.filter {
@@ -183,6 +183,8 @@ extension DaemonCore {
                 madeByApp: Self.isMadeByApp(root, branch: entry.branch, in: repository),
                 agents: own.sorted { $0.createdAt < $1.createdAt }.map(\.id))
         }
+        let statuses = await Self.statuses(of: summaries, base: await GitWorktrees.base(in: project))
+        for index in summaries.indices { summaries[index].status = statuses[summaries[index].root] }
         // A branch checked out anywhere cannot be checked out again; its worktree is
         // already on the list.
         let checkedOut = Set(entries.compactMap(\.branch))
@@ -193,6 +195,30 @@ extension DaemonCore {
             isRepository: true, canMakeNew: hasCommit,
             whyNot: hasCommit ? nil : "There is no commit here yet to base a worktree on.",
             worktrees: summaries, branches: branches)
+    }
+
+    /// Each worktree's git status, worked out side by side: a project with a dozen
+    /// worktrees shouldn't wait on three dozen git calls one after another.
+    static func statuses(of worktrees: [DaemonAPI.WorktreeSummary],
+                         base: String?) async -> [URL: DaemonAPI.WorktreeStatus] {
+        await withTaskGroup(of: (URL, DaemonAPI.WorktreeStatus?).self) { group in
+            for worktree in worktrees where worktree.exists {
+                group.addTask {
+                    let root = worktree.root
+                    guard let uncommitted = try? await GitWorktrees.statusCount(in: root) else { return (root, nil) }
+                    let tracking = await GitWorktrees.aheadBehind(in: root)
+                    var unmerged: Int?
+                    if !worktree.isProjectFolder, let branch = worktree.branch, let base, base != branch {
+                        unmerged = await GitWorktrees.commitCount(from: base, to: branch, in: root)
+                    }
+                    return (root, DaemonAPI.WorktreeStatus(uncommitted: uncommitted, ahead: tracking?.ahead,
+                                                           behind: tracking?.behind, unmerged: unmerged))
+                }
+            }
+            var result: [URL: DaemonAPI.WorktreeStatus] = [:]
+            for await (root, status) in group { result[root] = status }
+            return result
+        }
     }
 
     // MARK: Cleaning up (US3)
