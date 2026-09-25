@@ -16,20 +16,20 @@ All paths are relative to `/tmp/w-033`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `Shared/UI/Chat/` and run `xcodegen generate` so both targets pick it up (`project.yml` already lists `Shared/UI`)
-- [ ] T002 Record a baseline: `swift test` in `Packages/AgentsKit` plus both `xcodebuild` schemes on the untouched branch, saved to `/tmp/w-033-baseline.log`
+- [X] T001 Create `Shared/UI/Chat/` and run `xcodegen generate` so both targets pick it up (`project.yml` already lists `Shared/UI`)
+- [X] T002 Record a baseline: `swift test` in `Packages/AgentsKit` plus both `xcodebuild` schemes on the untouched branch, saved to `/tmp/w-033-baseline.log`
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 Move the pending-option bookkeeping (`PendingOption`, `chosenOption`, and the sequence rule "Only the latest write for an (agent, option) may clear it") from `App/Sources/AppModel.swift` into `Packages/AgentsKit/Sources/AgentsKitCore/Client/AgentsModel.swift` as `beginOption`/`settleOption`/`chosenOption`, and make `AppModel.setOption` call it
-- [ ] T004 [P] Unit tests for T003 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentsModelTests.swift`: a pending value wins; a stale settle does not clear a later choice; a settle falls back to `startOptions`
-- [ ] T005 Claim `agent/terminalOutput` in `AgentsModel.apply` and keep `terminalOutput[terminalID]`, tail-capped at the Mac's cap. Remove the copy in `App/Sources/AppModel.swift` and read the shared one
-- [ ] T006 [P] Unit test for T005 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentsModelTests.swift`: chunks append per terminal; the cap keeps the tail
-- [ ] T007 Add `ceilingToGoOn(for:under:)` to `AgentsModel` and make `AppModel.letThisAgentGoOn` use it
-- [ ] T008 [P] Unit test for T007 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/CostLimitTests.swift`
-- [ ] T009 Create `Shared/UI/Chat/ChatActions.swift`: an environment value with `open(ToolCallLocation)`, `terminalOutput(String) -> String`, and `unqueue(QueuedPrompt, UUID) async`, with no-op defaults
+- [X] T003 Move the pending-option bookkeeping (`PendingOption`, `chosenOption`, and the sequence rule "Only the latest write for an (agent, option) may clear it") from `App/Sources/AppModel.swift` into `Packages/AgentsKit/Sources/AgentsKitCore/Client/AgentsModel.swift` as `beginOption`/`settleOption`/`chosenOption`, and make `AppModel.setOption` call it
+- [X] T004 [P] Unit tests for T003 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentsModelTests.swift`: a pending value wins; a stale settle does not clear a later choice; a settle falls back to `startOptions`
+- [X] T005 Claim `agent/terminalOutput` in `AgentsModel.apply` and keep `terminalOutput[terminalID]`, tail-capped at the Mac's cap. Remove the copy in `App/Sources/AppModel.swift` and read the shared one
+- [X] T006 [P] Unit test for T005 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentsModelTests.swift`: chunks append per terminal; the cap keeps the tail
+- [X] T007 Add `ceilingToGoOn(for:under:)` to `AgentsModel` and make `AppModel.letThisAgentGoOn` use it
+- [X] T008 [P] Unit test for T007 in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/CostLimitTests.swift`
+- [X] T009 Create `Shared/UI/Chat/ChatActions.swift`: an environment value with `open(ToolCallLocation)`, `terminalOutput(String) -> String`, and `unqueue(QueuedPrompt, UUID) async`, with no-op defaults
 
 **Checkpoint**: the suite is green, and the Mac builds and behaves as before.
 
@@ -41,11 +41,11 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: The same conversation, line by line on Mac and phone: the same words and the same taps.
 
-- [ ] T010 [US1] Move `EntryRow`, `WorkReportLine`, `QueuedPromptRow`, `ToolRunRow`, `ToolCallLine`, `WorkingLine`, `ComingBackLine` and `StateLine` from `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptRows.swift`. Add a public `TranscriptRow(item:isExpanded:toggle:)`. Replace `NSWorkspace`, `model.terminalOutput` and `model.unqueue` with `ChatActions`. Use `.help` only under `#if os(macOS)`, and accessibility hints on iOS
-- [ ] T011 [US1] Make `App/Sources/Chat/Transcript.swift` draw `TranscriptRow` and `QueuedPromptRow`/`WorkingLine`/`ComingBackLine` from Shared, and inject `ChatActions` in `App/Sources/Chat/ChatView.swift` (open with `NSWorkspace`, terminal from `work.terminalOutput`, unqueue from `AppModel`)
-- [ ] T012 [P] [US1] Give the Remote the per-app types the shared rows call: `TerminalOutputView(text:)` in `Remote/Sources/Chat/BlocksView.swift`, and a Mac-compatible `ServedRequestLine` if the Mac's is not already in the moved set. Match signatures to `App/Sources/Chat/DiffView.swift`
-- [ ] T013 [US1] Add `unqueue(_:from:)` and `terminalOutput` pass-through to `Remote/Sources/RemoteModel.swift`
-- [ ] T014 [US1] Replace `EntryView` in `Remote/Sources/Chat/RemoteChatView.swift` with the shared rows plus `QueuedPromptRow` and `WorkingLine`, inject `ChatActions` (open sets `fileOnScreen`), and delete `Remote/Sources/Chat/EntryView.swift`. Keep `WrappingHStack` only if still used
+- [X] T010 [US1] Move `EntryRow`, `WorkReportLine`, `QueuedPromptRow`, `ToolRunRow`, `ToolCallLine`, `WorkingLine`, `ComingBackLine` and `StateLine` from `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptRows.swift`. Add a public `TranscriptRow(item:isExpanded:toggle:)`. Replace `NSWorkspace`, `model.terminalOutput` and `model.unqueue` with `ChatActions`. Use `.help` only under `#if os(macOS)`, and accessibility hints on iOS
+- [X] T011 [US1] Make `App/Sources/Chat/Transcript.swift` draw `TranscriptRow` and `QueuedPromptRow`/`WorkingLine`/`ComingBackLine` from Shared, and inject `ChatActions` in `App/Sources/Chat/ChatView.swift` (open with `NSWorkspace`, terminal from `work.terminalOutput`, unqueue from `AppModel`)
+- [X] T012 [P] [US1] Give the Remote the per-app types the shared rows call: `TerminalOutputView(text:)` in `Remote/Sources/Chat/BlocksView.swift`, and a Mac-compatible `ServedRequestLine` if the Mac's is not already in the moved set. Match signatures to `App/Sources/Chat/DiffView.swift`
+- [X] T013 [US1] Add `unqueue(_:from:)` and `terminalOutput` pass-through to `Remote/Sources/RemoteModel.swift`
+- [X] T014 [US1] Replace `EntryView` in `Remote/Sources/Chat/RemoteChatView.swift` with the shared rows plus `QueuedPromptRow` and `WorkingLine`, inject `ChatActions` (open sets `fileOnScreen`), and delete `Remote/Sources/Chat/EntryView.swift`. Keep `WrappingHStack` only if still used
 - [ ] T015 [US1] Build both schemes; screenshot the Mac chat on a scratch root with the run-app skill and compare with the baseline
 
 ---

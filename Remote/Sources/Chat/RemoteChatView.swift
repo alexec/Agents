@@ -17,6 +17,8 @@ struct RemoteChatView: View {
     @State private var distanceFromEnd: CGFloat = 0
     /// Something arrived while the reader was up the conversation reading.
     @State private var hasNewBelow = false
+    /// Which runs of tool calls are unfolded. Folded again on a change of conversation.
+    @State private var expandedRuns: Set<UUID> = []
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -30,14 +32,27 @@ struct RemoteChatView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 8)
                     }
+                    // The Mac's rows, not a copy of them (033).
                     ForEach(model.transcriptItems) { item in
-                        EntryView(item: item).id(item.id)
+                        TranscriptRow(item: item,
+                                      isExpanded: expandedRuns.contains(item.id),
+                                      toggle: {
+                                          if expandedRuns.contains(item.id) { expandedRuns.remove(item.id) } else { expandedRuns.insert(item.id) }
+                                      })
+                            .id(item.id)
+                    }
+                    if let agent {
+                        ForEach(agent.queuedPrompts) { queued in
+                            QueuedPromptRow(prompt: queued, agentID: agent.id)
+                        }
                     }
                     // Live, and so at the foot rather than in the record: the chat
                     // itself says what the card in the list says, and it stops saying
                     // it the moment the prompt lands.
                     if let agent, model.isComingBack(agent) {
                         ComingBackLine()
+                    } else if let agent, agent.state == .running || agent.state == .starting {
+                        WorkingLine()
                     }
                     Color.clear.frame(height: 1).id(bottom)
                 }
@@ -107,6 +122,8 @@ struct RemoteChatView: View {
         }
         // The agent asking to be looked at. An event, so it opens the moment it
         // arrives and is taken off the model in the same breath.
+        .environment(\.chatActions, actions)
+        .onChange(of: model.selection) { expandedRuns = [] }
         .onChange(of: model.fileTheAgentWants) { _, wanted in
             if wanted != nil { model.openFileTheAgentWants() }
         }
@@ -146,6 +163,16 @@ struct RemoteChatView: View {
             // in the menu, and that is the move to make first.
             PromptBar(agent: agent)
         }
+    }
+
+    /// What the shared chat rows mean on a phone (033). A file a tool call touched
+    /// opens the change the agent made to it, in a sheet: the phone cannot open the
+    /// Mac's disk, and that is the one deliberate difference in these rows.
+    private var actions: ChatActions {
+        ChatActions(
+            open: { [model] location in model.fileOnScreen = location.path },
+            terminalOutput: { [model] id in model.terminalOutput(id) },
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
 
     private var bottom: String { "bottom" }

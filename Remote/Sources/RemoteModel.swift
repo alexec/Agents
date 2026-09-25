@@ -909,6 +909,24 @@ final class RemoteModel {
         }
     }
 
+    /// Take something back off the queue before it goes (033). The same call the Mac
+    /// makes; the row goes on both when the daemon says the agent changed.
+    func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be taken back."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsUnqueue,
+                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// What a command an agent ran has printed, as far as this phone heard it.
+    func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
+
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }

@@ -69,6 +69,16 @@ struct ChatView: View {
             }
         }
         .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
+        .environment(\.chatActions, actions)
+    }
+
+    /// What the shared chat rows mean on a Mac (033).
+    private var actions: ChatActions {
+        ChatActions(
+            // The editor the Mac opens that file with, which is the one the user chose.
+            open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
+            terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
 
     private var form: some View {
