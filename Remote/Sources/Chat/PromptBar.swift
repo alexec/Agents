@@ -46,7 +46,8 @@ struct PromptBar: View {
         VStack(alignment: .leading, spacing: 12) {
             if isShowingEverything {
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
+                             leaseStatus: model.work.leaseStatus(of: agent.id)) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }

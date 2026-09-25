@@ -58,22 +58,24 @@ struct AppServiceTests {
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
         // The four agent tools (028) sit after the workflow tool, before the older
-        // names, for an agent that may use them — which is the default.
+        // names, for an agent that may use them — which is the default. The three lease
+        // tools (036) follow them, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
+                AppService.leaseResourceToolName, AppService.releaseResourceToolName,
+                AppService.listResourcesToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue }
             == WorkOutcome.allCases.map(\.rawValue))
-        // The outcome, its words and the conversation's name are the call; the chips
-        // ride along.
+        // The outcome and its words are the call; the name and the chips ride along.
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message", "title"])
+            == ["outcome", "message"])
         #expect(finish?["properties"]?["title"]?["type"]?.stringValue == "string")
         // One suggestion, as an object; the list is read but no longer offered (031).
         let next = finish?["properties"]?["next_prompt"]
@@ -432,10 +434,10 @@ struct AppServiceTests {
         var outcome = ""
         var message = ""
         var prompts: [SuggestedPrompt] = []
-        var title = ""
+        var title: String?
         var words = AppService.BlockWords.none
         func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt],
-                    _ title: String, _ words: AppService.BlockWords) {
+                    _ title: String?, _ words: AppService.BlockWords) {
             calls += 1
             self.words = words
             self.outcome = outcome
@@ -646,10 +648,10 @@ struct AppServiceTests {
 
     // MARK: The title
 
-    /// Required, and refused whole without it — outcome, words and chips included — so
-    /// the agent is told while it can still send one, rather than the row keeping a
-    /// name for work it is no longer doing.
-    @Test func aFinishCallWithNoTitleIsRefusedWhole() async throws {
+    /// Sent when the goal is named or changes, and left out otherwise. A call without
+    /// one — or with one that cleans to nothing — still lands, carrying no title, so
+    /// the row keeps the name it has.
+    @Test func aFinishCallWithNoTitleLandsWithoutOne() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         for arguments in [
@@ -660,12 +662,28 @@ struct AppServiceTests {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName), "arguments": arguments,
             ])
-            #expect(result["isError"]?.boolValue == true)
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-                .contains("title") == true)
+            #expect(result["isError"]?.boolValue == false)
+            #expect(await box.title == nil)
+            #expect(await box.message == "All done.")
         }
-        #expect(await box.calls == 0)
+        #expect(await box.calls == 3)
         await service.close()
+    }
+
+    /// The words an agent reads decide what it names: the goal, kept while it holds,
+    /// not the step it just took. Checked on the tool and on the briefing alike, since
+    /// either alone left titles naming the turn.
+    @Test func theTitleIsDescribedAsTheGoal() {
+        let description = AppService.finishTurnTool["description"]?.stringValue ?? ""
+        #expect(description.contains("its goal, not the step you just took"))
+        #expect(description.contains("leave it out otherwise and the name stays"))
+        #expect(!description.contains("Give a fresh one every time"))
+        let property = AppService.finishTurnTool["inputSchema"]?["properties"]?["title"]?["description"]?
+            .stringValue ?? ""
+        #expect(property.contains("goal"))
+        #expect(property.contains("leave it out to keep the name"))
+        #expect(Briefing.finish.contains("title for the conversation's goal (only when it changes)"))
+        #expect(!Briefing.finish.contains("doing now"))
     }
 
     /// A title is a row's name: one line, spaces collapsed, no longer than a
@@ -685,7 +703,7 @@ struct AppServiceTests {
             "name": .string(AppService.finishTurnToolName),
             "arguments": ["outcome": "done", "message": "Done.", "title": .string(long)],
         ])
-        let clipped = await box.title
+        let clipped = try #require(await box.title)
         #expect(clipped.count == 80)
         #expect(clipped.hasSuffix("…"))
         await service.close()

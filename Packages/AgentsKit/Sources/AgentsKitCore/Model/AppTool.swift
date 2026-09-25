@@ -39,6 +39,19 @@ public enum AppTool {
     /// The agents the caller started that are still here, and the places in use.
     public static let listMyAgents = "list_my_agents"
 
+    // Three more for taking turns with the Mac's shared things (036). Offered to every
+    // agent, including one another agent started: waiting for the simulator is not
+    // managing anyone.
+
+    /// Take a lease on a resource, extend one already held, or wait in line for it.
+    public static let leaseResource = "lease_resource"
+
+    /// Give a lease back, or leave the line for one.
+    public static let releaseResource = "release_resource"
+
+    /// What can be leased on this Mac, and who holds what.
+    public static let listResources = "list_resources"
+
     // Two that act on GitHub for a run a pull-request trigger started (038), and only
     // on that pull request: the daemon fixes the destination from the run.
 

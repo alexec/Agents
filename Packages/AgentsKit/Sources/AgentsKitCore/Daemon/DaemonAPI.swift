@@ -151,6 +151,20 @@ public enum DaemonAPI {
         public static let agentsStopHelper = "agents/stopHelper"
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
+        /// What the MCP helper relays for `lease_resource`, `release_resource` and
+        /// `list_resources` (036). The caller is the token. `leases/lease` may stay open
+        /// for up to `LeaseLimits.waitLimit` while the agent waits its turn.
+        public static let leasesLease = "leases/lease"
+        public static let leasesRelease = "leases/release"
+        public static let leasesList = "leases/list"
+        /// Every resource and who holds and waits for it, for a window that has just
+        /// connected. Kept up to date after that by `leases/changed`.
+        public static let leasesSnapshot = "leases/snapshot"
+        /// The person ending whoever holds a resource, and taking one agent out of a
+        /// line (036 US4). There is no method for the person to take one: only agents
+        /// hold leases.
+        public static let leasesEnd = "leases/end"
+        public static let leasesRemoveWaiter = "leases/removeWaiter"
         /// A folder's repository and its worktrees, for the start bar's chooser and the
         /// project page (030). Asked for when something is shown, never polled.
         public static let worktreesList = "worktrees/list"
@@ -278,6 +292,12 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+
+        /// A lease was granted, extended, released, ended or expired, or a line moved:
+        /// the whole `LeaseSnapshot`, which clients replace rather than merge (036).
+        /// Also once a minute while anything is held, so "minutes left" stays true
+        /// without each client counting against its own clock.
+        public static let leasesChanged = "leases/changed"
 
         /// The Mac is now being kept awake, or is not. Sent only when the verdict
         /// moves — `reviseWakefulness` is reached on every streamed token, and a
@@ -1309,6 +1329,9 @@ public enum DaemonAPI {
         public static let fileNotReadable = -32033
         /// `changes/file` for a path that is not in the agent's list of changes.
         public static let notChanged = -32034
+        /// A lease action on something that is not there to act on: an end on a
+        /// resource nobody holds, an empty name, a waiter not in that line (036).
+        public static let leaseRefused = -32035
         // 038's, from -32040 so that lanes being built alongside it can take the
         // numbers straight after 034's without colliding.
         /// Checking a pull request out: its worktree folder is already there.
@@ -1486,6 +1509,121 @@ public enum DaemonAPI {
         public init(folder: URL, number: Int) {
             self.folder = folder
             self.number = number
+        }
+    }
+
+    // MARK: Leases (036)
+
+    /// `lease_resource`: take, extend, or wait in line.
+    public struct LeaseRequest: Codable, Sendable {
+        public var token: String
+        public var name: String
+        public var minutes: Int?
+        /// Nil is true: wait in line.
+        public var wait: Bool?
+
+        public init(token: String, name: String, minutes: Int? = nil, wait: Bool? = nil) {
+            self.token = token
+            self.name = name
+            self.minutes = minutes
+            self.wait = wait
+        }
+    }
+
+    /// `release_resource`: give back, or leave the line.
+    public struct LeaseNameRequest: Codable, Sendable {
+        public var token: String
+        public var name: String
+
+        public init(token: String, name: String) {
+            self.token = token
+            self.name = name
+        }
+    }
+
+    /// `list_resources`.
+    public struct LeaseTokenRequest: Codable, Sendable {
+        public var token: String
+
+        public init(token: String) {
+            self.token = token
+        }
+    }
+
+    /// The person ending whoever holds `name`.
+    public struct PersonEndRequest: Codable, Sendable {
+        public var name: String
+
+        public init(name: String) {
+            self.name = name
+        }
+    }
+
+    /// The person taking one agent out of the line for `name`. The id is a string, so
+    /// a malformed one is refused in words rather than failing to decode.
+    public struct PersonRemoveRequest: Codable, Sendable {
+        public var name: String
+        public var agentID: String
+
+        public init(name: String, agentID: String) {
+            self.name = name
+            self.agentID = agentID
+        }
+    }
+
+    /// Every resource worth drawing, and the daemon's time when it was read.
+    ///
+    /// The time is the daemon's so a client counts "minutes left" from the same clock
+    /// the lease runs by, not from its own.
+    public struct LeaseSnapshot: Codable, Sendable, Hashable {
+        public var resources: [ResourceState]
+        public var at: Date
+
+        public init(resources: [ResourceState], at: Date) {
+            self.resources = resources
+            self.at = at
+        }
+
+        public static let empty = LeaseSnapshot(resources: [], at: .distantPast)
+    }
+
+    /// One resource as the page draws it. A waiter's call id stays in the daemon; what
+    /// crosses the wire is only whether its call is open.
+    public struct ResourceState: Codable, Sendable, Hashable, Identifiable {
+        public var name: ResourceName
+        public var kind: ResourceKind
+        public var displayName: String
+        /// Leased, but no longer found on the Mac (spec, Edge Cases).
+        public var isGone: Bool
+        public var lease: Lease?
+        public var line: [LineMember]
+        public var endingSoon: Bool
+
+        public var id: ResourceName { name }
+
+        public init(name: ResourceName, kind: ResourceKind, displayName: String, isGone: Bool = false,
+                    lease: Lease? = nil, line: [LineMember] = [], endingSoon: Bool = false) {
+            self.name = name
+            self.kind = kind
+            self.displayName = displayName
+            self.isGone = isGone
+            self.lease = lease
+            self.line = line
+            self.endingSoon = endingSoon
+        }
+    }
+
+    public struct LineMember: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var askedAt: Date
+        /// Whether its call is still open ("waiting in its call"), or it will be
+        /// started when its turn comes ("will be started").
+        public var isCallOpen: Bool
+
+        public init(agentID: UUID, askedAt: Date, isCallOpen: Bool) {
+            self.agentID = agentID
+            self.askedAt = askedAt
+            self.isCallOpen = isCallOpen
         }
     }
 

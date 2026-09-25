@@ -44,6 +44,9 @@ public actor AppService {
     public static let stopAgentToolName = AppTool.stopAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
+    public static let leaseResourceToolName = AppTool.leaseResource
+    public static let releaseResourceToolName = AppTool.releaseResource
+    public static let listResourcesToolName = AppTool.listResources
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -77,7 +80,7 @@ public actor AppService {
     /// which may be none, and the conversation's new title. One sink rather than the
     /// two above in turn, because the daemon refuses the whole call or lands the whole
     /// call, and two sinks could do half of each.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String, BlockWords) async -> Outcome
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
@@ -108,6 +111,16 @@ public actor AppService {
     /// Where those go.
     public typealias AgentsSink = @Sendable (AgentCall) async -> Outcome
 
+    /// One of the three lease calls (036), as the agent made it.
+    public enum LeaseCall: Sendable, Equatable {
+        case lease(name: String, minutes: Int?, wait: Bool?)
+        case release(name: String)
+        case list
+    }
+
+    /// Where those go. A lease call may take up to the wait limit to come back.
+    public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -115,6 +128,7 @@ public actor AppService {
     private let workflowSink: WorkflowSink
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
+    private let leasesSink: LeasesSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -135,6 +149,9 @@ public actor AppService {
                 },
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
+                },
+                leases: @escaping LeasesSink = { _ in
+                    .refused("This app cannot lease resources.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -143,6 +160,7 @@ public actor AppService {
         self.workflowSink = workflows
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
+        self.leasesSink = leases
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -188,8 +206,11 @@ public actor AppService {
             let agentTools = managesAgents
                 ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
                 : []
+            // The three lease tools after those, for every agent: waiting for the
+            // simulator is not managing anyone (036).
+            let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
-                                              Self.workflowTool] + agentTools
+                                              Self.workflowTool] + agentTools + leaseTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -214,12 +235,10 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
-                // The title is checked here too, for the same reason the message is:
-                // an agent that left it out is told so while it can still send it,
-                // rather than the row keeping a name for work it is no longer doing.
-                guard let title = Agent.cleanedTitle(arguments?["title"]?.stringValue ?? "") else {
-                    return .success(Self.reply(Self.noTitle, isError: true))
-                }
+                // The title names the conversation's goal, which outlasts a turn, so
+                // it is sent only when the goal changes: one left out, or that cleans
+                // to nothing, keeps the name the row already has.
+                let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
                 let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
                                                    orFirstOf: arguments?["next_prompts"])
                 let words: BlockWords
@@ -260,6 +279,13 @@ public actor AppService {
                 return .success(Self.reply(await workflowSink(action,
                                                               arguments?["id"]?.stringValue,
                                                               arguments?["content"]?.stringValue)))
+            }
+
+            if let call = Self.leaseCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await leasesSink(call)))
+                }
             }
 
             if let call = Self.agentCall(named: name, arguments) {
@@ -332,6 +358,35 @@ public actor AppService {
         return nil
     }
 
+    /// Which of the three lease calls a tool name is, with its arguments read. `nil`
+    /// when the name is none of them.
+    static func leaseCall(named name: String,
+                          _ arguments: JSONValue?) -> Result<LeaseCall, AgentCallProblem>? {
+        let resource = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Release first: "release_resource" ends with "lease_resource", so a suffix
+        // test for the lease tool matches both, and every release became an
+        // extension. Found on the real app, 2026-09-25.
+        if name.hasSuffix(releaseResourceToolName) {
+            guard !resource.isEmpty else {
+                return .failure("Nothing was released: say which resource, in `name`.")
+            }
+            return .success(.release(name: resource))
+        }
+        if name.hasSuffix(leaseResourceToolName) {
+            guard !resource.isEmpty else { return .failure(AgentCallProblem(stringLiteral: LeaseWords.emptyName)) }
+            let minutes = arguments?["minutes"].flatMap { value -> Int? in
+                if let number = value.intValue { return number }
+                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            let wait = arguments?["wait"]?.boolValue
+            return .success(.lease(name: resource, minutes: minutes, wait: wait))
+        }
+        if name.hasSuffix(listResourcesToolName) {
+            return .success(.list)
+        }
+        return nil
+    }
+
     /// What was wrong with an agent call's arguments, in the sentence the agent reads.
     struct AgentCallProblem: Error, ExpressibleByStringLiteral {
         let message: String
@@ -380,11 +435,6 @@ public actor AppService {
     static let noWords = """
         Nothing was recorded: say in a sentence how it went. An outcome with no words \
         is no more use than the turn simply ending.
-        """
-
-    static let noTitle = """
-        Nothing was recorded: give the conversation a title — a few words saying what \
-        it is doing now. It is the name the person sees on its row.
         """
 
     /// A tool result is content plus a flag, and a failure inside the tool is reported
@@ -445,10 +495,12 @@ public actor AppService {
             somebody who has not read the conversation. For needs_answer, the message \
             is the question itself.
 
-            The title is the name on that row: a few words saying what this \
-            conversation is doing now, like "Login redirect fixed" or "Choosing a \
-            test account". Give a fresh one every time, as the work moves on; it \
-            replaces the last one. Keep it short and specific, and do not repeat the \
+            The title is the name on that row: a few words naming what the person \
+            wants from this conversation — its goal, not the step you just took — \
+            like "Login redirect" or "Test account for staging". Send it on your \
+            first turn, and again only when the person moves the conversation on to \
+            a different goal; leave it out otherwise and the name stays as it is. \
+            What you did this turn belongs in the message, not here. Do not put the \
             outcome in it.
 
             With it, offer the one thing the person is most likely to want to say next, \
@@ -482,8 +534,9 @@ public actor AppService {
                 "title": [
                     "type": "string",
                     "description": """
-                        A few words naming what this conversation is doing now. \
-                        Replaces the name on its row.
+                        A few words naming the conversation's goal, which becomes \
+                        the name on its row. Send it on the first turn and when the \
+                        goal changes; leave it out to keep the name as it is.
                         """,
                 ],
                 "waiting_on": [
@@ -522,7 +575,7 @@ public actor AppService {
                     "required": .array(["label", "prompt"]),
                 ],
             ],
-            "required": .array(["outcome", "message", "title"]),
+            "required": .array(["outcome", "message"]),
         ],
     ]
 
@@ -806,6 +859,74 @@ public actor AppService {
             The agents you started with start_agent that have not been archived: each \
             one's id, what it is doing, and what it last said about its work. Also how \
             many of this project's three places are in use.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    // MARK: Leases (036). Words from contracts/lease-tools.md.
+
+    static let leaseResourceTool: JSONValue = [
+        "name": .string(leaseResourceToolName),
+        "title": "Take a turn with a shared resource",
+        "description": """
+            Take a turn with something on this Mac that only one agent should use at a \
+            time: a simulator, a browser, the screen (mouse, keyboard, front window), or \
+            anything you name, such as a port. Lease it before you use it, and release it \
+            as soon as you are done. If you already hold it, this extends your lease. If \
+            someone else holds it, this waits for up to 45 seconds. If it is still not \
+            yours after that, you keep your place in line. You can call this again to go \
+            on waiting, or end your turn, and you will be started again when it is yours. \
+            Take several resources in the same order every time. Use list_resources to \
+            see the names.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": [
+                    "type": "string",
+                    "description": """
+                        A name from list_resources, a simulator's UDID, a browser's name, \
+                        or any name of your own. Case and surrounding spaces don't matter.
+                        """,
+                ],
+                "minutes": [
+                    "type": "integer",
+                    "description": "How long. Default 30, at most 240.",
+                ],
+                "wait": [
+                    "type": "boolean",
+                    "description": """
+                        Default true. With false, you are told at once whether you got \
+                        it, and you don't join the line.
+                        """,
+                ],
+            ],
+            "required": .array(["name"]),
+        ],
+    ]
+
+    static let releaseResourceTool: JSONValue = [
+        "name": .string(releaseResourceToolName),
+        "title": "Give back a shared resource",
+        "description": """
+            Give back a lease you hold, or leave the line for a resource you are waiting \
+            for. Do this as soon as you are done with it, so the next agent can have it.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": ["type": "string", "description": "The resource, as you leased it."],
+            ],
+            "required": .array(["name"]),
+        ],
+    ]
+
+    static let listResourcesTool: JSONValue = [
+        "name": .string(listResourcesToolName),
+        "title": "List shared resources",
+        "description": """
+            List what can be leased on this Mac and who holds what, with your own leases \
+            and waits first.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

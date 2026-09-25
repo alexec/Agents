@@ -59,6 +59,8 @@ final class AppModel {
     /// What the reader will allow and what today has cost. Nil until the daemon has
     /// said, which is how every surface knows to show nothing rather than a zero.
     var costState: DaemonAPI.CostState? { work.costState }
+    /// Every resource an agent can lease and who holds it (036).
+    var leases: DaemonAPI.LeaseSnapshot? { work.leases }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
@@ -93,6 +95,7 @@ final class AppModel {
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
+            showsResources = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -102,6 +105,39 @@ final class AppModel {
         }
     }
 
+    /// Whether the window is showing Resources: who holds the Mac's shared things
+    /// and who is waiting (036). A page like Spending, and not persisted for the same
+    /// reason: it is somewhere you go to answer a question.
+    var showsResources = false {
+        didSet {
+            guard showsResources, showsResources != oldValue else { return }
+            showsSpending = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
+    var resourcesFocus: ResourceName?
+
+    /// Resources, at one resource if a chat's capsule asked for it.
+    func showResources(at name: ResourceName? = nil) {
+        resourcesFocus = name
+        showsResources = true
+    }
+
+    /// An agent's chat, from the Resources page or a capsule naming its holder: its
+    /// own project first, as a banner does, so the sidebar and the page agree.
+    func openAgent(_ agentID: UUID) {
+        showsSpending = false
+        showsResources = false
+        if let agent = agents.first(where: { $0.id == agentID }) {
+            selectedProject = agent.projectFolder
+        }
+        openWorkflow = nil
+        selection = agentID
+    }
+
     /// What is picked in the sidebar, as one value.
     ///
     /// The projects and Spending share a column, so they have to share a selection:
@@ -109,13 +145,19 @@ final class AppModel {
     /// stored fact — it is what the window reopens on — and this is the view of it
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
-        get { showsSpending ? .spending : selectedProject.map(SidebarItem.project) }
+        get {
+            showsResources ? .resources
+                : showsSpending ? .spending : selectedProject.map(SidebarItem.project)
+        }
         set {
             switch newValue {
             case .spending:
                 showsSpending = true
+            case .resources:
+                showResources()
             case .project(let folder):
                 showsSpending = false
+                showsResources = false
                 showProject(folder)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -140,8 +182,10 @@ final class AppModel {
     /// daemon.
     func showProject(_ folder: URL) {
         // Going to a project is going away from Spending, wherever the ask came from
-        // — a new project being added, a menu item, the list itself.
+        // — a new project being added, a menu item, the list itself. And from
+        // Resources, for the same reason.
         showsSpending = false
+        showsResources = false
         selectedProject = folder
         selection = nil
         openWorkflow = nil
@@ -443,6 +487,32 @@ final class AppModel {
         work.replaceWakeState(state)
     }
 
+    /// Every resource and who holds it (036). A daemon too old to know the method
+    /// leaves `leases` nil, and nothing about leases is drawn.
+    func refreshLeases() async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+                                                    Optional<String>.none,
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
+    /// The person ending whoever holds a resource (036 US4). Never a way to take one.
+    func endLease(_ name: ResourceName) async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesEnd,
+                                                    DaemonAPI.PersonEndRequest(name: name.key),
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
+    /// The person taking one agent out of one line (036 US4).
+    func removeFromLine(_ name: ResourceName, agentID: UUID) async {
+        guard let snapshot = try? await client.call(
+            DaemonAPI.Method.leasesRemoveWaiter,
+            DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
+            returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
     func refreshCostState() async {
         guard let state = try? await client.call(DaemonAPI.Method.costState,
                                                  Optional<String>.none,
@@ -718,10 +788,11 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
+        async let leases: Void = refreshLeases()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, cloning, wake, modes, transcript)
+                   elicitations, attention, resuming, cost, cloning, wake, leases, modes, transcript)
     }
 
     func refreshElicitations() async {
@@ -775,15 +846,10 @@ final class AppModel {
         guard presence == nil else { return }
         notifier.open = { [weak self] agentID in
             guard let self else { return }
-            self.showsSpending = false
             // Its own project first, because picking a project empties the selection:
             // a chat opened from a banner under some other project's heading is a
             // sidebar and a page that disagree about where you are.
-            if let agent = self.agents.first(where: { $0.id == agentID }) {
-                self.selectedProject = agent.projectFolder
-            }
-            self.openWorkflow = nil
-            self.selection = agentID
+            self.openAgent(agentID)
         }
         let reporter = PresenceReporter { [weak self] watching, active in
             guard let self else { return }
