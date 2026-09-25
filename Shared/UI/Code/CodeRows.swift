@@ -127,15 +127,19 @@ private struct DiffRowView: View {
             }
             Text(mark)
                 .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
             CodeLine(text: row.text, spans: index.flatMap { document?.spans(line: $0) } ?? [],
                      changed: row.changed)
                 // By mark, strike and weight, never by red and green (035 FR-013).
                 .strikethrough(row.kind == .removed)
                 .opacity(row.kind == .removed ? 0.62 : 1)
                 .fontWeight(row.kind == .added ? .semibold : nil)
-                .accessibilityLabel(label)
         }
+        // One element per line, read as "Added: …" or "Removed: …". A second label laid
+        // over `CodeLine`'s own sent AppKit's accessibility into a stack overflow when the
+        // row was queried (walked 2026-09-25), so the row speaks for its children.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(.isStaticText)
         .appText(.code)
         .fixedSize()
         .padding(.horizontal, 8)
