@@ -211,16 +211,16 @@ changed: it is marked, and it is current.
 **Independent Test**: Run a command on the Mac, then open the phone's terminal: the same
 scrollback is there. Tap ^C once on the phone to interrupt, and the Mac shows the same.
 
-- [ ] T045 [US4] Move `App/Sources/Sidebar/ShellClient.swift` to `Packages/AgentsKit/Sources/AgentsKitCore/Client/ShellClient.swift`:
+- [X] T045 [US4] Move `App/Sources/Sidebar/ShellClient.swift` to `Packages/AgentsKit/Sources/AgentsKitCore/Client/ShellClient.swift`:
   - It takes a `DaemonClient` and a `describe: (Error) -> String` instead of `AppModel`.
   - `send` includes the client's last known `rows` and `cols`.
   - Keep the behaviour and the comments.
   - Update `App/Sources/Sidebar/TerminalPane.swift` and `App/Sources/AppModel.swift` (`shellClients`, `attachShell` and the rest) to build and feed it.
-- [ ] T046 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, `writeToShell` resizes first when `rows` and `cols` are present, positive and different from the session's size (add `ShellHost.size(agentID:)` if needed), then writes.
-- [ ] T047 [US4] Route shell notifications to devices (research §9):
+- [X] T046 [US4] In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Shells.swift`, `writeToShell` resizes first when `rows` and `cols` are present, positive and different from the session's size (add `ShellHost.size(agentID:)` if needed), then writes.
+- [X] T047 [US4] Route shell notifications to devices (research §9):
   - `DaemonCore` keeps `shellWatchers: [UUID: Set<UUID>]`, from agent to device connections. Attach and restart from a `.device` surface add to it. Detach from it, and `connectionEnded`, remove from it.
   - `forward(_:_:)` sends through a new `broadcast(except devices not watching)`: every `.mac` connection, plus the watching devices. Implement it in `DaemonServer` next to `notify(to:)`.
-- [ ] T048 [P] [US4] Write `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ShellSizeTests.swift`. It checks:
+- [X] T048 [P] [US4] Write `Packages/AgentsKit/Tests/AgentsKitTests/Integration/ShellSizeTests.swift`. It checks:
   - input with a size resizes before writing (read the PTY size back with `stty size` output)
   - input without a size does not resize
   - a device connection hears no `shell/output` until it attaches, and none after it detaches

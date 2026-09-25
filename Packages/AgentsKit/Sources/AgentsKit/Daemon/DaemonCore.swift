@@ -128,6 +128,9 @@ public actor DaemonCore {
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
     var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The phones and iPads that have an agent's shell open, by agent (034). A device
+    /// hears a shell's output only while it is here; a window on the Mac hears them all.
+    var shellWatchers: [UUID: Set<UUID>] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]

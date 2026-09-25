@@ -301,11 +301,11 @@ extension DaemonCore {
 
             case DaemonAPI.Method.shellAttach:
                 let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
-                return .success(try JSONValue.encoding(try attachShell(request)))
+                return .success(try JSONValue.encoding(try attachShell(request, from: surface, connection: connection)))
 
             case DaemonAPI.Method.shellDetach:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                detachShell(request.agentID)
+                detachShell(request.agentID, connection: connection)
                 return .success([:])
 
             case DaemonAPI.Method.shellInput:
@@ -325,7 +325,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.shellRestart:
                 let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
-                return .success(try JSONValue.encoding(try restartShell(request)))
+                return .success(try JSONValue.encoding(try restartShell(request, from: surface, connection: connection)))
 
             default:
                 return .failure(.methodNotFound(method))

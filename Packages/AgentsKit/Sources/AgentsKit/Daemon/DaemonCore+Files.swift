@@ -68,6 +68,7 @@ extension DaemonCore {
     /// without saying so as often as not, and an FSEvents stream left running for it
     /// would run for the rest of the daemon's life.
     public func connectionEnded(_ connection: UUID) {
+        forgetShellWatcher(connection)
         guard let interests = fileInterests.removeValue(forKey: connection) else { return }
         for root in Set(interests.map(\.root)) { stopWatchingIfUnwanted(root) }
     }
