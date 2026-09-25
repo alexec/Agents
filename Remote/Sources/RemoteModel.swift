@@ -954,8 +954,9 @@ final class RemoteModel {
     }
 
     private func refreshAgents() async {
+        // Without an archived chat's commands: it has no prompt bar here to use them.
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList,
-                                                  DaemonAPI.ListRequest(),
+                                                  DaemonAPI.ListRequest(archivedCommands: false),
                                                   returning: [Agent].self) else { return }
         work.replaceAgents(listed)
     }

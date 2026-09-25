@@ -130,7 +130,11 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsList:
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
-                return .success(try JSONValue.encoding(allAgents(includeArchived: request.includeArchived)))
+                var listed = allAgents(includeArchived: request.includeArchived)
+                if !request.archivedCommands {
+                    for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }
+                }
+                return .success(try JSONValue.encoding(listed))
 
             case DaemonAPI.Method.agentsResuming:
                 // For a window that connected part-way through the batch. Order is

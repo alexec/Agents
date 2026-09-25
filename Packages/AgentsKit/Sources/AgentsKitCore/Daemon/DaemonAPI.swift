@@ -970,11 +970,20 @@ public enum DaemonAPI {
 
     public struct ListRequest: Codable, Sendable {
         public var includeArchived: Bool
-        public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
+        /// Whether an archived agent comes with its slash commands. The Mac's archived
+        /// chat still has a prompt bar and wants them; the phone's has none. They were
+        /// nine tenths of a 5.4 MB `agents/list` on 2026-09-25 (seventy commands each,
+        /// 220 archived agents). Unarchiving sends the whole agent again.
+        public var archivedCommands: Bool
+        public init(includeArchived: Bool = true, archivedCommands: Bool = true) {
+            self.includeArchived = includeArchived
+            self.archivedCommands = archivedCommands
+        }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+            archivedCommands = try c.decodeIfPresent(Bool.self, forKey: .archivedCommands) ?? true
         }
     }
 
