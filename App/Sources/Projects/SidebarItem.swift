@@ -1,3 +1,4 @@
+import AgentsKit
 import Foundation
 
 /// What can be picked in the window's first column.
@@ -7,6 +8,6 @@ import Foundation
 /// bindings a project and Spending could both look chosen, and the reader would have
 /// to guess which one the detail column was showing.
 enum SidebarItem: Hashable {
-    case project(URL)
+    case project(ProjectKey)
     case spending
 }

@@ -17,7 +17,7 @@ struct ProjectListView: View {
         List(selection: $selection) {
             ForEach(model.liveProjects) { summary in
                 ProjectRow(summary: summary)
-                    .tag(SidebarItem.project(summary.folder))
+                    .tag(SidebarItem.project(summary.key))
                     .contextMenu { menu(for: summary) }
             }
             // Where the project will be once it is one (027).

@@ -74,7 +74,7 @@ final class AppModel {
     var selectedProject: URL? {
         didSet {
             guard selectedProject != oldValue else { return }
-            UserDefaults.standard.set(selectedProject?.path, forKey: Self.selectedProjectKey)
+            UserDefaults.standard.set(selectedProjectKey?.stored, forKey: Self.selectedProjectDefault)
             // Picking a project shows the project, not a conversation, and not a
             // workflow either. Both are things you go into from here, and come back
             // out of.
@@ -83,7 +83,17 @@ final class AppModel {
         }
     }
 
-    static let selectedProjectKey = "selectedProjectFolder"
+    static let selectedProjectDefault = "selectedProjectFolder"
+
+    /// Which machine the selected project is on (037). Set with it, by `select`, never
+    /// on its own: a folder names a project only together with its host.
+    private(set) var selectedProjectHost: HostID = .mac
+
+    /// The selected project as the window identifies projects now that a server can
+    /// have the same path as this Mac.
+    var selectedProjectKey: ProjectKey? {
+        selectedProject.map { ProjectKey(host: selectedProjectHost, folder: $0) }
+    }
 
     /// Whether the window is showing Spending rather than a project.
     ///
@@ -109,14 +119,14 @@ final class AppModel {
     /// stored fact — it is what the window reopens on — and this is the view of it
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
-        get { showsSpending ? .spending : selectedProject.map(SidebarItem.project) }
+        get { showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project) }
         set {
             switch newValue {
             case .spending:
                 showsSpending = true
-            case .project(let folder):
+            case .project(let key):
                 showsSpending = false
-                showProject(folder)
+                showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
@@ -138,13 +148,24 @@ final class AppModel {
     /// This is that rule as something callable. It touches no agent: `selection` only
     /// decides which transcript this window is watching, and the turn belongs to the
     /// daemon.
-    func showProject(_ folder: URL) {
+    func showProject(_ key: ProjectKey) {
         // Going to a project is going away from Spending, wherever the ask came from
         // — a new project being added, a menu item, the list itself.
         showsSpending = false
-        selectedProject = folder
+        select(key)
         selection = nil
         openWorkflow = nil
+    }
+
+    /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
+    /// and compares the pair rather than a folder paired with the last host (037).
+    func select(_ key: ProjectKey?) {
+        if let key, key.host != selectedProjectHost {
+            selectedProjectHost = key.host
+            // The same folder on another host is another project.
+            if selectedProject == key.folder { selectedProject = nil }
+        }
+        selectedProject = key?.folder
     }
 
     /// Bumped when something asks the conversation to go to its end.
@@ -255,16 +276,16 @@ final class AppModel {
 
     var archivedProjects: [DaemonAPI.ProjectSummary] { work.archivedProjects }
 
-    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
+    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProjectKey) }
 
     /// A project's agents in one group, newest first.
-    func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
-        work.agents(in: folder, group: group)
+    func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
+        work.agents(in: key, group: group)
     }
 
     /// This window's own counts for a project, from the grouping its panel uses.
-    func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
-    func unreadCount(in folder: URL?) -> Int { work.unreadCount(in: folder) }
+    func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
+    func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
@@ -433,19 +454,21 @@ final class AppModel {
     /// puts at the top.
     private func settleProjectSelection() {
         let live = liveProjects
-        if let selectedProject, live.contains(where: { $0.folder == selectedProject }) { return }
-        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectKey)
-            .map { Project.standardize(URL(filePath: $0)) }
-        if let stored, live.contains(where: { $0.folder == stored }) {
-            selectedProject = stored
+        if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
+        // `host|path`, or a bare path from before servers, which is this Mac's.
+        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectDefault)
+            .flatMap(ProjectKey.init(stored:))
+            .map { ProjectKey(host: $0.host, folder: Project.standardize($0.folder)) }
+        if let stored, live.contains(where: { $0.key == stored }) {
+            select(stored)
         } else {
-            selectedProject = live.first?.folder
+            select(live.first?.key)
         }
     }
 
     func addProject(_ folder: URL) async {
         await callProject(DaemonAPI.Method.projectsAdd, folder) { [weak self] summary in
-            self?.selectedProject = summary.folder
+            self?.select(summary.key)
         }
     }
 
@@ -459,7 +482,7 @@ final class AppModel {
                                                 DaemonAPI.CloneRequest(url: url),
                                                 returning: DaemonAPI.ProjectSummary.self)
             upsert(summary)
-            selectedProject = summary.folder
+            select(summary.key)
             settleProjectSelection()
         } catch {
             // Written for the person already: which host, which folder, what to do.
@@ -479,7 +502,7 @@ final class AppModel {
 
     func unarchiveProject(_ folder: URL) async {
         await callProject(DaemonAPI.Method.projectsUnarchive, folder) { [weak self] summary in
-            self?.selectedProject = summary.folder
+            self?.select(summary.key)
         }
     }
 
@@ -711,7 +734,7 @@ final class AppModel {
             // a chat opened from a banner under some other project's heading is a
             // sidebar and a page that disagree about where you are.
             if let agent = self.agents.first(where: { $0.id == agentID }) {
-                self.selectedProject = agent.projectFolder
+                self.select(ProjectKey(host: agent.host, folder: agent.projectFolder))
             }
             self.openWorkflow = nil
             self.selection = agentID

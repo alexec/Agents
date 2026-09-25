@@ -130,7 +130,7 @@ struct ProjectAgentsView: View {
                     }
                 }
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    let agents = model.agents(in: folder, group: group)
+                    let agents = model.agents(in: model.selectedProjectKey, group: group)
                     if !agents.isEmpty {
                         GroupHeading(title: group.title, count: agents.count)
                         ForEach(agents) { agent in
@@ -164,11 +164,11 @@ struct ProjectAgentsView: View {
     }
 
     private var hasSessions: Bool {
-        AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
+        AgentGroup.allCases.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
     }
 
     private var archived: [Agent] {
-        model.agents(in: folder, group: .archived)
+        model.agents(in: model.selectedProjectKey, group: .archived)
     }
 
     /// Out of the way until it is wanted, because looking at what you archived is a
