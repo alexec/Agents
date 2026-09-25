@@ -156,6 +156,8 @@ struct ProjectAgentsView: View {
             .padding(.bottom, 28)
         }
         .animation(.default, value: model.agents.map(\.state))
+        // Parking moves a chat without changing its state (040).
+        .animation(.default, value: model.agents.map(\.parking))
         // Who is working in which worktree changes when an agent is archived or
         // brought back, so the list is asked for again then. Not polled.
         .onChange(of: archived.count) { Task { await model.loadDraftWorktrees() } }

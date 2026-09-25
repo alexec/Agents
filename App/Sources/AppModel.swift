@@ -1061,6 +1061,12 @@ final class AppModel {
         await attempt { try await self.client.call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
+    /// Park or unpark, whichever `Agent.parkAction` offers (040).
+    func perform(_ action: ParkAction, on id: UUID) async {
+        let method = action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark
+        await attempt { try await self.client.call(method, DaemonAPI.AgentRequest(agentID: id)) }
+    }
+
     func answer(_ request: PermissionRequest, optionID: String) async {
         await attempt {
             try await self.client.call(DaemonAPI.Method.permissionsAnswer,
