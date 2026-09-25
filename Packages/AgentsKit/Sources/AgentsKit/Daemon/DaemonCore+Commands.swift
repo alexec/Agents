@@ -580,7 +580,8 @@ extension DaemonCore {
         agent.queuedPrompts.remove(at: index)
         changed(agent)
         await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks,
-                        from: next.from, session: session)
+                        from: next.from, session: session, unlessStoppedSince: stopsBefore,
+                        requeue: next)
     }
 
     /// Whatever is waiting, now that a turn has ended of its own accord.
@@ -827,7 +828,8 @@ extension DaemonCore {
     // MARK: The turn itself
 
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
-                   from: PromptOrigin = .person, session: ACPSession) async {
+                   from: PromptOrigin = .person, session: ACPSession,
+                   unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil) async {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
@@ -839,6 +841,19 @@ extension DaemonCore {
         // The text is kept beside the blocks so the record reads the way it always has.
         await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
                      for: agentID)
+        // Stopped or archived while that was written. The move below would otherwise
+        // take an archived agent straight back out of the archive — the app's own
+        // question to a silent agent did, and started it in a worktree the archive had
+        // just removed. The app's words go; a person's go back on the queue, as a stop
+        // promises.
+        if let stopsBefore, stops[agentID, default: 0] != stopsBefore {
+            if from == .person, let requeue, var agent = agents[agentID] {
+                agent.queuedPrompts.insert(requeue, at: 0)
+                changed(agent)
+            }
+            await releaseRuntime(for: agentID)
+            return
+        }
         // One moment reached from two directions: the first turn of an agent that is
         // still `starting`, and an ordinary prompt to a settled one. They are two
         // events rather than one because that is what lets the table refuse
@@ -1244,6 +1259,7 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         }
+        await removeWorktreeIfDone(archiving: agentID)
     }
 
     /// What an agent that started others is called in their transcripts: its title
