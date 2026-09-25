@@ -127,6 +127,35 @@ struct AttentionTests {
         #expect(told.need?.headline.h3.contains("No signing certificate") == true)
     }
 
+    /// A report the person has looked at is not news again when they look away. The
+    /// agent still wants an answer and stays under Needs attention; only the banner is
+    /// done with, and that is written down so a restart does not bring it back.
+    @Test func aReportOnceLookedAtIsNotToldAgain() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(400)
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        let heard = AttentionRecorder(); await heard.attach(to: core)
+        let mac = FakeSurface(.mac)
+        await mac.report(core, active: true)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
+                                               outcome: "partly_done", message: "The rest is yours."))
+        await eventually("it finished") { await core.agent(id)?.state == .finished }
+        await eventually("the Mac was told") { !heard.deliveries.isEmpty }
+
+        await mac.report(core, watching: id, active: true)
+        await mac.report(core, watching: nil, active: true)
+        try await settled()
+        #expect(await core.attentionPending().needs.isEmpty)
+        #expect(heard.deliveries.count == 1, "told once: \(heard.deliveries.map(\.to))")
+        #expect(await core.agent(id)?.group(wantsEyes: false) == .needsAttention)
+        let written = try await AgentStore(locations: locations).load(id).agent
+        #expect(written.reportIsSeen, "on the record, for the next daemon")
+    }
+
     // MARK: US3, silence (Phase 4)
 
     /// SC-004: watching the conversation means nothing is delivered anywhere.
