@@ -75,19 +75,24 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     public var architecture: Architecture
     public var home: String
     public var freeBytes: Int64
-    /// `agentsd --version` on the server, or nil when nothing is installed.
+    /// From `~/.agents-server/install.json`: the app version that installed the
+    /// running binary, and the binary's SHA-256, which is what identifies it. Both nil
+    /// when nothing is installed.
     public var installedVersion: String?
+    public var installedSHA256: String?
     /// False only when `sshd_config` turns Unix-socket forwarding off.
     public var streamLocalForwarding: Bool
     public var probedAt: Date
 
     public init(system: String, architecture: Architecture, home: String, freeBytes: Int64,
-                installedVersion: String?, streamLocalForwarding: Bool, probedAt: Date = Date()) {
+                installedVersion: String?, installedSHA256: String? = nil,
+                streamLocalForwarding: Bool, probedAt: Date = Date()) {
         self.system = system
         self.architecture = architecture
         self.home = home
         self.freeBytes = freeBytes
         self.installedVersion = installedVersion
+        self.installedSHA256 = installedSHA256
         self.streamLocalForwarding = streamLocalForwarding
         self.probedAt = probedAt
     }

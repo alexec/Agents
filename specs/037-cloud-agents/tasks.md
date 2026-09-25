@@ -73,7 +73,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 - [X] T018 Implement `Pkg/Sources/AgentsKit/Hosts/SSHMaster.swift` (contracts/ssh.md § 4). It starts without `-L`, has `restartWithForward(home:)`, exposes `onExit`, and uses socket paths `<root>/hosts/<id>.{ctl,sock}`. It throws `socketPathTooLong` over 103 bytes. **Done. `restartWithForward` is `stop()` then `start(forwardingTo:)`.**
 - [X] T019 [P] Write `Tests/Unit/HostKeyCheckTests.swift` using temporary `known_hosts` files: known → `.known`; unknown → the fetch writes `<tmp>` and the fingerprint is parsed; trust appends the line, hashed when `hashknownhosts yes`; cancel deletes `<tmp>`. **Done: 7 tests, all on temporary known_hosts files.**
 - [X] T020 Implement `Pkg/Sources/AgentsKit/Hosts/HostKeyCheck.swift` (contracts/ssh.md §§ 1–3). **Done.**
-- [ ] T021 [P] Write `Tests/Integration/ServerInstallerTests.swift` against the fake, using the Mac `agentsd` built by `swift build` as the "Linux" binary:
+- [X] T021 [P] Write `Tests/Integration/ServerInstallerTests.swift` against the fake, using the Mac `agentsd` built by `swift build` as the "Linux" binary: **Done: 9 tests. Binaries are named `agentsd-<sha16>`; `install.json` carries version and SHA-256 and is written at the swap; `ServerFacts.installedSHA256` added.**
   - the probe parses all five lines, and a garbled probe gives `installFailed`;
   - `Darwin arm64` gives `unsupportedSystem`, and nothing is written under `$FAKE_SSH_HOME`;
   - install puts `bin/agentsd-<v>` with mode 0700, `current` points at it, and `root/` is 0700;
@@ -81,7 +81,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - a checksum mismatch on update leaves the old `current` and no `.part` file;
   - `freeBytes` under 200 MB gives `diskFull` before any write;
   - remove with `purge` deletes `~/.agents-server` and nothing else in `$FAKE_SSH_HOME`.
-- [ ] T022 Implement `Pkg/Sources/AgentsKit/Hosts/ServerInstaller.swift` (`probe`, `install(binary:version:sha256:)`, `swapCurrent`, `purge`), per contracts/ssh.md §§ 5, 6, 8.
+- [X] T022 Implement `Pkg/Sources/AgentsKit/Hosts/ServerInstaller.swift` (`probe`, `install(binary:version:sha256:)`, `swapCurrent`, `purge`), per contracts/ssh.md §§ 5, 6, 8. **Done, plus `removeBinaries(except:)` and `startDaemon()`.**
 - [ ] T023 [P] Write `Tests/Integration/ServerLinkTests.swift`: with the fake master up and no daemon, `DaemonClient(link: ServerLink(...)).connect()` runs `start()`, the Mac `agentsd --serve --detach` comes up under `$FAKE_SSH_HOME/.agents-server/root`, and `agents/list` answers through the forward. With the master down, `connect` throws within 1 s and never starts a master.
 - [ ] T024 Extract `SocketLink`'s connect body into a shared `connectUnixSocket(path:)` in `Pkg/Sources/AgentsKit/Client/SocketLink.swift`. Implement `Pkg/Sources/AgentsKit/Hosts/ServerLink.swift` (R5).
 
