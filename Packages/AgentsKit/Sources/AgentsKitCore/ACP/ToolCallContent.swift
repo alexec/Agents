@@ -2,9 +2,10 @@ import Foundation
 
 /// What a tool call produced.
 ///
-/// Copilot and Grok both send a structured diff for an edit; the Claude adapter shells
-/// out and sends console text. Both are drawn, neither is invented, and anything else
-/// is kept whole.
+/// Claude and Copilot send a structured diff for an edit — for an edit, the passage
+/// that went and the one that came, not the whole file — and Grok sends none (035
+/// research R1). What is sent is drawn, nothing is invented, and anything else is kept
+/// whole.
 public enum ToolCallContent: Codable, Hashable, Sendable {
     case content(ContentBlock)
     case diff(Diff)

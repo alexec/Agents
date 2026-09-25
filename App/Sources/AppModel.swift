@@ -827,6 +827,21 @@ final class AppModel {
         await loadDraftWorktrees()
     }
 
+    /// What an agent changed (035). Asked by the Changes pane on its own triggers —
+    /// shown, an edit finished, the turn ended — and never polled.
+    func changes(for agentID: UUID) async throws -> ChangesList {
+        try await client.call(DaemonAPI.Method.changesList,
+                              DaemonAPI.ChangesListRequest(agentID: agentID),
+                              returning: ChangesList.self)
+    }
+
+    /// One file from `changes(for:)`: its edits, and with `whole` the file as it stands.
+    func changeDetail(for agentID: UUID, path: String, whole: Bool = false) async throws -> ChangedFileDetail {
+        try await client.call(DaemonAPI.Method.changesFile,
+                              DaemonAPI.ChangesFileRequest(agentID: agentID, path: path, whole: whole),
+                              returning: ChangedFileDetail.self)
+    }
+
     /// What the draft folder's repository has. Asked once each time the folder
     /// changes or an agent starts, never polled; an answer for a folder since left is
     /// dropped.

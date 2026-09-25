@@ -2,18 +2,19 @@ import AgentsKit
 import Foundation
 import Observation
 
-/// Which of the four panes the column is showing.
+/// Which of the five panes the column is showing.
 ///
-/// One column, four panes, taking turns. The spec's assumption, and the reason a pane
+/// One column, five panes, taking turns. The spec's assumption, and the reason a pane
 /// is a single case rather than a set.
 enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
-    case files, terminal, browser, artifacts
+    case files, changes, terminal, browser, artifacts
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .files: return "Files"
+        case .changes: return "Changes"
         case .terminal: return "Terminal"
         case .browser: return "Browser"
         case .artifacts: return "Exchanged"
@@ -23,6 +24,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
     var symbol: String {
         switch self {
         case .files: return "folder"
+        case .changes: return "plusminus"
         case .terminal: return "apple.terminal"
         case .browser: return "globe"
         case .artifacts: return "tray.full"
@@ -172,6 +174,9 @@ final class AgentPaneState {
     /// is why it is cleared beside `openFile` rather than left to go stale.
     var openLine: Int?
     var browserURL: URL?
+    /// The file open in the Changes pane, and which edit to bring into view. Nil is
+    /// the list.
+    var changesSelection: ChangesSelection?
     var isAttachedToShell = false
 
     init(agentID: UUID) {
@@ -196,4 +201,14 @@ final class SidebarStates {
     func forget(_ agentID: UUID) {
         states[agentID] = nil
     }
+}
+
+/// Where the Changes pane is looking (035).
+struct ChangesSelection: Equatable {
+    enum View: Equatable { case edits, folder, whole }
+
+    var path: String
+    /// The tool call whose edit to bring into view, when the pane was opened from one.
+    var toolCallID: String?
+    var view: View = .edits
 }
