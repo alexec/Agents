@@ -154,20 +154,21 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
   - When `plainBecause` is set, show one `.appText(.fine)`, `.secondary` line above the rows: "Shown without colour: the file is too large." or "Shown without colour: a line is too long." (research R6).
 - [X] T022 [US1] Pass the open file's path to `FileLines` in `App/Sources/Sidebar/FilesPane.swift` (the `.text` case, around line 203) and `Remote/Sources/Panes/FilesPane.swift`.
 - [X] T023 [US1] Run `CT` tests, and build `Agents` then `Remote`.
-- [ ] T024 [US1] **Look gate.** Use the run-app skill on a scratch root (see memory: drive the scratch app only when Alex is away):
+- [X] T024 [US1] **Look gate.** Use the run-app skill on a scratch root (see memory: drive the scratch app only when Alex is away):
   - Put `CT/Tests/CodeTextTests/Samples/*` and a `notes.xyz` in the scratch project.
   - Open `sample.swift`, `sample.py`, `sample.ts` and `sample.json` in Files.
   - Screenshot each in Light and Dark (the Paper setting) into `specs/041-rich-files-and-changes/walk/01-*.png`.
   - Check there is no red, the numbers are unchanged, `notes.xyz` is plain, and copying a line gives plain text.
   - **Stop and show Alex.** Record his palette changes here and apply them to `InkValues.swift` before going on.
-- [ ] T025 [US1] Vendor the remaining 15 grammars with `scripts/vendor-grammars.sh all`:
+  - **Walked 2026-09-25 (shots in `walk/`). Alex: strengthen functions, then carry on. Function slate `#3D5A80`/`#9DB5D9` became indigo `#5B4BB5`/`#B3A6F0`; seen distinct on screen after (`pane-light-sample.swift.png`, `pane-light-sample.rs.png`).**
+- [X] T025 [US1] Vendor the remaining 15 grammars with `scripts/vendor-grammars.sh all`:
   - c, cpp, go, rust, java, ruby, bash, yaml, toml, html, css, markdown, dockerfile, make, tsx.
   - Add a sample file for each to `CT/Tests/CodeTextTests/Samples/`.
   - T008–T010 now cover all 20 languages (SC-006). Fix any query that fails to compile against its grammar version by pinning the query to the same tag, never by editing the grammar.
-- [ ] T026 [US1] Live text (US1 AS5, FR-007):
+- [X] T026 [US1] Live text (US1 AS5, FR-007):
   - Add a test in `CT/Tests/CodeTextTests/IncrementalTests.swift`: append 100 lines, one at a time, to a Swift document. After each `update`, the spans for untouched lines equal a fresh parse's, and only windows overlapping the changed lines were dropped.
   - Then walk it on scratch: an agent writes a long Swift file while it is open in Files, the colour follows, and the place is kept. Screenshot `walk/02-live.png`.
-- [ ] T027 [US1] [P] Accessibility: rows keep their plain text as the accessibility label, so VoiceOver reads the code, not the colour. Check with Accessibility Inspector on the scratch window.
+- [X] T027 [US1] [P] Accessibility: rows keep their plain text as the accessibility label, so VoiceOver reads the code, not the colour. Check with Accessibility Inspector on the scratch window.
 
 **Checkpoint**: US1 is complete and shippable alone. Files are coloured on the Mac and phone.
 
