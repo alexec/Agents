@@ -103,8 +103,12 @@ extension DaemonCore {
     public func startWatchingMachine(_ watch: any MachineWatch = IOKitMachineWatch()) {
         machineWatch?.stop()
         machineWatch = watch
-        watch.start { [weak self] change in
-            Task { await self?.machineChanged(change) }
+        // One stream, read by one task, so the changes land in the order they happened:
+        // a Task each would let a wake overtake the sleep before it.
+        let (changes, continuation) = AsyncStream.makeStream(of: MachineChange.self)
+        watch.start { change in continuation.yield(change) }
+        Task { [weak self] in
+            for await change in changes { await self?.machineChanged(change) }
         }
     }
 

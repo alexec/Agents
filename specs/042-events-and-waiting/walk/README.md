@@ -42,3 +42,11 @@ Scratch root `/tmp/run-042`, Debug build of `fdbdcfa`, 2026-09-25 22:42–22:44:
   "hello from Pinger"."
 
 Grok and Cursor as Waiter: not yet run (T066).
+
+## Full suite (T065, partial)
+
+At `3110fa4`, run 1: 1820 tests in 199 suites, 2 failures, both main's own known flakes
+(`twoHelpersFinishingGiveOneResumeNamingEach`, `anAgentCanStartInANewWorktreeOnALocalBranch`).
+Run 2 (cut short by an app restart) caught a real ordering bug: machine changes were each
+delivered on their own Task, so a wake could be logged before its sleep. Fixed by delivering
+them through one stream; MachineEventTests then passed 5/5. More full runs are still owed.
