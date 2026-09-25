@@ -718,6 +718,16 @@ final class AppModel {
     /// Each server's end of `files/*`, made when first wanted (037).
     @ObservationIgnored private var serverFilesByHost: [HostID: RemoteFiles] = [:]
 
+    @ObservationIgnored private var serverPicturesByHost: [HostID: ServerPictures] = [:]
+
+    /// A server's pictures for its live pages, kept while the app runs (037).
+    func serverPictures(_ host: HostID) -> ServerPictures {
+        if let known = serverPicturesByHost[host] { return known }
+        let made = ServerPictures(files: serverFiles(host))
+        serverPicturesByHost[host] = made
+        return made
+    }
+
     /// How the files pane reads a server agent's folder: through that server's daemon,
     /// because the folder is not on this Mac.
     func serverFiles(_ host: HostID) -> RemoteFiles {
