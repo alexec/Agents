@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-25
 
-**Status**: Draft
+**Status**: Implemented on the Mac; phone and iPad walk open
 
 **Input**: User description: "Rich files and changes. The changes/diff view has landed but both that and the existing file views are not very rich. It often needs to be richer. I'm not sure the best way to do this. It must be a careful balance between performance, simplicity, library use, system libs. We should support common coding file types. Perhaps there is a library to make this easy?"
 

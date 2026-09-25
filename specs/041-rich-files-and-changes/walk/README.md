@@ -1,3 +1,26 @@
+# 041 walk: where it stands (2026-09-25)
+
+| Story | Seen on screen | Proof |
+|---|---|---|
+| US1 files read like code | Mac, light and dark, 11 languages shown (below) | 57 CodeText tests: text untouched in all 20 languages, contrast, live edits |
+| US2 edits as real diffs | Mac, light and dark: one word, a new function | line/word diff and fold tests; one-word change ≤ 10 lines (SC-004) |
+| US3 Whole file | Mac, light and dark: two changes 400 lines apart, fold opened in place | change stops tested; Previous/Next pressed |
+| US4 fenced blocks | Mac: swift/ts/py coloured, untagged plain, in a message and on a page | fence tag tests |
+| US5 phone and iPad | **not yet**: installing replaces Alex's own Remote, so that is his call | the phone app builds in Debug and Release with it |
+
+Measured: first coloured screen of 5,000 Swift lines in 29 ms (Release, T054); a 30 MB file
+or a 286 KB one-line file shown plain in well under a second (T053); the Mac app +18.1 MB
+installed / +2.0 MB zipped, the phone app +17.2 / +1.9 (T058).
+
+Still to see: the "Shown without colour" line and scrolling a 5,000-line file on screen (the
+screen locked before they could be captured), and everything on the phone and iPad.
+
+![fences in a message](06-light-fences-chat.png)
+
+![fences on a page](06-light-fences-page.png)
+
+---
+
 # 041 diff look gate (T043): edits and Whole file
 
 Taken 2026-09-25 on a scratch root, in a git project. A real Claude agent made three edits:

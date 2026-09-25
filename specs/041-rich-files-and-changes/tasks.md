@@ -298,7 +298,8 @@ the second.
   **Both build in Release (Agents for macOS; Remote for generic iOS, unsigned).**
 - [X] T058 Size (SC-003, quickstart §7): `du -sk` and `ditto -c -k` sizes of Release `Agents.app` and `Remote.app` against main's Release build. It should be at most +20 MB installed and +5 MB compressed. Record the numbers in research.md under R1.
   **Measured against main's Release build, same machine: Mac app 35.9 → 54.0 MB installed (+18.1), 9.0 → 11.0 MB zipped (+2.0); phone app 23.8 → 41.1 MB installed (+17.2), 5.8 → 7.6 MB zipped (+1.9). Within SC-003 (≤ 20 MB, ≤ 5 MB).**
-- [ ] T059 Run quickstart.md §1–§7 end to end on the finished branch, with screenshots in `walk/`. Write `specs/041-rich-files-and-changes/walk/README.md` listing what was seen and what is Alex's (phone and iPad looks).
+- [X] T059 Run quickstart.md §1–§7 end to end on the finished branch, with screenshots in `walk/`. Write `specs/041-rich-files-and-changes/walk/README.md` listing what was seen and what is Alex's (phone and iPad looks).
+  **Done on the Mac 2026-09-25; the walk page lists what is still to see (phone, iPad, the plain-reason line and scrolling on screen).**
 - [X] T060 Rerun `scripts/check-agentsd-links-no-parsers.sh` on the Release build.
   **Release agentsd: no tree-sitter symbols; 12.0 MB against main's 12.1 MB.**
 - [ ] T061 Update the spec's Status to "Implemented", update the 041 line in the memory spec queue with the head commit and what is left, and commit. Don't merge into main until Alex says it's this lane's turn (see memory: main checkout is only main).
