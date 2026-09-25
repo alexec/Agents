@@ -8,7 +8,22 @@ import SwiftUI
 /// is the thing you came to find out.
 struct AgentRow: View {
     @Environment(AppModel.self) private var model
-    let agent: Agent
+    /// The agent as the list had it when it drew this row. Only its id is trusted.
+    private let given: Agent
+
+    init(agent: Agent) {
+        given = agent
+    }
+
+    /// The agent as the window has it now, read from the model rather than kept.
+    ///
+    /// A row that drew the copy it was handed stayed on that copy: a card that moved
+    /// between groups in the lazy stack kept its first render, so a finished agent sat
+    /// under Complete with a spinner and its first title, and one prompted again sat
+    /// under Working with a tick. The heading was right, because it is counted from the
+    /// model; the row was not, because nothing made the stack hand it the new copy.
+    /// Reading the model here makes this row observe the agent itself.
+    private var agent: Agent { model.agents.first { $0.id == given.id } ?? given }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
