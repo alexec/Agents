@@ -10,58 +10,15 @@ import Testing
 /// no network. `gh` is `FakeGitHub`, answering from the recorded fixtures.
 @Suite("My pull requests, listed", .timeLimit(.minutes(1)))
 struct PullRequestListTests {
-    private struct Setup {
-        let core: DaemonCore
-        let project: URL
-        let gh: FakeGitHub
-    }
+    private typealias Setup = PullRequestSandbox
 
     @discardableResult
     private func git(_ arguments: [String], in folder: URL) async throws -> String {
-        let outcome = try await GitProcess(arguments, in: folder).run()
-        guard outcome.succeeded else {
-            throw GitWorktrees.Failure(message: "git \(arguments.joined(separator: " ")): \(outcome.errors)")
-        }
-        return outcome.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await PullRequestSandbox.git(arguments, in: folder)
     }
 
-    /// A bare "GitHub" with a branch for each pull request in `pulls-mixed`, cloned as
-    /// the project. #405's branch is checked out in the project folder and #412's in a
-    /// worktree of its own; #390's is only on the remote.
     private func setUp(origin: String = "https://github.com/alexec/agents.git") async throws -> Setup {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("AgentsPulls-\(UUID().uuidString)", isDirectory: true)
-        let seed = root.appending(path: "seed", directoryHint: .isDirectory)
-        let bare = root.appending(path: "remote.git", directoryHint: .isDirectory)
-        let project = root.appending(path: "agents", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: seed, withIntermediateDirectories: true)
-
-        try await git(["init", "-q", "-b", "main"], in: seed)
-        try await git(["config", "user.email", "test@example.com"], in: seed)
-        try await git(["config", "user.name", "Test"], in: seed)
-        try "hello\n".write(to: seed.appending(path: "README"), atomically: true, encoding: .utf8)
-        try await git(["add", "."], in: seed)
-        try await git(["commit", "-q", "-m", "first"], in: seed)
-        for branch in ["fix-login-redirect", "paper-settings-card", "retry-upload", "docs-for-leases", "bump-swiftterm"] {
-            try await git(["branch", branch], in: seed)
-        }
-        try await git(["clone", "-q", "--bare", seed.path, bare.path], in: root)
-        try await git(["clone", "-q", bare.path, project.path], in: root)
-        try await git(["remote", "set-url", "origin", origin], in: project)
-        try await git(["config", "url.\(bare.path).insteadOf", origin], in: project)
-        try await git(["checkout", "-q", "paper-settings-card"], in: project)
-        try await git(["worktree", "add", "-q", root.appending(path: "fix-login-redirect").path, "fix-login-redirect"],
-                      in: project)
-
-        let locations = StoreLocations(root: root.appending(path: "store"))
-        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
-                              discovery: .findsEverything, launcher: FakeLauncher())
-        await core.loadFromDisk()
-        _ = try await core.addProject(project)
-        let gh = try FakeGitHub()
-        try gh.answer(with: "pulls-mixed")
-        await core.setGitHubCLI(gh.cli)
-        return Setup(core: core, project: Project.standardize(project), gh: gh)
+        try await PullRequestSandbox.make(origin: origin)
     }
 
     @Test func eachPullRequestIsMatchedToWhereItsBranchIs() async throws {

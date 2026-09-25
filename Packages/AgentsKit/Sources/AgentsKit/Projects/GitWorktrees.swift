@@ -114,6 +114,16 @@ public enum GitWorktrees {
         return await remoteURL(remote, in: folder)
     }
 
+    /// How far the branch checked out in `folder` is ahead of and behind what it tracks,
+    /// or nil when it tracks nothing (038 R10).
+    public static func aheadBehind(in folder: URL) async -> (ahead: Int, behind: Int)? {
+        guard let counts = try? await git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], in: folder)
+        else { return nil }
+        let parts = counts.split(whereSeparator: \.isWhitespace).compactMap { Int($0) }
+        guard parts.count == 2 else { return nil }
+        return (parts[0], parts[1])
+    }
+
     // MARK: Writing
 
     /// Fetch `refspec` from `remote`, which is a remote's name or a URL (038 R5).

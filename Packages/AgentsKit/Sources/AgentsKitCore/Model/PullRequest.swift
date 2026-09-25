@@ -117,13 +117,18 @@ public struct ReviewItem: Codable, Hashable, Sendable, Identifiable {
 /// Not an `AgentWorktree`: that one records how an agent was started, and a pull
 /// request is checked out wherever git says its branch is, the project folder included.
 public struct PullRequestWorktree: Codable, Hashable, Sendable {
+    /// Where an agent works: the same subfolder of the worktree that the project folder
+    /// is of its repository, or the project folder itself.
     public var root: URL
+    /// The top of the checkout, which is what git and 030's `.existing` know it by.
+    public var checkout: URL
     /// The folder's name, or "project folder".
     public var name: String
     public var isProjectFolder: Bool
 
-    public init(root: URL, name: String, isProjectFolder: Bool) {
+    public init(root: URL, checkout: URL? = nil, name: String, isProjectFolder: Bool) {
         self.root = root
+        self.checkout = checkout ?? root
         self.name = name
         self.isProjectFolder = isProjectFolder
     }

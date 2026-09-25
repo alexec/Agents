@@ -1,6 +1,20 @@
 import Foundation
 import AgentsKitCore
 
+/// One pull request a workflow is about to fire on, with what changed on it.
+struct PullRequestFire: Sendable {
+    var folder: URL
+    var repository: GitHubRepository
+    var pull: PullRequest
+    var changes: [PullRequestChanges.Change]
+
+    var ref: PullRequestRef {
+        PullRequestRef(number: pull.number, headBranch: pull.headBranch,
+                       worktree: pull.worktree?.root ?? folder,
+                       changeKey: changes.map(\.key).joined(separator: "|"))
+    }
+}
+
 /// The person's own pull requests on a GitHub project (038).
 ///
 /// Read with their `gh`, one request per project, at most every five minutes on the
@@ -54,6 +68,7 @@ extension DaemonCore {
         let attempts = pullRequestStore.load().lastAttemptAt
         let due = allProjects(includeArchived: false).map(\.folder).filter { folder in
             guard Self.isDirectory(folder) else { return false }
+            if let soon = pullRequestsDueAt[folder], soon <= now { return true }
             guard let last = attempts[folder.path] else { return true }
             return now.timeIntervalSince(last) >= Self.pullRequestCadence
         }
@@ -127,8 +142,164 @@ extension DaemonCore {
         records.setList(list, for: folder)
         pullRequestStore.save(records)
         pullRequestLists[folder] = list
+        pullRequestsDueAt[folder] = nil
         if list != previous { tellMac(list) }
-        return list
+        // Only on a list that is true now: nothing fires on stale state (spec edge case).
+        if list.problem == nil { await firePullRequestTriggers(in: list) }
+        return pullRequestLists[folder] ?? list
+    }
+
+    // MARK: Firing (US2)
+
+    /// Every workflow here with a pull-request trigger, against every pull request, for
+    /// the changes it has not fired on yet (R6). One fire for each workflow and pull
+    /// request, carrying every change at once, so a review and a failing check that
+    /// arrive together are one run rather than two in a row.
+    func firePullRequestTriggers(in list: PullRequestList) async {
+        let records = workflowStore.load()
+        let candidates = (workflows[list.folder] ?? [:]).values
+            .filter { $0.respondsToPullRequests
+                && records.state(folder: list.folder, workflowID: $0.workflowID)?.isArchived != true }
+            .sorted { $0.workflowID < $1.workflowID }
+        for workflow in candidates {
+            for pull in list.pullRequests {
+                // A run in flight on it: left alone, and looked at again once the run
+                // ends, when its key is still unfired (FR-014).
+                guard workflowRuns[runKey(for: workflow, pullRequest: pull.number)] == nil else { continue }
+                let record = pullRequestStore.load().record(folder: list.folder, number: pull.number)
+                let changes = PullRequestChanges.unfired(workflow.triggers, on: pull, record: record,
+                                                         workflowID: workflow.workflowID)
+                guard let first = changes.first else { continue }
+                await fire(workflow, on: first.trigger,
+                           pullRequest: PullRequestFire(folder: list.folder, repository: list.repository,
+                                                        pull: pull, changes: changes))
+            }
+        }
+    }
+
+    /// R9's checks, in order, before 008's own.
+    func pullRequestRefusal(for workflow: Workflow, _ fire: PullRequestFire) async -> WorkflowRefusal? {
+        let number = fire.pull.number
+        guard let worktree = fire.pull.worktree else { return .noWorktree(pr: number) }
+        let record = pullRequestStore.load().record(folder: fire.folder, number: number)
+        if let record, record.consecutiveRuns >= Workflow.chainDepthLimit {
+            return .babysittingStopped(pr: number, runs: record.consecutiveRuns)
+        }
+        if let dirty = try? await GitWorktrees.statusCount(in: worktree.root), dirty > 0 {
+            return .worktreeDirty(pr: number)
+        }
+        if agents(in: worktree, folder: fire.folder).contains(where: { $0.state.holdsRuntime }) {
+            return .worktreeBusy(pr: number)
+        }
+        return nil
+    }
+
+    /// The agents working in a pull request's worktree. For the project folder, the ones
+    /// in it and not in one of its worktrees.
+    func agents(in worktree: PullRequestWorktree, folder: URL) -> [Agent] {
+        let checkout = Self.canonicalPath(worktree.checkout)
+        return agents.values.filter { agent in
+            guard agent.state != .archived else { return false }
+            if worktree.isProjectFolder {
+                return agent.worktree == nil && agent.projectFolder == Project.standardize(folder)
+            }
+            if let own = agent.worktree { return Self.canonicalPath(own.root) == checkout }
+            return Self.canonicalPath(agent.cwd).hasPrefix(checkout)
+        }
+    }
+
+    /// Write down a refusal against the pull request as well as the workflow, so its row
+    /// can say it (FR-019). Repeats collapse, as on the workflow's row.
+    func notePullRequestOutcome(_ outcome: WorkflowOutcome, workflow: Workflow, _ fire: PullRequestFire) {
+        var records = pullRequestStore.load()
+        records.update(folder: fire.folder, number: fire.pull.number) { record in
+            record.lastOutcome = outcome.following(record.lastOutcome)
+            record.lastOutcomeWorkflowID = workflow.workflowID
+        }
+        pullRequestStore.save(records)
+        republishPullRequests(in: fire.folder, records: records)
+    }
+
+    /// A run started: every change it carries is fired, the watermark moves past the
+    /// comments it was given, and it counts towards the three in a row (R6, R8).
+    func notePullRequestRan(agentID: UUID, at now: Date, workflow: Workflow, _ fire: PullRequestFire) {
+        var records = pullRequestStore.load()
+        records.update(folder: fire.folder, number: fire.pull.number) { record in
+            for change in fire.changes {
+                record.firedKeys[PullRequestChanges.slot(workflowID: workflow.workflowID, trigger: change.trigger)] = change.key
+            }
+            if let newest = fire.changes.flatMap(\.comments).map(\.id).max() {
+                record.commentWatermark[workflow.workflowID] = max(newest, record.commentWatermark[workflow.workflowID] ?? 0)
+            }
+            record.consecutiveRuns += 1
+            record.lastRunStartedAt = now
+            record.lastOutcome = .ran(agentID: agentID, at: now)
+            record.lastOutcomeWorkflowID = workflow.workflowID
+        }
+        pullRequestStore.save(records)
+        republishPullRequests(in: fire.folder, records: records)
+    }
+
+    /// A pull request's run ended: say so on its row, and look again within a minute or
+    /// so, at the first tick past the floor (FR-014, R3).
+    func pullRequestRunEnded(in folder: URL) {
+        let folder = Project.standardize(folder)
+        let last = pullRequestStore.load().lastAttemptAt[folder.path] ?? .distantPast
+        pullRequestsDueAt[folder] = max(now(), last.addingTimeInterval(Self.pullRequestFloor))
+        republishPullRequests(in: folder, records: pullRequestStore.load())
+    }
+
+    /// The cached list with babysitting filled in again, kept and sent.
+    private func republishPullRequests(in folder: URL, records: PullRequestRecords) {
+        let folder = Project.standardize(folder)
+        guard let cached = pullRequestLists[folder] else { return }
+        let list = withBabysitter(withBabysitting(cached, records: records))
+        guard list != cached else { return }
+        pullRequestLists[folder] = list
+        var records = records
+        records.setList(list, for: folder)
+        pullRequestStore.save(records)
+        tellMac(list)
+    }
+
+    // MARK: The prompt (R10)
+
+    /// What a pull-request run adds to the workflow's own words: which pull request,
+    /// where, and what changed. Reviewers' words are quoted and introduced as theirs,
+    /// never run into the instructions.
+    func pullRequestPromptBlock(for workflow: Workflow, _ fire: PullRequestFire) async -> String {
+        let pull = fire.pull
+        var lines: [String] = []
+        var context = "(You were started by the workflow \"\(workflow.name)\" for pull request #\(pull.number), "
+            + "\"\(pull.title)\", \(pull.url.absoluteString). Branch \(pull.headBranch) into \(pull.baseBranch), checked out here."
+        if let worktree = pull.worktree, let counts = await GitWorktrees.aheadBehind(in: worktree.root), counts.behind > 0 {
+            context += counts.ahead > 0
+                ? " Your branch and GitHub's have both moved on (\(counts.ahead) and \(counts.behind) commits): bring GitHub's in, don't discard them."
+                : " GitHub has \(counts.behind) commit\(counts.behind == 1 ? "" : "s") you don't: bring \(counts.behind == 1 ? "it" : "them") in first."
+        }
+        lines.append(context + ")")
+        lines.append("")
+        lines.append("What changed:")
+        for change in fire.changes {
+            for check in change.checks {
+                lines.append("- Check \"\(check.name)\" failed" + (check.logURL.map { ": \($0.absoluteString)" } ?? "."))
+            }
+            for item in change.comments {
+                var who = item.author
+                if let path = item.path { who += " on \(path)" + (item.line.map { ":\($0)" } ?? "") }
+                if item.requestsChanges { who += ", requesting changes" }
+                lines.append("- \(who) (comment \(item.id)) wrote:")
+                let body = item.body.count > 2_000 ? String(item.body.prefix(2_000)) + " …" : item.body
+                lines.append(contentsOf: body.split(separator: "\n", omittingEmptySubsequences: false).map { "  > \($0)" })
+            }
+            if let base = change.conflictsWith {
+                lines.append("- It now conflicts with \(base).")
+            }
+        }
+        lines.append("")
+        lines.append("Push with push_pull_request, and reply with reply_on_pull_request. Never force-push, "
+                     + "and never use git push or gh yourself.")
+        return "\n\n" + lines.joined(separator: "\n")
     }
 
     /// The Mac's windows only (FR-010).
@@ -161,7 +332,7 @@ extension DaemonCore {
                 let root = isProjectFolder
                     ? Project.standardize(folder)
                     : Self.workingFolder(in: Project.standardize(entry.path), prefix: repository.prefix)
-                pull.worktree = PullRequestWorktree(root: root,
+                pull.worktree = PullRequestWorktree(root: root, checkout: Project.standardize(entry.path),
                                                     name: isProjectFolder ? "project folder" : entry.path.lastPathComponent,
                                                     isProjectFolder: isProjectFolder)
                 break

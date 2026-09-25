@@ -252,6 +252,9 @@ public actor DaemonCore {
     var pullRequestSweep: Task<Void, Never>?
     /// The person's `gh`. A test gives it a fake.
     var gitHubCLI = GitHubCLI()
+    /// Projects due a look sooner than their five minutes, because a pull request's run
+    /// just ended there (FR-014), and from when.
+    var pullRequestsDueAt: [URL: Date] = [:]
     /// Whether the ticker refreshes pull requests by itself. Off until the daemon turns
     /// it on, so the many tests that drive the ticker by hand never run git or `gh` on
     /// the side; one that wants the sweep turns it on.
