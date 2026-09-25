@@ -34,16 +34,16 @@ fetches again.
 
 ## Phase 1: Setup
 
-- [ ] T001 Bring the branch up to date and record a baseline:
+- [X] T001 Bring the branch up to date and record a baseline:
   - Merge `main` into `041-rich-files-and-changes` and verify it with `git merge-base` (see memory: a branch can move under a merge).
-  - Run `swift test` in `Packages/AgentsKit` once, and write the count and any failures into this task. Known flakes on main: BlockedTests twoHelpers, aPickedUpAgentKeepsTheCommands, WorktreeStart.
+  - Run `swift test` in `Packages/AgentsKit` once, and write the count and any failures into this task. Known flakes on main: BlockedTests twoHelpers, aPickedUpAgentKeepsTheCommands, WorktreeStart. **Baseline at `499e53f` (main `90225c7` merged in): 1705 tests in 186 suites, 1 failure: WorktreeStart `anAgentCanStartInANewWorktreeOnALocalBranch` (the known race). `Agents` and `Remote` both build.**
   - Build `Agents`, then `Remote`, and note both results here.
-- [ ] T002 Create the package `CT/Package.swift` (tools 6.2, platforms `.macOS("27.0")`, `.iOS("27.0")`):
+- [X] T002 Create the package `CT/Package.swift` (tools 6.2, platforms `.macOS("27.0")`, `.iOS("27.0")`):
   - Dependency: `https://github.com/tree-sitter/swift-tree-sitter` from `0.25.0`, product `SwiftTreeSitter`.
   - Product: library `CodeText`, target `CodeText` (Swift, depends on `SwiftTreeSitter` and every grammar target), with `resources: [.copy("Queries")]`.
   - Test target `CodeTextTests` with `resources: [.copy("Samples")]`.
   - Grammar targets are added by T004. Put a header comment in the same voice as `Packages/AgentsKit/Package.swift`, saying why this is a separate package: `agentsd` must not carry 17 MB of parsers (plan: Structure Decision).
-- [ ] T003 Write `scripts/vendor-grammars.sh <name|all>`, which reads the table at the top of the script:
+- [X] T003 Write `scripts/vendor-grammars.sh <name|all>`, which reads the table at the top of the script:
   - Columns: name, repo, tag or commit, subdirectory, query files in order.
   - For each grammar it:
     - shallow-clones the repo at the pin into a temp dir;
@@ -58,16 +58,16 @@ fetches again.
     - javascript = `highlights-jsx.scm` + `highlights.scm`
     - make is pinned to commit `a4b9187`
     - markdown = `tree-sitter-markdown/` block grammar only.
-- [ ] T004 Wire the grammar targets in `CT/Package.swift`: one `.target(name: "TS<Name>", path: "Grammars/TS<Name>", cSettings: [.headerSearchPath("."), .unsafeFlags(["-w", "-Os"])])` per vendored grammar, listed from one array so adding a language is one line (FR-020). Check `-Os` is accepted for a package dependency in Xcode. If not, drop it and note the size difference at T058.
-- [ ] T005 [P] Write `CT/Grammars/VENDORED.md`: for each of the 20 grammars, the repo, pin, licence (read from the repo's LICENSE), compiled KB from research R1, and the extensions it covers. Also record that SQL and Kotlin are left out and why (research R1, R2).
-- [ ] T006 Add `CodeText` to `project.yml`:
+- [X] T004 Wire the grammar targets in `CT/Package.swift`: one `.target(name: "TS<Name>", path: "Grammars/TS<Name>", cSettings: [.headerSearchPath("."), .unsafeFlags(["-w", "-Os"])])` per vendored grammar, listed from one array so adding a language is one line (FR-020). Check `-Os` is accepted for a package dependency in Xcode. If not, drop it and note the size difference at T058. **Done without `-Os`: flags are `-w` only, and the targets take the configuration's optimisation. Module names are `TS_<name>`, not `TS<Name>`: mechanical from the script's table. Scanners are listed in the manifest rather than found on disk, since a manifest has no Foundation.**
+- [X] T005 [P] Write `CT/Grammars/VENDORED.md`: for each of the 20 grammars, the repo, pin, licence (read from the repo's LICENSE), compiled KB from research R1, and the extensions it covers. Also record that SQL and Kotlin are left out and why (research R1, R2).
+- [X] T006 Add `CodeText` to `project.yml`:
   - Under `packages:` as `path: Packages/CodeText`.
   - As a dependency of the `Agents` and `Remote` targets only, with a comment in the file's voice saying `agentsd` must not link it.
-  - Run `xcodegen generate` and build both schemes.
-- [ ] T007 Add a check, `scripts/check-agentsd-links-no-parsers.sh`:
+  - Run `xcodegen generate` and build both schemes. **Both build with it (09:38).**
+- [X] T007 Add a check, `scripts/check-agentsd-links-no-parsers.sh`:
   - It fails if `project.yml`'s `agentsd` target lists `CodeText`.
   - It fails if `nm` on the built `agentsd` shows any `tree_sitter_` or `ts_parser_` symbol.
-  - Run it now, and again at T060.
+  - Run it now, and again at T060. **Passes on the Debug build: the agentsd binary has no tree-sitter symbols; Agents.debug.dylib has them.**
 
 ## Phase 2: Foundational (blocks every story)
 
@@ -76,25 +76,25 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
 
 **Tests first. Each must fail before its code exists.**
 
-- [ ] T008 [P] `CT/Tests/CodeTextTests/LanguageTests.swift`: `CodeLanguage.detect(path:firstLine:)` tries exact name, then extension, then `#!`.
+- [X] T008 [P] `CT/Tests/CodeTextTests/LanguageTests.swift`: `CodeLanguage.detect(path:firstLine:)` tries exact name, then extension, then `#!`.
   - Cases: `a.swift`→swift; `A.SWIFT`→swift; `x.m`→c; `x.mm`→cpp; `x.h`→c; `x.tsx`→tsx; `x.jsx`→javascript; `Dockerfile`→dockerfile; `Makefile`→make; `x.mk`→make; `Gemfile`→ruby; `.zshrc`→bash; a name with no extension and first line `#!/usr/bin/env python3`→python; `#!/bin/zsh`→bash.
   - Unknowns give nil: `x.kt`, `x.sql`, `x.xyz`, a name with no extension and no `#!`.
   - `fence(tag:)`: `ts`→typescript; `py`→python; `sh`/`shell`/`zsh`→bash; `yml`→yaml; `objc`/`objective-c`→c; `swift {.line-numbers}`→swift (drop after the first space or `{`); `""`/nil/`text`/`sql`→nil.
-- [ ] T009 [P] `CT/Tests/CodeTextTests/RoleTests.swift`: `CodeRole.role(forCapture:)` is total and follows data-model.md.
+- [X] T009 [P] `CT/Tests/CodeTextTests/RoleTests.swift`: `CodeRole.role(forCapture:)` is total and follows data-model.md.
   - `keyword.return`→keyword; `string.special`→string; `comment.documentation`→comment; `number`/`constant.builtin`/`boolean`→number; `type.builtin`→type; `function.method`→function; `property`/`attribute`→property; `operator`/`punctuation.bracket`→punctuation; `variable.builtin`→keyword; `variable`, `label` and `""`→plain.
   - Every capture name in every vendored `Queries/*.scm` maps without trapping; parse the `@name` tokens from the files.
-- [ ] T010 [P] `CT/Tests/CodeTextTests/ColourerTests.swift`, for each vendored language with a sample in `CT/Tests/CodeTextTests/Samples/sample.<ext>` (50–150 lines of real-looking code, including a string, comment, number, type and function):
+- [X] T010 [P] `CT/Tests/CodeTextTests/ColourerTests.swift`, for each vendored language with a sample in `CT/Tests/CodeTextTests/Samples/sample.<ext>` (50–150 lines of real-looking code, including a string, comment, number, type and function):
   - (a) Spans on each line don't overlap and lie within the line.
   - (b) **Text is untouched** (contract invariant 1): build the per-line `AttributedString` the way `CodeLine` will, with a helper in the package, `CodeText.attributed(line:spans:)` using plain `foregroundColor` placeholders. Joining `String(characters)` over the lines equals the input.
   - (c) The Swift sample has at least one each of keyword, string, comment, number and type.
   - (d) A half-written file (the sample cut mid-string) still gives spans and no crash.
-- [ ] T011 [P] `CT/Tests/CodeTextTests/LimitTests.swift` (contract invariant 5): text of 512 KB + 1 gives `plainBecause == .tooLarge` and no spans; a 4,001-character line anywhere gives `.lineTooLong`; the constants equal research R6's.
+- [X] T011 [P] `CT/Tests/CodeTextTests/LimitTests.swift` (contract invariant 5): text of 512 KB + 1 gives `plainBecause == .tooLarge` and no spans; a 4,001-character line anywhere gives `.lineTooLong`; the constants equal research R6's.
 
 **Implementation**
 
-- [ ] T012 `CT/Sources/CodeText/Language.swift`: `CodeLanguage` with all 20 cases (contract), plus its `extensions`, `fileNames`, `interpreters` and `fenceTags` tables (data-model.md), `detect` and `fence`. Unknown gives nil: "It is never guessed from content beyond the `#!` line." Makes T008 pass.
-- [ ] T013 `CT/Sources/CodeText/CodeRole.swift`: the role enum and its mapping table. Makes T009 pass.
-- [ ] T014 `CT/Sources/CodeText/Limits.swift`, public constants:
+- [X] T012 `CT/Sources/CodeText/Language.swift`: `CodeLanguage` with all 20 cases (contract), plus its `extensions`, `fileNames`, `interpreters` and `fenceTags` tables (data-model.md), `detect` and `fence`. Unknown gives nil: "It is never guessed from content beyond the `#!` line." Makes T008 pass.
+- [X] T013 `CT/Sources/CodeText/CodeRole.swift`: the role enum and its mapping table. Makes T009 pass.
+- [X] T014 `CT/Sources/CodeText/Limits.swift`, public constants:
   - `colourMaxUTF16 = 512 * 1024`
   - `colourMaxLine = 4_000`
   - `wordMarkMaxLine = 1_000`
@@ -104,22 +104,22 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
   - `window = 200`
 
   Plus `PlainReason` and `static func plainReason(for text: String) -> PlainReason?`.
-- [ ] T015 `CT/Sources/CodeText/Grammar.swift`: `language → SwiftTreeSitter.Language` via each `tree_sitter_<name>()`, and `query(for:) async throws -> Query`, compiled from `Bundle.module`'s `Queries/<name>.scm` on first use and cached in an actor for the process lifetime (research R8). A query that fails to compile logs once and gives nil, and the language is then shown plain; it never crashes.
-- [ ] T016 `CT/Sources/CodeText/Colourer.swift`: an `actor Colourer` holding one `Parser` and `MutableTree` per document id.
+- [X] T015 `CT/Sources/CodeText/Grammar.swift`: `language → SwiftTreeSitter.Language` via each `tree_sitter_<name>()`, and `query(for:) async throws -> Query`, compiled from `Bundle.module`'s `Queries/<name>.scm` on first use and cached in an actor for the process lifetime (research R8). A query that fails to compile logs once and gives nil, and the language is then shown plain; it never crashes.
+- [X] T016 `CT/Sources/CodeText/Colourer.swift`: an `actor Colourer` holding one `Parser` and `MutableTree` per document id.
   - `parse(id:text:language:)`
   - `edit(id:newText:)`: common prefix/suffix gives one `InputEdit`, then `tree.edit`, then reparse with the old tree (research R7).
   - `spans(id:lines: Range<Int>, lineStarts: [Int]) -> [[CodeSpan]]`: run the query with `cursor.setRange` over those lines' UTF-16 range, `resolve(with: .init(string:))`, `.highlights()`, map to roles, drop `plain`, split multi-line captures at line ends, resolve overlaps by letting the later (more specific) capture win over its range, and shift ranges to line-relative UTF-16.
   - `forget(id:)`.
 
   Makes T010 pass.
-- [ ] T017 `CT/Sources/CodeText/CodeDocument.swift`: a `@MainActor @Observable` class per the contract.
+- [X] T017 `CT/Sources/CodeText/CodeDocument.swift`: a `@MainActor @Observable` class per the contract.
   - `init(text:language:)` splits lines once and sets `plainBecause` from `Limits`. If it has a language and no limit, it starts a parse on the `Colourer`.
   - `appear(line:)` requests window `line / Limits.window` and the one after, once each.
   - `spans(line:)` reads from `windows`.
   - `update(text:)` diffs against the old text, calls `Colourer.edit`, and drops only the windows overlapping the changed line range.
   - `deinit`/`close()` forgets the id.
   - Add `os_signpost` intervals `parse` and `firstWindow` under subsystem `com.alexecollins.Agents`, category `CodeText`, for SC-001.
-- [ ] T018 [P] `Shared/UI/CodeInk.swift`: nine roles, with `Color(light:dark:)` hex beside `Paper`, per research R4:
+- [X] T018 [P] `Shared/UI/CodeInk.swift`: nine roles, with `Color(light:dark:)` hex beside `Paper`, per research R4:
   - comment a muted warm grey, italic
   - keyword deep ink blue, semibold
   - string dark olive
@@ -130,7 +130,7 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
   - punctuation `.secondary`
 
   Also `removedWash` (about 6% ink) and `changedWash` (about 14% ink). A header table in the same form as `Paper.swift`'s. No hue within 30° of red above 40% saturation.
-- [ ] T019 [P] `CT/Tests/CodeTextTests/PaletteContrastTests.swift` (SC-007):
+- [X] T019 [P] `CT/Tests/CodeTextTests/PaletteContrastTests.swift` (SC-007):
   - Mirror `CodeInk`'s hex values in `CT/Sources/CodeText/InkValues.swift` (the numbers only, so the test runs under `swift test`).
   - Have `Shared/UI/CodeInk.swift` read from it, via `import CodeText`.
   - Compute the WCAG relative-luminance contrast of each role against `Paper.ground` (`FBF9F4`/`1C1B19`) and `Paper.well` (`F1EDE4`/`2A2825`), and require ≥ 4.5 in both appearances.
@@ -145,15 +145,15 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
 **Independent test**: Open one sample per vendored language in the files pane. Each is coloured,
 `notes.xyz` is plain, and line numbers, wrapping and the named line are unchanged.
 
-- [ ] T020 [US1] `Shared/UI/Code/CodeLine.swift`: a view that builds one `Text` from a line's `Substring` and `[CodeSpan]`, applying `CodeInk` colour, weight and italic per role, with `.appText(.code)`. Built so it can later take `changed: [Range<Int>]` and a `kind` (T034); for now, plain rows only. Empty line → `" "` as today.
-- [ ] T021 [US1] Change `Shared/UI/Page/FileLines.swift`:
+- [X] T020 [US1] `Shared/UI/Code/CodeLine.swift`: a view that builds one `Text` from a line's `Substring` and `[CodeSpan]`, applying `CodeInk` colour, weight and italic per role, with `.appText(.code)`. Built so it can later take `changed: [Range<Int>]` and a `kind` (T034); for now, plain rows only. Empty line → `" "` as today.
+- [X] T021 [US1] Change `Shared/UI/Page/FileLines.swift`:
   - Add `path: String? = nil`, keep the existing init working, and create a `@State CodeDocument` from `text` and `CodeLanguage.detect(path:firstLine:)`.
   - Each row calls `document.appear(line:)` in `.onAppear` and draws `CodeLine`.
   - When `text` changes for the same path, call `document.update(text:)` instead of rebuilding.
   - Keep everything else as it is: the gutter widths, the "Line N is past what is shown here." line, `keepsPlace`, the scroll-to-line `task(id:)`, the named-line tint, `textSelection(.enabled)`.
   - When `plainBecause` is set, show one `.appText(.fine)`, `.secondary` line above the rows: "Shown without colour: the file is too large." or "Shown without colour: a line is too long." (research R6).
-- [ ] T022 [US1] Pass the open file's path to `FileLines` in `App/Sources/Sidebar/FilesPane.swift` (the `.text` case, around line 203) and `Remote/Sources/Panes/FilesPane.swift`.
-- [ ] T023 [US1] Run `CT` tests, and build `Agents` then `Remote`.
+- [X] T022 [US1] Pass the open file's path to `FileLines` in `App/Sources/Sidebar/FilesPane.swift` (the `.text` case, around line 203) and `Remote/Sources/Panes/FilesPane.swift`.
+- [X] T023 [US1] Run `CT` tests, and build `Agents` then `Remote`.
 - [ ] T024 [US1] **Look gate.** Use the run-app skill on a scratch root (see memory: drive the scratch app only when Alex is away):
   - Put `CT/Tests/CodeTextTests/Samples/*` and a `notes.xyz` in the scratch project.
   - Open `sample.swift`, `sample.py`, `sample.ts` and `sample.json` in Files.
