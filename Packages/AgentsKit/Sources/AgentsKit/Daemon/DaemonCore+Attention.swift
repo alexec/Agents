@@ -265,6 +265,9 @@ extension DaemonCore {
                 // the whole of FR-018 — and the notification moves either way.
                 var moved = existing
                 moved.to = decision.to
+                // About the old destination. `post` sets it again if the new one is a
+                // device nothing can reach yet.
+                moved.unsentAlert = nil
                 if decision.alert {
                     moved.alertedAt = now
                     moved.alertCount += 1
@@ -289,6 +292,9 @@ extension DaemonCore {
             }
         }
 
+        // Banners decided while nothing could carry them, now that something can.
+        sendUnsentPosts(outstanding, at: now)
+
         // Last, once every decision above has landed. What is owed goes out if anything
         // will carry it; then, only if any of this moved anything, it is written down —
         // whatever the next daemon is told, it is told here.
@@ -309,9 +315,27 @@ extension DaemonCore {
         // the bridge was away would be taken off again the moment the bridge arrived —
         // for a question that is still asking.
         pendingWithdrawals.removeAll { $0.need == need.id && $0.device == id }
+        // Nothing to hand it to. Broadcast now, it would reach nobody and be counted as
+        // shown; held on the delivery, it goes when a carrier says it is here.
+        guard hasCarrier else {
+            deliveries[need.id]?.unsentAlert = alert
+            return
+        }
+        deliveries[need.id]?.unsentAlert = nil
         guard let device = device(id),
               let envelope = try? Envelope.seal(need.headline, to: device.publicKey) else { return }
         enqueue(MailboxItem(needID: need.id, device: id, envelope: envelope, alert: alert, postedAt: now))
+    }
+
+    /// Post every banner that was decided for a device while nothing could carry it,
+    /// with the buzz it was decided with.
+    private func sendUnsentPosts(_ outstanding: [Need], at now: Date) {
+        guard hasCarrier else { return }
+        for need in outstanding {
+            guard let delivery = deliveries[need.id], let alert = delivery.unsentAlert,
+                  let device = delivery.to?.deviceID else { continue }
+            post(need, to: device, alert: alert, at: now)
+        }
     }
 
     /// The need is over here: a withdrawal, naming only the id, replaces whatever was

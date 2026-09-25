@@ -75,13 +75,19 @@ struct AppServiceTests {
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["outcome", "message", "title"])
         #expect(finish?["properties"]?["title"]?["type"]?.stringValue == "string")
-        let next = finish?["properties"]?["next_prompts"]
-        #expect(next?["maxItems"]?.intValue == SuggestedPrompt.limit)
-        #expect(next?["items"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
+        // One suggestion, as an object; the list is read but no longer offered (031).
+        let next = finish?["properties"]?["next_prompt"]
+        #expect(next?["type"]?.stringValue == "object")
+        #expect(next?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["label", "prompt"])
+        #expect(finish?["properties"]?["next_prompts"] == nil)
 
         let suggest = tools.first { $0["name"]?.stringValue == AppService.toolName }
-        let items = suggest?["inputSchema"]?["properties"]?["prompts"]?["items"]
+        let list = suggest?["inputSchema"]?["properties"]?["prompts"]
+        // No ceiling in the schema: a conversation told "up to four" must not be
+        // refused before the call for sending four.
+        #expect(list?["maxItems"] == nil)
+        let items = list?["items"]
         #expect(items?["properties"]?["label"] != nil)
         #expect(items?["properties"]?["prompt"] != nil)
 
@@ -177,7 +183,7 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func fourIsTheMostThatGetThrough() async throws {
+    @Test func onlyTheFirstGetsThrough() async throws {
         let box = Box()
         let (client, service) = await pair(sink: { prompts in
             await box.record(prompts)
@@ -188,8 +194,7 @@ struct AppServiceTests {
             "name": .string(AppService.toolName),
             "arguments": ["prompts": .array(many)],
         ])
-        #expect(await box.prompts.count == SuggestedPrompt.limit)
-        #expect(await box.prompts.map(\.label) == ["1", "2", "3", "4"])
+        #expect(await box.prompts.map(\.label) == ["1"])
         await service.close()
     }
 
@@ -461,7 +466,7 @@ struct AppServiceTests {
         #expect(await box.outcome == "done")
         // Trimmed on the way through, as a report is.
         #expect(await box.message == "Renamed 14 call sites.")
-        #expect(await box.prompts.map(\.label) == ["Run the tests", "Push"])
+        #expect(await box.prompts.map(\.label) == ["Run the tests"])
         #expect(await box.title == "Call sites renamed")
         await service.close()
     }
@@ -533,7 +538,7 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func fiveNextPromptsBecomeFour() async throws {
+    @Test func fiveNextPromptsBecomeTheFirst() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let many = (1...5).map { JSONValue.object(["label": .string("\($0)"), "prompt": .string("Do \($0)")]) }
@@ -542,7 +547,49 @@ struct AppServiceTests {
             "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
                           "next_prompts": .array(many)],
         ])
-        #expect(await box.prompts.map(\.label) == ["1", "2", "3", "4"])
+        #expect(await box.prompts.map(\.label) == ["1"])
+        await service.close()
+    }
+
+    /// What a fresh agent is told to send (031).
+    @Test func oneNextPromptReachesTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
+                          "next_prompt": ["label": "Push", "prompt": "Push the branch"]],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.prompts.map(\.prompt) == ["Push the branch"])
+        await service.close()
+    }
+
+    /// Both forms in one call: the one is what the agent meant, and wins.
+    @Test func theOneWinsOverTheList() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
+                          "next_prompt": ["label": "One", "prompt": "Do one"],
+                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
+        ])
+        #expect(await box.prompts.map(\.label) == ["One"])
+        await service.close()
+    }
+
+    /// A list whose first entry is blank keeps the first that is not.
+    @Test func aBlankFirstEntryGivesWayToTheNext() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
+                          "next_prompts": .array([["label": "Blank", "prompt": "  "],
+                                                  ["label": "Real", "prompt": "Do it"]])],
+        ])
+        #expect(await box.prompts.map(\.label) == ["Real"])
         await service.close()
     }
 

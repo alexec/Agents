@@ -202,16 +202,22 @@ public enum WorkflowFile {
         }
 
         var hours = 0...23
+        var startMinute = 0
+        var endMinute = 30
         if let between = keys["between"]?.scalar, !between.isEmpty {
             let halves = between.split(separator: "-", maxSplits: 1).map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
+            // Compared as minutes of the day, so `09:30-09:00` is refused along with
+            // `18:00-09:00`.
             guard halves.count == 2,
-                  let from = hour(from: halves[0]), let to = hour(from: halves[1]),
-                  from <= to else {
+                  let from = time(from: halves[0]), let to = time(from: halves[1]),
+                  from.hour * 60 + from.minute <= to.hour * 60 + to.minute else {
                 throw YAMLNode.Failure("\"\(between)\" is not a range of times, like \"09:00-18:00\"")
             }
-            hours = from...to
+            hours = from.hour...to.hour
+            startMinute = from.minute
+            endMinute = to.minute
         }
 
         var days = Weekday.everyDay
@@ -227,13 +233,20 @@ public enum WorkflowFile {
             days = parsed
         }
 
-        return WorkflowSchedule(minutes: minutes, hours: hours, days: days)
+        return WorkflowSchedule(minutes: minutes, hours: hours, startMinute: startMinute,
+                                endMinute: endMinute, days: days)
     }
 
     /// `09:00` or `9` — the hour part of either.
-    private static func hour(from text: String) -> Int? {
-        let hourPart = text.split(separator: ":").first.map(String.init) ?? text
-        guard let value = Int(hourPart), (0...23).contains(value) else { return nil }
-        return value
+    /// `09:00` or `9:30`, or a bare hour. The minutes are the ones a schedule can run
+    /// at and no others: a range that starts at `09:45` names a moment nothing can fire
+    /// at, and rounding it one way or the other would be a guess about what was meant.
+    private static func time(from text: String) -> (hour: Int, minute: Int)? {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        guard (1...2).contains(parts.count),
+              let hour = Int(parts[0]), (0...23).contains(hour) else { return nil }
+        guard parts.count == 2 else { return (hour, 0) }
+        guard let minute = Int(parts[1]), WorkflowSchedule.allowedMinutes.contains(minute) else { return nil }
+        return (hour, minute)
     }
 }

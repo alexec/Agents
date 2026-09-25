@@ -125,6 +125,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// never changed. It is what lets that agent stop and archive this one, what keeps
     /// the tools from this one, and what counts it against its project's three.
     public var startedByAgent: UUID?
+    /// How deep a workflow fire caused by this agent is, when the agent that started it
+    /// was part of a workflow chain (028). Taken when this agent is made, because the
+    /// starter's run can end long before this agent does, and a depth read from it then
+    /// would be zero — the loop the chain limit exists to stop, begun again.
+    public var chainDepth: Int?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -218,12 +223,16 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // Newer than the field above, and on the record rather than held in memory so
         // the chips are still there when the app is opened again on a turn that ended
         // last night.
-        suggestedPrompts = try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? []
+        // Cut to one since 031: a record written when a turn could offer four opens
+        // offering its first.
+        suggestedPrompts = Array((try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? [])
+            .prefix(SuggestedPrompt.limit))
         // New in 008, and optional, so every record written before workflows existed
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
+        chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -282,6 +291,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
+        try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -301,7 +311,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
-        case startedByWorkflow, startedByRun, startedByAgent
+        case startedByWorkflow, startedByRun, startedByAgent, chainDepth
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
@@ -341,6 +351,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 startedByWorkflow: String? = nil,
                 startedByRun: UUID? = nil,
                 startedByAgent: UUID? = nil,
+                chainDepth: Int? = nil,
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
@@ -373,6 +384,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.startedByWorkflow = startedByWorkflow
         self.startedByRun = startedByRun
         self.startedByAgent = startedByAgent
+        self.chainDepth = chainDepth
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked

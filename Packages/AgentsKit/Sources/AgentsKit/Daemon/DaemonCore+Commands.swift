@@ -119,7 +119,11 @@ extension DaemonCore {
     /// A start, made on behalf of another agent when `starter` is set (028). Not on
     /// the wire: nothing a window or a phone sends can say an agent started this one,
     /// so nothing but `startHelper` can make an agent the tools are kept from.
-    func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?) async throws -> UUID {
+    ///
+    /// `chainDepth` is how deep a workflow fire this agent causes would be, read off
+    /// the starter before any of the awaits here — see `Agent.chainDepth`.
+    func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?,
+               chainDepth: Int? = nil) async throws -> UUID {
         // Before the session is made. Refusing after spawning a runtime costs a
         // process for a turn that was never going to run. A new agent has no queue
         // to wait on, which is why this is a refusal where a prompt is a hold — and
@@ -195,7 +199,8 @@ extension DaemonCore {
                           // On the record from the first save, so a daemon killed
                           // before the next one never finds this agent looking like the
                           // person's — with the tools, and holding no place.
-                          startedByAgent: starter)
+                          startedByAgent: starter,
+                          chainDepth: chainDepth)
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -425,12 +430,7 @@ extension DaemonCore {
         // its own transcript saying so on every drain attempt.
         let limits = limitStore.load()
         if agent.isAtCostLimit(under: limits) {
-            if held.insert(agentID).inserted {
-                await record(.runtimeNote(
-                    "What you sent is waiting: this agent has reached its cost limit. "
-                    + "Raise the limit, or let this one agent go on, and it will go."),
-                             for: agentID)
-            }
+            await holdForCostLimit(agentID)
             return
         }
         if isDayLimitReached(under: limits) {
@@ -530,10 +530,13 @@ extension DaemonCore {
     ///
     /// Equal readings bank nothing, which is what makes this safe to call on every
     /// one of the several usage updates a turn sends.
-    func bank(_ cost: Cost, into agent: inout Agent) {
-        let previous = costReadings[agent.id]?[cost.currency] ?? 0
+    ///
+    /// `reader` is the session that quoted it: each process's running total is its own,
+    /// and the next process counts from nothing.
+    func bank(_ cost: Cost, into agent: inout Agent, readBy reader: UUID) {
+        let previous = costReadings[reader]?[cost.currency] ?? 0
         let added = cost.amount >= previous ? cost.amount - previous : cost.amount
-        costReadings[agent.id, default: [:]][cost.currency] = cost.amount
+        costReadings[reader, default: [:]][cost.currency] = cost.amount
         guard added > 0 else { return }
         // Per currency. Adding two currencies would be a number nobody could check.
         agent.costToDate[cost.currency] = (agent.costToDate[cost.currency] ?? 0) + added
@@ -760,6 +763,8 @@ extension DaemonCore {
 
     private func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        // Read before anything is awaited, so a stop in any of the waits below is seen.
+        let stopsBefore = stops[agentID, default: 0]
         // Whether this turn was the one that crossed the per-agent ceiling. Decided
         // here because banking is what makes a limit true, and acted on below rather
         // than now because the turn is the unit: it finishes, whole, first.
@@ -825,8 +830,30 @@ extension DaemonCore {
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
+        // Stopped since this turn ended, while its runtime was being let go. `stop`
+        // found nothing running and moved nothing, so this is where it is heard: no
+        // question of the app's own, and what is queued stays queued, as stop promises.
+        guard stops[agentID, default: 0] == stopsBefore else { return }
+        // A turn that crossed its limit leaves its queue exactly where it is, whatever
+        // the limit says by the time the runtime has gone. Letting the agent go on is
+        // the reader's second act (FR-018), and a ceiling raised in the seconds the
+        // release takes would otherwise have the drain below send the held words for
+        // them.
+        if crossedItsLimit {
+            if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
+            return
+        }
         await askForOutcomeIfSilent(agentID: agentID, reason: reason)
         await drainQueue(after: agentID)
+    }
+
+    /// Say, once per hold, that this agent's queue is waiting on its cost limit.
+    func holdForCostLimit(_ agentID: UUID) async {
+        guard held.insert(agentID).inserted else { return }
+        await record(.runtimeNote(
+            "What you sent is waiting: this agent has reached its cost limit. "
+            + "Raise the limit, or let this one agent go on, and it will go."),
+                     for: agentID)
     }
 
     /// A turn ended and said nothing about how it went. Ask, once.

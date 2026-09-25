@@ -181,6 +181,14 @@ public actor DaemonCore {
     /// top of what the agent had already cost. That rule is what makes this safe to
     /// lose on restart, and it is also the only thing that catches a mid-session
     /// `/clear`, which no lifecycle hook would see.
+    ///
+    /// Keyed by the **session** that quoted it — one id per listener — not by the agent. A turn's last usage
+    /// update is sent just before its reply, and can still be in the listener's buffer
+    /// when the turn ends and the runtime is let go; handled then, it used to put the
+    /// old process's figure back under the agent after `forget` had cleared it, and the
+    /// next process's spend was banked only for what it exceeded that — often nothing.
+    /// Per session, a late reading lands on its own process and nowhere else, and the
+    /// entry goes when that session's listener has heard the last of it.
     var costReadings: [UUID: [String: Decimal]] = [:]
     /// What time it is, for everything about money.
     ///
@@ -579,14 +587,23 @@ public actor DaemonCore {
     func listen(to session: ACPSession, agentID: UUID) {
         eventTasks[agentID]?.cancel()
         let stream = session.eventStream()
+        // A fresh id per listener rather than the session's address, which the next
+        // session can be handed once this one is freed.
+        let reader = UUID()
         eventTasks[agentID] = Task { [weak self] in
             for await event in stream {
-                await self?.handle(event, agentID: agentID)
+                await self?.handle(event, agentID: agentID, reader: reader)
             }
+            // Nothing more will come from this session, so nothing more will be read.
+            await self?.forgetCostReadings(reader)
         }
     }
 
-    private func handle(_ event: ACPSessionEvent, agentID: UUID) async {
+    func forgetCostReadings(_ reader: UUID) {
+        costReadings.removeValue(forKey: reader)
+    }
+
+    private func handle(_ event: ACPSessionEvent, agentID: UUID, reader: UUID) async {
         switch event {
         case .entry(let kind):
             await record(kind, for: agentID)
@@ -624,7 +641,7 @@ public actor DaemonCore {
             // research §2 chose to, banked nothing and left every agent reading
             // "Not measured". Here is where the money is.
             let spentBefore = agent.costToDate
-            if let cost = usage.cost { bank(cost, into: &agent) }
+            if let cost = usage.cost { bank(cost, into: &agent, readBy: reader) }
             agents[agentID] = agent
             // Money is written down as it is spent, not at the end of the turn. The
             // ledger already has it; a daemon killed mid-turn must not come back with
@@ -731,10 +748,9 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
-        // A runtime's cost is a running total for its process, and the next process
-        // counts from nothing. Kept, the next one's first reading would be banked only
-        // for what it exceeds this one's last, and the difference would go uncounted.
-        costReadings.removeValue(forKey: agentID)
+        // A runtime's cost reading is let go by its own listener, once it has heard the
+        // last of that session — not here, where the listener may still have a reading
+        // to get through. See `costReadings`.
         // The MCP helper the runtime started dies with it. Its token stops working
         // here at the same moment, rather than whenever that process gets round to it.
         dropAppTokens(for: agentID)

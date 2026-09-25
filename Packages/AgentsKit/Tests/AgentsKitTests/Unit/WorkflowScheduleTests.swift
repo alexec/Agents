@@ -101,4 +101,70 @@ struct WorkflowScheduleTests {
         let next = workflow.nextDue(after: date("2026-09-19 07:00"), calendar: calendar("Europe/London"))
         #expect(next == date("2026-09-19 09:00"))
     }
+
+    // MARK: The minutes at either end of a range
+
+    /// `between: 09:00-18:00` ends at six. Read as hours alone it ran until half past,
+    /// while the page said "between 9am and 6pm".
+    @Test func aRangeEndingOnTheHourDoesNotRunAtHalfPast() {
+        let file = WorkflowFile.parse("""
+            ---
+            on:
+              - schedule:
+                  at: [":00", ":30"]
+                  between: "09:00-18:00"
+            ---
+            Check.
+            """, workflowID: "check", in: URL(filePath: "/tmp/p"))
+        let schedule = try! #require(file.schedules.first)
+        let london = calendar("Europe/London")
+        #expect(schedule.matches(date("2026-09-19 18:00"), calendar: london))
+        #expect(!schedule.matches(date("2026-09-19 18:30"), calendar: london))
+        #expect(schedule.nextDue(after: date("2026-09-19 18:05"), calendar: london)
+                == date("2026-09-20 09:00"))
+        #expect(file.summary.contains("between 9am and 6pm"))
+    }
+
+    @Test func aRangeStartingOnTheHalfHourDoesNotRunBeforeIt() {
+        let file = WorkflowFile.parse("""
+            ---
+            on:
+              - schedule:
+                  at: [":00", ":30"]
+                  between: "09:30-17:30"
+            ---
+            Check.
+            """, workflowID: "check", in: URL(filePath: "/tmp/p"))
+        let schedule = try! #require(file.schedules.first)
+        let london = calendar("Europe/London")
+        #expect(!schedule.matches(date("2026-09-19 09:00"), calendar: london))
+        #expect(schedule.matches(date("2026-09-19 09:30"), calendar: london))
+        #expect(schedule.matches(date("2026-09-19 17:30"), calendar: london))
+        #expect(file.summary.contains("between 9:30am and 5:30pm"))
+    }
+
+    /// A time nothing can fire at is refused rather than rounded one way or the other.
+    @Test func aRangeAtAMinuteNothingRunsAtIsRefused() {
+        for between in ["09:45-18:00", "09:00-17:15", "10:30-10:00"] {
+            let file = WorkflowFile.parse("""
+                ---
+                on:
+                  - schedule:
+                      at: ":00"
+                      between: "\(between)"
+                ---
+                Check.
+                """, workflowID: "check", in: URL(filePath: "/tmp/p"))
+            #expect(file.problem != nil, "\(between) should be refused")
+        }
+    }
+
+    /// A schedule from an older daemon has neither minute, and means the whole of both
+    /// hours by it.
+    @Test func aScheduleWithoutRangeMinutesStillReads() throws {
+        let old = #"{"minutes":[0,30],"hours":[9,18],"days":["mon"]}"#
+        let schedule = try JSONDecoder().decode(WorkflowSchedule.self, from: Data(old.utf8))
+        #expect(schedule.startMinute == 0)
+        #expect(schedule.endMinute == 30)
+    }
 }
