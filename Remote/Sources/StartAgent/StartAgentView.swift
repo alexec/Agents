@@ -44,6 +44,14 @@ struct StartAgentView: View {
             }
             focused = true
         }
+        // Said once, when it arrives: a refusal is the one thing on this sheet a person
+        // using VoiceOver would otherwise have to go looking for.
+        .onChange(of: model.startRefusal) {
+            if let refusal = model.startRefusal { AccessibilityNotification.Announcement(refusal).post() }
+        }
+        .onChange(of: attachNote) {
+            if let attachNote { AccessibilityNotification.Announcement(attachNote).post() }
+        }
         .onChange(of: text) { keep() }
         .onChange(of: attachments) { keep() }
         .onDisappear { StartDraftKeeper.shared.flush() }
@@ -64,7 +72,6 @@ struct StartAgentView: View {
                     .appText(.supporting)
                     .tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.updatesFrequently)
             }
             HStack(alignment: .bottom, spacing: 8) {
                 AttachButton(attachments: $attachments, refusal: $attachNote)
@@ -97,6 +104,7 @@ struct StartAgentView: View {
                 .disabled(!canSend)
                 .opacity(canSend ? 1 : 0.4)
                 .accessibilityLabel("Start agent")
+                .accessibilityValue(model.isStarting ? "Starting" : "")
             }
         }
         .padding(.horizontal, 12)

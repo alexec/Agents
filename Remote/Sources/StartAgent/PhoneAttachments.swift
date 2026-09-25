@@ -84,7 +84,11 @@ struct AttachmentStrip: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Image(systemName: icon(for: attachment))
-                            Text(attachment.displayName).lineLimit(1)
+                                .accessibilityHidden(true)
+                            // Two lines before it gives up, so a long name at the largest
+                            // text size still says which file it is.
+                            Text(attachment.displayName).lineLimit(2)
+                                .accessibilityLabel(kind(of: attachment) + ", " + attachment.displayName)
                             Button {
                                 attachments.removeAll { $0.id == attachment.id }
                             } label: {
@@ -101,12 +105,18 @@ struct AttachmentStrip: View {
                                 .frame(maxWidth: 220, alignment: .leading)
                         }
                     }
+                    .frame(maxWidth: 240, alignment: .leading)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
+    }
+
+    private func kind(of attachment: Attachment) -> String {
+        if case .image = attachment.block { return "Picture" }
+        return "File"
     }
 
     private func icon(for attachment: Attachment) -> String {

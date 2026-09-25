@@ -25,8 +25,8 @@ struct ChoiceRows: View {
                     Text(reason).appText(.supporting).tinted(.failure)
                     Button("Try again") { Task { await model.loadStartChoices() } }
                         .appText(.supporting)
+                        .accessibilityHint("Asks \(runtimeName) again what it offers")
                 }
-                .accessibilityElement(children: .combine)
             case .ready:
                 if model.startOptions.isEmpty {
                     Text("\(runtimeName) has nothing to adjust.")

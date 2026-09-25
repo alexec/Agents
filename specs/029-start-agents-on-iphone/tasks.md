@@ -126,9 +126,9 @@ beside `OptionCache.swift`, not in `Daemon/`.
 
 ## Phase 6: Polish, iPad and the gate
 
-- [ ] T031 [P] Check the sheet as a form sheet on iPad in the simulator (screenshot), then mark 013's T072 in `specs/013-ipad-app/tasks.md` as carried by this feature, and update the start row of `specs/013-ipad-app/contracts/parity.md` to say what the remote offers and that folders, MCP servers and extra arguments stay on the Mac by decision (spec, Assumptions).
-- [ ] T032 [P] Accessibility pass over `Remote/Sources/StartAgent/`: every control has a label, rows wrap rather than truncate at the largest Dynamic Type size, and the prompt keeps at least two lines visible with the keyboard up (FR-020).
-- [ ] T033 Run the full `swift test` six times on this branch and six on `main`, and compare before blaming any failure on the branch (memory: the suite is broadly flaky). Build both schemes, one after the other.
+- [X] T031 [P] Check the sheet as a form sheet on iPad in the simulator (screenshot), then mark 013's T072 in `specs/013-ipad-app/tasks.md` as carried by this feature, and update the start row of `specs/013-ipad-app/contracts/parity.md` to say what the remote offers and that folders, MCP servers and extra arguments stay on the Mac by decision (spec, Assumptions).
+- [X] T032 [P] Accessibility pass over `Remote/Sources/StartAgent/`: every control has a label, rows wrap rather than truncate at the largest Dynamic Type size, and the prompt keeps at least two lines visible with the keyboard up (FR-020).
+- [X] T033 Run the full `swift test` six times on this branch and six on `main`, and compare before blaming any failure on the branch (memory: the suite is broadly flaky). Build both schemes, one after the other.
 - [ ] T034 **Gate, SC-006.** Hand Alex [quickstart.md](./quickstart.md) §4's real-iPhone walk, steps 1–6, and nothing an agent could have run. Record the date and anything found under Notes. The cellular test and SC-002's mobile timing are recorded as waiting on 013 Track A, not as passed.
 
 ---
@@ -193,3 +193,20 @@ Then US2, whose daemon half can land without the sheet. Then US3. Then the gate,
     because a phone has no file to attach by reference.
   - The draft store keeps at most 512 KB by value, below the 900 KB a send allows. A bigger
     set of attachments is dropped from the kept draft, and the sheet says to attach them again.
+- **2026-09-24, Phase 6 except the walk (T031–T033).**
+  - T031: 013's T072 is marked carried by 029. T074 is marked half carried: the picker is
+    still missing on the conversation's bar. Four rows in `parity.md` are updated. The iPad form
+    sheet was **not** screenshotted (no simulators, by Alex's choice), so it's unseen like the
+    phone's.
+  - T032, what changed:
+    - "Try again" is no longer merged into its error text, so VoiceOver can reach it.
+    - Attachment names wrap to two lines instead of cutting off, and each chip reads as
+      "Picture, name" or "File, name".
+    - Refusals and attach notes are announced once, rather than marked "updates frequently".
+    - Start agent says "Starting" while it's under way.
+    Every control already had a label. The prompt keeps at least two lines (`lineLimit(2...6)`).
+    Not checked at the largest Dynamic Type size on a device.
+  - T033: six full runs on each side, in sequence: branch `2c581cf` 6/6 green (1342 tests);
+    base `9a9c7d9` 5/6 (1310 tests), one `aWindowThatHasGoneLeavesNoDescriptorBehind` failure,
+    a known flake on the base. Both schemes build.
+  - What remains: T019 and T034, Alex's walk on a device.
