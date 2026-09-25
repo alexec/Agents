@@ -408,3 +408,10 @@ prove.
     reading "project folder · Babysat 1 minute ago → · Removed the stray FAIL file…", Show
     babysitter, and the workflow row.
   - The sandbox repository and its PR are left in place for Alex to delete or reuse.
+- Merged main again 2026-09-25 (`e3a2819`, 2 commits: worktrees on an existing branch). All three
+  schemes build. Main's new `WorktreeStartTests.anAgentCanStartInANewWorktreeOnALocalBranch` fails
+  when run beside `PullRequestFireTests`, and passes alone here and on main. Traced with a
+  temporary print in `FakeLauncher`: the second launch is the daemon's own `askForOutcomeIfSilent`
+  relaunching the agent after its silent first turn, which lands before the test reads
+  `launcher.launches` whenever other suites load the machine. A race in that test, not 038; left
+  for its owner.
