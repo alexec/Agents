@@ -70,9 +70,17 @@ final class RemoteModel {
     private var reconnecting: Task<Void, Never>?
     private var isLoadingEarlier = false
 
+    /// The agent's files as the Mac reads them, and where each agent's pane is (034).
+    let files: RemoteFiles
+    let panes = RemotePanes()
+
     init(link: any DaemonLink) {
         client = DaemonClient(link: link)
+        files = RemoteFiles(client: client)
     }
+
+    /// The Mac predates the panes, and the phone does what it did before them (FR-029).
+    var macLacksPanes: Bool { files.macLacksPanes }
 
     // MARK: What the screens read
 
@@ -585,6 +593,7 @@ final class RemoteModel {
             await identify()
             startPresence()
             presence?.connected()
+            await files.reconnected()
             await refreshEverything()
             return true
         } catch {
@@ -614,6 +623,10 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.draftOptions,
                    let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
                     self.settleStartDraft(change)
+                }
+                if notification.method == DaemonAPI.Notification.filesChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
+                    self.files.apply(change)
                 }
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()

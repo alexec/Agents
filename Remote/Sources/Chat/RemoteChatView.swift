@@ -9,13 +9,22 @@ import SwiftUI
 /// paragraph of.
 struct RemoteChatView: View {
     @Environment(RemoteModel.self) private var model
-    @State private var isShowingArtifacts = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
     /// How much of the foot of the screen the prompt area and any card above it cover.
     @State private var formHeight: CGFloat = 0
 
     private var agent: Agent? { model.selectedAgent }
 
     var body: some View {
+        if let agent {
+            // The conversation with its panes beside it or over it (034).
+            PaneHost(agent: agent) { conversation }
+        } else {
+            conversation
+        }
+    }
+
+    private var conversation: some View {
         // The Mac's shape (033): the conversation runs the full height and the prompt
         // area floats over its foot, with a question floating above that. The
         // conversation is told how tall they are so the last thing said can still be
@@ -65,17 +74,6 @@ struct RemoteChatView: View {
             }
             .paperSheet()
         }
-        .sheet(isPresented: $isShowingArtifacts) {
-            NavigationStack {
-                ArtifactsList()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { isShowingArtifacts = false }
-                        }
-                    }
-            }
-            .paperSheet()
-        }
         // The agent asking to be looked at. An event, so it opens the moment it
         // arrives and is taken off the model in the same breath.
         .onChange(of: model.fileTheAgentWants) { _, wanted in
@@ -111,8 +109,21 @@ struct RemoteChatView: View {
                     .accessibilityHint("Archives this chat and goes back to the project")
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                if let agent { ChatMenu(agent: agent, isShowingArtifacts: $isShowingArtifacts) }
+            if let agent {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // The Mac's side panes: Page, Files, Terminal, Exchanged (034). One
+                    // tap opens the last one used; the switch at its top reaches the rest.
+                    Button {
+                        let state = model.panes.state(for: agent.id)
+                        if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
+                    } label: {
+                        Label("Panes", systemImage: sizeClass == .regular ? "sidebar.right" : "doc.text")
+                    }
+                    .accessibilityHint("Shows the page, files and terminal for this agent")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    ChatMenu(agent: agent)
+                }
             }
         }
     }
@@ -167,11 +178,10 @@ struct RemoteChatView: View {
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
-    @Binding var isShowingArtifacts: Bool
 
     var body: some View {
         Menu {
-            Button("Exchanged", systemImage: "doc") { isShowingArtifacts = true }
+            Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             if agent.state == .archived {
                 Divider()
                 Button("Bring back", systemImage: "tray.and.arrow.up") {

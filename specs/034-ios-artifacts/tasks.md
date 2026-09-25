@@ -72,20 +72,20 @@ put a pane.
 - [X] T016 Create `Remote/Sources/Panes/PaneState.swift`:
   - an `@Observable` `PaneState` per agent, following data-model.md "PaneState": `pane: Pane?` (`.page`, `.files`, `.terminal`, `.exchanged`), `pagePath`, `folder`, `openFile`, `openLine`, `scrollAnchor: [String: Int]` and `showingChanges`
   - `RemotePanes`, holding `[UUID: PaneState]` with `state(for:)`
-- [ ] T017 Create `Remote/Sources/Panes/RemoteFiles.swift`, the phone's end of `files/*`, owned by `RemoteModel`:
+- [X] T017 Create `Remote/Sources/Panes/RemoteFiles.swift`, the phone's end of `files/*`, owned by `RemoteModel`:
   - `list(agentID:folder:)` and `read(agentID:path:known:)`
   - `watch` and `unwatch` with a local set of what is watched, re-sent after every reconnect
   - `changed`, an `AsyncStream`, or an observed counter keyed by folder, fed from `files/changed`
   - The first `isMethodNotFound` from any `files/*` call sets `RemoteModel.macLacksPanes`, which is cleared on reconnect.
   - Hook the notification into `RemoteModel`'s notification switch (grep `DaemonAPI.Notification` in `Remote/Sources/RemoteModel.swift`).
-- [ ] T018 Create `Remote/Sources/Panes/PaneHost.swift`:
+- [X] T018 Create `Remote/Sources/Panes/PaneHost.swift`:
   - It reads the width with `onGeometryChange`, then asks `PanePlacement`.
   - A column is the chat plus a divider plus the pane, with a close button on the pane.
   - Full screen is a `navigationDestination` push from the chat.
   - The pane's top is a segmented picker of Page, Files, Terminal and Exchanged. Page shows only when `pagePath != nil`, and Terminal is hidden when `macLacksPanes`. There is no Browser segment (FR-030).
   - The bodies are placeholders until their stories land. Exchanged uses the existing `ArtifactsList`.
-- [ ] T019 In `Remote/Sources/Chat/RemoteChatView.swift`, add a Panes button to the top bar (`sidebar.right` on iPad, `doc.text` on iPhone). It opens the agent's last pane, or Page when `pagePath` is set, or Files. Wrap the chat in `PaneHost`. The chat menu's Exchanged sets `pane = .exchanged` instead of the sheet.
-- [ ] T020 Run the suite, then build both schemes.
+- [X] T019 In `Remote/Sources/Chat/RemoteChatView.swift`, add a Panes button to the top bar (`sidebar.right` on iPad, `doc.text` on iPhone). It opens the agent's last pane, or Page when `pagePath` is set, or Files. Wrap the chat in `PaneHost`. The chat menu's Exchanged sets `pane = .exchanged` instead of the sheet.
+- [X] T020 Run the suite, then build both schemes.
 
 **Checkpoint**:
 - The suite is green, apart from the flakes baselined in T001.
