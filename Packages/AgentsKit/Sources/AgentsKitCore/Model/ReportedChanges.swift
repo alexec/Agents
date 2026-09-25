@@ -43,7 +43,10 @@ public struct ReportedChanges: Sendable, Equatable {
         if call.rawInput?["replace_all"]?.boolValue == true { record.replaceAll = true }
         let diffs = call.content.compactMap { content -> ToolCallContent.Diff? in
             // Resolved once, here, rather than every time the list is read.
-            if case .diff(var diff) = content { diff.path = Self.key(diff.path); return diff }
+            if case .diff(var diff) = content {
+                diff.path = Self.key(diff.path)
+                return Self.normalised(diff)
+            }
             return nil
         }
         if !diffs.isEmpty {
@@ -90,6 +93,26 @@ public struct ReportedChanges: Sendable, Equatable {
             grouped[edit.path, default: []].append(edit)
         }
         return order.map { ($0, grouped[$0] ?? []) }
+    }
+
+    /// One shape for a new file, whichever runtime sent it (checked live, 035 T040).
+    ///
+    /// Claude leaves the old text out. Copilot and Grok send it empty. Cursor sends the
+    /// header of a unified diff as though it were the text — old `-- /dev/null`, new
+    /// `++ b/<path>` and then the file, without its last newline. All three mean the
+    /// same thing: nothing was there, and this is what is now.
+    static func normalised(_ diff: ToolCallContent.Diff) -> ToolCallContent.Diff {
+        var diff = diff
+        if let old = diff.oldText, old.hasPrefix("--"), old.hasSuffix("/dev/null"),
+           !old.contains("\n"), diff.newText.hasPrefix("++") {
+            let lines = diff.newText.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+            if lines.first?.hasPrefix("++ b/") == true || lines.first?.hasPrefix("+++ b/") == true {
+                diff.newText = lines.count > 1 ? String(lines[1]) : ""
+                diff.oldText = nil
+            }
+        }
+        if diff.oldText?.isEmpty == true { diff.oldText = nil }
+        return diff
     }
 
     /// Resolved the way `TouchedPaths` resolves them, so `/tmp/x` and `/private/tmp/x`

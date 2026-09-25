@@ -17,6 +17,10 @@ actor FakeACPAgent {
         /// How long a turn takes. Zero for almost every test; a real duration for the
         /// ones about what happens while the agent is still working.
         var turnDelay: Duration = .zero
+        /// Send `updates` on the first turn only. A real runtime never sends the same
+        /// tool call again on a later turn; one that replays its script does, and a
+        /// test about tool calls then reads the replay as the call starting over (035).
+        var updatesOnFirstTurnOnly = false
         /// Ask a permission part way through the turn and wait for the answer.
         var permission: JSONValue?
         /// Answer `session/resume` and `session/load` with this error instead.
@@ -73,6 +77,7 @@ actor FakeACPAgent {
     }
 
     private var script: Script
+    private var turnsTaken = 0
     private var connection: JSONRPCConnection!
     private let box = FakeBox()
 
@@ -190,7 +195,10 @@ actor FakeACPAgent {
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }
-        for update in script.updates { await send(update: update) }
+        turnsTaken += 1
+        if !script.updatesOnFirstTurnOnly || turnsTaken == 1 {
+            for update in script.updates { await send(update: update) }
+        }
         for notification in script.extensionNotifications {
             try? connection.notify(notification.method, notification.params)
         }

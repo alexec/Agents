@@ -25,6 +25,7 @@ struct ChangesTests {
     private func launcher(sending updates: [JSONValue]) -> FakeLauncher {
         var script = FakeACPAgent.Script()
         script.updates = updates
+        script.updatesOnFirstTurnOnly = true
         return FakeLauncher(script: script)
     }
 
@@ -58,11 +59,16 @@ struct ChangesTests {
         try git(["commit", "-q", "-m", "seed"], in: folder)
     }
 
-    /// Wait for the turn's edits to reach the list.
-    private func list(_ core: DaemonCore, _ id: UUID, count: Int) async -> ChangesList? {
+    /// Wait for the turn's edits to reach the list: `count` files and `edits` edits in
+    /// all, none still being made. Waiting for the turn to end is not enough — its
+    /// updates are written as they are heard, and a list read between two edits is a
+    /// true list of fewer.
+    private func list(_ core: DaemonCore, _ id: UUID, count: Int, edits: Int? = nil) async -> ChangesList? {
         await eventuallySome("\(count) changed files") {
             guard let list = try? await core.changesList(.init(agentID: id)),
-                  list.files.count == count, !list.files.contains(where: \.inProgress) else { return nil }
+                  list.files.count == count, !list.files.contains(where: \.inProgress),
+                  edits.map({ $0 == list.files.reduce(0) { $0 + $1.editCount } }) ?? true
+            else { return nil }
             return list
         }
     }
@@ -78,7 +84,7 @@ struct ChangesTests {
         let core = try core(launcher(sending: updates), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
 
-        let listed = try #require(await list(core, id, count: 2))
+        let listed = try #require(await list(core, id, count: 2, edits: 3))
         #expect(listed.files.map(\.path) == [a, b])
         #expect(listed.files[0].editCount == 2, "the failed edit is not one")
         #expect(listed.files[0].state == .modified)
@@ -166,7 +172,7 @@ struct ChangesTests {
         _ = try write("# B\n", to: "b.md", in: work)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         _ = await eventuallySome("the starting point was taken") { await core.agent(id)?.startingPoint }
-        _ = try #require(await list(core, id, count: files))
+        _ = try #require(await list(core, id, count: files, edits: files))
         return (core, id, work, head, a, b)
     }
 

@@ -35,6 +35,10 @@ struct EditReplayTests {
         #expect(!EditReplay.accounts(for: [edit("gone", "here")], start: "nothing", now: "nothing"))
     }
 
+    @Test func aDroppedLastNewlineIsNotSomethingElse() {
+        #expect(EditReplay.accounts(for: [edit(nil, "hello")], start: "", now: "hello\n"))
+    }
+
     @Test func aNewFileStartsFromNothing() {
         let edits = [edit(nil, "made\n"), edit("made", "made twice")]
         #expect(EditReplay.accounts(for: edits, start: "ignored", now: "made twice\n"))

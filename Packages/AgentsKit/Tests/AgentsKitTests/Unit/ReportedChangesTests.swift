@@ -105,6 +105,28 @@ struct ReportedChangesTests {
         #expect(fold.byFile.count == 1)
     }
 
+    // MARK: What each runtime sends for a new file (T040)
+
+    @Test func anEmptyOldTextIsANewFile() {
+        let fold = ReportedChanges(entries: [call("a", status: "completed",
+                                                  diffs: [diff("/w/notes.md", "", "hello\n")])])
+        #expect(fold.edits.first?.oldText == nil)
+    }
+
+    @Test func cursorsDiffHeaderIsNotTheFile() {
+        let fold = ReportedChanges(entries: [call("a", status: "completed",
+                                                  diffs: [diff("/w/notes.md", "-- /dev/null",
+                                                               "++ b//w/notes.md\nhello")])])
+        #expect(fold.edits.first?.oldText == nil)
+        #expect(fold.edits.first?.newText == "hello")
+    }
+
+    @Test func textThatOnlyLooksLikeAHeaderIsKept() {
+        let fold = ReportedChanges(entries: [call("a", status: "completed",
+                                                  diffs: [diff("/w/a.md", "-- a list item", "++ b")])])
+        #expect(fold.edits.first?.oldText == "-- a list item")
+    }
+
     // MARK: SC-002
 
     private var fixtures: URL {

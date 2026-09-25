@@ -46,6 +46,27 @@ rejected edit didn't happen.
 The comment on `ToolCallContent` ("the Claude adapter shells out and sends console text") is out
 of date. Correct it while touching the file.
 
+### Checked live, one agent per runtime (T040, 2026-09-25)
+
+Each agent got the same three-step prompt in a scratch git repo: edit `two` to `TWO` in `a.txt`
+with its edit tool, create `notes.md` with its write tool, and run
+`printf 'extra\n' >> a.txt && echo hi > shell.txt` in the shell.
+
+| Runtime | An edit | A new file | Copies per call | Pane |
+|---------|---------|------------|-----------------|------|
+| Claude | passage | old text absent | 2–3, the last is right | right |
+| Copilot | passage | old text `""` | 2, identical | right |
+| Grok | passage | old text `""` | 2, identical | right (Grok now sends diffs; the transcripts checked before had none) |
+| Cursor | **the whole file** | old `-- /dev/null`, new `++ b/<path>` then the text without its last newline | 1 | right after the fix below |
+
+In every run, `a.txt` showed as edited and "changed since" (the shell's append), `notes.md` as
+new, and `shell.txt` as seen in the folder only.
+
+**What changed because of it**: the fold now gives a new file one shape, whichever runtime
+sent it. Empty old text means absent, and Cursor's header scrap is taken off. The replay also
+ignores a lone missing last newline. The fold rule itself (the last copy of each call, completed
+calls only) held for all four runtimes.
+
 ## R2. Where the list is built
 
 **Decision**: In the daemon. It uses a fold per agent (`ReportedChanges`), built from

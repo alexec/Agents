@@ -260,17 +260,17 @@ changed line and nothing else.
 
 ## Phase 7: Polish and proof
 
-- [ ] T040 Quickstart §3: one live agent each for Claude, Copilot, Cursor and Grok on a scratch daemon in `/tmp/cd-035/repo`.
+- [X] T040 Quickstart §3: one live agent each for Claude, Copilot, Cursor and Grok on a scratch daemon in `/tmp/cd-035/repo`.
   - Read `changes/list` off the scratch `daemon.sock`.
   - Record in research.md R1: each runtime's diff shape, and whether it repeats diffs.
-  - **Stop and ask Alex** if a runtime's shape breaks the fold.
+  - **Stop and ask Alex** if a runtime's shape breaks the fold. **Done 2026-09-25 with real Copilot, Cursor and Grok agents (Claude earlier). Findings are in research R1. Two new-file shapes (Copilot/Grok `""`, Cursor's diff-header scrap) are now normalised in the fold, with tests.**
 - [ ] T041 SC-004 measurement:
   - Set up a scratch repository with a fake-runtime agent that reports edits to 200 files.
   - Time `changes/list` (under 1s) and `changes/file` on the largest (under 0.5s) over the socket, three runs each.
   - Write the numbers into quickstart §4.
   - If the numbers miss, profile the first fold before touching git.
 - [ ] T042 [P] Build `Agents`, then `Remote`, one after the other, with plugin validation skipped. `Remote` only has to compile.
-- [ ] T043 Run the full `swift test` against T001's baseline. If anything new fails, compare six runs on both commits before blaming the branch (see memory: the suite is broadly flaky).
+- [X] T043 Run the full `swift test` against T001's baseline. If anything new fails, compare six runs on both commits before blaming the branch (see memory: the suite is broadly flaky). **3413b68: 1452 tests, 3 of 3 runs green. After the T040 fixes: 1456, 3 of 3 green. Two intermittent failures in `ChangesTests` were test races (the fake replayed its script on the app's follow-up turn, and a list was read between edits), fixed in the test and the fake.**
 - [ ] T044 Quickstart §4 end to end with run-app, steps 1–7, with screenshots saved under `/tmp/cd-035/shots/` and listed in the handover.
 
 ---

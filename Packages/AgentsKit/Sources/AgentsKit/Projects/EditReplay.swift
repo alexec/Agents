@@ -14,7 +14,13 @@ enum EditReplay {
             guard let replayed = apply(edit, to: text) else { return false }
             text = replayed
         }
-        return text == now
+        // A runtime that drops a file's last newline (Cursor, for a new file) has not
+        // left anything out that is worth telling anybody about.
+        return text == now || trimmedEnd(text) == trimmedEnd(now)
+    }
+
+    private static func trimmedEnd(_ text: String) -> Substring {
+        text.hasSuffix("\n") ? text.dropLast() : Substring(text)
     }
 
     /// One edit over a text, or nil when its passage is not there to replace.
