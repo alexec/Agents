@@ -150,7 +150,12 @@ extension DaemonCore {
         pullRequestsDueAt[folder] = nil
         if list != previous { tellMac(list) }
         // Only on a list that is true now: nothing fires on stale state (spec edge case).
-        if list.problem == nil { await firePullRequestTriggers(in: list) }
+        if list.problem == nil {
+            // What changed, on the log first (042), so each of 038's fires can say
+            // which event it came from.
+            let causes = await raisePullRequestEvents(in: list)
+            await firePullRequestTriggers(in: list, causes: causes)
+        }
         return pullRequestLists[folder] ?? list
     }
 
@@ -178,7 +183,7 @@ extension DaemonCore {
     /// the changes it has not fired on yet (R6). One fire for each workflow and pull
     /// request, carrying every change at once, so a review and a failing check that
     /// arrive together are one run rather than two in a row.
-    func firePullRequestTriggers(in list: PullRequestList) async {
+    func firePullRequestTriggers(in list: PullRequestList, causes: [String: EventPosition] = [:]) async {
         let records = workflowStore.load()
         let candidates = (workflows[list.folder] ?? [:]).values
             .filter { $0.respondsToPullRequests
@@ -193,9 +198,11 @@ extension DaemonCore {
                 let changes = PullRequestChanges.unfired(workflow.triggers, on: pull, record: record,
                                                          workflowID: workflow.workflowID)
                 guard let first = changes.first else { continue }
+                let cause = Self.eventName(for: first.trigger).flatMap { causes["\(pull.number) \($0)"] }
                 await fire(workflow, on: first.trigger,
                            pullRequest: PullRequestFire(folder: list.folder, repository: list.repository,
-                                                        pull: pull, changes: changes))
+                                                        pull: pull, changes: changes),
+                           causingEvent: cause)
             }
         }
     }

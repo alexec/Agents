@@ -324,7 +324,7 @@ each fire shows as a consequence on its event.
   - In `Pkg/Sources/AgentsKitCore/Model/WorkflowOutcome.swift`, `.ran` and `.refused` gain `causingEvent: EventPosition?`, encoded only when present.
   - 038's `firePullRequestTriggers` passes the position of the matching `pull_request.*` event raised in T050, so 038 fires still show on the log.
 - [X] T049 [US3] `manage_workflows`: in `AppService.swift`, append `EventCatalogue.describe()` to its description, under "Triggers you can use", so it is the same text as `wait_for_event`'s `list` (FR-024). Extend the `AppServiceTests` assertion to compare the two strings.
-- [ ] T050 [US3] Pull-request events, in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+PullRequests.swift`, after each refresh (R8):
+- [X] T050 [US3] Pull-request events, in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+PullRequests.swift`, after each refresh (R8):
   - Diff the new `PullRequestList` against `eventState.pullRequestsSeen[folder]` and raise `opened`, `checks_failed`, `checks_passed`, `approved`, `changes_requested`, `conflicts` and `review_comments`, each followed by `pull_request.changed` with `what`.
   - For a number that has left the open list, make one `gh api graphql` call through the injected `GitHubCLI` for `pullRequest(number:){ state }`, which gives `merged` or `closed`. If that fails, raise nothing and try again at the next refresh.
   - The first refresh after start only seeds the list, except for a merged or closed pull request that was in the stored list.
