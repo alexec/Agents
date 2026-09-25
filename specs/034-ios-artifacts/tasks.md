@@ -186,8 +186,8 @@ page. Prompt "carry on", and the agent keeps the edit.
 **Independent Test**: Walk two folders down and open a file the agent never touched. Open one it
 changed: it is marked, and it is current.
 
-- [ ] T038 [US3] Move `App/Sources/Sidebar/FileLines.swift` to `Shared/UI/Page/FileLines.swift` (numbered lines, with the named line tinted), keeping the Mac's call sites working.
-- [ ] T039 [US3] Create `Remote/Sources/Panes/FilesPane.swift`, following contracts/panes-ui.md "Files":
+- [X] T038 [US3] Move `App/Sources/Sidebar/FileLines.swift` to `Shared/UI/Page/FileLines.swift` (numbered lines, with the named line tinted), keeping the Mac's call sites working.
+- [X] T039 [US3] Create `Remote/Sources/Panes/FilesPane.swift`, following contracts/panes-ui.md "Files":
   - **Bar**: Back or Up, and the name truncated at the head.
   - **Listing**: a lazy `List`, folders first, with the Mac's touched dot from `TouchedPaths` and the "N more, not shown" row.
   - **Text**: `FileLines` at `openLine`, with `truncationNote`.
@@ -196,11 +196,11 @@ changed: it is marked, and it is current.
   - **Other**: its sentence.
   - **Refusal, gone, and folder gone**: sentences, as in the contract.
   - It watches the agent's `cwd`. On `files/changed` it re-lists the shown folder when it is named, and re-reads the open file when its parent is named.
-- [ ] T040 [US3] Keep touched marks true for a long conversation. In `RemoteModel`, add `touchedPaths(for:)`, which folds `work.entries`. On the Files pane's first open for an agent whose loaded page does not reach its first entry, fetch the whole transcript once through the same `agents/transcript` request `loadEarlier` uses, and fold that into a per-agent `TouchedPaths` cache.
-- [ ] T041 [US3] Rename `Remote/Sources/Chat/FileView.swift` to `Remote/Sources/Chat/ChangesView.swift` (`struct ChangesView`, "What the agent did"). In `FilesPane`, a bar button opens it when the transcript has diffs for the open file.
-- [ ] T042 [US3] In `RemoteChatView`'s `ChatActions.open`, set `pane = .files` with `openFile` and `openLine` from the `ToolCallLocation`. When `macLacksPanes`, keep `fileOnScreen` and the `ChangesView` sheet.
-- [ ] T043 [US3] In `Remote/Sources/Chat/DocumentView.swift`'s `ArtifactsList`, an entry whose path is inside the agent's `folderScope` opens the live file (Page for `.md`, otherwise Files). Other entries open as today.
-- [ ] T044 [US3] Build Remote.
+- [X] T040 [US3] Keep touched marks true for a long conversation. In `RemoteModel`, add `touchedPaths(for:)`, which folds `work.entries`. On the Files pane's first open for an agent whose loaded page does not reach its first entry, fetch the whole transcript once through the same `agents/transcript` request `loadEarlier` uses, and fold that into a per-agent `TouchedPaths` cache.
+- [X] T041 [US3] Rename `Remote/Sources/Chat/FileView.swift` to `Remote/Sources/Chat/ChangesView.swift` (`struct ChangesView`, "What the agent did"). In `FilesPane`, a bar button opens it when the transcript has diffs for the open file.
+- [X] T042 [US3] In `RemoteChatView`'s `ChatActions.open`, set `pane = .files` with `openFile` and `openLine` from the `ToolCallLocation`. When `macLacksPanes`, keep `fileOnScreen` and the `ChangesView` sheet.
+- [X] T043 [US3] In `Remote/Sources/Chat/DocumentView.swift`'s `ArtifactsList`, an entry whose path is inside the agent's `folderScope` opens the live file (Page for `.md`, otherwise Files). Other entries open as today.
+- [X] T044 [US3] Build Remote.
 
 ---
 

@@ -50,7 +50,7 @@ struct DocumentView: View {
                       link: url)
         case .file:
             // A path, not bytes. The protocol hands a client no way to read a file on
-            // the Mac, and inventing one is not this view's business — see FileView.
+            // the Mac, and inventing one is not this view's business — see ChangesView.
             Elsewhere(name: artifact.name,
                       detail: "It is a file on your Mac. Open it there.",
                       link: nil)
@@ -107,12 +107,26 @@ struct ArtifactsList: View {
             } else {
                 List {
                     ForEach(artifacts) { artifact in
-                        NavigationLink {
-                            DocumentView(artifact: artifact)
-                        } label: {
-                            row(artifact)
+                        if let file = liveFile(artifact) {
+                            // A file in the agent's folders opens as it is now, on the Page
+                            // or in Files, not as the conversation carried it (034 FR-027).
+                            Button {
+                                if let agentID = model.selection {
+                                    model.panes.state(for: agentID).open(file: file, line: nil)
+                                }
+                            } label: {
+                                row(artifact)
+                            }
+                            .buttonStyle(.plain)
+                            .paperListRow()
+                        } else {
+                            NavigationLink {
+                                DocumentView(artifact: artifact)
+                            } label: {
+                                row(artifact)
+                            }
+                            .paperListRow()
                         }
-                        .paperListRow()
                     }
                     if model.hasMoreBefore {
                         Text("Only what is in the part of the conversation read so far.")
@@ -127,6 +141,20 @@ struct ArtifactsList: View {
         .navigationTitle("Exchanged")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+    }
+
+    /// The file an entry names, when the Mac can read it for this agent. Judged by path
+    /// here, because the phone has no disk to resolve it against; the Mac holds the real
+    /// boundary on every read.
+    private func liveFile(_ artifact: Artifact) -> URL? {
+        guard !model.macLacksPanes, let agent = model.selectedAgent,
+              case .file(let url) = artifact.destination else { return nil }
+        let path = url.standardizedFileURL.path
+        let inside = agent.folderScope.folders.contains { folder in
+            let root = folder.standardizedFileURL.path
+            return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+        }
+        return inside ? url : nil
     }
 
     private func row(_ artifact: Artifact) -> some View {

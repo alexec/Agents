@@ -553,6 +553,47 @@ final class RemoteModel {
         return work.filesToShow[selection]
     }
 
+    // MARK: Which files the agent changed (034)
+
+    /// What the agent touched in the part of its conversation before the page loaded,
+    /// per agent. Fetched once, when Files first opens for it.
+    private var touchedEarlier: [UUID: TouchedPaths] = [:]
+    private var touchedHistoryAsked: Set<UUID> = []
+
+    /// The files an agent changed since it started, as the Mac marks them: from the
+    /// transcript, never the disk (FR-011). The page of it that is loaded, plus what was
+    /// read of the rest when Files opened.
+    func touchedPaths(for agentID: UUID) -> TouchedPaths {
+        var touched = touchedEarlier[agentID] ?? TouchedPaths()
+        if selection == agentID { for entry in work.entries { touched.absorb(entry) } }
+        return touched
+    }
+
+    /// Read the part of the conversation the chat has not loaded, once, so a file the
+    /// agent edited an hour ago is marked here as it is on the Mac (research §5). Paged,
+    /// backwards, as "load earlier" is; kept apart from the chat's own page.
+    func loadTouchedHistory(for agentID: UUID) async {
+        guard !touchedHistoryAsked.contains(agentID) else { return }
+        touchedHistoryAsked.insert(agentID)
+        var before: Int? = selection == agentID ? work.firstEntryIndex : nil
+        if before == 0 { return }
+        var touched = TouchedPaths()
+        while true {
+            guard let page = try? await client.call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: agentID, before: before, limit: 500),
+                returning: TranscriptPage.self) else {
+                // Try again next time Files opens; the marks are short, not wrong.
+                touchedHistoryAsked.remove(agentID)
+                break
+            }
+            for entry in page.entries { touched.absorb(entry) }
+            guard page.hasMoreBefore else { break }
+            before = page.firstIndex
+        }
+        touchedEarlier[agentID] = touched
+    }
+
     /// Something is being typed on this device: the prompt, a passage on a page, the
     /// terminal. While it is, an agent asking to be looked at is offered, not opened,
     /// so the screen is not taken from under somebody's fingers (034 FR-005).

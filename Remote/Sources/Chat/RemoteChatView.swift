@@ -67,7 +67,7 @@ struct RemoteChatView: View {
             // conversation; a sheet is what that is on a screen with one column.
             NavigationStack {
                 if let path = model.fileOnScreen {
-                    FileView(path: path)
+                    ChangesView(path: path)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { model.fileOnScreen = nil }
@@ -165,12 +165,19 @@ struct RemoteChatView: View {
         model.questionForSelection != nil || model.formForSelection != nil
     }
 
-    /// What the shared chat rows mean on a phone (033). A file a tool call touched
-    /// opens the change the agent made to it, in a sheet: the phone cannot open the
-    /// Mac's disk, and that is the one deliberate difference in these rows.
+    /// What the shared chat rows mean on a phone. A file a tool call touched opens as it
+    /// is now, in Files at the line the call named, with what the agent did one tap from
+    /// there (034 FR-014). A Mac too old to read files for the phone gets 033's sheet of
+    /// the change instead.
     private var actions: ChatActions {
         ChatActions(
-            open: { [model] location in model.fileOnScreen = location.path },
+            open: { [model] location in
+                guard !model.macLacksPanes, let agentID = model.selection else {
+                    model.fileOnScreen = location.path
+                    return
+                }
+                model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
+            },
             terminalOutput: { [model] id in model.terminalOutput(id) },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
