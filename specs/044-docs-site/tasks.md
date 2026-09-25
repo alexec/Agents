@@ -148,13 +148,13 @@ clicks.
 For each guide: read the named specs and the app's current source for exact labels, check them on the scratch app,
 write the guide in the how-to shape, add pictures only where a step is hard to find, and add it to `nav:`.
 
-- [ ] T017 [P] [US2] `docs/how-to/add-a-project.md`: add a folder, clone a repository, remove or archive a
+- [X] T017 [P] [US2] `docs/how-to/add-a-project.md`: add a folder, clone a repository, remove or archive a
   project, the lead agent (specs 025, 026).
-- [ ] T018 [P] [US2] `docs/how-to/start-in-a-worktree.md`: choose a worktree when starting, what happens on
+- [X] T018 [P] [US2] `docs/how-to/start-in-a-worktree.md`: choose a worktree when starting, what happens on
   archive, on iPhone/iPad (specs 030, `0ea158d`).
-- [ ] T019 [P] [US2] `docs/how-to/answer-a-question.md`: permission requests, questions, multi-question forms,
+- [X] T019 [P] [US2] `docs/how-to/answer-a-question.md`: permission requests, questions, multi-question forms,
   from the Mac, the phone and notifications; covers Grok's needs-answer case (specs 023, 039, some-ux-issues-1).
-- [ ] T020 [P] [US2] `docs/how-to/add-a-linux-server.md` (`devices: [mac, server]`):
+- [X] T020 [P] [US2] `docs/how-to/add-a-linux-server.md` (`devices: [mac, server]`):
   - what a server needs;
   - Add a server;
   - a server project;
@@ -162,19 +162,19 @@ write the guide in the how-to shape, add pictures only where a step is hard to f
   - removing a server (spec 037, `specs/037-cloud-agents/walk/README.md`).
 
   Its example host is `devbox.example.com`, never a real address.
-- [ ] T021 [P] [US2] `docs/how-to/set-up-a-workflow.md`: the workflows page, triggers, actions, one worked
+- [X] T021 [P] [US2] `docs/how-to/set-up-a-workflow.md`: the workflows page, triggers, actions, one worked
   example "when an agent finishes, start a reviewer" (spec 017, the workflow page source).
-- [ ] T022 [P] [US2] `docs/how-to/watch-a-pull-request.md`: start an agent on a PR and let it babysit, with the
+- [X] T022 [P] [US2] `docs/how-to/watch-a-pull-request.md`: start an agent on a PR and let it babysit, with the
   GitHub access it needs (spec 038). Examples use `example/repo`.
-- [ ] T023 [P] [US2] `docs/how-to/sign-a-runtime-in.md`: sign in from the app, and the runtimes that hand over a
+- [X] T023 [P] [US2] `docs/how-to/sign-a-runtime-in.md`: sign in from the app, and the runtimes that hand over a
   terminal command (README "Signing in").
-- [ ] T024 [P] [US2] `docs/how-to/archive-park-stop.md`: stop, park, archive and unarchive, what each keeps, and
+- [X] T024 [P] [US2] `docs/how-to/archive-park-stop.md`: stop, park, archive and unarchive, what each keeps, and
   swipe to archive (specs 040, some-ux-issues-1).
-- [ ] T025 [P] [US2] `docs/how-to/attach-files.md`: drag, paste, `@` mention, and what each runtime accepts;
+- [X] T025 [P] [US2] `docs/how-to/attach-files.md`: drag, paste, `@` mention, and what each runtime accepts;
   links to reference/runtimes.
-- [ ] T026 [P] [US2] `docs/how-to/read-an-agents-changes.md`: the Changes pane, diffs in the chat, Whole file,
+- [X] T026 [P] [US2] `docs/how-to/read-an-agents-changes.md`: the Changes pane, diffs in the chat, Whole file,
   the files pane, `show_file` (specs 035, 041).
-- [ ] T027 [US2] Fill in `docs/how-to/index.md`, grouped by area (Projects, Agents, Servers, Phone and iPad,
+- [X] T027 [US2] Fill in `docs/how-to/index.md`, grouped by area (Projects, Agents, Servers, Phone and iPad,
   Automation), and the How-to section of `nav:`. Run `scripts/docs.sh check`, and check the search for "server",
   "worktree" and "pull request" in `serve`.
 
@@ -188,21 +188,21 @@ write the guide in the how-to shape, add pictures only where a step is hard to f
 
 **Independent Test**: quickstart V5. Each list compared with its source of truth has nothing missing and nothing extra.
 
-- [ ] T028 [P] [US3] `docs/reference/statuses.md`: one table (Status | Group | What it means | What you can do)
+- [X] T028 [P] [US3] `docs/reference/statuses.md`: one table (Status | Group | What it means | What you can do)
   from `AgentGroup` and the status enum in `Packages/AgentsKit`. It covers Needs attention, Blocked, Working,
   Complete, Stopped, Parked and Archived.
-- [ ] T029 [P] [US3] `docs/reference/runtimes.md`: one table (Runtime | Command it starts | Pictures |
+- [X] T029 [P] [US3] `docs/reference/runtimes.md`: one table (Runtime | Command it starts | Pictures |
   Sign in from app | App tools available | Notes) from `ToolPolicyCatalog`, the runtime catalogue and the README.
   It covers Claude, Grok, Copilot and Cursor, including that Copilot sessions get none of the app's tools.
-- [ ] T030 [P] [US3] `docs/reference/agent-tools.md`: one entry per tool on the app's MCP server (Tool | What it
+- [X] T030 [P] [US3] `docs/reference/agent-tools.md`: one entry per tool on the app's MCP server (Tool | What it
   does | Who it asks), taken from the helper's tool list in source, not from memory (research R9).
-- [ ] T031 [P] [US3] `docs/reference/settings.md`: every Settings pane and control on the Mac (including Servers,
+- [X] T031 [P] [US3] `docs/reference/settings.md`: every Settings pane and control on the Mac (including Servers,
   Theme) and on iPhone/iPad, from the Settings views' source.
-- [ ] T032 [P] [US3] `docs/reference/workflows.md`: triggers, conditions and actions, with the file format, from
+- [X] T032 [P] [US3] `docs/reference/workflows.md`: triggers, conditions and actions, with the file format, from
   `Packages/AgentsKit/Sources/AgentsKit/Workflows/`.
-- [ ] T033 [P] [US3] `docs/reference/keyboard-shortcuts.md`: every `.keyboardShortcut` and menu command in `App/`,
+- [X] T033 [P] [US3] `docs/reference/keyboard-shortcuts.md`: every `.keyboardShortcut` and menu command in `App/`,
   from a grep of the source.
-- [ ] T034 [US3] Fill in `docs/reference/index.md` and `nav:`. For each page, record in its task line the file(s)
+- [X] T034 [US3] Fill in `docs/reference/index.md` and `nav:`. For each page, record in its task line the file(s)
   it was checked against, and run `scripts/docs.sh check`.
 
 **Checkpoint**: US1–US3 pass their tests.
@@ -216,17 +216,17 @@ write the guide in the how-to shape, add pictures only where a step is hard to f
 **Independent Test**: the spec's test. After reading *The window and the daemon*, a reader predicts what happens to
 a running agent when the window closes and when the Mac restarts.
 
-- [ ] T035 [P] [US4] `docs/explanation/window-and-daemon.md`: the daemon owns the agents, the window is a view,
+- [X] T035 [P] [US4] `docs/explanation/window-and-daemon.md`: the daemon owns the agents, the window is a view,
   the daemon exits when idle, and what survives a restart (README "The daemon").
-- [ ] T036 [P] [US4] `docs/explanation/scoped-tools.md`: why a runtime's own scheduler, question and subagent
+- [X] T036 [P] [US4] `docs/explanation/scoped-tools.md`: why a runtime's own scheduler, question and subagent
   tools are taken away, and what is kept (README "Scoping an agent's tools").
-- [ ] T037 [P] [US4] `docs/explanation/projects-hosts-worktrees.md`: a project is a folder on one host, and why
+- [X] T037 [P] [US4] `docs/explanation/projects-hosts-worktrees.md`: a project is a folder on one host, and why
   worktrees (specs 030, 037).
-- [ ] T038 [P] [US4] `docs/explanation/leases.md`: why one agent at a time uses the screen or a browser, waiting in
+- [X] T038 [P] [US4] `docs/explanation/leases.md`: why one agent at a time uses the screen or a browser, waiting in
   line, and what a person can end (spec 036).
-- [ ] T039 [P] [US4] `docs/explanation/phone-and-ipad.md`: how the phone and iPad reach the Mac and what they can
+- [X] T039 [P] [US4] `docs/explanation/phone-and-ipad.md`: how the phone and iPad reach the Mac and what they can
   and cannot do (specs 013, 029, 033, 034). It does not describe network internals beyond what a user needs.
-- [ ] T040 [US4] Fill in `docs/explanation/index.md` and `nav:`, and run `scripts/docs.sh check`.
+- [X] T040 [US4] Fill in `docs/explanation/index.md` and `nav:`, and run `scripts/docs.sh check`.
 
 **Checkpoint**: all four sections are complete.
 
