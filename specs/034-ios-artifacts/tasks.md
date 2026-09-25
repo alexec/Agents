@@ -23,8 +23,8 @@ the other, with `-skipPackagePluginValidation`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Record a baseline on the untouched branch, saved to `/tmp/w-034-baseline.log`: `swift test` in `Packages/AgentsKit` (pass and fail counts), then `xcodebuild -scheme Agents -destination 'platform=macOS'`, then `xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator'`
-- [ ] T002 In `project.yml`, add `- package: SwiftTerm` to the Remote target's dependencies (with a comment: its `LocalProcess` is macOS-only, so no PTY reaches the phone). Create `Shared/UI/Page/` and `Remote/Sources/Panes/`, then run `xcodegen generate`
+- [X] T001 Record a baseline on the untouched branch, saved to `/tmp/w-034-baseline.log`: `swift test` in `Packages/AgentsKit` (pass and fail counts), then `xcodebuild -scheme Agents -destination 'platform=macOS'`, then `xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator'`
+- [X] T002 In `project.yml`, add `- package: SwiftTerm` to the Remote target's dependencies (with a comment: its `LocalProcess` is macOS-only, so no PTY reaches the phone). Create `Shared/UI/Page/` and `Remote/Sources/Panes/`, then run `xcodegen generate`
 
 ---
 
@@ -33,43 +33,43 @@ the other, with `-skipPackagePluginValidation`.
 **Purpose**: The daemon can list, read and watch files for a device. The phone has somewhere to
 put a pane.
 
-- [ ] T003 Move `DirectoryEntry` and `DirectoryListing` out of `Packages/AgentsKit/Sources/AgentsKit/Files/DirectoryReader.swift` into `Packages/AgentsKit/Sources/AgentsKitCore/Model/FileListing.swift`, public and `Codable`. `touchedByAgent` is not encoded. `DirectoryReader` stays where it is.
-- [ ] T004 [P] Move `Packages/AgentsKit/Sources/AgentsKit/Files/TouchedPaths.swift` to `Packages/AgentsKit/Sources/AgentsKitCore/Model/TouchedPaths.swift` unchanged, and `.../Files/PageMetrics.swift` to `.../AgentsKitCore/UI/PageMetrics.swift` unchanged.
-- [ ] T005 Create `Packages/AgentsKit/Sources/AgentsKitCore/Model/FileReading.swift`:
+- [X] T003 Move `DirectoryEntry` and `DirectoryListing` out of `Packages/AgentsKit/Sources/AgentsKit/Files/DirectoryReader.swift` into `Packages/AgentsKit/Sources/AgentsKitCore/Model/FileListing.swift`, public and `Codable`. `touchedByAgent` is not encoded. `DirectoryReader` stays where it is.
+- [X] T004 [P] Move `Packages/AgentsKit/Sources/AgentsKit/Files/TouchedPaths.swift` to `Packages/AgentsKit/Sources/AgentsKitCore/Model/TouchedPaths.swift` unchanged, and `.../Files/PageMetrics.swift` to `.../AgentsKitCore/UI/PageMetrics.swift` unchanged.
+- [X] T005 Create `Packages/AgentsKit/Sources/AgentsKitCore/Model/FileReading.swift`:
   - `FileStamp { size: Int, modifiedAt: Date }`, equal when both fields are equal
   - `FileReading`, tagged by `kind`: `text(text, isTruncated, size, stamp)`, `image(bytes, describedAs, stamp)`, `other(describedAs, size, stamp)`, `unchanged(stamp)`
   - `static let imageLimit = 4 * 1024 * 1024`
   - a `truncationNote` sentence: "Showing the first 128 KB of 3.2 MB."
-- [ ] T006 In `Packages/AgentsKit/Sources/AgentsKit/Files/FileProbe.swift`, add `FileReading.read(_ url:, known: FileStamp?)`:
+- [X] T006 In `Packages/AgentsKit/Sources/AgentsKit/Files/FileProbe.swift`, add `FileReading.read(_ url:, known: FileStamp?)`:
   - `unchanged` when the stamp matches
   - otherwise `FileProbe.read`, mapped as text → `text`, image ≤ `imageLimit` → `image` with the whole file's bytes, image over it → `other`, binary → `other`
-- [ ] T007 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FileReadingTests.swift`. It covers text, a text file over 128 KB (`isTruncated`), PNG, SVG, a 5 MB image (becomes `other`), binary, a matching stamp (`unchanged`) and the JSON round-trip of every case.
-- [ ] T008 In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, add:
+- [X] T007 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FileReadingTests.swift`. It covers text, a text file over 128 KB (`isTruncated`), PNG, SVG, a 5 MB image (becomes `other`), binary, a matching stamp (`unchanged`) and the JSON round-trip of every case.
+- [X] T008 In `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, add:
   - `Method.filesList = "files/list"`, `filesRead = "files/read"`, `filesWatch = "files/watch"`, `filesUnwatch = "files/unwatch"`, and `Notification.filesChanged = "files/changed"`
   - `FilesListRequest {agentID, folder}`, `FilesReadRequest {agentID, path, knownStamp?}`, `FilesWatchRequest {agentID, folder}` and `FilesChangedNotification {agentID, folders: [String]}`
   - `Failure.fileGone` and `Failure.fileNotReadable`: the next two free codes (-32032 and -32033 at planning time)
   - `ShellInputRequest` gains optional `rows` and `cols`, decoded with `decodeIfPresent`
-- [ ] T009 In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift`, add `notify(_ method:, _ params:, to ids: Set<UUID>)`. It sends on the same per-connection queues as `broadcast`, and only to connections whose `ConnectionIdentity.id` is in `ids`. Keep the ids beside `ConnectionSet`, and expose `surface(of:)` for T047. Wire a `targetedBroadcaster` into `DaemonCore` the way `broadcaster` is wired (look at `Daemon.swift` for where the broadcaster is set).
-- [ ] T010 Create `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Files.swift` with `listFiles`, `readFile` and a shared `resolveInScope(agentID:path:)`:
+- [X] T009 In `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift`, add `notify(_ method:, _ params:, to ids: Set<UUID>)`. It sends on the same per-connection queues as `broadcast`, and only to connections whose `ConnectionIdentity.id` is in `ids`. Keep the ids beside `ConnectionSet`, and expose `surface(of:)` for T047. Wire a `targetedBroadcaster` into `DaemonCore` the way `broadcaster` is wired (look at `Daemon.swift` for where the broadcaster is set).
+- [X] T010 Create `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Files.swift` with `listFiles`, `readFile` and a shared `resolveInScope(agentID:path:)`:
   - Every path is standardised and has its symlinks resolved, then checked with `agent.folderScope.allows`. A path out of scope is refused with `scope.refusal(for:)` as `invalidParams`, the same as `artifactWrite`.
   - `DirectoryReader.Failure.gone` and `FileProbe.Failure.gone` become `fileGone`. `notReadable` becomes `fileNotReadable`.
   - A folder sent to `readFile` gets "That is a folder." A file sent to `listFiles` gets "That is a file."
-- [ ] T011 In the same file, add `watchFiles(_:connection:)`, `unwatchFiles(_:connection:)` and `connectionEnded(_:)`, following data-model.md "FolderWatchInterest":
+- [X] T011 In the same file, add `watchFiles(_:connection:)`, `unwatchFiles(_:connection:)` and `connectionEnded(_:)`, following data-model.md "FolderWatchInterest":
   - Keep one `FolderWatch` per root, where the root is the scope folder holding the requested folder.
   - Keep `interests: [UUID: Set<Interest>]`.
   - An event sends `files/changed {agentID, folders}` through the targeted broadcaster, only to connections with an interest in (agentID, root).
   - The last interest in a root stops its watch.
   - Call `connectionEnded` from wherever `onDisconnected` reaches `DaemonCore` today (grep `onDisconnected` in `Daemon.swift` and `DaemonCore+Attention.swift`).
-- [ ] T012 Add the four `files/*` cases to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, passing `connection` to watch and unwatch.
-- [ ] T013 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FilesRequestTests.swift`, modelled on `ArtifactWriteTests` and `BroadcastIsolationTests`. It checks:
+- [X] T012 Add the four `files/*` cases to `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, passing `connection` to watch and unwatch.
+- [X] T013 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FilesRequestTests.swift`, modelled on `ArtifactWriteTests` and `BroadcastIsolationTests`. It checks:
   - the refusal text equals `show_file`'s, and a symlink out of scope is refused
   - folders come first, and the listing is capped with `omitted`
   - `files/read`: text, image, unchanged, gone, and a folder
   - `files/changed` reaches the watching connection id and not another
   - after unwatch, or `connectionEnded`, there are no more events and the watch is released (assert on a `watchCount` testing hook)
-- [ ] T014 [P] Create `Packages/AgentsKit/Sources/AgentsKitCore/UI/PanePlacement.swift` with `enum PanePlacement { case column(paneWidth: Double), fullScreen }`, `static let minimumPaneWidth = 360.0` and `static func decide(width:, preferredPaneWidth:)`. The rule: a column when `width >= ChatMetrics.comfortablePane + minimumPaneWidth + 1`, with the pane clamped to `minimumPaneWidth...width/2`.
-- [ ] T015 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PanePlacementTests.swift`. It checks 1,180 and 1,366 → column, 820 and 390 → fullScreen, the 1,021 boundary, and that a preferred width is clamped.
-- [ ] T016 Create `Remote/Sources/Panes/PaneState.swift`:
+- [X] T014 [P] Create `Packages/AgentsKit/Sources/AgentsKitCore/UI/PanePlacement.swift` with `enum PanePlacement { case column(paneWidth: Double), fullScreen }`, `static let minimumPaneWidth = 360.0` and `static func decide(width:, preferredPaneWidth:)`. The rule: a column when `width >= ChatMetrics.comfortablePane + minimumPaneWidth + 1`, with the pane clamped to `minimumPaneWidth...width/2`.
+- [X] T015 [P] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PanePlacementTests.swift`. It checks 1,180 and 1,366 → column, 820 and 390 → fullScreen, the 1,021 boundary, and that a preferred width is clamped.
+- [X] T016 Create `Remote/Sources/Panes/PaneState.swift`:
   - an `@Observable` `PaneState` per agent, following data-model.md "PaneState": `pane: Pane?` (`.page`, `.files`, `.terminal`, `.exchanged`), `pagePath`, `folder`, `openFile`, `openLine`, `scrollAnchor: [String: Int]` and `showingChanges`
   - `RemotePanes`, holding `[UUID: PaneState]` with `state(for:)`
 - [ ] T017 Create `Remote/Sources/Panes/RemoteFiles.swift`, the phone's end of `files/*`, owned by `RemoteModel`:

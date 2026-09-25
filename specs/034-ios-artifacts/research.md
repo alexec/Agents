@@ -69,6 +69,16 @@ the agent's scope and a second rule. Rejected.
 - JSON-RPC lines are all-or-nothing, so a half-received file never looks whole (the "very
   slow connection" edge case).
 
+**SVG on the phone** (found while building T005): ImageIO has no SVG decoder on either
+platform. `CGImageSourceCopyTypeIdentifiers()` lists none, and a source over an SVG has no
+type. The Mac draws SVG only because `NSImage` decodes it itself. `UIImage(data:)` does not.
+
+So the phone rasterises an SVG in an offscreen `WKWebView`: load the markup, then
+`takeSnapshot` at the width the page draws it. The picture is cached by path and stamp, like
+every other picture, and the page itself stays native. Rasterising in the daemon was
+rejected, because the daemon links no UI framework, and `qlmanage` thumbnails are a process
+spawn per picture.
+
 **The 4 MB cap** is for pictures only. A photo from a camera is the case it catches. It keeps
 a single line from holding the connection's other notifications for seconds on a slow link.
 

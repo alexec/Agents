@@ -144,7 +144,8 @@ public final class DaemonServer: @unchecked Sendable {
             }
             return await handler(identity.context, method, params)
         }
-        connections.add(connection, queue: DispatchQueue(label: "com.alexecollins.agents.broadcast.\(identity.id)"))
+        connections.add(connection, queue: DispatchQueue(label: "com.alexecollins.agents.broadcast.\(identity.id)"),
+                        identity: identity)
         onConnectionCountChanged(connections.count)
         Task {
             await connection.start()
@@ -182,7 +183,19 @@ public final class DaemonServer: @unchecked Sendable {
     /// closed, and the client reconnects and asks for everything again — which a
     /// window already does whenever its connection goes.
     public func broadcast(_ method: String, _ params: JSONValue?) {
-        for (connection, queue) in connections.allWithQueues {
+        broadcast(method, params, to: { _ in true })
+    }
+
+    /// Tell only the connections `wanted` picks, in the same order and on the same
+    /// queues as everything else they are told (034).
+    ///
+    /// For what belongs to somebody: the folder a phone is watching, the shell it has
+    /// open. The rest of what the daemon says still goes to everyone. A phone on WiFi
+    /// should not carry an unrelated agent's build output because a Mac window happens
+    /// to have that shell open.
+    public func broadcast(_ method: String, _ params: JSONValue?,
+                          to wanted: @Sendable (ConnectionContext) -> Bool) {
+        for (connection, queue, context) in connections.allAddressed where wanted(context) {
             queue.async {
                 do {
                     try connection.notify(method, params)
@@ -225,22 +238,31 @@ final class ConnectionSet: @unchecked Sendable {
     private var connections: [ObjectIdentifier: JSONRPCConnection] = [:]
     /// The queue each connection's notifications go out on, in order.
     private var queues: [ObjectIdentifier: DispatchQueue] = [:]
+    /// Who each connection is, read as it is sent to: a window becomes a device when it
+    /// says so, after it was added here.
+    private var identities: [ObjectIdentifier: DaemonServer.ConnectionIdentity] = [:]
 
-    func add(_ connection: JSONRPCConnection, queue: DispatchQueue) {
+    func add(_ connection: JSONRPCConnection, queue: DispatchQueue,
+             identity: DaemonServer.ConnectionIdentity) {
         lock.lock(); defer { lock.unlock() }
         connections[ObjectIdentifier(connection)] = connection
         queues[ObjectIdentifier(connection)] = queue
+        identities[ObjectIdentifier(connection)] = identity
     }
 
     func remove(_ connection: JSONRPCConnection) {
         lock.lock(); defer { lock.unlock() }
         connections.removeValue(forKey: ObjectIdentifier(connection))
         queues.removeValue(forKey: ObjectIdentifier(connection))
+        identities.removeValue(forKey: ObjectIdentifier(connection))
     }
 
-    var allWithQueues: [(JSONRPCConnection, DispatchQueue)] {
+    var allAddressed: [(JSONRPCConnection, DispatchQueue, DaemonServer.ConnectionContext)] {
         lock.lock(); defer { lock.unlock() }
-        return connections.compactMap { key, connection in queues[key].map { (connection, $0) } }
+        return connections.compactMap { key, connection in
+            guard let queue = queues[key], let identity = identities[key] else { return nil }
+            return (connection, queue, identity.context)
+        }
     }
 
     var all: [JSONRPCConnection] {
