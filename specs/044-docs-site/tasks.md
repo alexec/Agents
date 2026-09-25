@@ -60,7 +60,7 @@ the running scratch app.
 **Purpose**: The check that every page is written against, and a scratch app to take screenshots from. Both are
 needed before any content.
 
-- [ ] T006 Write `scripts/docs-check.py` (Python 3.9+, standard library only) per `contracts/docs-check-cli.md`.
+- [X] T006 Write `scripts/docs-check.py` (Python 3.9+, standard library only) per `contracts/docs-check-cli.md`.
   - **Inputs**: it reads `docs_dir` and `nav` from `mkdocs.yml` with a small indentation parser (no PyYAML), and
     walks `docs/**/*.md` and `docs/**/images/*`.
   - **Rules** (codes from the contract), each reported as `path:line: message`:
@@ -77,7 +77,7 @@ needed before any content.
   - It ignores fenced code blocks for everything except the private check.
   - **Output**: the summary line `docs-check: ok (M pages, K pictures)` or `docs-check: N problems in M pages`.
   - **Exit**: 0, 1 if there are problems, 2 if it cannot run. `--root` is optional.
-- [ ] T007 Run `scripts/docs.sh check` on the skeleton, and fix the pages or the script until it prints `ok`.
+- [X] T007 Run `scripts/docs.sh check` on the skeleton, and fix the pages or the script until it prints `ok`.
 - [ ] T008 Set up the demo projects for screenshots, `scripts/docs-demo.sh`:
   - it creates `/tmp/run-044/demo/weather-app` (a small git repo: README, a Swift file, one failing test) and
     `/tmp/run-044/demo/recipes-site` (HTML/CSS);
