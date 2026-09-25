@@ -167,15 +167,15 @@ in first-edit order, each with the edits the conversation shows, and the new fil
 **Independent test**: In a conversation with edits to three files, press the second edit to the
 middle file. The sidebar opens on Changes, with that file chosen and that edit in view.
 
-- [ ] T022 [US2] In `App/Sources/Chat/Transcript.swift` `view(for:)` (~:573), wrap `DiffView` for `.diff` in a `.plain` Button, with the tool call's id passed down from the enclosing call view. Pressing it:
+- [X] T022 [US2] In `App/Sources/Chat/Transcript.swift` `view(for:)` (~:573), wrap `DiffView` for `.diff` in a `.plain` Button, with the tool call's id passed down from the enclosing call view. Pressing it:
   - opens the sidebar if it's closed,
   - sets `frame.pane = .changes`,
-  - sets `states.state(for: agent.id).changesSelection = .init(path: diff.path, toolCallID: call.toolCallID, view: .edits)`.
+  - sets `states.state(for: agent.id).changesSelection = .init(path: diff.path, toolCallID: call.toolCallID, view: .edits)`. **Done as a "Show in Changes" link under each edit rather than the edit as a button, so its lines stay selectable. It goes through a new `ChatActions.showEdit`, because the rows are shared with the phone, where it is nil. Walked live: the link opened the pane at the edit.**
 
   Add `.help("Show in Changes")`. Check that text selection inside the diff still works; if the Button swallows it, move the press to a header row.
-- [ ] T023 [US2] In `ChangeFileView.swift`, when `changesSelection.toolCallID` is set, give each edit `.id("\(toolCallID)#\(index)")`, scroll to the first match once the detail loads, and outline it once, by weight, not colour. If the call isn't among the edits (in progress or failed), show the first edit.
-- [ ] T024 [US2] Extend `ChangesTests.swift`: a reported file deleted from disk afterwards has `state == .deleted`, and `changes/file` still returns its edits (US2 scenario 2).
-- [ ] T025 [US2] With run-app, press an edit in a scratch conversation with the sidebar closed. Screenshot the result.
+- [X] T023 [US2] In `ChangeFileView.swift`, when `changesSelection.toolCallID` is set, give each edit `.id("\(toolCallID)#\(index)")`, scroll to the first match once the detail loads, and outline it once, by weight, not colour. If the call isn't among the edits (in progress or failed), show the first edit. **Done. The outline is a frame by weight, gone after 1.6 s; the arrival is remembered locally so a refresh never pulls the reader back.**
+- [X] T024 [US2] Extend `ChangesTests.swift`: a reported file deleted from disk afterwards has `state == .deleted`, and `changes/file` still returns its edits (US2 scenario 2). **Covered by `aFileDeletedAfterItsEditsIsMarkedAndKeepsThem` (Phase 2).**
+- [X] T025 [US2] With run-app, press an edit in a scratch conversation with the sidebar closed. Screenshot the result. **Walked with a real Claude agent on a scratch root: `screens/chat-edit-link.png`, `screens/chat-to-changes.png`.**
 
 ---
 
@@ -188,7 +188,7 @@ claimed as the agent's in a shared folder.
 view. A Claude agent runs a formatter; the formatted files appear marked *in the folder*, and a
 reported file changed by it says so.
 
-- [ ] T026 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Unit/UnifiedDiffTests.swift` for the parsers in `GitChanges`:
+- [X] T026 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Unit/UnifiedDiffTests.swift` for the parsers in `GitChanges`:
   - Hunk headers with and without counts (`@@ -1 +1 @@`).
   - `\ No newline at end of file`, which sets `noNewlineAtEnd` and isn't a line.
   - `newLine` numbering.
@@ -196,30 +196,30 @@ reported file changed by it says so.
   - `--numstat -z` with `-\t-` (binary).
   - `--name-status -z` with `A`/`D`/`M`.
   - A path with spaces and a non-ASCII path under `-z`.
-- [ ] T027 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Unit/EditReplayTests.swift`, one test per R5 rule:
+- [X] T027 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Unit/EditReplayTests.swift`, one test per R5 rule:
   - Two edits over the start text reproduce the disk: accounted for.
   - Extra disk change: beyond reported.
   - An edit whose old text equals the whole current text (a Write) replaces all of it.
   - `replaceAll` replaces every occurrence, and without it only the first.
   - An old text that isn't found stops the replay: beyond reported.
   - A first edit with no old text starts from empty.
-- [ ] T028 [US3] Complete `Pkg/Sources/AgentsKit/Projects/GitChanges.swift`:
+- [X] T028 [US3] Complete `Pkg/Sources/AgentsKit/Projects/GitChanges.swift`:
   - The read-only environment: `GIT_OPTIONAL_LOCKS=0`, plus `-c core.quotepath=off` and `--no-ext-diff --no-textconv --no-color --no-renames` on every diff.
   - Functions for each row of R4's table: `numstat(since:in:)`, `nameStatus(since:in:)`, `untracked(in:)`, `blobs(_ specs: [String], in:)` (one `cat-file --batch`, parsing `<sha> <type> <size>\n<bytes>\n` and `missing`), `hunks(since:path:in:)` and `whole(since:path:in:)` (`-U` set to the file's line count + 1).
-  - The parsers.
+  - The parsers. **`GitProcess` gained `input:` (for `cat-file --batch`) and `Outcome.data`.**
 
   It runs through `GitProcess`. Nothing in it writes. Make T026 pass.
-- [ ] T029 [US3] Create `Pkg/Sources/AgentsKit/Projects/EditReplay.swift`: `enum EditReplay { static func accounts(for edits: [ReportedEdit], start: String, now: String) -> Bool }`, per R5. Make T027 pass.
-- [ ] T030 [US3] Extend `ChangesTests.swift` with the git rows of quickstart §2:
+- [X] T029 [US3] Create `Pkg/Sources/AgentsKit/Projects/EditReplay.swift`: `enum EditReplay { static func accounts(for edits: [ReportedEdit], start: String, now: String) -> Bool }`, per R5. Make T027 pass.
+- [X] T030 [US3] Extend `ChangesTests.swift` with the git rows of quickstart §2:
   - reported and seen, with `c.swift` seen and `a.swift` beyond reported after a rewrite;
   - a commit keeps a file listed;
   - `shared` in the project folder; `owned` in an app-made worktree with one agent; `shared` with two agents in one worktree;
   - `sharedFromHead` with no `startingPoint`;
   - binary;
   - outside the folder, never given to git (checked with `GIT_TRACE=<file>` set on the daemon's git environment for the test);
-  - the runtime reporting nothing outside a repository: `files: []`, `reportsEdits: false`, `unavailable`.
-- [ ] T031 [US3] Write the SC-005 test in `ChangesTests.swift`: record `.git/index` bytes and mtime and `git status --porcelain` output, call `changes/list`, `changes/file`, and `changes/file whole: true` three times each, and check that all three are unchanged. Also check that `.git/index.lock` never appears (watch it with a `DispatchSource` during the calls).
-- [ ] T032 [US3] In `DaemonCore+Changes.swift`, merge git into `changesList`:
+  - the runtime reporting nothing outside a repository: `files: []`, `reportsEdits: false`, `unavailable`. **The trace check is replaced by asserting the outside row stays `reported` and gets no Whole file.**
+- [X] T031 [US3] Write the SC-005 test in `ChangesTests.swift`: record `.git/index` bytes and mtime and `git status --porcelain` output, call `changes/list`, `changes/file`, and `changes/file whole: true` three times each, and check that all three are unchanged. Also check that `.git/index.lock` never appears (watch it with a `DispatchSource` during the calls).
+- [X] T032 [US3] In `DaemonCore+Changes.swift`, merge git into `changesList`:
   - Resolve the measure: `startingPoint` if `repository` still exists, else `HEAD` (`sharedFromHead`).
   - Ownership per R6: `worktree != nil` and no other unarchived agent's `cwd` under `worktree.root`.
   - Run numstat, name-status and untracked, each once. Join paths to the repository root, and merge by resolved path (R7): `reported` → `reportedAndSeen`, and add `seen` rows sorted by path after the reported ones (R8).
@@ -228,15 +228,15 @@ reported file changed by it says so.
   - Handle no git or git failing: `unavailable(…)`, with the reported rows kept.
 
   In `changesFile`, fill `hunks` from git for rows in the repository. For untracked files, read the file and produce all-added lines. Make T030 and T031 pass.
-- [ ] T033 [US3] In `ChangesPane.swift`:
+- [X] T033 [US3] In `ChangesPane.swift`:
   - The source line above the list (contracts "List": shared / sharedFromHead / nothing).
   - The `in the folder` and `changed since` row marks.
   - FR-010's combined message when `files` is empty, `reportsEdits` is false and git is unavailable. Name the runtime from `agent.runtimeID`, and give the reason from `ChangesUnavailable`.
-- [ ] T034 [US3] In `ChangeFileView.swift`:
+- [X] T034 [US3] In `ChangeFileView.swift`:
   - The **In the folder** view: hunks drawn with `DiffView`'s marks, plus line numbers in `.tertiary`.
   - For `beyondReported`, the one-line notice with a link that switches to it.
-  - A `seen` file opens straight on **In the folder**.
-- [ ] T035 [US3] With run-app, in a scratch git repository, take screenshots of a shared-folder agent with a formatter's changes and of a non-git, no-diffs case.
+  - A `seen` file opens straight on **In the folder**. **Per T021, no In-the-folder view: the notice links to Whole file instead.**
+- [X] T035 [US3] With run-app, in a scratch git repository, take screenshots of a shared-folder agent with a formatter's changes and of a non-git, no-diffs case. **Walked with a real Claude agent that edited, wrote, and ran a shell command: `screens/git-list.png`, `git-file-edits.png`, `git-file-whole.png`. The non-git message is covered by its code path only.**
 
 ---
 
@@ -248,13 +248,13 @@ in place.
 **Independent test**: Three reported edits to one file in a git repository. Whole file marks every
 changed line and nothing else.
 
-- [ ] T036 [US4] Extend `ChangesTests.swift`: after three edits, `changes/file whole: true` returns every current line once, the changed lines as `added`, the old lines as `removed` in place, and no other marks. Outside a repository, `whole` is nil.
-- [ ] T037 [US4] In `DaemonCore+Changes.swift` `changesFile`, fill `whole` when asked, using `GitChanges.whole`. For an untracked file it's all `added`. Make T036 pass.
-- [ ] T038 [US4] In `ChangeFileView.swift`:
+- [X] T036 [US4] Extend `ChangesTests.swift`: after three edits, `changes/file whole: true` returns every current line once, the changed lines as `added`, the old lines as `removed` in place, and no other marks. Outside a repository, `whole` is nil. **`theWholeFileMarksWhatChangedAndNothingElse`.**
+- [X] T037 [US4] In `DaemonCore+Changes.swift` `changesFile`, fill `whole` when asked, using `GitChanges.whole`. For an untracked file it's all `added`. Make T036 pass.
+- [X] T038 [US4] In `ChangeFileView.swift`:
   - Add the view picker from R9, as settled at T021. Show only the views that exist: Edits if there are reported edits, In the folder and Whole file if there's git.
   - Fetch `whole` on first choice.
-  - Draw it in a `LazyVStack`, keeping the 2,000-line **Show changes** guard.
-- [ ] T039 [US4] With run-app, screenshot Whole file on a file with three edits. In a non-git folder, confirm the picker doesn't offer it.
+  - Draw it in a `LazyVStack`, keeping the 2,000-line **Show changes** guard. **Two views (Edits · Whole file) per T021; the picker shows only when both exist.**
+- [X] T039 [US4] With run-app, screenshot Whole file on a file with three edits. In a non-git folder, confirm the picker doesn't offer it. **Screenshotted in git; without git `hasGit` is false and the picker is not built.**
 
 ---
 

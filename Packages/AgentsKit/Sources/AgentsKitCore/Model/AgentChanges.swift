@@ -56,7 +56,7 @@ public struct ReportedEdit: Codable, Hashable, Sendable, Identifiable {
     public var removedLines: Int { oldText.map(Self.lineCount) ?? 0 }
     public var addedLines: Int { Self.lineCount(newText) }
 
-    static func lineCount(_ text: String) -> Int {
+    public static func lineCount(_ text: String) -> Int {
         if text.isEmpty { return 0 }
         var count = 0
         for byte in text.utf8 where byte == UInt8(ascii: "\n") { count += 1 }
@@ -126,7 +126,7 @@ public enum ChangesUnavailable: Codable, Hashable, Sendable {
     case gitNotInstalled
     case folderGone
     /// git's own message.
-    case failed(String)
+    case failed(message: String)
 }
 
 /// What git's half of the list is, and how far it can be believed to be this agent's.
@@ -138,6 +138,47 @@ public enum GitView: Codable, Hashable, Sendable {
     /// No starting point was recorded: uncommitted changes against `HEAD`.
     case sharedFromHead
     case unavailable(ChangesUnavailable)
+
+    /// Whether git's half is there at all.
+    public var isAvailable: Bool {
+        if case .unavailable = self { return false }
+        return true
+    }
+
+    // Written as the contract has it — `{"shared":{"since":…}}`,
+    // `{"unavailable":{"notARepository":{}}}` — rather than with the `_0` a payload
+    // without a label would otherwise put in the way.
+    private enum Key: String, CodingKey { case owned, shared, sharedFromHead, unavailable }
+    private enum Since: String, CodingKey { case since }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        if let owned = try? c.nestedContainer(keyedBy: Since.self, forKey: .owned) {
+            self = .owned(since: try owned.decode(String.self, forKey: .since))
+        } else if let shared = try? c.nestedContainer(keyedBy: Since.self, forKey: .shared) {
+            self = .shared(since: try shared.decode(String.self, forKey: .since))
+        } else if c.contains(.sharedFromHead) {
+            self = .sharedFromHead
+        } else {
+            self = .unavailable(try c.decode(ChangesUnavailable.self, forKey: .unavailable))
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: Key.self)
+        switch self {
+        case .owned(let since):
+            var nested = c.nestedContainer(keyedBy: Since.self, forKey: .owned)
+            try nested.encode(since, forKey: .since)
+        case .shared(let since):
+            var nested = c.nestedContainer(keyedBy: Since.self, forKey: .shared)
+            try nested.encode(since, forKey: .since)
+        case .sharedFromHead:
+            _ = c.nestedContainer(keyedBy: Since.self, forKey: .sharedFromHead)
+        case .unavailable(let why):
+            try c.encode(why, forKey: .unavailable)
+        }
+    }
 }
 
 public struct DiffLine: Codable, Hashable, Sendable {

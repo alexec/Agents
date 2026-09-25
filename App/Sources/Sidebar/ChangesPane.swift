@@ -32,9 +32,12 @@ struct ChangesPane: View {
         Group {
             if let selection = state.changesSelection {
                 ChangeFileView(agent: agent, state: state, selection: selection,
-                               listed: list?.files.first { $0.path == selection.path })
+                               listed: list?.files.first { $0.path == selection.path },
+                               hasGit: list?.git.isAvailable ?? false)
             } else if let list {
-                if list.files.isEmpty {
+                if list.files.isEmpty, !list.reportsEdits, case .unavailable(let why) = list.git {
+                    NothingToShow(runtime: agent.runtimeID, why: why)
+                } else if list.files.isEmpty {
                     NothingChanged()
                 } else {
                     files(list)
@@ -105,9 +108,17 @@ struct ChangesPane: View {
     /// quietly than the same folder under every row.
     private func files(_ list: ChangesList) -> some View {
         List {
-            Text(total(list.files))
-                .appText(.fine)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(total(list.files))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                if let source = Self.source(list.git) {
+                    Text(source)
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             ForEach(Self.folders(of: list.files), id: \.name) { folder in
                 Section {
                     ForEach(folder.files) { file in
@@ -151,6 +162,19 @@ struct ChangesPane: View {
         return parent.isEmpty ? "Top folder" : parent
     }
 
+    /// Said once above the list, and only where git's half could be read as this
+    /// agent's when it may not be (FR-008). An agent's own worktree needs no word.
+    static func source(_ git: GitView) -> String? {
+        switch git {
+        case .shared:
+            return "Also shows what git sees changed in this folder since the agent started. That may include other agents' work, and yours."
+        case .sharedFromHead:
+            return "This agent started before its starting point was recorded, so git's part is only what is uncommitted, and may include others' work."
+        case .owned, .unavailable:
+            return nil
+        }
+    }
+
     private func total(_ files: [ChangedFile]) -> String {
         let added = files.reduce(0) { $0 + ($1.added ?? 0) }
         let removed = files.reduce(0) { $0 + ($1.removed ?? 0) }
@@ -184,8 +208,8 @@ struct ChangeRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 ChangeCounts(added: file.added, removed: file.removed)
-                if file.editCount > 0 {
-                    Text(file.editCount == 1 ? "1 edit" : "\(file.editCount) edits")
+                if let note {
+                    Text(note)
                         .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
@@ -193,6 +217,16 @@ struct ChangeRow: View {
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
+    }
+
+    /// Where the knowledge came from, when it is not simply the agent's edits.
+    private var note: String? {
+        let edits = file.editCount == 1 ? "1 edit" : "\(file.editCount) edits"
+        switch file.source {
+        case .seen: return "in the folder"
+        case .reportedAndSeen where file.beyondReported: return "\(edits) · changed since"
+        default: return file.editCount > 0 ? edits : nil
+        }
     }
 }
 
@@ -241,5 +275,37 @@ private struct NothingChanged: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Neither source can say anything (FR-010): which is missing, and why, rather than an
+/// empty list that reads as "nothing changed".
+private struct NothingToShow: View {
+    let runtime: String
+    let why: ChangesUnavailable
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "plusminus")
+                .appText(.title)
+                .foregroundStyle(.tertiary)
+            Text("Nothing to show")
+                .appText(.reading).fontWeight(.semibold)
+            Text("\(runtime.capitalized) doesn't report its edits, and \(reason), so what this agent changed can't be shown here.")
+                .appText(.supporting)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var reason: String {
+        switch why {
+        case .notARepository: return "this folder isn't tracked by git"
+        case .gitNotInstalled: return "git isn't installed on this Mac"
+        case .folderGone: return "its folder is no longer there"
+        case .failed(let message): return "git couldn't be asked (\(message))"
+        }
     }
 }

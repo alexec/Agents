@@ -15,6 +15,10 @@ struct ChatActions {
     var open: @MainActor (ToolCallLocation) -> Void = { _ in }
     var terminalOutput: @MainActor (String) -> String = { _ in "" }
     var unqueue: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
+    /// Show an edit among the rest of what the agent changed (035): the Mac's Changes
+    /// pane, at that file and that tool call. Nil where there is no such pane, and then
+    /// the edit offers nothing.
+    var showEdit: (@MainActor (ToolCallContent.Diff, String?) -> Void)? = nil
 }
 
 extension EnvironmentValues {
