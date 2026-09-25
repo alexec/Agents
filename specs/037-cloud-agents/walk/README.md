@@ -56,3 +56,13 @@ branch. Nothing here touches your real agents; a scratch root is fine.
 | 6 | Update (SC-007) | Rebuild the Linux binaries after any change and reconnect: once idle, once with an agent mid-turn. | Idle: new binary, conversations intact. Mid-turn: orange "Update waiting", then the swap once the turn ends. |
 | 7 | Reboot | `sudo reboot` the box while idle; wait; reconnect. | The window comes back on its own and the daemon is started again. |
 | 8 | Remove | Settings ▸ Servers ▸ Remove…, with and without the checkbox. | Projects leave the list; the daemon is gone on the box; with the checkbox `~/.agents-server` is gone; your repos are untouched. |
+
+## A Linux box on this Mac (2026-09-25)
+
+`colima start` runs Docker; `docker start agents-devbox` brings the box back after a reboot. It is
+Debian bookworm with openssh-server, one user `agents` who logs in with `~/.ssh/id_ed25519` only,
+listening on 127.0.0.1:2222 and nowhere else. Its Dockerfile is in `/tmp/037-devbox/`.
+
+In Add a server, type `agents@127.0.0.1:2222`. From a terminal:
+`ssh -p 2222 agents@127.0.0.1`. It has no agent CLI yet; to run a turn, install one there and log
+in (e.g. `curl -fsSL https://claude.ai/install.sh | bash`, then `claude` once to sign in).

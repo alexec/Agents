@@ -29,13 +29,23 @@ public struct SSHCommand: Sendable {
 
     static let batch = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
 
+    /// What ssh is handed as the destination. `user@host:port` is how people write it,
+    /// and ssh does not read a port there; it does read `ssh://user@host:port`, so that
+    /// form is written for it (037). An alias, or anything else, goes as typed.
+    var destination: String {
+        guard !name.hasPrefix("ssh://"), let colon = name.lastIndex(of: ":"),
+              let port = Int(name[name.index(after: colon)...]), (1...65535).contains(port),
+              !name[..<colon].contains(":") else { return name }
+        return "ssh://" + name
+    }
+
     private var control: [String] {
         guard let controlPath else { return [] }
         return ["-S", controlPath.path(percentEncoded: false)]
     }
 
     /// § 1: what the person's config says about this name, with no network.
-    public var resolveArguments: [String] { ["-G", "--", name] }
+    public var resolveArguments: [String] { ["-G", "--", destination] }
 
     /// § 3: connect only far enough to learn the host key, offering no credentials.
     public func keyFetchArguments(knownHosts: URL) -> [String] {
@@ -43,7 +53,7 @@ public struct SSHCommand: Sendable {
                       "-o", "UserKnownHostsFile=\(knownHosts.path(percentEncoded: false))",
                       "-o", "GlobalKnownHostsFile=/dev/null",
                       "-o", "PreferredAuthentications=none",
-                      "--", name, "true"]
+                      "--", destination, "true"]
     }
 
     /// § 4: the long-lived connection everything else goes over.
@@ -52,17 +62,17 @@ public struct SSHCommand: Sendable {
             "-o", "ControlPersist=no", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3",
             "-o", "ExitOnForwardFailure=yes", "-o", "StreamLocalBindUnlink=yes"]
         if let forward { args += ["-L", "\(forward.local):\(forward.remote)"] }
-        return args + ["--", name]
+        return args + ["--", destination]
     }
 
     /// `-O check` or `-O exit`, asked of the master.
     public func controlArguments(_ operation: String) -> [String] {
-        control + ["-O", operation, "--", name]
+        control + ["-O", operation, "--", destination]
     }
 
     /// §§ 5–8: a shell command on the server, over the master.
     public func runArguments(_ remote: String) -> [String] {
-        Self.batch + control + ["--", name, remote]
+        Self.batch + control + ["--", destination, remote]
     }
 
     /// The window's environment, less anything that could open a prompt the window does

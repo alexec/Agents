@@ -12,6 +12,17 @@ struct SSHCommandTests {
     private let ssh = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "devbox",
                                  controlPath: URL(filePath: "/r/hosts/ab12cd34.ctl"))
 
+    @Test func aPortAfterTheHostIsWrittenTheWaySSHReadsIt() {
+        let withPort = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "agents@127.0.0.1:2222",
+                                  controlPath: nil)
+        #expect(withPort.resolveArguments == ["-G", "--", "ssh://agents@127.0.0.1:2222"])
+        #expect(withPort.runArguments("true").suffix(2) == ["ssh://agents@127.0.0.1:2222", "true"])
+        let alias = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "devbox", controlPath: nil)
+        #expect(alias.destination == "devbox")
+        let v6 = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "fe80::1", controlPath: nil)
+        #expect(v6.destination == "fe80::1", "an IPv6 address is not a port")
+    }
+
     @Test func resolvingReadsTheConfigWithoutConnecting() {
         #expect(ssh.resolveArguments == ["-G", "--", "devbox"])
     }
