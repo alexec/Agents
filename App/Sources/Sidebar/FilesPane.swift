@@ -200,7 +200,7 @@ struct FilesPane: View {
             case .text:
                 VStack(alignment: .leading, spacing: 0) {
                     // Everything that is not Markdown: numbered source, as it was.
-                    FileLines(text: probe.text ?? "", line: state.openLine)
+                    FileLines(text: probe.text ?? "", line: state.openLine, path: url.path)
                     if probe.isTruncated {
                         Divider()
                         Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
