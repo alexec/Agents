@@ -357,6 +357,30 @@ struct HelperAgentTests {
         #expect(await core.workflowChainDepth(causedBy: helper) == 3)
     }
 
+    /// The run a helper's starter was in can end long before the helper does. Its
+    /// depth was taken when it was made, so a helper finishing afterwards does not
+    /// begin the chain again at zero.
+    @Test func aHelperKeepsItsDepthOnceItsStartersRunIsOver() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher())
+        let (lead, token) = try await caller(core, in: work)
+        let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished,
+                              depth: 2, agentID: lead)
+        await core.setWorkflowRunForTesting(run)
+        if var agent = await core.agent(lead) {
+            agent.startedByRun = run.id
+            await core.changed(agent)
+        }
+        let helper = try await start(core, token)
+
+        await core.clearWorkflowRunsForTesting()
+
+        #expect(await core.workflowChainDepth(causedBy: lead) == 0, "the lead's run is over")
+        #expect(await core.workflowChainDepth(causedBy: helper) == 3, "the helper's depth is not")
+        #expect(await core.agent(helper)?.chainDepth == 3, "and it is on the record")
+    }
+
     // MARK: Stopping and archiving (US3)
 
     private func longTurns() -> FakeLauncher {
@@ -500,5 +524,9 @@ extension DaemonCore {
     /// deep an agent's helper is, not how a workflow comes to be running.
     func setWorkflowRunForTesting(_ run: WorkflowRun) {
         workflowRuns[run.id.uuidString] = run
+    }
+
+    func clearWorkflowRunsForTesting() {
+        workflowRuns.removeAll()
     }
 }

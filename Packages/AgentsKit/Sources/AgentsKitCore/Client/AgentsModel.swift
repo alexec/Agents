@@ -44,6 +44,18 @@ public final class AgentsModel {
     /// for every word.
     public private(set) var transcriptItems: [TranscriptItem] = []
     @ObservationIgnored private var display = TranscriptDisplayBuilder()
+    /// Every entry in hand, by id, so one that reaches us twice is kept once.
+    @ObservationIgnored private var entryIDs: Set<UUID> = []
+    /// Entries heard as they happened since the last page arrived.
+    ///
+    /// A page and the entries streaming past it come by two different doors — a reply
+    /// and a notification — and nothing orders one against the other. An entry written
+    /// after the daemon read the page can be applied before the page lands, and the
+    /// page would then replace it: a chunk of a reply gone from the middle of the chat
+    /// until it was next opened. These are laid back on top of the page. Bounded,
+    /// because a chat watched for hours hears thousands between pages.
+    @ObservationIgnored private var heardSincePage: [TranscriptEntry] = []
+    private static let heardSincePageLimit = 1_000
     /// Each agent's folder in the form projects compare by, worked out once.
     ///
     /// `Project.standardize` resolves symlinks, which is the file system being asked
@@ -166,6 +178,12 @@ public final class AgentsModel {
 
         case .entry(let notification):
             guard notification.agentID == watching else { return }
+            heardSincePage.append(notification.entry)
+            if heardSincePage.count > Self.heardSincePageLimit {
+                heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
+            }
+            // Already on the page: written before the daemon read it, and heard after.
+            guard entryIDs.insert(notification.entry.id).inserted else { return }
             entries.append(notification.entry)
             display.add(notification.entry)
             transcriptItems = display.items
@@ -305,7 +323,11 @@ public final class AgentsModel {
 
     /// The first page of the conversation being read: the end of it.
     public func replaceTranscript(with page: TranscriptPage) {
-        entries = page.entries
+        // What was heard and is not on the page was written after the page was read, so
+        // it goes after it, in the order it was heard.
+        let onPage = Set(page.entries.map(\.id))
+        entries = page.entries + heardSincePage.filter { !onPage.contains($0.id) }
+        heardSincePage = []
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.hasMoreBefore
         refold()
@@ -321,6 +343,7 @@ public final class AgentsModel {
 
     public func clearTranscript() {
         entries = []
+        heardSincePage = []
         firstEntryIndex = 0
         hasMoreBefore = false
         refold()
@@ -329,6 +352,7 @@ public final class AgentsModel {
     /// The page folded again from the top: a page replaced or grown at the front is
     /// not a page grown at the end, and only the latter can be folded a step at a time.
     private func refold() {
+        entryIDs = Set(entries.map(\.id))
         display = TranscriptDisplayBuilder()
         for entry in entries { display.add(entry) }
         transcriptItems = display.items

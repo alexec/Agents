@@ -26,11 +26,22 @@ public struct Delivery: Hashable, Sendable, Codable {
     public var alertedAt: Date
     /// How many times. Read by SC-006's assertion, and by nothing else.
     public var alertCount: Int
+    /// Set while a banner decided for a device has not yet been handed to anything that
+    /// can carry it, holding whether it was to buzz. `nil` once it has gone, and always
+    /// for a delivery to the Mac.
+    ///
+    /// On disk with the rest, so a banner decided while the bridge was away — or the
+    /// daemon before it — still goes when a carrier arrives. Without it the delivery
+    /// said "shown on the phone" about a banner nothing had carried, and nothing would
+    /// ever post it again: the next decision sees the same destination and moves nothing.
+    public var unsentAlert: Bool?
 
-    public init(needID: NeedID, to: Surface?, alertedAt: Date, alertCount: Int) {
+    public init(needID: NeedID, to: Surface?, alertedAt: Date, alertCount: Int,
+                unsentAlert: Bool? = nil) {
         self.needID = needID
         self.to = to
         self.alertedAt = alertedAt
         self.alertCount = alertCount
+        self.unsentAlert = unsentAlert
     }
 }

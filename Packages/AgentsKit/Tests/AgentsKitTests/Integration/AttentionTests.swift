@@ -1055,6 +1055,44 @@ struct WithdrawalRestartTests {
         #expect(heard.withdrawals(of: need).isEmpty, "handed to a bridge that had gone")
     }
 
+    /// The banner itself, not only its withdrawal, waits for a carrier. It used to be
+    /// broadcast into a room with no bridge in it and counted as shown — and since the
+    /// next decision saw the same destination and moved nothing, it was never posted
+    /// again: the phone was never told about a question that was still asking.
+    @Test func aBannerDecidedWithNobodyToCarryItGoesWhenACarrierArrives() async throws {
+        let (locations, work) = try temporary()
+        defer { try? FileManager.default.removeItem(at: locations.root) }
+        let core = try core(locations: locations, launcher: asking())
+        _ = await core.recover()
+        let heard = MailboxRecorder(); await heard.attach(to: core)
+        let phone = FakeSurface(.device(UUID()))
+        await phone.pair(core, name: "iPhone", kind: .iPhone)
+        await phone.report(core, active: true, mayNotify: true)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "tidy up"))
+        await eventually("waiting on its question") { await core.agent(id)?.state == .waitingOnUser }
+        let need = try #require(await core.attentionPending().needs.first?.id)
+        @Sendable func banners() -> [MailboxItem] { heard.items.filter { $0.needID == need && $0.envelope != nil } }
+
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(banners().isEmpty, "nothing was there to carry it")
+        #expect(onDisk(locations).deliveries.first { $0.needID == need }?.unsentAlert == true,
+                "so it waits on the delivery, with the buzz it was decided with")
+
+        _ = await core.handle(method: DaemonAPI.Method.mailboxCarry, params: nil,
+                              from: .mac, connection: UUID())
+        await eventually("the banner went once there was a carrier") { banners().count == 1 }
+        #expect(banners().first?.device == phone.surface.deviceID)
+        #expect(banners().first?.alert == true)
+
+        // Carried is carried: the next decision does not post it again.
+        await phone.report(core, active: true, mayNotify: true)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(banners().count == 1)
+        await eventually("and the file says it went") {
+            onDisk(locations).deliveries.first { $0.needID == need }?.unsentAlert == nil
+        }
+    }
+
     /// FR-006: a device this daemon no longer has on record is sent nothing — not a
     /// banner, and not a withdrawal.
     @Test func aWithdrawalForADeviceNoLongerKnownIsDropped() async throws {
@@ -1090,8 +1128,9 @@ struct WithdrawalRestartTests {
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "tidy up"))
         await eventually("waiting on its question") { await core.agent(id)?.state == .waitingOnUser }
         let need = try #require(await core.attentionPending().needs.first?.id)
-        await eventually("posted to the phone") {
-            heard.items.contains { $0.needID == need && $0.envelope != nil }
+        // Decided for the phone. Nothing carries mail yet, so it waits on the delivery.
+        await eventually("decided for the phone") {
+            onDisk(locations).deliveries.contains { $0.needID == need && $0.to == phone.surface }
         }
 
         // The person comes to the Mac: the banner leaves the phone, with no carrier to
@@ -1108,5 +1147,7 @@ struct WithdrawalRestartTests {
                               from: .mac, connection: UUID())
         try await Task.sleep(for: .milliseconds(300))
         #expect(heard.withdrawals(of: need).isEmpty, "the question is still asking; its banner stays")
+        #expect(heard.items.filter { $0.needID == need && $0.envelope != nil }.count == 1,
+                "and the banner itself goes, once, now that something carries it")
     }
 }
