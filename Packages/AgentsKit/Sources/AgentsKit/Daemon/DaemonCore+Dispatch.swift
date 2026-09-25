@@ -14,6 +14,10 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.filesBrowse:
+                let request = try decode(params, as: DaemonAPI.FilesBrowseRequest.self) ?? .init()
+                return .success(try JSONValue.encoding(try browse(request)))
+
             case DaemonAPI.Method.daemonStatus:
                 return .success(try JSONValue.encoding(status()))
 

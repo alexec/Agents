@@ -65,6 +65,12 @@ struct ProjectAgentsView: View {
             Text(summary?.name ?? "Project")
                 .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
+            // Which machine, when it is not this one (037).
+            if let summary, summary.host != .mac {
+                Text("on \(model.hosts.label(summary.host))")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             if let summary, !summary.exists {
                 Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
                     .appText(.supporting)

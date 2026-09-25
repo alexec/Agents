@@ -171,6 +171,9 @@ public enum DaemonAPI {
         public static let daemonStatus = "daemon/status"
         /// Go now, rather than when idle. A server's daemon never leaves for being idle.
         public static let daemonQuit = "daemon/quit"
+        /// The folders at a path, before there is any project or agent to scope it to:
+        /// what the window browses to choose a server folder as a project (037).
+        public static let filesBrowse = "files/browse"
 
         // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
         // which is 003's and belongs to the agent. Different owner, different
@@ -1702,5 +1705,14 @@ public extension DaemonAPI {
         public var stopAgents: Bool
 
         public init(stopAgents: Bool) { self.stopAgents = stopAgents }
+    }
+}
+
+public extension DaemonAPI {
+    /// `files/browse` (037). An absolute path, or one starting `~`, which is the
+    /// daemon's own home. Nil is the home.
+    struct FilesBrowseRequest: Codable, Hashable, Sendable {
+        public var path: String?
+        public init(path: String? = nil) { self.path = path }
     }
 }

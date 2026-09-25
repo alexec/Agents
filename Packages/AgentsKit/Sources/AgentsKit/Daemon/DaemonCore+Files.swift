@@ -31,6 +31,29 @@ extension DaemonCore {
         }
     }
 
+    /// Any folder this account can read, by absolute path (037). Only ever asked by a
+    /// window choosing a server folder as a project, before there is an agent to scope
+    /// a listing to. The daemon runs as the person, so it shows exactly what they could
+    /// `ls` themselves, and no more.
+    public func browse(_ request: DaemonAPI.FilesBrowseRequest) throws -> DirectoryListing {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+        var path = request.path ?? "~"
+        if path == "~" { path = home } else if path.hasPrefix("~/") { path = home + path.dropFirst(1) }
+        guard path.hasPrefix("/") else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Give an absolute path, or one starting ~.")
+        }
+        let url = URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL
+        do {
+            return try DirectoryReader.read(url)
+        } catch DirectoryReader.Failure.notADirectory {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That is a file.")
+        } catch DirectoryReader.Failure.notReadable {
+            throw Self.notReadable(url)
+        } catch {
+            throw Self.gone(url)
+        }
+    }
+
     public func readFile(_ request: DaemonAPI.FilesReadRequest) throws -> FileReading {
         let (url, _) = try resolveInScope(agentID: request.agentID, path: request.path)
         do {
