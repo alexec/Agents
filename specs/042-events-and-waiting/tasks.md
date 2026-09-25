@@ -40,7 +40,7 @@ the end of Phase 3. Story 1 is still the MVP: it is the first story that is usef
 ## Phase 1: Setup
 
 - [X] T001 Merge `main` into `042-events-and-waiting` in this worktree, so the branch sits on today's `main` (041, 038, 039 and 040 are all merged there). Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge's output. Conflicts should only be in `specs/`.
-- [ ] T002 Record the baseline: run `swift test` in `Pkg/` once, and write down in `specs/042-events-and-waiting/walk/README.md` which tests fail before any change. The suite is flaky under load, so a later failure belongs to this lane only if it is new, and only after six runs on both commits.
+- [X] T002 Record the baseline: run `swift test` in `Pkg/` once, and write down in `specs/042-events-and-waiting/walk/README.md` which tests fail before any change. The suite is flaky under load, so a later failure belongs to this lane only if it is new, and only after six runs on both commits.
 
 ---
 
