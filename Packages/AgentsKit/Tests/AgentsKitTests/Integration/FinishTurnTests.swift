@@ -397,8 +397,9 @@ struct FinishTurnTests {
         try await settle(core, id)
     }
 
-    /// A helper started from an older binary sends no title. The call still lands, and
-    /// the name is left as it was rather than blanked or refused.
+    /// No title — the agent's goal has not changed, or a helper started from an older
+    /// binary sent none. The call still lands, and the name is left as it was rather
+    /// than blanked or refused.
     @Test("A call with no title leaves the name as it was")
     func noTitleLeavesTheNameAlone() async throws {
         let (locations, work) = try temporary()
@@ -414,6 +415,33 @@ struct FinishTurnTests {
         #expect(!agent.titledByAgent)
         #expect(agent.report?.message == "Fixed.")
         try await settle(core, id)
+    }
+
+    /// The title names the goal, so it is sent once and then left out while the goal
+    /// holds. A later call without one keeps the agent's name — and keeps it the
+    /// agent's, so the runtime's title at the end of the turn still does not replace it.
+    @Test("A goal title outlasts the calls that leave it out")
+    func theGoalTitleOutlastsLaterCalls() async throws {
+        let (locations, work) = try temporary()
+        let launcher = namingAtTurnEnd("Fix login redirect issue")
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
+        let token = await mintedToken(launcher)
+
+        _ = try await core.finishTurn(.init(token: token, outcome: "partly_done",
+                                            message: "Found the redirect.",
+                                            prompts: [], title: "Login redirect"))
+        _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
+                                            prompts: []))
+        try await settle(core, id)
+        // As above: the runtime's title comes on its own task, so this waits for a
+        // thing not to happen.
+        try await Task.sleep(for: .milliseconds(500))
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.title == "Login redirect")
+        #expect(agent.titledByAgent)
+        #expect(agent.report?.message == "Fixed.")
     }
 
     /// The daemon cleans the title as well as the tool, because the daemon is what

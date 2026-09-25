@@ -77,7 +77,7 @@ public actor AppService {
     /// which may be none, and the conversation's new title. One sink rather than the
     /// two above in turn, because the daemon refuses the whole call or lands the whole
     /// call, and two sinks could do half of each.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String, BlockWords) async -> Outcome
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
@@ -214,12 +214,10 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
-                // The title is checked here too, for the same reason the message is:
-                // an agent that left it out is told so while it can still send it,
-                // rather than the row keeping a name for work it is no longer doing.
-                guard let title = Agent.cleanedTitle(arguments?["title"]?.stringValue ?? "") else {
-                    return .success(Self.reply(Self.noTitle, isError: true))
-                }
+                // The title names the conversation's goal, which outlasts a turn, so
+                // it is sent only when the goal changes: one left out, or that cleans
+                // to nothing, keeps the name the row already has.
+                let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
                 let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
                                                    orFirstOf: arguments?["next_prompts"])
                 let words: BlockWords
@@ -382,11 +380,6 @@ public actor AppService {
         is no more use than the turn simply ending.
         """
 
-    static let noTitle = """
-        Nothing was recorded: give the conversation a title — a few words saying what \
-        it is doing now. It is the name the person sees on its row.
-        """
-
     /// A tool result is content plus a flag, and a failure inside the tool is reported
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
     private static func reply(_ text: String, isError: Bool = false) -> JSONValue {
@@ -445,10 +438,12 @@ public actor AppService {
             somebody who has not read the conversation. For needs_answer, the message \
             is the question itself.
 
-            The title is the name on that row: a few words saying what this \
-            conversation is doing now, like "Login redirect fixed" or "Choosing a \
-            test account". Give a fresh one every time, as the work moves on; it \
-            replaces the last one. Keep it short and specific, and do not repeat the \
+            The title is the name on that row: a few words naming what the person \
+            wants from this conversation — its goal, not the step you just took — \
+            like "Login redirect" or "Test account for staging". Send it on your \
+            first turn, and again only when the person moves the conversation on to \
+            a different goal; leave it out otherwise and the name stays as it is. \
+            What you did this turn belongs in the message, not here. Do not put the \
             outcome in it.
 
             With it, offer the one thing the person is most likely to want to say next, \
@@ -482,8 +477,9 @@ public actor AppService {
                 "title": [
                     "type": "string",
                     "description": """
-                        A few words naming what this conversation is doing now. \
-                        Replaces the name on its row.
+                        A few words naming the conversation's goal, which becomes \
+                        the name on its row. Send it on the first turn and when the \
+                        goal changes; leave it out to keep the name as it is.
                         """,
                 ],
                 "waiting_on": [
@@ -522,7 +518,7 @@ public actor AppService {
                     "required": .array(["label", "prompt"]),
                 ],
             ],
-            "required": .array(["outcome", "message", "title"]),
+            "required": .array(["outcome", "message"]),
         ],
     ]
 
