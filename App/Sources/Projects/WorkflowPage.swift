@@ -146,7 +146,7 @@ struct WorkflowPage: View {
         HStack(spacing: 8) {
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.paperProminent)
             } else {
                 // Offered even on a workflow that cannot fire on its own. Being able to
                 // try one is what makes writing one worth doing, and a refusal says why
@@ -154,7 +154,7 @@ struct WorkflowPage: View {
                 Button(summary.isRunning ? "Running…" : "Run now") {
                     Task { await model.runWorkflow(summary) }
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.paperProminent)
                 .disabled(summary.isRunning)
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
@@ -167,7 +167,7 @@ struct WorkflowPage: View {
                 } label: {
                     Label("Archive", systemImage: "archivebox")
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .help("Archive this workflow and go back to the project")
             }
         }
@@ -271,7 +271,7 @@ struct WorkflowPage: View {
                 Label(url(workflow).lastPathComponent, systemImage: "doc.text")
                     .lineLimit(1)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .appText(.fine)
             .help("\(url(workflow).path) — click to show in Finder")
             Spacer(minLength: 8)
@@ -396,7 +396,7 @@ struct WorkflowPage: View {
                         .padding(.vertical, 13)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(RoundedRectangle(cornerRadius: 14))
-                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+                        .paperRow()
                 }
                 .buttonStyle(.plain)
             }
@@ -404,7 +404,7 @@ struct WorkflowPage: View {
                 Button("Show more (\(started.count - shownRuns) more)") {
                     shownRuns += Self.runsPerMore
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .appText(.reading)
             }
         }
@@ -437,7 +437,7 @@ struct WorkflowPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .padding(14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+            .paperRaised(in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func url(_ workflow: Workflow) -> URL {

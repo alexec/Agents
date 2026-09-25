@@ -40,7 +40,7 @@ struct PermissionSheet: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         // The same ceiling the transcript has, so the question sits over the column it
@@ -76,11 +76,11 @@ struct PermissionSheet: View {
             ForEach(request.options) { option in
                 if option.kind.allows {
                     Button { answer(option) } label: { label(option) }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.paperProminent)
                         .controlSize(.large)
                 } else {
                     Button { answer(option) } label: { label(option) }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                         .controlSize(.large)
                 }
             }

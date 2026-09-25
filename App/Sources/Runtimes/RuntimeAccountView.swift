@@ -32,7 +32,7 @@ struct RuntimeAccountView: View {
                             Task { terminalCommand = await model.signIn(runtimeID: runtimeID,
                                                                         methodID: method.id) }
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.paperProminent)
                         // What the runtime says, minus anything telling the user to run a
                         // command. See ACP.AuthMethod.guidance: Cursor's advice names a
                         // binary that on this Mac belongs to Grok.
@@ -51,7 +51,7 @@ struct RuntimeAccountView: View {
                         .appText(.code)
                         .textSelection(.enabled)
                         .padding(8)
-                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+                        .paperWell(in: RoundedRectangle(cornerRadius: 6))
                     HStack {
                         Button("Open Terminal") { openTerminal(with: terminalCommand) }
                         Button("Copy") {
@@ -63,7 +63,7 @@ struct RuntimeAccountView: View {
                             Task { await model.refreshAccounts() }
                         }
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                 }
             }
 
@@ -91,11 +91,11 @@ struct RuntimeAccountView: View {
             HStack {
                 if account.canLogOut, account.state == .ready {
                     Button("Sign out") { isConfirmingSignOut = true }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                 }
                 Spacer()
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .keyboardShortcut(.defaultAction)
             }
         }

@@ -109,11 +109,13 @@ struct PromptBar: View {
         .sheet(isPresented: $isShowingRuntimeAccount) {
             if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
                 RuntimeAccountView(runtimeID: runtimeID)
+                    .paperSheet()
             }
         }
         .sheet(isPresented: $isShowingSessions) {
             if let runtimeID = model.draftRuntimeID, let cwd = model.draftCwd {
                 SessionListView(runtimeID: runtimeID, cwd: cwd)
+                    .paperSheet()
             }
         }
         .sheet(isPresented: $isShowingReach) {
@@ -122,6 +124,7 @@ struct PromptBar: View {
                                             set: { model.draftFolders = $0 }),
                            servers: Binding(get: { model.draftServers },
                                             set: { model.draftServers = $0 }))
+                .paperSheet()
         }
         .onChange(of: model.selection) {
             dismissedSuggestions = false
@@ -177,18 +180,18 @@ struct PromptBar: View {
                 }
                 Spacer(minLength: 8)
                 SettingsLink { Text("Raise the limit") }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .appText(.fine)
                 Button("Let this one go on") {
                     Task { await model.letThisAgentGoOn(agent) }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .appText(.fine)
                 .help("Raises this agent's own ceiling. No other agent is changed.")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .glassEffect(.regular, in: Capsule())
+            .paperRaised(in: Capsule())
         } else if let agent, model.costState?.dayLimitReached == true {
             HStack(spacing: 10) {
                 Image(systemName: "clock")
@@ -202,12 +205,12 @@ struct PromptBar: View {
                 }
                 Spacer(minLength: 8)
                 SettingsLink { Text("Raise the limit") }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .appText(.fine)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .glassEffect(.regular, in: Capsule())
+            .paperRaised(in: Capsule())
             .id(agent.id)
         }
     }
@@ -218,7 +221,7 @@ struct PromptBar: View {
         HStack(spacing: 12) {
             if let agent {
                 // Both of these are settled once the agent exists, so they are
-                // labels rather than controls. They still sit on glass: the
+                // labels rather than controls. They still sit on raised paper: the
                 // transcript scrolls under this row.
                 Label(agent.cwd.lastPathComponent, systemImage: "folder")
                     .appText(.fine)
@@ -226,19 +229,19 @@ struct PromptBar: View {
                     .lineLimit(1)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .glassEffect(.regular, in: Capsule())
+                    .paperRaised(in: Capsule())
                     .help(agent.cwd.path(percentEncoded: false))
                 Spacer(minLength: 8)
                 ContextMeter(agent: agent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .glassEffect(.regular, in: Capsule())
+                    .paperRaised(in: Capsule())
                 Text(runtimeName(agent.runtimeID))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .glassEffect(.regular, in: Capsule())
+                    .paperRaised(in: Capsule())
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
@@ -249,7 +252,7 @@ struct PromptBar: View {
                             .lineLimit(1)
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .appText(.fine)
                 // On a project page the folder is the project. Changing it there would
                 // start the agent somewhere else and file it under a different project,
@@ -266,7 +269,7 @@ struct PromptBar: View {
                 } label: {
                     Image(systemName: "clock.arrow.circlepath")
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .appText(.fine)
                 .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
                 .help("Conversations this runtime is already holding here")
@@ -377,7 +380,7 @@ struct PromptBar: View {
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .buttonBorderShape(.circle)
             .help("Attach a file or a picture")
             .accessibilityLabel("Attach")
@@ -388,7 +391,7 @@ struct PromptBar: View {
                     .frame(width: 22, height: 22)
                     .symbolEffect(.variableColor, isActive: dictation.isListening)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .buttonBorderShape(.circle)
             .help(dictation.isListening ? "Stop dictating" : "Dictate")
             .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
@@ -398,7 +401,7 @@ struct PromptBar: View {
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.paperProminent)
             .buttonBorderShape(.circle)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
@@ -406,7 +409,7 @@ struct PromptBar: View {
             .accessibilityLabel(willQueue ? "Queue" : "Send")
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         // A file dragged onto the prompt is a file you are talking about.
         .dropDestination(for: URL.self) { urls, _ in
             for url in urls { attach(url) }
@@ -415,7 +418,7 @@ struct PromptBar: View {
         .onPasteCommand(of: [.png, .tiff, .fileURL]) { providers in
             for provider in providers { paste(provider) }
         }
-        .sheet(isPresented: $isPrimingDictation) { dictationPrimer }
+        .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
         .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
                                                  set: { if !$0 { dictation.dismissProblem() } })) {
             // Where a switch would fix it, offer to open the switch.
@@ -682,7 +685,7 @@ struct PromptBar: View {
             Button("Try again") {
                 Task { await model.loadDraftOptions() }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .appText(.fine)
             Spacer(minLength: 0)
         }
@@ -726,14 +729,14 @@ struct PromptBar: View {
                     .fixedSize()
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .paperRaised(in: .capsule)
                     .help("Folders and MCP servers this agent may reach")
                 }
                 Spacer(minLength: 16)
                 otherOptions(shown)
             }
-            // The glass capsules are drawn to their own edge, and a scroll view clips
-            // at its bounds. A point either side keeps the glass from being shaved.
+            // The raised capsules are drawn to their own edge, and a scroll view clips
+            // at its bounds. A point either side keeps their edge and shadow from being shaved.
             .padding(.vertical, 1)
             .frame(minWidth: optionsWidth, alignment: .leading)
         }

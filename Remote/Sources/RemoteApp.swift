@@ -26,6 +26,7 @@ struct RemoteApp: App {
     var body: some Scene {
         WindowGroup {
             RemoteView()
+                .background(Paper.ground)
                 .environment(model)
                 .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
         }
@@ -56,7 +57,8 @@ struct RemoteView: View {
         } detail: {
             NavigationStack(path: openAgent) {
                 ProjectPageView()
-                    .navigationDestination(for: UUID.self) { _ in RemoteChatView() }
+                    .paperGround()
+                    .navigationDestination(for: UUID.self) { _ in RemoteChatView().paperGround() }
             }
         }
         .navigationSplitViewStyle(.balanced)

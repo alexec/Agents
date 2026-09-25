@@ -37,7 +37,7 @@ struct PromptBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(Paper.ground)
         .animation(.easeOut(duration: 0.15), value: isCompleting)
     }
 
@@ -50,7 +50,7 @@ struct PromptBar: View {
                 .appText(.reading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+                .paperRaised(in: RoundedRectangle(cornerRadius: 18))
                 .accessibilityLabel("What to ask \(agent.title ?? "this agent")")
 
             Button {
@@ -62,7 +62,7 @@ struct PromptBar: View {
                     .frame(width: 34, height: 34)
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .paperRaised(in: .circle)
             .disabled(!canSend)
             .opacity(canSend ? 1 : 0.4)
             .accessibilityLabel("Send")
@@ -153,7 +153,7 @@ private struct CommandList: View {
             .padding(6)
         }
         .frame(maxHeight: 200)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
     }
 
     /// The name, then what it wants after it, then what it is for. No selection and no
@@ -203,7 +203,7 @@ private struct SuggestionChip: View {
                 .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .paperRaised(in: .capsule)
         .padding(.horizontal, 2)
         .frame(height: 36)
         .accessibilityHint("Puts this in the prompt. Nothing is sent yet.")

@@ -21,7 +21,7 @@ struct WorkflowRow: View {
 
     var body: some View {
         // The whole card is the button, exactly as an agent's card is (`AgentCard`):
-        // the content is the label, the glass is interactive, and the play button and
+        // the content is the label, the paper row answers the pointer, and the play button and
         // the Ran → link inside keep their own clicks because a nested button wins
         // its own hit. A button *behind* the card was tried first and a real mouse
         // never reached it through the glass.
@@ -51,7 +51,7 @@ struct WorkflowRow: View {
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open \(workflow.name)")
@@ -147,7 +147,7 @@ struct WorkflowRow: View {
             // a thing that will not run would be offering a lie.
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .appText(.fine)
             } else {
                 if summary.isRunning {
@@ -164,7 +164,7 @@ struct WorkflowRow: View {
                     } label: {
                         Image(systemName: "play")
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .help("Run this workflow now")
                 }
             }

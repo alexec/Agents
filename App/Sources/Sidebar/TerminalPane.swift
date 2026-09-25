@@ -71,7 +71,7 @@ struct TerminalPane: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(.quaternary)
+        .background(Paper.well)
     }
 }
 
@@ -87,7 +87,7 @@ private struct Note: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.quaternary)
+            .background(Paper.well)
     }
 }
 

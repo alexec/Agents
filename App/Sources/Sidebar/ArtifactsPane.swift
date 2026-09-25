@@ -35,6 +35,7 @@ struct ArtifactsPane: View {
                     row(artifact)
                 }
                 .listStyle(.inset)
+                .scrollContentBackground(.hidden)
             }
         }
         .task(id: model.entries.count) { fold() }

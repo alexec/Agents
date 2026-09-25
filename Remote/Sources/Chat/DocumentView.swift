@@ -112,13 +112,16 @@ struct ArtifactsList: View {
                         } label: {
                             row(artifact)
                         }
+                        .paperListRow()
                     }
                     if model.hasMoreBefore {
                         Text("Only what is in the part of the conversation read so far.")
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
+                            .paperListRow()
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
         }
         .navigationTitle("Exchanged")
