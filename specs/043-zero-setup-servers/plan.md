@@ -67,7 +67,7 @@ still built with the Static Linux SDK.
   app's root so scratch copies do not share the real one). What is safe to show — kind, last four
   characters, added, last worked — in `credentials.json` in the root. `hosts.json` gains, per
   server, `ownSignInOnly` and the last-seen project paths.
-- App bundle: `Resources/servers/toolsets/claude/` with `manifest.json` and `package-lock.json`
+- App bundle: `Resources/toolsets/claude/` with `manifest.json` and `package-lock.json`
   (+ `package.json`).
 - Server: `~/.agents-server/tools/claude/<toolset-id>/` and `tools/claude/current`, beside 037's
   `bin/` and `root/`. The token is never on it.
@@ -161,7 +161,7 @@ Packages/AgentsKit/
 ├── Tests/AgentsKitTests/Hosts/ToolsetInstallTests.swift      # NEW  fake-ssh
 ├── Tests/AgentsKitTests/Credentials/LendTests.swift          # NEW  daemon-level
 └── Tests/Fixtures/toolsets/                                  # NEW  tiny fake node tarball + lock
-App/Resources/servers/toolsets/claude/          # NEW  manifest.json, package.json, package-lock.json
+App/Resources/toolsets/claude/          # NEW  manifest.json, package.json, package-lock.json
 scripts/update-claude-toolset.sh                # NEW  regenerate the lock and checksums for a new pin
 App/Sources/
 ├── Settings/ServersSettingsView.swift         # Claude sign-in section; per-server "own sign-in only"

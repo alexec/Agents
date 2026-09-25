@@ -19,7 +19,7 @@
 
 ## Toolset (bundle)
 
-`App/Resources/servers/toolsets/claude/manifest.json`:
+`App/Resources/toolsets/claude/manifest.json`:
 
 | Field | Type | Notes |
 |---|---|---|
