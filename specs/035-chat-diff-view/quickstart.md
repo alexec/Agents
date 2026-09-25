@@ -84,6 +84,10 @@ use the real app.
 7. **SC-004**: in a scratch repository, have a fake-runtime agent touch 200 files. Time
    `changes/list` over the socket (under 1s) and `changes/file` on the largest (under 0.5s).
 
+**Measured 2026-09-25 (step 7, as `ChangesTests.twoHundredFilesAreQuickToList`)**: with 200
+changed files in a git repository, `changes/list` took 0.10–0.13 s and `changes/file` with the
+whole file took 0.10–0.14 s, over three runs of three. The spec's bounds are 1 s and 0.5 s.
+
 Phase 2's gate is steps 1–2 with reported edits only. Hand those screenshots to Alex to settle the
 layout before git is built.
 

@@ -286,4 +286,50 @@ struct ChangesTests {
         #expect(try git(["status", "--porcelain"], in: work) == status)
         _ = (bytes, modified)
     }
+
+    // MARK: SC-004
+
+    /// Two hundred changed files: the list under a second, a file under half a second.
+    /// Measured, and printed, so the numbers can be written down; the bounds are the
+    /// spec's, with room for a loaded machine.
+    @Test func twoHundredFilesAreQuickToList() async throws {
+        let (locations, work) = try temporary()
+        try repository(at: work)
+        var updates: [JSONValue] = []
+        for n in 0..<200 {
+            let name = "f\(n).swift"
+            _ = try write(String(repeating: "let v\(n) = 1\n", count: 40), to: name, in: work)
+            updates += FakeACPAgent.claudeEdit(id: "e\(n)", path: work.appending(path: name).path,
+                                               oldText: "let v\(n) = 1\n", newText: "let v\(n) = 2\n")
+        }
+        try git(["add", "."], in: work)
+        try git(["commit", "-q", "-m", "two hundred"], in: work)
+        for n in 0..<200 {
+            let body = "let v\(n) = 2\n" + String(repeating: "let v\(n) = 1\n", count: 39)
+            _ = try write(body, to: "f\(n).swift", in: work)
+        }
+        let core = try core(launcher(sending: updates), locations: locations)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        _ = await eventuallySome("the starting point was taken") { await core.agent(id)?.startingPoint }
+        _ = try #require(await list(core, id, count: 200, edits: 200))
+
+        let clock = ContinuousClock()
+        var listing: [Duration] = []
+        for _ in 0..<3 {
+            let started = clock.now
+            let listed = try await core.changesList(.init(agentID: id))
+            listing.append(clock.now - started)
+            #expect(listed.files.count == 200)
+        }
+        let path = work.appending(path: "f199.swift").path
+        var file: [Duration] = []
+        for _ in 0..<3 {
+            let started = clock.now
+            _ = try await core.changesFile(.init(agentID: id, path: path, whole: true))
+            file.append(clock.now - started)
+        }
+        print("SC-004 changes/list x200: \(listing)  changes/file whole: \(file)")
+        #expect(listing.min()! < .seconds(1))
+        #expect(file.min()! < .milliseconds(500))
+    }
 }
