@@ -100,6 +100,18 @@ the input to the Service" alert in the window, and every menu is dead until it's
 (`swift $T/button.swift $APP_PID OK`). An unexplained small window in `ui.swift windows` is
 usually that alert: `screencapture -x -o -l <id>` shows it.
 
+A shell on the server is keyed by an agent there, and runs in its folder:
+
+```python
+c = Client(ROOT + "-srv")          # after one server-rpc.sh call has made the link
+c.call("shell/attach", {"agentID": AGENT, "rows": 24, "cols": 100})
+c.call("shell/input", {"agentID": AGENT, "bytes": base64.b64encode(b"uname -sm\n").decode()})
+# read the answer from a second attach's "scrollback" (base64). Don't loop on
+# wait_for("shell/output"): it gives None on a timeout and the same buffered message
+# again, which reads like a shell printing its prompt forever.
+c.call("shell/detach", {"agentID": AGENT})
+```
+
 An immediate `stopped` with `processDied` whose server log says `Authentication required` means
 Claude isn't signed in on the box (see §1). The window only says "Claude stopped answering".
 

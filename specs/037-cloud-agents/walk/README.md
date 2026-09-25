@@ -84,3 +84,7 @@ Walked with the real `/usr/bin/ssh` on scratch root `/tmp/run-037r` (screenshots
 
 To finish it: `ssh -p 2222 agents@127.0.0.1`, run `claude`, sign in with `/login`, quit, then
 send a turn in the hello project.
+
+After merging main (2026-09-25): relaunching on the new build updated the box by itself (new
+binary, old daemon quit, new one answering, about 2 s in `hosts.log`), and `shell/attach` over the
+forward gave a login bash on `/dev/pts/0` in `~/src/hello` that ran a command and echoed it back.
