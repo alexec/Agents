@@ -74,6 +74,10 @@ struct ProjectListView: View {
                 // awake is not spending. It is absent entirely when there is nothing
                 // to say, which is most of the time (024 FR-015).
                 WakefulnessRow()
+                // Above Spending (036): who holds the Mac's shared things. Always
+                // there, like Spending, so the page can be found before anything is
+                // leased; its count line is what comes and goes.
+                ResourcesRow(selection: $selection)
                 SpendingRow(selection: $selection)
             }
         }

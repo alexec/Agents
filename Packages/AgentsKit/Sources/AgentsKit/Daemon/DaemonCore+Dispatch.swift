@@ -248,6 +248,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))
 
+            case DaemonAPI.Method.changesList:
+                let request = try require(params, as: DaemonAPI.ChangesListRequest.self)
+                return .success(try JSONValue.encoding(try await changesList(request)))
+
+            case DaemonAPI.Method.changesFile:
+                let request = try require(params, as: DaemonAPI.ChangesFileRequest.self)
+                return .success(try JSONValue.encoding(try await changesFile(request)))
+
             case DaemonAPI.Method.agentsSetOption:
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
@@ -288,6 +296,37 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
 
+            case DaemonAPI.Method.agentsPushPullRequest:
+                let request = try require(params, as: DaemonAPI.PushPullRequestRequest.self)
+                return .success(["note": .string(try await pushPullRequest(request))])
+
+            case DaemonAPI.Method.agentsReplyOnPullRequest:
+                let request = try require(params, as: DaemonAPI.ReplyOnPullRequestRequest.self)
+                return .success(["note": .string(try await replyOnPullRequest(request))])
+
+            case DaemonAPI.Method.leasesLease:
+                let request = try require(params, as: DaemonAPI.LeaseRequest.self)
+                return .success(["note": .string(try await lease(request))])
+
+            case DaemonAPI.Method.leasesRelease:
+                let request = try require(params, as: DaemonAPI.LeaseNameRequest.self)
+                return .success(["note": .string(try await releaseLease(request))])
+
+            case DaemonAPI.Method.leasesList:
+                let request = try require(params, as: DaemonAPI.LeaseTokenRequest.self)
+                return .success(["note": .string(try await listLeases(request))])
+
+            case DaemonAPI.Method.leasesSnapshot:
+                return .success(try JSONValue.encoding(await leaseSnapshot()))
+
+            case DaemonAPI.Method.leasesEnd:
+                let request = try require(params, as: DaemonAPI.PersonEndRequest.self)
+                return .success(try JSONValue.encoding(try await endLease(request)))
+
+            case DaemonAPI.Method.leasesRemoveWaiter:
+                let request = try require(params, as: DaemonAPI.PersonRemoveRequest.self)
+                return .success(try JSONValue.encoding(try await removeWaiter(request)))
+
             case DaemonAPI.Method.agentsStartHelper:
                 let request = try require(params, as: DaemonAPI.StartHelperRequest.self)
                 let started = try await startHelper(request)
@@ -313,6 +352,27 @@ extension DaemonCore {
             case DaemonAPI.Method.worktreesRemove:
                 let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
                 return .success(try JSONValue.encoding(try await removeWorktree(request)))
+
+            // Pull requests (038). The Mac's only: the phone has no section to ask for.
+            case DaemonAPI.Method.pullRequestsList:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(await pullRequestList(for: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsRefresh:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(await refreshPullRequests(in: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsResume:
+                let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
+                return .success(try JSONValue.encoding(try await resumePullRequest(request.number, in: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsAddBabysitter:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(try addBabysitter(in: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsCheckout:
+                let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
+                return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))
 
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)

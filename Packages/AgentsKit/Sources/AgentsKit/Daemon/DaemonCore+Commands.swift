@@ -300,6 +300,10 @@ extension DaemonCore {
         }
         agents[agent.id] = agent
         live[agent.id] = session
+        // Where its changes will be measured from (035), asked for beside the start
+        // rather than inside it: a start waits for nothing it does not need, and git
+        // answers in milliseconds where a runtime takes seconds to make its first edit.
+        Task { [self] in await takeStartingPoint(for: agent.id, in: cwd) }
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindAppToken(appToken, to: agent.id)
@@ -1028,9 +1032,14 @@ extension DaemonCore {
     /// It names the one tool a fresh conversation was told about (023). An agent
     /// briefed with the older name answers by that name all the same, because the
     /// older names are accepted everywhere the new one is.
+    ///
+    /// It used to end "and say nothing else", and Opus 5.5 took that literally: after
+    /// the call it still owes a reply, and the nothing it wrote was zero-width spaces —
+    /// one, usually, and once twenty-two thousand of them. Nothing is said about what
+    /// comes after the call now; the call is what is asked for.
     static let askForOutcome = """
         That turn ended without a report. Call \(AppTool.finishTurn) now with how it \
-        actually went, and say nothing else. If the work is done, that is done.
+        actually went. If the work is done, that is done.
         """
 
     private func turnFailed(agentID: UUID, error: any Error) async {
@@ -1133,6 +1142,10 @@ extension DaemonCore {
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
+        // Every lease it holds given back and every line it is in left (036 FR-007),
+        // before any `await`, so nothing is handed to it halfway through stopping.
+        // Said at the end, once the stop itself is in the transcript.
+        let leaseEvents = dropLeases(for: agentID, ending: .holderStopped)
         // Each open question is taken off the list before anything is awaited, then said
         // in the conversation to have gone unanswered, then refused to the runtime. In
         // that order: an answer arriving in the same moment finds it gone rather than
@@ -1209,6 +1222,7 @@ extension DaemonCore {
                          for: agentID)
         }
         await releaseRuntime(for: agentID)
+        await settle(leaseEvents)
     }
 
     public func archive(_ agentID: UUID, by cause: StopCause = .person) async throws {
@@ -1218,7 +1232,11 @@ extension DaemonCore {
         stops[agentID, default: 0] += 1
         // Archived is never resumed (FR-017): the block goes before anything is awaited.
         dropBlock(agentID)
+        // Before the stop, which would give them back as "stopped": an archived
+        // agent's transcript should say it let go because it was archived (036).
+        let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)
         if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
+        await settle(leaseEvents)
         switch cause {
         case .person:
             await move(agentID, on: .archivedByUser)

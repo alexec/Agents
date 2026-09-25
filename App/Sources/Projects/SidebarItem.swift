@@ -10,4 +10,6 @@ import Foundation
 enum SidebarItem: Hashable {
     case project(ProjectKey)
     case spending
+    /// Every resource an agent can lease, and who holds and waits for each (036).
+    case resources
 }

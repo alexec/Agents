@@ -36,6 +36,11 @@ extension DaemonCore {
         // A clone with no window open is still somebody's project on its way. Exiting
         // under it would throw the download away (027).
         if !clones.isEmpty { return true }
+        // Somebody waiting for a lease (036). Only a running daemon can let them
+        // through when it comes free, so a line keeps it up. A lease nobody is waiting
+        // for does not: when it runs out there is nothing to do but free it, and the
+        // next daemon to start does that as it reads the book (research R10).
+        if leaseBook.hasWaiters { return true }
         return agents.values.contains { $0.state.holdsRuntime }
     }
 

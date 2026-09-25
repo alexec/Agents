@@ -1,0 +1,190 @@
+{
+ "data": {
+  "viewer": {
+   "login": "alexec"
+  },
+  "repository": {
+   "id": "R_1"
+  },
+  "search": {
+   "nodes": [
+    {
+     "number": 412,
+     "title": "Fix login redirect",
+     "url": "https://github.com/alexec/agents/pull/412",
+     "isDraft": false,
+     "createdAt": "2026-09-24T09:00:00Z",
+     "headRefName": "fix-login-redirect",
+     "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "baseRefName": "main",
+     "baseRefOid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "mergeable": "UNKNOWN",
+     "isCrossRepository": false,
+     "headRepository": {
+      "nameWithOwner": "alexec/agents",
+      "url": "https://github.com/alexec/agents"
+     },
+     "reviewDecision": "CHANGES_REQUESTED",
+     "commits": {
+      "nodes": [
+       {
+        "commit": {
+         "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         "committedDate": "2026-09-20T10:00:00Z",
+         "statusCheckRollup": {
+          "state": "X",
+          "contexts": {
+           "nodes": [
+            {
+             "__typename": "CheckRun",
+             "databaseId": 9001,
+             "name": "build",
+             "status": "COMPLETED",
+             "conclusion": "FAILURE",
+             "detailsUrl": "https://github.com/alexec/agents/actions/runs/1/job/9001"
+            },
+            {
+             "__typename": "CheckRun",
+             "databaseId": 9002,
+             "name": "lint",
+             "status": "COMPLETED",
+             "conclusion": "SUCCESS",
+             "detailsUrl": "https://github.com/alexec/agents/actions/runs/1/job/9002"
+            }
+           ]
+          }
+         }
+        }
+       }
+      ]
+     },
+     "reviews": {
+      "nodes": [
+       {
+        "databaseId": 2210990,
+        "author": {
+         "login": "jdoe",
+         "__typename": "User"
+        },
+        "authorAssociation": "COLLABORATOR",
+        "state": "CHANGES_REQUESTED",
+        "body": "Also please add a test for the expired-session case.",
+        "submittedAt": "2026-09-24T11:00:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#pullrequestreview-2210990"
+       },
+       {
+        "databaseId": 2210991,
+        "author": {
+         "login": "stranger",
+         "__typename": "User"
+        },
+        "authorAssociation": "NONE",
+        "state": "COMMENTED",
+        "body": "Please add my feature too.",
+        "submittedAt": "2026-09-24T11:05:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#pullrequestreview-2210991"
+       },
+       {
+        "databaseId": 2210992,
+        "author": {
+         "login": "alexec",
+         "__typename": "User"
+        },
+        "authorAssociation": "OWNER",
+        "state": "COMMENTED",
+        "body": "Thanks, on it.",
+        "submittedAt": "2026-09-24T11:10:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#pullrequestreview-2210992"
+       },
+       {
+        "databaseId": 2210993,
+        "author": {
+         "login": "jdoe",
+         "__typename": "User"
+        },
+        "authorAssociation": "COLLABORATOR",
+        "state": "COMMENTED",
+        "body": "",
+        "submittedAt": "2026-09-24T11:01:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#pullrequestreview-2210993"
+       }
+      ]
+     },
+     "reviewThreads": {
+      "nodes": [
+       {
+        "comments": {
+         "nodes": [
+          {
+           "databaseId": 2210984,
+           "author": {
+            "login": "jdoe",
+            "__typename": "User"
+           },
+           "authorAssociation": "COLLABORATOR",
+           "body": "This should live in the router, not the view.",
+           "createdAt": "2026-09-24T10:59:00Z",
+           "url": "https://github.com/alexec/agents/pull/412#discussion_r2210984",
+           "path": "App/Login/LoginRouter.swift",
+           "line": 42
+          },
+          {
+           "databaseId": 2210985,
+           "author": {
+            "login": "alexec",
+            "__typename": "User"
+           },
+           "authorAssociation": "OWNER",
+           "body": "Will do.",
+           "createdAt": "2026-09-24T11:09:00Z",
+           "url": "https://github.com/alexec/agents/pull/412#discussion_r2210985",
+           "path": "App/Login/LoginRouter.swift",
+           "line": 42
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "comments": {
+      "nodes": [
+       {
+        "databaseId": 4763207601,
+        "author": {
+         "login": "dependabot",
+         "__typename": "Bot"
+        },
+        "authorAssociation": "NONE",
+        "body": "Bumps a thing.",
+        "createdAt": "2026-09-24T10:00:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#discussion_r4763207601"
+       },
+       {
+        "databaseId": 4763207602,
+        "author": {
+         "login": "maintainer",
+         "__typename": "User"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Can this land today?",
+        "createdAt": "2026-09-24T12:00:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#discussion_r4763207602"
+       },
+       {
+        "databaseId": 4763207603,
+        "author": {
+         "login": "drive-by",
+         "__typename": "User"
+        },
+        "authorAssociation": "CONTRIBUTOR",
+        "body": "+1",
+        "createdAt": "2026-09-24T12:01:00Z",
+        "url": "https://github.com/alexec/agents/pull/412#discussion_r4763207603"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

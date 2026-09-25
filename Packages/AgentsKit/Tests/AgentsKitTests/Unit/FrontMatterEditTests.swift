@@ -113,6 +113,36 @@ struct FrontMatterEditTests {
         }
     }
 
+    // MARK: A key under a block
+
+    @Test func aKeyUnderABlockThatIsNotThereAddsTheBlock() throws {
+        let edited = try FrontMatterEdit.set("fast", under: "options", to: "true", in: sample)
+        #expect(edited.contains("agent: new   # a fresh one every time\noptions:\n  fast: true\n---"))
+        // And taking it away again gives the file back byte for byte.
+        #expect(try FrontMatterEdit.set("fast", under: "options", to: nil, in: edited) == sample)
+    }
+
+    @Test func aKeyUnderABlockIsChangedInItsOwnIndentation() throws {
+        let source = "---\non: [x]\noptions:\n    fast: false  # quick\n    allow_all: on\nagent: new\n---\n\nGo.\n"
+        let edited = try FrontMatterEdit.set("fast", under: "options", to: "true", in: source)
+        #expect(edited == source.replacingOccurrences(of: "fast: false", with: "fast: true"))
+        let added = try FrontMatterEdit.set("speed", under: "options", to: "high", in: source)
+        #expect(added.contains("    allow_all: on\n    speed: high\nagent: new"))
+    }
+
+    @Test func theLastKeyUnderABlockTakesTheBlockWithIt() throws {
+        let source = "---\non: [x]\noptions:\n  fast: true\nagent: new\n---\n\nGo.\n"
+        let edited = try FrontMatterEdit.set("fast", under: "options", to: nil, in: source)
+        #expect(edited == "---\non: [x]\nagent: new\n---\n\nGo.\n")
+    }
+
+    @Test func aBlockWrittenOnOneLineIsRefused() {
+        let source = "---\non: [x]\noptions: {fast: true}\n---\n\nGo.\n"
+        #expect(throws: FrontMatterEdit.Refusal.self) {
+            try FrontMatterEdit.set("fast", under: "options", to: "false", in: source)
+        }
+    }
+
     @Test func windowsLineEndingsSurvive() throws {
         let windows = sample.replacingOccurrences(of: "\n", with: "\r\n")
         let edited = try FrontMatterEdit.set("permission-mode", to: "plan", in: windows)

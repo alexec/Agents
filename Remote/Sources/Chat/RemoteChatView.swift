@@ -315,8 +315,7 @@ private struct OfferedFileStrip: View {
                 .truncationMode(.middle)
             Spacer(minLength: 8)
             Button("Open") { model.openOfferedFile() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.paper)
             Button {
                 model.dismissOfferedFile()
             } label: {

@@ -88,6 +88,38 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                                DaemonAPI.ListHelpersRequest(token: token),
                                fallback: "Nothing to list.")
         }
+    } pullRequests: { call in
+        // Only ever the caller's own pull request: the daemon takes which one, and
+        // where it goes, from the run the caller was started for (038 R7).
+        switch call {
+        case .push:
+            return await relay(DaemonAPI.Method.agentsPushPullRequest,
+                               DaemonAPI.PushPullRequestRequest(token: token),
+                               fallback: "Pushed.")
+        case .reply(let body, let inReplyTo):
+            return await relay(DaemonAPI.Method.agentsReplyOnPullRequest,
+                               DaemonAPI.ReplyOnPullRequestRequest(token: token, body: body,
+                                                                   inReplyTo: inReplyTo),
+                               fallback: "Replied.")
+        }
+    } leases: { call in
+        // A lease call may wait up to the daemon's limit before it answers (036). The
+        // socket read has no timeout of its own, so the daemon's is the only one.
+        switch call {
+        case .lease(let name, let minutes, let wait):
+            return await relay(DaemonAPI.Method.leasesLease,
+                               DaemonAPI.LeaseRequest(token: token, name: name,
+                                                      minutes: minutes, wait: wait),
+                               fallback: "Leased.")
+        case .release(let name):
+            return await relay(DaemonAPI.Method.leasesRelease,
+                               DaemonAPI.LeaseNameRequest(token: token, name: name),
+                               fallback: "Released.")
+        case .list:
+            return await relay(DaemonAPI.Method.leasesList,
+                               DaemonAPI.LeaseTokenRequest(token: token),
+                               fallback: "Nothing to list.")
+        }
     }
     let task = Task {
         await service.run()

@@ -73,4 +73,22 @@ struct GitWorktreesTests {
         let text = try String(contentsOf: common.appending(path: "info/exclude"), encoding: .utf8)
         #expect(text.contains("/.agents/worktrees/\n"))
     }
+
+    @Test func localBranchesThenRemoteOnesNotAlreadyLocal() {
+        let refs = """
+            refs/heads/main
+            refs/remotes/origin/HEAD
+            refs/remotes/origin/main
+            refs/remotes/origin/review/pr-12
+            refs/remotes/my/fork/topic
+            refs/heads/feature/login
+            """
+        let branches = GitWorktrees.parseBranches(refs, remotes: ["origin", "my/fork", "my"])
+        #expect(branches == [
+            .init(name: "main"),
+            .init(name: "feature/login"),
+            .init(name: "review/pr-12", remote: "origin"),
+            .init(name: "topic", remote: "my/fork"),
+        ])
+    }
 }

@@ -88,9 +88,49 @@ public enum GitWorktrees {
         parse(try await git(["worktree", "list", "--porcelain"], in: folder))
     }
 
+    /// Every local branch, then every remote one with no local branch of its name, most
+    /// recently committed to first. A remote's `HEAD` is a pointer, not a branch.
+    public static func branches(in folder: URL) async throws -> [DaemonAPI.BranchSummary] {
+        let refs = try await git(["for-each-ref", "--sort=-committerdate", "--format=%(refname)",
+                                  "refs/heads", "refs/remotes"], in: folder)
+        return parseBranches(refs, remotes: try await git(["remote"], in: folder)
+            .split(separator: "\n").map(String.init))
+    }
+
+    /// `refs/heads/…` and `refs/remotes/<remote>/…` lines, as branches. The remotes are
+    /// needed because a remote's name can itself have a `/` in it.
+    public static func parseBranches(_ refs: String, remotes: [String]) -> [DaemonAPI.BranchSummary] {
+        var local: [DaemonAPI.BranchSummary] = []
+        var remote: [DaemonAPI.BranchSummary] = []
+        for line in refs.split(separator: "\n").map(String.init) {
+            if line.hasPrefix("refs/heads/") {
+                local.append(.init(name: String(line.dropFirst(11))))
+            } else if line.hasPrefix("refs/remotes/") {
+                let rest = String(line.dropFirst(13))
+                guard let owner = remotes.sorted(by: { $0.count > $1.count })
+                        .first(where: { rest.hasPrefix($0 + "/") }) else { continue }
+                let name = String(rest.dropFirst(owner.count + 1))
+                guard !name.isEmpty, name != "HEAD" else { continue }
+                remote.append(.init(name: name, remote: owner))
+            }
+        }
+        var seen = Set(local.map(\.name))
+        var result = local
+        for branch in remote where seen.insert(branch.name).inserted { result.append(branch) }
+        return result
+    }
+
     /// Lines of `git status --porcelain`: what is changed and not committed.
     public static func statusCount(in folder: URL) async throws -> Int {
         try await git(["status", "--porcelain"], in: folder)
+            .split(separator: "\n").count
+    }
+
+    /// Uncommitted changes outside the app's own `.agents` folder (038). A workflow just
+    /// written there, the babysitter included, is not somebody's work in progress, and
+    /// counting it would refuse every pull request checked out in the project folder.
+    public static func workInProgressCount(in folder: URL) async throws -> Int {
+        try await git(["status", "--porcelain", "--", ".", ":(exclude).agents"], in: folder)
             .split(separator: "\n").count
     }
 
@@ -99,13 +139,68 @@ public enum GitWorktrees {
         (try? await git(["merge-base", "--is-ancestor", branch, base], in: folder)) != nil
     }
 
+    /// The URL a remote is configured with, or nil when there is no such remote. As
+    /// written, before any `insteadOf` rewriting: what the project says it is.
+    public static func remoteURL(_ remote: String, in folder: URL) async -> String? {
+        try? await git(["config", "--get", "remote.\(remote).url"], in: folder)
+    }
+
+    /// The URL of the remote a local branch tracks, or nil when it tracks none (038 R4).
+    public static func upstreamURL(of branch: String, in folder: URL) async -> String? {
+        guard let remote = try? await git(["config", "--get", "branch.\(branch).remote"], in: folder),
+              !remote.isEmpty else { return nil }
+        // A branch may track a URL directly rather than a named remote.
+        if remote.contains("/") || remote.contains(":") { return remote }
+        return await remoteURL(remote, in: folder)
+    }
+
+    /// How far the branch checked out in `folder` is ahead of and behind what it tracks,
+    /// or nil when it tracks nothing (038 R10).
+    public static func aheadBehind(in folder: URL) async -> (ahead: Int, behind: Int)? {
+        guard let counts = try? await git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], in: folder)
+        else { return nil }
+        let parts = counts.split(whereSeparator: \.isWhitespace).compactMap { Int($0) }
+        guard parts.count == 2 else { return nil }
+        return (parts[0], parts[1])
+    }
+
     // MARK: Writing
+
+    /// Fetch `refspec` from `remote`, which is a remote's name or a URL (038 R5).
+    public static func fetch(remote: String, refspec: String, in folder: URL) async throws {
+        _ = try await git(["fetch", "--no-tags", remote, refspec], in: folder)
+    }
+
+    /// A new worktree at `path` on a branch that already exists and is not checked out
+    /// anywhere (038 R5): a pull request's own branch, never a new `agents/` one.
+    public static func add(existingBranch branch: String, path: URL, in folder: URL) async throws {
+        _ = try await git(["worktree", "add", path.path(percentEncoded: false), branch], in: folder)
+    }
+
+    /// A new worktree at `path` on a new local branch that tracks `upstream`.
+    public static func add(trackingBranch branch: String, upstream: String, path: URL,
+                           in folder: URL) async throws {
+        _ = try await git(["worktree", "add", "--track", "-b", branch, path.path(percentEncoded: false), upstream],
+                          in: folder)
+    }
 
     /// A new worktree at `path` on a new branch from what `folder` has checked out.
     /// Git refuses an existing branch itself, which is the last word on a clash.
     public static func add(branch: String, path: URL, in folder: URL) async throws {
         _ = try await git(["worktree", "add", "-b", branch, path.path(percentEncoded: false), "HEAD"],
                           in: folder)
+    }
+
+    /// A new worktree at `path` on a branch that is already there. One only a remote
+    /// has becomes a local branch of the same name that tracks it.
+    public static func add(existing branch: DaemonAPI.BranchSummary, path: URL, in folder: URL) async throws {
+        let at = path.path(percentEncoded: false)
+        if let remote = branch.remote {
+            _ = try await git(["worktree", "add", "--track", "-b", branch.name, at, "\(remote)/\(branch.name)"],
+                              in: folder)
+        } else {
+            _ = try await git(["worktree", "add", at, branch.name], in: folder)
+        }
     }
 
     public static func remove(_ path: URL, force: Bool, in folder: URL) async throws {

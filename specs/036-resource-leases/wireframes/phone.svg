@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .rb { font-size:16px; font-weight:600; } .r { font-size:16px; } .f { font-size:12px; } .sup { font-size:14px; }
+    .cap { fill:#fbfbfd; stroke:#d1d1d6; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <!-- PHONE A: chat -->
+  <text x="20" y="24" class="f s" font-weight="600">A · Chat, holding and waiting</text>
+  <rect x="20" y="40" width="390" height="844" rx="48" fill="#fff" stroke="#1d1d1f" stroke-width="2"/>
+  <rect x="160" y="52" width="110" height="30" rx="15" fill="#1d1d1f"/>
+  <text x="44" y="120" class="f" fill="#0a64d8">‹ Agents</text>
+  <text x="215" y="120" class="rb t" text-anchor="middle">Walk the phone</text>
+
+  <text x="44" y="170" class="f q">Leased Screen, mouse and keyboard until 14:12.</text>
+  <text x="44" y="196" class="sup t">I have the screen. Launching the</text>
+  <text x="44" y="216" class="sup t">scratch app and opening the start form.</text>
+  <text x="44" y="252" class="f q">Agents asked</text>
+  <text x="44" y="272" class="f s">iPhone 17 Pro · iOS 26.0 is yours now. You</text>
+  <text x="44" y="288" class="f s">hold it until 14:25 (30 minutes). You asked</text>
+  <text x="44" y="304" class="f s">for it at 13:50 and were waiting in line…</text>
+  <text x="44" y="328" class="f q">Leased iPhone 17 Pro · iOS 26.0 until 14:25.</text>
+  <text x="44" y="354" class="sup t">Got the simulator. Building Remote.</text>
+
+  <!-- prompt area -->
+  <rect x="32" y="640" width="366" height="220" rx="24" fill="#f7f7f9" stroke="#e5e5ea"/>
+  <!-- NEW lease row: wraps, never scrolls sideways -->
+  <rect x="44" y="652" width="186" height="26" rx="13" class="cap"/>
+  <text x="56" y="670" class="f s">▣ Screen · 18 min</text>
+  <rect x="236" y="652" width="150" height="26" rx="13" class="cap"/>
+  <text x="248" y="670" class="f s">▣ iPhone 17 Pro · 31 min</text>
+  <!-- existing PromptHeader -->
+  <rect x="44" y="688" width="96" height="26" rx="13" class="cap"/><text x="56" y="706" class="f s">▭ Agents</text>
+  <rect x="222" y="688" width="92" height="26" rx="13" class="cap"/><text x="234" y="706" class="f s">◔ 41% · £0.84</text>
+  <rect x="320" y="688" width="66" height="26" rx="13" class="cap"/><text x="332" y="706" class="f s">Claude</text>
+  <rect x="44" y="724" width="342" height="80" rx="14" fill="#fff" stroke="#d1d1d6"/>
+  <text x="58" y="752" class="r q">Message</text>
+  <rect x="352" y="814" width="34" height="34" rx="17" fill="#0a64d8"/><text x="369" y="837" fill="#fff" font-size="16" text-anchor="middle">↑</text>
+
+  <text x="420" y="660" class="note">← NEW: the same row as the Mac,</text>
+  <text x="420" y="676" class="note">   in the shared PromptHeader (033).</text>
+  <text x="420" y="692" class="note">   Names shortened to fit: the device</text>
+  <text x="420" y="708" class="note">   name without the OS, “Screen”.</text>
+  <text x="420" y="724" class="note">   Tapping a capsule shows the full</text>
+  <text x="420" y="740" class="note">   line in a small sheet (read-only).</text>
+
+  <!-- phone A inset: waiting variant -->
+  <text x="44" y="560" class="f s" font-weight="600">Waiting, on “Screenshot pass”:</text>
+  <rect x="44" y="572" width="342" height="44" rx="14" class="cap"/>
+  <text x="58" y="590" class="f s">◷ Waiting for Screen · 2nd in line</text>
+  <text x="58" y="606" class="f q">held by “Walk the phone” until 14:12</text>
+
+  <!-- PHONE B: project page cards -->
+  <text x="590" y="24" class="f s" font-weight="600">B · Project page, agent cards</text>
+  <rect x="590" y="40" width="390" height="844" rx="48" fill="#fff" stroke="#1d1d1f" stroke-width="2"/>
+  <rect x="730" y="52" width="110" height="30" rx="15" fill="#1d1d1f"/>
+  <text x="614" y="120" class="f" fill="#0a64d8">‹ Projects</text>
+  <text x="614" y="160" font-size="28" font-weight="700" class="t">Agents</text>
+
+  <g>
+    <rect x="606" y="184" width="358" height="104" rx="16" fill="#fbfbfd" stroke="#e5e5ea"/>
+    <circle cx="628" cy="208" r="5" fill="#6e6e73"/>
+    <text x="642" y="213" class="rb t">Walk the phone</text>
+    <text x="642" y="235" class="sup s">Taking screenshots of the start form…</text>
+    <text x="642" y="262" class="f s">▣ Holds Screen · 18 min</text>
+    <text x="642" y="278" class="f q">and 1 more</text>
+  </g>
+  <g>
+    <rect x="606" y="300" width="358" height="88" rx="16" fill="#fbfbfd" stroke="#e5e5ea"/>
+    <circle cx="628" cy="324" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+    <text x="642" y="329" class="rb t">Screenshot pass</text>
+    <text x="642" y="351" class="sup s">In line for the screen; ended its turn.</text>
+    <text x="642" y="376" class="f s">◷ Waiting for Screen · 2nd</text>
+  </g>
+  <g>
+    <rect x="606" y="400" width="358" height="88" rx="16" fill="#fbfbfd" stroke="#e5e5ea"/>
+    <circle cx="628" cy="424" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+    <text x="642" y="429" class="rb t">Docs check</text>
+    <text x="642" y="451" class="sup s">Done: checked every page in Chrome.</text>
+    <text x="642" y="476" class="f s">▣ Holds Google Chrome · 4 min left</text>
+  </g>
+  <g>
+    <rect x="606" y="500" width="358" height="68" rx="16" fill="#fbfbfd" stroke="#e5e5ea"/>
+    <circle cx="628" cy="524" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+    <text x="642" y="529" class="rb t">Tidy the README</text>
+    <text x="642" y="551" class="sup s">Done: trimmed the install section.</text>
+  </g>
+
+  <text x="606" y="610" class="note">The card mark is the Mac row mark, word for word</text>
+  <text x="606" y="626" class="note">(LeaseStatus.mark, shared). No Resources page, no</text>
+  <text x="606" y="642" class="note">End or remove-from-line on the phone or iPad (FR-011).</text>
+  <text x="606" y="674" class="note">iPad: the same two pieces in its chat and cards;</text>
+  <text x="606" y="690" class="note">the lease row fits on one line there.</text>
+</svg>

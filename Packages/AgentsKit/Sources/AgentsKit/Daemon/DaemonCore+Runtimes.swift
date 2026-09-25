@@ -183,7 +183,10 @@ extension DaemonCore {
                          mcpServers: agent.mcpServers,
                          // Where the conversation was happening goes with it: the branch
                          // works in the same worktree and belongs to the same project (030).
-                         worktree: agent.worktree)
+                         worktree: agent.worktree,
+                         // And so does where its changes are counted from: the branch
+                         // carries the edits the history before it made (035).
+                         startingPoint: agent.startingPoint)
         agents[copy.id] = copy
         try await store.save(copy)
         // The history so far is ours, so the branch starts with a copy of it rather

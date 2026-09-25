@@ -84,15 +84,28 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case folderGone
     /// The day's spending limit has been reached, so nothing new may start.
     case dayLimitReached
-    /// The file names a permission mode, a runtime or a model that cannot be had, so
-    /// nothing was started rather than something being started differently.
+    /// The file names a permission mode, a runtime, a model, an effort or an option
+    /// that cannot be had, so nothing was started rather than something being started
+    /// differently.
     ///
     /// `setting` is the key as the file spells it — `permission-mode`, `runtime`,
-    /// `model` — and `detail` is the whole sentence, naming what the runtime does
+    /// `model`, `effort`, or an option's own id from under `options:` — and `detail` is the whole sentence, naming what the runtime does
     /// offer. The two are apart rather than one string because the reason a row
     /// collapses on is the setting, while the sentence carries a list that may change
     /// between one fire and the next.
     case settingRefused(setting: String, detail: String)
+    // Five that belong to pull-request triggers (038), each naming its pull request so
+    // that repeats collapse for each one rather than across them.
+    /// The pull request's branch is not checked out anywhere in the project.
+    case noWorktree(pr: Int)
+    /// Its worktree has uncommitted changes, which babysitting must not mix into.
+    case worktreeDirty(pr: Int)
+    /// An agent is already working in its worktree.
+    case worktreeBusy(pr: Int)
+    /// Run now on a workflow whose only triggers are pull-request ones.
+    case noPullRequest
+    /// Three runs in a row with nobody else acting in between.
+    case babysittingStopped(pr: Int, runs: Int)
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -110,6 +123,32 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .folderGone: return "the project folder is not there"
         case .dayLimitReached: return "the day's spending limit has been reached"
         case .settingRefused(_, let detail): return detail
+        case .noWorktree(let pr): return "#\(pr) has no local worktree"
+        case .worktreeDirty(let pr): return "#\(pr)'s worktree has uncommitted changes"
+        case .worktreeBusy(let pr): return "an agent is already working in #\(pr)'s worktree"
+        case .noPullRequest: return "nothing says which pull request"
+        case .babysittingStopped(let pr, let runs): return "babysitting #\(pr) stopped after \(runs) tries in a row"
+        }
+    }
+
+    /// The same sentence on the pull request's own row, where naming it again reads
+    /// oddly: "its worktree", not "#377's worktree".
+    public var rowMessage: String {
+        switch self {
+        case .noWorktree: return "not checked out here"
+        case .worktreeDirty: return "its worktree has uncommitted changes"
+        case .worktreeBusy: return "an agent is already working in its worktree"
+        case .babysittingStopped(_, let runs): return "babysitting stopped after \(runs) tries in a row"
+        default: return message
+        }
+    }
+
+    /// The pull request this refusal is about, if it is about one.
+    public var pullRequestNumber: Int? {
+        switch self {
+        case .noWorktree(let pr), .worktreeDirty(let pr), .worktreeBusy(let pr),
+             .babysittingStopped(let pr, _): return pr
+        default: return nil
         }
     }
 
@@ -128,6 +167,10 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // has silently run nothing for a fortnight looks exactly like one whose trigger
         // never matched.
         case .chainTooDeep, .unreadable, .folderGone, .overLimit, .settingRefused: return true
+        // Stopped babysitting stays stopped until somebody pushes, comments or chooses
+        // Resume, so it is the one pull-request refusal that earns the colour.
+        case .babysittingStopped: return true
+        case .noWorktree, .worktreeDirty, .worktreeBusy, .noPullRequest: return false
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .triggerNotSupported, .agentUnavailable,
@@ -143,8 +186,13 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case (.chainTooDeep, .chainTooDeep), (.runInFlight, .runInFlight),
              (.archived, .archived), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
-             (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached):
+             (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
+             (.noPullRequest, .noPullRequest):
             return true
+        case (.noWorktree(let a), .noWorktree(let b)), (.worktreeDirty(let a), .worktreeDirty(let b)),
+             (.worktreeBusy(let a), .worktreeBusy(let b)),
+             (.babysittingStopped(let a, _), .babysittingStopped(let b, _)):
+            return a == b
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
         case (.triggerNotSupported(let a), .triggerNotSupported(let b)): return a == b
@@ -277,10 +325,21 @@ public struct WorkflowRun: Codable, Hashable, Sendable, Identifiable {
     public var depth: Int
     public var agentID: UUID?
     public var startedAt: Date
+    /// Set when a pull-request trigger started it: which pull request, and where (038).
+    public var pullRequest: PullRequestRef?
+
+    /// What the in-flight table is keyed on. One workflow may run on two pull requests
+    /// at once, so a pull-request run's key names its pull request (R9).
+    public var runKey: String { Self.runKey(workflowID: workflowID, pullRequest: pullRequest?.number) }
+
+    public static func runKey(workflowID: String, pullRequest: Int?) -> String {
+        pullRequest.map { "\(workflowID)#\($0)" } ?? workflowID
+    }
 
     public init(id: UUID = UUID(), workflowID: String, folder: URL,
                 trigger: WorkflowTrigger, triggeringAgentID: UUID? = nil,
-                depth: Int = 0, agentID: UUID? = nil, startedAt: Date = Date()) {
+                depth: Int = 0, agentID: UUID? = nil, startedAt: Date = Date(),
+                pullRequest: PullRequestRef? = nil) {
         self.id = id
         self.workflowID = workflowID
         self.folder = Project.standardize(folder)
@@ -289,5 +348,22 @@ public struct WorkflowRun: Codable, Hashable, Sendable, Identifiable {
         self.depth = depth
         self.agentID = agentID
         self.startedAt = startedAt
+        self.pullRequest = pullRequest
+    }
+}
+
+/// The pull request a run is for (038 R9).
+public struct PullRequestRef: Codable, Hashable, Sendable {
+    public var number: Int
+    public var headBranch: String
+    public var worktree: URL
+    /// The change it fired on, recorded as fired once the run has started (R6).
+    public var changeKey: String
+
+    public init(number: Int, headBranch: String, worktree: URL, changeKey: String) {
+        self.number = number
+        self.headBranch = headBranch
+        self.worktree = worktree
+        self.changeKey = changeKey
     }
 }

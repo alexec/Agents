@@ -113,11 +113,30 @@ public enum WorkflowFile {
             }
             return value.isEmpty ? nil : value
         }
+        // Everything else the runtime offers, by its own id, one scalar each. A value
+        // left empty says nothing, as it does at the top level.
+        func options() throws -> [String: String] {
+            guard let node = mapping[WorkflowSettings.Setting.options] else { return [:] }
+            if node.scalar?.isEmpty == true { return [:] }
+            guard case .mapping(let pairs) = node else {
+                throw YAMLNode.Failure("`options:` must be a list of keys, like `fast: true`")
+            }
+            var named: [String: String] = [:]
+            for (id, value) in pairs {
+                guard let text = value.scalar else {
+                    throw YAMLNode.Failure("`\(id):` under `options:` must be a single value")
+                }
+                if !text.isEmpty { named[id] = text }
+            }
+            return named
+        }
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
                                         runtimeID: try setting("runtime"),
-                                        model: try setting("model"))
+                                        model: try setting("model"),
+                                        effort: try setting("effort"),
+                                        options: try options())
         } catch let error as YAMLNode.Failure {
             return broken(error.message)
         } catch {
@@ -129,7 +148,8 @@ public enum WorkflowFile {
         // the catalog is actually consulted — and not into a file marked broken, which
         // is what a person would have to go and edit. See research.md §4.
 
-        let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model"]
+        let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model",
+                                   "effort", "options"]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
@@ -174,6 +194,14 @@ public enum WorkflowFile {
         case "agent-asked-form": return .agentAskedForm
         case "agent-stopped": return .agentStopped
         case "workflow-completed": return .workflowCompleted(id: keys["id"]?.scalar)
+        case "pull-request-checks-failed", "pull-request-review-comments", "pull-request-conflicts":
+            // They take no settings (038). One given something to say is a file that
+            // expects a behaviour this version does not have, and saying so beats
+            // quietly ignoring half of what was asked for.
+            guard keys.isEmpty else {
+                throw YAMLNode.Failure("\"\(name)\" takes no settings")
+            }
+            return WorkflowTrigger.pullRequestTriggers.first { $0.name == name }!
         default:
             // Kept whole, with whatever it came with. This is the case that lets the
             // format grow without anything already on disk changing shape.

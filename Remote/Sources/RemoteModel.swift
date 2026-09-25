@@ -30,6 +30,7 @@ final class RemoteModel {
         didSet {
             guard selectedProject != oldValue else { return }
             selection = nil
+            openWorkflow = nil
         }
     }
 
@@ -119,8 +120,13 @@ final class RemoteModel {
     /// Archived ones too, for the spending page. A project put away still cost what it
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
     var allProjects: [DaemonAPI.ProjectSummary] { work.projects }
-    /// The open project's standing arrangements. Listed here, driven on the Mac.
+    /// The open project's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
+
+    /// The workflow whose page is open, if one is. Its id rather than a copy, for the
+    /// Mac page's reason: the file is the truth, and a copy would show what it used to
+    /// say. Pushed under the conversation, so a run opened from its page comes back to it.
+    var openWorkflow: Workflow.ID?
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
@@ -431,6 +437,7 @@ final class RemoteModel {
         await refreshProjects()
         startingIn = nil
         selectedProject = folder
+        openWorkflow = nil
         // A beat, so the sheet has gone before the conversation is pushed. Two
         // presentations in one turn of the loop is not something to ask of a split view.
         try? await Task.sleep(for: .milliseconds(400))
@@ -792,6 +799,7 @@ final class RemoteModel {
         await refreshAttention()
         await refreshResuming()
         await refreshCostState()
+        await refreshLeases()
         await refreshWorkflows()
         await refreshRuntimes()
         await refreshModes()
@@ -887,6 +895,8 @@ final class RemoteModel {
         }
         pendingOpen = nil
         selectedProject = agent.projectFolder
+        // A banner is about the agent, not whatever page was open over the project.
+        openWorkflow = nil
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
             self.selection = agentID
@@ -958,6 +968,15 @@ final class RemoteModel {
         work.replaceCostState(state)
     }
 
+    /// What each agent holds and waits for (036). The phone only reads it: the
+    /// Resources page and ending a lease are the Mac's (FR-011).
+    private func refreshLeases() async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+                                                    Optional<String>.none,
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
     private func refreshProjects() async {
         guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
                                                   DaemonAPI.ProjectsListRequest(),
@@ -995,6 +1014,58 @@ final class RemoteModel {
                                                   DaemonAPI.WorkflowsListRequest(),
                                                   returning: [WorkflowSummary].self) else { return }
         work.replaceWorkflows(listed)
+    }
+
+    // MARK: Driving a workflow
+
+    /// Run one now. The Mac still applies the in-flight, ceiling and archive rules and
+    /// says so on the summary, which is why nothing here second-guesses it first.
+    func runWorkflow(_ summary: WorkflowSummary) async {
+        do {
+            try await client.call(DaemonAPI.Method.workflowsRun,
+                                  DaemonAPI.WorkflowRequest(folder: summary.folder,
+                                                            workflowID: summary.workflowID))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Put one away, or bring it back. `workflow/changed` redraws the page.
+    func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
+        do {
+            try await client.call(DaemonAPI.Method.workflowsArchive,
+                                  DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
+                                                                   workflowID: summary.workflowID,
+                                                                   archived: archived))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
+    /// answers with what it now says; a refusal has to reach the person, and the list
+    /// is asked again so the menu goes back to what the file still holds (FR-025).
+    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings) async {
+        do {
+            let updated: WorkflowSummary = try await client.call(
+                DaemonAPI.Method.workflowsSettings,
+                DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
+                                                  workflowID: summary.workflowID,
+                                                  settings: settings),
+                returning: WorkflowSummary.self)
+            work.upsert(updated)
+        } catch {
+            problem = sentence(for: error)
+            await refreshWorkflows()
+        }
+    }
+
+    /// What a runtime last advertised for a folder, for the workflow page's menus.
+    /// Empty is an answer: nothing has been remembered for it there yet.
+    func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
+        (try? await client.call(DaemonAPI.Method.optionsRemembered,
+                                DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd),
+                                returning: [ConfigOption].self)) ?? []
     }
 
     /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
@@ -1292,6 +1363,13 @@ final class RemoteModel {
             // pushes in one turn of the loop is not something to ask of a split view.
             try? await Task.sleep(for: .milliseconds(600))
             selection = agent.id
+        }
+        // `-workflow` opens a workflow's page on the chosen project, by its name.
+        if let name = value("-workflow"),
+           let workflow = work.workflows.first(where: { $0.workflow.name == name }) {
+            selectedProject = workflow.folder
+            try? await Task.sleep(for: .milliseconds(600))
+            openWorkflow = workflow.id
         }
     }
 #endif

@@ -90,6 +90,9 @@ public struct StoreLocations: Sendable {
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
+    /// What the app remembers about the person's pull requests (038): which changes
+    /// have fired, the babysitting counts, and the last good list for each project.
+    public var pullRequests: URL { root.appendingPathComponent("pull-requests.json") }
     /// Every device that has announced itself to this daemon.
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
@@ -129,6 +132,9 @@ public struct StoreLocations: Sendable {
     /// limits and its own day, which is consistent with the root being the daemon's
     /// identity and is worth knowing before wondering why a limit did not bite.
     public var limits: URL { root.appendingPathComponent("limits.json") }
+    /// Every resource lease on the Mac and every line waiting for one (036). One file
+    /// for the root, like the limits: a lease is the Mac's, not a project's.
+    public var leases: URL { root.appendingPathComponent("leases.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather
     /// than starting the day again from zero.

@@ -17,6 +17,7 @@ struct ChoiceRows: View {
                 worktreeRow
             }
         }
+        .paperListRow()
         Section {
             switch model.startChoicesState {
             case .loading:
@@ -45,6 +46,7 @@ struct ChoiceRows: View {
                 Text("You can still start it with what \(runtimeName) chooses by itself.")
             }
         }
+        .paperListRow()
     }
 
     private var runtimeName: String {
@@ -104,6 +106,19 @@ struct ChoiceRows: View {
                     .disabled(!worktree.exists)
                 }
             }
+            if !listed.branches.isEmpty {
+                Divider()
+                Menu("New worktree on a branch") {
+                    ForEach(listed.branches) { branch in
+                        Button {
+                            Task { await model.chooseWorktree(.branch(branch.name)) }
+                        } label: {
+                            choiceLabel(branch.name, chosen: model.startWorktree == .branch(branch.name))
+                            if let remote = branch.remote { Text("From \(remote)") }
+                        }
+                    }
+                }
+            }
         } label: {
             LabeledContent("Worktree") {
                 Text(worktreeTitle).foregroundStyle(.secondary)
@@ -118,6 +133,7 @@ struct ChoiceRows: View {
         case nil: "Project folder"
         case .new: "New worktree"
         case .existing(let root): root.lastPathComponent
+        case .branch(let name): name
         }
     }
 

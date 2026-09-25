@@ -25,6 +25,7 @@ struct StartAgentView: View {
             Form {
                 ChoiceRows()
             }
+            .paperForm()
             .navigationTitle(model.work.project(project)?.name ?? "New agent")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -73,17 +74,17 @@ struct StartAgentView: View {
                     .tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // The chat's prompt bar: one raised card holding the words, attach, and send
+            // in ink, so starting an agent and talking to one look like the same act.
             HStack(alignment: .bottom, spacing: 8) {
-                AttachButton(attachments: $attachments, refusal: $attachNote)
                 TextField("What should it do?", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...6)
                     .focused($focused)
                     .appText(.reading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
                     .accessibilityLabel("What the new agent should do")
+
+                AttachButton(attachments: $attachments, refusal: $attachNote)
 
                 Button {
                     send()
@@ -93,23 +94,23 @@ struct StartAgentView: View {
                             ProgressView()
                         } else {
                             Image(systemName: "arrow.up")
-                                // Decorative: a glyph in a button, not text.
-                                .font(.system(size: 15, weight: .semibold))
+                                .appText(.reading).fontWeight(.semibold)
                         }
                     }
-                    .frame(width: 34, height: 34)
+                    .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
+                .buttonStyle(.paperProminent)
+                .buttonBorderShape(.circle)
                 .disabled(!canSend)
-                .opacity(canSend ? 1 : 0.4)
                 .accessibilityLabel("Start agent")
                 .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
             }
+            .padding(14)
+            .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(Paper.ground)
     }
 
     private var canSend: Bool {

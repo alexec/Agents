@@ -73,6 +73,9 @@ struct SidebarView: View {
             FilesPane(agent: agent, state: state)
                 .opacity(frame.pane == .files ? 1 : 0)
                 .allowsHitTesting(frame.pane == .files)
+            ChangesPane(agent: agent, state: state)
+                .opacity(frame.pane == .changes ? 1 : 0)
+                .allowsHitTesting(frame.pane == .changes)
             TerminalPane(agent: agent, state: state)
                 .opacity(frame.pane == .terminal ? 1 : 0)
                 .allowsHitTesting(frame.pane == .terminal)
@@ -87,7 +90,7 @@ struct SidebarView: View {
     }
 }
 
-/// What the sidebar says when there is no agent to show. Not four blank panes (FR-007).
+/// What the sidebar says when there is no agent to show. Not five blank panes (FR-007).
 private struct NoAgent: View {
     var body: some View {
         VStack(spacing: 8) {

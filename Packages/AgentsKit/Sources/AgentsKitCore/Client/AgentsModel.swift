@@ -95,6 +95,10 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// Every resource an agent can lease, who holds it and who is waiting (036), as
+    /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
+    /// from a daemon too old to have leases, which draws nothing.
+    public private(set) var leases: DaemonAPI.LeaseSnapshot?
     /// The mode last chosen for each runtime, as the Mac holds it (029). A copy, kept
     /// current by `modes/changed`, so a start form can open on it without a round trip.
     public private(set) var rememberedModes: DaemonAPI.RememberedModes = [:]
@@ -151,6 +155,7 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
+        case leasesChanged(DaemonAPI.LeaseSnapshot)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
@@ -178,6 +183,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
@@ -279,6 +285,9 @@ public final class AgentsModel {
         case .costChanged(let state):
             costState = state
 
+        case .leasesChanged(let snapshot):
+            leases = snapshot
+
         case .modesChanged(let modes):
             rememberedModes = modes
 
@@ -373,6 +382,20 @@ public final class AgentsModel {
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
+
+    /// What an agent holds and waits for, in the words the row, the card and the chat
+    /// use. Nil when it is nothing, or the daemon has no leases to say.
+    public func leaseStatus(of agentID: UUID) -> LeaseStatus? {
+        guard let leases else { return nil }
+        return LeaseStatus.of(agentID, in: leases, titles: agentTitles)
+    }
+
+    /// Every agent's title by id, for naming whoever holds what another is waiting for.
+    public var agentTitles: [UUID: String] {
+        Dictionary(agents.compactMap { agent in agent.title.map { (agent.id, $0) } },
+                   uniquingKeysWith: { first, _ in first })
+    }
     public func replaceRememberedModes(_ modes: DaemonAPI.RememberedModes) { rememberedModes = modes }
 
     /// The mode last chosen for this runtime, on any device (029).

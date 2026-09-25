@@ -101,14 +101,20 @@ struct BlocksView: View {
 /// its weight instead, and the only colour here is the one for a line that was removed.
 struct DiffView: View {
     let diff: ToolCallContent.Diff
+    /// The conversation caps an edit so one big one does not take the page; the
+    /// Changes pane, where the edit is the thing being read, does not (035).
+    var maxHeight: CGFloat? = 280
+    var showsPath = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(diff.path)
-                .appText(.fine)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.head)
+            if showsPath {
+                Text(diff.path)
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
@@ -127,7 +133,7 @@ struct DiffView: View {
                 }
                 .padding(.vertical, 6)
             }
-            .frame(maxHeight: 280)
+            .frame(maxHeight: maxHeight)
             .paperWell(in: RoundedRectangle(cornerRadius: 8))
         }
         .textSelection(.enabled)

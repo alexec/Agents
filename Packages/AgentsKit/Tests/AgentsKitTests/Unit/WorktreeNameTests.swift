@@ -49,4 +49,11 @@ struct WorktreeNameTests {
     @Test func theBranchIsTheNameUnderAgents() {
         #expect(WorktreeName.branch(for: "fix-login") == "agents/fix-login")
     }
+
+    @Test func aBranchsFolderHasNoSlashes() {
+        #expect(WorktreeName.folder(forBranch: "feature/login") == "feature-login")
+        #expect(WorktreeName.folder(forBranch: "agents/fix-it") == "fix-it")
+        #expect(WorktreeName.folder(forBranch: "fix//two  gaps") == "fix-two-gaps")
+        #expect(WorktreeName.folder(forBranch: "/") == "branch")
+    }
 }

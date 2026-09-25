@@ -198,9 +198,10 @@ struct WorkflowPage: View {
     /// settings under it — the prompt bar's own arrangement, because this is a prompt
     /// that sends itself.
     ///
-    /// The settings are the three the file can hold. The bar also shows a runtime's
-    /// thinking level and speed; a workflow has no key for those, so they are not
-    /// drawn here as controls that would write nothing. Each control has four states,
+    /// The settings are the ones the file can hold: the mode, the model and the
+    /// effort by name, and under them every other option the runtime last advertised
+    /// here — fast mode, and whatever a runtime offers next — each written under
+    /// `options:` by its own id. Each control has four states,
     /// and the two that are not the ordinary menu carry the explanation: a value the
     /// runtime does not offer is why this workflow is refusing every fire, and this
     /// page is where that gets said, with what it does offer; nothing remembered means
@@ -245,11 +246,22 @@ struct WorkflowPage: View {
                                        option: remembered.flatMap(WorkflowSettings.modelOption(in:)),
                                        runtime: runtime,
                                        chosen: binding(summary, \.model) { $0.model = $1 })
+                        Spacer(minLength: 16)
+                        settingControl(summary, name: "Effort",
+                                       setting: WorkflowSettings.Setting.effort,
+                                       value: workflow.settings.effort,
+                                       option: remembered.flatMap(WorkflowSettings.effortOption(in:)),
+                                       runtime: runtime,
+                                       chosen: binding(summary, \.effort) { $0.effort = $1 })
                     } else {
                         Spacer(minLength: 0)
                     }
                 }
                 .disabled(workflow.mode == .triggering)
+                if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                    otherOptions(summary, runtime: runtime)
+                        .disabled(workflow.mode == .triggering)
+                }
             }
         }
         // Asked again when the runtime or the folder changes, and not otherwise: the
@@ -309,7 +321,7 @@ struct WorkflowPage: View {
         }
     }
 
-    /// One of the two settings the runtime itself defines, in the four states the
+    /// One of the settings the runtime itself defines, in the four states the
     /// contract names.
     @ViewBuilder
     private func settingControl(_ summary: WorkflowSummary, name: String, setting: String,
@@ -317,7 +329,8 @@ struct WorkflowPage: View {
                                 chosen: Binding<JSONValue?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let option {
-                OptionMenu(option: withDefault(option, named: name), chosen: chosen)
+                OptionMenu(option: withDefault(option, named: name, labelled: !Self.namedOnItsOwn(setting)),
+                           chosen: chosen)
                 if let value, !(option.options ?? []).contains(where: { $0.value.stringValue == value }) {
                     // The same sentence the row carries for the refusal, so the page
                     // and the row cannot describe the one problem two ways.
@@ -337,13 +350,74 @@ struct WorkflowPage: View {
         }
     }
 
+    /// Every option the runtime advertised that is not the mode, the model or the
+    /// effort, one control each, written under `options:` by the option's own id. A
+    /// value the file names that the runtime did not advertise is drawn too, marked,
+    /// because that workflow is refusing every fire on it.
+    @ViewBuilder
+    private func otherOptions(_ summary: WorkflowSummary, runtime: Runtime) -> some View {
+        let advertised = remembered ?? []
+        let others = advertised.filter {
+            $0.isRenderable && !WorkflowSettings.isNamedOnItsOwn($0, in: advertised)
+        }
+        let unknown = summary.workflow.settings.options.keys
+            .filter { id in !others.contains { $0.id == id } }.sorted()
+        if !others.isEmpty || !unknown.isEmpty {
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(others) { option in
+                    settingControl(summary, name: option.name, setting: option.id,
+                                   value: shown(summary.workflow.settings.options[option.id], for: option),
+                                   option: selectable(option), runtime: runtime,
+                                   chosen: optionBinding(summary, id: option.id))
+                }
+                ForEach(unknown, id: \.self) { id in
+                    settingControl(summary, name: id, setting: id,
+                                   value: summary.workflow.settings.options[id],
+                                   option: nil, runtime: runtime,
+                                   chosen: optionBinding(summary, id: id))
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private static func namedOnItsOwn(_ setting: String) -> Bool {
+        [WorkflowSettings.Setting.permissionMode, WorkflowSettings.Setting.model,
+         WorkflowSettings.Setting.effort].contains(setting)
+    }
+
+    /// A boolean the file wrote as `yes` or `on` is the menu's `true`, which is how the
+    /// start path reads it too — not a value to mark as refused.
+    private func shown(_ value: String?, for option: ConfigOption) -> String? {
+        guard option.isBoolean, let value, let flag = WorkflowSettings.boolean(value) else { return value }
+        return String(flag)
+    }
+
+    /// A boolean as a menu, because a toggle cannot say "the runtime's default", and
+    /// leaving the key out is a thing a workflow has to be able to say. The values are
+    /// the words the file holds.
+    private func selectable(_ option: ConfigOption) -> ConfigOption {
+        guard option.isBoolean else { return option }
+        var copy = option
+        copy.kind = .select([ConfigChoiceGroup(name: nil, choices: [
+            ConfigChoice(value: .string("true"), name: "\(option.name) on"),
+            ConfigChoice(value: .string("false"), name: "\(option.name) off"),
+        ])])
+        return copy
+    }
+
     /// The runtime's option with a way to say nothing: the first choice leaves the key
     /// out of the file, which is what a workflow that never mentioned it has.
-    private func withDefault(_ option: ConfigOption, named name: String) -> ConfigOption {
+    ///
+    /// The mode, the model and the effort read for themselves — `Plan`, `High`. Any
+    /// other option carries its name in the default, because `Runtime default` beside
+    /// three others says nothing about which one it is.
+    private func withDefault(_ option: ConfigOption, named name: String, labelled: Bool = false) -> ConfigOption {
         var copy = option
         copy.name = name
         copy.currentValue = .null
-        let leading = ConfigChoiceGroup(name: nil, choices: [ConfigChoice(value: .null, name: "Runtime default")])
+        let label = labelled ? "\(name): runtime default" : "Runtime default"
+        let leading = ConfigChoiceGroup(name: nil, choices: [ConfigChoice(value: .null, name: label)])
         copy.kind = .select([leading] + option.groups)
         return copy
     }
@@ -357,6 +431,17 @@ struct WorkflowPage: View {
                 set: { chosen in
                     var settings = summary.workflow.settings
                     write(&settings, chosen?.stringValue)
+                    guard settings != summary.workflow.settings else { return }
+                    Task { await model.setWorkflowSettings(summary, settings) }
+                })
+    }
+
+    /// The same, for one key under `options:`.
+    private func optionBinding(_ summary: WorkflowSummary, id: String) -> Binding<JSONValue?> {
+        Binding(get: { summary.workflow.settings.options[id].map(JSONValue.string) ?? .null },
+                set: { chosen in
+                    var settings = summary.workflow.settings
+                    settings.options[id] = chosen?.stringValue
                     guard settings != summary.workflow.settings else { return }
                     Task { await model.setWorkflowSettings(summary, settings) }
                 })

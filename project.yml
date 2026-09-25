@@ -180,6 +180,8 @@ targets:
         # Not the Mac's set: that mark stands on nothing, and iOS fills nothing with
         # black. This one is the crowd on its own dark ground, square, for iOS to round.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The Mac's accent, so a link or a control is the same ink-blue on both.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
 

@@ -88,6 +88,29 @@ struct DaemonTests {
         #expect(texts.contains(" on it"))
     }
 
+    /// Opus 5.5, told to say nothing, streams zero-width spaces — once, twenty-two
+    /// thousand of them, one chunk each. None of it is anything to read.
+    @Test func zeroWidthChunksAreNotRecorded() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.updates = Array(repeating: FakeACPAgent.chunk("\u{200B}\u{200B}"), count: 40)
+            + [FakeACPAgent.chunk("Done"), FakeACPAgent.chunk("\n\n"), FakeACPAgent.chunk("\u{200B}")]
+        let core = try core(FakeLauncher(script: script), locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "report"))
+        @Sendable func said() async -> [String] {
+            let page = try? await core.transcript(.init(agentID: id))
+            return page?.entries.compactMap { entry in
+                guard case .agentMessage(_, let text, _) = entry.kind else { return nil }
+                return text
+            } ?? []
+        }
+        await eventually("the reply reached the transcript") { await said().contains("\n\n") }
+
+        // The words and the paragraph break are kept; not one zero-width chunk is.
+        #expect(await said() == ["Done", "\n\n"])
+    }
+
     @Test func aFinishedAgentsProcessIsLetGo() async throws {
         // Every runtime hands its session back after the process is gone, so holding
         // one open for an idle agent buys nothing and works against the exit rule.

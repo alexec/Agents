@@ -334,14 +334,24 @@ private struct ToolCallLine: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Copilot and Grok send a structured diff for an edit; the Claude adapter shells
-    /// out and sends console text. Both are drawn as what they are. Nothing is
-    /// invented for the runtime that sends neither.
+    /// Claude and Copilot send a structured diff for an edit; Grok sends none. What is
+    /// sent is drawn as what it is. Nothing is invented for the runtime that sends
+    /// nothing.
     @ViewBuilder
     private func view(for piece: ToolCallContent) -> some View {
         switch piece {
         case .diff(let diff):
-            DiffView(diff: diff)
+            VStack(alignment: .trailing, spacing: 4) {
+                DiffView(diff: diff)
+                // A link under the edit rather than the edit as a button: the lines
+                // stay selectable, and the way in is said in words.
+                if let showEdit = actions.showEdit {
+                    Button("Show in Changes") { showEdit(diff, call.toolCallID) }
+                        .linkStyle()
+                        .appText(.fine)
+                        .help("See this edit among everything the agent changed")
+                }
+            }
         case .content(let block):
             BlocksView(blocks: [block])
                 .appText(.supporting)

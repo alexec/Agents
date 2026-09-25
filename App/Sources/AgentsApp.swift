@@ -25,6 +25,7 @@ struct AgentsApp: App {
                 // The keyboard route to what the sidebar's last row does. The row is
                 // the way in; this is for the hands that never leave the keys.
                 Button("Spending") { model.showsSpending = true }
+                Button("Resources") { model.showResources() }
             }
         }
 
