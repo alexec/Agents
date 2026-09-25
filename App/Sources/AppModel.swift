@@ -283,8 +283,29 @@ final class AppModel {
 
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
+    /// What a new agent can be started with, on the machine it would start on: the
+    /// selected project's (037). A server's runtimes are the ones installed there.
     var availableRuntimes: [RuntimeStatus] {
+        runtimes(on: selectedProjectHost).filter { $0.availability.isAvailable }
+    }
+
+    /// This Mac's, whatever is selected: for saying nothing is installed on this Mac.
+    var macRuntimesAvailable: [RuntimeStatus] {
         runtimes.filter { $0.availability.isAvailable }
+    }
+
+    /// Each server's runtimes, as it last listed them (037).
+    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
+
+    func runtimes(on host: HostID) -> [RuntimeStatus] {
+        host == .mac ? runtimes : serverRuntimes[host] ?? []
+    }
+
+    func refreshServerRuntimes(_ host: HostID) async {
+        if let listed = try? await client(for: host).call(DaemonAPI.Method.runtimesList, Optional<String>.none,
+                                                          returning: [RuntimeStatus].self) {
+            serverRuntimes[host] = listed
+        }
     }
 
     // MARK: Projects
@@ -712,6 +733,8 @@ final class AppModel {
         // else a server says is about this window: its devices, runtimes and clones
         // are asked for when they are wanted.
         switch method {
+        case DaemonAPI.Notification.runtimeChanged:
+            await refreshServerRuntimes(host)
         case DaemonAPI.Notification.filesChanged:
             guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
             serverFiles(host).apply(change)
@@ -731,6 +754,7 @@ final class AppModel {
         // A new connection watches nothing; what the files pane was watching is asked
         // for again, and everything it shows is read again.
         await serverFilesByHost[host]?.reconnected()
+        await refreshServerRuntimes(host)
         if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(),
                                                returning: [Agent].self) {
             work.replaceAgents(listed, from: host)

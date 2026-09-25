@@ -240,8 +240,18 @@ struct PromptBar: View {
                     }
                 }
                 .disabled(model.availableRuntimes.isEmpty)
+                .help(noServerRuntime ?? "")
             }
         }
+    }
+
+    /// A server with nothing to start agents with says so where the runtime is chosen
+    /// (037, FR-012).
+    private var noServerRuntime: String? {
+        let host = model.selectedProjectHost
+        guard agent == nil, host != .mac, !model.hosts.isOffline(host), model.availableRuntimes.isEmpty else { return nil }
+        let label = model.hosts.label(host)
+        return "No agent runtime on \(label). Install one there and log in, then choose Check again."
     }
 
     // MARK: What you want done

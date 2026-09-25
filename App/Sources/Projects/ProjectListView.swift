@@ -198,7 +198,7 @@ private struct EmptyProjectList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if model.availableRuntimes.isEmpty {
+            if model.macRuntimesAvailable.isEmpty {
                 Text("No agent runtime found")
                     .appText(.reading).fontWeight(.semibold)
                 Text("Agents runs the coding CLIs you already have. Install one and it appears here.")
