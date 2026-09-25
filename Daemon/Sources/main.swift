@@ -88,6 +88,24 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                                DaemonAPI.ListHelpersRequest(token: token),
                                fallback: "Nothing to list.")
         }
+    } leases: { call in
+        // A lease call may wait up to the daemon's limit before it answers (036). The
+        // socket read has no timeout of its own, so the daemon's is the only one.
+        switch call {
+        case .lease(let name, let minutes, let wait):
+            return await relay(DaemonAPI.Method.leasesLease,
+                               DaemonAPI.LeaseRequest(token: token, name: name,
+                                                      minutes: minutes, wait: wait),
+                               fallback: "Leased.")
+        case .release(let name):
+            return await relay(DaemonAPI.Method.leasesRelease,
+                               DaemonAPI.LeaseNameRequest(token: token, name: name),
+                               fallback: "Released.")
+        case .list:
+            return await relay(DaemonAPI.Method.leasesList,
+                               DaemonAPI.LeaseTokenRequest(token: token),
+                               fallback: "Nothing to list.")
+        }
     }
     let task = Task {
         await service.run()

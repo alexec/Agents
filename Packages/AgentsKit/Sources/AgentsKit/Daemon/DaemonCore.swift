@@ -185,6 +185,31 @@ public actor DaemonCore {
     /// restart, and it counts agents that have since ended or been archived, so it
     /// cannot be derived from the agents that happen to still be about.
     lazy var spendLedger = SpendLedger(locations: locations)
+
+    // MARK: Leases (036)
+
+    /// Where the lease book is kept between runs.
+    lazy var leaseStore = LeaseStore(locations: locations)
+    /// Every lease on the Mac and everyone waiting. Read from disk on first use, and
+    /// written back after every change, so a restart finds it as it was (FR-008).
+    var leaseBook = LeaseBook()
+    var leaseBookIsLoaded = false
+    /// Lease calls waiting their turn, by the id the book knows the waiter's call by.
+    /// Answered when the lease comes, the wait runs out, or the agent is stopped.
+    var openWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
+    var openWaitStarted: [UUID: Date] = [:]
+    /// The one timer, aimed at the book's next deadline. Re-aimed after every change.
+    var leaseTimer: Task<Void, Never>?
+    /// Tells the windows once a minute while anything is held, so "minutes left"
+    /// keeps counting down on screen.
+    var leaseMinuteTicker: Task<Void, Never>?
+    /// How long a lease call may stay open. A test shortens it.
+    var leaseWaitLimit: Duration = LeaseLimits.waitLimit
+    /// What the Mac has that can be leased. A test gives it a fixed list.
+    var resourceCatalog: any ResourceFinding = ResourceCatalog()
+    /// What the catalog last said, so a snapshot can be drawn without waiting on it.
+    /// Nil until it has answered once: before that, nothing held can be called gone.
+    var foundResources: [FoundResource]?
     /// The local day the last tick saw, so the heartbeat can notice a rollover
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?

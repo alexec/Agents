@@ -71,6 +71,12 @@ extension DaemonCore {
             interrupted[id] = agent.state
             recovered.append(id)
         }
+        // The leases as they were (036 FR-008). Whatever ran out while the daemon was
+        // down is released now and handed on, and every waiter is one to start rather
+        // than one to answer: no call survives a restart.
+        let leaseEvents = loadLeasesIfNeeded()
+        leasesChanged()
+        await settle(leaseEvents)
         return recovered
     }
 
