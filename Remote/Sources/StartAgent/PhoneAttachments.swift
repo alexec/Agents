@@ -124,7 +124,7 @@ struct AttachmentStrip: View {
                     .frame(maxWidth: 240, alignment: .leading)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+                    .paperRaised(in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }

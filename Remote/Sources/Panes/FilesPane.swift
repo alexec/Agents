@@ -99,8 +99,7 @@ struct FilesPane: View {
             if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
                     .appText(.fine)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.paper)
             }
         }
         .buttonStyle(.borderless)

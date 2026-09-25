@@ -93,6 +93,65 @@ struct WorkflowToolTests {
         #expect(answer == sample)
     }
 
+    /// What Claude advertised the last time it was used here: a mode, an effort and a
+    /// fast mode. Remembered by hand, because what these tests are about is what the
+    /// tool says with it, not how it came to be remembered.
+    private func rememberClaude(_ core: DaemonCore, in project: URL) async {
+        let options = [
+            ConfigOption(id: "mode", name: "Mode", category: "mode", type: "select",
+                         options: [ConfigChoice(value: .string("default"), name: "Default"),
+                                   ConfigChoice(value: .string("plan"), name: "Plan")]),
+            ConfigOption(id: "effort", name: "Effort", category: "thought_level", type: "select",
+                         options: [ConfigChoice(value: .string("low"), name: "Low"),
+                                   ConfigChoice(value: .string("high"), name: "High")]),
+            ConfigOption(id: "fast", name: "Fast mode", category: "model_config", kind: .boolean),
+        ]
+        await core.remember(OptionCache.Entry(options: options, commands: []),
+                            for: OptionCache.key(runtimeID: "claude", cwd: project, mcpServers: []))
+    }
+
+    @Test func readingSaysWhatTheRuntimeOffersUnderTheFile() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try FileManager.default.createDirectory(at: WorkflowFile.folder(in: work),
+                                                withIntermediateDirectories: true)
+        try Data(sample.utf8).write(to: WorkflowFile.url(for: "advisories", in: work))
+        let (core, token, _) = try await core(locations, in: work)
+        await rememberClaude(core, in: work)
+
+        let answer = try await call(core, token, .read, id: "advisories")
+
+        // The file first and whole, so an agent writing it back has it as it was.
+        #expect(answer.hasPrefix(sample + "\n\n(End of the file. Not part of it:)"))
+        #expect(answer.contains("- `permission-mode:` default, plan"))
+        #expect(answer.contains("- `effort:` low, high"))
+        #expect(answer.contains("  - `fast:` true, false (Fast mode)"))
+    }
+
+    @Test func writingAnEffortAndFastModeIsTakenAndAnUnofferedOneIsSaidAtOnce() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        await rememberClaude(core, in: work)
+        // Its turn over and its runtime let go first, so the session ending cannot
+        // drop the token between one write and the next.
+        await eventually("its runtime was handed back") { await core.live[agentID] == nil }
+
+        let settled = sample.replacingOccurrences(
+            of: "agent: new\n", with: "agent: new\neffort: high\noptions:\n  fast: true\n")
+        let answer = try await call(core, token, .write, id: "advisories", content: settled,
+                                    keepingAlive: agentID)
+        #expect(answer.contains("at high effort, with fast."))
+        #expect(!answer.contains("will not run"))
+
+        let unoffered = sample.replacingOccurrences(of: "agent: new\n", with: "agent: new\neffort: max\n")
+        let warned = try await call(core, token, .write, id: "advisories", content: unoffered,
+                                    keepingAlive: agentID)
+        // Written anyway — the memory may be stale — but the agent is told now.
+        #expect(warned.hasPrefix("Changed advisories."))
+        #expect(warned.contains("\"max\" is not an effort Claude offers here — it offers low, high"))
+    }
+
     @Test func listingSaysWhatEachOneIsAndWhatHappenedToIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

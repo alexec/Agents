@@ -106,6 +106,98 @@ public enum FrontMatterEdit {
         return lines.joined(separator: newline)
     }
 
+    /// Set, change or remove one scalar key in a top-level block of keys: `fast` under
+    /// `options:`. `nil` removes it, and the block goes with its last key.
+    ///
+    /// Held to the same rule as `set`: the block's own indentation is kept, a key that
+    /// is there twice or has something under it is refused, and a block written inline
+    /// as `{…}` is refused rather than rewritten into a shape its author did not use.
+    public static func set(_ key: String, under block: String, to value: String?,
+                           in source: String) throws -> String {
+        let newline = source.range(of: "\r\n") != nil ? "\r\n" : "\n"
+        var lines = source.components(separatedBy: newline)
+
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+            throw Refusal("This file does not start with a metadata block, and one cannot be invented for it")
+        }
+        guard let closing = lines.dropFirst().firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces) == "---"
+        }) else {
+            throw Refusal("The metadata block is never closed")
+        }
+
+        let heads = (1..<closing).filter { isKeyLine(lines[$0], key: block) }
+        guard heads.count <= 1 else {
+            throw Refusal("`\(block):` appears more than once in the metadata — which one is meant is not something to pick between silently")
+        }
+        guard let head = heads.first else {
+            guard let value else { return source }
+            lines.insert(contentsOf: ["\(block):", "  \(key): \(quoted(value))"], at: closing)
+            return lines.joined(separator: newline)
+        }
+        let headValue = split(lines[head], key: block).value
+        guard headValue.isEmpty else {
+            throw Refusal("`\(block):` is written on one line, which this cannot change")
+        }
+
+        // The block is every line after its head that belongs to it; blank lines and
+        // comments inside it are kept where they are.
+        var end = head + 1
+        while end < closing, isContinuation(lines[end]) || lines[end].trimmingCharacters(in: .whitespaces).isEmpty {
+            end += 1
+        }
+        let children = (head + 1)..<end
+        let indents = children.compactMap { index -> Int? in
+            let line = lines[index]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { return nil }
+            return line.prefix { $0 == " " }.count
+        }
+        let indent = indents.min() ?? 2
+        guard indent > 0 else {
+            throw Refusal("`\(block):` has a list under it, which this cannot change")
+        }
+        let pad = String(repeating: " ", count: indent)
+
+        let matches = children.filter {
+            lines[$0].hasPrefix(pad) && isKeyLine(String(lines[$0].dropFirst(indent)), key: key)
+        }
+        guard matches.count <= 1 else {
+            throw Refusal("`\(key):` appears more than once under `\(block):` — which one is meant is not something to pick between silently")
+        }
+
+        guard let index = matches.first else {
+            guard let value else { return source }
+            // After the block's last real line, so a trailing blank stays trailing.
+            let last = children.last { !lines[$0].trimmingCharacters(in: .whitespaces).isEmpty } ?? head
+            lines.insert("\(pad)\(key): \(quoted(value))", at: last + 1)
+            return lines.joined(separator: newline)
+        }
+
+        let line = String(lines[index].dropFirst(indent))
+        let parts = split(line, key: key)
+        if parts.value.isEmpty, index + 1 < end,
+           lines[index + 1].prefix(while: { $0 == " " }).count > indent {
+            throw Refusal("`\(key):` under `\(block):` has a block under it, which this cannot change")
+        }
+        if parts.value.hasPrefix("[") || parts.value.hasPrefix("{") {
+            throw Refusal("`\(key):` under `\(block):` is a list, which this cannot change")
+        }
+
+        guard let value else {
+            lines.remove(at: index)
+            // The last key gone takes its block with it, unless something the author
+            // wrote — a comment — is still under it.
+            let remaining = (head + 1)..<(end - 1)
+            if remaining.allSatisfy({ lines[$0].trimmingCharacters(in: .whitespaces).isEmpty }) {
+                lines.remove(at: head)
+            }
+            return lines.joined(separator: newline)
+        }
+        lines[index] = "\(pad)\(key):\(parts.spacing)\(quoted(value))\(parts.trailing)"
+        return lines.joined(separator: newline)
+    }
+
     /// Whether this line is `key:` at column zero, as against a key of the same name
     /// nested under something, or a longer key that merely starts the same way.
     private static func isKeyLine(_ line: String, key: String) -> Bool {

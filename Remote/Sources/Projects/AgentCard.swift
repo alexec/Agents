@@ -20,7 +20,7 @@ struct AgentCard: View {
     private var agent: Agent { model.work.agent(given.id) ?? given }
 
     var body: some View {
-        NavigationLink(value: agent.id) {
+        NavigationLink(value: RemoteRoute.agent(agent.id)) {
             HStack(alignment: .top, spacing: 12) {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
                            outcome: agent.report?.outcome,

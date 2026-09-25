@@ -401,7 +401,68 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(workflowID ?? "") in this project.")
         }
-        return text
+        let parsed = WorkflowFile.parse(text, workflowID: url.deletingPathExtension().lastPathComponent,
+                                        in: project)
+        guard let menu = offeredSettings(for: parsed) else { return text }
+        // Set apart from the file, so an agent copying the text back does not write
+        // this into it.
+        return text + "\n\n(End of the file. Not part of it:)\n" + menu
+    }
+
+    /// What the workflow's runtime last offered in this project, as the keys a file
+    /// writes it with — so an agent changing a workflow's settings can see the words
+    /// that will work, rather than guessing at `plan` on a runtime that calls it
+    /// something else.
+    ///
+    /// From the daemon's memory, and said to be: nothing is started to ask, and a
+    /// runtime can change its menu. The fire is still what checks.
+    private func offeredSettings(for workflow: Workflow) -> String? {
+        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        let advertised = rememberedOptions(DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID,
+                                                                              cwd: workflow.folder))
+        // Nothing remembered is nothing to add: the file is the whole answer, and the
+        // fire still checks whatever it names.
+        guard !advertised.isEmpty else { return nil }
+        func line(_ key: String, _ option: ConfigOption?) -> String? {
+            guard let option else { return nil }
+            return "- `\(key):` \(WorkflowSettings.offered(by: option).joined(separator: ", "))"
+        }
+        var lines = [
+            line(WorkflowSettings.Setting.permissionMode, ModeMemory.modeOption(in: advertised)),
+            line(WorkflowSettings.Setting.model, WorkflowSettings.modelOption(in: advertised)),
+            line(WorkflowSettings.Setting.effort, WorkflowSettings.effortOption(in: advertised)),
+        ].compactMap { $0 }
+        let others = advertised.filter {
+            $0.isRenderable && !WorkflowSettings.isNamedOnItsOwn($0, in: advertised)
+        }
+        if !others.isEmpty {
+            lines.append("- under `\(WorkflowSettings.Setting.options):`")
+            lines += others.map {
+                "  - `\($0.id):` \(WorkflowSettings.offered(by: $0).joined(separator: ", "))"
+                    + " (\($0.name))"
+            }
+        }
+        return (["What \(name) last offered in this project, as a file writes it:"] + lines)
+            .joined(separator: "\n")
+    }
+
+    /// Values the runtime is remembered not to offer, said while the agent that wrote
+    /// them is still there to fix them. Not a refusal: the memory can be stale, and the
+    /// fire is what decides.
+    private func unofferedWarning(for workflow: Workflow) -> String? {
+        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+        guard !workflow.settings.isEmpty, RuntimeCatalog.runtime(id: runtimeID) != nil else { return nil }
+        let advertised = rememberedOptions(DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID,
+                                                                              cwd: workflow.folder))
+        guard !advertised.isEmpty,
+              case .refused(let setting, let value, let offered) = WorkflowSettings.resolve(
+                workflow.settings, against: advertised)
+        else { return nil }
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        let detail = WorkflowSettings.refusalDetail(setting: setting, value: value,
+                                                    offered: offered, runtime: name)
+        return "But \(detail), so as it stands it will not run. Fix it with another write."
     }
 
     // MARK: Writing
@@ -464,18 +525,19 @@ extension DaemonCore {
         let archived = workflowStore.load()
             .state(folder: project, workflowID: workflowID)?.isArchived ?? false
         rescanWorkflows(in: project)
+        let warning = unofferedWarning(for: parsed).map { " " + $0 } ?? ""
         if archived {
             return """
                 \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
                 It is archived, though, so it will not run until they bring it back \
                 from the project page. Tell them it is there.
-                """
+                """ + warning
         }
         return """
             \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
             It is live now; it shows on the project page, where they can run it, pause \
             it, or archive it if it is not what they wanted.
-            """
+            """ + warning
     }
 
     private func removeWorkflowForAgent(_ workflowID: String?, in project: URL) throws -> String {
