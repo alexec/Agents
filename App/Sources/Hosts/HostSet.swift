@@ -124,12 +124,19 @@ final class HostSet {
         try? store.save(hosts)
     }
 
-    /// Stop talking to a server and forget it. What happens on the server is the
-    /// caller's to have done first (`ServerInstaller.purge`, `daemon/quit`).
-    func remove(_ id: HostID) async {
+    /// How many agents removing this server would stop, for the Remove dialog.
+    func agentsLive(_ id: HostID) async -> Int {
+        await connections[id]?.agentsLive() ?? 0
+    }
+
+    /// Remove a server: its agents stopped, its daemon gone, and with `purge` what
+    /// Agents installed there; then forget it here. Its folders are left alone.
+    func remove(_ id: HostID, purge: Bool = false) async {
         listening[id]?.cancel()
         retrying[id]?.cancel()
-        await connections[id]?.disconnect()
+        if let connection = connections[id] {
+            do { try await connection.remove(purge: purge) } catch { log("\(label(id)): remove: \(error)") }
+        }
         connections[id] = nil
         states[id] = nil
         hosts.remove(id)

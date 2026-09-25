@@ -165,6 +165,28 @@ public actor ServerConnection {
         return (status?.turnsInFlight ?? 0) > 0
     }
 
+    /// How many agents removing this server would stop (037, the Remove dialog).
+    public func agentsLive() async -> Int {
+        let status = try? await client.call(DaemonAPI.Method.daemonStatus, returning: DaemonAPI.DaemonStatus.self)
+        return status?.agentsLive ?? 0
+    }
+
+    /// Remove the server (037 US5): its agents are stopped and its daemon quits; with
+    /// `purge`, what Agents installed goes too. The person's folders are never touched:
+    /// they are not under `~/.agents-server`.
+    public func remove(purge: Bool) async throws {
+        if state == .connected {
+            _ = try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: true))
+            await client.disconnect()
+            try? await installer.waitForDaemonGone()
+        }
+        if purge {
+            if !(await master.isRunning) { try await master.start(forwardingTo: nil) }
+            try await installer.purge()
+        }
+        await disconnect()
+    }
+
     public func disconnect() async {
         wasConnected = false
         await client.disconnect()

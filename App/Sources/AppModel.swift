@@ -749,6 +749,16 @@ final class AppModel {
     /// Everything a server has, after it connects or comes back. Replaces only that
     /// server's own, so the Mac's list is never emptied by a server re-listing, and
     /// whatever happened while the Mac was away is simply what the server now says.
+    /// Remove a server, and everything the window held from it (037 US5).
+    func removeServer(_ host: HostID, purge: Bool) async {
+        await hosts.remove(host, purge: purge)
+        work.replaceAgents([], from: host)
+        work.replaceProjects([], from: host)
+        serverRuntimes[host] = nil
+        serverFilesByHost[host] = nil
+        if selectedProjectHost == host { select(liveProjects.first?.key) }
+    }
+
     func refreshServer(_ host: HostID) async {
         let server = client(for: host)
         // A new connection watches nothing; what the files pane was watching is asked

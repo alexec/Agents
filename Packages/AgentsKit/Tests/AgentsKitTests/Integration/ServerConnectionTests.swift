@@ -150,6 +150,37 @@ struct ServerConnectionTests {
         #expect(current == ServerInstaller.binaryName(sha256: new.sha256))
     }
 
+    @Test func removingStopsTheDaemonAndLeavesTheFoldersAlone() async throws {
+        let fake = try FakeSSH()
+        defer { fake.tearDown() }
+        let project = fake.home.appendingPathComponent("src/api", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try "keep".write(to: project.appendingPathComponent("README"), atomically: true, encoding: .utf8)
+        let server = try connection(fake)
+        await server.connect()
+        let lock = fake.home.appendingPathComponent(".agents-server/root/daemon.lock")
+        let pid = try #require(Int32(String(contentsOf: lock, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        try await server.remove(purge: false)
+        await eventually("the daemon has gone") { kill(pid, 0) != 0 }
+        #expect(FileManager.default.fileExists(atPath: fake.home.appendingPathComponent(".agents-server").path),
+                "without purge, what was installed stays")
+        #expect(try String(contentsOf: project.appendingPathComponent("README"), encoding: .utf8) == "keep")
+        #expect(await server.state == .idle)
+    }
+
+    @Test func removingWithPurgeDeletesOnlyWhatAgentsInstalled() async throws {
+        let fake = try FakeSSH()
+        defer { fake.tearDown() }
+        let project = fake.home.appendingPathComponent("src/api", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try "keep".write(to: project.appendingPathComponent("README"), atomically: true, encoding: .utf8)
+        let server = try connection(fake)
+        await server.connect()
+        try await server.remove(purge: true)
+        #expect(!FileManager.default.fileExists(atPath: fake.home.appendingPathComponent(".agents-server").path))
+        #expect(try String(contentsOf: project.appendingPathComponent("README"), encoding: .utf8) == "keep")
+    }
+
     @Test func versionsCompareByNumber() {
         #expect(ServerConnection.isNewer("1.14.0+1", than: "1.9.0+99"))
         #expect(ServerConnection.isNewer("1.2.0+10", than: "1.2.0+9"))
