@@ -1193,11 +1193,12 @@ final class AppModel {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let host = work.agent(selection)?.host ?? .mac
         if host != .mac {
+            guard let carried = await carry(attachments, to: host, for: selection) else { return false }
             let sendID = UUID()
             return await sendToServer(host) { client in
                 try await client.call(DaemonAPI.Method.agentsPrompt,
                                       DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                              attachments: attachments, sendID: sendID))
+                                                              attachments: carried, sendID: sendID))
             }
         }
         return await attempt {
@@ -1526,6 +1527,42 @@ final class AppModel {
     /// Whether the work went through, for the callers that must undo something when
     /// it did not.
     @discardableResult
+    /// Files attached from this Mac, copied to the server first (037, FR-015). A path
+    /// on the Mac means nothing to an agent on a server, so each file that exists here
+    /// is written into the agent's folder there, and the attachment points at that
+    /// copy. Pictures already travel as bytes, and a file named from the server's own
+    /// files pane is already a path there. Nil, with the reason said, when a file
+    /// cannot go: the prompt then stays in the field.
+    private func carry(_ attachments: [Attachment], to host: HostID, for agentID: UUID) async -> [Attachment]? {
+        var carried: [Attachment] = []
+        for attachment in attachments {
+            guard case .resourceLink(let uri, let name, let mimeType, _, _) = attachment.block,
+                  let url = URL(string: uri), url.isFileURL,
+                  let agent = work.agent(agentID),
+                  !url.path.hasPrefix(agent.cwd.path),
+                  FileManager.default.fileExists(atPath: url.path) else {
+                carried.append(attachment)
+                continue
+            }
+            guard let data = try? Data(contentsOf: url), data.count <= DaemonAPI.attachmentLimit else {
+                problem = "\(name) is too big to send to \(hosts.label(host))."
+                return nil
+            }
+            do {
+                let written = try await client(for: host).call(
+                    DaemonAPI.Method.filesWrite, DaemonAPI.FilesWriteRequest(agentID: agentID, name: name, data: data),
+                    returning: DaemonAPI.FilesWriteResponse.self)
+                carried.append(Attachment(block: .resourceLink(uri: URL(filePath: written.path).absoluteString,
+                                                               name: name, mimeType: mimeType, size: data.count),
+                                          displayName: attachment.displayName, byteCount: data.count))
+            } catch {
+                problem = "\(name) could not be sent to \(hosts.label(host))."
+                return nil
+            }
+        }
+        return carried
+    }
+
     /// A send to a server, delivered once or reported as not sent (037, FR-020).
     ///
     /// The caller makes the `sendID` once, so every retry here is the same send: a

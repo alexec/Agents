@@ -174,6 +174,9 @@ public enum DaemonAPI {
         /// The folders at a path, before there is any project or agent to scope it to:
         /// what the window browses to choose a server folder as a project (037).
         public static let filesBrowse = "files/browse"
+        /// A file attached on one machine, for an agent on another (037): written into
+        /// the agent's folder so it can read it, and the path handed back.
+        public static let filesWrite = "files/write"
 
         // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
         // which is 003's and belongs to the agent. Different owner, different
@@ -1715,4 +1718,26 @@ public extension DaemonAPI {
         public var path: String?
         public init(path: String? = nil) { self.path = path }
     }
+}
+
+public extension DaemonAPI {
+    /// `files/write` (037). `data` travels as base64 in the JSON.
+    struct FilesWriteRequest: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var name: String
+        public var data: Data
+        public init(agentID: UUID, name: String, data: Data) {
+            self.agentID = agentID
+            self.name = name
+            self.data = data
+        }
+    }
+
+    struct FilesWriteResponse: Codable, Hashable, Sendable {
+        public var path: String
+        public init(path: String) { self.path = path }
+    }
+
+    /// The most `files/write` takes, and the most the window sends.
+    static let attachmentLimit = 25 * 1024 * 1024
 }
