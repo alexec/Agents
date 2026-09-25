@@ -55,7 +55,7 @@ case "${1:-status}" in
   status)
     docker ps -a --filter name=^$NAME\$ --format 'box: {{.Status}}'
     "${SSH[@]}" 'echo "ssh: ok ($(uname -sm))"
-      echo "node: $(command -v node || echo none)  npx: $(command -v npx || echo none)  claude sign-in: $([ -e ~/.claude ] && echo yes || echo none)"
+      echo "node: $(command -v node || echo none)  npx: $(command -v npx || echo none)  claude sign-in: $([ -f ~/.claude/.credentials.json ] && echo yes || echo none)"
       if [ -f ~/.agents-server/install.json ]; then echo "agentsd installed: $(cat ~/.agents-server/install.json)"; else echo "agentsd installed: nothing"; fi
       echo "claude toolset: $(readlink ~/.agents-server/tools/claude/current 2>/dev/null || echo none)"
       p=$(pgrep -af "agentsd.*--serve" | grep -v pgrep); echo "agentsd: ${p:-not running}"' \
