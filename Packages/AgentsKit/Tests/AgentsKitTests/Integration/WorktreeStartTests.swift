@@ -335,8 +335,14 @@ struct WorktreeStartTests {
     /// An agent started in a new worktree, finished, with its worktree's folder.
     private func finishedInWorktree(_ core: DaemonCore, _ repo: Repo) async throws -> (UUID, URL) {
         let id = try await startNew(core, repo)
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await settled(core, id)
         return (id, try #require(await core.agent(id)?.worktree?.root))
+    }
+
+    /// Finished. The app's question to a silent agent (a fake one never says how it
+    /// went) may still be on its way, and archiving has to win over it.
+    private func settled(_ core: DaemonCore, _ id: UUID) async {
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
     }
 
     private func removal(_ repo: Repo, _ root: URL, confirmed: Bool = false) -> DaemonAPI.WorktreeRemovalRequest {
@@ -387,7 +393,7 @@ struct WorktreeStartTests {
         let (id, root) = try await finishedInWorktree(core, repo)
         let other = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "and this",
                                                worktree: .existing(root)))
-        await eventually("the turn ended") { await core.agent(other)?.state == .finished }
+        await settled(core, other)
         try await core.archive(id)
         #expect(FileManager.default.fileExists(atPath: root.path))
 
@@ -401,7 +407,7 @@ struct WorktreeStartTests {
         let byHand = try await addByHand(repo, "by-hand")
         let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
                                             worktree: .existing(byHand)))
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await settled(core, id)
         try await core.archive(id)
         #expect(FileManager.default.fileExists(atPath: byHand.path))
     }
@@ -627,7 +633,7 @@ struct WorktreeStartTests {
         let core = try await makeCore(repo, FakeLauncher())
         let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
                                             worktree: .branch("feature/login")))
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await settled(core, id)
         let root = try #require(await core.agent(id)?.worktree?.root)
         try "more\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
         _ = try await git(["add", "NEW"], in: root)
@@ -655,7 +661,7 @@ struct WorktreeStartTests {
         let core = try await makeCore(repo, FakeLauncher())
         let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
                                             worktree: .branch("feature/login")))
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await settled(core, id)
         let root = try #require(await core.agent(id)?.worktree?.root)
         try await core.archive(id)
         #expect(!FileManager.default.fileExists(atPath: root.path))
