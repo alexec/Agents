@@ -614,8 +614,13 @@ public actor DaemonCore {
         case .starting, .running, .waitingOnUser:
             break
         }
+        let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
+        // Its first turn has begun (042).
+        if wasStarting, next == .running {
+            raiseAgentEvent("agent.started", agentID, sentence: "started working.")
+        }
 
         // The whole of the lifecycle trigger surface, in the one place every state
         // change already passes through. `applying` returns nil for a transition that
@@ -654,6 +659,9 @@ public actor DaemonCore {
             // finished agent's depth unfindable, and a depth that quietly resets to
             // zero is a loop the limit never stops.
             let depth = workflowChainDepth(causedBy: agentID)
+            // The event first (042): it is what a waiting agent hears, and what the
+            // log keeps. Workflows still fire from the line below until US3 moves them.
+            raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason, depth: depth)
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
                              agentID: agentID, depth: depth)
@@ -837,6 +845,7 @@ public actor DaemonCore {
 
         case .elicitationRequested(let request):
             await holdElicitation(request, agentID: agentID)
+            raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
             workflowsRespond(to: .askedForm, agentID: agentID)
 
         case .elicitationWithdrawn(let requestID):
@@ -873,6 +882,7 @@ public actor DaemonCore {
                       DaemonAPI.PermissionNotification(agentID: agentID, request: request))
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
+            raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
             workflowsRespond(to: .askedPermission, agentID: agentID)
             reconsider()
 

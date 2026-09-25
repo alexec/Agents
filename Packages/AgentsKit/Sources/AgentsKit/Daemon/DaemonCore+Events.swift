@@ -39,6 +39,46 @@ extension DaemonCore {
         broadcastEvents(event)
     }
 
+    // MARK: Agents (042 contracts/catalogue.md)
+
+    /// An event about one agent, in its project, with its id and title.
+    func raiseAgentEvent(_ name: String, _ agentID: UUID, sentence: String,
+                         details extra: [String: String] = [:], depth: Int? = nil) {
+        guard let agent = agents[agentID] else { return }
+        raise(EventDraft(name: name, at: now(), scope: .project(folder: agent.projectFolder),
+                         sentence: "\(LeaseWords.agentName(agent.title)) \(sentence)",
+                         details: agentDetails(agent).merging(extra) { $1 },
+                         chainDepth: depth ?? workflowChainDepth(causedBy: agentID)))
+    }
+
+    /// `agent.finished`, `agent.stopped` or `agent.failed`. Stopped is somebody or
+    /// something choosing to stop it; failed is everything that ended it that nobody
+    /// chose. The old `agent-stopped` trigger answers to both (FR-022).
+    func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int) {
+        guard let agent = agents[agentID] else { return }
+        if next == .finished {
+            let outcome = agent.report?.outcome
+            raiseAgentEvent("agent.finished", agentID,
+                            sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",
+                            details: outcome.map { ["outcome": $0.rawValue] } ?? [:], depth: depth)
+            return
+        }
+        let words = reason?.summary?.lowercased() ?? "stopped"
+        if Self.isChosenStop(reason) {
+            raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": words], depth: depth)
+        } else {
+            raiseAgentEvent("agent.failed", agentID, sentence: "ended in an error: \(words).",
+                            details: ["reason": words], depth: depth)
+        }
+    }
+
+    static func isChosenStop(_ reason: EndedReason?) -> Bool {
+        switch reason {
+        case .cancelled, .costLimit, nil: return true
+        default: return false
+        }
+    }
+
     // MARK: Workflows
 
     /// Fire every workflow whose trigger this event matches. Filled in with US3.
