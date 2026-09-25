@@ -225,12 +225,12 @@ scrollback is there. Tap ^C once on the phone to interrupt, and the Mac shows th
   - input without a size does not resize
   - a device connection hears no `shell/output` until it attaches, and none after it detaches
   - a window hears every shell
-- [ ] T049 [US4] Create `Remote/Sources/Panes/ShellKeys.swift`, the key row as a `UIInputView`:
+- [X] T049 [US4] Create `Remote/Sources/Panes/ShellKeys.swift`, the key row as a `UIInputView`:
   - **^C** (0x03), **Esc** (0x1b), **Tab** (0x09), **← ↑ ↓ →** (`ESC [ D/A/B/C`, or the application-cursor forms when the terminal says so, read from SwiftTerm's `terminal.applicationCursor`)
   - a sticky **Ctrl**, which masks the next typed letter to its control code
   - `| ~ / -`
   - Each key calls `TerminalView.send(_:)`. It follows the paper colours.
-- [ ] T050 [US4] Create `Remote/Sources/Panes/TerminalPane.swift`:
+- [X] T050 [US4] Create `Remote/Sources/Panes/TerminalPane.swift`:
   - a `UIViewRepresentable` over SwiftTerm's iOS `TerminalView`, painted like `App/Sources/Sidebar/TerminalHostView.swift`, with `inputAccessoryView = ShellKeys`
   - the delegate's `send` goes to `ShellClient.send`, and `sizeChanged` to `ShellClient.resize`
   - it attaches on appear and detaches on disappear
@@ -238,8 +238,8 @@ scrollback is there. Tap ^C once on the phone to interrupt, and the Mac shows th
   - exited, failed or released states show the daemon's sentence with **Start again** (`restart`)
   - stale: input is disabled and the keyboard dismissed, and on reconnect it re-attaches and replays
   - focus reports to `isTyping`
-- [ ] T051 [US4] In `Remote/Sources/RemoteModel.swift`, add `shells: [UUID: ShellClient]`, and route `shell/output` and `shell/stateChanged` to them in the notification switch.
-- [ ] T052 [US4] Build Remote (SwiftTerm on iOS for the first time), then the Mac. On the Mac, walk the terminal pane with run-app: attach, `ls`, resize, then Start again after `exit`.
+- [X] T051 [US4] In `Remote/Sources/RemoteModel.swift`, add `shells: [UUID: ShellClient]`, and route `shell/output` and `shell/stateChanged` to them in the notification switch.
+- [ ] T052 (builds done 2026-09-24; the Mac terminal walk is deferred to the end with T027) [US4] Build Remote (SwiftTerm on iOS for the first time), then the Mac. On the Mac, walk the terminal pane with run-app: attach, `ls`, resize, then Start again after `exit`.
 
 ---
 

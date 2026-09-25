@@ -74,6 +74,18 @@ final class RemoteModel {
     let files: RemoteFiles
     let panes = RemotePanes()
     let pictures: PhonePictures
+    /// This device's end of each agent's shell it has opened (034). The shell is the
+    /// Mac's; these only know how to reach it.
+    @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+
+    func shellClient(for agentID: UUID) -> ShellClient {
+        if let existing = shells[agentID] { return existing }
+        let fresh = ShellClient(agentID: agentID, client: client, describe: { error in
+            (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
+        })
+        shells[agentID] = fresh
+        return fresh
+    }
 
     init(link: any DaemonLink) {
         client = DaemonClient(link: link)
@@ -712,6 +724,16 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.draftOptions,
                    let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
                     self.settleStartDraft(change)
+                }
+                // The Mac sends a device only the shells it has open (034).
+                if notification.method == DaemonAPI.Notification.shellOutput,
+                   let params = notification.params,
+                   let output = DaemonAPI.ShellOutputNotification(params: params) {
+                    self.shells[output.agentID]?.received(output.bytes)
+                }
+                if notification.method == DaemonAPI.Notification.shellStateChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+                    self.shells[change.agentID]?.received(change.state)
                 }
                 if notification.method == DaemonAPI.Notification.filesChanged,
                    let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
