@@ -356,6 +356,33 @@ struct ConsistencyTests {
             """)
     }
 
+    /// The live page's pieces, one copy for both apps in `Shared/UI/Page` and Core (034).
+    private static let sharedPageTypes = [
+        "MarkdownText", "LivePage", "PassageEditor", "CursorFlag", "FileLines",
+        "PageFollower", "PassageMerge", "ImageStamps", "ShellClient",
+    ]
+
+    /// The page is one page on the Mac and the phone. Two `MarkdownText`s drifted once;
+    /// this is what stops two pages doing the same.
+    @Test func neitherAppHasAPageOfItsOwn() throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
+            scanned += 1
+            for (index, line) in source.lines.enumerated() {
+                guard let name = Self.declaredType(line), Self.sharedPageTypes.contains(name) else { continue }
+                violations.append("\(Self.at(source, index)): \(name)")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            An app declares its own copy of a piece of the live page, which lives in \
+            `Shared/UI/Page` and AgentsKitCore. Change the shared one; what genuinely \
+            differs by app goes through `PageActions` or a platform branch there.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
     /// A sentence written into both apps' chats, rather than once where both read it.
     ///
     /// The chat folders only: a settings screen that happens to share a phrase with a

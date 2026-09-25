@@ -13,15 +13,18 @@ struct FileLines: View {
     let text: String
     /// The line to put the reader on, counted from one, or nil for the top.
     let line: Int?
+    /// Where the reader was, kept by a pane that is drawn afresh on a phone (034).
+    var place: Binding<Int?>? = nil
 
     /// Split once, when the view is made, rather than on every pass of `body` and
     /// once more for every row drawn.
     private let lines: [Substring]
     private let gutter: Double
 
-    init(text: String, line: Int?) {
+    init(text: String, line: Int?, place: Binding<Int?>? = nil) {
         self.text = text
         self.line = line
+        self.place = place
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         self.lines = lines
         // Wide enough for the biggest number this will draw. The pane shows the first
@@ -47,9 +50,11 @@ struct FileLines: View {
                         row(number: number + 1, content: content)
                     }
                 }
+                .scrollTargetLayout()
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .keepsPlace(place)
             // Runs again when the agent names a different line in the same file, which
             // is the case a plain `onAppear` would sleep through.
             .task(id: TaskKey(text: text, line: line)) {

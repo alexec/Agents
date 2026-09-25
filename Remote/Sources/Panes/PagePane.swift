@@ -82,11 +82,19 @@ struct PagePane: View {
                 LivePage(text: text, url: url, line: state.openLine,
                          agentName: RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID,
                          folderEvent: model.files.anyChange[agent.id] ?? 0,
-                         reconnection: readAfterReconnecting)
+                         reconnection: readAfterReconnecting,
+                         place: place(for: url))
                     .opacity(isGone ? 0.6 : 1)
                     .environment(\.pageActions, actions)
             }
         }
+    }
+
+    /// The passage at the top when this page was last drawn, kept on the pane.
+    private func place(for url: URL) -> Binding<Int?> {
+        let state = state
+        return Binding(get: { state.scrollAnchor[url.path] },
+                       set: { state.scrollAnchor[url.path] = $0 })
     }
 
     private var text: String {

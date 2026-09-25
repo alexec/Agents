@@ -49,8 +49,9 @@ struct DocumentView: View {
                       detail: "It is on the web.",
                       link: url)
         case .file:
-            // A path, not bytes. The protocol hands a client no way to read a file on
-            // the Mac, and inventing one is not this view's business — see ChangesView.
+            // A file the Mac will not read for this agent: outside its folders, or a Mac
+            // too old to read files for the phone. One inside them never comes here;
+            // the Exchanged list opens it live (034 FR-027).
             Elsewhere(name: artifact.name,
                       detail: "It is a file on your Mac. Open it there.",
                       link: nil)

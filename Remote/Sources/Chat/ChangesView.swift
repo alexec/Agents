@@ -13,10 +13,10 @@ import SwiftUI
 /// SC-014 asks that the absence be a fact about the screens rather than a flag
 /// somebody could flip.
 ///
-/// **Where the content comes from, and why it is not the file.** The Mac's pane reads
-/// the disk. An iPad has no such disk, and the protocol has no method that hands a
-/// client a file's bytes — `ShownFile` carries a path and a line and nothing else.
-/// What it does carry, on every edit, is `ToolCallContent.diff`, whose `newText` is
+/// **Where the content comes from, and why it is not the file.** The file itself is
+/// Files' business, read from the Mac with `files/read` (034). This answers a different
+/// question — what did the agent do — from what the conversation carries: on every
+/// edit, `ToolCallContent.diff`, whose `newText` is
 /// what the agent wrote and whose `oldText` is what was there before. So this is the
 /// file as the conversation knows it: accurate about what the agent did, and honest
 /// that it is not a live read. A path the transcript has never seen says so rather

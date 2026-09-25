@@ -45,6 +45,9 @@ struct LivePage: View {
     /// Bumped when the connection to the Mac comes back, so a draft that could not be
     /// saved is carried across whatever happened meanwhile and saved (034 FR-009).
     var reconnection = 0
+    /// Where the reader was, kept by a pane that is drawn afresh on a phone (034). The
+    /// Mac passes nothing.
+    var place: Binding<Int?>? = nil
 
     @State private var page = PageFollower()
     @State private var typist: Task<Void, Never>?
@@ -82,9 +85,11 @@ struct LivePage: View {
                                 .id(index)
                         }
                     }
+                    .scrollTargetLayout()
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
+                .keepsPlace(place)
                 // Prose on the app's reading step: the same face and the same size as
                 // everything else, because a document is a thing you read and that is
                 // what the step is for. It was New York at 12pt for 007, which read as

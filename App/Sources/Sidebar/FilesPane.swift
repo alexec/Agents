@@ -7,6 +7,9 @@ import SwiftUI
 /// file opens as a live page the person can type on, and what they type goes to disk
 /// through the daemon. Nothing else here creates, renames, deletes or edits; the
 /// terminal pane is still the escape hatch for the rest.
+///
+/// The phone has the same pane since 034, reading through the daemon's `files/*` rather
+/// than this disk, with the same page and the same one exception.
 struct FilesPane: View {
     @Environment(AppModel.self) private var model
     let agent: Agent

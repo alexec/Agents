@@ -191,7 +191,10 @@ struct FilesPane: View {
                         .padding(.vertical, 6)
                     Divider()
                 }
-                FileLines(text: text, line: state.openLine)
+                // The line at the top, kept on the pane for when it is drawn again.
+                FileLines(text: text, line: state.openLine,
+                          place: Binding(get: { state.scrollAnchor[url.path] },
+                                         set: { state.scrollAnchor[url.path] = $0 }))
             }
         }
     }

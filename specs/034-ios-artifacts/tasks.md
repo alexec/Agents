@@ -251,25 +251,25 @@ was left.
 **Independent Test**: On an iPad in landscape, a column beside a running chat. Rotate: it moves
 to full screen and keeps its place. Switching agents and back keeps each pane.
 
-- [ ] T053 [US5] In `PaneHost`, add a drag handle between the chat and the column. It sets `preferredPaneWidth` on `RemotePanes` (in memory), clamped by `PanePlacement`.
-- [ ] T054 [US5] Keep each pane's place:
+- [X] T053 [US5] In `PaneHost`, add a drag handle between the chat and the column. It sets `preferredPaneWidth` on `RemotePanes` (in memory), clamped by `PanePlacement`.
+- [X] T054 [US5] Keep each pane's place:
   - `LivePage` and `FileLines` report their top visible index into `PaneState.scrollAnchor[path]` and restore it on appear.
   - Moving between column and full screen, or between agents, re-reads nothing that is current (stamps).
   - The terminal keeps its `ShellClient` across placement changes.
-- [ ] T055 [US5] Build Remote. Write the iPad and iPhone walk for Alex into `specs/034-ios-artifacts/walk/README.md`, from quickstart.md slices A–E.
+- [X] T055 [US5] Build Remote. Write the iPad and iPhone walk for Alex into `specs/034-ios-artifacts/walk/README.md`, from quickstart.md slices A–E.
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T056 Handle the older Mac (FR-029). When `macLacksPanes`:
+- [X] T056 Handle the older Mac (FR-029). When `macLacksPanes`:
   - `PaneHost` shows only Exchanged, with the line "Update Agents on your Mac to read files and use the terminal here."
   - Tool-call files open `ChangesView` in a sheet as before.
   - "Look at this" uses `fileOnScreen`.
-- [ ] T057 [P] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`, fail if `Remote/Sources` declares `struct MarkdownText`, `struct LivePage`, `struct PassageEditor`, `PassageMerge` or `final class ShellClient`, or if `App/Sources` does.
-- [ ] T058 [P] Update `Shared/UI/README.md` for `Shared/UI/Page/` and `PageActions`. Update the `FilesPane` doc comment (read-only apart from the page, now on both devices). Update the `RemoteModel` and `FileView`/`ChangesView` doc comments that say the phone cannot read the Mac's disk.
-- [ ] T059 Run the full suite six times on this branch and on `main`, and compare the failure sets (memory: the suite is broadly flaky under load). Then build both schemes one after the other.
-- [ ] T060 Walk the Mac once more with run-app, covering the page, files and terminal, then stop the scratch app. Record what was seen, and what is Alex's, in `specs/034-ios-artifacts/walk/README.md`.
+- [X] T057 [P] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`, fail if `Remote/Sources` declares `struct MarkdownText`, `struct LivePage`, `struct PassageEditor`, `PassageMerge` or `final class ShellClient`, or if `App/Sources` does.
+- [X] T058 [P] Update `Shared/UI/README.md` for `Shared/UI/Page/` and `PageActions`. Update the `FilesPane` doc comment (read-only apart from the page, now on both devices). Update the `RemoteModel` and `FileView`/`ChangesView` doc comments that say the phone cannot read the Mac's disk.
+- [X] T059 Run the full suite six times on this branch and on `main`, and compare the failure sets (memory: the suite is broadly flaky under load). Then build both schemes one after the other.
+- [ ] T060 (deferred with T027 and T052: Alex at the keyboard, 2026-09-24; see walk/README.md) Walk the Mac once more with run-app, covering the page, files and terminal, then stop the scratch app. Record what was seen, and what is Alex's, in `specs/034-ios-artifacts/walk/README.md`.
 
 ---
 
