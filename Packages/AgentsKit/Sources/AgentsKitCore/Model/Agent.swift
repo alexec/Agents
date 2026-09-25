@@ -34,6 +34,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// that build knew with `stopped` (FR-021). Cleared the moment a transition writes
     /// a state of our own, in `DaemonCore.move`.
     public var rawState: String?
+    /// Which machine this agent runs on, as the window that heard of it says (037).
+    /// Kept in memory only and out of `CodingKeys` for the same reason as `rawState`:
+    /// the daemon that owns the record does not know it has a name elsewhere, and the
+    /// window stamps it on arrival. A record read without it is this Mac's.
+    public var host: HostID = .mac
     public var runtimeSessionID: String?
     public var startOptions: StartOptions
 

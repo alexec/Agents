@@ -87,13 +87,13 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ### 2e — The window can hold many daemons
 
-- [ ] T025 [P] Write `Tests/Unit/AgentsModelHostTests.swift`:
+- [X] T025 [P] Write `Tests/Unit/AgentsModelHostTests.swift`: **Done: 6 tests.**
   - `apply(_:from:)` tags agents and projects with the host;
   - `replaceAgents(_:from: host)` replaces only that host's agents, and `replaceProjects` likewise;
   - two hosts with the same folder path are two projects;
   - `project(_ key:)`, `agents(in:group:)`, `counts(in:)` and `unreadCount(in:)` take `ProjectKey`;
   - records decoded without `host` are `.mac`.
-- [ ] T026 Add `host: HostID` (client-assigned, default `.mac`, not encoded) to `DaemonAPI.ProjectSummary` and `Agent` in `Pkg/Sources/AgentsKitCore/Model/`. Change `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift` to key projects by `ProjectKey` and to add `apply(_:from:)`. Keep URL-taking shims that mean `.mac` until T028 has moved every caller, then delete them.
+- [X] T026 Add `host: HostID` (client-assigned, default `.mac`, not encoded) to `DaemonAPI.ProjectSummary` and `Agent` in `Pkg/Sources/AgentsKitCore/Model/`. Change `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift` to key projects by `ProjectKey` and to add `apply(_:from:)`. Keep URL-taking shims that mean `.mac` until T028 has moved every caller, then delete them. **Done. URL-taking queries stay (the phone uses them, and they mean any host); keyed ones added beside them. T028 moves the Mac's callers.**
 - [ ] T027 Create `App/Sources/Hosts/HostSet.swift` (`@Observable @MainActor`):
   - hosts `[HostID: HostConnection]`, `.mac` first, the rest loaded from `HostStore`;
   - each `HostConnection` has its `DaemonClient`, link, `SSHMaster?` and `HostState` (data-model.md state diagram);

@@ -348,9 +348,17 @@ public enum DaemonAPI {
         /// the ordinary case; non-zero means `costToDate` is a floor rather than the
         /// whole.** Like `counts`, recomputed on every call and never stored.
         public var unmeasuredAgents: Int
+        /// Which machine the project is on, stamped by the window that heard of it and
+        /// never sent (037). Not in `CodingKeys`.
+        public var host: HostID = .mac
 
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
+        public var key: ProjectKey { ProjectKey(host: host, folder: project.folder) }
+
+        enum CodingKeys: String, CodingKey {
+            case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
+        }
 
         /// Whether anything in this project wants the user.
         /// From the daemon's counts, so with the same blind spot: an agent waiting to be
