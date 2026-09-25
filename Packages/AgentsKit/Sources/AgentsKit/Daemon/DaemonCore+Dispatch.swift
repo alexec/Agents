@@ -268,6 +268,29 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
 
+            case DaemonAPI.Method.leasesLease:
+                let request = try require(params, as: DaemonAPI.LeaseRequest.self)
+                return .success(["note": .string(try await lease(request))])
+
+            case DaemonAPI.Method.leasesRelease:
+                let request = try require(params, as: DaemonAPI.LeaseNameRequest.self)
+                return .success(["note": .string(try await releaseLease(request))])
+
+            case DaemonAPI.Method.leasesList:
+                let request = try require(params, as: DaemonAPI.LeaseTokenRequest.self)
+                return .success(["note": .string(try await listLeases(request))])
+
+            case DaemonAPI.Method.leasesSnapshot:
+                return .success(try JSONValue.encoding(await leaseSnapshot()))
+
+            case DaemonAPI.Method.leasesEnd:
+                let request = try require(params, as: DaemonAPI.PersonEndRequest.self)
+                return .success(try JSONValue.encoding(try await endLease(request)))
+
+            case DaemonAPI.Method.leasesRemoveWaiter:
+                let request = try require(params, as: DaemonAPI.PersonRemoveRequest.self)
+                return .success(try JSONValue.encoding(try await removeWaiter(request)))
+
             case DaemonAPI.Method.agentsStartHelper:
                 let request = try require(params, as: DaemonAPI.StartHelperRequest.self)
                 let started = try await startHelper(request)

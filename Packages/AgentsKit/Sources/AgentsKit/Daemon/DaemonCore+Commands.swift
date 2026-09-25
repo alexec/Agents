@@ -1133,6 +1133,10 @@ extension DaemonCore {
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
+        // Every lease it holds given back and every line it is in left (036 FR-007),
+        // before any `await`, so nothing is handed to it halfway through stopping.
+        // Said at the end, once the stop itself is in the transcript.
+        let leaseEvents = dropLeases(for: agentID, ending: .holderStopped)
         // Each open question is taken off the list before anything is awaited, then said
         // in the conversation to have gone unanswered, then refused to the runtime. In
         // that order: an answer arriving in the same moment finds it gone rather than
@@ -1209,6 +1213,7 @@ extension DaemonCore {
                          for: agentID)
         }
         await releaseRuntime(for: agentID)
+        await settle(leaseEvents)
     }
 
     public func archive(_ agentID: UUID, by cause: StopCause = .person) async throws {
@@ -1218,7 +1223,11 @@ extension DaemonCore {
         stops[agentID, default: 0] += 1
         // Archived is never resumed (FR-017): the block goes before anything is awaited.
         dropBlock(agentID)
+        // Before the stop, which would give them back as "stopped": an archived
+        // agent's transcript should say it let go because it was archived (036).
+        let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)
         if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
+        await settle(leaseEvents)
         switch cause {
         case .person:
             await move(agentID, on: .archivedByUser)
