@@ -98,7 +98,10 @@ struct ContentView: View {
                 // sits outside the conversation stack deliberately: a chat is pushed
                 // from a project and popped back to it, and the bill is not on that
                 // path.
-                if model.showsResources {
+                if model.showsEvents {
+                    EventsView()
+                        .paperGround()
+                } else if model.showsResources {
                     ResourcesView()
                         .paperGround()
                 } else if model.showsSpending {

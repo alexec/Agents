@@ -800,6 +800,7 @@ final class RemoteModel {
         await refreshResuming()
         await refreshCostState()
         await refreshLeases()
+        await refreshEvents()
         await refreshWorkflows()
         await refreshRuntimes()
         await refreshModes()
@@ -975,6 +976,22 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+    }
+
+    /// The newest events and who is waiting (042). The phone only reads them.
+    private func refreshEvents() async {
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(),
+                                                returning: DaemonAPI.EventsPage.self) else { return }
+        work.takeEvents(page)
+    }
+
+    /// The page before the oldest event the phone has, for scrolling back.
+    func loadOlderEvents() async {
+        guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList,
+                                                DaemonAPI.EventsListRequest(before: oldest),
+                                                returning: DaemonAPI.EventsPage.self) else { return }
+        work.takeEvents(page, appending: true)
     }
 
     private func refreshProjects() async {

@@ -63,6 +63,10 @@ struct ProjectListView: View {
                 // Above Spending (036): who holds the Mac's shared things. Always
                 // there, like Spending, so the page can be found before anything is
                 // leased; its count line is what comes and goes.
+                // Above Resources (042): what happened. Always there, so the page can
+                // be found before anything has; no count, because a record is read,
+                // not something asking for attention.
+                EventsRow(selection: $selection)
                 ResourcesRow(selection: $selection)
                 SpendingRow(selection: $selection)
             }

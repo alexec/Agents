@@ -99,6 +99,17 @@ public final class AgentsModel {
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
     public private(set) var leases: DaemonAPI.LeaseSnapshot?
+    /// The newest events (042), newest first, as far back as has been paged in. A new
+    /// or changed event from `events/changed` is put in by its position. Empty until a
+    /// page has been asked for, and on a daemon too old to have events.
+    public private(set) var recentEvents: [Event] = []
+    /// Whether the daemon has older events than `recentEvents` reaches.
+    public private(set) var moreEvents = false
+    /// Every agent waiting on something, for the Waiting now strip.
+    public private(set) var waitingAgents: [DaemonAPI.WaitingAgent] = []
+    /// Whether a page of events has arrived at all, so an empty list can say "nothing
+    /// yet" rather than "loading".
+    public private(set) var eventsLoaded = false
     /// The mode last chosen for each runtime, as the Mac holds it (029). A copy, kept
     /// current by `modes/changed`, so a start form can open on it without a round trip.
     public private(set) var rememberedModes: DaemonAPI.RememberedModes = [:]
@@ -156,6 +167,7 @@ public final class AgentsModel {
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
+        case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
@@ -184,6 +196,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
+        case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
@@ -264,6 +277,10 @@ public final class AgentsModel {
 
         case .leasesChanged(let snapshot):
             leases = snapshot
+
+        case .eventsChanged(let change):
+            waitingAgents = change.waiting
+            if let event = change.event { takeEvent(event) }
 
         case .modesChanged(let modes):
             rememberedModes = modes
@@ -348,6 +365,43 @@ public final class AgentsModel {
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
+
+    /// A page of events from `events/list`. The first page replaces what was there;
+    /// a page from further back (`appending`) goes on the end.
+    public func takeEvents(_ page: DaemonAPI.EventsPage, appending: Bool = false) {
+        if appending {
+            let known = Set(recentEvents.map(\.position))
+            recentEvents += page.events.filter { !known.contains($0.position) }
+        } else {
+            recentEvents = page.events
+        }
+        moreEvents = page.hasMore
+        waitingAgents = page.waiting
+        eventsLoaded = true
+    }
+
+    /// One event, new or changed, put in by its position so the list stays newest first.
+    func takeEvent(_ event: Event) {
+        if let index = recentEvents.firstIndex(where: { $0.position == event.position }) {
+            recentEvents[index] = event
+        } else if let index = recentEvents.firstIndex(where: { $0.position < event.position }) {
+            recentEvents.insert(event, at: index)
+        } else if !moreEvents || recentEvents.isEmpty {
+            recentEvents.append(event)
+        }
+        if recentEvents.count > Self.eventsKept { recentEvents.removeLast(recentEvents.count - Self.eventsKept) }
+    }
+
+    /// How many live events a window keeps before the oldest go; paging back brings them in.
+    static let eventsKept = 1_000
+
+    /// The time of the newest event, for the sidebar's "Last 07:40".
+    public var lastEventAt: Date? { recentEvents.first?.latest }
+
+    /// What an agent is waiting on, in the words its row, card and capsule use.
+    public func waitStatus(of agent: Agent) -> WaitStatus? {
+        WaitStatus.of(agent, names: { self.agentTitles[$0] })
+    }
 
     /// What an agent holds and waits for, in the words the row, the card and the chat
     /// use. Nil when it is nothing, or the daemon has no leases to say.

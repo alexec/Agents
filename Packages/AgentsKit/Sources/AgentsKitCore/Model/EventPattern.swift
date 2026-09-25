@@ -73,6 +73,39 @@ public struct EventPattern: Codable, Hashable, Sendable {
         return .success(EventPattern(name, filters: filters))
     }
 
+    // MARK: From an event
+
+    /// The pattern that matches this event and ones like it: its name, narrowed by the
+    /// details its kind lets a trigger filter on. What Copy as trigger starts from.
+    public static func matching(_ event: Event) -> EventPattern {
+        let keys: [String]
+        if EventCatalogue.isCustom(event.name) {
+            keys = Array(event.details.keys)
+        } else {
+            keys = EventCatalogue.kind(named: event.name)?.details ?? []
+        }
+        var filters: [String: String] = [:]
+        for key in keys { if let value = event.details[key] { filters[key] = value } }
+        return EventPattern(event.name, filters: filters)
+    }
+
+    /// The pattern as a workflow file's `on:` says it, ready to paste (042 wireframes §1).
+    public var asTrigger: String {
+        guard !filters.isEmpty else { return "on:\n  - \(name)" }
+        let lines = filters.sorted { $0.key < $1.key }.map { "      \($0.key): \(Self.yamlScalar($0.value))" }
+        return (["on:", "  - \(name):"] + lines).joined(separator: "\n")
+    }
+
+    /// A value as YAML reads it back as the same string: a number stays bare, and
+    /// anything YAML might take for something else is quoted.
+    static func yamlScalar(_ value: String) -> String {
+        if Int(value) != nil { return value }
+        let plain = value.range(of: #"^[A-Za-z0-9_./-]+$"#, options: .regularExpression) != nil
+        let reserved = ["true", "false", "yes", "no", "on", "off", "null", "~"].contains(value.lowercased())
+        if plain && !reserved { return value }
+        return "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
     // MARK: Words
 
     /// The kind's meaning, narrowed by what it is filtered on, for the project page:

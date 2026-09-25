@@ -67,6 +67,15 @@ struct EventPatternTests {
         #expect(try pattern("  Mac.Wake ").name == "mac.wake")
     }
 
+    @Test func copyAsTriggerNarrowsByTheKindsDetailsOnly() {
+        let merged = event("pull_request.merged", ["number": "41"])
+        #expect(EventPattern.matching(merged).asTrigger == "on:\n  - pull_request.merged:\n      number: 41")
+        #expect(EventPattern.matching(event("mac.wake")).asTrigger == "on:\n  - mac.wake")
+        let custom = event("custom.build_green", ["branch": "feature x"])
+        #expect(EventPattern.matching(custom).asTrigger
+                == "on:\n  - custom.build_green:\n      branch: \"feature x\"")
+    }
+
     @Test func theLabelWritesANumberAsAHash() throws {
         #expect(try pattern("pull_request.merged", ["number": "44"]).label == "pull_request.merged #44")
     }
