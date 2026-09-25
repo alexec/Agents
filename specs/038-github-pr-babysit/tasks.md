@@ -180,53 +180,53 @@ prove.
 
 **Independent test**: quickstart §1 (the integration part), and §3 steps 2–3 once Alex has approved the sandbox.
 
-- [ ] T029 [P] [US2] Write `Tests/Unit/PullRequestChangeTests.swift` (R6):
+- [X] T029 [P] [US2] Write `Tests/Unit/PullRequestChangeTests.swift` (R6):
   - The checks key is `checks:<head oid>:<sorted failing ids>`; the same response twice fires once, and a new failing id fires again.
   - The comments key is `comments:<newest countable id>`, compared against the watermark.
   - The conflict key is `conflict:<base oid>`, and `UNKNOWN` never fires.
   - On first sight, only items newer than the viewer's own latest comment or pushed head count.
   - An item from a `NONE` author never counts.
   - Babysitting's own `postedCommentIDs` never count.
-- [ ] T030 [US2] Put the change keys in `DaemonCore+PullRequests.swift`, as pure functions that T029 can call:
+- [X] T030 [US2] Put the change keys in `DaemonCore+PullRequests.swift`, as pure functions that T029 can call:
   - `changeKey(for trigger:, pr:, record:, viewer:) -> String?`.
   - `isNew(key:, record:, workflowID:, trigger:)`.
   - The watermark update, done only when a run actually starts, never on a refusal or while one is in flight (R9).
-- [ ] T031 [US2] Key runs per pull request in `DaemonCore+Workflows.swift` (R9). The `workflowRuns` key is `workflow.id + "#<number>"` for pull-request runs, and `WorkflowSummary.isRunning` becomes "any key for this workflow". Check every existing reader of `workflowRuns[workflow.id]` and change it.
-- [ ] T032 [US2] Add the pull-request refusals in front of `refusalIfBlocked`, in this order (R9):
+- [X] T031 [US2] Key runs per pull request in `DaemonCore+Workflows.swift` (R9). The `workflowRuns` key is `workflow.id + "#<number>"` for pull-request runs, and `WorkflowSummary.isRunning` becomes "any key for this workflow". Check every existing reader of `workflowRuns[workflow.id]` and change it.
+- [X] T032 [US2] Add the pull-request refusals in front of `refusalIfBlocked`, in this order (R9):
   1. `.noWorktree`
   2. `.babysittingStopped`, reading the count from the record (it is filled in US3; here always allow)
   3. `.worktreeDirty` (`GitWorktrees.statusCount > 0`)
   4. `.worktreeBusy` (an agent whose `cwd` is the worktree is mid-turn)
 
   Then 008's own checks. Refusals are recorded on the pull request's record and on the workflow's `lastOutcome`, and collapse through `WorkflowOutcome.following`.
-- [ ] T033 [US2] Decide the mode against the worktree, in `runAgent` in `DaemonCore+Workflows.swift` (FR-017):
+- [X] T033 [US2] Decide the mode against the worktree, in `runAgent` in `DaemonCore+Workflows.swift` (FR-017):
   - `new`: `startRequest(settings:folder:)` with the worktree as `folder`, and the agent's `worktree` set as 030 does it.
   - `standing`: `WorkflowState.standingAgentIDs[number]`.
   - `triggering`: the most recently active non-archived agent whose `cwd` is the worktree, else `.noTriggeringAgent`.
 
   Run now on a workflow whose only triggers are pull-request ones is refused with `.noPullRequest`.
-- [ ] T034 [US2] Add R10's pull-request block to `promptText(for:run:)`, after the file's own body:
+- [X] T034 [US2] Add R10's pull-request block to `promptText(for:run:)`, after the file's own body:
   - "(You were started by the workflow "<name>" for pull request #<n>, "<title>", <url>. Branch <head> into <base>, checked out here. <behind/diverged line>)". The behind/diverged line comes from `git rev-list --left-right --count HEAD...<upstream>`, saying to bring the remote's commits in and not discard them.
   - "What changed:", then one line per item:
     - Check "<name>" failed: <logURL>
     - <author> on <path>:<line> (comment <id>): followed by the body quoted with `> `, each body cut at 2,000 characters
     - It now conflicts with <base>.
   - "Push with push_pull_request, and reply with reply_on_pull_request. Never force-push, and never use git push or gh yourself."
-- [ ] T035 [US2] Fire from the refresh. After each good refresh, for every non-archived workflow in that project with pull-request triggers, and every matched pull request, compute the change keys (T030). For each new one, run the fire path (T032 → T033). Fire nothing on a refresh that failed (spec edge case). The project and machine ceilings (008 FR-031b) apply as they do today. Fires over the ceiling are looked at again on the next refresh.
-- [ ] T036 [US2] After a run ends, when `workflowRunFinished` is for a pull-request run, make the project due for a refresh at the first tick that is at least 60 s after its last attempt (FR-014, R3). Don't mark the change key fired if the run started while it was already in flight, so it fires then if it still holds.
-- [ ] T037 [P] [US2] Add the handler for `push_pull_request` to `Kit/Daemon/DaemonCore+AppTools.swift` (R7):
+- [X] T035 [US2] Fire from the refresh. After each good refresh, for every non-archived workflow in that project with pull-request triggers, and every matched pull request, compute the change keys (T030). For each new one, run the fire path (T032 → T033). Fire nothing on a refresh that failed (spec edge case). The project and machine ceilings (008 FR-031b) apply as they do today. Fires over the ceiling are looked at again on the next refresh.
+- [X] T036 [US2] After a run ends, when `workflowRunFinished` is for a pull-request run, make the project due for a refresh at the first tick that is at least 60 s after its last attempt (FR-014, R3). Don't mark the change key fired if the run started while it was already in flight, so it fires then if it still holds.
+- [X] T037 [P] [US2] Add the handler for `push_pull_request` to `Kit/Daemon/DaemonCore+AppTools.swift` (R7):
   - Find the caller's run by agent id; if there is none, refuse with "Only a run started for a pull request can push or reply; ask the person to do it."
   - If the agent's `cwd` is not the pull request's worktree, refuse with "This agent is not in #n's worktree."
   - Run `git push <headRepositoryURL> HEAD:refs/heads/<headBranch>` in the worktree. Never `--force`, `--force-with-lease` or a leading `+`.
   - Reply "Pushed <short oid> to <head> (#n).", or "Git refused: <stderr>".
   - Record the pushed oid in `pushedOids`, keeping the last 20.
-- [ ] T038 [P] [US2] Add the handler for `reply_on_pull_request` to `DaemonCore+AppTools.swift` (R7):
+- [X] T038 [P] [US2] Add the handler for `reply_on_pull_request` to `DaemonCore+AppTools.swift` (R7):
   - The same run check as the push.
   - With `in_reply_to`, it must be the id of an item on *that* pull request in the last fetched state, else "Comment <id> is not on #n.". It posts through `GitHubCLI.api` to `POST /repos/{o}/{r}/pulls/{n}/comments/{id}/replies`.
   - Without it, it posts to `POST /repos/{o}/{r}/issues/{n}/comments`.
   - Reply "Replied: <url>", and record the new id in `postedCommentIDs`, keeping the last 50.
-- [ ] T039 [US2] Serve the two tools from `Kit/ACP/Serve/AppService.swift`, with the names, descriptions and input schemas exactly as the contract gives them. List them for every session, like `manage_workflows`. Relay them in `Daemon/Sources/main.swift`, and make `autoAllowed` in `DaemonCore+AppTools.swift` cover both. Depends on T037 and T038.
-- [ ] T040 [US2] Write `Tests/Integration/PullRequestFireTests.swift`, with a fake `gh`, real git, a bare remote and a fake runtime:
+- [X] T039 [US2] Serve the two tools from `Kit/ACP/Serve/AppService.swift`, with the names, descriptions and input schemas exactly as the contract gives them. List them for every session, like `manage_workflows`. Relay them in `Daemon/Sources/main.swift`, and make `autoAllowed` in `DaemonCore+AppTools.swift` cover both. Depends on T037 and T038.
+- [X] T040 [US2] Write `Tests/Integration/PullRequestFireTests.swift`, with a fake `gh`, real git, a bare remote and a fake runtime:
   - A failing check fires once and starts an agent whose `cwd` is the worktree and whose prompt names #n, the check and its log URL.
   - The same state again does not fire.
   - A comment from a `NONE` author does not fire.
@@ -237,12 +237,12 @@ prove.
   - The push is refused outside a pull-request run.
   - `reply_on_pull_request` refuses an id from another pull request, and the fake `gh` receives the right endpoint.
   - Two pull requests in one workflow run at once.
-- [ ] T041 [US2] Show the latest run on the row in `PullRequestRow.swift` (FR-019):
+- [X] T041 [US2] Show the latest run on the row in `PullRequestRow.swift` (FR-019):
   - "Babysitting now →" while running.
   - "Babysat <relative> →" · the run agent's report, cut to one line.
   - The refusal's `rowMessage` in grey ("Did not run — its worktree has uncommitted changes").
   - → selects the run's agent.
-- [ ] T042 [US2] Update the workflow row in `App/Sources/Projects/WorkflowRow.swift` for pull-request workflows. The "next" text is "Watching <n> pull requests", counting matched pull requests that are not stopped. A run reads "Running on #<n> →" or "Ran on #<n> →". A refusal names its pull request, as data-model's messages do.
+- [X] T042 [US2] Update the workflow row in `App/Sources/Projects/WorkflowRow.swift` for pull-request workflows. The "next" text is "Watching <n> pull requests", counting matched pull requests that are not stopped. A run reads "Running on #<n> →" or "Ran on #<n> →". A refusal names its pull request, as data-model's messages do.
 
 **Checkpoint**: with fakes, a pull-request change starts one agent in the right place, with the right prompt, and it can push and reply only to its own pull request.
 
@@ -254,19 +254,19 @@ prove.
 
 **Independent test**: quickstart §3, step 5.
 
-- [ ] T043 [P] [US3] Write `Tests/Unit/BabysittingCountTests.swift` (R8):
+- [X] T043 [P] [US3] Write `Tests/Unit/BabysittingCountTests.swift` (R8):
   - Three runs, then `.babysittingStopped(runs: 3)` with `needsAPerson`.
   - A new head oid that is not in `pushedOids` resets the count; one that is in `pushedOids` does not.
   - A countable comment newer than `lastRunStartedAt` resets it; the viewer's own comment does not.
   - Resume resets it.
   - The refusal order puts stopped after no-worktree and before dirty.
-- [ ] T044 [US3] Implement the count in `DaemonCore+PullRequests.swift`:
+- [X] T044 [US3] Implement the count in `DaemonCore+PullRequests.swift`:
   - On each good refresh, before any triggers are looked at, apply R8's resets (a foreign head oid, a newer countable comment).
   - Starting a pull-request run adds one to `consecutiveRuns` and sets `lastRunStartedAt`.
   - T032's check refuses at `>= 3` and sets `stoppedAt`.
   - Fill `BabysittingStatus` on each `PullRequest` in the list.
-- [ ] T045 [US3] Add `pullRequests/resume`, which clears `consecutiveRuns` and `stoppedAt`, stores, and broadcasts. Route it in `DaemonCore+Dispatch.swift`, and add `resume(_:)` to `AppModel`.
-- [ ] T046 [US3] Show the stopped state on the row in `PullRequestRow.swift`: "Babysitting stopped after 3 tries in a row", semibold, in `StateTint.attention`, with a **Resume** button. It is the only tinted thing in the section (wireframes §4). The workflow row's status icon already turns orange through `needsAPerson`; check that it does.
+- [X] T045 [US3] Add `pullRequests/resume`, which clears `consecutiveRuns` and `stoppedAt`, stores, and broadcasts. Route it in `DaemonCore+Dispatch.swift`, and add `resume(_:)` to `AppModel`.
+- [X] T046 [US3] Show the stopped state on the row in `PullRequestRow.swift`: "Babysitting stopped after 3 tries in a row", semibold, in `StateTint.attention`, with a **Resume** button. It is the only tinted thing in the section (wireframes §4). The workflow row's status icon already turns orange through `needsAPerson`; check that it does.
 
 **Checkpoint**: an unfixable check stops after three runs, and a hand push or Resume starts it again.
 
@@ -278,17 +278,17 @@ prove.
 
 **Independent test**: quickstart §3, step 1.
 
-- [ ] T047 [US4] Add `pullRequests/addBabysitter` to `DaemonCore+PullRequests.swift`:
+- [X] T047 [US4] Add `pullRequests/addBabysitter` to `DaemonCore+PullRequests.swift`:
   - If any workflow in the project, archived or not, has a pull-request trigger, fail with `babysitterExists(workflowID)`.
   - Otherwise write `.agents/workflows/babysit-pull-requests.md` through the write path `manage_workflows` uses, so the ceilings apply (per project 3: "This project already runs its 3 workflows. Archive another in this project to let it run.").
   - The front matter is exactly R10's: `name: Babysit my pull requests`, the three triggers, `agent: new`, `permission-mode: acceptEdits`.
   - The body is the starter prompt as wireframe §3 words it: "Read what changed. Fix what you can, run the build and tests you can, commit, push, and reply to each comment with what you did or why not. If you cannot fix it, say so in one reply and stop."
   - Above the body goes an HTML comment saying the mode is `acceptEdits` on purpose, so runs ask before building, testing or committing. To make it hands-off, allow those commands in the project's Claude settings, or change `permission-mode` knowingly (Alex's decision, wireframes §5).
   - Route it in `DaemonCore+Dispatch.swift`.
-- [ ] T048 [US4] Wire the section's button in `PullRequestsSection.swift` and `AppModel`:
+- [X] T048 [US4] Wire the section's button in `PullRequestsSection.swift` and `AppModel`:
   - **Babysit my pull requests** calls `addBabysitter`. A ceiling refusal shows under the button in `.fine` grey (wireframe G), with no alert.
   - **Show babysitter** sets `model.openWorkflow` to `babysitterWorkflowID`.
-- [ ] T049 [US4] Add tests to `Tests/Integration/PullRequestFireTests.swift`:
+- [X] T049 [US4] Add tests to `Tests/Integration/PullRequestFireTests.swift`:
   - `addBabysitter` writes a file that parses into the three triggers and `acceptEdits`.
   - A second call fails with `babysitterExists`.
   - A project at its ceiling fails with the ceiling's message.
@@ -352,5 +352,27 @@ prove.
   listed under Worktrees) and alexec/EquilibriumApp #85 (passing, commented, in the project folder).
   A failed check-out (a leftover folder) shows its reason on the row. Decisions: Alex approved the
   layout on 2026-09-25 as built, one card per pull request (not the wireframe's shared card). US2 next.
+- US2–US4 (2026-09-25), all with fakes, nothing sent to GitHub:
+  - Changes (R6) are pure functions in `Kit/GitHub/PullRequestChanges.swift`. All of a workflow's
+    unfired changes on one pull request go into one fire, so a review and a failing check that
+    arrive together make one run.
+  - A run in flight on a pull request makes the refresh skip it without recording a refusal; the
+    run ending makes the project due a look at the first tick a minute on (FR-014).
+  - `PullRequestWorktree` gained `checkout` (the worktree's top), which `.existing` needs.
+  - The busy check counts agents that hold a runtime (starting, running, waiting on the person).
+  - The two tools are auto-allowed through `ToolCall.isAutoAllowable`, not `isTheApps`. Push goes
+    through `origin` for a same-repository pull request (the person's own remote, and what
+    `insteadOf` rewrites in tests) and to the fork's URL otherwise.
+  - The count also resets when the head commit changes to one babysitting did not push; the
+    record keeps `lastSeenHeadOid` for that. `isStopped` is three runs or `stoppedAt`.
+  - The starter's note about acceptEdits is a YAML comment in the front matter: the body is the
+    prompt word for word, and a note there would reach every run.
+  - T042: the workflow row says "Watching N pull requests". "Running on #n" is not drawn: a
+    `WorkflowSummary` does not say which pull request its run is for, and the pull request's own
+    row already says "Babysitting now".
+  - A test showed the starter refused with `settingRefused` on a runtime offering no modes, which
+    is right; the test now offers `acceptEdits` as Claude does.
+  - `WorkflowToolTests.archivingOneLetsAnAgentWriteAnother` fails 2 runs in 5 on this branch (a
+    token dropped as the agent's turn ends); compared on main below.
 - Screenshot differences (T052):
 - Live run and audit (T053):
