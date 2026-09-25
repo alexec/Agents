@@ -99,9 +99,13 @@ struct ProjectPageView: View {
             .readableWidth()
         }
         .markedStale(model.isStale)
-        // Asked when the page opens and when its archive changes (who is working in a
-        // worktree moves then), never polled.
-        .task(id: WorktreesAsk(project: model.selectedProject, archived: archivedCount)) {
+        // Asked when the page opens and when any agent here changes state (who is working
+        // in a worktree moves as the archive does, its git status as a turn ends), never
+        // polled. Not the archived ones, which arrive only when that section is opened;
+        // an agent being archived still leaves the live groups, and that is a change.
+        .task(id: WorktreesAsk(project: model.selectedProject,
+                               states: AgentGroup.allCases.filter { $0 != .archived }
+                                   .flatMap { model.agents(group: $0) }.map(\.state))) {
             if let folder = model.selectedProject { await model.loadProjectWorktrees(in: folder) }
         }
         // The archived page wanted, once it is open, and again when the count moves.
@@ -227,7 +231,7 @@ struct GroupHeading: View {
 /// What the Worktrees section is asked again for.
 private struct WorktreesAsk: Equatable {
     var project: URL?
-    var archived: Int
+    var states: [AgentState]
 }
 
 /// When the Archived section fetches: opened, paged, or its count moved.
