@@ -285,7 +285,7 @@ a running agent when the window closes and when the Mac restarts.
     `actions/configure-pages@v5` and `actions/upload-pages-artifact@v3` with `path: site`.
   - **Deploy job**: `needs: build`; `environment: github-pages` with the URL taken from the deploy step;
     permissions `pages: write` and `id-token: write`; runs `actions/deploy-pages@v4`.
-- [ ] T048 [US6] Ask Alex (AskUserQuestion) to confirm that the account has GitHub Pro or above, and whether to turn
+- [X] T048 [US6] Ask Alex (AskUserQuestion) to confirm that the account has GitHub Pro or above, and whether to turn
   on Pages with `gh api -X POST repos/alexec/Agents/pages -f build_type=workflow` or through Settings himself.
   Do not run it unasked (research R4).
 - [ ] T049 [US6] After the branch merges (when Alex says it is this lane's turn), watch the first `docs-publish` run

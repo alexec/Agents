@@ -307,9 +307,9 @@ template (FR-010).
 
 ## Assumptions
 
-- **A-001**: Alex's GitHub account is on, or will move to, a plan that publishes Pages from a private repository
-  (Pro or above). Until it is, the site can be built and read locally (FR-011), and publishing is the only step
-  that waits.
+- **A-001**: ~~Alex's account publishes Pages from a private repository.~~ It does not: the plan refused Pages
+  for a private repository (2026-09-25). Alex chose to make `alexec/Agents` public instead, after a history scan
+  found no real secrets, and Pages was turned on with GitHub Actions as its source the same day.
 - **A-002**: The site is published on GitHub Pages at its default address. A custom domain can be added later
   without changing any page.
 - **A-003**: The tool that turns the docs source into a site is chosen in `/speckit-plan`. It must work from

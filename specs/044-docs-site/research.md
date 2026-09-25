@@ -89,7 +89,8 @@ its failures before merge (User Story 5), and never deploys.
 **Rationale**: Deploying from Actions means nothing built is ever committed. There is no `gh-pages` branch, so
 the rule "only `docs/` is published" holds by construction: the artifact is `site/`, built from `docs/` alone.
 
-**Prerequisite, Alex's**: the repository is private (checked 2026-09-25, `has_pages: false`), so Pages needs
+**Prerequisite, done 2026-09-25**: the plan refused Pages for a private repository, so Alex made it public
+(a scan of all 546 commits found only test fixtures) and Pages was turned on from Actions. Originally: the repository was private (checked 2026-09-25, `has_pages: false`), so Pages needs
 GitHub Pro or above on `alexec`. Turning Pages on is a settings change on a live repository and waits for him.
 It is `gh api -X POST repos/alexec/Agents/pages -f build_type=workflow` or Settings ▸ Pages ▸ Source ▸ GitHub
 Actions.
