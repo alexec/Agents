@@ -6,7 +6,7 @@
 diff logic to be written test first. Every pure-logic test lives in `CT/Tests/CodeTextTests/` and
 runs with `swift test` in `CT/`. Views are proven by run-app walks and screenshots.
 
-**Where**: Everything runs in the worktree `.agents/worktrees/041-rich-files-and-changes` on
+**Where**: Everything runs in the worktree `/tmp/w-041` on
 branch `041-rich-files-and-changes`. Never edit the shared checkout at
 `/Users/alexcollins/Agents`. Paths are relative to the worktree. `CT/` stands for
 `Packages/CodeText/`. The R1 spike (grammar clones in `/tmp/041-spike/grammars/src-*`, inputs in
