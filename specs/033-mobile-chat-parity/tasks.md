@@ -85,7 +85,7 @@ All paths are relative to `/tmp/w-033`.
 **Independent Test**: A streaming reply follows with no taps; scrolling up holds; sending returns to the end.
 
 - [X] T026 [US4] Extract the scroll behaviour of `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptScroller.swift` with the inputs in `contracts/chat-surface.md`, and move `App/Sources/Chat/JumpToEnd.swift` into `Shared/UI/Chat/`. Keep the Mac's thresholds (160 to leave, 40 to be back) and its comments
-- [X] T027 [US4] Make `App/Sources/Chat/Transcript.swift` a thin wrapper over `TranscriptScroller`; confirm on a scratch root that following, jump-to-end, earlier pages and focus-an-entry behave as before
+- [X] T027 [US4] Make `App/Sources/Chat/Transcript.swift` a thin wrapper over `TranscriptScroller`; confirm on a scratch root that following, jump-to-end, earlier pages and focus-an-entry behave as before (following checked; leaving the end, jump-to-end and earlier pages are Alex's, see quickstart Status)
 - [X] T028 [US4] Add `scrollToEndToken` to `Remote/Sources/RemoteModel.swift` (bumped on a successful send), and rebuild `Remote/Sources/Chat/RemoteChatView.swift` as a `ZStack(alignment: .bottom)` of `TranscriptScroller` and the form stack, measured into `bottomInset`, passing `measure(transcriptHeight:)` as `onHeight`. Delete the phone's own `Place`, `JumpToEnd`, `settle` and `loadEarlier`
 
 ---

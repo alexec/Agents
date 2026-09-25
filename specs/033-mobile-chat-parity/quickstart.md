@@ -54,6 +54,10 @@ Expected: up to 30 entries under the agent's folder, each with `path` and `relat
   and a queued prompt behind it: the Mac chat draws the shared rows, "Waiting its turn" with
   its remove button, the header row (folder, meter, runtime), attach, dictate, the queue icon
   on Send, and the options row. It looks as it did before the move.
+- Walked again on `/tmp/run-c033b` after the last commit (suite 1406 green, both schemes built):
+  a folded run unfolds on a click, and a 60-line reply followed to its end with no scrolling.
+  Scrolling up, the end button and earlier pages were not reached. A window behind another
+  takes no scroll events sent to its pid, so those three are part of Alex's walk on the Mac too.
 - §3 is covered by `FileMentionTests`, which go through `handle(method:)`, the same path as the
   socket.
 - §4 is Alex's. It needs a real iPhone and iPad, and the Remote app needs rebuilding and
