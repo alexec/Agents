@@ -30,6 +30,25 @@ struct HelperAgentTests {
         if let id = callers[token] { await core.bindAppToken(token, to: id) }
         return token
     }
+
+    /// A tool call made with the token bound again first — and made again if the
+    /// caller's session ended in the moment between the two, which a fake agent's
+    /// quick turn can do under load. Only for a token that does speak for an agent:
+    /// a test about a token that never did still sees its refusal.
+    private func calling<T>(_ core: DaemonCore, _ token: String,
+                            _ body: (String) async throws -> T) async throws -> T {
+        var attempt = 0
+        while true {
+            do {
+                return try await body(await bound(core, token))
+            } catch let error as JSONRPCError
+                        where error.code == DaemonAPI.Failure.noSuchAgent
+                        && error.message.hasPrefix("That conversation is not open")
+                        && callers[token] != nil && attempt < 5 {
+                attempt += 1
+            }
+        }
+    }
     private func temporary() throws -> (StoreLocations, URL) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("AgentsHelpers-\(UUID().uuidString)", isDirectory: true)
@@ -63,8 +82,8 @@ struct HelperAgentTests {
 
     private func start(_ core: DaemonCore, _ token: String, _ prompt: String = "Count the files",
                        runtime: String? = nil) async throws -> UUID {
-        try await core.startHelper(.init(token: await bound(core, token), prompt: prompt,
-                                         runtime: runtime)).agentID
+        try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: prompt,
+                                         runtime: runtime)) }.agentID
     }
 
     private func refusal(_ body: () async throws -> Void) async -> JSONRPCError? {
@@ -86,7 +105,7 @@ struct HelperAgentTests {
         let core = try await makeCore(locations, FakeLauncher())
         let (lead, token) = try await caller(core, in: work)
 
-        let started = try await core.startHelper(.init(token: await bound(core, token), prompt: "Count the files"))
+        let started = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Count the files")) }
         let helper = try #require(await core.agent(started.agentID))
 
         #expect(Project.standardize(helper.cwd) == work)
@@ -179,7 +198,14 @@ struct HelperAgentTests {
         let alpha = try await start(core, token, "Alpha")
         _ = try await start(core, token, "Beta")
         _ = try await start(core, token, "Gamma")
-        _ = await eventually("Alpha settled") { await core.agent(alpha)?.state.holdsRuntime == false }
+        // Settled for good: finished, asked how its work went (a fake agent never
+        // says), and let go. Archiving before that ask lands would see the ask's
+        // prompt pick the agent back up, which is not what this test is about.
+        _ = await eventually("Alpha settled") {
+            let agent = await core.agent(alpha)
+            let released = await core.live[alpha] == nil
+            return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+        }
 
         try await core.archive(alpha)   // by the person
         _ = try await start(core, token, "Delta")
@@ -213,7 +239,7 @@ struct HelperAgentTests {
             let results = await withTaskGroup(of: Bool.self) { group in
                 for index in 0..<4 {
                     group.addTask {
-                        (try? await core.startHelper(.init(token: await bound(core, token), prompt: "Part \(index)"))) != nil
+                        (try? await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Part \(index)")) }) != nil
                     }
                 }
                 return await group.reduce(into: [Bool]()) { $0.append($1) }
@@ -347,7 +373,7 @@ struct HelperAgentTests {
         let helper = try await start(core, token)
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
 
-        let note = try await core.stopHelper(.init(token: await bound(core, token), agentID: helper.uuidString))
+        let note = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: helper.uuidString)) }
 
         let stopped = try #require(await core.agent(helper))
         #expect(stopped.state == .stopped)
@@ -364,7 +390,7 @@ struct HelperAgentTests {
         let helper = try await start(core, token)
         _ = await eventually("the helper finished") { await core.agent(helper)?.state == .finished }
 
-        let note = try await core.stopHelper(.init(token: await bound(core, token), agentID: helper.uuidString))
+        let note = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: helper.uuidString)) }
 
         #expect(note.hasSuffix("had already stopped; nothing changed."))
         #expect(await core.agent(helper)?.state == .finished)
@@ -378,7 +404,7 @@ struct HelperAgentTests {
         let helper = try await start(core, token)
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
 
-        let note = try await core.archiveHelper(.init(token: await bound(core, token), agentID: helper.uuidString))
+        let note = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) }
 
         let archived = try #require(await core.agent(helper))
         #expect(archived.state == .archived)
@@ -396,7 +422,7 @@ struct HelperAgentTests {
         _ = await eventually("settled") { await core.agent(helper)?.state.holdsRuntime == false }
         try await core.archive(helper)
 
-        let error = await refusal { _ = try await core.stopHelper(.init(token: await bound(core, token), agentID: helper.uuidString)) }
+        let error = await refusal { _ = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: helper.uuidString)) } }
         #expect(error?.message == "Nothing changed: \u{201C}Alpha\u{201D} is already archived.")
     }
 
@@ -426,9 +452,9 @@ struct HelperAgentTests {
             (UUID().uuidString, "Nothing changed: there is no agent with that id."),
         ]
         for (target, expected) in cases {
-            let stopped = await refusal { _ = try await core.stopHelper(.init(token: await bound(core, token), agentID: target)) }
+            let stopped = await refusal { _ = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: target)) } }
             #expect(stopped?.message == expected, "stop \(target)")
-            let archived = await refusal { _ = try await core.archiveHelper(.init(token: await bound(core, token), agentID: target)) }
+            let archived = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: target)) } }
             #expect(archived?.message == expected.replacingOccurrences(of: "cannot stop itself",
                                                                         with: "cannot archive itself"),
                     "archive \(target)")
@@ -450,7 +476,7 @@ struct HelperAgentTests {
         let theirs = try await start(core, otherToken, "Beta")
         _ = await eventually("Alpha finished") { await core.agent(mine)?.state == .finished }
 
-        let list = try await core.listHelpers(.init(token: await bound(core, token)))
+        let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
 
         let lines = list.split(separator: "\n").map(String.init)
         #expect(lines.first == "2 of 3 places in this project are in use.")
@@ -464,7 +490,7 @@ struct HelperAgentTests {
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
 
-        #expect(try await core.listHelpers(.init(token: await bound(core, token)))
+        #expect(try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
                 == "You have not started any agents that are still here. 0 of 3 places in this project are in use.")
     }
 }
