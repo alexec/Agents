@@ -22,7 +22,7 @@ struct WorkflowsSection: View {
 
     var body: some View {
         if !all.isEmpty {
-            GroupHeading(title: "Workflows", count: live.count)
+            SectionHeading(title: "Workflows")
             ForEach(live) { summary in
                 WorkflowRow(summary: summary)
             }
@@ -33,18 +33,11 @@ struct WorkflowsSection: View {
                     .padding(.vertical, 4)
             }
             if !archived.isEmpty {
+                DisclosureHeading(title: "Archived", count: archived.count, isOpen: $showsArchived)
                 if showsArchived {
-                    GroupHeading(title: "Archived workflows", count: archived.count)
                     ForEach(archived) { summary in
                         WorkflowRow(summary: summary)
                     }
-                    Button("Hide archived workflows") { showsArchived = false }
-                        .appText(.reading)
-                        .padding(.top, 6)
-                } else {
-                    Button("Archived workflows (\(archived.count))") { showsArchived = true }
-                        .appText(.reading)
-                        .padding(.top, 10)
                 }
             }
         }

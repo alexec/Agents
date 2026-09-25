@@ -29,9 +29,13 @@ struct ProjectAgentsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 heading
+                SectionHeading(title: "New session")
+                    .chatColumn()
+                    .padding(.top, 6)
                 // Its own margins, the same as in a chat, so it is not padded twice.
                 // The folder is this project's and not the bar's to change.
                 PromptBar(folderIsFixed: true)
+                    .padding(.top, -10)
                 agents
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,6 +120,9 @@ struct ProjectAgentsView: View {
     private var agents: some View {
         GlassEffectContainer(spacing: Self.cardSpacing) {
             LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
+                if hasSessions {
+                    SectionHeading(title: "Sessions")
+                }
                 ForEach(AgentGroup.live, id: \.self) { group in
                     let agents = model.agents(in: folder, group: group)
                     if !agents.isEmpty {
@@ -147,6 +154,10 @@ struct ProjectAgentsView: View {
             .padding(.bottom, 28)
         }
         .animation(.default, value: model.agents.map(\.state))
+    }
+
+    private var hasSessions: Bool {
+        AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
     }
 
     private var isEmpty: Bool {
@@ -220,6 +231,22 @@ private struct AgentCard<Content: View>: View {
                 .paperRow()
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// One of the page's three parts — starting a session, the sessions, the workflows —
+/// a step above the `GroupHeading`s inside them.
+struct SectionHeading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .appText(.reading).fontWeight(.semibold)
+            .padding(.top, 22)
+            .padding(.bottom, 2)
+            .padding(.leading, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

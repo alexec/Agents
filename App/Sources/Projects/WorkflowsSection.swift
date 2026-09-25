@@ -61,18 +61,7 @@ struct WorkflowsSection: View {
     /// actually needs is to see which ones went quiet, and archiving them says that on
     /// each row.
     private var heading: some View {
-        HStack(spacing: 6) {
-            Text("Workflows")
-            Text("\(workflows.count)")
-                .monospacedDigit()
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .appText(.fine).fontWeight(.medium)
-        .foregroundStyle(.secondary)
-        .padding(.top, 14)
-        .padding(.leading, 2)
-        .accessibilityAddTraits(.isHeader)
+        SectionHeading(title: "Workflows")
     }
 
     /// Why the next one an agent is asked for will be refused, said before it is

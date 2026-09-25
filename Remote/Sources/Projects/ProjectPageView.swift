@@ -53,6 +53,10 @@ struct ProjectPageView: View {
                     ProjectTotal(summary: summary)
                 }
 
+                if !isEmpty {
+                    SectionHeading(title: "Sessions")
+                }
+
                 ForEach(AgentGroup.live, id: \.self) { group in
                     let agents = model.agents(group: group)
                     if !agents.isEmpty {
@@ -89,28 +93,23 @@ struct ProjectPageView: View {
 
     private var archived: [Agent] { model.agents(group: .archived) }
 
-    /// Out of the way until it is wanted, ten at a time, as on the Mac. On a mobile
-    /// connection there is a second reason: the rest is not fetched until it is asked
-    /// for.
+    /// Out of the way until it is wanted, ten at a time, as on the Mac, and behind the
+    /// same chevron. On a mobile connection there is a second reason: the rest is not
+    /// fetched until it is asked for.
     @ViewBuilder
     private var archivedSection: some View {
-        if showsArchived {
-            GroupHeading(title: "Archived", count: archived.count)
-            ForEach(archived.prefix(archivedShown)) { agent in
-                AgentCard(agent: agent)
+        if !archived.isEmpty {
+            DisclosureHeading(title: "Archived", count: archived.count, isOpen: $showsArchived)
+            if showsArchived {
+                ForEach(archived.prefix(archivedShown)) { agent in
+                    AgentCard(agent: agent)
+                }
+                if archived.count > archivedShown {
+                    Button("Show more") { archivedShown += pageSize }
+                        .appText(.reading)
+                        .padding(.top, 4)
+                }
             }
-            if archived.count > archivedShown {
-                Button("Show more") { archivedShown += pageSize }
-                    .appText(.reading)
-                    .padding(.top, 4)
-            }
-            Button("Hide archived") { showsArchived = false }
-                .appText(.reading)
-                .padding(.top, 6)
-        } else if !archived.isEmpty {
-            Button("Archived (\(archived.count))") { showsArchived = true }
-                .appText(.reading)
-                .padding(.top, 10)
         }
     }
 }
@@ -125,6 +124,51 @@ private struct MissingFolder: View {
             .tinted(.failure)
             .padding(.top, 4)
             .accessibilityHint(path)
+    }
+}
+
+/// One of the page's parts — the sessions, the workflows — a step above the
+/// `GroupHeading`s inside them.
+struct SectionHeading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .appText(.reading).fontWeight(.semibold)
+            .padding(.top, 18)
+            .padding(.leading, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// A `GroupHeading` that opens and closes what is under it, for what is put away.
+struct DisclosureHeading: View {
+    let title: String
+    let count: Int
+    @Binding var isOpen: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.18)) { isOpen.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                    .appText(.fine)
+                Text(title)
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .appText(.fine).fontWeight(.medium)
+        .foregroundStyle(.secondary)
+        .padding(.top, 14)
+        .padding(.leading, 2)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
