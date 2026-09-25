@@ -1,0 +1,20 @@
+/* A small shop's till, for the colour samples (041). */
+:root {
+  --ink: #1f1d1a;
+  --paper: #fbf9f4;
+}
+
+.till h1#total {
+  font: 600 2rem/1.2 "Iowan Old Style", serif;
+  color: var(--ink);
+}
+
+button[disabled]:hover::after {
+  content: "closed";
+  margin: 0 0.5em;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --paper: rgb(28 27 25); }
+}

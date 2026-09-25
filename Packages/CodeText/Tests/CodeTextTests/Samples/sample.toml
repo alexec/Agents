@@ -1,0 +1,18 @@
+# A small shop's till, for the colour samples (041).
+name = "till"
+version = "1.4.0"
+private = true
+float = 150.00
+mask = 0xFF
+opened = 2026-09-25T09:00:00Z
+
+[hours]
+monday = [9, 17]
+sunday = []
+
+[[currency]]
+code = "GBP"
+symbol = '£'
+
+[[currency]]
+code = "EUR"
