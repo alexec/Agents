@@ -28,8 +28,8 @@ the running scratch app.
 
 **Purpose**: An empty site that builds and serves.
 
-- [ ] T001 Add `site/` and `.cache/` to `.gitignore`.
-- [ ] T002 Create `mkdocs.yml` at the repository root:
+- [X] T001 Add `site/` and `.cache/` to `.gitignore`.
+- [X] T002 Create `mkdocs.yml` at the repository root:
   - `site_name: Agents`, `site_url: https://alexec.github.io/Agents/`, `docs_dir: docs`,
     `repo_url: https://github.com/alexec/Agents`, `strict: true`;
   - `theme`: `name: material`, `features: [navigation.tabs, navigation.sections, navigation.indexes,
@@ -39,16 +39,16 @@ the running scratch app.
   - `markdown_extensions: [admonition, attr_list, md_in_html, tables, toc: {permalink: true},
     pymdownx.details, pymdownx.superfences, pymdownx.tabbed: {alternate_style: true}]`;
   - a `nav:` with Home plus the four sections, each an index page only (research R1, R2).
-- [ ] T003 Create `scripts/docs.sh` (executable, POSIX sh) per `contracts/docs-check-cli.md`:
+- [X] T003 Create `scripts/docs.sh` (executable, POSIX sh) per `contracts/docs-check-cli.md`:
   - it resolves the repository root from its own path;
   - it pins `ZENSICAL=zensical==0.0.65` in one variable;
   - `serve` runs `uvx "$ZENSICAL" serve -a 127.0.0.1:8000`, `build` runs `uvx "$ZENSICAL" build --strict --clean`,
     and `check` runs `python3 scripts/docs-check.py` and then `build`;
   - any other argument prints usage and exits 2.
-- [ ] T004 [P] Create the skeleton pages with front matter `diataxis: index`: `docs/index.md` (placeholder) and
+- [X] T004 [P] Create the skeleton pages with front matter `diataxis: index`: `docs/index.md` (placeholder) and
   `docs/tutorials/index.md`, `docs/how-to/index.md`, `docs/reference/index.md`, `docs/explanation/index.md`. Each
   section index gets one sentence on what the section is for, in Diataxis terms, with a page list to fill in.
-- [ ] T005 [P] Copy the app's logo from `design/logo/` into `docs/assets/` as `logo.svg`/`logo.png` and a favicon,
+- [X] T005 [P] Copy the app's logo from `design/logo/` into `docs/assets/` as `logo.svg`/`logo.png` and a favicon,
   and set `theme.logo` and `theme.favicon` in `mkdocs.yml`.
 
 **Checkpoint**: `scripts/docs.sh build` exits 0, and `scripts/docs.sh serve` shows five pages with four tabs.

@@ -1,0 +1,66 @@
+# The docs site (044). Built by Zensical, which reads this file; Material for MkDocs reads it too.
+# Preview: scripts/docs.sh serve   Check: scripts/docs.sh check
+site_name: Agents
+site_description: Run coding agents on your Mac, and follow them from your iPhone and iPad.
+site_url: https://alexec.github.io/Agents/
+repo_url: https://github.com/alexec/Agents
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dark
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Light
+
+plugins:
+  - search
+  # A page that moves leaves its old path here, pointing at the new one: old.md: new.md
+  - redirects:
+      redirect_maps: {}
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - tutorials/index.md
+  - How-to guides:
+      - how-to/index.md
+  - Reference:
+      - reference/index.md
+  - Explanation:
+      - explanation/index.md
