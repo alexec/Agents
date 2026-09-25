@@ -30,17 +30,24 @@ public final class GitProcess: @unchecked Sendable {
         return nil
     }
 
-    public init(_ arguments: [String], in folder: URL? = nil) throws {
+    public convenience init(_ arguments: [String], in folder: URL? = nil) throws {
         guard let git = Self.executable() else { throw LaunchError.notInstalled }
-        process.executableURL = git
-        process.arguments = arguments
-        if let folder { process.currentDirectoryURL = folder }
-        var environment = LoginShellPath.environment()
         // Never ask. The SSH side cannot ask either: the daemon has no terminal, and
         // `GIT_SSH_COMMAND` is left alone because it would override their own
         // `core.sshCommand`.
-        environment["GIT_TERMINAL_PROMPT"] = "0"
-        process.environment = environment
+        self.init(executable: git, arguments: arguments, in: folder,
+                  environment: ["GIT_TERMINAL_PROMPT": "0"])
+    }
+
+    /// Any of the person's own tools, run the same way: their PATH, no stdin, nothing
+    /// that can ask. `gh` goes through here too (038), because everything that makes
+    /// git safe to run unattended is what makes `gh` safe.
+    init(executable: URL, arguments: [String], in folder: URL? = nil,
+         environment extra: [String: String] = [:]) {
+        process.executableURL = executable
+        process.arguments = arguments
+        if let folder { process.currentDirectoryURL = folder }
+        process.environment = LoginShellPath.environment().merging(extra) { _, new in new }
         process.standardInput = FileHandle.nullDevice
     }
 

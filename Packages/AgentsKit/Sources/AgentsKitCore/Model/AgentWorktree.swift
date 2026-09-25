@@ -92,6 +92,24 @@ public enum WorktreeName {
         return "agent-" + stamp.string(from: now)
     }
 
+    /// A worktree's name for a branch that already exists, such as a pull request's
+    /// (038): the same rules as a name from a prompt, applied to the branch's last
+    /// part, so `alex/fix-login` checks out as `fix-login`.
+    public static func from(branch: String) -> String {
+        let last = branch.split(separator: "/").last.map(String.init) ?? branch
+        let words = last.lowercased()
+            .split { !($0.isASCII && ($0.isLetter || $0.isNumber)) }
+            .map(String.init)
+        var name = ""
+        for word in words {
+            let longer = name.isEmpty ? word : name + "-" + word
+            if longer.count > maxLength { break }
+            name = longer
+        }
+        if name.isEmpty, let first = words.first { name = String(first.prefix(maxLength)) }
+        return name.isEmpty ? "pull-request" : name
+    }
+
     /// The name itself when it is free, otherwise the first free `-2`, `-3`, …
     public static func next(after name: String, taken: Set<String>) -> String {
         guard taken.contains(name) else { return name }

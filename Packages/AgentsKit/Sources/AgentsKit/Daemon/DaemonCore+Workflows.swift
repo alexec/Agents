@@ -319,6 +319,11 @@ extension DaemonCore {
         // is exactly when a Mac that slept through the time should catch up.
         await resumeDueBlocks(now: now)
 
+        // Pull requests that are due a look (038 R3), also above the guard: the first
+        // tick after a start is when a restarted daemon should catch up. It starts a
+        // sweep and returns; the sweep runs beside the clock, not on it.
+        sweepPullRequestsIfDue(now: now)
+
         // The day rolling over, noticed on the heartbeat that is already running
         // rather than on a timer of its own. `now` is the parameter this already
         // takes, so midnight is testable without waiting for it.

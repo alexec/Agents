@@ -99,7 +99,40 @@ public enum GitWorktrees {
         (try? await git(["merge-base", "--is-ancestor", branch, base], in: folder)) != nil
     }
 
+    /// The URL a remote is configured with, or nil when there is no such remote. As
+    /// written, before any `insteadOf` rewriting: what the project says it is.
+    public static func remoteURL(_ remote: String, in folder: URL) async -> String? {
+        try? await git(["config", "--get", "remote.\(remote).url"], in: folder)
+    }
+
+    /// The URL of the remote a local branch tracks, or nil when it tracks none (038 R4).
+    public static func upstreamURL(of branch: String, in folder: URL) async -> String? {
+        guard let remote = try? await git(["config", "--get", "branch.\(branch).remote"], in: folder),
+              !remote.isEmpty else { return nil }
+        // A branch may track a URL directly rather than a named remote.
+        if remote.contains("/") || remote.contains(":") { return remote }
+        return await remoteURL(remote, in: folder)
+    }
+
     // MARK: Writing
+
+    /// Fetch `refspec` from `remote`, which is a remote's name or a URL (038 R5).
+    public static func fetch(remote: String, refspec: String, in folder: URL) async throws {
+        _ = try await git(["fetch", "--no-tags", remote, refspec], in: folder)
+    }
+
+    /// A new worktree at `path` on a branch that already exists and is not checked out
+    /// anywhere (038 R5): a pull request's own branch, never a new `agents/` one.
+    public static func add(existingBranch branch: String, path: URL, in folder: URL) async throws {
+        _ = try await git(["worktree", "add", path.path(percentEncoded: false), branch], in: folder)
+    }
+
+    /// A new worktree at `path` on a new local branch that tracks `upstream`.
+    public static func add(trackingBranch branch: String, upstream: String, path: URL,
+                           in folder: URL) async throws {
+        _ = try await git(["worktree", "add", "--track", "-b", branch, path.path(percentEncoded: false), upstream],
+                          in: folder)
+    }
 
     /// A new worktree at `path` on a new branch from what `folder` has checked out.
     /// Git refuses an existing branch itself, which is the last word on a clash.

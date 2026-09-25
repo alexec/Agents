@@ -294,6 +294,19 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
                 return .success(try JSONValue.encoding(try await removeWorktree(request)))
 
+            // Pull requests (038). The Mac's only: the phone has no section to ask for.
+            case DaemonAPI.Method.pullRequestsList:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(await pullRequestList(for: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsRefresh:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(await refreshPullRequests(in: request.folder)))
+
+            case DaemonAPI.Method.pullRequestsCheckout:
+                let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
+                return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))
+
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)
                 return .success(["note": .string(try listHelpers(request))])

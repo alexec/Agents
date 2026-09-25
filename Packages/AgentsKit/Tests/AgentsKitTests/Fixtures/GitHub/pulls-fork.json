@@ -1,0 +1,52 @@
+{
+ "data": {
+  "viewer": {
+   "login": "alexec"
+  },
+  "repository": {
+   "id": "R_1"
+  },
+  "search": {
+   "nodes": [
+    {
+     "number": 501,
+     "title": "Typo from a fork",
+     "url": "https://github.com/alexec/agents/pull/501",
+     "isDraft": false,
+     "createdAt": "2026-09-24T09:00:00Z",
+     "headRefName": "fix-typo",
+     "headRefOid": "1111111111111111111111111111111111111111",
+     "baseRefName": "main",
+     "baseRefOid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "mergeable": "MERGEABLE",
+     "isCrossRepository": true,
+     "headRepository": {
+      "nameWithOwner": "someone/agents",
+      "url": "https://github.com/someone/agents"
+     },
+     "reviewDecision": null,
+     "commits": {
+      "nodes": [
+       {
+        "commit": {
+         "oid": "1111111111111111111111111111111111111111",
+         "committedDate": "2026-09-20T10:00:00Z",
+         "statusCheckRollup": null
+        }
+       }
+      ]
+     },
+     "reviews": {
+      "nodes": []
+     },
+     "reviewThreads": {
+      "nodes": []
+     },
+     "comments": {
+      "nodes": []
+     }
+    }
+   ]
+  }
+ }
+}

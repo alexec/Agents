@@ -233,6 +233,25 @@ public actor DaemonCore {
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,
     /// and what a fired agent's own events read to work out how deep they are.
     var workflowRuns: [String: WorkflowRun] = [:]
+    // MARK: Pull requests (038)
+
+    /// What the daemon remembers about the person's pull requests.
+    lazy var pullRequestStore = PullRequestStore(locations: locations)
+    /// Each GitHub project's section, by folder. Started from the last good lists on
+    /// disk, so a restarted daemon shows something before its first refresh (R12).
+    lazy var pullRequestLists: [URL: PullRequestList] = Dictionary(
+        pullRequestStore.load().lists.map { ($0.folder, $0) }, uniquingKeysWith: { _, last in last })
+    /// Projects whose refresh is running now, so a tick and a button never run two.
+    var pullRequestRefreshes: Set<URL> = []
+    /// The sweep the ticker started, while it runs. One at a time, projects one after
+    /// another, so a slow GitHub never holds up the clock.
+    var pullRequestSweep: Task<Void, Never>?
+    /// The person's `gh`. A test gives it a fake.
+    var gitHubCLI = GitHubCLI()
+    /// Whether the ticker refreshes pull requests by itself. Off until the daemon turns
+    /// it on, so the many tests that drive the ticker by hand never run git or `gh` on
+    /// the side; one that wants the sweep turns it on.
+    var watchesPullRequests = false
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?
