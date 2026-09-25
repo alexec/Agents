@@ -170,6 +170,63 @@ struct HelperAgentTests {
         #expect(await core.reservedStarts.values.allSatisfy { $0 == 0 }, "and its place given back")
     }
 
+    // MARK: Its permission mode
+
+    /// A runtime that offers a default and a plan mode, and starts in the default.
+    private static let modes = FakeACPAgent.Script(configOptions: [
+        ConfigOption(id: "mode", name: "Mode", category: "mode", type: "select",
+                     currentValue: .string("default"),
+                     options: [ConfigChoice(value: .string("default"), name: "Default"),
+                               ConfigChoice(value: .string("plan"), name: "Plan")]),
+    ])
+
+    /// The caller, moved into plan mode the way the person moves it.
+    private func callerInPlanMode(_ core: DaemonCore, in folder: URL) async throws -> (UUID, String) {
+        let (lead, token) = try await caller(core, in: folder)
+        await eventually("the caller heard what its runtime offers") {
+            await !(core.agent(lead)?.advertisedOptions.isEmpty ?? true)
+        }
+        _ = try await core.setOption(.init(agentID: lead, optionID: "mode", value: .string("plan")))
+        return (lead, token)
+    }
+
+    @Test func aStartedAgentTakesTheModeItsStarterIsIn() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher(script: Self.modes))
+        let (_, token) = try await callerInPlanMode(core, in: work)
+
+        let id = try await start(core, token)
+
+        let helper = try #require(await core.agent(id))
+        #expect(helper.startOptions.values["mode"] == .string("plan"))
+    }
+
+    @Test func aModeItNamesIsTheOneItGets() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher(script: Self.modes))
+        let (_, token) = try await callerInPlanMode(core, in: work)
+
+        let id = try await calling(core, token) { t in
+            try await core.startHelper(.init(token: t, prompt: "Count the files", permissionMode: "default"))
+        }.agentID
+
+        #expect(try #require(await core.agent(id)).startOptions.values["mode"] == .string("default"))
+    }
+
+    @Test func onAnotherRuntimeItStartsAsThatRuntimeStarts() async throws {
+        // A mode is a runtime's own word; the same word elsewhere is not the same promise.
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher(script: Self.modes))
+        let (lead, _) = try await callerInPlanMode(core, in: work)
+        let caller = try #require(await core.agent(lead))
+
+        #expect(await core.inheritedMode(from: caller, runtime: nil) == "plan")
+        #expect(await core.inheritedMode(from: caller, runtime: "grok") == nil)
+    }
+
     // MARK: The limits (US2)
 
     @Test func aFourthIsRefusedAndTheThreeAreNamed() async throws {
