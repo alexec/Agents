@@ -212,7 +212,7 @@ seconds with the event in its prompt.
 
 ### Tests for User Story 1
 
-- [ ] T028 [P] [US1] Create `Pkg/Tests/AgentsKitTests/Integration/EventWaitTests.swift`, failing first, with `eventHoldLimit` shortened and events raised with `raise` directly. Cover:
+- [X] T028 [P] [US1] Create `Pkg/Tests/AgentsKitTests/Integration/EventWaitTests.swift`, failing first, with `eventHoldLimit` shortened and events raised with `raise` directly. Cover:
   - A match inside the hold answers the open call with `EventWords.matched` (US1-AS2).
   - Reaching the hold limit answers "Still waiting", keeps the wait, and leaves A grouped as `.blocked` once its turn ends (US1-AS3, FR-012).
   - A match after the call closed wakes A with a `.app` prompt containing `EventWords.wake`, within 5 s (US1-AS4, SC-001).
@@ -223,7 +223,7 @@ seconds with the event in its prompt.
   - Waiting on another project's scope never matches, and a `mac.*` wait does.
   - An unknown name, a bad filter and `until_minutes` 0 or 1441 are refused with `-32050` and the contract's words.
   - `action: recent` returns newest-first lines and a head. `action: list` returns `EventCatalogue.describe()`.
-- [ ] T029 [P] [US1] In the same file, add the cancel and restart cases:
+- [X] T029 [P] [US1] In the same file, add the cancel and restart cases:
   - `cancel_wait`, `events/cancelWait`, the person's prompt, stop and archive each end the wait with no later wake. The person's prompt carries `EventWords.cancelledByPrompt` before their text in the agent's input, and not in their bubble (US1-AS7, FR-013).
   - `cancel_wait` with nothing open gives `-32051`.
   - Restart 20 times with a wait open: it is there each time (SC-005).
@@ -233,8 +233,8 @@ seconds with the event in its prompt.
 
 ### Implementation for User Story 1
 
-- [ ] T030 [P] [US1] In `Pkg/Sources/AgentsKitCore/Model/AppTool.swift`, add `waitForEvent = "wait_for_event"`, `cancelWait = "cancel_wait"` and `publishEvent = "publish_event"`, with the file's comment voice and a note that these three are offered to every agent, including helpers. None of the three is a suffix of another tool's name (compare 036's `release_resource` bug), and the tests in T036 assert that.
-- [ ] T031 [US1] Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift`, with `public func waitForEvent(_ request: EventWaitRequest) async throws -> String`:
+- [X] T030 [P] [US1] In `Pkg/Sources/AgentsKitCore/Model/AppTool.swift`, add `waitForEvent = "wait_for_event"`, `cancelWait = "cancel_wait"` and `publishEvent = "publish_event"`, with the file's comment voice and a note that these three are offered to every agent, including helpers. None of the three is a suffix of another tool's name (compare 036's `release_resource` bug), and the tests in T036 assert that.
+- [X] T031 [US1] Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+EventWaits.swift`, with `public func waitForEvent(_ request: EventWaitRequest) async throws -> String`:
   - Resolve the caller by token, as `leaseCaller` does.
   - For `recent` and `list`, answer straight away.
   - For `wait`: parse every name with `EventPattern.parse`, applying `where` to each. A `where.agent` given as a title resolves to an id with 039's `waitTarget(named:for:)` rules.
@@ -242,35 +242,35 @@ seconds with the event in its prompt.
   - Otherwise, with no `await` in between, write `agent.eventWait` (replacing any open one and noting it for the reply), call `changed(agent)`, raise `agent.blocked` with `waiting_on`, and park a continuation in `openEventWaits[agentID]` with a hold timer set to `eventHoldLimit`.
   - When the hold limit is reached, answer `stillWaiting`.
   - Re-arm the deadline timer.
-- [ ] T032 [US1] In `DaemonCore+Events.swift`, fill in `matchWaits(event)`. For each agent with an open `eventWait` whose patterns match and whose scope is allowed:
+- [X] T032 [US1] In `DaemonCore+Events.swift`, fill in `matchWaits(event)`. For each agent with an open `eventWait` whose patterns match and whose scope is allowed:
   - If `openEventWaits[agentID]` exists, answer it with `matched`, clear the wait, and add a `woke` consequence.
   - Otherwise, in one write with no `await`, set `ending = .matched(position, extraMatches: 0)` and a new `resumePromptID`, queue the `.app` prompt with `EventWords.wake`, add the `woke` consequence, then send it on a detached task as 039's `sendResume` does.
   - A match on a wait that is ended but not yet sent increments `extraMatches`, so the prompt says how many more arrived.
   - When the send fails, drop the wait, add a `couldNotWake` consequence and write a runtime note (mirror `wake(_:askedAt:)` in `DaemonCore+Leases.swift`).
-- [ ] T033 [US1] Deadlines: in `DaemonCore+EventWaits.swift`, arm one timer for the earliest open deadline across agents. On firing, set `ending = .timedOut` and queue the `timedOut` prompt in the same write. Re-arm the timer on every wait change and at start.
-- [ ] T034 [US1] Cancel paths:
+- [X] T033 [US1] Deadlines: in `DaemonCore+EventWaits.swift`, arm one timer for the earliest open deadline across agents. On firing, set `ending = .timedOut` and queue the `timedOut` prompt in the same write. Re-arm the timer on every wait change and at start.
+- [X] T034 [US1] Cancel paths:
   - `cancelWait(token)` and `cancelWaitByPerson(agentID)` (`events/cancelWait`) clear the wait, answer any open call with `stoppedWaiting`, and broadcast.
   - In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`, the person's prompt (`prompt` with `from: .person`) clears an open wait and prepends `EventWords.cancelledByPrompt` to the text the runtime receives, not the transcript's bubble text. Stop and archive clear it with `.stopped` or `.archived`.
   - Every clear broadcasts `events/changed` with the new `waiting`.
-- [ ] T035 [US1] Grouping and restart:
+- [X] T035 [US1] Grouping and restart:
   - In `Pkg/Sources/AgentsKitCore/Model/AgentGroup.swift`, an open `eventWait` while the state is not `starting`, `running` or `waitingOnUser` gives `.blocked`. Wanting a person still outranks it. Extend the existing `AgentGroup` tests.
   - In `DaemonCore+Recovery.swift`, re-arm deadlines, send any queued-but-unsent `resumePromptID` once, and close every open call (there are none after a restart).
   - `DaemonCore+Lifetime.swift`'s `isHoldingAgents` counts an agent with an open wait, as it counts lease waiters.
-- [ ] T036 [US1] Tools:
+- [X] T036 [US1] Tools:
   - In `Pkg/Sources/AgentsKit/ACP/Serve/AppService.swift`, add the `wait_for_event` and `cancel_wait` schemas with the descriptions and inputs from `contracts/event-tools.md` verbatim, an `eventCall(named:_:)` parser beside `leaseCall`, and dispatch.
   - In `Daemon/Sources/main.swift`, relay them to `events/wait` and `events/cancel`, as the lease tools are relayed at `main.swift:110`.
   - Add `events/wait` and `events/cancel` to `DaemonCore+Dispatch.swift`.
   - Extend `Pkg/Tests/AgentsKitTests/Unit/AppServiceTests.swift`: `tools/list` includes all three new tools, and no tool name is a suffix of another's.
-- [ ] T037 [US1] Briefing: in `Pkg/Sources/AgentsKit/ACP/Serve/Briefing.swift`, add the events paragraph described in `contracts/event-tools.md` §Briefing. Extend `BriefingTests`.
-- [ ] T038 [US1] Agent events through `raise`. In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`, at the three `workflowsRespond` call sites (lines ~637, ~819 and ~855), raise the matching events:
+- [X] T037 [US1] Briefing: in `Pkg/Sources/AgentsKit/ACP/Serve/Briefing.swift`, add the events paragraph described in `contracts/event-tools.md` §Briefing. Extend `BriefingTests`.
+- [X] T038 [US1] Agent events through `raise`. In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`, at the three `workflowsRespond` call sites (lines ~637, ~819 and ~855), raise the matching events:
   - `agent.finished` with `outcome`;
   - `agent.stopped` with `by`, or `agent.failed` with `reason`, according to the `EndedReason` (a person, an agent or the app gives stopped; a process death or an error gives failed);
   - `agent.asked_form` and `agent.asked_permission`.
   Also raise `agent.started` where a new agent's first turn begins. Each carries `agent`, `agent_title` and `chainDepth` from `workflowChainDepth(causedBy:)`, and `sentence` in plain words ("“Fix login” finished: done"). Leave the `workflowsRespond` calls in place for now: Phase 5 moves them.
-- [ ] T039 [US1] A 039 `blocked` report raises `agent.blocked` with `waiting_on` set to the waited agents' titles, in `DaemonCore+Blocks.swift` where the block is written.
-- [ ] T040 [P] [US1] Create `Shared/UI/Chat/WaitCapsule.swift`: the ◷ capsule drawn in `PromptHeader`'s lease row (`Shared/UI/Chat/LeaseRow.swift` / `PromptPieces.swift`), with the text of `WaitStatus.line`. On the Mac, clicking it opens the Events page with Waiting now in view, and ✕ calls `events/cancelWait`. The phone has no ✕. Above the prompt bar, while a wait is open, add the one-line hint from `EventWords.hint`, on both platforms.
-- [ ] T041 [US1] Row and card marks: `App/Sources/AgentList/AgentRow.swift` and `Remote/Sources/Projects/AgentCard.swift` show `WaitStatus.mark` on the same line 036 uses for `LeaseMark`. Wire the Events page's Waiting now ✕ (T023) to `events/cancelWait`.
-- [ ] T042 [US1] Run `swift test --filter 'EventWaitTests|WaitStatusTests|AppServiceTests|BriefingTests|AgentGroup'` until green, then the existing `Blocked|Lease|Workflow` suites, which must pass without edits.
+- [X] T039 [US1] A 039 `blocked` report raises `agent.blocked` with `waiting_on` set to the waited agents' titles, in `DaemonCore+Blocks.swift` where the block is written.
+- [X] T040 [P] [US1] Create `Shared/UI/Chat/WaitCapsule.swift`: the ◷ capsule drawn in `PromptHeader`'s lease row (`Shared/UI/Chat/LeaseRow.swift` / `PromptPieces.swift`), with the text of `WaitStatus.line`. On the Mac, clicking it opens the Events page with Waiting now in view, and ✕ calls `events/cancelWait`. The phone has no ✕. Above the prompt bar, while a wait is open, add the one-line hint from `EventWords.hint`, on both platforms.
+- [X] T041 [US1] Row and card marks: `App/Sources/AgentList/AgentRow.swift` and `Remote/Sources/Projects/AgentCard.swift` show `WaitStatus.mark` on the same line 036 uses for `LeaseMark`. Wire the Events page's Waiting now ✕ (T023) to `events/cancelWait`.
+- [X] T042 [US1] Run `swift test --filter 'EventWaitTests|WaitStatusTests|AppServiceTests|BriefingTests|AgentGroup'` until green, then the existing `Blocked|Lease|Workflow` suites, which must pass without edits.
 
 **Checkpoint**: The MVP. An agent can wait on any agent event or a raised event, costs nothing
 while it waits, and is woken, timed out or cancelled correctly.
@@ -352,20 +352,20 @@ and a chain-depth step.
 with B's message, and the log shows the publish, attributed to B, with A woken as its
 consequence.
 
-- [ ] T054 [P] [US4] Add to `EventWaitTests.swift`, failing first:
+- [X] T054 [P] [US4] Add to `EventWaitTests.swift`, failing first:
   - Publishing wakes a waiter and fires a `custom.ping` workflow. Its reply lists both consequences.
   - The event has `publisher` and `message`.
   - `mac.wake` and `agent.finished` are refused with `publishOutsideCustom`.
   - A message over 500 characters, 11 details, or a detail over 200 characters is refused.
   - The 31st publish within an hour is refused with `publishLimit`, naming when the next is allowed (FR-019).
   - A publish by a workflow's agent fires the next workflow at `depth + 1`, and a loop stops at the depth limit (FR-020).
-- [ ] T055 [US4] Implement `publishEvent(_ request: EventPublishRequest)` in `DaemonCore+EventWaits.swift`:
+- [X] T055 [US4] Implement `publishEvent(_ request: EventPublishRequest)` in `DaemonCore+EventWaits.swift`:
   - Resolve the caller.
   - Check `EventCatalogue.isCustom`, the size limits, and `eventState.publishes[agentID]` over the last hour, pruning older entries.
   - Raise it with `scope: .project(caller.projectFolder)`, `publisher`, `message`, `details` and `chainDepth: workflowChainDepth(causedBy: caller.id)`.
   - Reply with `EventWords.published(event, consequences)`, using the consequences known when `raise` returns.
-- [ ] T056 [US4] Add the `publish_event` schema and dispatch to `AppService.swift`, the relay in `Daemon/Sources/main.swift`, and the `events/publish` case in `DaemonCore+Dispatch.swift`. In `EventDetailView` (T024), show the publisher and the message.
-- [ ] T057 [US4] Run `swift test --filter EventWaitTests` until green.
+- [X] T056 [US4] Add the `publish_event` schema and dispatch to `AppService.swift`, the relay in `Daemon/Sources/main.swift`, and the `events/publish` case in `DaemonCore+Dispatch.swift`. In `EventDetailView` (T024), show the publisher and the message.
+- [X] T057 [US4] Run `swift test --filter EventWaitTests` until green.
 
 **Checkpoint**: Agents coordinate by what happened. Publishing is limited and chain-safe.
 
