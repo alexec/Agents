@@ -60,10 +60,12 @@ struct ConsistencyTests {
     /// A control is not a state; the next one that earns a colour is written down
     /// here rather than hidden.
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
-        (file: "Remote/Sources/Chat/EntryView.swift", contains: ".foregroundStyle(Color.accentColor)",
-         why: "a button that opens a diff, drawn as the system draws controls (FR-006b)"),
-        (file: "App/Sources/Sidebar/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
+        (file: "Shared/UI/Chat/TranscriptRows.swift", contains: "foregroundStyle(Color.accentColor)",
+         why: "a file a tool call touched, drawn on a phone as the system draws a link (FR-006b, 033)"),
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
          why: "the person's caret flag on a live page, in the colour the system draws their own insertion point"),
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "color: .accentColor",
+         why: "the same flag on a phone, where the accent is the colour of the person's own insertion point (034)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {
@@ -206,6 +208,11 @@ struct ConsistencyTests {
         "App/Sources/Permission/PermissionView.swift",
         "App/Sources/Elicitation/ElicitationView.swift",
         "App/Sources/Projects/ProjectAgentsView.swift",
+        // The phone's, in the same column since 033.
+        "Shared/UI/Chat/ChatTranscript.swift",
+        "Remote/Sources/Chat/PromptBar.swift",
+        "Remote/Sources/Permission/PermissionSheet.swift",
+        "Remote/Sources/Elicitation/ElicitationSheet.swift",
     ]
 
     /// A gutter is tens of points; the inset of a capsule or a card inside the bar is
@@ -219,7 +226,7 @@ struct ConsistencyTests {
         let padding = /\.padding\(\.horizontal,\s*([^)]+)\)/
         var violations: [String] = []
         var read = 0
-        for source in try Self.sources(under: ["App/Sources"]) {
+        for source in try Self.sources(under: ["App/Sources", "Remote/Sources", "Shared/UI"]) {
             guard Self.columnSurfaces.contains(source.path) else { continue }
             read += 1
             for (index, line) in source.lines.enumerated() {
@@ -288,6 +295,127 @@ struct ConsistencyTests {
             `AgentState.startingLabel`, so the row, the accessibility label, the \
             transcript line and the phone's card cannot drift apart.
             \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    // MARK: 5. One chat on every screen (033 FR-021)
+
+    /// The transcript's pieces, which live in `Shared/UI/Chat` and nowhere else. The
+    /// phone had its own copy of each of these until 033, and in a month it had grown
+    /// a chevron and an "N more" the Mac never had.
+    private static let sharedChatTypes = [
+        "EntryRow", "ToolRunRow", "ToolCallLine", "StateLine", "WorkReportLine",
+        "QueuedPromptRow", "WorkingLine", "ComingBackLine", "JumpToEnd", "BlocksView",
+        "DiffView", "PlanView", "TerminalOutputView", "ServedRequestLine", "CommandList",
+        "MentionList", "OptionMenu", "SelectCapsule", "Dictation",
+    ]
+
+    /// The name of a type a line declares, if it declares one.
+    static func declaredType(_ line: String) -> String? {
+        let declaration = /^\s*(?:private\s+|fileprivate\s+|public\s+)?(?:final\s+)?(?:struct|class|enum)\s+(\w+)/
+        return Self.code(line).firstMatch(of: declaration).map { String($0.output.1) }
+    }
+
+    /// Every string literal on a line long enough to be a sentence somebody reads.
+    static func sentences(_ line: String, atLeast length: Int = 20) -> [String] {
+        Self.code(line).matches(of: /"((?:[^"\\]|\\.)*)"/)
+            .map { String($0.output.1) }
+            .filter { $0.count >= length && $0.contains(" ") && !$0.contains("\\(") }
+    }
+
+    /// Both checks, against lines that must and must not trip them.
+    @Test func theChatScansCatchWhatTheyAreFor() {
+        #expect(Self.declaredType("private struct ToolRunRow: View {") == "ToolRunRow")
+        #expect(Self.declaredType("struct EntryView: View {") == "EntryView")
+        #expect(Self.declaredType("    let row = ToolRunRow(calls: [])") == nil)
+        #expect(Self.declaredType("// struct ToolRunRow was here") == nil)
+        #expect(Self.sentences(#"Text("Say what next, and it goes when this turn ends")"#)
+                == ["Say what next, and it goes when this turn ends"])
+        #expect(Self.sentences(#"Label("Folder", systemImage: "folder")"#).isEmpty)
+        // A comment that quotes a sentence is not a second copy of it.
+        #expect(Self.sentences(#"// "Say what next, and it goes when this turn ends""#).isEmpty)
+    }
+
+    @Test func thePhoneDrawsTheSharedChatRatherThanItsOwn() throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
+            scanned += 1
+            for (index, line) in source.lines.enumerated() {
+                guard let name = Self.declaredType(line), Self.sharedChatTypes.contains(name) else { continue }
+                violations.append("\(Self.at(source, index)): \(name)")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            An app declares its own copy of a piece of the chat that lives in \
+            `Shared/UI/Chat`. Two copies drift; change the shared one, and if the phone \
+            genuinely needs to differ, say how through `ChatActions` or a platform \
+            branch in the shared file, and add it to 033's Deliberate Differences.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    /// The live page's pieces, one copy for both apps in `Shared/UI/Page` and Core (034).
+    private static let sharedPageTypes = [
+        "MarkdownText", "LivePage", "PassageEditor", "CursorFlag", "FileLines",
+        "PageFollower", "PassageMerge", "ImageStamps", "ShellClient",
+    ]
+
+    /// The page is one page on the Mac and the phone. Two `MarkdownText`s drifted once;
+    /// this is what stops two pages doing the same.
+    @Test func neitherAppHasAPageOfItsOwn() throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
+            scanned += 1
+            for (index, line) in source.lines.enumerated() {
+                guard let name = Self.declaredType(line), Self.sharedPageTypes.contains(name) else { continue }
+                violations.append("\(Self.at(source, index)): \(name)")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            An app declares its own copy of a piece of the live page, which lives in \
+            `Shared/UI/Page` and AgentsKitCore. Change the shared one; what genuinely \
+            differs by app goes through `PageActions` or a platform branch there.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    /// A sentence written into both apps' chats, rather than once where both read it.
+    ///
+    /// The chat folders only: a settings screen that happens to share a phrase with a
+    /// phone screen is not what this is about.
+    @Test func noSentenceInTheChatIsWrittenTwice() throws {
+        func sentences(under directory: String) throws -> [String: String] {
+            var found: [String: String] = [:]
+            for source in try Self.sources(under: [directory]) {
+                for (index, line) in source.lines.enumerated() {
+                    for sentence in Self.sentences(line) { found[sentence] = Self.at(source, index) }
+                }
+            }
+            return found
+        }
+        let shared = try sentences(under: "Shared/UI/Chat")
+        let mac = try sentences(under: "App/Sources/Chat")
+        let phone = try sentences(under: "Remote/Sources/Chat")
+        #expect(!shared.isEmpty && !mac.isEmpty && !phone.isEmpty, "a chat folder has moved")
+
+        var violations: [String] = []
+        for (sentence, place) in mac where phone[sentence] != nil {
+            violations.append("\(place) and \(phone[sentence]!): \"\(sentence)\"")
+        }
+        for (sentence, place) in shared {
+            if let copy = mac[sentence] ?? phone[sentence] {
+                violations.append("\(copy) repeats \(place): \"\(sentence)\"")
+            }
+        }
+        #expect(violations.isEmpty, """
+            A sentence in the chat is written in more than one place. Put it in \
+            `Shared/UI/Chat` (`PromptWords` for the prompt area) and read it from there, \
+            so the Mac and the phone cannot come to say different things.
+            \(violations.sorted().joined(separator: "\n"))
             """)
     }
 }

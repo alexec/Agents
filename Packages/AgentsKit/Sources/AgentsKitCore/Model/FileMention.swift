@@ -59,6 +59,8 @@ extension FileMention {
                                                   includingPropertiesForKeys: [.isDirectoryKey],
                                                   options: [.skipsHiddenFiles, .skipsPackageDescendants])
             else { continue }
+            let resolved = Self.realPath(folder)
+            let ignored = MentionIgnore(folder: folder)
             var seen = 0
             for case let url as URL in walker {
                 seen += 1
@@ -68,21 +70,39 @@ extension FileMention {
                 // Run off the main actor by the prompt bar, and cancelled by the next
                 // keystroke: what was typed since is the search that matters.
                 if seen % 256 == 0, Task.isCancelled { return [] }
-                if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                    if url.lastPathComponent == ".git" || url.lastPathComponent == "node_modules" {
-                        walker.skipDescendants()
-                    }
+                // The walker hands back resolved paths, so a folder reached through a
+                // link (`/tmp`, `/var`) is matched by its resolved form too; otherwise
+                // the whole path is shown where the part under the folder belongs.
+                let relative = [folder.path, resolved.path]
+                    .first { url.path.hasPrefix($0 + "/") }
+                    .map { String(url.path.dropFirst($0.count + 1)) }
+                    ?? url.path
+                let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                // Build output and what the project ignores are not files anyone means:
+                // an index record under `build/DD` matched "PromptBar" before the source
+                // did. A skipped folder is not walked at all, which also keeps the cap
+                // for the files that are.
+                if ignored.skips(relative, isDirectory: isDirectory) {
+                    if isDirectory { walker.skipDescendants() }
                     continue
                 }
-                let relative = url.path.hasPrefix(folder.path)
-                    ? String(url.path.dropFirst(folder.path.count + 1))
-                    : url.path
+                if isDirectory { continue }
                 guard needle.isEmpty || relative.lowercased().contains(needle) else { continue }
                 found.append(FileMention(url: url, relativePath: relative))
                 if found.count >= limit { return ranked(found, term: needle) }
             }
         }
         return ranked(found, term: needle)
+    }
+
+    /// The folder as the walker will report it. Not `resolvingSymlinksInPath`, which
+    /// deliberately turns `/private/var` back into `/var` — the opposite of what the
+    /// walker does.
+    private static func realPath(_ folder: URL) -> URL {
+        guard let resolved = folder.withUnsafeFileSystemRepresentation({ $0.flatMap { realpath($0, nil) } })
+        else { return folder }
+        defer { free(resolved) }
+        return URL(filePath: String(cString: resolved))
     }
 
     /// What starts with the term comes before what merely contains it, and a match on
@@ -101,3 +121,83 @@ extension FileMention {
         return 2
     }
 }
+
+/// What a mention search leaves out: build output, and what the folder's own
+/// `.gitignore` says it ignores.
+///
+/// Only the cheap part of `.gitignore`: the file at the top of the folder, and lines that
+/// are a plain name (`build/`, `/DerivedData`, `xcuserdata/`), a path (`.claude/worktrees/`)
+/// or a suffix (`*.xcuserstate`). Anything with a wildcard in the middle, a negation, or a
+/// `.gitignore` further down is not read — asking git would be exact, but this runs on
+/// every keystroke and on a phone's behalf, and a `Process` is not something the kit may
+/// start on iOS. Getting one of those wrong only means a file is offered that git would
+/// have hidden, which is how every search behaved before this.
+struct MentionIgnore {
+    /// Folders that are build output in every project this app has met, whatever the
+    /// project's `.gitignore` says, or whether it has one.
+    static let alwaysSkipped: Set<String> = [
+        ".git", "node_modules", ".build", "build", "DerivedData", "Pods", ".swiftpm",
+    ]
+
+    struct Rule: Equatable {
+        enum Kind: Equatable {
+            /// Matches the last component, at any depth.
+            case name(String)
+            /// Matches the path from the top of the folder.
+            case path(String)
+            /// Matches names ending in this, at any depth.
+            case suffix(String)
+        }
+        var kind: Kind
+        var directoriesOnly: Bool
+    }
+
+    let rules: [Rule]
+
+    init(folder: URL) {
+        let text = (try? String(contentsOf: folder.appending(path: ".gitignore"), encoding: .utf8)) ?? ""
+        self.init(gitignore: text)
+    }
+
+    init(gitignore text: String) {
+        rules = text.split(whereSeparator: \.isNewline).compactMap { Self.rule(String($0)) }
+    }
+
+    /// One line of a `.gitignore`, if it is one of the shapes this reads.
+    static func rule(_ line: String) -> Rule? {
+        var pattern = line.trimmingCharacters(in: .whitespaces)
+        guard !pattern.isEmpty, !pattern.hasPrefix("#"), !pattern.hasPrefix("!") else { return nil }
+        let directoriesOnly = pattern.hasSuffix("/")
+        if directoriesOnly { pattern.removeLast() }
+        let anchored = pattern.hasPrefix("/")
+        if anchored { pattern.removeFirst() }
+        guard !pattern.isEmpty else { return nil }
+        let wildcards = CharacterSet(charactersIn: "*?[")
+        if pattern.hasPrefix("*"), !anchored, !pattern.contains("/") {
+            let rest = String(pattern.dropFirst())
+            guard !rest.isEmpty, rest.rangeOfCharacter(from: wildcards) == nil else { return nil }
+            return Rule(kind: .suffix(rest), directoriesOnly: directoriesOnly)
+        }
+        guard pattern.rangeOfCharacter(from: wildcards) == nil else { return nil }
+        // A slash anywhere but the end ties it to the top of the folder, as git does.
+        if anchored || pattern.contains("/") {
+            return Rule(kind: .path(pattern), directoriesOnly: directoriesOnly)
+        }
+        return Rule(kind: .name(pattern), directoriesOnly: directoriesOnly)
+    }
+
+    /// Whether this path, relative to the folder, is left out.
+    func skips(_ relative: String, isDirectory: Bool) -> Bool {
+        let name = relative.split(separator: "/").last.map(String.init) ?? relative
+        if isDirectory, Self.alwaysSkipped.contains(name) { return true }
+        return rules.contains { rule in
+            guard isDirectory || !rule.directoriesOnly else { return false }
+            switch rule.kind {
+            case .name(let wanted): return name == wanted
+            case .path(let wanted): return relative == wanted
+            case .suffix(let ending): return name.hasSuffix(ending)
+            }
+        }
+    }
+}
+

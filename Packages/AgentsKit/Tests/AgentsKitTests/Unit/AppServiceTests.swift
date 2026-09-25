@@ -14,10 +14,10 @@ struct AppServiceTests {
     /// is what a runtime is here.
     private func pair(sink: @escaping AppService.Sink,
                       showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
-                      reportOutcome: @escaping AppService.OutcomeSink = { _, _ in
+                      reportOutcome: @escaping AppService.OutcomeSink = { _, _, _ in
                           .refused("not expected")
                       },
-                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _ in
+                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _, _ in
                           .refused("not expected")
                       })
         async -> (client: JSONRPCConnection, service: AppService) {
@@ -69,7 +69,7 @@ struct AppServiceTests {
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue }
-            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
+            == WorkOutcome.allCases.map(\.rawValue))
         // The outcome, its words and the conversation's name are the call; the chips
         // ride along.
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
@@ -113,11 +113,11 @@ struct AppServiceTests {
         #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
 
         let outcome = tools.last?["inputSchema"]
-        // The five, and only the five, spelled the way the daemon reads them. A sixth
+        // The six, and only the six, spelled the way the daemon reads them. A seventh
         // word offered here would be a word the daemon has to refuse.
         #expect(outcome?["properties"]?["outcome"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue }
-            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
+            == WorkOutcome.allCases.map(\.rawValue))
         // Both required. A status with no words is what the app already had.
         #expect(outcome?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["outcome", "message"])
@@ -376,7 +376,7 @@ struct AppServiceTests {
     @Test func aPrefixedNameStillReachesTheSameSink() async throws {
         let seen = Recorder()
         let (client, service) = await pair(sink: neverCalled(),
-                                           reportOutcome: { outcome, message in
+                                           reportOutcome: { outcome, message, _ in
             await seen.record(outcome, message)
             return .shown("Noted.")
         })
@@ -433,9 +433,11 @@ struct AppServiceTests {
         var message = ""
         var prompts: [SuggestedPrompt] = []
         var title = ""
+        var words = AppService.BlockWords.none
         func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt],
-                    _ title: String) {
+                    _ title: String, _ words: AppService.BlockWords) {
             calls += 1
+            self.words = words
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
@@ -444,10 +446,59 @@ struct AppServiceTests {
     }
 
     private func finishing(_ box: FinishBox) -> AppService.FinishSink {
-        { outcome, message, prompts, title in
-            await box.record(outcome, message, prompts, title)
+        { outcome, message, prompts, title, words in
+            await box.record(outcome, message, prompts, title, words)
             return .shown("Noted.")
         }
+    }
+
+    // MARK: Blocked (039)
+
+    /// The sixth outcome is offered, with what it carries, on both names.
+    @Test func blockedIsOfferedWithWhatItCarries() async throws {
+        for tool in [AppService.finishTurnTool, AppService.reportOutcomeTool] {
+            let properties = tool["inputSchema"]?["properties"]
+            #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
+            #expect(properties?["waiting_on"]?["type"]?.stringValue == "array")
+            #expect(properties?["check_again_in_minutes"]?["maximum"]?.intValue == 1440)
+        }
+        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("blocked") == true)
+    }
+
+    @Test func aBlockedCallCarriesItsWaitsAndTimeToTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "blocked", "message": "Waiting on the helpers.",
+                          "title": "Waiting", "waiting_on": ["A", "B"],
+                          "check_again_in_minutes": 25],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.words == AppService.BlockWords(waitingOn: ["A", "B"], checkAgainInMinutes: 25))
+        await service.close()
+    }
+
+    /// Contract §1: the block's arguments go with blocked alone, and the minutes are
+    /// whole and in range. Refused before the daemon is asked.
+    @Test func blockArgumentsAreRefusedWhereTheyDoNotBelong() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let cases: [JSONValue] = [
+            ["outcome": "done", "message": "m", "title": "t", "waiting_on": ["A"]],
+            ["outcome": "done", "message": "m", "title": "t", "check_again_in_minutes": 5],
+            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 0],
+            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 1441],
+            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 2.5],
+        ]
+        for arguments in cases {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
+            ])
+            #expect(result["isError"]?.boolValue == true, "\(arguments)")
+        }
+        #expect(await box.calls == 0)
+        await service.close()
     }
 
     @Test func aFinishCallReachesTheSinkWithBothHalves() async throws {
@@ -644,7 +695,7 @@ struct AppServiceTests {
     /// the title existed was never told to send one, and still has to land.
     @Test func theOlderOutcomeNameNeedsNoTitle() async throws {
         let (client, service) = await pair(sink: neverCalled(),
-                                           reportOutcome: { _, _ in .shown("Noted.") })
+                                           reportOutcome: { _, _, _ in .shown("Noted.") })
         let result = try await client.call("tools/call", [
             "name": .string(AppService.reportOutcomeToolName),
             "arguments": ["outcome": "done", "message": "All done."],

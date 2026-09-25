@@ -53,19 +53,13 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         let fd = readFD
         let continuation = self.continuation
         let thread = Thread {
-            var pending = Data()
+            var splitter = LineSplitter()
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while true {
                 let n = buffer.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress, $0.count) }
                 if n > 0 {
-                    pending.append(contentsOf: buffer[0..<n])
-                    while let i = pending.firstIndex(of: UInt8(ascii: "\n")) {
-                        let lineData = pending[pending.startIndex..<i]
-                        pending = pending[pending.index(after: i)...]
-                        let line = String(decoding: lineData, as: UTF8.self)
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !line.isEmpty { continuation.yield(line) }
-                    }
+                    buffer.withUnsafeBufferPointer { splitter.append(UnsafeBufferPointer(rebasing: $0[0..<n])) }
+                    while let line = splitter.next() { continuation.yield(line) }
                 } else if n == 0 {
                     continuation.finish()
                     return
@@ -113,6 +107,67 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         if writeFD == readFD { shutdown(readFD, SHUT_RDWR) }
         Darwin.close(readFD)
         if writeFD != readFD { Darwin.close(writeFD) }
+    }
+}
+
+/// Bytes in, whole lines out, each byte looked at once.
+///
+/// A daemon page can be one line of twenty megabytes, and it arrives a read at a time.
+/// Searching the whole backlog for a newline after every read looked at the start of
+/// that line some three hundred times; this remembers how far it has already looked.
+/// Lines that are only whitespace are dropped and a trailing `\r` is left off, which
+/// is what trimming the whole line did, without walking it twice to do it.
+struct LineSplitter {
+    private var pending: [UInt8] = []
+    /// Where the next line starts.
+    private var start = 0
+    /// How far past `start` has been searched and found no newline.
+    private var searched = 0
+    /// Bytes handed to the newline search, over the splitter's life. At most every
+    /// byte once; the tests hold it to that.
+    private(set) var examined = 0
+
+    mutating func append(_ bytes: UnsafeBufferPointer<UInt8>) {
+        // Taken lines are dropped from the front only once they are most of the
+        // buffer, so a burst of short lines does not shuffle the rest along each time.
+        if start > 0, start >= pending.count / 2 {
+            pending.removeSubrange(0..<start)
+            searched -= start
+            start = 0
+        }
+        pending.append(contentsOf: bytes)
+    }
+
+    mutating func next() -> String? {
+        while true {
+            let found: Int? = pending.withUnsafeBufferPointer { all in
+                let from = searched
+                guard from < all.count,
+                      let hit = memchr(all.baseAddress! + from, Int32(UInt8(ascii: "\n")), all.count - from)
+                else { return nil }
+                return all.baseAddress!.distance(to: hit.assumingMemoryBound(to: UInt8.self))
+            }
+            examined += (found.map { $0 + 1 } ?? pending.count) - searched
+            guard let end = found else {
+                searched = pending.count
+                return nil
+            }
+            let line = pending.withUnsafeBufferPointer { all -> String? in
+                var last = end
+                while last > start, Self.isSpace(all[last - 1]) { last -= 1 }
+                var first = start
+                while first < last, Self.isSpace(all[first]) { first += 1 }
+                guard first < last else { return nil }
+                return String(decoding: UnsafeBufferPointer(rebasing: all[first..<last]), as: UTF8.self)
+            }
+            start = end + 1
+            searched = start
+            if let line { return line }
+        }
+    }
+
+    private static func isSpace(_ byte: UInt8) -> Bool {
+        byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
     }
 }
 

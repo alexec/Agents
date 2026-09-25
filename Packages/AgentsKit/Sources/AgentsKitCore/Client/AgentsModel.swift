@@ -105,6 +105,31 @@ public final class AgentsModel {
     /// know `wake/state`, which is what lets a new window work against an old daemon.
     public private(set) var wakeState: DaemonAPI.WakeState?
 
+    /// What each command an agent ran has printed, as far as this client heard it (033).
+    ///
+    /// Here rather than in the Mac's own model so a phone shows the same output in a
+    /// call's detail. Only what arrived while this client was listening: the output is
+    /// streamed, not kept in the transcript.
+    public private(set) var terminalOutput: [String: String] = [:]
+    public static let terminalOutputLimit = 200_000
+
+    /// A choice made on a control that the daemon has not yet confirmed (033).
+    ///
+    /// The sequence is which write this was. A call that completes clears the entry
+    /// only if it is still the one it wrote, so two taps in a row settle on the later
+    /// choice whatever order the answers come back in.
+    public struct PendingOption: Equatable, Sendable {
+        public var value: JSONValue
+        public var sequence: Int
+    }
+
+    /// Held only while the change is in flight, and never written into
+    /// `agent.startOptions`: that is the daemon's record mirrored here, and a client
+    /// that edits it is a client that can disagree with the daemon with no way to
+    /// notice.
+    public private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
+    @ObservationIgnored private var pendingOptionSequence = 0
+
     public init() {}
 
     // MARK: What each notification means
@@ -130,6 +155,7 @@ public final class AgentsModel {
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
+        case terminalOutput(DaemonAPI.TerminalOutputNotification)
         /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
         case unreadable
     }
@@ -156,6 +182,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
+        case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
         default: return nil
         }
     }
@@ -245,6 +272,14 @@ public final class AgentsModel {
                 resuming.remove(notification.agentID)
             }
 
+        case .terminalOutput(let notification):
+            var text = terminalOutput[notification.terminalID, default: ""] + notification.chunk
+            // The tail, because a build that prints for ten minutes is read from the end.
+            if text.count > Self.terminalOutputLimit {
+                text = String(text.suffix(Self.terminalOutputLimit))
+            }
+            terminalOutput[notification.terminalID] = text
+
         case .unreadable:
             break
         }
@@ -308,6 +343,38 @@ public final class AgentsModel {
     /// The mode last chosen for this runtime, on any device (029).
     public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
+
+    // MARK: Choices in flight
+
+    /// What an option control should read: the choice just made, else what is in
+    /// force, else what the runtime says is current.
+    public func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
+        pendingOptions[agent.id]?[optionID]?.value
+            ?? agent.startOptions.values[optionID]
+            ?? advertised.currentValue
+    }
+
+    /// Show a choice at once, before the daemon has it. Returns which write this was,
+    /// for `settleOption` when the call comes back.
+    ///
+    /// The control used to read `agent.startOptions` while the change went only to a
+    /// `Task`, so the menu closed over the old value and stayed there for the whole
+    /// round trip. The optimistic value closes that gap.
+    public func beginOption(agentID: UUID, optionID: String, value: JSONValue) -> Int {
+        pendingOptionSequence += 1
+        pendingOptions[agentID, default: [:]][optionID] = PendingOption(value: value, sequence: pendingOptionSequence)
+        return pendingOptionSequence
+    }
+
+    /// The call for one write came back, whether it succeeded or was refused: the
+    /// record is what is in force, and a refusal must settle the control on that rather
+    /// than on what was asked for. Only if this write is still the last word — a slower
+    /// earlier call finishing must not drop a later choice.
+    public func settleOption(agentID: UUID, optionID: String, sequence: Int) {
+        guard pendingOptions[agentID]?[optionID]?.sequence == sequence else { return }
+        pendingOptions[agentID]?[optionID] = nil
+        if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
+    }
 
     /// What this agent has left before it stops, under the limits as they stand.
     /// Nil when uncapped, when unmeasured, or before the daemon has said.
@@ -401,11 +468,42 @@ public final class AgentsModel {
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 
+    // MARK: Blocked (039)
+
+    /// The block this agent is sitting in, if it is: a settled agent whose last report
+    /// was `blocked` and has not cleared. Nil for a running agent even when its report
+    /// still says blocked — that is the resumed turn, and it is working.
+    public func openBlock(_ agent: Agent) -> (report: WorkReport, block: Block)? {
+        guard agent.state == .finished, let report = agent.report, report.isOpenBlock
+        else { return nil }
+        return (report, report.block ?? Block())
+    }
+
+    /// What an agent that is waited on is called now: its current title, or the one it
+    /// had when the block was made once it has none or has gone (FR-010).
+    public func waitName(_ wait: Wait) -> String {
+        let title = agent(wait.agentID)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.flatMap { $0.isEmpty ? nil : $0 } ?? wait.nameAtReport
+    }
+
+    /// The lines under a blocked agent's message: one per agent it waits on, and when it
+    /// will check again. The same on the Mac's row and the phone's card (FR-011).
+    public func blockLines(_ agent: Agent) -> [String] {
+        guard let (_, block) = openBlock(agent) else { return [] }
+        return block.waits.map { Block.waitLine(name: waitName($0), ending: $0.ending) }
+            + [block.checkAgainLine()].compactMap { $0 }
+    }
+
+    /// The name of the button that ends a block by hand.
+    public static let carryOnLabel = "Carry on"
+
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.
     public func canStop(_ agent: Agent) -> Bool {
-        agent.state.holdsRuntime || isComingBack(agent)
+        // A blocked chat too (039): it holds nothing, but a resume is coming, and Stop
+        // is how the person calls it off.
+        agent.state.holdsRuntime || isComingBack(agent) || openBlock(agent) != nil
     }
 
     /// The one thing every client says about a chat on its way back, so the window
@@ -450,7 +548,8 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest activity first.
+    /// The agents of one project, in one group, newest activity first — or, under
+    /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
     /// another client would not. Filtered from what is already held, so the archived
@@ -462,7 +561,9 @@ public final class AgentsModel {
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         let wanted = Project.standardize(folder)
-        return agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        let found = agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        guard group == .parked else { return found }
+        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }
     }
 
     /// The agent's folder as projects compare it, remembered after the first ask.

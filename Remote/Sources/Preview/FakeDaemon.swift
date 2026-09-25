@@ -130,6 +130,18 @@ private actor FakeState {
                 await change(request?.agentID) { $0.state = .finished }
                 return .success(.object([:]))
 
+            case DaemonAPI.Method.agentsPark:
+                let request = try params?.decode(DaemonAPI.AgentRequest.self)
+                await change(request?.agentID) {
+                    $0.parking = $0.state.hasTurnInFlight ? .whenTurnEnds(since: Date()) : .parked(at: Date())
+                }
+                return .success(.object([:]))
+
+            case DaemonAPI.Method.agentsUnpark:
+                let request = try params?.decode(DaemonAPI.AgentRequest.self)
+                await change(request?.agentID) { $0.parking = nil }
+                return .success(.object([:]))
+
             default:
                 return .failure(JSONRPCError(code: -32601, message: "Not in the fake: \(method)"))
             }

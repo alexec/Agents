@@ -498,6 +498,26 @@ extension DaemonCore {
         changed(agent)
     }
 
+    /// Files under this agent's folders worth offering for what follows an `@` (033).
+    ///
+    /// The Mac's window walks the disk itself; a phone cannot, so it asks here, and the
+    /// walk is the same capped one. Off the actor, because even capped it is thousands
+    /// of stat calls, and nothing else the daemon does should wait on it.
+    public func fileMentions(_ request: DaemonAPI.FileMentionRequest) async throws -> [DaemonAPI.FileMentionDTO] {
+        guard let agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        let term = request.term
+        guard !term.isEmpty else { return [] }
+        let folders = [agent.cwd] + agent.additionalDirectories
+        let found = await Task.detached(priority: .userInitiated) {
+            FileMention.matching(term, in: folders)
+        }.value
+        return found.map {
+            DaemonAPI.FileMentionDTO(path: $0.url.path(percentEncoded: false), relativePath: $0.relativePath)
+        }
+    }
+
     /// Send the next thing waiting, if the agent is free to take it.
     ///
     /// One at a time. Each queued prompt is a turn of its own, so the transcript reads
@@ -692,7 +712,7 @@ extension DaemonCore {
         return agents[request.agentID] ?? agent
     }
 
-    private func reason(_ error: any Error) -> String {
+    func reason(_ error: any Error) -> String {
         (error as? JSONRPCError)?.message ?? error.localizedDescription
     }
 
@@ -940,6 +960,10 @@ extension DaemonCore {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
             return
         }
+        // Ended blocked, with everything it named already over (039): carried on here,
+        // after the runtime is let go, and never from inside `move`, where the release
+        // still to come would take the new turn's runtime with it.
+        await resumeIfCleared(agentID)
         await askForOutcomeIfSilent(agentID: agentID, reason: reason)
         await drainQueue(after: agentID)
     }
@@ -1144,6 +1168,17 @@ extension DaemonCore {
         // reject `.stoppedByUser` — so this is not what keeps the record right. It is
         // here so the code says what it means instead of leaning on a refusal to
         // undo a call it should not have made.
+        // A blocked agent (039). Its block is dropped first, so nothing clearing in the
+        // awaits below can resume it; and a finished one, which has no turn to cancel,
+        // is stopped on the one event that takes a finished agent to stopped.
+        let wasBlocked = agents[agentID]?.report?.isOpenBlock == true
+        dropBlock(agentID)
+        if wasBlocked, agents[agentID]?.state == .finished {
+            if case .agent(let starter) = cause {
+                await record(.runtimeNote("\(starterName(starter)) stopped this agent."), for: agentID)
+            }
+            await move(agentID, on: cause == .person ? .stoppedWaitingByUser : .stoppedWaitingByAgent)
+        }
         if agents[agentID]?.state.holdsRuntime == true {
             switch cause {
             case .person:
@@ -1181,6 +1216,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         stops[agentID, default: 0] += 1
+        // Archived is never resumed (FR-017): the block goes before anything is awaited.
+        dropBlock(agentID)
         if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
         switch cause {
         case .person:
@@ -1204,6 +1241,44 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         await move(agentID, on: .unarchivedByUser)
+    }
+
+    // MARK: Parking (040)
+
+    /// Put a chat down to come back to. A settled chat is parked now; one with a turn in
+    /// flight is marked, and `move` parks it the moment that turn ends, so nothing is cut
+    /// off (FR-006). The runtime, the transcript and the queue are not touched (FR-005).
+    /// An archived chat, or one already so, is left as it is and nothing is said (FR-017).
+    public func park(_ agentID: UUID) throws {
+        guard var agent = agents[agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard agent.state != .archived else { return }
+        let inFlight = agent.state.hasTurnInFlight
+        switch (agent.parking, inFlight) {
+        case (.parked, _), (.whenTurnEnds, true): return
+        case (_, true): agent.parking = .whenTurnEnds(since: now())
+        case (_, false): agent.parking = .parked(at: now())
+        }
+        changed(agent)
+        reconsider()
+    }
+
+    /// Pick a chat back up without saying anything to it: it goes back to the group its
+    /// ending puts it in, or, mid-turn, ends where it would have (FR-008).
+    public func unpark(_ agentID: UUID) throws {
+        guard agents[agentID] != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        unparkQuietly(agentID)
+    }
+
+    /// Take the mark off, if there is one. Shared with the person's prompt.
+    func unparkQuietly(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.parking != nil else { return }
+        agent.parking = nil
+        changed(agent)
+        reconsider()
     }
 
     // MARK: Options and permissions

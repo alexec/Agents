@@ -29,6 +29,7 @@ enum Canned {
     static let halfDone = UUID(uuidString: "00000000-0000-0000-0000-0000000000A8")!
     static let stuck = UUID(uuidString: "00000000-0000-0000-0000-0000000000A9")!
     static let nothingToDo = UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!
+    static let blocked = UUID(uuidString: "00000000-0000-0000-0000-0000000000AD")!
     static let unaccounted = UUID(uuidString: "00000000-0000-0000-0000-0000000000AB")!
     /// Blocked on a form rather than on a permission. A different screen from `waiting`
     /// and, until this existed, one nobody could look at: the form hides behind a live
@@ -120,6 +121,22 @@ enum Canned {
                   report: WorkReport(outcome: .stuck,
                                      message: "No signing certificate on this machine.",
                                      at: ago(35))),
+            // Waiting on two agents of its own, one of which has finished (039): under
+            // Blocked, grey, with a line for each.
+            Agent(id: blocked, runtimeID: "claude", cwd: agentsFolder,
+                  title: "Land the settings rewrite", state: .finished,
+                  createdAt: ago(50), lastActivityAt: ago(12),
+                  endedReason: .endTurn, costToDate: ["USD": 0.19],
+                  report: WorkReport(outcome: .blocked,
+                                     message: "Waiting on the two helpers before I merge.",
+                                     at: ago(12),
+                                     block: Block(waits: [
+                                         Wait(agentID: working, nameAtReport: "Split the package in two"),
+                                         Wait(agentID: done, nameAtReport: "Swipe a chat aside to archive it",
+                                              ending: WaitEnding(at: ago(10),
+                                                                 how: .finished(outcome: .done,
+                                                                                message: "Renamed 14 call sites."))),
+                                     ]))),
             // Looked, and there was nothing to do: hollow and grey, under Complete.
             Agent(id: nothingToDo, runtimeID: "grok", cwd: agentsFolder,
                   title: "Nightly build check", state: .finished,

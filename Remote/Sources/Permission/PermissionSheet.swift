@@ -41,11 +41,9 @@ struct PermissionSheet: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
-        // The same ceiling the transcript has, so the question sits over the column it
-        // is about rather than across the whole iPad.
-        .readableWidth()
+        // In the chat column with the prompt under it and the conversation
+        // above, as on the Mac (033).
+        .chatColumn()
         .animation(.snappy(duration: 0.2), value: chosen)
     }
 

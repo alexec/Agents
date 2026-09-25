@@ -154,6 +154,13 @@ public actor JSONRPCConnection {
         try send(.notification(method: method, params: params))
     }
 
+    /// A notification already encoded, for saying one thing to many connections: it is
+    /// turned into JSON once, not once per listener. See `DaemonServer.broadcast`.
+    public nonisolated func notify(line: String) throws {
+        guard !closed.isSet else { throw JSONRPCTransportError.closed }
+        try transport.write(line: line)
+    }
+
     public func close() {
         readTask?.cancel()
         readTask = nil

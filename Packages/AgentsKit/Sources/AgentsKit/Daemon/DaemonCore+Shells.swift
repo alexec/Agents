@@ -7,7 +7,9 @@ import Foundation
 /// reason it holds agents: so a build outlives the window that started it.
 extension DaemonCore {
     /// Give a window the shell for an agent, starting one if there is none.
-    func attachShell(_ request: DaemonAPI.ShellAttachRequest) throws -> DaemonAPI.ShellAttachResponse {
+    func attachShell(_ request: DaemonAPI.ShellAttachRequest,
+                     from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
+        watchShell(request.agentID, from: surface, connection: connection)
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
         }
@@ -26,11 +28,38 @@ extension DaemonCore {
     }
 
     /// The window stopped looking. Nothing is killed (FR-026).
-    func detachShell(_ agentID: UUID) {
+    func detachShell(_ agentID: UUID, connection: UUID? = nil) {
+        if let connection {
+            shellWatchers[agentID]?.remove(connection)
+            if shellWatchers[agentID]?.isEmpty == true { shellWatchers[agentID] = nil }
+        }
         shells.detach(agentID: agentID)
     }
 
+    /// A device that opened this shell hears it from now on (034). A window hears every
+    /// shell already, and is not written down.
+    private func watchShell(_ agentID: UUID, from surface: Surface?, connection: UUID?) {
+        guard case .device = surface, let connection else { return }
+        shellWatchers[agentID, default: []].insert(connection)
+    }
+
+    /// A connection has gone: it hears no shells now.
+    func forgetShellWatcher(_ connection: UUID) {
+        for agentID in shellWatchers.keys {
+            shellWatchers[agentID]?.remove(connection)
+            if shellWatchers[agentID]?.isEmpty == true { shellWatchers[agentID] = nil }
+        }
+    }
+
     func writeToShell(_ request: DaemonAPI.ShellInputRequest) throws {
+        // The shell takes the size of whoever typed last (034, US4 scenario 5). The
+        // daemon is the one place that knows who that was: two screens on one shell
+        // each send their own size with their keystrokes, and the later wins.
+        if let rows = request.rows, let cols = request.cols, rows > 0, cols > 0,
+           let session = shells.session(for: request.agentID),
+           session.rows != rows || session.cols != cols {
+            shells.resize(agentID: request.agentID, rows: rows, cols: cols)
+        }
         do {
             try shells.write(agentID: request.agentID, data: request.bytes)
         } catch ShellHost.Failure.notLive {
@@ -51,7 +80,9 @@ extension DaemonCore {
     }
 
     /// A new shell for an agent whose old one is over (FR-024).
-    func restartShell(_ request: DaemonAPI.ShellAttachRequest) throws -> DaemonAPI.ShellAttachResponse {
+    func restartShell(_ request: DaemonAPI.ShellAttachRequest,
+                      from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
+        watchShell(request.agentID, from: surface, connection: connection)
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
         }
@@ -95,14 +126,29 @@ extension DaemonCore {
     }
 
     private func forward(_ agentID: UUID, _ event: ShellHost.ShellEvent) {
+        let method: String
+        let value: any Encodable & Sendable
         switch event {
         case .output(let data):
-            broadcast(DaemonAPI.Notification.shellOutput,
-                      DaemonAPI.ShellOutputNotification(agentID: agentID, bytes: data))
+            method = DaemonAPI.Notification.shellOutput
+            value = DaemonAPI.ShellOutputNotification(agentID: agentID, bytes: data)
         case .state(let state):
-            broadcast(DaemonAPI.Notification.shellStateChanged,
-                      DaemonAPI.ShellStateNotification(agentID: agentID, state: state))
+            method = DaemonAPI.Notification.shellStateChanged
+            value = DaemonAPI.ShellStateNotification(agentID: agentID, state: state)
         }
+        // Every window, and only the devices that opened this shell (034): a phone on
+        // WiFi does not carry an unrelated agent's build output because a Mac window
+        // has that shell open. Without the addressed door — a test's daemon — it goes
+        // to everyone, as it always did.
+        guard addressed.isSet else {
+            broadcast(method, value)
+            return
+        }
+        let watchers = shellWatchers[agentID] ?? []
+        send(method, value, to: { context in
+            guard case .device = context.surface else { return true }
+            return watchers.contains(context.id)
+        })
     }
 
     /// Let go of shells nobody has touched for a long time (FR-028). Called on the same
