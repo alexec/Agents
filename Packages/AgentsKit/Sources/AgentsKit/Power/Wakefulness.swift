@@ -43,8 +43,11 @@ public final class ProcessInfoWakefulness: Wakefulness, @unchecked Sendable {
         // begin a second activity and drop the first token on the floor, and the
         // assertion would leak for the lifetime of the process.
         guard token == nil else { return }
+        #if canImport(Darwin)
         token = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled], reason: reason)
+        #endif
+        // A Linux server has no idle sleep to hold off (037): nothing to take.
     }
 
     public func release() {
@@ -52,7 +55,9 @@ public final class ProcessInfoWakefulness: Wakefulness, @unchecked Sendable {
         defer { lock.unlock() }
         guard let held = token else { return }
         token = nil
+        #if canImport(Darwin)
         ProcessInfo.processInfo.endActivity(held)
+        #endif
     }
 
     deinit {
@@ -65,7 +70,9 @@ public final class ProcessInfoWakefulness: Wakefulness, @unchecked Sendable {
         // In production there is one core per process and this never fires before
         // exit. It is here so that running the suite does not quietly keep the
         // developer's Mac awake.
+        #if canImport(Darwin)
         if let held = token { ProcessInfo.processInfo.endActivity(held) }
+        #endif
     }
 
     // No cleanup path anywhere for a hold left behind by

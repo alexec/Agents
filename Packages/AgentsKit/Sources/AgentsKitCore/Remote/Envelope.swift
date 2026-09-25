@@ -1,4 +1,6 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
 import Foundation
 
 /// Something sealed to one device, and to nobody else.
@@ -21,6 +23,7 @@ public struct Envelope: Hashable, Sendable, Codable {
         self.ciphertext = ciphertext
     }
 
+    #if canImport(CryptoKit)
     static let suite = HPKE.Ciphersuite.P256_SHA256_AES_GCM_256
     static let purpose = Data("com.alexecollins.agents.headline.v1".utf8)
 
@@ -44,4 +47,13 @@ public struct Envelope: Hashable, Sendable, Codable {
                                            encapsulatedKey: envelope.encapsulated)
         return try recipient.open(envelope.ciphertext)
     }
+    #else
+    public struct Unavailable: Error {}
+
+    /// A Linux server has no paired devices (037), so nothing is ever sealed there.
+    /// Asked anyway, it says so rather than sending a banner in the clear.
+    public static func seal(_ headline: Headline, to publicKey: Data) throws -> Envelope {
+        throw Unavailable()
+    }
+    #endif
 }

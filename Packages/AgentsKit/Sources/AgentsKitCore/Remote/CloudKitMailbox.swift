@@ -1,3 +1,5 @@
+// Not on Linux: the server build of agentsd has no CloudKit and no use for this (037).
+#if canImport(CloudKit)
 import CloudKit
 import Foundation
 
@@ -123,3 +125,4 @@ public struct CloudKitMailbox: Mailbox {
                       withdrawn: (fields[Field.withdrawn] as? Int) == 1)
     }
 }
+#endif

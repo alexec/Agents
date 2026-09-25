@@ -38,7 +38,7 @@ public struct SocketLink: DaemonLink {
         }
         let size = socklen_t(MemoryLayout<sockaddr_un>.size)
         let result = withUnsafePointer(to: &address) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, size) }
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { POSIX.connect(fd, $0, size) }
         }
         guard result == 0 else {
             close(fd)
@@ -58,15 +58,15 @@ public struct SocketLink: DaemonLink {
         // if that file cannot be opened. On a first run the directory does not exist
         // yet, and the daemon that would have made it is the thing being started.
         try? locations.createDirectories()
-        var attributes: posix_spawnattr_t?
+        var attributes: SpawnAttributes = Spawn.noAttributes
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
         // CLOEXEC_DEFAULT so the helper starts with nothing of the app's but the three
         // descriptors named below. It outlives the window on purpose; what it inherits
         // would outlive it too.
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT))
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSID | Spawn.closeOnExecByDefault))
 
-        var actions: posix_spawn_file_actions_t?
+        var actions: SpawnActions = Spawn.noActions
         posix_spawn_file_actions_init(&actions)
         defer { posix_spawn_file_actions_destroy(&actions) }
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)

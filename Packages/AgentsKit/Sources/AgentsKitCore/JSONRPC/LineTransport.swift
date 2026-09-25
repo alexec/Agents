@@ -56,7 +56,7 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
             var splitter = LineSplitter()
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while true {
-                let n = buffer.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress, $0.count) }
+                let n = buffer.withUnsafeMutableBytes { POSIX.read(fd, $0.baseAddress, $0.count) }
                 if n > 0 {
                     buffer.withUnsafeBufferPointer { splitter.append(UnsafeBufferPointer(rebasing: $0[0..<n])) }
                     while let line = splitter.next() { continuation.yield(line) }
@@ -83,7 +83,7 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         var offset = 0
         while offset < data.count {
             let written = data[offset...].withUnsafeBufferPointer {
-                Darwin.write(writeFD, $0.baseAddress, $0.count)
+                POSIX.write(writeFD, $0.baseAddress, $0.count)
             }
             if written > 0 {
                 offset += written
@@ -105,8 +105,8 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         // Shutting down returns it zero at once. A pipe is not a socket, and the call
         // simply fails on one.
         if writeFD == readFD { shutdown(readFD, SHUT_RDWR) }
-        Darwin.close(readFD)
-        if writeFD != readFD { Darwin.close(writeFD) }
+        POSIX.close(readFD)
+        if writeFD != readFD { POSIX.close(writeFD) }
     }
 }
 

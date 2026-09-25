@@ -22,9 +22,9 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm 034-ios-artifacts is merged into `main` (`git log main --oneline | grep -i 034` and `grep -n '"files/list"' Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift` on main). If it is not, stop: this feature's server files pane needs `files/list`, `files/read`, `files/watch` (R9). Then `git merge main` into this branch.
-- [ ] T002 Record the baseline: `swift test` in `Pkg` once, and write the pass/fail count into this task, as 030's T001 did.
-- [ ] T003 Install the Linux toolchain (R1). Take the swift.org toolchain for the Swift version `swift --version` reports (6.4 today) and its Static Linux SDK (`swift sdk install <url> --checksum <sum>`). Confirm `swift sdk list` shows `x86_64-swift-linux-musl` and `aarch64-swift-linux-musl`. This is a download of about 1.5 GB. Ask Alex before starting it.
+- [X] T001 Confirm 034-ios-artifacts is merged into `main` (`git log main --oneline | grep -i 034` and `grep -n '"files/list"' Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift` on main). If it is not, stop: this feature's server files pane needs `files/list`, `files/read`, `files/watch` (R9). Then `git merge main` into this branch. **Done 2026-09-25: main (`fbbaa87`, 034 merged) merged in as `258ea6d`.**
+- [X] T002 Record the baseline: `swift test` in `Pkg` once, and write the pass/fail count into this task, as 030's T001 did. **Baseline at `258ea6d`: 1517 tests in 168 suites, 1 issue. The suite is known flaky under load; see T053.**
+- [X] T003 Install the Linux toolchain (R1). Take the swift.org toolchain for the Swift version `swift --version` reports (6.4 today) and its Static Linux SDK (`swift sdk install <url> --checksum <sum>`). Confirm `swift sdk list` shows `x86_64-swift-linux-musl` and `aarch64-swift-linux-musl`. This is a download of about 1.5 GB. Ask Alex before starting it. **Done: swift.org 6.4.0-RELEASE toolchain in ~/Library/Developer/Toolchains; `swift-6.4.0-RELEASE_static-linux-0.1.0` SDK installed.**
 
 ---
 
@@ -32,7 +32,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ### 2a — The daemon builds and runs on Linux (the gate)
 
-- [ ] T004 Make `agentsd` compile for Linux, per [contracts/daemon.md § Linux build](contracts/daemon.md#linux-build):
+- [X] T004 Make `agentsd` compile for Linux, per [contracts/daemon.md § Linux build](contracts/daemon.md#linux-build): **Done: `Daemon/Package.swift` builds `agentsd` static for aarch64 and x86_64 (Debug, 160 MB unstripped). The changes: `AgentsKitCore/Platform/POSIX.swift`, a `CShims` C target (ioctl, non-reaping exit check), `AgentsKit/Platform/Spawn.swift`, inotify `FolderWatch+Linux.swift`, Linux exit watcher in PTY, and guards around PhoneAttachment, MarkdownBlock, CloudKit, Network and CryptoKit. The Mac suite is unchanged, though failures under load vary. Runtime on Linux is unproven until T005.**
   - Add `Pkg/Sources/AgentsKit/Platform/Platform.swift`: `#if canImport(Darwin) import Darwin #elseif canImport(Musl) import Musl #elseif canImport(Glibc) import Glibc`, plus wrappers for `connect`, `socket` send flags (`SO_NOSIGPIPE` vs `MSG_NOSIGNAL`), and `sun_path` size (104 vs 108).
   - Route `Pkg/Sources/AgentsKit/Terminal/PTY.swift`, `Terminal/ShellSession.swift`, `Daemon/DaemonServer.swift` and `Client/SocketLink.swift` through it.
   - `Pkg/Sources/AgentsKit/Files/FolderWatch.swift`: keep FSEvents under `#if os(macOS)`. Add an `#if os(Linux)` body using `inotify_init1`/`inotify_add_watch` (recursive, via a watch per directory) with the same `init(root:onChange:)`.
@@ -52,8 +52,8 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ### 2c — Host record and store
 
-- [ ] T012 [P] Write `Tests/Unit/HostTests.swift`, covering the validation rules in data-model.md: "`sshName` is non-empty, has no whitespace, and does not start with `-`"; "Two hosts may not share an `sshName`"; `HostID` is 8 characters of `[a-z0-9]`; `.mac` is never encoded into `hosts.json`; label defaults (alias → alias, `alex@devbox.lan:2222` → `devbox.lan`); `ProjectKey` stored as `"<host>|<path>"`, with a bare path decoding as `.mac`.
-- [ ] T013 Create `Pkg/Sources/AgentsKitCore/Hosts/Host.swift` (`HostID`, `Host`, `ServerFacts`, `Architecture`, `HostProblem`, `ProjectKey`) as data-model.md specifies, plus `Pkg/Sources/AgentsKit/Hosts/HostStore.swift` (atomic `hosts.json` at `StoreLocations.hosts`). Add `hosts` and `hostsFolder` to `Pkg/Sources/AgentsKit/Store/StoreLocations.swift`.
+- [X] T012 [P] Write `Tests/Unit/HostTests.swift`, covering the validation rules in data-model.md: "`sshName` is non-empty, has no whitespace, and does not start with `-`"; "Two hosts may not share an `sshName`"; `HostID` is 8 characters of `[a-z0-9]`; `.mac` is never encoded into `hosts.json`; label defaults (alias → alias, `alex@devbox.lan:2222` → `devbox.lan`); `ProjectKey` stored as `"<host>|<path>"`, with a bare path decoding as `.mac`.
+- [X] T013 Create `Pkg/Sources/AgentsKitCore/Hosts/Host.swift` (`HostID`, `Host`, `ServerFacts`, `Architecture`, `HostProblem`, `ProjectKey`) as data-model.md specifies, plus `Pkg/Sources/AgentsKit/Hosts/HostStore.swift` (atomic `hosts.json` at `StoreLocations.hosts`). Add `hosts` and `hostsFolder` to `Pkg/Sources/AgentsKit/Store/StoreLocations.swift`.
 
 ### 2d — The SSH layer (Mac only)
 

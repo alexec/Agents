@@ -1,4 +1,11 @@
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Glibc)
+import Glibc
+#endif
+import CShims
 import Foundation
 
 /// A program running on a pseudo-terminal.
@@ -52,7 +59,7 @@ public final class PTY: @unchecked Sendable {
     /// Watches the child so the tty is let go even in the case where the revoke above
     /// does not come. It does not wait for the child: `finish` is the one place the
     /// child is ever reaped, and two reapers race each other to ECHILD.
-    private var exitWatcher: DispatchSourceProcess?
+    private var exitWatcher: (any DispatchSourceProtocol)?
     var debugTotal = 0
     let debugStart = Date()
     var debugArgs = ""
@@ -107,12 +114,12 @@ public final class PTY: @unchecked Sendable {
         _ = fcntl(master, F_SETFD, FD_CLOEXEC)
         _ = fcntl(slave, F_SETFD, FD_CLOEXEC)
         guard let slaveName = ptsname(master).map({ String(cString: $0) }) else {
-            Darwin.close(master); master = -1
-            Darwin.close(slave); slave = -1
+            POSIX.close(master); master = -1
+            POSIX.close(slave); slave = -1
             throw Failure.couldNotOpen
         }
 
-        var attributes: posix_spawnattr_t?
+        var attributes: SpawnAttributes = Spawn.noAttributes
         posix_spawnattr_init(&attributes)
 
         // Every signal back to its default in the child.
@@ -145,9 +152,9 @@ public final class PTY: @unchecked Sendable {
         // dead daemon's lock ends up refusing to let the next one start.
         posix_spawnattr_setflags(&attributes,
                                  Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
-                                       | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_CLOEXEC_DEFAULT))
+                                       | POSIX_SPAWN_SETSIGMASK | Spawn.closeOnExecByDefault))
 
-        var actions: posix_spawn_file_actions_t?
+        var actions: SpawnActions = Spawn.noActions
         posix_spawn_file_actions_init(&actions)
         // Opened by the child, after setsid, so BSD makes it the controlling terminal.
         posix_spawn_file_actions_addopen(&actions, 0, slaveName, O_RDWR, 0)
@@ -180,8 +187,8 @@ public final class PTY: @unchecked Sendable {
         PTY.spawnLock.unlock()
 
         guard result == 0 else {
-            Darwin.close(master); master = -1
-            Darwin.close(slave); slave = -1
+            POSIX.close(master); master = -1
+            POSIX.close(slave); slave = -1
             throw Failure.couldNotStart(String(cString: strerror(result)))
         }
         pid = spawned
@@ -199,8 +206,8 @@ public final class PTY: @unchecked Sendable {
         // child parked in `exit` for ever, waiting for a reader that has gone.
         exitWatcher?.cancel()
         reader?.cancel()
-        if slave >= 0 { Darwin.close(slave) }
-        if master >= 0 { Darwin.close(master) }
+        if slave >= 0 { POSIX.close(slave) }
+        if master >= 0 { POSIX.close(master) }
     }
 
     private static let spawnLock = NSLock()
@@ -212,8 +219,7 @@ public final class PTY: @unchecked Sendable {
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = read(self.master, &buffer, buffer.count)
             if count <= 0 {
-                var avail: Int32 = -1
-                _ = ioctl(self.master, TIOCOUTQ, &avail)
+                let avail = agents_output_queued(self.master)
                 FileHandle.standardError.write(Data("PTYDEBUG eof pid=\(self.pid) count=\(count) slave=\(self.slave) totalRead=\(self.debugTotal) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
             } else {
                 self.debugTotal += count
@@ -230,7 +236,7 @@ public final class PTY: @unchecked Sendable {
         source.setCancelHandler { [weak self] in
             guard let self else { return }
             self.lock.lock()
-            if self.master >= 0 { Darwin.close(self.master); self.master = -1 }
+            if self.master >= 0 { POSIX.close(self.master); self.master = -1 }
             self.lock.unlock()
         }
         reader = source
@@ -249,6 +255,7 @@ public final class PTY: @unchecked Sendable {
     /// away with ECHILD and no status, which is how a shell that exited 3 was
     /// reported as having exited for no reason anyone could name.
     private func watchForExit() {
+        #if canImport(Darwin)
         let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
         source.setEventHandler { [weak self] in
             guard let self else { return }
@@ -257,11 +264,26 @@ public final class PTY: @unchecked Sendable {
         }
         exitWatcher = source
         source.resume()
+        #else
+        // Linux has no process source. Ask, without reaping, five times a second; on
+        // Linux this is the main path rather than the spare, because the master only
+        // reports end of file once the slave this side holds is let go (037).
+        let pid = self.pid
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + .milliseconds(200), repeating: .milliseconds(200))
+        timer.setEventHandler { [weak self] in
+            guard let self, agents_has_exited(pid) == 1 else { return }
+            timer.cancel()
+            self.releaseSlave()
+        }
+        exitWatcher = timer
+        timer.resume()
+        #endif
     }
 
     private func releaseSlave() {
         lock.lock()
-        if slave >= 0 { Darwin.close(slave); slave = -1 }
+        if slave >= 0 { POSIX.close(slave); slave = -1 }
         lock.unlock()
     }
 
@@ -373,7 +395,7 @@ public final class PTY: @unchecked Sendable {
             guard let base = raw.baseAddress else { return }
             var written = 0
             while written < raw.count {
-                let n = Darwin.write(master, base.advanced(by: written), raw.count - written)
+                let n = POSIX.write(master, base.advanced(by: written), raw.count - written)
                 if n <= 0 { break }
                 written += n
             }
@@ -386,8 +408,7 @@ public final class PTY: @unchecked Sendable {
         guard master >= 0, rows > 0, cols > 0 else { return }
         self.rows = rows
         self.cols = cols
-        var size = winsize(ws_row: UInt16(rows), ws_col: UInt16(cols), ws_xpixel: 0, ws_ypixel: 0)
-        _ = ioctl(master, TIOCSWINSZ, &size)
+        _ = agents_set_winsize(master, UInt16(rows), UInt16(cols))
         // The kernel sends SIGWINCH to the foreground process group by itself.
     }
 
@@ -430,7 +451,7 @@ public final class PTY: @unchecked Sendable {
     public func killNow() {
         guard pid > 0 else { return }
         killpg(pid, SIGKILL)
-        Darwin.kill(pid, SIGKILL)
+        POSIX.kill(pid, SIGKILL)
     }
 
     /// Let go of the master descriptor. The program is not signalled: detaching a

@@ -1,3 +1,5 @@
+// Not on Linux: the server build of agentsd has no CoreGraphics and no use for this (037).
+#if canImport(CoreGraphics)
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -91,3 +93,4 @@ public enum PhoneAttachment {
         return out as Data
     }
 }
+#endif

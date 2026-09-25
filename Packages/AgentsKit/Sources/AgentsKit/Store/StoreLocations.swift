@@ -94,6 +94,13 @@ public struct StoreLocations: Sendable {
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
     public var devices: URL { root.appendingPathComponent("devices.json") }
+    /// The servers the window reaches over ssh (037). Written by the window only; the
+    /// daemon at this root never reads it.
+    public var hosts: URL { root.appendingPathComponent("hosts.json") }
+    /// Each connected server's ssh control socket and forwarded daemon socket,
+    /// `<id>.ctl` and `<id>.sock`. Short names, because both count against the same
+    /// 104 bytes as `daemon.sock`.
+    public var hostsFolder: URL { root.appendingPathComponent("hosts", isDirectory: true) }
     /// What each runtime last advertised. A cache: safe to delete, and deleting it
     /// costs the next start form the wait it used to have every time.
     public var optionCache: URL { root.appendingPathComponent("option-cache.json") }

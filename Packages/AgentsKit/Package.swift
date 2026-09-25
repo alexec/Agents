@@ -29,7 +29,11 @@ let package = Package(
         // Nothing here, deliberately. `agentsd` links this library, and the daemon
         // moves terminal bytes without parsing them. SwiftTerm belongs to the app,
         // where it is declared against the app target in `project.yml`.
-        .target(name: "AgentsKit", dependencies: ["AgentsKitCore"]),
+        .target(name: "AgentsKit", dependencies: ["AgentsKitCore", "CShims"]),
+        // Three one-line C wrappers the Linux build of `agentsd` needs, because Swift
+        // cannot call a variadic C function there (037). The Mac uses them too, so there
+        // is one path rather than two.
+        .target(name: "CShims"),
         // The test target may have it, because a test target is not linked into any
         // product: the daemon is still free of it. The replay test needs a real
         // emulator to prove the property `shell.attach` rests on, which is that the
