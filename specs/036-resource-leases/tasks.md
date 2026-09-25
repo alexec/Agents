@@ -326,4 +326,10 @@ The pure book, its limits, the wire snapshot and the store. Nothing behaves diff
   daemon by the pid in its `daemon.lock` left it a zombie until the window reaped it, and the
   window started a new daemon on the same root. The book came back with the same holder, the same
   expiry to the millisecond, and the waiter's call marked closed (`walk/after-daemon-restart.png`).
-- **Still Alex's**: the iPad look.
+- **iPad look**: approved by Alex on Alex's iPad (2), iPad (A16), with Remote at `e3ce367`: the
+  card line, the capsule on one line, and the read-only sheet.
+- **Expiry across sleep**: the iPad check lease was due at 01:26 but lapsed at 01:33. The Mac slept
+  from about 01:23 to a DarkWake at 01:33:13 (`pmset -g log`), and the timer fired at that wake.
+  SC-003's 5 seconds holds only while the Mac is awake. Nothing runs during sleep, and the daemon
+  catches up at the first wake, which is what happened. The agent's notice gives the time it
+  was noticed ("ran out at 01:33"), not the expiry, so after a sleep the two differ.
