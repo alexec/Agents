@@ -38,6 +38,12 @@ struct FilesPane: View {
 
     private var folder: URL { state.folder ?? agent.cwd }
 
+    /// A server agent's folder is read through its server (037). Nil for this Mac's,
+    /// which is read straight off the disk as it always was.
+    private var server: RemoteFiles? { agent.host == .mac ? nil : model.serverFiles(agent.host) }
+    private var serverLabel: String? { agent.host == .mac ? nil : model.hosts.label(agent.host) }
+    private var serverChanges: Int { server?.changeCount(agentID: agent.id, folder: folder) ?? 0 }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -49,7 +55,16 @@ struct FilesPane: View {
             }
         }
         .task(id: agent.id) { await start() }
-        .onDisappear { watch?.stop(); watch = nil }
+        .onDisappear {
+            watch?.stop(); watch = nil
+            if let server { Task { await server.unwatch(agentID: agent.id, folder: agent.cwd) } }
+        }
+        // A server says `files/changed` where FSEvents would have told this Mac.
+        .onChange(of: serverChanges) {
+            folderEvents += 1
+            reloadListing(inBackground: true)
+            if let openFile = state.openFile { reloadFile(openFile) }
+        }
         .onChange(of: model.entries.count) { refreshTouched() }
         // The agent can open a file here as well as the user (`show_file`), and when
         // it does, this pane is already on screen and has already run its task.
@@ -210,10 +225,10 @@ struct FilesPane: View {
                     }
                 }
             case .image(let description):
-                ImageFile(url: url, probe: probe, description: description)
+                ImageFile(url: url, probe: probe, description: description, server: serverLabel)
             case .binary(let description):
                 // Its bytes are never shown (FR-014). What is shown is the way out.
-                OpenElsewhere(url: url, description: description)
+                OpenElsewhere(url: url, description: description, server: serverLabel)
             }
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -239,6 +254,10 @@ struct FilesPane: View {
 
     private func startWatching() {
         watch?.stop()
+        if let server {
+            Task { await server.watch(agentID: agent.id, folder: agent.cwd) }
+            return
+        }
         // The watch is on the agent's whole folder, but the pane only re-reads the
         // directory it is showing and the file it has open. FSEvents coalesces, so a
         // build writing thousands of files is a handful of events, not thousands.
@@ -277,6 +296,22 @@ struct FilesPane: View {
     /// same frame as the click.
     private func reloadListing(inBackground: Bool = false) {
         listingRequest += 1
+        if let server {
+            let folder = folder, request = listingRequest, agentID = agent.id
+            Task {
+                let read: Result<DirectoryListing, any Error>
+                do { read = .success(try await server.list(agentID: agentID, folder: folder)) }
+                catch { read = .failure(error) }
+                guard request == listingRequest else { return }
+                if case .failure(let error) = read {
+                    listing = nil
+                    problem = RemoteFiles.describe(error, name: folder.lastPathComponent)
+                } else {
+                    show(read, of: folder)
+                }
+            }
+            return
+        }
         guard inBackground else {
             show(Result { try DirectoryReader.read(folder) }, of: folder)
             return
@@ -314,6 +349,22 @@ struct FilesPane: View {
 
     private func reloadFile(_ url: URL) {
         loaded = url
+        if let server {
+            let agentID = agent.id
+            Task {
+                do {
+                    let reading = try await server.read(agentID: agentID, path: url.path(percentEncoded: false))
+                    guard let fresh = Self.probe(reading) else { return }
+                    if let probe, probe.prefix == fresh.prefix, probe.size == fresh.size { fileProblem = nil; return }
+                    probe = fresh
+                    fileProblem = nil
+                } catch {
+                    if !(RemoteFiles.isGone(error) && isMarkdown(url)) { probe = nil }
+                    fileProblem = RemoteFiles.describe(error, name: url.lastPathComponent)
+                }
+            }
+            return
+        }
         do {
             let fresh = try FileProbe.read(url)
             // The watch is on the whole folder, so a build writing beside this file
@@ -336,6 +387,20 @@ struct FilesPane: View {
         } catch {
             probe = nil
             fileProblem = "\(url.lastPathComponent) could not be read."
+        }
+    }
+
+    /// What a server read looks like to the pane, which was written for the disk's.
+    private static func probe(_ reading: FileReading) -> FileProbe? {
+        switch reading {
+        case .text(let text, let isTruncated, let size, _):
+            FileProbe(kind: .text, prefix: Data(text.utf8), isTruncated: isTruncated, size: size)
+        case .image(let bytes, let describedAs, _):
+            FileProbe(kind: .image(describedAs: describedAs), prefix: bytes, isTruncated: false, size: bytes.count)
+        case .other(let describedAs, let size, _):
+            FileProbe(kind: .binary(describedAs: describedAs), prefix: Data(), isTruncated: false, size: size)
+        case .unchanged:
+            nil
         }
     }
 

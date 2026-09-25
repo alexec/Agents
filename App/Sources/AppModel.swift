@@ -677,6 +677,17 @@ final class AppModel {
     // MARK: Servers (037)
 
     @ObservationIgnored private var hostsStarted = false
+    /// Each server's end of `files/*`, made when first wanted (037).
+    @ObservationIgnored private var serverFilesByHost: [HostID: RemoteFiles] = [:]
+
+    /// How the files pane reads a server agent's folder: through that server's daemon,
+    /// because the folder is not on this Mac.
+    func serverFiles(_ host: HostID) -> RemoteFiles {
+        if let known = serverFilesByHost[host] { return known }
+        let made = RemoteFiles(client: client(for: host))
+        serverFilesByHost[host] = made
+        return made
+    }
 
     /// Once, after the Mac's own daemon has answered: the servers come after the Mac,
     /// so a slow server never holds up the window's first list.
@@ -701,6 +712,9 @@ final class AppModel {
         // else a server says is about this window: its devices, runtimes and clones
         // are asked for when they are wanted.
         switch method {
+        case DaemonAPI.Notification.filesChanged:
+            guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
+            serverFiles(host).apply(change)
         case DaemonAPI.Notification.shellOutput, DaemonAPI.Notification.shellStateChanged,
              DaemonAPI.Notification.draftOptions:
             await received(method, params, nil)
@@ -714,6 +728,9 @@ final class AppModel {
     /// whatever happened while the Mac was away is simply what the server now says.
     func refreshServer(_ host: HostID) async {
         let server = client(for: host)
+        // A new connection watches nothing; what the files pane was watching is asked
+        // for again, and everything it shows is read again.
+        await serverFilesByHost[host]?.reconnected()
         if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(),
                                                returning: [Agent].self) {
             work.replaceAgents(listed, from: host)
