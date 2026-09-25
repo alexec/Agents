@@ -136,6 +136,16 @@ public struct ServerInstaller: Sendable {
             """)
     }
 
+    /// Wait until the daemon has let go of its socket, after `daemon/quit`. A daemon
+    /// told to go replies first and exits a moment later; connecting in that moment
+    /// reaches the one that is leaving (037).
+    public func waitForDaemonGone(seconds: Int = 10) async throws {
+        try await check("""
+            s="$HOME/.agents-server/root/daemon.sock"; i=0; \
+            while [ -e "$s" ] && [ $i -lt \(seconds * 5) ]; do sleep 0.2; i=$((i+1)); done; [ ! -e "$s" ]
+            """)
+    }
+
     // MARK: § 8 Remove
 
     public func purge() async throws {

@@ -45,8 +45,13 @@ public actor SSHMaster {
         if process?.isRunning == true { await stop() }
         try? FileManager.default.createDirectory(at: controlPath.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
-        // Left by a master that did not get to tidy up. ssh refuses to bind a control
-        // path that exists, and a forward whose socket file is in the way fails.
+        // A master a previous window left running (it quit without stopping it, or
+        // crashed) is asked to go first; one that is already dead just leaves a file.
+        // ssh refuses to bind a control path that exists, and a forward whose socket
+        // file is in the way fails.
+        if FileManager.default.fileExists(atPath: controlPath.path(percentEncoded: false)) {
+            _ = try? await command.run(command.controlArguments("exit"))
+        }
         try? FileManager.default.removeItem(at: controlPath)
         try? FileManager.default.removeItem(at: socket)
 
@@ -84,6 +89,16 @@ public actor SSHMaster {
         }
         await stop()
         throw HostProblem.timedOut("connect")
+    }
+
+    /// For quitting: ask the master to go and do not wait for the answer. The app is
+    /// leaving, and a master left behind would hold its socket until the next launch.
+    public nonisolated func stopWithoutWaiting() {
+        let exit = Process()
+        exit.executableURL = command.executable
+        exit.arguments = command.controlArguments("exit")
+        exit.environment = command.environment
+        try? exit.run()
     }
 
     /// `-O exit`, then SIGTERM if it is still there after two seconds.

@@ -28,6 +28,13 @@ final class HostSet {
     @ObservationIgnored private let locations: StoreLocations
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var quitObserver: (any NSObjectProtocol)?
+
+    /// Quitting: every ssh master goes with the window. The servers' daemons, and the
+    /// agents on them, carry on.
+    func stopForQuit() {
+        for connection in connections.values { connection.stopForQuit() }
+    }
 
     /// What a server said, and which one said it.
     @ObservationIgnored var onNotification: ((HostID, String, JSONValue?) async -> Void)?
@@ -48,8 +55,16 @@ final class HostSet {
         id == .mac ? "This Mac" : hosts[id]?.label ?? "a server"
     }
 
+    /// Since when a server that was connected has been gone. Kept through the retries,
+    /// so the heading says Offline and since when rather than flickering to a spinner
+    /// every time the window tries again (037, ui.md § Offline).
+    private(set) var offlineSince: [HostID: Date] = [:]
+
     func state(_ id: HostID) -> ServerConnection.State {
-        id == .mac ? .connected : states[id] ?? .idle
+        guard id != .mac else { return .connected }
+        let state = states[id] ?? .idle
+        if case .connecting = state, let since = offlineSince[id] { return .offline(since: since) }
+        return state
     }
 
     func isOffline(_ id: HostID) -> Bool {
@@ -74,6 +89,7 @@ final class HostSet {
 
     func connect(_ id: HostID) {
         guard let host = hosts[id] else { return }
+        log("\(host.label): connecting")
         let connection = connections[id] ?? makeConnection(host)
         connections[id] = connection
         retrying[id]?.cancel()
@@ -84,7 +100,8 @@ final class HostSet {
     /// Try every server that is not connected, now.
     func retryNow() {
         for host in hosts.all where isOffline(host.id) {
-            if case .failed = state(host.id) { continue }
+            if case .failed = states[host.id] { continue }
+            if case .connecting = states[host.id] { continue }
             connect(host.id)
         }
     }
@@ -121,6 +138,19 @@ final class HostSet {
 
     // MARK: -
 
+    /// `<root>/hosts/hosts.log`: every server's state as it changes, for finding out
+    /// afterwards why one would not come back.
+    private func log(_ line: String) {
+        let file = locations.hostsFolder.appendingPathComponent("hosts.log")
+        try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        let stamped = "\(ISO8601DateFormatter().string(from: Date())) \(line)\n"
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile(); handle.write(Data(stamped.utf8)); try? handle.close()
+        } else {
+            try? Data(stamped.utf8).write(to: file)
+        }
+    }
+
     /// The ssh command for a host, its control socket under this root's `hosts/`.
     static func ssh(for host: ServerHost, locations: StoreLocations) -> SSHCommand {
         SSHCommand(executable: sshExecutable, name: host.sshName,
@@ -146,16 +176,19 @@ final class HostSet {
 
     private func moved(_ id: HostID, to state: ServerConnection.State) async {
         states[id] = state
+        log("\(hosts[id]?.label ?? id.rawValue): \(state)")
         switch state {
         case .connected:
             nextTry[id] = nil
+            offlineSince[id] = nil
             if let facts = await connections[id]?.facts, var host = hosts[id] {
                 host.facts = facts
                 update(host)
             }
             listen(id)
             await onConnected?(id)
-        case .offline:
+        case .offline(let since):
+            if offlineSince[id] == nil { offlineSince[id] = since }
             listening[id]?.cancel()
             scheduleRetry(id)
         default:
@@ -171,6 +204,10 @@ final class HostSet {
             for await notification in notifications {
                 await self?.forward(id, notification.method, notification.params)
             }
+            // The stream ends when the daemon's connection does. Unless this listener
+            // was cancelled on purpose, that is the server's daemon gone.
+            guard !Task.isCancelled else { return }
+            await self?.connections[id]?.daemonWentAway()
         }
     }
 
@@ -200,6 +237,10 @@ final class HostSet {
         }
         monitor.start(queue: DispatchQueue(label: "com.alexecollins.agents.hosts.path"))
         pathMonitor = monitor
+        quitObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopForQuit() }
+        }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.retryNow() }

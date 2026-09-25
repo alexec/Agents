@@ -95,10 +95,71 @@ struct ServerConnectionTests {
         await server.disconnect()
     }
 
+    @Test func twoConnectsAtOnceAreOne() async throws {
+        let fake = try FakeSSH()
+        defer { fake.tearDown() }
+        let server = try connection(fake)
+        async let first: Void = server.connect()
+        async let second: Void = server.connect()
+        _ = await (first, second)
+        #expect(await server.state == .connected)
+        await server.disconnect()
+    }
+
+    /// Two "builds": scripts that run this Mac's agentsd, differing only in a comment,
+    /// so their checksums differ the way two builds' do.
+    private func build(_ fake: FakeSSH, _ name: String) throws -> ServerBinary {
+        let agentsd = try #require(ServerLinkTests.agentsd)
+        let file = fake.folder.appendingPathComponent(name)
+        try "#!/bin/sh\n# \(name)\nexec '\(agentsd.path)' \"$@\"\n".write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+        let sha = try #require(try? Data(contentsOf: file)).sha256Hex
+        return ServerBinary(file: file, sha256: sha, version: "0.1.0+1")
+    }
+
+    private func connection(_ fake: FakeSSH, binary: ServerBinary) -> ServerConnection {
+        ServerConnection(hostID: HostID(rawValue: "fk000001"), ssh: fake.command(),
+                         socket: fake.hosts.appendingPathComponent("fk000001.sock"),
+                         installedBy: "test") { _ in binary }
+    }
+
+    @Test func anUpdateOnAnIdleServerEndsWithTheNewDaemonAnswering() async throws {
+        let fake = try FakeSSH()
+        defer { fake.tearDown() }
+        let old = try build(fake, "old")
+        let new = try build(fake, "new")
+        let first = connection(fake, binary: old)
+        await first.connect()
+        #expect(await first.state == .connected)
+        let lock = fake.home.appendingPathComponent(".agents-server/root/daemon.lock")
+        let oldPID = try String(contentsOf: lock, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        await first.disconnect()
+
+        let second = connection(fake, binary: new)
+        await second.connect()
+        #expect(await second.state == .connected)
+        // Answering now, not merely answered once on its way out.
+        try await Task.sleep(for: .seconds(1))
+        let ping = try? await second.client.call(DaemonAPI.Method.ping)
+        let newPID = try String(contentsOf: lock, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        await second.disconnect()
+        #expect(ping != nil)
+        #expect(newPID != oldPID, "a new daemon, on the new binary")
+        let current = try FileManager.default.destinationOfSymbolicLink(
+            atPath: fake.home.appendingPathComponent(".agents-server/bin/current").path)
+        #expect(current == ServerInstaller.binaryName(sha256: new.sha256))
+    }
+
     @Test func versionsCompareByNumber() {
         #expect(ServerConnection.isNewer("1.14.0+1", than: "1.9.0+99"))
         #expect(ServerConnection.isNewer("1.2.0+10", than: "1.2.0+9"))
         #expect(!ServerConnection.isNewer("1.2.0+9", than: "1.2.0+9"))
         #expect(!ServerConnection.isNewer("garbage", than: "0.1.0+1"))
     }
+}
+
+import CryptoKit
+
+private extension Data {
+    var sha256Hex: String { SHA256.hash(data: self).map { String(format: "%02x", $0) }.joined() }
 }

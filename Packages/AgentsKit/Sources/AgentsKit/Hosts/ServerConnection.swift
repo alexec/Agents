@@ -45,12 +45,13 @@ public actor ServerConnection {
     public private(set) var state: State = .idle
     public private(set) var facts: ServerFacts?
 
-    private let master: SSHMaster
+    private nonisolated let master: SSHMaster
     private let installer: ServerInstaller
     private let binary: @Sendable (Architecture) async -> ServerBinary?
     private let installedBy: String
     private var onState: (@Sendable (State) async -> Void)?
     private var wasConnected = false
+    private var isConnecting = false
 
     /// - Parameters:
     ///   - ssh: the host's command, its control path under `<root>/hosts/`.
@@ -71,11 +72,20 @@ public actor ServerConnection {
         })
     }
 
+    /// The app is quitting: let the ssh master go. The server's daemon stays up.
+    public nonisolated func stopForQuit() { master.stopWithoutWaiting() }
+
     public func setOnState(_ handler: @escaping @Sendable (State) async -> Void) {
         onState = handler
     }
 
     public func connect() async {
+        // One at a time. A retry arriving while a connect is under way (the network
+        // monitor fires the moment it starts) would start a second master over the
+        // first and fail both.
+        guard !isConnecting else { return }
+        isConnecting = true
+        defer { isConnecting = false }
         do {
             try await run()
         } catch let problem as HostProblem {
@@ -125,7 +135,11 @@ public actor ServerConnection {
                 await move(.updateWaiting)
                 return
             }
-            if !first { try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false)) }
+            if !first {
+                try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
+                await client.disconnect()
+                try await installer.waitForDaemonGone()
+            }
             await client.disconnect()
             try await installer.swapCurrent(to: wanted.sha256, version: wanted.version, installedBy: installedBy)
         }
@@ -156,6 +170,14 @@ public actor ServerConnection {
         await client.disconnect()
         await master.stop()
         await move(.idle)
+    }
+
+    /// The server's daemon stopped answering while ssh stayed up: it exited, or was
+    /// restarted. The same as losing the master, so the window retries, and the retry
+    /// starts the daemon again (037).
+    public func daemonWentAway() async {
+        guard state == .connected else { return }
+        await lost()
     }
 
     private func lost() async {
