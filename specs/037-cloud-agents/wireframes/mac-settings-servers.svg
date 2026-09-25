@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; } .rb { font-size:14px; font-weight:600; } .f { font-size:12px; }
+    .btn { fill:#fff; stroke:#c7c7cc; } .pri { fill:#0a84ff; } .red { fill:#ff3b30; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <text x="20" y="28" class="h">A · SETTINGS ▸ SERVERS</text>
+  <text x="700" y="28" class="h">B · REMOVE, NOTHING RUNNING</text>
+  <text x="700" y="298" class="h">B′ · REMOVE, AGENTS RUNNING</text>
+
+  <!-- settings window -->
+  <rect x="20.5" y="40.5" width="640" height="440" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="20.5" y="40.5" width="640" height="70" rx="12" fill="#f5f5f7"/>
+  <text x="120" y="96" class="f s" text-anchor="middle">Appearance</text>
+  <text x="220" y="96" class="f s" text-anchor="middle">Spending</text>
+  <text x="320" y="96" class="f s" text-anchor="middle">Devices</text>
+  <rect x="376" y="54" width="88" height="50" rx="8" fill="#dcdce1"/>
+  <text x="420" y="96" class="f t" text-anchor="middle" font-weight="600">Servers</text>
+  <rect x="408" y="62" width="24" height="18" rx="3" fill="none" stroke="#6e6e73"/>
+
+  <rect x="40" y="128" width="600" height="252" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <rect x="44" y="132" width="592" height="78" rx="8" fill="#e8f0fd"/>
+  <circle cx="62" cy="156" r="5" fill="#34c759"/>
+  <text x="76" y="161" class="rb t">devbox</text><text x="620" y="161" class="f s" text-anchor="end">2 projects · 3 agents running</text>
+  <text x="76" y="181" class="f s">Linux · ARM64 · Agents 1.14 · Claude Code, Codex</text>
+  <rect x="468" y="184" width="84" height="22" rx="5" class="btn"/><text x="510" y="199" class="f t" text-anchor="middle">Check again</text>
+  <rect x="558" y="184" width="70" height="22" rx="5" class="btn"/><text x="593" y="199" class="f" fill="#ff3b30" text-anchor="middle">Remove…</text>
+
+  <line x1="56" y1="214" x2="624" y2="214" stroke="#f2f2f7"/>
+  <circle cx="62" cy="240" r="5" fill="#aeaeb2"/>
+  <text x="76" y="245" class="rb t">gpu-01</text><text x="620" y="245" class="f s" text-anchor="end">1 project</text>
+  <text x="76" y="265" class="f s">Offline since 14:02 · Linux · x86-64 · Agents 1.14</text>
+
+  <line x1="56" y1="282" x2="624" y2="282" stroke="#f2f2f7"/>
+  <circle cx="62" cy="308" r="5" fill="#c77700"/>
+  <text x="76" y="313" class="rb t">staging</text><text x="620" y="313" class="f s" text-anchor="end">1 project</text>
+  <text x="76" y="333" class="f s">Update waiting — an agent is mid-turn · Agents 1.13 → 1.14</text>
+
+  <rect x="40" y="388" width="28" height="24" rx="5" class="btn"/><text x="54" y="405" class="r t" text-anchor="middle">+</text>
+  <text x="80" y="405" class="f s">Servers are reached with your own ssh setup. Nothing on them listens on a network port.</text>
+
+  <text x="40" y="508" class="note">Row shows the controls only when selected. Other version states on the row:</text>
+  <text x="40" y="524" class="note">“devbox runs a newer Agents. Update this app.” (no downgrade, FR-023)</text>
+
+  <!-- B -->
+  <rect x="700.5" y="40.5" width="400" height="220" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="720" y="72" class="rb t">Remove devbox?</text>
+  <text x="720" y="100" class="r t">Its 2 projects leave the list. Your folders</text>
+  <text x="720" y="120" class="r t">on devbox are not touched.</text>
+  <rect x="720" y="146" width="14" height="14" rx="3" class="btn"/>
+  <text x="742" y="158" class="f t">Also delete what Agents installed on devbox</text>
+  <text x="742" y="174" class="f s">(~/.agents-server)</text>
+  <rect x="908" y="214" width="80" height="28" rx="6" class="btn"/><text x="948" y="233" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="996" y="214" width="84" height="28" rx="6" class="red"/><text x="1038" y="233" class="f" fill="#fff" text-anchor="middle">Remove</text>
+
+  <!-- B' -->
+  <rect x="700.5" y="310.5" width="400" height="220" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="720" y="342" class="rb t">Remove devbox?</text>
+  <text x="720" y="370" class="r t">3 agents are running on devbox and will be</text>
+  <text x="720" y="390" class="r t">stopped. Its 2 projects leave the list. Your</text>
+  <text x="720" y="410" class="r t">folders on devbox are not touched.</text>
+  <rect x="720" y="430" width="14" height="14" rx="3" class="btn"/>
+  <text x="742" y="442" class="f t">Also delete what Agents installed on devbox</text>
+  <rect x="868" y="484" width="80" height="28" rx="6" class="btn"/><text x="908" y="503" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="956" y="484" width="124" height="28" rx="6" class="red"/><text x="1018" y="503" class="f" fill="#fff" text-anchor="middle">Stop 3 and Remove</text>
+</svg>
