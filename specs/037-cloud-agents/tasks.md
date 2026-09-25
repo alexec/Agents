@@ -57,18 +57,18 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ### 2d — The SSH layer (Mac only)
 
-- [ ] T014 Build the fake `ssh` fixture at `Tests/Fixtures/ssh/ssh` (executable `/bin/sh`) with a `Tests/Support/FakeSSH.swift` helper, per R11:
+- [X] T014 Build the fake `ssh` fixture at `Tests/Fixtures/ssh/ssh` (executable `/bin/sh`) with a `Tests/Support/FakeSSH.swift` helper, per R11: **Done: `Fixtures/ssh/` (shell script + python3 relay + `uname`/`sha256sum` shims), `Support/FakeSSH.swift`. Two stderr fixtures captured for real; the rest are OpenSSH's text written by hand (README says which).**
   - It accepts `-G`, `-M -N -S <ctl> -L a:b`, `-S <ctl> -O check|exit`, and `-S <ctl> <name> <command>`.
   - It runs commands with `HOME=$FAKE_SSH_HOME` via `/bin/sh -c`.
   - It relays `-L` with a small Swift relay the helper builds once into the test's temporary folder.
   - It simulates failures via `FAKE_SSH_FAIL=<stderr fixture name>`.
   - Capture real OpenSSH 10.3 stderr for each row of [ssh.md § Errors](contracts/ssh.md#errors) into `Tests/Fixtures/ssh/stderr/*.txt`.
-- [ ] T015 [P] Write `Tests/Unit/SSHCommandTests.swift`:
+- [X] T015 [P] Write `Tests/Unit/SSHCommandTests.swift`: **Done: 14 tests.**
   - argv for every command in [contracts/ssh.md](contracts/ssh.md), matched exactly, with `--` before the name;
   - a name starting with `-` is refused;
   - the environment drops `CLAUDE_*`, `AGENTS_*`, `SSH_ASKPASS` and `DISPLAY`, and keeps `SSH_AUTH_SOCK`;
   - `classify` maps each stderr fixture to its `HostProblem`, with `ssh-add -l` stubbed for the locked/refused split.
-- [ ] T016 Implement `Pkg/Sources/AgentsKit/Hosts/SSHCommand.swift`: argv building, the environment, `run(_:stdin:) async -> (status, stdout, stderr)` ending on `terminationHandler` (memory: `waitUntilExit` hangs off the main thread), and `classify`. The executable URL is injected, so tests pass the fixture.
+- [X] T016 Implement `Pkg/Sources/AgentsKit/Hosts/SSHCommand.swift`: argv building, the environment, `run(_:stdin:) async -> (status, stdout, stderr)` ending on `terminationHandler` (memory: `waitUntilExit` hangs off the main thread), and `classify`. The executable URL is injected, so tests pass the fixture. **Done.**
 - [ ] T017 [P] Write `Tests/Integration/SSHMasterTests.swift` against the fake: `start()` becomes ready when `-O check` passes; the forward socket answers once something listens at the remote path; `stop()` uses `-O exit` and then SIGTERM; `onExit` fires within 1 s of the master being killed; stale `.ctl`/`.sock` files are removed on start.
 - [ ] T018 Implement `Pkg/Sources/AgentsKit/Hosts/SSHMaster.swift` (contracts/ssh.md § 4). It starts without `-L`, has `restartWithForward(home:)`, exposes `onExit`, and uses socket paths `<root>/hosts/<id>.{ctl,sock}`. It throws `socketPathTooLong` over 103 bytes.
 - [ ] T019 [P] Write `Tests/Unit/HostKeyCheckTests.swift` using temporary `known_hosts` files: known → `.known`; unknown → the fetch writes `<tmp>` and the fingerprint is parsed; trust appends the line, hashed when `hashknownhosts yes`; cancel deletes `<tmp>`.
