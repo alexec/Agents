@@ -24,6 +24,16 @@ final class AddServerFlow {
     /// Steps already done, for the ticks.
     private(set) var done: [ServerConnection.Step] = []
     private(set) var system: String?
+    /// Claude's toolset on the new server (043). Shown as its own step when it installs.
+    private(set) var claude: ServerConnection.Claude = .unknown
+    /// Whether the checklist has an Install Claude step: the window has a credential for it.
+    var installsClaude: Bool { hosts.claudeWanted(host?.id ?? HostID(rawValue: "")) || claudeHasBeenTouched }
+    private var claudeHasBeenTouched: Bool {
+        switch claude {
+        case .installing, .ready, .failed, .updateWaiting: true
+        default: false
+        }
+    }
 
     @ObservationIgnored private let locations: StoreLocations
     @ObservationIgnored private let hosts: HostSet
@@ -86,10 +96,13 @@ final class AddServerFlow {
 
     private func proceed() async {
         guard let host else { return }
-        let connection = HostSet.connection(for: host, locations: locations)
+        let connection = HostSet.connection(for: host, locations: locations, wantsClaude: hosts.wantsClaude(host.id))
         self.connection = connection
         await connection.setOnState { [weak self] state in
             await self?.follow(state)
+        }
+        await connection.setOnClaude { [weak self] next in
+            await self?.claudeMoved(next)
         }
         await connection.connect()
         guard case .connected = await connection.state else { return }
@@ -103,9 +116,18 @@ final class AddServerFlow {
         let listed = (try? await connection.client.call(DaemonAPI.Method.runtimesList,
                                                         returning: [RuntimeStatus].self)) ?? []
         let available = listed.filter { $0.availability.isAvailable }.map(\.runtime.name)
-        done = [.connect, .checkSystem, .setUp, .findRuntimes]
+        done = [.connect, .checkSystem, .setUp, .installClaude, .findRuntimes]
         phase = .ready(runtimes: available)
         record()
+    }
+
+    private func claudeMoved(_ next: ServerConnection.Claude) {
+        claude = next
+    }
+
+    /// Try Claude's install again from the sheet.
+    func installClaude() async {
+        await connection?.installClaude()
     }
 
     private func follow(_ state: ServerConnection.State) {

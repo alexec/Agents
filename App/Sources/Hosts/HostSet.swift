@@ -20,6 +20,11 @@ final class HostSet {
     private(set) var states: [HostID: ServerConnection.State] = [:]
     /// When the next attempt is due, for the offline strip's countdown.
     private(set) var nextTry: [HostID: Date] = [:]
+    /// Claude's toolset on each server (043).
+    private(set) var claude: [HostID: ServerConnection.Claude] = [:]
+    /// Whether a server should get Claude as it connects: the window has a credential it
+    /// may lend there (043, FR-002). Set by `AppModel`, which knows the credentials.
+    @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
 
     @ObservationIgnored private var connections: [HostID: ServerConnection] = [:]
     @ObservationIgnored private var listening: [HostID: Task<Void, Never>] = [:]
@@ -114,12 +119,8 @@ final class HostSet {
         try? hosts.add(host)
         try? store.save(hosts)
         connections[host.id] = connection
-        Task {
-            await connection.setOnState { [weak self] state in
-                await self?.moved(host.id, to: state)
-            }
-            await self.moved(host.id, to: connection.state)
-        }
+        follow(host.id, connection)
+        Task { await self.moved(host.id, to: connection.state) }
     }
 
     func update(_ host: ServerHost) {
@@ -139,6 +140,12 @@ final class HostSet {
     /// How Claude stands on a server, in one line for Settings (043, contracts/ui.md § 2).
     func claudeLine(_ id: HostID, hasCredential: Bool) -> String {
         guard let host = hosts[id], let facts = host.facts else { return "Claude: not checked yet" }
+        switch claude[id] {
+        case .installing: return "Claude: installing…"
+        case .updateWaiting: return "Claude: update waiting for a turn to end"
+        case .failed(let problem): return problem.sentence(name: host.sshName, label: host.label)
+        default: break
+        }
         let signIn = host.ownSignInOnly ? " · its own sign-in only"
             : hasCredential ? " · signs in with the token in Settings"
             : facts.hasOwnClaudeSignIn ? " · its own sign-in" : " · needs a token"
@@ -193,21 +200,53 @@ final class HostSet {
                    controlPath: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).ctl"))
     }
 
-    static func connection(for host: ServerHost, locations: StoreLocations) -> ServerConnection {
+    static func connection(for host: ServerHost, locations: StoreLocations,
+                           wantsClaude: @escaping @Sendable () async -> Bool) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
-                         binary: { await ServerBinaries.binary(for: $0) })
+                         binary: { await ServerBinaries.binary(for: $0) },
+                         toolset: { ServerBinaries.claudeToolset },
+                         wantsClaude: wantsClaude)
+    }
+
+    /// For a connection made here or by the Add a server sheet: ask this set, on the main
+    /// actor, at the moment the server connects.
+    func wantsClaude(_ id: HostID) -> @Sendable () async -> Bool {
+        { [weak self] in await MainActor.run { self?.claudeWanted(id) ?? false } }
     }
 
     private func makeConnection(_ host: ServerHost) -> ServerConnection {
-        let connection = Self.connection(for: host, locations: locations)
+        let connection = Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(host.id))
+        follow(host.id, connection)
+        return connection
+    }
+
+    private func follow(_ id: HostID, _ connection: ServerConnection) {
         Task {
             await connection.setOnState { [weak self] state in
-                await self?.moved(host.id, to: state)
+                await self?.moved(id, to: state)
             }
+            await connection.setOnClaude { [weak self] next in
+                await self?.claudeMoved(id, to: next)
+            }
+            let now = await connection.claude
+            claudeMoved(id, to: now)
         }
-        return connection
+    }
+
+    private func claudeMoved(_ id: HostID, to next: ServerConnection.Claude) {
+        claude[id] = next
+        log("\(hosts[id]?.label ?? id.rawValue): claude \(next)")
+        if case .ready(let toolset) = next, var host = hosts[id], host.facts?.toolsetID != toolset {
+            host.facts?.toolsetID = toolset
+            update(host)
+        }
+    }
+
+    /// Install Claude on a server now: chosen there for the first time, or Try again (043).
+    func installClaude(_ id: HostID) async {
+        await connections[id]?.installClaude()
     }
 
     private func moved(_ id: HostID, to state: ServerConnection.State) async {
@@ -324,6 +363,14 @@ enum ServerBinaries {
         else { return nil }
         return ServerBinary(file: file, sha256: sha.trimmingCharacters(in: .whitespacesAndNewlines), version: version)
     }
+
+    /// Claude's pinned toolset, from `Resources/toolsets/claude` (043). Read once.
+    nonisolated static let claudeToolset: Toolset? = {
+        guard let folder = Bundle.main.url(forResource: "claude", withExtension: nil, subdirectory: "toolsets") else {
+            return nil
+        }
+        return try? Toolset.load(from: folder)
+    }()
 
     static var version: String {
         let info = Bundle.main.infoDictionary
