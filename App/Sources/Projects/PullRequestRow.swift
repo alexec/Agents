@@ -21,23 +21,26 @@ struct PullRequestRow: View {
     private var key: AppModel.PullRequestKey { .init(folder: folder, number: pull.number) }
 
     var body: some View {
-        // The whole card is the button, as `WorkflowRow`'s is, and it opens the pull
-        // request on GitHub (FR-005). The links and buttons inside keep their own
-        // clicks, because a nested button wins its own hit.
-        Button { openURL(pull.url) } label: {
-            VStack(alignment: .leading, spacing: 4) {
+        // One card. Its first line is the button that opens the pull request on GitHub
+        // (FR-005); its second line sits beside that button rather than inside it,
+        // because a button's label is one element to accessibility, and the worktree
+        // link, Check out and Resume must each be reachable on their own.
+        VStack(alignment: .leading, spacing: 4) {
+            Button { openURL(pull.url) } label: {
                 firstLine
-                secondLine
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 14))
-            .paperRow()
+            .buttonStyle(.plain)
+            .help(pull.url.absoluteString)
+            .accessibilityLabel("#\(pull.number) \(pull.title), open on GitHub")
+            secondLine
         }
-        .buttonStyle(.plain)
-        .help(pull.url.absoluteString)
-        .accessibilityLabel("#\(pull.number) \(pull.title), open on GitHub")
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .paperRow()
     }
 
     // MARK: What state it is in
@@ -48,10 +51,15 @@ struct PullRequestRow: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+                .fixedSize()
+            // The title takes what is left; the columns after it are fixed, so the
+            // states line up down the list.
             Text(pull.title)
                 .appText(.reading).fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
             if pull.isDraft {
                 Text("Draft")
                     .appText(.fine)
@@ -59,12 +67,16 @@ struct PullRequestRow: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
                     .overlay(Capsule().strokeBorder(.tertiary))
+                    .fixedSize()
             }
-            Spacer(minLength: 12)
+            if pull.conflicts == .conflicting {
+                Text("⚠ conflicts").fixedSize()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             Group {
-                Text(checks).frame(width: 78, alignment: .leading)
-                Text(review).frame(width: 150, alignment: .leading)
-                Text(pull.conflicts == .conflicting ? "⚠ conflicts" : "").frame(width: 78, alignment: .leading)
+                Text(checks).frame(width: 70, alignment: .leading)
+                Text(review).frame(width: 136, alignment: .leading)
             }
             .appText(.fine)
             .foregroundStyle(.secondary)
@@ -103,12 +115,15 @@ struct PullRequestRow: View {
             } else if let worktree = pull.worktree {
                 where_(worktree)
                 babysitting
-            } else if let failure = model.checkoutFailures[key] {
-                Text("Couldn't check out: \(failure)")
-                    .lineLimit(2)
             } else {
-                Text("Not checked out here")
-                Button("Check out into a worktree") {
+                // A failure stays, with its reason, beside the button to try again.
+                if let failure = model.checkoutFailures[key] {
+                    Text("Couldn't check out: \(failure)")
+                        .lineLimit(2)
+                } else {
+                    Text("Not checked out here")
+                }
+                Button(model.checkoutFailures[key] == nil ? "Check out into a worktree" : "Try again") {
                     Task { await model.checkOut(pull.number, in: folder) }
                 }
                 .buttonStyle(.paper)

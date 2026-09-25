@@ -31,8 +31,8 @@ prove.
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge `main` into `038-github-pr-babysit`. It is 7 commits ahead, including `3290695`, which changed how Worktree rows look, and `76121d5`, which says which branch the project folder is on; both touch `App/Sources/Projects/`. Check with `git merge-base HEAD main` that the merge landed on this branch. Run `swift test` in `Packages/AgentsKit` and record the pass/fail count as the baseline in this file's Notes, remembering that the suite is flaky under load.
-- [ ] T002 [P] Record the GraphQL fixtures in `Tests/Fixtures/GitHub/`, as R2's query would return them:
+- [X] T001 Merge `main` into `038-github-pr-babysit`. It is 7 commits ahead, including `3290695`, which changed how Worktree rows look, and `76121d5`, which says which branch the project folder is on; both touch `App/Sources/Projects/`. Check with `git merge-base HEAD main` that the merge landed on this branch. Run `swift test` in `Packages/AgentsKit` and record the pass/fail count as the baseline in this file's Notes, remembering that the suite is flaky under load.
+- [X] T002 [P] Record the GraphQL fixtures in `Tests/Fixtures/GitHub/`, as R2's query would return them:
   - `pulls-mixed.json`: 5 pull requests matching the wireframe moment (#412 failing checks and changes requested; #405 passing and approved; #398 failing; #390 a draft, checks running, `CONFLICTING`; #377 failing). Include review items from `OWNER`, `COLLABORATOR` and `NONE` authors, one from a bot, and one from the viewer.
   - `pulls-empty.json`: no pull requests.
   - `pulls-fork.json`: one pull request with `isCrossRepository: true`.
@@ -45,7 +45,7 @@ prove.
 
 ## Phase 2: Foundational (model and storage; blocks every story)
 
-- [ ] T003 [P] Create `Core/Model/PullRequest.swift`, with fields exactly as data-model.md lists them:
+- [X] T003 [P] Create `Core/Model/PullRequest.swift`, with fields exactly as data-model.md lists them:
   - `GitHubRepository` (`host` lowercased, `owner`, `name` with `.git` removed). `init?(remote: GitRemote)` returns nil unless `host.contains("github")` and the path has exactly two parts; `webURL` is `https://<host>/<owner>/<name>`.
   - `PullRequest`.
   - `PullRequestChecks`: `.passing`, `.failing([FailedCheck])`, `.running`, `.none`.
@@ -62,14 +62,14 @@ prove.
     - `.unreachable` is never shown as the one line. It gives the footer "Couldn't reach GitHub · showing <HH:mm>".
 
   All the types are `Codable, Hashable, Sendable`.
-- [ ] T004 [P] Add the three cases to `Core/Model/WorkflowTrigger.swift`:
+- [X] T004 [P] Add the three cases to `Core/Model/WorkflowTrigger.swift`:
   - The cases, with file names and `summary` exactly as data-model.md gives them:
     - `.pullRequestChecksFailed` / `pull-request-checks-failed` / "When checks fail on one of my pull requests"
     - `.pullRequestReviewComments` / `pull-request-review-comments` / "When one of my pull requests gets review comments"
     - `.pullRequestConflicts` / `pull-request-conflicts` / "When one of my pull requests conflicts with its base"
   - `isPullRequest`.
   - A hand-written `Codable` that encodes the three in the same shape as `.unrecognised(name:keys:)` and decodes them from it by name (R11).
-- [ ] T005 [P] Add five cases to `WorkflowRefusal` in `Core/Model/WorkflowOutcome.swift`, with `message` and `needsAPerson` exactly as data-model.md gives them:
+- [X] T005 [P] Add five cases to `WorkflowRefusal` in `Core/Model/WorkflowOutcome.swift`, with `message` and `needsAPerson` exactly as data-model.md gives them:
   - `.noWorktree(pr:)`, "#n has no local worktree", no.
   - `.worktreeDirty(pr:)`, "#n's worktree has uncommitted changes", no.
   - `.worktreeBusy(pr:)`, "an agent is already working in #n's worktree", no.
@@ -77,23 +77,23 @@ prove.
   - `.babysittingStopped(pr:runs:)`, "babysitting #n stopped after 3 tries in a row", **yes**.
 
   Also add a `rowMessage` that says "its" in place of "#n's" for the pull request's own row (wireframe §1). `isSameReason` compares the case and the pull request number. In the same file, add `WorkflowRun.pullRequest: PullRequestRef?` (`number`, `headBranch`, `worktree: URL`, `changeKey: String`).
-- [ ] T006 [P] In `Core/Model/Workflow.swift`, add `respondsToPullRequests` (any trigger `isPullRequest`). When a workflow has all three pull-request triggers, its summary is the combined sentence the wireframe uses: "When one of my pull requests fails its checks, gets review comments or conflicts with its base".
-- [ ] T007 [P] Add `pushPullRequest = "push_pull_request"` and `replyOnPullRequest = "reply_on_pull_request"` to `Core/Model/AppTool.swift`.
-- [ ] T008 Add the five methods from the contract table to `Core/Daemon/DaemonAPI.swift`:
+- [X] T006 [P] In `Core/Model/Workflow.swift`, add `respondsToPullRequests` (any trigger `isPullRequest`). When a workflow has all three pull-request triggers, its summary is the combined sentence the wireframe uses: "When one of my pull requests fails its checks, gets review comments or conflicts with its base".
+- [X] T007 [P] Add `pushPullRequest = "push_pull_request"` and `replyOnPullRequest = "reply_on_pull_request"` to `Core/Model/AppTool.swift`.
+- [X] T008 Add the five methods from the contract table to `Core/Daemon/DaemonAPI.swift`:
   - `pullRequests/list`, `pullRequests/refresh`, `pullRequests/resume`, `pullRequests/checkout` and `pullRequests/addBabysitter`, with their request types (`{ folder }`, `{ folder, number }`).
   - The notification `pullRequestsChanged` carrying `PullRequestList`.
   - The failures `worktreeExists`, `branchCheckedOut`, `fetchFailed` and `babysitterExists(workflowID)`, each with a message.
 
   Depends on T003.
-- [ ] T009 Parse the three trigger names in `Kit/Workflows/WorkflowFile.swift`. They take no settings, so any keys under them are an `.unreadable` error. Add `standingAgentIDs: [Int: UUID]` to `WorkflowState` in `Kit/Workflows/WorkflowStore.swift`, decoded with `decodeIfPresent` and defaulting to empty. Depends on T004.
-- [ ] T010 [P] Create `Kit/GitHub/PullRequestStore.swift` for `pull-requests.json` next to `workflows.json`, shaped like `WorkflowStore`: a lenient read, where a file it cannot read reads as empty. It holds `PullRequestRecord` (key `folder` + `number`; `firedKeys [String: String]` keyed `"<workflowID>/<trigger name>"`; `commentWatermark [String: Int]` keyed by workflow ID; `consecutiveRuns`; `stoppedAt?`; `lastRunStartedAt?`; `lastOutcome?` + `lastOutcomeWorkflowID?`; `pushedOids`, last 20; `postedCommentIDs`, last 50), plus `lists: [PullRequestList]` and `lastAttemptAt: [String: Date]` keyed by folder path. Depends on T003.
-- [ ] T011 [P] Write `Tests/Unit/GitHubRepositoryTests.swift`. `github.com` and `github.example.com` are accepted in HTTPS and scp form. `gitlab.com`, a one-part path and a three-part path are refused. `.git` is stripped, and the host is lowercased.
-- [ ] T012 [P] Write `Tests/Unit/WorkflowTriggerCodingTests.swift`:
+- [X] T009 Parse the three trigger names in `Kit/Workflows/WorkflowFile.swift`. They take no settings, so any keys under them are an `.unreadable` error. Add `standingAgentIDs: [Int: UUID]` to `WorkflowState` in `Kit/Workflows/WorkflowStore.swift`, decoded with `decodeIfPresent` and defaulting to empty. Depends on T004.
+- [X] T010 [P] Create `Kit/GitHub/PullRequestStore.swift` for `pull-requests.json` next to `workflows.json`, shaped like `WorkflowStore`: a lenient read, where a file it cannot read reads as empty. It holds `PullRequestRecord` (key `folder` + `number`; `firedKeys [String: String]` keyed `"<workflowID>/<trigger name>"`; `commentWatermark [String: Int]` keyed by workflow ID; `consecutiveRuns`; `stoppedAt?`; `lastRunStartedAt?`; `lastOutcome?` + `lastOutcomeWorkflowID?`; `pushedOids`, last 20; `postedCommentIDs`, last 50), plus `lists: [PullRequestList]` and `lastAttemptAt: [String: Date]` keyed by folder path. Depends on T003.
+- [X] T011 [P] Write `Tests/Unit/GitHubRepositoryTests.swift`. `github.com` and `github.example.com` are accepted in HTTPS and scp form. `gitlab.com`, a one-part path and a three-part path are refused. `.git` is stripped, and the host is lowercased.
+- [X] T012 [P] Write `Tests/Unit/WorkflowTriggerCodingTests.swift`:
   - The three names round-trip through `WorkflowFile` and through JSON.
   - A decoder with no knowledge of the new cases sees `.unrecognised` (R11).
   - A pull-request trigger with a key is refused as unreadable.
   - `WorkflowState` without `standingAgentIDs` decodes.
-- [ ] T013 Add `pullRequestStore` and the in-memory `pullRequestLists: [URL: PullRequestList]` to `Kit/Daemon/DaemonCore.swift`, loaded from the store at start so a restarted daemon shows the last good list at once (R12). Depends on T010.
+- [X] T013 Add `pullRequestStore` and the in-memory `pullRequestLists: [URL: PullRequestList]` to `Kit/Daemon/DaemonCore.swift`, loaded from the store at start so a restarted daemon shows the last good list at once (R12). Depends on T010.
 
 **Checkpoint**: `swift test --filter 'GitHubRepository|WorkflowTriggerCoding'` passes, both schemes build, and no behaviour has changed yet.
 
@@ -105,17 +105,17 @@ prove.
 
 **Independent test**: quickstart §2, steps 1–4, on a scratch app.
 
-- [ ] T014 [P] [US1] Create `Kit/GitHub/GitHubCLI.swift`, modelled on `GitProcess` in `Kit/Projects/GitClone.swift`:
+- [X] T014 [P] [US1] Create `Kit/GitHub/GitHubCLI.swift`, modelled on `GitProcess` in `Kit/Projects/GitClone.swift`:
   - Find `gh` through `LoginShellPath`. Give it empty stdin and set `GH_PROMPT_DISABLED=1` and `GH_NO_UPDATE_NOTIFIER=1`.
   - End it on `terminationHandler`, never `waitUntilExit`.
   - `graphql(query:variables:host:)` and `api(method:path:fields:host:)` return `Data`.
   - Classify failures: not found → `.noCLI`; `gh auth status --hostname` failing → `.notSignedIn`; GraphQL `NOT_FOUND`/`FORBIDDEN` for the repository → `.cannotSee`; everything else (network, rate limit) → `.unreachable`.
   - Take the executable URL as an injectable parameter, so the tests can put a fake `gh` on PATH.
-- [ ] T015 [P] [US1] Create `Kit/GitHub/GitHubQuery.swift`:
+- [X] T015 [P] [US1] Create `Kit/GitHub/GitHubQuery.swift`:
   - R2's query text, with the fields exactly as listed and `search … author:@me first: 50`.
   - Decoding into `[PullRequest]`. Checks are failing when a check run concluded `FAILURE`, `TIMED_OUT`, `CANCELLED`, `ACTION_REQUIRED` or `STARTUP_FAILURE`, or a status context is `FAILURE` or `ERROR`; running when any are pending; none when there are none.
   - `countableComments`: the author is not the viewer and not a bot, `authorAssociation` is `OWNER`, `MEMBER` or `COLLABORATOR` (FR-011a), and the item is a `CHANGES_REQUESTED` review, a `COMMENTED` review with a body, a thread comment, or a conversation comment. Sorted oldest first.
-- [ ] T016 [US1] Write `Tests/Unit/GitHubQueryDecodingTests.swift` against the T002 fixtures:
+- [X] T016 [US1] Write `Tests/Unit/GitHubQueryDecodingTests.swift` against the T002 fixtures:
   - The checks, review and conflict state of each of the five pull requests.
   - `NONE`, bot and viewer comments are dropped.
   - Newest first.
@@ -123,8 +123,8 @@ prove.
   - `error-not-found.json` gives `.cannotSee`.
 
   Depends on T002 and T015.
-- [ ] T017 [US1] Add `upstreamURL(of:in:)`, `fetch(remote:refspec:in:)` and `add(existingBranch:path:in:)` to `Kit/Projects/GitWorktrees.swift`, next to the existing `isAncestor`, for R4 and R5. Each is a thin wrapper over `git(_:in:)`.
-- [ ] T018 [US1] Create `Kit/Daemon/DaemonCore+PullRequests.swift` with the refresh:
+- [X] T017 [US1] Add `upstreamURL(of:in:)`, `fetch(remote:refspec:in:)` and `add(existingBranch:path:in:)` to `Kit/Projects/GitWorktrees.swift`, next to the existing `isAncestor`, for R4 and R5. Each is a thin wrapper over `git(_:in:)`.
+- [X] T018 [US1] Create `Kit/Daemon/DaemonCore+PullRequests.swift` with the refresh:
   - Read `origin` through `GitRemote` → `GitHubRepository`, or no list at all (SC-006). Read `origin` again on every refresh, so a changed remote takes effect.
   - Run one `GitHubCLI.graphql` per project.
   - Match worktrees (R4): the `GitWorktrees.list` entry whose branch is `refs/heads/<headRefName>`, where the project folder counts. A fork pull request also needs `upstreamURL` to equal the head repository, or `isAncestor(headOid)`.
@@ -132,17 +132,17 @@ prove.
   - On success, replace the cached list and `fetchedAt`, and drop records for pull requests no longer listed (US1-5).
   - On `.unreachable`, keep the rows and set `problem`. On the other problems, clear the rows.
   - Store, then broadcast `pullRequestsChanged` if anything changed.
-- [ ] T019 [US1] Drive the refresh from the existing workflow ticker in `Kit/Daemon/DaemonCore+Workflows.swift` (R3):
+- [X] T019 [US1] Drive the refresh from the existing workflow ticker in `Kit/Daemon/DaemonCore+Workflows.swift` (R3):
   - A GitHub project that is not archived and whose folder exists refreshes when its `lastAttemptAt` is at least 5 minutes old.
   - `pullRequests/refresh` is served unless the last attempt was under 60 s ago, in which case it returns the cache.
   - Projects refresh one at a time, never in parallel.
-- [ ] T020 [US1] Add `pullRequests/checkout` (R5) to `DaemonCore+PullRequests.swift`:
+- [X] T020 [US1] Add `pullRequests/checkout` (R5) to `DaemonCore+PullRequests.swift`:
   - Reuse 030's `prepare` for the path, the exclude line and the name reservation. The name is `WorktreeName.from(branch:)`, a new static in `Core/Model/AgentWorktree.swift` that follows the same rules as `from(prompt:)`.
   - Same repository: `git fetch origin <head>`, then `add(existingBranch:)` when a local branch exists and is not checked out, else `git worktree add --track -b <head> <path> origin/<head>`.
   - Fork: `git fetch <headRepositoryURL> <head>:<head>`, then `add(existingBranch:)`.
   - Fail with `worktreeExists`, `branchCheckedOut` (naming the path it is checked out in) or `fetchFailed`. On success, refresh the match and return the list.
-- [ ] T021 [US1] Route `pullRequests/list`, `pullRequests/refresh` and `pullRequests/checkout` in `Kit/Daemon/DaemonCore+Dispatch.swift`. Don't relay any of them to the phone (FR-010).
-- [ ] T022 [US1] Write `Tests/Integration/PullRequestListTests.swift`, with a real temporary repository, a bare local "remote" as `origin` rewritten to a `github.com` URL through `url.<bare>.insteadOf`, and a fake `gh` script on PATH that prints the T002 fixtures:
+- [X] T021 [US1] Route `pullRequests/list`, `pullRequests/refresh` and `pullRequests/checkout` in `Kit/Daemon/DaemonCore+Dispatch.swift`. Don't relay any of them to the phone (FR-010).
+- [X] T022 [US1] Write `Tests/Integration/PullRequestListTests.swift`, with a real temporary repository, a bare local "remote" as `origin` rewritten to a `github.com` URL through `url.<bare>.insteadOf`, and a fake `gh` script on PATH that prints the T002 fixtures:
   - A pull request matched to the project folder and to a worktree.
   - An unmatched one.
   - `checkout` making a worktree on the existing branch.
@@ -150,24 +150,24 @@ prove.
   - A non-GitHub project giving `nil`.
   - The fake `gh` exiting "not logged in" giving `.notSignedIn`.
   - A network failure keeping the rows.
-- [ ] T023 [US1] Add the app side to `App/Sources/AppModel.swift`:
+- [X] T023 [US1] Add the app side to `App/Sources/AppModel.swift`:
   - `pullRequestLists: [URL: PullRequestList]`, filled by `pullRequests/list` when a project page opens, then `pullRequests/refresh`.
   - Updates on `pullRequestsChanged`. Don't poll.
   - `checkOut(_:)`, with an in-progress set per folder and number, and the last check-out failure per folder and number, cleared on the next list.
-- [ ] T024 [P] [US1] Create `App/Sources/Projects/PullRequestRow.swift`, following wireframes §1:
+- [X] T024 [P] [US1] Create `App/Sources/Projects/PullRequestRow.swift`, following wireframes §1:
   - Line one: `#n` (`.supporting`, secondary), then the title (`.reading`, semibold), then a Draft capsule. Then two fixed-width columns, so states line up down the list: checks (✕ failing, ✓ passing, ◌ running, nothing for none) and review (● changes requested, ✓ approved, ◦ commented). Then `⚠ conflicts`, then a trailing ↗.
   - Line two, `.fine`: the worktree name, or "project folder", as a link to that worktree's agents; or "Not checked out here" and a **Check out into a worktree** button; then "Checking out `branch`…" and the failure line (wireframe E).
   - All grey. No `StateTint`.
   - The whole row is the Button that opens `url` (FR-005), with the links inside it keeping their own clicks (see the SwiftUI card-taps note in memory).
-- [ ] T025 [P] [US1] Create `App/Sources/Projects/PullRequestsSection.swift`:
+- [X] T025 [P] [US1] Create `App/Sources/Projects/PullRequestsSection.swift`:
   - A `SectionHeading("Pull requests")` with ↻, which calls refresh.
   - A trailing **Babysit my pull requests** button, or **Show babysitter** when `babysitterWorkflowID` is set. Wire both in US4; here the button is present and disabled.
   - The rows in one card, then the footer "Fetched <relative> · <n> open".
   - With a `problem`, the one line replaces the rows and the button is hidden (wireframes A, B). The command text is selectable and never a button.
   - With `.unreachable` and a cache, the rows stay at full strength and the footer reads "Couldn't reach GitHub · showing <HH:mm>" (C).
   - With no pull requests, "No open pull requests of yours on <owner>/<name>", and the button stays (D).
-- [ ] T026 [US1] Put `PullRequestsSection` in `App/Sources/Projects/ProjectAgentsView.swift`, after `archivedSection` and before `WorkflowsSection`. It is present only when a list exists for the folder, so there is nothing on a non-GitHub project (H). Depends on T024 and T025.
-- [ ] T027 [US1] Build the `agentsd` scheme, then the `Agents` scheme. Run `swift test --filter 'GitHub|PullRequestList'`.
+- [X] T026 [US1] Put `PullRequestsSection` in `App/Sources/Projects/ProjectAgentsView.swift`, after `archivedSection` and before `WorkflowsSection`. It is present only when a list exists for the folder, so there is nothing on a non-GitHub project (H). Depends on T024 and T025.
+- [X] T027 [US1] Build the `agentsd` scheme, then the `Agents` scheme. Run `swift test --filter 'GitHub|PullRequestList'`.
 - [ ] T028 [US1] **Gate: the look.** With the run-app skill on a scratch root, add this repository (its `origin` is on GitHub) as a project, open it, and screenshot the Pull requests section, including a check-out. Compare it with `wireframes/mac-project.svg`, then settle the layout with Alex (ask with the question tool) before starting Phase 4. Record what was decided in this file's Notes.
 
 **Checkpoint**: US1 works alone. The section lists, matches, checks out and says what's wrong, with no triggers yet.
@@ -326,7 +326,30 @@ prove.
 
 ## Notes
 
-- Baseline (T001):
-- Gate decisions (T028):
+- Baseline (T001): merged main twice (35 commits on 2026-09-25, then 10 more with 035, which took
+  -32034; 038's error codes start at -32040). Full suite before any 038 code: 1517 tests, 1 issue
+  (flaky; the run overlapped the first edits). The 038-related filter after US1: 257 tests green.
+- Changed from the design while building:
+  - The matched worktree is `PullRequestWorktree` (root, name, isProjectFolder), not
+    `AgentWorktree`, which records how an agent started and cannot say "the project folder".
+  - `viewerLastCommentAt` became `viewerLastActionAt` (R6 also counts the head commit).
+  - The query also asks `repository(owner:name:) { id }`: a search on a repository the sign-in
+    cannot see comes back empty rather than as an error, so this is what makes `.cannotSee` work.
+  - `remote.origin.url` is read raw from config (not `git remote get-url`, which applies
+    `insteadOf`), so the project's own spelling decides whether it is on GitHub.
+  - `GitProcess` gained an internal init taking an executable, and `gh` runs through it.
+  - The ticker's sweep is off until `Daemon.start()` calls `watchPullRequests()`, so the many tests
+    that drive the ticker never run git or gh on the side.
+  - `pullRequests/changed` goes to Mac windows only (`surface == .mac`).
+  - Each pull request is its own card, like every other card on the page, not rows in one card as
+    the wireframe drew. Only the first line is the "open on GitHub" button: a button's label is one
+    element to accessibility, which hid Check out from VoiceOver (and from AX pressing).
+  - A failed check-out keeps its reason beside a **Try again** button.
+  - `run-app`'s `ui.swift` gained `select`, to choose a sidebar row without a click.
+- Gate (T028), screenshots in `walk/`, on a scratch root with the real `gh` and two real
+  repositories cloned read-only: kitproj/kit #116 (draft, passing, changes requested, not checked
+  out, then checked out into `discussion-useful-hooks` on `copilot/discussion-useful-hooks` and
+  listed under Worktrees) and alexec/EquilibriumApp #85 (passing, commented, in the project folder).
+  A failed check-out (a leftover folder) shows its reason on the row. Decisions:
 - Screenshot differences (T052):
 - Live run and audit (T053):

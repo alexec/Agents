@@ -360,6 +360,8 @@ final class AppModel {
                                              DaemonAPI.PullRequestRequest(folder: key.folder, number: number),
                                              returning: PullRequestList.self)
             setPullRequests(list, for: key.folder)
+            // The new worktree belongs in the Worktrees section below too.
+            await loadDraftWorktrees()
         } catch {
             checkoutFailures[key] = describe(error)
         }

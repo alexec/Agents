@@ -137,6 +137,32 @@ case "find", "press":
     print("nothing pressable matched \(arguments[3])")
     exit(1)
 
+case "select":
+    // A sidebar row is selected rather than pressed: set AXSelected on the nearest
+    // row above the first matching label. Nothing is clicked and focus stays put.
+    guard arguments.count > 3 else { print("need text to match"); exit(2) }
+    let wanted = arguments[3].lowercased()
+    var found: AXUIElement?
+    walk(app, depth: 0, limit: 30) { element, _ in
+        if found == nil, label(element).lowercased().contains(wanted) { found = element }
+        return found == nil
+    }
+    var candidate = found.map { Optional($0) } ?? nil
+    var hops = 0
+    while let current = candidate, hops < 6 {
+        var settable = DarwinBoolean(false)
+        if AXUIElementIsAttributeSettable(current, kAXSelectedAttribute as CFString, &settable) == .success,
+           settable.boolValue,
+           AXUIElementSetAttributeValue(current, kAXSelectedAttribute as CFString, kCFBooleanTrue) == .success {
+            print("selected: \(role(current)) · \(label(current))")
+            exit(0)
+        }
+        candidate = attribute(current, kAXParentAttribute as String).map { $0 as! AXUIElement }
+        hops += 1
+    }
+    print("nothing selectable matched \(arguments[3])")
+    exit(1)
+
 case "set":
     guard arguments.count > 4 else { print("need text and value"); exit(2) }
     let needle = arguments[3].lowercased()
