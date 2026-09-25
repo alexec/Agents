@@ -297,8 +297,8 @@ prove.
 
 ## Phase 7: Polish and proof
 
-- [ ] T050 [P] Build the iOS Remote scheme for the generic simulator only, and confirm it decodes the new trigger and refusal cases. Don't create or boot a simulator.
-- [ ] T051 Build `agentsd`, then `Agents`. Run the full `swift test` six times on this branch and six on `main`, and compare pass counts before blaming any failure on this branch.
+- [X] T050 [P] Build the iOS Remote scheme for the generic simulator only, and confirm it decodes the new trigger and refusal cases. Don't create or boot a simulator.
+- [X] T051 Build `agentsd`, then `Agents`. Run the full `swift test` six times on this branch and six on `main`, and compare pass counts before blaming any failure on this branch.
 - [ ] T052 With the run-app skill on a scratch root, screenshot wireframe states A, C, D and E (using `GH_CONFIG_DIR` pointed at an empty folder for A) and the stopped row. Compare them with `wireframes/mac-section-states.svg`, and record the differences in Notes.
 - [ ] T053 Ask Alex (question tool) to create or approve the throwaway sandbox repository. Only then run quickstart §3 live, then run the §4 audit (`gh api repos/<o>/<r>/events` and the branch reflog): no force-push, no other branch, no merge, close, approve or edit (SC-004). Record the results in this file's Notes and in research.md.
 - [ ] T054 Update memory: 038's status in the spec-queue entry and its MEMORY.md line.
@@ -374,5 +374,16 @@ prove.
     is right; the test now offers `acceptEdits` as Claude does.
   - `WorkflowToolTests.archivingOneLetsAnAgentWriteAnother` fails 2 runs in 5 on this branch (a
     token dropped as the agent's turn ends); compared on main below.
-- Screenshot differences (T052):
+- T050: Remote builds for the generic simulator at `98ae7d0`; nothing was installed on a device
+  (038 changes nothing the phone shows).
+- T051 (2026-09-25, `dabd496` against main `e3ce367`+): six full runs each. Branch 1696 tests: 2
+  clean, failures only `aLeaseThatRanOutWhileTheDaemonWasDown…` (3) and
+  `theEndingAPersonsPromptOvertook…` (3). Main 1631 tests: 1 clean, the same two (2, 4) plus
+  `twoHelpersFinishingGiveOneResumeNamingEach` (4). No 038 test failed in any run.
+  `WorkflowToolTests` flakes 2 in 6 on main as well.
+- Screenshot differences (T052): the screen was locked when this was reached, so the new states
+  (Show babysitter, the stopped row with Resume, Watching N) were proved over the scratch root's
+  socket against the real gh instead: the starter written with the three triggers and acceptEdits,
+  a second press refused with `babysitterExists`, Run now refused with `noPullRequest`, no agent
+  started. The screenshots are still owed.
 - Live run and audit (T053):
