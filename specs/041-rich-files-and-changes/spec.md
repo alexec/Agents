@@ -49,6 +49,9 @@ web view or anything that needs the network.
   quiet palette drawn from the theme; added and removed lines keep their marks, weight and at most
   a faint tint, never red and green (FR-004, FR-011).
 - Q: Which devices? → A: Mac, phone and iPad. The views are shared already (FR-021).
+- Q: (Plan, after measuring both) tree-sitter or highlight.js? → A: tree-sitter, trimmed. The three
+  heaviest languages (SQL 10.8 MB, Objective-C 5.2 MB, Kotlin 4.0 MB) are not coloured on their
+  own: Objective-C is coloured as C, SQL and Kotlin are plain (FR-002, research R1).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -216,9 +219,11 @@ an iPad. Each matches the Mac in colour and in what is marked.
   comments, numbers, type names, function names and punctuation — in the files pane, the Changes
   pane (edits and Whole file), edits in the conversation, and fenced code blocks in messages and
   pages.
-- **FR-002**: Colouring MUST cover at least these kinds of file: Swift, Objective-C, C, C++,
-  Python, JavaScript, TypeScript (with JSX and TSX), Go, Rust, Java, Kotlin, Ruby, shell (sh,
-  bash, zsh), JSON, YAML, TOML, HTML, CSS, SQL, Markdown, Dockerfile and Makefile.
+- **FR-002**: Colouring MUST cover at least these kinds of file: Swift, C, C++, Python,
+  JavaScript, TypeScript (with JSX and TSX), Go, Rust, Java, Ruby, shell (sh, bash, zsh), JSON,
+  YAML, TOML, HTML, CSS, Markdown, Dockerfile and Makefile. Objective-C MUST be coloured as C.
+  SQL and Kotlin are shown plain in this feature: their colouring costs more app size than the
+  rest together (research R1).
 - **FR-003**: A file's kind MUST be recognised by its extension, by well-known file names, and by
   a `#!` first line; a fenced block's by its language tag and the common aliases of it.
 - **FR-004**: Colours MUST come from the app's theme (Paper, Light, Dark), follow it when it
@@ -285,8 +290,8 @@ an iPad. Each matches the Mac in colour and in what is marked.
   it to colour being on screen.
 - **SC-002**: Scrolling a coloured 5,000-line file from top to bottom drops no more frames than
   scrolling the same file plain does today.
-- **SC-003**: The app, on the Mac and on the phone, grows by no more than 10 MB in download size
-  with every FR-002 language included.
+- **SC-003**: The app, on the Mac and on the phone, grows by no more than 5 MB in download size
+  and 20 MB installed, with every FR-002 language included.
 - **SC-004**: For a one-word change in a 40-line edit, the edit shows at most 10 lines by default
   (context, one removed, one added), against 80 today.
 - **SC-005**: A 200 KB single-line file and a 20 MB file each open without the app becoming
