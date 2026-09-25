@@ -416,4 +416,39 @@ struct AgentsModelDisplayTests {
             Issue.record("ours, and unreadable, is claimed"); return
         }
     }
+
+    // MARK: A page and the entries streaming past it
+
+    private func entry(_ text: String) -> TranscriptEntry {
+        TranscriptEntry(kind: .agentMessage(messageID: nil, text: text))
+    }
+
+    private func heard(_ entry: TranscriptEntry, by model: AgentsModel, for agentID: UUID) throws {
+        model.apply(DaemonAPI.Notification.agentEntry,
+                    try JSONValue.encoding(DaemonAPI.EntryNotification(agentID: agentID, entry: entry)))
+    }
+
+    /// An entry written after the daemon read the page, but heard before the page
+    /// landed, is not replaced by it.
+    @Test func anEntryHeardBeforeItsPageIsKept() throws {
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        let onPage = entry("On the page")
+        let after = entry("Written after")
+        try heard(after, by: model, for: id)
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [onPage]))
+        #expect(model.entries.map(\.id) == [onPage.id, after.id])
+    }
+
+    /// And the mirror: an entry on the page that is heard again afterwards is kept once.
+    @Test func anEntryOnThePageHeardAfterItIsKeptOnce() throws {
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        let onPage = entry("On the page")
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [onPage]))
+        try heard(onPage, by: model, for: id)
+        #expect(model.entries.map(\.id) == [onPage.id])
+    }
 }

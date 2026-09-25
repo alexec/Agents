@@ -105,6 +105,12 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
     public func close() {
         guard closed.set() else { return }
         continuation.finish()
+        // A socket is shut down before it is closed. Closing alone does not wake a
+        // thread blocked in `read` on it, and that thread would then read again from a
+        // descriptor number the process may since have handed to something else.
+        // Shutting down returns it zero at once. A pipe is not a socket, and the call
+        // simply fails on one.
+        if writeFD == readFD { shutdown(readFD, SHUT_RDWR) }
         Darwin.close(readFD)
         if writeFD != readFD { Darwin.close(writeFD) }
     }

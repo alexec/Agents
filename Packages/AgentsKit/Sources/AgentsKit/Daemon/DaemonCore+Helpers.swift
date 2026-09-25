@@ -38,6 +38,10 @@ extension DaemonCore {
                 message: "Nothing was started: this project already has \(HelperLimit.perProject) "
                     + "agents started by agents\(naming). Archive one to free its place.")
         }
+        // Read now, while the caller's own run — if it has one — is still in flight.
+        // The helper can outlive that run by hours, and a depth worked out from it then
+        // would be zero.
+        let depth = workflowChainDepth(causedBy: caller.id)
         reservedStarts[folder, default: 0] += 1
         defer { reservedStarts[folder, default: 1] -= 1 }
 
@@ -47,7 +51,7 @@ extension DaemonCore {
         do {
             let start = try await startRequest(settings: settings, folder: folder,
                                                prompt: prompt, managesAgents: false)
-            agentID = try await self.start(start, startedBy: caller.id)
+            agentID = try await self.start(start, startedBy: caller.id, chainDepth: depth)
         } catch let refused as SettingRefused {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was started: \(refused.detail).")

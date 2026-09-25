@@ -657,7 +657,11 @@ extension DaemonCore {
             // part of whatever chain its starter is in (028). Without this, a workflow
             // whose agent starts one that fires the same workflow again would begin
             // again at depth zero every time round — the loop the limit exists for.
-            // One step only: an agent another agent started cannot start one itself.
+            // Taken when the agent was made, because the starter's run may be over by
+            // now (see `Agent.chainDepth`). Read off the starter only for a record from
+            // before that was kept. One step only: an agent another agent started
+            // cannot start one itself.
+            if let depth = agents[agentID]?.chainDepth { return depth }
             if let starter = agents[agentID]?.startedByAgent, starter != agentID {
                 return workflowChainDepth(causedBy: starter)
             }

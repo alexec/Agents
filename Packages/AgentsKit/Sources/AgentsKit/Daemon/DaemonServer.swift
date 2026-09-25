@@ -118,6 +118,7 @@ public final class DaemonServer: @unchecked Sendable {
                 // window connects, an agent starts a terminal, and the window's
                 // connection is held open by a shell that will never read it.
                 setCloseOnExec(fd)
+                DaemonServer.limitSendWait(fd)
                 guard let self, !self.stopped.isSet else { close(fd); return }
                 self.accepted(fd)
             }
@@ -143,7 +144,7 @@ public final class DaemonServer: @unchecked Sendable {
             }
             return await handler(identity.context, method, params)
         }
-        connections.add(connection)
+        connections.add(connection, queue: DispatchQueue(label: "com.alexecollins.agents.broadcast.\(identity.id)"))
         onConnectionCountChanged(connections.count)
         Task {
             await connection.start()
@@ -172,16 +173,40 @@ public final class DaemonServer: @unchecked Sendable {
     /// writing to a socket blocks until the window on the other end reads. A window
     /// that has stopped reading should cost the windows their news, not the daemon its
     /// agents.
+    ///
+    /// One queue **per connection**, not one for them all. With one, a window that
+    /// stopped reading blocked the queue on its write, and every other window and the
+    /// bridge stopped hearing anything while the backlog grew without bound. Each
+    /// connection's own queue keeps its own order, which is the only order that
+    /// matters; and a write that cannot finish in `sendWait` fails, the connection is
+    /// closed, and the client reconnects and asks for everything again — which a
+    /// window already does whenever its connection goes.
     public func broadcast(_ method: String, _ params: JSONValue?) {
-        let connections = connections.all
-        sending.async {
-            for connection in connections {
-                try? connection.notify(method, params)
+        for (connection, queue) in connections.allWithQueues {
+            queue.async {
+                do {
+                    try connection.notify(method, params)
+                } catch {
+                    // Closed, or stuck past the wait. Either way this connection has
+                    // missed something, and a client that carried on would be showing
+                    // a list that is no longer true. Half a line may also be on the
+                    // wire. Closing is what tells it to start again.
+                    Task { await connection.close() }
+                }
             }
         }
     }
 
-    private let sending = DispatchQueue(label: "com.alexecollins.agents.broadcast")
+    /// How long a write to one client may block before that client is given up on.
+    /// Long enough for a window busy for a moment; a client that has read nothing for
+    /// this long has stopped.
+    static let sendWait = timeval(tv_sec: 10, tv_usec: 0)
+
+    /// Bound every blocking write on this descriptor by `sendWait`.
+    static func limitSendWait(_ fd: Int32) {
+        var wait = sendWait
+        _ = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &wait, socklen_t(MemoryLayout<timeval>.size))
+    }
 
     public var connectionCount: Int { connections.count }
 
@@ -198,15 +223,24 @@ public final class DaemonServer: @unchecked Sendable {
 final class ConnectionSet: @unchecked Sendable {
     private let lock = NSLock()
     private var connections: [ObjectIdentifier: JSONRPCConnection] = [:]
+    /// The queue each connection's notifications go out on, in order.
+    private var queues: [ObjectIdentifier: DispatchQueue] = [:]
 
-    func add(_ connection: JSONRPCConnection) {
+    func add(_ connection: JSONRPCConnection, queue: DispatchQueue) {
         lock.lock(); defer { lock.unlock() }
         connections[ObjectIdentifier(connection)] = connection
+        queues[ObjectIdentifier(connection)] = queue
     }
 
     func remove(_ connection: JSONRPCConnection) {
         lock.lock(); defer { lock.unlock() }
         connections.removeValue(forKey: ObjectIdentifier(connection))
+        queues.removeValue(forKey: ObjectIdentifier(connection))
+    }
+
+    var allWithQueues: [(JSONRPCConnection, DispatchQueue)] {
+        lock.lock(); defer { lock.unlock() }
+        return connections.compactMap { key, connection in queues[key].map { (connection, $0) } }
     }
 
     var all: [JSONRPCConnection] {
