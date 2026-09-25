@@ -83,7 +83,7 @@ struct ChoiceRows: View {
                 Task { await model.chooseWorktree(nil) }
             } label: {
                 choiceLabel("Project folder", chosen: model.startWorktree == nil)
-                Text("Work alongside anything else here")
+                Text(listed.projectFolderDescription)
             }
             Button {
                 Task { await model.chooseWorktree(.new) }

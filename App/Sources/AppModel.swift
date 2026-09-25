@@ -198,6 +198,9 @@ final class AppModel {
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
     private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var draftWorktreesGeneration = 0
+    /// The branch each project folder is on, for the chat's folder chip. Missing until
+    /// asked, and for a folder in no repository.
+    private(set) var projectFolderBranches: [URL: String] = [:]
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -835,6 +838,17 @@ final class AppModel {
             ?? .notARepository
         guard generation == draftWorktreesGeneration else { return }
         draftWorktrees = answer
+    }
+
+    /// Ask which branch an agent's project folder is on. Asked when its chat opens and
+    /// when its turn ends, since someone may have checked out another branch meanwhile.
+    func loadProjectFolderBranch(of agent: Agent) async {
+        guard agent.worktree == nil else { return }
+        let folder = agent.projectFolder
+        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                            returning: DaemonAPI.WorktreesListResponse.self)
+        projectFolderBranches[folder] = answer?.projectFolderBranch
     }
 
     /// A session has to exist before its options do, so choosing a folder and a

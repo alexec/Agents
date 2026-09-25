@@ -179,7 +179,11 @@ struct PromptBar: View {
         HStack(spacing: 12) {
             if let agent {
                 // The phone's row too (033).
-                PromptHeader(agent: agent) { ContextMeter(agent: agent) }
+                PromptHeader(agent: agent,
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                    ContextMeter(agent: agent)
+                }
+                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
@@ -801,7 +805,7 @@ struct PromptBar: View {
         let listed = model.draftWorktrees
         return SelectCapsule(name: "Worktree", title: worktreeTitle) { dismiss in
             SelectChoice(title: "Project folder",
-                         description: "Work alongside anything else here",
+                         description: listed.projectFolderDescription,
                          isChosen: model.draftWorktree == nil) {
                 model.chooseWorktree(nil)
                 dismiss()
