@@ -364,7 +364,7 @@ public enum DaemonAPI {
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
             // By the group's name, dropping any this build has never heard of. A plain
             // `[AgentGroup: Int]` decode throws on an unknown key, which would take the
-            // whole project list down on a phone older than the group (040, R7).
+            // whole project list down on a phone older than the group (039's `blocked`, 040's `parked`).
             counts = [:]
             for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
                 if let group = AgentGroup(rawValue: name) { counts[group] = count }
@@ -598,11 +598,18 @@ public enum DaemonAPI {
         public var token: String
         public var outcome: String
         public var message: String
+        /// Only with `blocked` (039): the agents it waits on, as it wrote them — ids or
+        /// titles, resolved by the daemon. Optional, so an older helper still relays.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
-        public init(token: String, outcome: String, message: String) {
+        public init(token: String, outcome: String, message: String,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 
@@ -633,14 +640,20 @@ public enum DaemonAPI {
         /// relays a call without it, and that call still lands — with the title left
         /// as it was.
         public var title: String?
+        /// Only with `blocked` (039). See `ReportOutcomeRequest`.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
         public init(token: String, outcome: String, message: String,
-                    prompts: [SuggestedPrompt], title: String? = nil) {
+                    prompts: [SuggestedPrompt], title: String? = nil,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
             self.title = title
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 

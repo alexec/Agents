@@ -79,6 +79,24 @@ struct AgentRow: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                // Blocked (039): what it waits on, one line an agent, and when it will
+                // look again — so the row says what it is waiting for without opening
+                // it (SC-005). Carry on is here because the person often knows the block
+                // has gone before the app does.
+                if model.isBlocked(agent) {
+                    ForEach(model.blockLines(agent), id: \.self) { line in
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .padding(.top, 3)
+                        .help("Tell it the block has cleared, and let it carry on")
+                }
                 // Parked, and since when; or that it will park when this turn ends
                 // (040). How it ended stays the icon's to say.
                 if let line = ParkWords.line(agent.parking) {
@@ -90,6 +108,9 @@ struct AgentRow: View {
             Spacer(minLength: 0)
         }
         .contextMenu {
+            if model.isBlocked(agent) {
+                Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
+            }
             if model.canStop(agent) {
                 Button("Stop") { Task { await model.stop(agent.id) } }
             }

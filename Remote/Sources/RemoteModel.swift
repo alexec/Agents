@@ -514,6 +514,10 @@ final class RemoteModel {
 
     /// Whether the menu offers Stop: the same answer the Mac gives.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
+    /// End a block by hand (039), as the person. See the Mac's `carryOn`.
+    func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }

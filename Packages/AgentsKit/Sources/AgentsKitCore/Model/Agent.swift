@@ -261,7 +261,15 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 014. A record written before agents could say how it went opens as an
         // agent that never reported and has never been asked — which is the truth about
         // it, and is why neither of these is a completion.
-        report = try c.decodeIfPresent(WorkReport.self, forKey: .report)
+        //
+        // An outcome this build does not know is a report that never arrived, not an
+        // agent that cannot be read (039): a newer daemon's sixth word must not make
+        // the whole record vanish from an older phone's list.
+        do {
+            report = try c.decodeIfPresent(WorkReport.self, forKey: .report)
+        } catch is WorkReport.UnknownOutcome {
+            report = nil
+        }
         outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.

@@ -64,6 +64,15 @@ struct AgentCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // Blocked (039): what it waits on and when it looks again, in the
+                    // Mac row's words. Carry on is in the card's menu and the chat, not
+                    // here: the whole card is the one control (see `AgentRow`).
+                    ForEach(model.blockLines(agent), id: \.self) { line in
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     // As on the Mac's row (040).
                     if let line = ParkWords.line(agent.parking) {
                         Text(line)
@@ -80,6 +89,15 @@ struct AgentCard: View {
             .paperRow()
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if model.isBlocked(agent) {
+                Button {
+                    Task { await model.carryOn(agent.id) }
+                } label: {
+                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                }
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -95,9 +113,8 @@ struct AgentCard: View {
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
-        return [agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message,
-                ParkWords.line(agent.parking)]
-            .compactMap { $0 }
+        return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
+            .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
     }
 }

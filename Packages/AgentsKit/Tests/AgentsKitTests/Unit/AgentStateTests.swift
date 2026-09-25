@@ -326,4 +326,24 @@ struct AgentStateTests {
             }
         }
     }
+
+    // MARK: Stopping a blocked agent (039)
+
+    /// The only stop a finished agent takes, and only from finished: a blocked agent has
+    /// no turn to cancel, but it has a resume coming.
+    @Test func stoppingWhileBlockedIsOnlyFromFinished() {
+        for state in AgentState.allCases {
+            let person = state.applying(.stoppedWaitingByUser)
+            let agent = state.applying(.stoppedWaitingByAgent)
+            if state == .finished {
+                #expect(person?.next == .stopped)
+                #expect(person?.endedReason == .set(.cancelled))
+                #expect(agent?.next == .stopped)
+                #expect(agent?.endedReason == .set(.stoppedByAgent))
+            } else {
+                #expect(person == nil, "\(state)")
+                #expect(agent == nil, "\(state)")
+            }
+        }
+    }
 }
