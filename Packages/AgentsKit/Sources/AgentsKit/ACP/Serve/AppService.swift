@@ -44,6 +44,8 @@ public actor AppService {
     public static let stopAgentToolName = AppTool.stopAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
+    public static let pushPullRequestToolName = AppTool.pushPullRequest
+    public static let replyOnPullRequestToolName = AppTool.replyOnPullRequest
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
@@ -121,6 +123,16 @@ public actor AppService {
     /// Where those go. A lease call may take up to the wait limit to come back.
     public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
 
+    /// One of the two pull-request calls (038), as the agent made it. Neither names a
+    /// pull request, a branch or a repository: the daemon takes those from the run.
+    public enum PullRequestCall: Sendable, Equatable {
+        case push
+        case reply(body: String, inReplyTo: Int?)
+    }
+
+    /// Where those go.
+    public typealias PullRequestsSink = @Sendable (PullRequestCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -129,6 +141,7 @@ public actor AppService {
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
+    private let pullRequestsSink: PullRequestsSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -150,6 +163,9 @@ public actor AppService {
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
                 },
+                pullRequests: @escaping PullRequestsSink = { _ in
+                    .refused("Only a run started for a pull request can push or reply; ask the person to do it.")
+                },
                 leases: @escaping LeasesSink = { _ in
                     .refused("This app cannot lease resources.")
                 }) {
@@ -161,6 +177,7 @@ public actor AppService {
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
+        self.pullRequestsSink = pullRequests
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -209,8 +226,13 @@ public actor AppService {
             // The three lease tools after those, for every agent: waiting for the
             // simulator is not managing anyone (036).
             let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
+            // The two pull-request tools, for every agent (038 R7): the list is fixed
+            // when a session is made, and a standing or triggering run resumes a session
+            // made long before. Outside such a run they refuse, in words.
+            let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
                                               Self.workflowTool] + agentTools + leaseTools
+                                             + pullRequestTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -279,6 +301,13 @@ public actor AppService {
                 return .success(Self.reply(await workflowSink(action,
                                                               arguments?["id"]?.stringValue,
                                                               arguments?["content"]?.stringValue)))
+            }
+
+            if let call = Self.pullRequestCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await pullRequestsSink(call)))
+                }
             }
 
             if let call = Self.leaseCall(named: name, arguments) {
@@ -354,6 +383,22 @@ public actor AppService {
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
+        }
+        return nil
+    }
+
+    /// Which of the two pull-request calls a tool name is, with its arguments read.
+    static func pullRequestCall(named name: String,
+                                _ arguments: JSONValue?) -> Result<PullRequestCall, AgentCallProblem>? {
+        if name.hasSuffix(pushPullRequestToolName) { return .success(.push) }
+        if name.hasSuffix(replyOnPullRequestToolName) {
+            let body = arguments?["body"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !body.isEmpty else { return .failure("Nothing was posted: say what to reply, in `body`.") }
+            let inReplyTo = arguments?["in_reply_to"].flatMap { value -> Int? in
+                if let number = value.intValue { return number }
+                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            return .success(.reply(body: body, inReplyTo: inReplyTo))
         }
         return nil
     }
@@ -861,6 +906,37 @@ public actor AppService {
             many of this project's three places are in use.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    // MARK: Pull requests (038). Words from contracts/pull-requests.md.
+
+    static let pushPullRequestTool: JSONValue = [
+        "name": .string(pushPullRequestToolName),
+        "title": "Push to the pull request",
+        "description": """
+            Push this worktree's commits to the pull request you were started for. Never \
+            force-pushes: if the remote has commits you don't, bring them in first and \
+            push again. Only works in a run started for a pull request.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    static let replyOnPullRequestTool: JSONValue = [
+        "name": .string(replyOnPullRequestToolName),
+        "title": "Reply on the pull request",
+        "description": """
+            Reply on the pull request you were started for. Give in_reply_to (a comment \
+            id from your prompt) to answer a review comment in its thread; leave it out \
+            to comment on the pull request itself.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "body": ["type": "string"],
+                "in_reply_to": ["type": "integer"],
+            ],
+            "required": .array(["body"]),
+        ],
     ]
 
     // MARK: Leases (036). Words from contracts/lease-tools.md.

@@ -183,6 +183,10 @@ public enum DaemonAPI {
         public static let pullRequestsCheckout = "pullRequests/checkout"
         /// Write the starter babysitting workflow (FR-026).
         public static let pullRequestsAddBabysitter = "pullRequests/addBabysitter"
+        /// The helper relaying `push_pull_request` (038 R7).
+        public static let agentsPushPullRequest = "agents/pushPullRequest"
+        /// The helper relaying `reply_on_pull_request` (038 R7).
+        public static let agentsReplyOnPullRequest = "agents/replyOnPullRequest"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
@@ -1500,6 +1504,27 @@ public enum DaemonAPI {
     public struct PullRequestsRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
+    }
+
+    /// `agents/pushPullRequest`: nothing but who is asking. The daemon takes the pull
+    /// request, the branch and the repository from the caller's run (R7).
+    public struct PushPullRequestRequest: Codable, Sendable {
+        public var token: String
+        public init(token: String) { self.token = token }
+    }
+
+    /// `agents/replyOnPullRequest`.
+    public struct ReplyOnPullRequestRequest: Codable, Sendable {
+        public var token: String
+        public var body: String
+        /// A review comment to answer in its thread; nil comments on the pull request.
+        public var inReplyTo: Int?
+
+        public init(token: String, body: String, inReplyTo: Int? = nil) {
+            self.token = token
+            self.body = body
+            self.inReplyTo = inReplyTo
+        }
     }
 
     /// `pullRequests/resume` and `pullRequests/checkout`.

@@ -127,4 +127,101 @@ struct PullRequestFireTests {
         _ = await box.core.refreshPullRequestsNow(in: box.project)
         #expect(await box.core.allAgents().isEmpty)
     }
+
+    // MARK: The two tools (R7)
+
+    /// A babysitting run that is still in its turn, and the token its helper holds.
+    private func runInProgress() async throws -> (PullRequestSandbox, Agent, String)? {
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .seconds(30)
+        let box = try await PullRequestSandbox.make(workflows: ["babysit-pull-requests": Self.babysitter],
+                                                    script: script)
+        _ = await box.core.refreshPullRequestsNow(in: box.project)
+        guard let agent = await eventuallySome("the babysitting agent", {
+            await box.core.allAgents().first { $0.startedByWorkflow == "babysit-pull-requests" }
+        }), let token = await eventuallySome("its token", {
+            await box.core.appTokens.first { $0.value == agent.id }?.key
+        }) else { return nil }
+        return (box, agent, token)
+    }
+
+    @Test func pushGoesToThePullRequestsOwnBranch() async throws {
+        guard let (box, _, token) = try await runInProgress() else { return }
+        try "fixed\n".write(to: box.fixWorktree.appending(path: "fix.txt"), atomically: true, encoding: .utf8)
+        try await PullRequestSandbox.git(["add", "."], in: box.fixWorktree)
+        try await PullRequestSandbox.git(["commit", "-q", "-m", "Fix it"], in: box.fixWorktree)
+        let head = try await PullRequestSandbox.git(["rev-parse", "HEAD"], in: box.fixWorktree)
+
+        let said = try await box.core.pushPullRequest(DaemonAPI.PushPullRequestRequest(token: token))
+        #expect(said == "Pushed \(head.prefix(7)) to fix-login-redirect (#412).")
+        #expect(try await PullRequestSandbox.git(["rev-parse", "fix-login-redirect"], in: box.bare) == head)
+        // Babysitting's own push is remembered, so it is never taken for the person's.
+        #expect(await box.core.pullRequestStore.load().record(folder: box.project, number: 412)?.pushedOids == [head])
+    }
+
+    @Test func aPushTheRemoteHasMovedPastIsRefusedNotForced() async throws {
+        guard let (box, _, token) = try await runInProgress() else { return }
+        // Somebody else pushes to the branch first.
+        let other = box.root.appending(path: "other", directoryHint: .isDirectory)
+        try await PullRequestSandbox.git(["clone", "-q", "-b", "fix-login-redirect", box.bare.path, other.path], in: box.root)
+        try await PullRequestSandbox.git(["-c", "user.email=o@example.com", "-c", "user.name=O",
+                                          "commit", "-q", "--allow-empty", "-m", "theirs"], in: other)
+        try await PullRequestSandbox.git(["push", "-q", "origin", "fix-login-redirect"], in: other)
+        let theirs = try await PullRequestSandbox.git(["rev-parse", "HEAD"], in: other)
+
+        try await PullRequestSandbox.git(["commit", "-q", "--allow-empty", "-m", "mine"], in: box.fixWorktree)
+        let said = try await box.core.pushPullRequest(DaemonAPI.PushPullRequestRequest(token: token))
+        #expect(said.hasPrefix("Git refused:"))
+        #expect(try await PullRequestSandbox.git(["rev-parse", "fix-login-redirect"], in: box.bare) == theirs)
+    }
+
+    @Test func aReplyAnswersAReviewCommentInItsThread() async throws {
+        guard let (box, _, token) = try await runInProgress() else { return }
+        try #"{"id": 5550001, "html_url": "https://github.com/alexec/agents/pull/412#discussion_r5550001"}"#
+            .write(to: box.gh.folder.appending(path: "reply.json"), atomically: true, encoding: .utf8)
+
+        let said = try await box.core.replyOnPullRequest(
+            DaemonAPI.ReplyOnPullRequestRequest(token: token, body: "Moved it into the router.", inReplyTo: 2210984))
+        #expect(said == "Replied: https://github.com/alexec/agents/pull/412#discussion_r5550001")
+        let call = try #require(box.gh.calledWith().last)
+        #expect(call.hasPrefix("api --hostname github.com -X POST repos/alexec/agents/pulls/412/comments/2210984/replies"))
+        #expect(call.contains("body=Moved it into the router."))
+        #expect(await box.core.pullRequestStore.load().record(folder: box.project, number: 412)?.postedCommentIDs == [5550001])
+
+        // Without a comment to answer, it goes on the pull request itself.
+        _ = try await box.core.replyOnPullRequest(DaemonAPI.ReplyOnPullRequestRequest(token: token, body: "Done."))
+        #expect(box.gh.calledWith().last?.contains("repos/alexec/agents/issues/412/comments") == true)
+    }
+
+    @Test func onlyThisPullRequestsCommentsCanBeAnswered() async throws {
+        guard let (box, _, token) = try await runInProgress() else { return }
+        let before = box.gh.calledWith().count
+        let said = try await box.core.replyOnPullRequest(
+            DaemonAPI.ReplyOnPullRequestRequest(token: token, body: "Hi", inReplyTo: 12345))
+        #expect(said == "Comment 12345 is not on #412.")
+        #expect(box.gh.calledWith().count == before)
+    }
+
+    @Test func anAgentNotStartedForAPullRequestCannotPushOrReply() async throws {
+        let box = try await sandbox()
+        let id = try await box.core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: box.project, prompt: "hello"))
+        guard let token = await eventuallySome("its token", { await box.core.appTokens.first { $0.value == id }?.key })
+        else { return }
+        for call in [{ try await box.core.pushPullRequest(DaemonAPI.PushPullRequestRequest(token: token)) },
+                     { try await box.core.replyOnPullRequest(DaemonAPI.ReplyOnPullRequestRequest(token: token, body: "x")) }] {
+            do {
+                _ = try await call()
+                Issue.record("expected a refusal")
+            } catch let error as JSONRPCError {
+                #expect(error.message == "Only a run started for a pull request can push or reply; ask the person to do it.")
+            }
+        }
+    }
+
+    @Test func theTwoToolsAreAnsweredWithoutAsking() {
+        for name in ["mcp__agents__push_pull_request", "reply_on_pull_request"] {
+            #expect(ToolCall(title: name, name: name).isAutoAllowable)
+        }
+        #expect(!ToolCall(title: "Bash", name: "Bash").isAutoAllowable)
+    }
 }

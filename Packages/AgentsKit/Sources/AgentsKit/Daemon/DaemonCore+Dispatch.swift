@@ -276,6 +276,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
 
+            case DaemonAPI.Method.agentsPushPullRequest:
+                let request = try require(params, as: DaemonAPI.PushPullRequestRequest.self)
+                return .success(["note": .string(try await pushPullRequest(request))])
+
+            case DaemonAPI.Method.agentsReplyOnPullRequest:
+                let request = try require(params, as: DaemonAPI.ReplyOnPullRequestRequest.self)
+                return .success(["note": .string(try await replyOnPullRequest(request))])
+
             case DaemonAPI.Method.leasesLease:
                 let request = try require(params, as: DaemonAPI.LeaseRequest.self)
                 return .success(["note": .string(try await lease(request))])

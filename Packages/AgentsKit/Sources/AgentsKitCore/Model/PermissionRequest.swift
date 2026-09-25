@@ -194,7 +194,17 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// sheet in front of the writing would only make the uninformed answer the quick
     /// one — and, under a runtime that asks before every call, would stop the writing
     /// dead whenever nobody was looking.
-    public var isAutoAllowable: Bool { isTheApps }
+    ///
+    /// And the two that act on a pull request (038): they can only push to the pull
+    /// request a run was started for, never forced, or reply on it, and an unattended
+    /// run stopped at a question nobody is there to answer is no babysitting at all.
+    public var isAutoAllowable: Bool { isTheApps || isActingOnPullRequest }
+
+    /// Whether this is one of the two pull-request tools (038).
+    public var isActingOnPullRequest: Bool {
+        let called = name ?? title
+        return called.hasSuffix(AppTool.pushPullRequest) || called.hasSuffix(AppTool.replyOnPullRequest)
+    }
 
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {
