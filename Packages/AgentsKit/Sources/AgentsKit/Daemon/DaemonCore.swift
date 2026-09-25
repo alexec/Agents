@@ -820,6 +820,12 @@ public actor DaemonCore {
             // Nothing to read, so nothing to keep: not written, not broadcast, and not
             // counted as the agent doing something.
             guard !kind.isInvisibleAgentText else { return }
+            // The runtime moving itself to another mode — Claude leaving plan mode —
+            // is the agent's mode now, and what an agent it starts inherits.
+            if case .optionChanged(let id, let value) = kind, var agent = agents[agentID] {
+                agent.startOptions.values[id] = value
+                changed(agent)
+            }
             await record(kind, for: agentID)
             notePlanning(kind, agentID: agentID)
 
