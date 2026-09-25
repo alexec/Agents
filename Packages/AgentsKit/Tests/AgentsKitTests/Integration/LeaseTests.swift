@@ -122,9 +122,11 @@ struct LeaseTests {
         }
     }
 
-    /// Until something is true, or a few seconds pass.
+    /// Until something is true, or twenty seconds pass. Long for a quiet machine, and
+    /// needed on a busy one: under the whole suite, starting a woken agent's fake
+    /// runtime has taken longer than eight.
     private func eventually(_ what: String, _ check: () async throws -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(8))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
         while ContinuousClock.now < deadline {
             if try await check() { return }
             try await Task.sleep(for: .milliseconds(20))
