@@ -84,6 +84,13 @@ public enum DaemonAPI {
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
         public static let agentsTranscript = "agents/transcript"
+        /// What an agent changed: the files its runtime reported editing, and — where its
+        /// folder is in git — what git sees changed since it started (035). Built by the
+        /// daemon because a window holds only a page of the transcript, and the list has
+        /// to be all of it. Never polled; asked on the Changes pane's triggers.
+        public static let changesList = "changes/list"
+        /// One file from `changes/list`: its reported edits, and git's view of it.
+        public static let changesFile = "changes/file"
         public static let agentsSetOption = "agents/setOption"
         /// Letting one agent carry on past the per-agent limit, or giving it a
         /// tighter ceiling of its own. The reader's call, never an agent's.
@@ -502,6 +509,23 @@ public enum DaemonAPI {
     public struct AgentRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    public struct ChangesListRequest: Codable, Sendable {
+        public var agentID: UUID
+        public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    public struct ChangesFileRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        /// Also the whole current file, with removed lines in place. Needs git.
+        public var whole: Bool
+        public init(agentID: UUID, path: String, whole: Bool = false) {
+            self.agentID = agentID
+            self.path = path
+            self.whole = whole
+        }
     }
 
     public struct PromptRequest: Codable, Sendable {
@@ -1173,6 +1197,8 @@ public enum DaemonAPI {
         public static let notAWorktree = -32030
         /// An agent is still working in the worktree to be removed.
         public static let worktreeInUse = -32031
+        /// `changes/file` for a path that is not in the agent's list of changes.
+        public static let notChanged = -32032
     }
 
     // MARK: Workflows

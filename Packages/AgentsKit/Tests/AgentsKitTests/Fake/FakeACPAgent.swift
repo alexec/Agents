@@ -252,6 +252,42 @@ actor FakeACPAgent {
         }
         return value
     }
+
+    /// A tool call beginning, the way Claude's does: a title and no content yet.
+    static func toolCall(id: String, title: String, status: String = "pending") -> JSONValue {
+        ["sessionUpdate": "tool_call", "toolCallId": .string(id), "title": .string(title),
+         "kind": "edit", "status": .string(status), "content": []]
+    }
+
+    /// An update carrying one diff. Claude sends one of these before the tool runs and
+    /// another after, with different old text (035 research R1).
+    static func diffUpdate(id: String, path: String, oldText: String?, newText: String,
+                           status: String? = nil, rawInput: JSONValue? = nil) -> JSONValue {
+        var diff: [String: JSONValue] = ["type": "diff", "path": .string(path),
+                                         "newText": .string(newText)]
+        if let oldText { diff["oldText"] = .string(oldText) }
+        var update: [String: JSONValue] = ["sessionUpdate": "tool_call_update",
+                                           "toolCallId": .string(id),
+                                           "content": [.object(diff)]]
+        if let status { update["status"] = .string(status) }
+        if let rawInput { update["rawInput"] = rawInput }
+        return .object(update)
+    }
+
+    /// An update carrying only how the call ended.
+    static func status(id: String, _ status: String) -> JSONValue {
+        ["sessionUpdate": "tool_call_update", "toolCallId": .string(id),
+         "status": .string(status)]
+    }
+
+    /// The whole of one Claude edit: begun, diff from the input, diff after it ran, done.
+    static func claudeEdit(id: String, path: String, oldText: String?, newText: String,
+                           ending: String = "completed") -> [JSONValue] {
+        [toolCall(id: id, title: "Edit \(path)"),
+         diffUpdate(id: id, path: path, oldText: nil, newText: newText),
+         diffUpdate(id: id, path: path, oldText: oldText, newText: newText),
+         status(id: id, ending)]
+    }
 }
 
 final class FakeBox: @unchecked Sendable {

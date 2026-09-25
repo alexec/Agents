@@ -30,7 +30,10 @@ public final class GitProcess: @unchecked Sendable {
         return nil
     }
 
-    public init(_ arguments: [String], in folder: URL? = nil) throws {
+    /// `extra` is laid over the environment last: how a caller that must only read
+    /// says so (035's `GIT_OPTIONAL_LOCKS=0`).
+    public init(_ arguments: [String], in folder: URL? = nil,
+                environment extra: [String: String] = [:]) throws {
         guard let git = Self.executable() else { throw LaunchError.notInstalled }
         process.executableURL = git
         process.arguments = arguments
@@ -40,6 +43,7 @@ public final class GitProcess: @unchecked Sendable {
         // `GIT_SSH_COMMAND` is left alone because it would override their own
         // `core.sshCommand`.
         environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment.merge(extra) { _, new in new }
         process.environment = environment
         process.standardInput = FileHandle.nullDevice
     }
