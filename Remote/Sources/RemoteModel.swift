@@ -158,6 +158,13 @@ final class RemoteModel {
     /// starting the work twice.
     private(set) var unsettledStart: DaemonAPI.StartRequest?
     private(set) var isStarting = false
+    /// Where in the project the new agent works, when not the project folder (030).
+    /// Decided per agent, so it goes back to the project folder each time the sheet
+    /// opens and after every start.
+    private(set) var startWorktree: WorktreeChoice?
+    /// What the sheet's project's repository has, for the Worktree row. Not a
+    /// repository until the Mac says otherwise, which keeps the row hidden.
+    private(set) var startWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var startDraftID: UUID?
     /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
     /// person has since moved off is recognised as that and let go.
@@ -167,6 +174,9 @@ final class RemoteModel {
 
     private func openStart(in folder: URL) async {
         startRefusal = nil
+        startWorktree = nil
+        startWorktrees = .notARepository
+        Task { await loadStartWorktrees(in: folder) }
         if startRuntimeID == nil || !availableRuntimeIDs.contains(startRuntimeID ?? "") {
             startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
         }
@@ -181,6 +191,32 @@ final class RemoteModel {
         startChosen = [:]
         startChoicesState = .loading
         startRefusal = nil
+        startWorktree = nil
+    }
+
+    /// The repository's worktrees for the sheet. Asked once when it opens, never polled.
+    private func loadStartWorktrees(in folder: URL) async {
+        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
+                                             DaemonAPI.WorktreesListRequest(folder: folder),
+                                             returning: DaemonAPI.WorktreesListResponse.self))
+            ?? .notARepository
+        guard startingIn == folder else { return }
+        startWorktrees = answer
+    }
+
+    /// Where the draft is made: in a worktree already there when one is chosen, so the
+    /// start can use it; otherwise the project folder (030, research R2).
+    private var startOptionsFolder: URL? {
+        if case .existing(let root) = startWorktree { return root }
+        return startingIn
+    }
+
+    /// Choose where the new agent works, and make the draft there if that moved it.
+    func chooseWorktree(_ choice: WorktreeChoice?) async {
+        let before = startOptionsFolder
+        startWorktree = choice
+        startRefusal = nil
+        if startOptionsFolder != before { await loadStartChoices() }
     }
 
     func chooseRuntime(_ runtimeID: String) async {
@@ -198,7 +234,7 @@ final class RemoteModel {
     /// that follows uses it. Answered from what it offered last time when the Mac has
     /// that, and put right by `agents/draftOptions` if it has moved.
     func loadStartChoices() async {
-        guard let folder = startingIn else { return }
+        guard let folder = startOptionsFolder else { return }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
             startChoicesState = .failed(runtimes.isEmpty
@@ -312,7 +348,7 @@ final class RemoteModel {
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            requestID: retrying ?? UUID())
+            worktree: startWorktree, requestID: retrying ?? UUID())
         return await send(start: request)
     }
 
@@ -343,6 +379,7 @@ final class RemoteModel {
     ///   and taking the screen from them would be the surprise.
     private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
         unsettledStart = nil
+        startWorktree = nil
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
         StartDraftKeeper.shared.clear(in: folder)
         guard open else { return }
@@ -367,6 +404,50 @@ final class RemoteModel {
         }
         guard startingIn == request.cwd else { return }
         _ = await send(start: request)
+    }
+
+    // MARK: The project's worktrees (030)
+
+    /// The app's worktrees for the project on screen, for its Worktrees section.
+    private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    private var projectWorktreesFolder: URL?
+
+    /// Asked when the project page appears and after a removal, never polled.
+    func loadProjectWorktrees(in folder: URL) async {
+        projectWorktreesFolder = folder
+        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
+                                             DaemonAPI.WorktreesListRequest(folder: folder),
+                                             returning: DaemonAPI.WorktreesListResponse.self))
+            ?? .notARepository
+        guard projectWorktreesFolder == folder else { return }
+        projectWorktrees = answer
+    }
+
+    /// What removing one would lose, or nil when the Mac could not say (and the app's
+    /// alert says why).
+    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
+        do {
+            return try await client.call(DaemonAPI.Method.worktreesCheck,
+                                         DaemonAPI.WorktreeRemovalRequest(project: folder, root: root),
+                                         returning: DaemonAPI.RemovalCheck.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Remove one. `confirmed` is the person having seen what would be lost; the Mac
+    /// checks again either way.
+    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
+        do {
+            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
+                                      DaemonAPI.WorktreeRemovalRequest(project: folder, root: root,
+                                                                       confirmed: confirmed),
+                                      returning: DaemonAPI.WorktreeRemoved.self)
+        } catch {
+            problem = sentence(for: error)
+        }
+        await loadProjectWorktrees(in: folder)
     }
 
     private func startRefusalBeforeSending(in folder: URL) -> String? {
