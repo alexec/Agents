@@ -411,6 +411,19 @@ final class AppModel {
         }
     }
 
+    /// Resume: start babysitting a stopped pull request again (FR-024).
+    func resume(_ number: Int, in folder: URL) async {
+        let folder = Project.standardize(folder)
+        do {
+            let list = try await client.call(DaemonAPI.Method.pullRequestsResume,
+                                             DaemonAPI.PullRequestRequest(folder: folder, number: number),
+                                             returning: PullRequestList.self)
+            setPullRequests(list, for: folder)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     private func setPullRequests(_ list: PullRequestList?, for folder: URL) {
         pullRequestLists[folder] = list
         // A failure is true until the list next changes, and no longer.

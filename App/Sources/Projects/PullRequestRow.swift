@@ -164,10 +164,11 @@ struct PullRequestRow: View {
             Text("Babysitting stopped after \(status.consecutiveRuns) tries in a row")
                 .fontWeight(.semibold)
                 .foregroundStyle(StateTint.attention.style(or: .secondary))
-            Button("Resume") {}
-                .buttonStyle(.paper)
-                .disabled(true)
-                .padding(.leading, 6)
+            Button("Resume") {
+                Task { await model.resume(pull.number, in: folder) }
+            }
+            .buttonStyle(.paper)
+            .padding(.leading, 6)
         } else if status.isRunning {
             Text("·")
             Text("Babysitting now")

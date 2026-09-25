@@ -22,6 +22,9 @@ public struct PullRequestRecord: Codable, Hashable, Sendable {
     public var pushedOids: [String]
     /// The comments `reply_on_pull_request` made, the last 50.
     public var postedCommentIDs: [Int]
+    /// The head commit the last good refresh saw, so a new one can be told apart from
+    /// babysitting's own (R8).
+    public var lastSeenHeadOid: String?
 
     static let pushedOidLimit = 20
     static let postedCommentLimit = 50
@@ -50,6 +53,7 @@ public struct PullRequestRecord: Codable, Hashable, Sendable {
         lastOutcomeWorkflowID = try c.decodeIfPresent(String.self, forKey: .lastOutcomeWorkflowID)
         pushedOids = try c.decodeIfPresent([String].self, forKey: .pushedOids) ?? []
         postedCommentIDs = try c.decodeIfPresent([Int].self, forKey: .postedCommentIDs) ?? []
+        lastSeenHeadOid = try c.decodeIfPresent(String.self, forKey: .lastSeenHeadOid)
     }
 
     public mutating func notePushed(_ oid: String) {
@@ -58,6 +62,30 @@ public struct PullRequestRecord: Codable, Hashable, Sendable {
 
     public mutating func notePosted(_ id: Int) {
         postedCommentIDs = Array((postedCommentIDs + [id]).suffix(Self.postedCommentLimit))
+    }
+
+    /// Whether babysitting has stopped on it: three runs in a row with nobody else
+    /// acting in between (FR-023).
+    public var isStopped: Bool { consecutiveRuns >= Workflow.chainDepthLimit || stoppedAt != nil }
+
+    /// Start the count again (FR-024).
+    public mutating func resume() {
+        consecutiveRuns = 0
+        stoppedAt = nil
+    }
+
+    /// What this refresh says about somebody else having acted, and start the count
+    /// again if so (R8): a head commit babysitting did not push, or a countable comment
+    /// newer than the last run. The viewer's own comments never count, since they are
+    /// babysitting's too; a push by hand does, because babysitting's pushes are known.
+    public mutating func notice(_ pull: PullRequest) {
+        let foreignPush = lastSeenHeadOid.map { $0 != pull.headOid && !pushedOids.contains(pull.headOid) } ?? false
+        let posted = Set(postedCommentIDs)
+        let newerComment = lastRunStartedAt.map { since in
+            pull.countableComments.contains { !posted.contains($0.id) && $0.createdAt > since }
+        } ?? false
+        if foreignPush || newerComment { resume() }
+        lastSeenHeadOid = pull.headOid
     }
 }
 

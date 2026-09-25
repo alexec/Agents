@@ -119,6 +119,11 @@ extension DaemonCore {
             list = PullRequestList(folder: folder, repository: repository, viewer: result.viewer,
                                    pullRequests: matched, fetchedAt: now())
             records.keepOnly(Set(matched.map(\.number)), in: folder)
+            // Before any trigger is looked at: somebody else having acted starts the
+            // count again (R8).
+            for pull in matched {
+                records.update(folder: folder, number: pull.number) { $0.notice(pull) }
+            }
         } catch let failure as GitHubCLI.Failure {
             var problem = failure.problem
             if case .cannotSee(let host, _, let login) = problem {
@@ -146,6 +151,24 @@ extension DaemonCore {
         if list != previous { tellMac(list) }
         // Only on a list that is true now: nothing fires on stale state (spec edge case).
         if list.problem == nil { await firePullRequestTriggers(in: list) }
+        return pullRequestLists[folder] ?? list
+    }
+
+    // MARK: Stopping (US3)
+
+    /// Resume: start the count again on a stopped pull request (FR-024), and look at it
+    /// again at once rather than in five minutes.
+    public func resumePullRequest(_ number: Int, in folder: URL) async throws -> PullRequestList {
+        let folder = Project.standardize(folder)
+        guard let list = pullRequestLists[folder], list.pullRequests.contains(where: { $0.number == number }) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchPullRequest,
+                               message: "#\(number) is not one of your open pull requests here.")
+        }
+        var records = pullRequestStore.load()
+        records.update(folder: folder, number: number) { $0.resume() }
+        pullRequestStore.save(records)
+        republishPullRequests(in: folder, records: records)
+        if let latest = pullRequestLists[folder] { await firePullRequestTriggers(in: latest) }
         return pullRequestLists[folder] ?? list
     }
 
@@ -182,7 +205,7 @@ extension DaemonCore {
         let number = fire.pull.number
         guard let worktree = fire.pull.worktree else { return .noWorktree(pr: number) }
         let record = pullRequestStore.load().record(folder: fire.folder, number: number)
-        if let record, record.consecutiveRuns >= Workflow.chainDepthLimit {
+        if let record, record.isStopped {
             return .babysittingStopped(pr: number, runs: record.consecutiveRuns)
         }
         if let dirty = try? await GitWorktrees.statusCount(in: worktree.root), dirty > 0 {
@@ -215,6 +238,9 @@ extension DaemonCore {
         records.update(folder: fire.folder, number: fire.pull.number) { record in
             record.lastOutcome = outcome.following(record.lastOutcome)
             record.lastOutcomeWorkflowID = workflow.workflowID
+            if case .refused(.babysittingStopped, let at, _) = outcome, record.stoppedAt == nil {
+                record.stoppedAt = at
+            }
         }
         pullRequestStore.save(records)
         republishPullRequests(in: fire.folder, records: records)
@@ -363,7 +389,7 @@ extension DaemonCore {
             pull.babysitting = BabysittingStatus(lastRun: record?.lastOutcome,
                                                  lastRunWorkflowID: record?.lastOutcomeWorkflowID,
                                                  consecutiveRuns: record?.consecutiveRuns ?? 0,
-                                                 isStopped: record?.stoppedAt != nil,
+                                                 isStopped: record?.isStopped ?? false,
                                                  isRunning: running)
             return pull
         }

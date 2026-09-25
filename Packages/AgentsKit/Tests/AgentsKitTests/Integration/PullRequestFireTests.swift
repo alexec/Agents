@@ -224,4 +224,27 @@ struct PullRequestFireTests {
         }
         #expect(!ToolCall(title: "Bash", name: "Bash").isAutoAllowable)
     }
+
+    // MARK: Stopping (US3)
+
+    @Test func stoppedBabysittingIsRefusedUntilResumed() async throws {
+        let box = try await sandbox()
+        var records = await box.core.pullRequestStore.load()
+        records.update(folder: box.project, number: 412) { $0.consecutiveRuns = 3 }
+        await box.core.pullRequestStore.save(records)
+
+        _ = await box.core.refreshPullRequestsNow(in: box.project)
+        #expect(await box.core.allAgents().isEmpty)
+        let row = try #require(await pull(412, in: box))
+        #expect(row.babysitting.isStopped)
+        guard case .refused(let refusal, _, _) = row.babysitting.lastRun else {
+            Issue.record("expected a refusal")
+            return
+        }
+        #expect(refusal == .babysittingStopped(pr: 412, runs: 3))
+
+        let resumed = try await box.core.resumePullRequest(412, in: box.project)
+        #expect(await eventually("a run after Resume") { await !box.core.allAgents().isEmpty })
+        #expect(resumed.pullRequests.first { $0.number == 412 }?.babysitting.isStopped == false)
+    }
 }
