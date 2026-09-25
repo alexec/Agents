@@ -53,6 +53,14 @@ struct RemoteChatView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
+                // Why it is under Parked, and since when (040, FR-011).
+                if let line = ParkWords.line(agent?.parking) {
+                    Label(line, systemImage: ParkWords.symbol)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
@@ -204,6 +212,18 @@ private struct ChatMenu: View {
     var body: some View {
         Menu {
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
+            // Park goes back to the project, as on the Mac: the person is done with it
+            // for now (040).
+            if let action = agent.parkAction {
+                Button(ParkWords.label(action), systemImage: ParkWords.symbol(action)) {
+                    Task {
+                        await model.perform(action, on: agent.id)
+                        if action == .park { model.selection = nil }
+                    }
+                }
+                .disabled(model.isStale)
+                .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
+            }
             if agent.state == .archived {
                 Divider()
                 Button("Bring back", systemImage: "tray.and.arrow.up") {

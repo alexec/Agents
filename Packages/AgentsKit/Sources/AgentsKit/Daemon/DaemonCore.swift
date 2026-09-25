@@ -523,6 +523,25 @@ public actor DaemonCore {
         // other move — picked up again, stopped, archived — is not a finish, so the
         // flag goes.
         agent.isUnread = next == .finished && !isWatched(agentID)
+        // Parking (040). A chat marked while its turn was in flight is parked the moment
+        // that turn ends, by whatever means, and before anything is told — so the
+        // ending never counts as a need and no banner goes out (FR-006). Not when a
+        // restarting daemon is about to pick it back up: that turn has not ended, and
+        // it parks when it does. Archiving takes the mark away, and unarchiving does
+        // not put it back (FR-010). The triggers below read `next`, never the mark, so
+        // a workflow sees the ending it always did (FR-015).
+        switch next {
+        case .finished, .stopped:
+            if case .whenTurnEnds = agent.parking,
+               !(event == .foundDead && agent.mayBePickedUpAfterRestart) {
+                agent.parking = .parked(at: now())
+                agent.isUnread = false
+            }
+        case .archived:
+            agent.parking = nil
+        case .starting, .running, .waitingOnUser:
+            break
+        }
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
 

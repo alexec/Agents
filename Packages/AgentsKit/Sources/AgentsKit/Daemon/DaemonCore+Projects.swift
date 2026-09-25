@@ -50,7 +50,12 @@ extension DaemonCore {
                 // looked at. This is the count a surface that cannot show a file takes
                 // as complete (the phone); the Mac window completes it from its own
                 // grouping, `AgentsModel.counts(in:)`, which has the fact (FR-009).
-                counts[agent.group(wantsEyes: false), default: 0] += 1
+                //
+                // Parked chats are left out. Nothing reads their number — both windows
+                // count their own groups — and a phone built before 040 cannot decode a
+                // key it has never heard of (040, R7).
+                let group = agent.group(wantsEyes: false)
+                if group != .parked { counts[group, default: 0] += 1 }
                 for (currency, amount) in agent.costToDate {
                     costToDate[currency, default: 0] += amount
                 }

@@ -164,6 +164,11 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsPrompt:
                 let request = try require(params, as: DaemonAPI.PromptRequest.self)
+                // Only the Mac and the phone send this, so a person's prompt here is a
+                // person typing, and that picks a parked chat back up (040, FR-009).
+                // Workflows, the restart pick-up and the outcome question reach
+                // `prompt` directly and leave the chat parked.
+                if request.from == .person { unparkQuietly(request.agentID) }
                 try await prompt(request)
                 return .success([:])
 
@@ -207,6 +212,16 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsUnarchive:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await unarchive(request.agentID)
+                return .success([:])
+
+            case DaemonAPI.Method.agentsPark:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                try park(request.agentID)
+                return .success([:])
+
+            case DaemonAPI.Method.agentsUnpark:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                try unpark(request.agentID)
                 return .success([:])
 
             case DaemonAPI.Method.agentsTranscript:

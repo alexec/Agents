@@ -1243,6 +1243,44 @@ extension DaemonCore {
         await move(agentID, on: .unarchivedByUser)
     }
 
+    // MARK: Parking (040)
+
+    /// Put a chat down to come back to. A settled chat is parked now; one with a turn in
+    /// flight is marked, and `move` parks it the moment that turn ends, so nothing is cut
+    /// off (FR-006). The runtime, the transcript and the queue are not touched (FR-005).
+    /// An archived chat, or one already so, is left as it is and nothing is said (FR-017).
+    public func park(_ agentID: UUID) throws {
+        guard var agent = agents[agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard agent.state != .archived else { return }
+        let inFlight = agent.state.hasTurnInFlight
+        switch (agent.parking, inFlight) {
+        case (.parked, _), (.whenTurnEnds, true): return
+        case (_, true): agent.parking = .whenTurnEnds(since: now())
+        case (_, false): agent.parking = .parked(at: now())
+        }
+        changed(agent)
+        reconsider()
+    }
+
+    /// Pick a chat back up without saying anything to it: it goes back to the group its
+    /// ending puts it in, or, mid-turn, ends where it would have (FR-008).
+    public func unpark(_ agentID: UUID) throws {
+        guard agents[agentID] != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        unparkQuietly(agentID)
+    }
+
+    /// Take the mark off, if there is one. Shared with the person's prompt.
+    func unparkQuietly(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.parking != nil else { return }
+        agent.parking = nil
+        changed(agent)
+        reconsider()
+    }
+
     // MARK: Options and permissions
 
     public func setOption(_ request: DaemonAPI.SetOptionRequest) async throws -> [ConfigOption] {
