@@ -112,13 +112,13 @@ beside `OptionCache.swift`, not in `Daemon/`.
 
 ### Tests for User Story 3
 
-- [ ] T027 [P] [US3] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PhoneAttachmentTests.swift` for the pure rules, placed in AgentsKitCore so they can be tested: a picture is downscaled to "2048 px, JPEG" on the long edge; "900 KB" total by value is the limit, and a set over it is refused with a sentence naming it; UTF-8 text becomes an embedded resource; anything else is refused with one sentence; `Attachment.refusal(from:)` refuses an image without the `image` capability and a resource without `embeddedContext`.
+- [X] T027 [P] [US3] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PhoneAttachmentTests.swift` for the pure rules, placed in AgentsKitCore so they can be tested: a picture is downscaled to "2048 px, JPEG" on the long edge; "900 KB" total by value is the limit, and a set over it is refused with a sentence naming it; UTF-8 text becomes an embedded resource; anything else is refused with one sentence; `Attachment.refusal(from:)` refuses an image without the `image` capability and a resource without `embeddedContext`.
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Put the rules from T027 in `Packages/AgentsKit/Sources/AgentsKitCore/Model/PhoneAttachment.swift` (new): `downscaled(_ data: Data, maxEdge: 2048) -> Data?` with ImageIO, `fromFile(_ url: URL) -> Result<Attachment, Refusal>`, and `totalRefusal(_ attachments: [Attachment], limit: 900_000) -> String?`. Makes T027 pass.
-- [ ] T029 [US3] Build `Remote/Sources/StartAgent/PhoneAttachments.swift` (new): an attach button offering a `PhotosPicker` (photo library) and a `fileImporter` (Files), each producing an `Attachment` through T028, plus a strip of what is attached, each item removable and showing `refusal(from: model.promptCapabilities(for: runtimeID))` under it. Put it in `StartAgentView`, and make `startAgent` refuse before sending when any attachment is refused or the total is over the limit, keeping everything (US3 scenario 2).
-- [ ] T030 [US3] Keep attachments in the draft through T016's keeper. When `DraftStore` drops inline data for size, the sheet says which attachments need attaching again rather than dropping them silently.
+- [X] T028 [US3] Put the rules from T027 in `Packages/AgentsKit/Sources/AgentsKitCore/Model/PhoneAttachment.swift` (new): `downscaled(_ data: Data, maxEdge: 2048) -> Data?` with ImageIO, `fromFile(_ url: URL) -> Result<Attachment, Refusal>`, and `totalRefusal(_ attachments: [Attachment], limit: 900_000) -> String?`. Makes T027 pass.
+- [X] T029 [US3] Build `Remote/Sources/StartAgent/PhoneAttachments.swift` (new): an attach button offering a `PhotosPicker` (photo library) and a `fileImporter` (Files), each producing an `Attachment` through T028, plus a strip of what is attached, each item removable and showing `refusal(from: model.promptCapabilities(for: runtimeID))` under it. Put it in `StartAgentView`, and make `startAgent` refuse before sending when any attachment is refused or the total is over the limit, keeping everything (US3 scenario 2).
+- [X] T030 [US3] Keep attachments in the draft through T016's keeper. When `DraftStore` drops inline data for size, the sheet says which attachments need attaching again rather than dropping them silently.
 
 **Checkpoint**: All three stories work.
 
@@ -184,3 +184,12 @@ Then US2, whose daemon half can land without the sheet. Then US3. Then the gate,
   no longer written to memory on the spot. The form still keeps it through `DraftKeeper`, and the
   daemon records it when the agent starts. A mode changed on a live conversation is recorded by
   the daemon in `agents/setOption`, as before.
+- **2026-09-24, US3 built (T027–T030).** 1342 tests pass; both schemes build. Nobody has
+  seen the attach button or the strip, and no photo has been picked on a phone. Three choices
+  made in the building, worth checking in the walk:
+  - Text from Files goes as a `resource` whose uri is `phone:<name>`, not a `file://` path,
+    so the agent doesn't take it for a file on the Mac.
+  - The Mac's "Attach the file itself" becomes "…so this can only be attached on the Mac",
+    because a phone has no file to attach by reference.
+  - The draft store keeps at most 512 KB by value, below the 900 KB a send allows. A bigger
+    set of attachments is dropped from the kept draft, and the sheet says to attach them again.

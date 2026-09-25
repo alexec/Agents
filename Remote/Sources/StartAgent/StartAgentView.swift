@@ -14,6 +14,10 @@ struct StartAgentView: View {
     let project: URL
 
     @State private var text = ""
+    @State private var attachments: [Attachment] = []
+    /// Why something picked could not be attached, or that a kept picture was too big
+    /// to keep and needs picking again.
+    @State private var attachNote: String?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -31,15 +35,30 @@ struct StartAgentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
         }
         .onAppear {
-            text = StartDraftKeeper.shared.draft(in: project)?.text ?? ""
+            let kept = StartDraftKeeper.shared.draft(in: project)
+            text = kept?.text ?? ""
+            attachments = kept?.attachments ?? []
+            if kept?.droppedInlineData == true {
+                // Said rather than restored silently incomplete (025's rule).
+                attachNote = "What was attached was too big to keep with the draft. Attach it again."
+            }
             focused = true
         }
-        .onChange(of: text) { StartDraftKeeper.shared.note(text, [], in: project) }
+        .onChange(of: text) { keep() }
+        .onChange(of: attachments) { keep() }
         .onDisappear { StartDraftKeeper.shared.flush() }
     }
 
     private var promptBar: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                AttachmentStrip(attachments: $attachments,
+                                capabilities: model.promptCapabilities(for: model.startRuntimeID))
+            }
+            if let attachNote {
+                Text(attachNote).appText(.supporting).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let refusal = model.startRefusal {
                 Text(refusal)
                     .appText(.supporting)
@@ -48,6 +67,7 @@ struct StartAgentView: View {
                     .accessibilityAddTraits(.updatesFrequently)
             }
             HStack(alignment: .bottom, spacing: 8) {
+                AttachButton(attachments: $attachments, refusal: $attachNote)
                 TextField("What should it do?", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...6)
@@ -88,8 +108,13 @@ struct StartAgentView: View {
         !model.isStarting && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private func keep() {
+        StartDraftKeeper.shared.note(text, attachments, in: project)
+    }
+
     private func send() {
         let words = text
-        Task { _ = await model.startAgent(prompt: words) }
+        let attached = attachments
+        Task { _ = await model.startAgent(prompt: words, attachments: attached) }
     }
 }

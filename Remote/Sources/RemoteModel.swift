@@ -286,6 +286,18 @@ final class RemoteModel {
             startRefusal = "Choose a runtime to start."
             return false
         }
+        // Before sending, and in the Mac's words: a runtime that will not take what is
+        // attached would refuse the whole prompt after the agent had started.
+        let capabilities = promptCapabilities(for: runtimeID)
+        if let refused = attachments.first(where: { PhoneAttachment.refusal(for: $0, from: capabilities) != nil }),
+           let reason = PhoneAttachment.refusal(for: refused, from: capabilities) {
+            startRefusal = "\(refused.displayName): \(reason)."
+            return false
+        }
+        if let tooMuch = PhoneAttachment.totalRefusal(attachments) {
+            startRefusal = tooMuch
+            return false
+        }
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
