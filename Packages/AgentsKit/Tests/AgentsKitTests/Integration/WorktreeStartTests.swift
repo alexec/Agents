@@ -343,15 +343,67 @@ struct WorktreeStartTests {
         .init(project: repo.project, root: root, confirmed: confirmed)
     }
 
-    @Test func archivingLeavesTheWorktreeAndItsBranch() async throws {
+    @Test func archivingTheOnlyAgentInACleanMergedWorktreeRemovesItAndItsBranch() async throws {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let (id, root) = try await finishedInWorktree(core, repo)
         try await core.archive(id)
 
-        #expect(FileManager.default.fileExists(atPath: root.path))
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(!(try await git(["worktree", "list"], in: repo.top)).contains("fix-login"))
+        #expect(try await git(["branch", "--list", "agents/*"], in: repo.top).isEmpty)
+        #expect(await core.agent(id)?.state == .archived)
+    }
+
+    @Test func archivingKeepsAWorktreeWithUncommittedChanges() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (id, root) = try await finishedInWorktree(core, repo)
+        try "untracked\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
+        try await core.archive(id)
+
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "NEW").path))
         let branches = try await git(["branch", "--list", "agents/*"], in: repo.top)
         #expect(branches.contains("agents/fix-login-redirect-safari"))
+    }
+
+    /// Committed but not merged: the folder goes, and the branch keeps the commits.
+    @Test func archivingKeepsTheBranchOfAnUnmergedWorktree() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (id, root) = try await finishedInWorktree(core, repo)
+        try "more\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "NEW"], in: root)
+        _ = try await git(["commit", "-q", "-m", "work"], in: root)
+        try await core.archive(id)
+
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(try await git(["log", "-1", "--format=%s", "agents/fix-login-redirect-safari"], in: repo.top) == "work")
+    }
+
+    @Test func archivingKeepsAWorktreeAnotherAgentIsWorkingIn() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (id, root) = try await finishedInWorktree(core, repo)
+        let other = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "and this",
+                                               worktree: .existing(root)))
+        await eventually("the turn ended") { await core.agent(other)?.state == .finished }
+        try await core.archive(id)
+        #expect(FileManager.default.fileExists(atPath: root.path))
+
+        try await core.archive(other)
+        #expect(!FileManager.default.fileExists(atPath: root.path), "the last one out takes it away")
+    }
+
+    @Test func archivingNeverRemovesAWorktreeTheAppDidNotMake() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let byHand = try await addByHand(repo, "by-hand")
+        let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
+                                            worktree: .existing(byHand)))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        try await core.archive(id)
+        #expect(FileManager.default.fileExists(atPath: byHand.path))
     }
 
     @Test func aWorktreeSomeoneIsWorkingInIsNotRemoved() async throws {
@@ -379,12 +431,12 @@ struct WorktreeStartTests {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let (id, root) = try await finishedInWorktree(core, repo)
-        try await core.archive(id)
-        // A commit on its branch, and a change not committed.
+        // A commit on its branch, and a change not committed, which keeps it past the archive.
         try "more\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
         _ = try await git(["add", "NEW"], in: root)
         _ = try await git(["commit", "-q", "-m", "work"], in: root)
         try "edited\n".write(to: root.appending(path: "README"), atomically: true, encoding: .utf8)
+        try await core.archive(id)
 
         let check = try await core.checkWorktreeRemoval(removal(repo, root))
         #expect(check.blockedBy.isEmpty)
@@ -405,7 +457,11 @@ struct WorktreeStartTests {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let (id, root) = try await finishedInWorktree(core, repo)
+        // An untracked file keeps it past the archive; gone again, nothing is lost.
+        let scratch = root.appending(path: "scratch")
+        try "x\n".write(to: scratch, atomically: true, encoding: .utf8)
         try await core.archive(id)
+        try FileManager.default.removeItem(at: scratch)
 
         let check = try await core.checkWorktreeRemoval(removal(repo, root))
         #expect(!check.losesWork)
@@ -419,8 +475,8 @@ struct WorktreeStartTests {
         let repo = try await repository()
         let core = try await makeCore(repo, FakeLauncher())
         let (id, root) = try await finishedInWorktree(core, repo)
-        try await core.archive(id)
         try FileManager.default.removeItem(at: root)
+        try await core.archive(id)
 
         _ = try await core.removeWorktree(removal(repo, root))
         #expect(!(try await git(["worktree", "list"], in: repo.top)).contains("fix-login"))
@@ -572,11 +628,16 @@ struct WorktreeStartTests {
         let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
                                             worktree: .branch("feature/login")))
         await eventually("the turn ended") { await core.agent(id)?.state == .finished }
-        try await core.archive(id)
         let root = try #require(await core.agent(id)?.worktree?.root)
         try "more\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
         _ = try await git(["add", "NEW"], in: root)
         _ = try await git(["commit", "-q", "-m", "work"], in: root)
+        // An untracked file keeps it past the archive, so the person removes it.
+        let scratch = root.appending(path: "scratch")
+        try "x\n".write(to: scratch, atomically: true, encoding: .utf8)
+        try await core.archive(id)
+        #expect(FileManager.default.fileExists(atPath: root.path))
+        try FileManager.default.removeItem(at: scratch)
 
         let check = try await core.checkWorktreeRemoval(removal(repo, root))
         #expect(!check.losesWork, "the commit stays on feature/login")
@@ -584,6 +645,21 @@ struct WorktreeStartTests {
         #expect(!removed.removedBranch)
         #expect(!FileManager.default.fileExists(atPath: root.path))
         #expect(try await git(["log", "-1", "--format=%s", "feature/login"], in: repo.top) == "work")
+    }
+
+    /// Archiving the last agent in a clean worktree on someone's branch takes the
+    /// folder and leaves the branch.
+    @Test func archivingKeepsSomeonesBranch() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
+                                            worktree: .branch("feature/login")))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        try await core.archive(id)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(await GitWorktrees.branchExists("feature/login", in: repo.top))
     }
 
     @Test func aHelperCanBeSentOntoABranch() async throws {

@@ -1244,6 +1244,7 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         }
+        await removeWorktreeIfDone(archiving: agentID)
     }
 
     /// What an agent that started others is called in their transcripts: its title
