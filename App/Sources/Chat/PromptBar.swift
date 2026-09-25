@@ -25,9 +25,7 @@ struct PromptBar: View {
     @State private var dismissedMentionTerm: String?
     /// Set when the list is dismissed, so Escape hides it until the word changes.
     @State private var dismissedCommandTerm: String?
-    /// Which of the agent's suggestions is showing, and whether Escape has put them
-    /// away for this turn.
-    @State private var selectedSuggestion = 0
+    /// Whether Escape has put the agent's suggestion away for this turn.
     @State private var dismissedSuggestions = false
     @State private var isPrimingDictation = false
     @State private var isShowingRuntimeAccount = false
@@ -54,18 +52,16 @@ struct PromptBar: View {
 
     // MARK: What the agent thinks you might ask
 
-    /// The one being offered, of the few the agent sent.
+    /// What the agent offered, of which there is one (031).
     ///
     /// Only while the field is empty: half a typed thought is already the answer to
     /// what was suggested, and a suggestion sitting behind it would be noise. Only
-    /// while no list is up, because Tab and the arrows belong to the list then.
+    /// while no list is up, because Tab belongs to the list then.
     private var suggestion: SuggestedPrompt? {
         guard let agent, !dismissedSuggestions, text.isEmpty, !isCompleting, !isMentioning else {
             return nil
         }
-        let prompts = agent.suggestedPrompts
-        guard !prompts.isEmpty else { return nil }
-        return prompts[min(selectedSuggestion, prompts.count - 1)]
+        return agent.suggestedPrompts.first
     }
 
     /// Take the words. They land in the field rather than going: the agent wrote
@@ -74,11 +70,6 @@ struct PromptBar: View {
         guard let suggestion else { return }
         text = suggestion.prompt
         focused = true
-    }
-
-    private func cycleSuggestion(by step: Int) {
-        guard let count = agent?.suggestedPrompts.count, count > 0 else { return }
-        selectedSuggestion = (selectedSuggestion + step + count) % count
     }
 
     var body: some View {
@@ -133,7 +124,6 @@ struct PromptBar: View {
                                             set: { model.draftServers = $0 }))
         }
         .onChange(of: model.selection) {
-            selectedSuggestion = 0
             dismissedSuggestions = false
             // What was half typed is no longer thrown away here. It is kept against the
             // conversation it was typed for, and each conversation's own comes back, files
@@ -148,10 +138,8 @@ struct PromptBar: View {
             focused = true
             model.offeredPrompt = nil
         }
-        // A new set is a new turn's worth, so it starts at the first one and comes
-        // back from having been dismissed.
+        // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {
-            selectedSuggestion = 0
             dismissedSuggestions = false
         }
         .onAppear { prepare() }
@@ -349,12 +337,7 @@ struct PromptBar: View {
                         selectedMention = min(selectedMention + 1, mentions.count - 1)
                         return .handled
                     }
-                    // Nothing typed and something offered: the arrows are how you see
-                    // the rest of what the agent thought of. There is no caret to move
-                    // in an empty field, so nothing is taken away by this.
-                    guard suggestion != nil else { return .ignored }
-                    cycleSuggestion(by: 1)
-                    return .handled
+                    return .ignored
                 }
                 .onKeyPress(.upArrow) {
                     if isCompleting {
@@ -365,9 +348,7 @@ struct PromptBar: View {
                         selectedMention = max(selectedMention - 1, 0)
                         return .handled
                     }
-                    guard suggestion != nil else { return .ignored }
-                    cycleSuggestion(by: -1)
-                    return .handled
+                    return .ignored
                 }
                 .onKeyPress(.escape) {
                     if isCompleting {
@@ -378,7 +359,7 @@ struct PromptBar: View {
                         dismissedMentionTerm = mentionQuery?.term
                         return .handled
                     }
-                    // Put them away, and they stay away until the next turn ends.
+                    // Put it away, and it stays away until the next turn ends.
                     guard suggestion != nil else { return .ignored }
                     dismissedSuggestions = true
                     return .handled
