@@ -24,3 +24,21 @@ Not yet on screen: Waiting now (needs a real wait, Phase 4), the chat capsule an
 (Phase 4), the phone and iPad list (Alex's, on a device).
 
 Look gate (T027): approved by Alex, 2026-09-25 ("The events page looks right"). Phone look not yet done.
+
+## Phase 4 checkpoint: two real Claude agents (MVP proof)
+
+Scratch root `/tmp/run-042`, Debug build of `fdbdcfa`, 2026-09-25 22:42–22:44:
+
+- "Waiter" was told to call `wait_for_event ["custom.ping"]`. Claude asked permission for the
+  tool first (as it does for the lease tools), then called it. The call was held 45 s
+  (22:42:13 → 22:42:58) and answered "Still waiting…"; `agent.blocked` was raised then. Claude
+  ended its turn reporting blocked. The wait stayed open on its record.
+- `mac-waiting-chat.png`: the chat with the capsule
+  "◷ Waiting for custom.ping · since 15:42 ✕" and the hint "Sending will cancel the wait on
+  custom.ping." above the prompt bar; the row under Blocked carries "◷ Waiting for custom.ping".
+- "Pinger" was told to `publish_event custom.ping` with message "hello from Pinger". The event
+  (position 8) was recorded with ↳ Woke "Wait for custom.ping". Waiter was started again 2 s
+  later with the wake prompt and replied: "The `custom.ping` event arrived with the message
+  "hello from Pinger"."
+
+Grok and Cursor as Waiter: not yet run (T066).
