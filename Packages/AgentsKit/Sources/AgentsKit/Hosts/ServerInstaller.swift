@@ -142,7 +142,8 @@ public struct ServerInstaller: Sendable {
     public func waitForDaemonGone(seconds: Int = 10) async throws {
         try await check("""
             s="$HOME/.agents-server/root/daemon.sock"; i=0; \
-            while [ -e "$s" ] && [ $i -lt \(seconds * 5) ]; do sleep 0.2; i=$((i+1)); done; [ ! -e "$s" ]
+            while [ -e "$s" ] && [ $i -lt \(seconds * 5) ]; do sleep 0.2; i=$((i+1)); done; \
+            [ ! -e "$s" ] || { echo "The old agentsd did not stop within \(seconds) seconds." >&2; exit 1; }
             """)
     }
 

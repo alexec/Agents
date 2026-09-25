@@ -1,4 +1,6 @@
+#if canImport(CoreServices)
 import CoreServices
+#endif
 import Foundation
 import AgentsKitCore
 
@@ -135,6 +137,7 @@ public actor ResourceCatalog: ResourceFinding {
 
     /// Every app that says it opens `https:` links, by bundle id.
     static func browsers() -> [FoundResource] {
+        #if canImport(CoreServices)
         guard let url = URL(string: "https:"),
               let apps = LSCopyApplicationURLsForURL(url as CFURL, .all)?.takeRetainedValue() as? [URL]
         else { return [] }
@@ -147,6 +150,10 @@ public actor ResourceCatalog: ResourceFinding {
             return FoundResource(name: name, kind: .browser, displayName: display, aliases: [display])
         }
         .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        #else
+        // A Linux server has no browsers to lease (037).
+        return []
+        #endif
     }
 }
 

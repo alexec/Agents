@@ -135,7 +135,7 @@ public actor ServerConnection {
                 await move(.updateWaiting)
                 return
             }
-            if !first {
+            if !first, await reachRunningDaemon() {
                 try? await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
                 await client.disconnect()
                 try await installer.waitForDaemonGone()
@@ -160,9 +160,21 @@ public actor ServerConnection {
     private func daemonIsBusy() async throws -> Bool {
         guard let socket = facts.map({ Self.daemonSocket(home: $0.home) }) else { return false }
         try await master.start(forwardingTo: socket)
-        guard (try? await client.connect(startIfNeeded: false, timeout: .seconds(3))) != nil else { return false }
+        guard await reachRunningDaemon() else { return false }
         let status = try? await client.call(DaemonAPI.Method.daemonStatus, returning: DaemonAPI.DaemonStatus.self)
         return (status?.turnsInFlight ?? 0) > 0
+    }
+
+    /// Connect to a daemon that may be running, without starting one. The forward's
+    /// local end can appear a moment after the master answers, so one miss is not taken
+    /// for no daemon: a few tries, then no.
+    private func reachRunningDaemon(within wait: Duration = .seconds(3)) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: wait)
+        repeat {
+            if (try? await client.connect(startIfNeeded: false)) != nil { return true }
+            try? await Task.sleep(for: .milliseconds(100))
+        } while ContinuousClock.now < deadline
+        return false
     }
 
     /// How many agents removing this server would stop (037, the Remove dialog).

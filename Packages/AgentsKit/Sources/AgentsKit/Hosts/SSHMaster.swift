@@ -66,9 +66,9 @@ public actor SSHMaster {
         process.standardError = errors
         let stderr = StderrTail()
         errors.fileHandleForReading.readabilityHandler = { handle in stderr.append(handle.availableData) }
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self] finished in
             errors.fileHandleForReading.readabilityHandler = nil
-            Task { await self?.exited() }
+            Task { await self?.exited(finished) }
         }
         stopping = false
         try process.run()
@@ -77,6 +77,10 @@ public actor SSHMaster {
         let deadline = ContinuousClock.now.advanced(by: .seconds(15))
         while ContinuousClock.now < deadline {
             if !process.isRunning {
+                // What ssh said last can still be in the pipe: the handler is gone once
+                // the process is, so read the rest here or the reason is lost under load.
+                errors.fileHandleForReading.readabilityHandler = nil
+                stderr.drain(errors.fileHandleForReading.fileDescriptor)
                 let words = stderr.text
                 let hasKeys = await SSHCommand.agentHasKeys(environment: command.environment)
                 throw SSHCommand.classify(status: process.terminationStatus == 0 ? 255 : process.terminationStatus,
@@ -118,9 +122,10 @@ public actor SSHMaster {
         try? FileManager.default.removeItem(at: socket)
     }
 
-    private func exited() async {
-        // A stop that was asked for is not news.
-        guard !stopping else { return }
+    private func exited(_ finished: Process) async {
+        // A stop that was asked for is not news, and neither is the end of a master
+        // this one has already replaced: its exit arrives late, after the new one is up.
+        guard !stopping, finished === process else { return }
         process = nil
         await onExit?()
     }
@@ -133,5 +138,15 @@ public actor SSHMaster {
             lock.lock(); data.append(more); if data.count > 16_384 { data = data.suffix(16_384) }; lock.unlock()
         }
         var text: String { lock.lock(); defer { lock.unlock() }; return String(decoding: data, as: UTF8.self) }
+        /// Whatever is waiting in the pipe, without blocking: ssh has exited, so all it
+        /// wrote is there, and a child that outlived it (a ProxyCommand, the test relay)
+        /// may hold the write end open, so end-of-file may never come.
+        func drain(_ fd: Int32) {
+            _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while case let count = read(fd, &buffer, buffer.count), count > 0 {
+                append(Data(buffer[..<count]))
+            }
+        }
     }
 }
