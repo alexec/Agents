@@ -70,6 +70,8 @@ public actor ServerConnection {
     private let tools: ToolsetInstaller
     private let toolset: @Sendable () -> Toolset?
     private let wantsClaude: @Sendable () async -> Bool
+    private let offer: @Sendable () async -> DaemonAPI.CredentialsOffer?
+    private let lender: DaemonClient.CredentialLender?
     private var onState: (@Sendable (State) async -> Void)?
     private var onClaude: (@Sendable (Claude) async -> Void)?
     private var wasConnected = false
@@ -87,7 +89,11 @@ public actor ServerConnection {
     public init(hostID: HostID, ssh: SSHCommand, socket: URL, installedBy: String,
                 binary: @escaping @Sendable (Architecture) async -> ServerBinary?,
                 toolset: @escaping @Sendable () -> Toolset? = { nil },
-                wantsClaude: @escaping @Sendable () async -> Bool = { false }) {
+                wantsClaude: @escaping @Sendable () async -> Bool = { false },
+                offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
+                lender: DaemonClient.CredentialLender? = nil) {
+        self.offer = offer
+        self.lender = lender
         self.hostID = hostID
         let master = SSHMaster(command: ssh, socket: socket)
         let installer = ServerInstaller(ssh: ssh)
@@ -183,6 +189,7 @@ public actor ServerConnection {
         try await master.start(forwardingTo: Self.daemonSocket(home: probed.home))
         try await client.connect(timeout: .seconds(20))
         try? await installer.removeBinaries(except: wanted.sha256)
+        await offerCredentials()
 
         await settleClaude(probed)
 
@@ -190,6 +197,22 @@ public actor ServerConnection {
         wasConnected = true
         await master.setOnExit { [weak self] in await self?.lost() }
         await move(.connected)
+    }
+
+    // MARK: Credentials (043)
+
+    /// Tell the server's daemon what this window could lend, on every connect: a lend
+    /// lasts only as long as the connection it was made on. Names only.
+    public func offerCredentials() async {
+        await client.setCredentialLender(lender)
+        guard let offer = await offer() else { return }
+        _ = try? await client.call(DaemonAPI.Method.credentialsOffer, offer)
+    }
+
+    /// Lend a credential on this connection. Only after the daemon asked for it.
+    public func lend(_ runtimeID: String, _ secret: Secret) async -> Bool {
+        (try? await client.call(DaemonAPI.Method.credentialsLend,
+                                DaemonAPI.CredentialsLend(runtime: runtimeID, secret: secret))) != nil
     }
 
     // MARK: Claude's toolset (043)

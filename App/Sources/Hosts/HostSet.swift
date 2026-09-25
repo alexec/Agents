@@ -25,6 +25,9 @@ final class HostSet {
     /// Whether a server should get Claude as it connects: the window has a credential it
     /// may lend there (043, FR-002). Set by `AppModel`, which knows the credentials.
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
+    /// What a server may be lent from this window, and who answers when it asks (043).
+    @ObservationIgnored var offerFor: (HostID) -> DaemonAPI.CredentialsOffer? = { _ in nil }
+    @ObservationIgnored var lenderFor: (HostID) -> DaemonClient.CredentialLender? = { _ in nil }
 
     @ObservationIgnored private var connections: [HostID: ServerConnection] = [:]
     @ObservationIgnored private var listening: [HostID: Task<Void, Never>] = [:]
@@ -201,13 +204,32 @@ final class HostSet {
     }
 
     static func connection(for host: ServerHost, locations: StoreLocations,
-                           wantsClaude: @escaping @Sendable () async -> Bool) -> ServerConnection {
+                           wantsClaude: @escaping @Sendable () async -> Bool,
+                           offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
+                           lender: DaemonClient.CredentialLender? = nil) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
                          binary: { await ServerBinaries.binary(for: $0) },
                          toolset: { ServerBinaries.claudeToolset },
-                         wantsClaude: wantsClaude)
+                         wantsClaude: wantsClaude, offer: offer, lender: lender)
+    }
+
+    /// A new connection for a host, asking this set what to offer and who lends (043).
+    func newConnection(for host: ServerHost) -> ServerConnection {
+        let id = host.id
+        return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id),
+                               offer: { [weak self] in await MainActor.run { self?.offerFor(id) } },
+                               lender: lenderFor(id))
+    }
+
+    /// Say again what this window may lend a server: a credential was just added (043).
+    func offerCredentials(_ id: HostID) async {
+        await connections[id]?.offerCredentials()
+    }
+
+    func lend(_ id: HostID, runtime: String, _ secret: Secret) async -> Bool {
+        await connections[id]?.lend(runtime, secret) ?? false
     }
 
     /// For a connection made here or by the Add a server sheet: ask this set, on the main
@@ -217,7 +239,7 @@ final class HostSet {
     }
 
     private func makeConnection(_ host: ServerHost) -> ServerConnection {
-        let connection = Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(host.id))
+        let connection = newConnection(for: host)
         follow(host.id, connection)
         return connection
     }

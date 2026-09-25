@@ -96,7 +96,7 @@ final class AddServerFlow {
 
     private func proceed() async {
         guard let host else { return }
-        let connection = HostSet.connection(for: host, locations: locations, wantsClaude: hosts.wantsClaude(host.id))
+        let connection = hosts.newConnection(for: host)
         self.connection = connection
         await connection.setOnState { [weak self] state in
             await self?.follow(state)

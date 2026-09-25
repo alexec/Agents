@@ -297,6 +297,8 @@ final class AppModel {
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
     let credentials = ServerCredentials(locations: .default)
+    /// A server asked for a credential there is none of; the window asks the person (043).
+    var tokenAsk: TokenAsk?
     /// What a server with no connection answers through: nothing, at once.
     private static let unreachable = DaemonClient(link: UnreachableLink())
 
@@ -920,6 +922,13 @@ final class AppModel {
         hostsStarted = true
         hosts.onNotification = { [weak self] host, method, params in
             await self?.receivedFromServer(host, method, params)
+        }
+        hosts.offerFor = { [weak self] id in self?.credentialOffer(id) }
+        hosts.lenderFor = { [weak self] id in
+            { [weak self] wanted in
+                guard let model = self else { return false }
+                return await model.answerCredentialWanted(wanted, on: id)
+            }
         }
         hosts.claudeWanted = { [weak self] id in
             guard let self else { return false }
