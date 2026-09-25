@@ -1668,13 +1668,17 @@ public enum DaemonAPI {
         /// Why a new worktree cannot be made, said where the choice is.
         public var whyNot: String?
         public var worktrees: [WorktreeSummary]
+        /// Branches a new worktree can be made on: none checked out anywhere, most
+        /// recently committed to first.
+        public var branches: [BranchSummary]
 
         public init(isRepository: Bool, canMakeNew: Bool = false, whyNot: String? = nil,
-                    worktrees: [WorktreeSummary] = []) {
+                    worktrees: [WorktreeSummary] = [], branches: [BranchSummary] = []) {
             self.isRepository = isRepository
             self.canMakeNew = canMakeNew
             self.whyNot = whyNot
             self.worktrees = worktrees
+            self.branches = branches
         }
 
         /// The branch the project folder is on, "detached" when it is on none. Nil
@@ -1699,6 +1703,22 @@ public enum DaemonAPI {
             canMakeNew = try c.decodeIfPresent(Bool.self, forKey: .canMakeNew) ?? false
             whyNot = try c.decodeIfPresent(String.self, forKey: .whyNot)
             worktrees = try c.decodeIfPresent([WorktreeSummary].self, forKey: .worktrees) ?? []
+            branches = try c.decodeIfPresent([BranchSummary].self, forKey: .branches) ?? []
+        }
+    }
+
+    /// A branch a new worktree can be made on.
+    public struct BranchSummary: Codable, Hashable, Sendable, Identifiable {
+        /// What git checks out: the local name, even for one only a remote has.
+        public var name: String
+        /// The remote it comes from, when there is no local branch of that name yet.
+        public var remote: String?
+
+        public var id: String { name }
+
+        public init(name: String, remote: String? = nil) {
+            self.name = name
+            self.remote = remote
         }
     }
 

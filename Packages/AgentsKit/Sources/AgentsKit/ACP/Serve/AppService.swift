@@ -853,7 +853,9 @@ public actor AppService {
                         project folder. "new" makes a fresh git worktree, on its own \
                         branch, named from the prompt — for parallel work that should \
                         not touch the same files. Or the name of a worktree of this \
-                        repository that is already there, as `git worktree list` shows it.
+                        repository that is already there, as `git worktree list` shows it. \
+                        Or the name of a branch not checked out anywhere, local or on a \
+                        remote, to make a fresh worktree on that branch.
                         """,
                 ],
             ],

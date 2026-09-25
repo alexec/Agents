@@ -88,6 +88,38 @@ public enum GitWorktrees {
         parse(try await git(["worktree", "list", "--porcelain"], in: folder))
     }
 
+    /// Every local branch, then every remote one with no local branch of its name, most
+    /// recently committed to first. A remote's `HEAD` is a pointer, not a branch.
+    public static func branches(in folder: URL) async throws -> [DaemonAPI.BranchSummary] {
+        let refs = try await git(["for-each-ref", "--sort=-committerdate", "--format=%(refname)",
+                                  "refs/heads", "refs/remotes"], in: folder)
+        return parseBranches(refs, remotes: try await git(["remote"], in: folder)
+            .split(separator: "\n").map(String.init))
+    }
+
+    /// `refs/heads/…` and `refs/remotes/<remote>/…` lines, as branches. The remotes are
+    /// needed because a remote's name can itself have a `/` in it.
+    public static func parseBranches(_ refs: String, remotes: [String]) -> [DaemonAPI.BranchSummary] {
+        var local: [DaemonAPI.BranchSummary] = []
+        var remote: [DaemonAPI.BranchSummary] = []
+        for line in refs.split(separator: "\n").map(String.init) {
+            if line.hasPrefix("refs/heads/") {
+                local.append(.init(name: String(line.dropFirst(11))))
+            } else if line.hasPrefix("refs/remotes/") {
+                let rest = String(line.dropFirst(13))
+                guard let owner = remotes.sorted(by: { $0.count > $1.count })
+                        .first(where: { rest.hasPrefix($0 + "/") }) else { continue }
+                let name = String(rest.dropFirst(owner.count + 1))
+                guard !name.isEmpty, name != "HEAD" else { continue }
+                remote.append(.init(name: name, remote: owner))
+            }
+        }
+        var seen = Set(local.map(\.name))
+        var result = local
+        for branch in remote where seen.insert(branch.name).inserted { result.append(branch) }
+        return result
+    }
+
     /// Lines of `git status --porcelain`: what is changed and not committed.
     public static func statusCount(in folder: URL) async throws -> Int {
         try await git(["status", "--porcelain"], in: folder)
@@ -157,6 +189,18 @@ public enum GitWorktrees {
     public static func add(branch: String, path: URL, in folder: URL) async throws {
         _ = try await git(["worktree", "add", "-b", branch, path.path(percentEncoded: false), "HEAD"],
                           in: folder)
+    }
+
+    /// A new worktree at `path` on a branch that is already there. One only a remote
+    /// has becomes a local branch of the same name that tracks it.
+    public static func add(existing branch: DaemonAPI.BranchSummary, path: URL, in folder: URL) async throws {
+        let at = path.path(percentEncoded: false)
+        if let remote = branch.remote {
+            _ = try await git(["worktree", "add", "--track", "-b", branch.name, at, "\(remote)/\(branch.name)"],
+                              in: folder)
+        } else {
+            _ = try await git(["worktree", "add", at, branch.name], in: folder)
+        }
     }
 
     public static func remove(_ path: URL, force: Bool, in folder: URL) async throws {
