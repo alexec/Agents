@@ -501,7 +501,9 @@ public final class AgentsModel {
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.
     public func canStop(_ agent: Agent) -> Bool {
-        agent.state.holdsRuntime || isComingBack(agent)
+        // A blocked chat too (039): it holds nothing, but a resume is coming, and Stop
+        // is how the person calls it off.
+        agent.state.holdsRuntime || isComingBack(agent) || openBlock(agent) != nil
     }
 
     /// The one thing every client says about a chat on its way back, so the window
