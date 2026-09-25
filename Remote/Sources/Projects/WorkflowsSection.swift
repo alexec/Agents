@@ -3,12 +3,11 @@ import SwiftUI
 
 /// A project's standing arrangements, under the agents working on it.
 ///
-/// **Listed, not driven.** No *Run now*, no *Archive*, no *Restore*, and nothing that
-/// goes to the file — starting, confirming and cancelling a workflow stay at the Mac,
-/// named in the spec's Out of scope. What is here is FR-021's half: what is arranged,
-/// when it next fires, and what the last fire produced. A workflow being refused every
-/// night looks exactly like one whose trigger never matched unless somebody says so,
-/// and that is worth knowing from a train.
+/// Each row opens the workflow's page, where it can be read whole and driven as on the
+/// Mac: Run now, Archive or Restore, and what it is allowed to do. The rows say what
+/// is arranged, when it next fires, and what the last fire produced (FR-021) — a
+/// workflow being refused every night looks exactly like one whose trigger never
+/// matched unless somebody says so.
 ///
 /// Below the agents rather than above, for the Mac's reason: you come to a project to
 /// see what is happening, and workflows are what will happen.
@@ -44,18 +43,43 @@ struct WorkflowsSection: View {
     }
 }
 
-/// One workflow: what it is, when it next runs, and what happened last.
-///
-/// The Mac's row leads to the agent a run left behind. This one does not, and the
-/// difference is not an omission: a run's agent is in the list above under its own
-/// card, reached the way every other agent on this page is reached. A second way in,
-/// on a screen this narrow, is a second thing to explain.
+/// One workflow: what it is, when it next runs, and what happened last. The whole row
+/// opens its page; Run now and Archive are also a long press away.
 private struct WorkflowRow: View {
+    @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
 
     private var workflow: Workflow { summary.workflow }
 
     var body: some View {
+        NavigationLink(value: RemoteRoute.workflow(summary.id)) {
+            card
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if summary.isArchived {
+                Button {
+                    Task { await model.setWorkflowArchived(summary, false) }
+                } label: {
+                    Label("Restore", systemImage: "arrow.uturn.backward")
+                }
+            } else {
+                Button {
+                    Task { await model.runWorkflow(summary) }
+                } label: {
+                    Label("Run now", systemImage: "play")
+                }
+                .disabled(summary.isRunning)
+                Button {
+                    Task { await model.setWorkflowArchived(summary, true) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+            }
+        }
+    }
+
+    private var card: some View {
         HStack(alignment: .top, spacing: 12) {
             StatusMark(summary: summary)
                 .padding(.top, 1)
@@ -80,6 +104,11 @@ private struct WorkflowRow: View {
                 }
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .appText(.fine)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 3)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
@@ -104,8 +133,7 @@ private struct WorkflowRow: View {
 }
 
 /// Whether it is running, waiting, refused or put away. Grey, all of it: the app's one
-/// colour means something needs a person, and nothing on this section does — driving a
-/// workflow is the Mac's.
+/// colour means something needs a person, and a row's mark is not where that is said.
 private struct StatusMark: View {
     let summary: WorkflowSummary
 
