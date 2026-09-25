@@ -68,13 +68,15 @@ public final class NetworkLink: DaemonLink {
 /// The third `LineTransport`, beside `FDTransport` and `PairedTransport`. Network
 /// framework hands back whatever arrived rather than whole lines, so the splitting is
 /// here — a line can arrive in three pieces, and two lines can arrive as one read.
+/// `agents/list` is one line of megabytes arriving in Wi‑Fi-sized reads, which is why
+/// the splitting is `LineSplitter`'s and looks at each byte once.
 public final class NWTransport: LineTransport, @unchecked Sendable {
     private let connection: NWConnection
     private let stream: AsyncThrowingStream<String, any Error>
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
     private let closed = ManagedAtomicFlag()
     private let lock = NSLock()
-    private var pending = Data()
+    private var splitter = LineSplitter()
 
     public init(connection: NWConnection) {
         self.connection = connection
@@ -127,14 +129,9 @@ public final class NWTransport: LineTransport, @unchecked Sendable {
 
     private func take(_ data: Data) {
         lock.lock()
-        pending.append(data)
+        splitter.append(data)
         var lines: [String] = []
-        while let i = pending.firstIndex(of: UInt8(ascii: "\n")) {
-            let line = String(decoding: pending[pending.startIndex..<i], as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            pending = pending[pending.index(after: i)...]
-            if !line.isEmpty { lines.append(line) }
-        }
+        while let line = splitter.next() { lines.append(line) }
         lock.unlock()
         for line in lines { continuation.yield(line) }
     }

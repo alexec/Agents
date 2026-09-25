@@ -791,9 +791,11 @@ final class RemoteModel {
     }
 
     func refreshEverything() async {
-        await refreshAgents()
-        // After the agents, because a project's counts are worked out from them.
+        // Projects first: a few kilobytes, and the screen the app opens on. The agents
+        // are megabytes (every archived one comes too), and a row's counts are read
+        // from them as they land, so the list is there while they are still coming.
         await refreshProjects()
+        await refreshAgents()
         await refreshPermissions()
         await refreshElicitations()
         await refreshAttention()
