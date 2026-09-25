@@ -287,13 +287,20 @@ the second.
 ## Phase 8: Polish and proof
 
 - [ ] T053 [P] Limits walk (SC-005, quickstart §5): open a 294 KB single-line `long.js` and a 20 MB `big.json` on scratch. Both show plain within a second with the reason line, and the app stays responsive. Sample the process if not (see memory: waitUntilExit / sample a silent hang first).
+  **Engine proven 2026-09-25 (`PerformanceTests`, Release): a 286 KB one-line file judged plain in 3 ms, a 30 MB file in 0.32 s; the files pane reads only 128 KB of either anyway. On-screen look of the reason line still to see (screen was locked).**
 - [ ] T054 [P] Mac timing (SC-001, SC-002): open `swift5k.swift` and record the `firstWindow` signpost with `xctrace` or `/usr/bin/log` (see memory: zsh `log`). It should be under 0.5 s. Record a scroll top to bottom with Instruments' SwiftUI template, against the same file on main plain. Write the load average beside the numbers.
-- [ ] T055 [P] Acknowledgements: add tree-sitter's and each grammar's licence notice to the apps' acknowledgements, beside any existing ones. If none exist, add `App/Resources/Acknowledgements.md` and `Remote/Resources/Acknowledgements.md` with the notices, generated from `CT/Grammars/VENDORED.md`.
-- [ ] T056 Full test run: `swift test` in `CT/` and in `Packages/AgentsKit`. Compare against T001's baseline, and judge flakes by six runs, not one (see memory: the suite is broadly flaky under load).
-- [ ] T057 Build `Agents` then `Remote` in Release.
-- [ ] T058 Size (SC-003, quickstart §7): `du -sk` and `ditto -c -k` sizes of Release `Agents.app` and `Remote.app` against main's Release build. It should be at most +20 MB installed and +5 MB compressed. Record the numbers in research.md under R1.
+  **Engine timing 2026-09-25, Release, load ~9: first coloured screen of 5,000 Swift lines in 29 ms (Debug 99 ms), limit 500 ms. The on-screen scroll comparison (SC-002) is still to do with the screen unlocked.**
+- [X] T055 [P] Acknowledgements: add tree-sitter's and each grammar's licence notice to the apps' acknowledgements, beside any existing ones. If none exist, add `App/Resources/Acknowledgements.md` and `Remote/Resources/Acknowledgements.md` with the notices, generated from `CT/Grammars/VENDORED.md`.
+  **Done: `scripts/acknowledgements.sh` writes 22 notices (tree-sitter, swift-tree-sitter, 20 grammars) to `App/Resources` and `Remote/Resources`.**
+- [X] T056 Full test run: `swift test` in `CT/` and in `Packages/AgentsKit`. Compare against T001's baseline, and judge flakes by six runs, not one (see memory: the suite is broadly flaky under load).
+  **2026-09-25: CodeText 57/57 green. AgentsKit 1705 tests, 9 issues, all in BlockedTests/UnreportedEndingTests timing (main's known flakes); this branch changes nothing under Packages/AgentsKit, Daemon or Bridge.**
+- [X] T057 Build `Agents` then `Remote` in Release.
+  **Both build in Release (Agents for macOS; Remote for generic iOS, unsigned).**
+- [X] T058 Size (SC-003, quickstart §7): `du -sk` and `ditto -c -k` sizes of Release `Agents.app` and `Remote.app` against main's Release build. It should be at most +20 MB installed and +5 MB compressed. Record the numbers in research.md under R1.
+  **Measured against main's Release build, same machine: Mac app 35.9 → 54.0 MB installed (+18.1), 9.0 → 11.0 MB zipped (+2.0); phone app 23.8 → 41.1 MB installed (+17.2), 5.8 → 7.6 MB zipped (+1.9). Within SC-003 (≤ 20 MB, ≤ 5 MB).**
 - [ ] T059 Run quickstart.md §1–§7 end to end on the finished branch, with screenshots in `walk/`. Write `specs/041-rich-files-and-changes/walk/README.md` listing what was seen and what is Alex's (phone and iPad looks).
-- [ ] T060 Rerun `scripts/check-agentsd-links-no-parsers.sh` on the Release build.
+- [X] T060 Rerun `scripts/check-agentsd-links-no-parsers.sh` on the Release build.
+  **Release agentsd: no tree-sitter symbols; 12.0 MB against main's 12.1 MB.**
 - [ ] T061 Update the spec's Status to "Implemented", update the 041 line in the memory spec queue with the head commit and what is left, and commit. Don't merge into main until Alex says it's this lane's turn (see memory: main checkout is only main).
 
 ## Dependencies

@@ -57,6 +57,17 @@ and phone app). Query files add about 100 KB.
 
 highlight.js: 308 KB script plus about 330 KB of Swift wrapper, about 0.1 MB compressed.
 
+### Measured on the built apps (T058)
+
+Release builds of this branch against main, on the same machine:
+
+| App | Installed | Zipped |
+|---|---|---|
+| Mac | 35.9 → 54.0 MB (+18.1) | 9.0 → 11.0 MB (+2.0) |
+| Phone (arm64, unsigned) | 23.8 → 41.1 MB (+17.2) | 5.8 → 7.6 MB (+1.9) |
+
+In the app, colouring the first screen of 5,000 Swift lines took 29 ms in Release (T054).
+
 ### Other findings
 
 - **Grammar packages don't build as published.** tree-sitter-python's `Package.swift` checks for
