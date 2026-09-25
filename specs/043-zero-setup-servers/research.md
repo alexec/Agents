@@ -31,8 +31,10 @@ mismatch. The toolset id is the first 16 hex characters of the SHA-256 of manife
 Node's official Linux builds need glibc ≥ 2.28. A musl server (Alpine) is told "Claude can't be
 installed on Alpine (musl); install it yourself to use it here" and keeps 037's behaviour.
 
-`npm ci --ignore-scripts --omit=dev --no-audit --no-fund`: no install scripts run. **(spike)**
-that the SDK needs none — its native binary arrives as a plain optional-dependency package.
+`npm ci --ignore-scripts --omit=dev --no-audit --no-fund`: no install scripts run. **Spike, confirmed**
+(walk/spike.md T006): the native binary arrives as a plain optional-dependency package, npm takes
+only the server's own platform, and the adapter starts. The toolset is ~484 MB unpacked (Node
+204 MB, native Claude 223 MB), so 800 MB free is required.
 
 **Rationale**: Every byte is checked against something the app shipped; nothing is "latest".
 
@@ -126,8 +128,10 @@ second Mac's agents would use the first Mac's token.
 `authentication_error` / `invalid x-api-key` / `OAuth token has expired`, is mapped to a new
 failure `credentialRefused {runtime}`, and the window shows "Claude refused the token in Settings.
 Replace it" with a button to Settings ▸ Servers. The window also marks the token's
-`lastRefused` date. **(spike)**: record what a revoked token actually looks like over ACP, and
-match that, not a guess.
+`lastRefused` date. **Spike, confirmed** (walk/spike.md T009): a refused token of either kind ends the prompt with
+`-32603` and `data.errorKind == "authentication_failed"`; that is the matcher. `-32000
+Authentication required` is *no* sign-in (→ `credentialWanted`). A bad API key takes ~3 min of
+retries before it is refused, so R9's check at save is the early warning.
 
 ## R8. A rebuilt server (FR-017–019)
 

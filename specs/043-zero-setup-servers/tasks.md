@@ -24,7 +24,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 ## Phase 1: Setup
 
 - [X] T001 Merge current `main` into `043-zero-setup-servers` (037 is on main as `b36226e`; the branch is ~40 behind), resolve, and confirm both schemes build with `-skipPackagePluginValidation`, sequentially
-- [ ] T002 Record the baseline: six full `swift test --package-path Packages/AgentsKit` runs on this merge, listing the failures that are main's own flakes, in `specs/043-zero-setup-servers/walk/baseline.md`
+- [X] T002 Record the baseline: six full `swift test --package-path Packages/AgentsKit` runs on this merge, listing the failures that are main's own flakes, in `specs/043-zero-setup-servers/walk/baseline.md`
 - [X] T003 [P] Build the bare container image `agents-bare` (Debian bookworm + `openssh-server curl ca-certificates xz-utils git`, user `agents` with Alex's public key, no Node, no Claude, no volume, host keys made at container start) from `.claude/skills/test-servers/bare/Dockerfile` via `.claude/skills/test-servers/scripts/bare.sh up|status|ssh|rebuild|down`, on `127.0.0.1:2223` (typed as `agents@127.0.0.1:2223`, no `~/.ssh/config` edit); `bare.sh status` shows node/npx/sign-in none
 - [X] T004 [P] Write `scripts/update-claude-toolset.sh`: given a Node version and a claude-agent-acp version, fetch `SHASUMS256.txt`, write `App/Resources/toolsets/claude/manifest.json` (fields per data-model.md § Toolset: `runtimeID`, `node.version`, `node.sha256 {x86_64, aarch64}`, `package`, `packageVersion`, `entry`, `minFreeBytes`), and generate `package.json` + `package-lock.json` with `npm install --package-lock-only` so the lock carries both `linux-x64` and `linux-arm64` SDK entries
 - [X] T005 Run T004 for Node `v24.21.0` and claude-agent-acp `0.81.2`; commit the three files under `App/Resources/toolsets/claude/`, and add that folder to the app bundle in `project.yml` (not under `servers/`, which is gitignored for 037's built binaries)
@@ -37,10 +37,10 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 ### Spike on `agents-bare` (by hand over ssh; notes in `specs/043-zero-setup-servers/walk/spike.md`)
 
-- [ ] T006 Run contracts/ssh.md § 2 by hand on `agents-bare` with the T005 files: download Node, check its sha256, `npm ci --ignore-scripts --omit=dev`; record whether the SDK's native binary is present and runs with scripts ignored (R2)
+- [X] T006 Run contracts/ssh.md § 2 by hand on `agents-bare` with the T005 files: download Node, check its sha256, `npm ci --ignore-scripts --omit=dev`; record whether the SDK's native binary is present and runs with scripts ignored (R2)
 - [ ] T007 Start `node …/claude-agent-acp/dist/index.js` on `agents-bare` with `CLAUDE_CODE_OAUTH_TOKEN` set (Alex's token, pasted by him into a one-off env, never into a file) and drive one ACP turn through the forwarded Linux `agentsd`; record time from download to first reply (SC-001 budget)
 - [ ] T008 On `agents-devbox` (which has Alex's `claude login`), start with a *different* token in the env and confirm which sign-in is used (R5: env must win)
-- [ ] T009 Revoke or corrupt the token and record exactly what arrives over ACP (initialize/authenticate/prompt error shape and text) for R7's matcher
+- [X] T009 Revoke or corrupt the token and record exactly what arrives over ACP (initialize/authenticate/prompt error shape and text) for R7's matcher
 - [ ] T010 From the Mac, call `GET https://api.anthropic.com/v1/models` with an API key and with the OAuth token (Bearer + beta header) and record which answer 200/401 (R9); update research.md R2/R5/R7/R9 with the findings and commit
 
 ### Shared records and plumbing

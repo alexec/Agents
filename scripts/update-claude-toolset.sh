@@ -53,7 +53,7 @@ cat > $out/manifest.json <<JSON
   "package": "$package",
   "packageVersion": "$acp_version",
   "entry": "${bin#./}",
-  "minFreeBytes": 419430400
+  "minFreeBytes": 838860800
 }
 JSON
 

@@ -29,7 +29,7 @@
 | package | String | `@agentclientprotocol/claude-agent-acp` |
 | packageVersion | String | e.g. `0.81.2` |
 | entry | String | Path of the ACP entry inside the package, e.g. `dist/index.js` |
-| minFreeBytes | Int64 | Refuse before download under this (≈ 400 MB) |
+| minFreeBytes | Int64 | Refuse before download under this (800 MB; the toolset is ~484 MB unpacked) |
 
 Beside it: `package.json`, `package-lock.json`. **Toolset id** = first 16 hex of SHA-256 over
 manifest + lockfile bytes.

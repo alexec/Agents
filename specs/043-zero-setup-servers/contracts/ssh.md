@@ -23,7 +23,7 @@ Parsed into `ServerFacts` (data-model.md). The last line prints a word, never a 
 Refused before any download (each a `HostProblem`):
 - musl or glibc < 2.28 → `unsupportedLibc`
 - no downloader → `noDownloader`
-- free space < `minFreeBytes` → `diskFullForTools`
+- free space < `minFreeBytes` (800 MB: the toolset is ~484 MB unpacked, plus download and cache) → `diskFullForTools`
 
 Then one script, with `package.json` and `package-lock.json` streamed on stdin as a tar:
 
@@ -31,7 +31,7 @@ Then one script, with `package.json` and `package-lock.json` streamed on stdin a
 set -e; umask 077
 T="$HOME/.agents-server/tools/claude"; P="$T/.part-<id>"
 rm -rf "$P"; mkdir -p "$P"; trap 'rm -rf "$P"' EXIT
-cd "$P"; tar -xf -                                          # package.json, package-lock.json
+cd "$P"; mkdir lib; tar -xf - -C lib                      # package.json, package-lock.json (COPYFILE_DISABLE=1 tar --no-xattrs on the Mac)
 fetch() { curl -fsSL "$1" || wget -qO- "$1"; }              # whichever the probe found
 fetch "$MIRROR/<node-version>/node-<node-version>-linux-<arch>.tar.xz" > node.tar.xz || exit 21
 echo "<sha256>  node.tar.xz" | sha256sum -c - >/dev/null      || exit 22
@@ -69,7 +69,7 @@ cd "$T" && for d in */; do d=${d%/}; [ "$d" = '<id>' ] || rm -rf -- "$d"; done  
 | `No space left on device` anywhere | "devbox ran out of disk while installing Claude." |
 | `unsupportedLibc` | "Claude can't be installed on devbox: it uses musl (Alpine). Install Claude there yourself to use it." |
 | `noDownloader` | "devbox has neither curl nor wget to download Claude." |
-| `diskFullForTools` | "devbox needs 400 MB free to install Claude, and has 120 MB." |
+| `diskFullForTools` | "devbox needs 800 MB free to install Claude, and has 120 MB." |
 
 ## § 5 Rebuilt server
 

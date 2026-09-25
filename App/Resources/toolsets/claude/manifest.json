@@ -7,5 +7,5 @@
   "package": "@agentclientprotocol/claude-agent-acp",
   "packageVersion": "0.81.2",
   "entry": "dist/index.js",
-  "minFreeBytes": 419430400
+  "minFreeBytes": 838860800
 }
