@@ -24,6 +24,9 @@ struct ProjectListView: View {
         .paperGround()
         .navigationTitle("Projects")
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+        // Pinned under the projects, as on the Mac: it is about all of them, and the
+        // foot of this column is where the money has always been.
+        .safeAreaInset(edge: .bottom, spacing: 0) { SpendingRow() }
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }
@@ -90,6 +93,51 @@ struct ProjectRow: View {
         if !summary.exists { parts.append("folder is missing") }
         if needsPerson { parts.append("needs attention") }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// The way into Spending, and what today has cost on the way past — the Mac's row,
+/// drawn whether or not anything has been spent so it is always there to go in by.
+private struct SpendingRow: View {
+    @Environment(RemoteModel.self) private var model
+
+    var body: some View {
+        NavigationLink {
+            TotalsView()
+        } label: {
+            HStack(alignment: .firstTextBaseline) {
+                Text(today == nil ? "Spending" : "Today")
+                Spacer()
+                VStack(alignment: .trailing, spacing: 1) {
+                    if let today {
+                        Text(today).monospacedDigit()
+                    }
+                    if let state = model.costState, let left = state.dayHeadroom,
+                       let daily = state.limits.daily {
+                        Text("\(left.money(in: daily.currency)) left")
+                            .appText(.fine)
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+            }
+            .appText(.supporting)
+            .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
+                                .style(or: .secondary))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Paper.ground)
+        .overlay(alignment: .top) { Rectangle().fill(Paper.rule).frame(height: 1) }
+        .accessibilityHint("Opens Spending")
+    }
+
+    private var today: String? {
+        model.costState.flatMap { Cost.total(of: $0.today) }
     }
 }
 

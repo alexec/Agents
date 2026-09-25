@@ -39,13 +39,6 @@ struct ProjectPageView: View {
                 }
                 .disabled(model.selectedProject == nil)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
-                    TotalsView()
-                } label: {
-                    Label("Spending", systemImage: "sterlingsign.circle")
-                }
-            }
         }
         .onChange(of: model.selectedProject) { archivedShown = pageSize }
         .sheet(isPresented: Binding(get: { model.startingIn != nil },
