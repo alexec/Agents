@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// Two things are offered here, both the runtime's or the agent's rather than ours:
 /// the commands this runtime takes, while a slash word is being typed (T067), and the
-/// prompts the agent suggested, while the field is empty (T069).
+/// prompt the agent suggested, while the field is empty (T069).
 struct PromptBar: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
@@ -29,8 +29,8 @@ struct PromptBar: View {
                 CommandList(commands: matchingCommands, choose: accept)
                     .transition(.opacity)
             }
-            if !suggestions.isEmpty {
-                SuggestionRow(prompts: suggestions, take: take)
+            if let suggestion {
+                SuggestionChip(prompt: suggestion, take: take)
                     .transition(.opacity)
             }
             field
@@ -122,10 +122,11 @@ struct PromptBar: View {
     // MARK: What the agent thinks you might ask (T069)
 
     /// Only while the field is empty: half a typed thought is already an answer to
-    /// what was suggested, and a chip sitting behind it would be noise.
-    private var suggestions: [SuggestedPrompt] {
-        guard !dismissedSuggestions, text.isEmpty, !model.isStale else { return [] }
-        return Array(agent.suggestedPrompts.prefix(SuggestedPrompt.limit))
+    /// what was suggested, and a chip sitting behind it would be noise. The first,
+    /// because a daemon from before 031 may still send up to four.
+    private var suggestion: SuggestedPrompt? {
+        guard !dismissedSuggestions, text.isEmpty, !model.isStale else { return nil }
+        return agent.suggestedPrompts.first
     }
 
     /// The words land in the field rather than going. The agent wrote them; sending
@@ -183,34 +184,28 @@ private struct CommandList: View {
     }
 }
 
-/// The few things the agent thinks you might ask next.
+/// The one thing the agent thinks you might ask next (031).
 ///
-/// Chips in a row that scrolls, because a suggestion can be a sentence and four of
-/// them wrapped would be a screen of the conversation given to what nobody asked for.
-private struct SuggestionRow: View {
-    let prompts: [SuggestedPrompt]
+/// One chip, cut short at the width rather than scrolled: there is nothing beside it
+/// to scroll to, and a scroller holding one thing reads as broken.
+private struct SuggestionChip: View {
+    let prompt: SuggestedPrompt
     let take: (SuggestedPrompt) -> Void
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(prompts) { prompt in
-                    Button { take(prompt) } label: {
-                        Text(prompt.label)
-                            .appText(.fine)
-                            .lineLimit(1)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .contentShape(.capsule)
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-                    .accessibilityHint("Puts this in the prompt. Nothing is sent yet.")
-                }
-            }
-            .padding(.horizontal, 2)
+        Button { take(prompt) } label: {
+            Text(prompt.label)
+                .appText(.fine)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .contentShape(.capsule)
         }
-        .scrollIndicators(.hidden)
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .padding(.horizontal, 2)
         .frame(height: 36)
+        .accessibilityHint("Puts this in the prompt. Nothing is sent yet.")
     }
 }

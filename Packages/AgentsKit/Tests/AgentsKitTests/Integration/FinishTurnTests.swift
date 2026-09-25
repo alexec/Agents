@@ -78,7 +78,8 @@ struct FinishTurnTests {
 
     // MARK: The turn ends in one breath
 
-    /// US1, whole: one call, and the agent reads as a report and a row of chips.
+    /// US1, whole: one call, and the agent reads as a report and a suggestion — the
+    /// first of what was sent, since 031 keeps one.
     @Test func oneCallLandsTheReportAndTheChips() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
@@ -91,7 +92,7 @@ struct FinishTurnTests {
         let agent = try #require(await core.agent(id))
         #expect(agent.report?.outcome == .done)
         #expect(agent.report?.message == "Renamed the call sites; tests pass.")
-        #expect(agent.suggestedPrompts.map(\.label) == ["A", "B"])
+        #expect(agent.suggestedPrompts.map(\.label) == ["A"])
         #expect(agent.group(wantsEyes: false) == .finished)
         // One record of it, at the foot, as a report alone leaves.
         #expect(try await reported(core, id).map(\.outcome) == [.done])
@@ -122,11 +123,11 @@ struct FinishTurnTests {
 
         let both = try await finish(core, launcher, "done", "All done.", "A", "B")
         #expect(both.hasPrefix("Noted."))
-        #expect(both.contains("2 shown above the prompt"))
+        #expect(both.contains(DaemonCore.shownNote))
 
         let alone = try await finish(core, launcher, "done", "All done.")
         #expect(alone.hasPrefix("Noted."))
-        #expect(!alone.contains("shown above the prompt"))
+        #expect(!alone.contains(DaemonCore.shownNote))
     }
 
     /// Both are an account of the turn they came from, and the next prompt is the
@@ -291,7 +292,7 @@ struct FinishTurnTests {
 
         let expected = Account(try #require(await core.agent(one)))
         #expect(expected.outcome == .partlyDone)
-        #expect(expected.labels == ["A", "B"])
+        #expect(expected.labels == ["A"])
         #expect(Account(try #require(await core.agent(suggestThenReport))) == expected)
         #expect(Account(try #require(await core.agent(reportThenSuggest))) == expected)
     }
@@ -324,7 +325,7 @@ struct FinishTurnTests {
         let agent = try #require(await core.agent(id))
         #expect(agent.report?.outcome == .stuck)
         #expect(agent.report?.message == "No signing certificate.")
-        #expect(agent.suggestedPrompts.map(\.label) == ["A", "B"])
+        #expect(agent.suggestedPrompts.map(\.label) == ["A"])
     }
 
     // MARK: The title
