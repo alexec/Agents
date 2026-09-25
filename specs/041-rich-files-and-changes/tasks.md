@@ -236,7 +236,7 @@ removed and one added, with the word washed on both. A new file is all added.
   - Ask it to change one word in the middle of a 40-line function in `sample.swift`.
   - Ask it to add a new function to `sample.py`.
   - Screenshot the conversation and Changes in Light and Dark into `walk/03-*.png`.
-- [ ] T043 [US2] **Diff look gate.** Show Alex T042's screenshots, and record his changes to the wash strengths or marks here.
+- [X] T043 [US2] **Diff look gate.** Show Alex T042's screenshots, and record his changes to the wash strengths or marks here. **Shown 2026-09-25; Alex: looks right, carry on (dark word wash, bold added lines and text-width removed wash all kept as shown).**
 
 **Checkpoint**: US1 and US2 are complete. This is the MVP.
 
@@ -268,10 +268,10 @@ the second.
 
 **Independent test**: Tagged `swift`, `ts` and `py` blocks are coloured; untagged and `text` blocks are plain.
 
-- [ ] T049 [US4] Change the `.code(language, text)` case in `Shared/UI/Page/MarkdownText.swift`:
+- [X] T049 [US4] Change the `.code(language, text)` case in `Shared/UI/Page/MarkdownText.swift`:
   - Draw the block's lines with `CodeLine` and a `CodeDocument` from `CodeLanguage.fence(tag: language)`.
   - Keep the language label, horizontal scroll, `paperWell`, `textSelection` and the caret trailing behaviour (`self.text(…, caret:)`). If the caret needs the block to stay one `Text`, build one `AttributedString` for the whole block from the per-line spans instead of rows.
-- [ ] T050 [US4] Walk: ask an agent for three fenced blocks (`swift`, `ts`, `py`) and one untagged. Screenshot the conversation and the same blocks in a page (`show_file` on a `.md` scratch file) into `walk/06-fences.png`.
+- [X] T050 [US4] Walk: ask an agent for three fenced blocks (`swift`, `ts`, `py`) and one untagged. Screenshot the conversation and the same blocks in a page (`show_file` on a `.md` scratch file) into `walk/06-fences.png`.
 
 ## Phase 7: User Story 5 — The same on the phone and the iPad (P3)
 
