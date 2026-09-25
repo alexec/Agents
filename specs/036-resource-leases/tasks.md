@@ -239,8 +239,8 @@ The pure book, its limits, the wire snapshot and the store. Nothing behaves diff
 
 - [X] T045 Run the full suite on this branch and on `main`, several times each, and compare before blaming the branch.
 - [X] T046 Build both schemes, one after the other, with plugin validation skipped. Build Remote for the generic simulator only. Never create or boot a simulator for screenshots.
-- [ ] T047 Run quickstart §3 end to end with the run-app skill on a scratch root, with two real agents on one simulator: page, chats, rows, the 45 s "still in line", the wake within 5 s, End, ✕, and a restart by the pid in `daemon.lock`. Save the screenshots, and never drive the scratch window while Alex is using the Mac.
-- [ ] T048 For each runtime available, record whether a 45 s wait came back as "still in line" or the runtime gave up first. Write the result as a note at the foot of this file (research R3 risk).
+- [X] T047 Run quickstart §3 end to end with the run-app skill on a scratch root, with two real agents on one simulator: page, chats, rows, the 45 s "still in line", the wake within 5 s, End, ✕, and a restart by the pid in `daemon.lock`. Save the screenshots, and never drive the scratch window while Alex is using the Mac.
+- [X] T048 For each runtime available, record whether a 45 s wait came back as "still in line" or the runtime gave up first. Write the result as a note at the foot of this file (research R3 risk).
 - [X] T049 [P] Check that FR-017 holds: `git diff main -- App/Sources/StartAgent Remote/Sources/StartAgent` and the `start_agent` schema show no lease option. Starting an agent is unchanged.
 
 ---
@@ -298,3 +298,32 @@ The pure book, its limits, the wire snapshot and the store. Nothing behaves diff
   permission before its first `lease_resource` and `release_resource` call. That is the
   runtime's own MCP permission policy (plan, Risks), and an unattended agent in "ask" mode will
   stop there.
+
+## Notes from finishing (2026-09-25)
+
+- **release_resource, live**: on the real app restarted onto `e3ce367`, a lease on "036 release
+  check" was taken and released ("Released 036 release check."), and `list_resources` then showed
+  nothing held. The same call first surfaced the two "the person ended your lease" notices from
+  00:50, delivered at the next lease call and kept across two restarts (FR-012). One quirk: a lease
+  of 5 minutes or less is inside the warning window from the start, so its holder is warned at
+  once. It's harmless, but worth changing if short leases turn out to be common.
+- **T048, the 45 s wait on each runtime** (scratch root, a Claude agent holding the screen):
+  - **Grok**: the call went out at 08:02:35 and came back at 08:03:20 with "still in line"
+    (1st). Grok then ended its turn with `finish_turn`. It did not give up first.
+  - **Cursor**: it asked the person's permission first (08:02:51), then came back with "still
+    in line" (2nd), and ended its turn at 08:03:46. It did not give up first.
+  - **Claude** (from the first walk): came back with "still in line" after 45 s.
+  - **Copilot**: not measured. Its session had none of the app's tools, not `lease_resource`
+    and not even `finish_turn`, and it said so ("I don't have a lease_resource tool available in
+    this environment"). This is how the app's MCP server reaches Copilot, not 036, and it is
+    worth its own look.
+  - **Codex, Gemini**: not runtimes this app has. The built-in ones are Claude, Grok, Copilot and
+    Cursor.
+- **T047, ✕ and restart by pid** (scratch root, while Alex was away): with two agents in line
+  for the screen, pressing ✕ on the Resources page removed exactly that waiter, and the other
+  kept its place (`walk/remove-from-line-*.png`). The two waiters had the same title, so the two
+  ✕ buttons' labels could not be told apart in the accessibility tree. Stopping the scratch
+  daemon by the pid in its `daemon.lock` left it a zombie until the window reaped it, and the
+  window started a new daemon on the same root. The book came back with the same holder, the same
+  expiry to the millisecond, and the waiter's call marked closed (`walk/after-daemon-restart.png`).
+- **Still Alex's**: the iPad look.
