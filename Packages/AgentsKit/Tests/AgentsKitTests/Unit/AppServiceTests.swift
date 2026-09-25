@@ -59,8 +59,8 @@ struct AppServiceTests {
         // against the list before calling it still finds what it was told (023).
         // The four agent tools (028) sit after the workflow tool, before the older
         // names, for an agent that may use them — which is the default. The three lease
-        // tools (036) follow them, for every agent, and the two pull-request tools
-        // (038) after those, also for every agent.
+        // tools (036) follow them, for every agent, then the three event tools (042),
+        // and the two pull-request tools (038) after those, also for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName,
@@ -68,6 +68,8 @@ struct AppServiceTests {
                 AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
+                AppService.waitForEventToolName, AppService.cancelWaitToolName,
+                AppService.publishEventToolName,
                 AppService.pushPullRequestToolName, AppService.replyOnPullRequestToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
@@ -731,5 +733,20 @@ struct AppServiceTests {
         let description = result["tools"]?.arrayValue?.first?["description"]?.stringValue ?? ""
         #expect(description.contains("The title is the name on that row"))
         await service.close()
+    }
+
+    /// The app tells its own tools apart by the end of their names (a runtime may
+    /// prefix them), so no tool's name may end with another's. 036's release_resource
+    /// once ended with lease_resource, and every release became an extension.
+    @Test func noToolNameEndsWithAnother() {
+        let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.startAgent,
+                     AppTool.stopAgent, AppTool.archiveAgent, AppTool.listMyAgents,
+                     AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
+                     AppTool.listResources, AppTool.pushPullRequest, AppTool.replyOnPullRequest]
+        for name in names {
+            for other in names + [AppTool.leaseResource] where other != name {
+                #expect(!name.hasSuffix(other), "\(name) ends with \(other)")
+            }
+        }
     }
 }

@@ -107,6 +107,9 @@ public enum Briefing {
     /// likely to be running alongside something else.
     public static let leases = LeaseWords.briefing
 
+    /// Waiting on what happens, and saying that something has (042).
+    public static let events = EventWords.briefing
+
     /// Ask, rather than guess or stop.
     ///
     /// The act, and then the reason it is worth doing: the question is held by the
@@ -226,7 +229,7 @@ public enum Briefing {
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
-            + [leases]
+            + [leases, events]
             + [residue(policy.residue)].compactMap { $0 }
     }
 

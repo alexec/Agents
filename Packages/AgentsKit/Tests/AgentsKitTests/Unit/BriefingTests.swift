@@ -125,12 +125,16 @@ struct BriefingTests {
     /// only one agent should use at a time (FR-015), cut to 396 characters. Measured
     /// then at 2,085 for the longest (Cursor), 2,084 and 2,005 for the next two. Every
     /// agent is told this one, so an agent another agent started goes up by the same.
+    ///
+    /// Raised in 042, to 2,450 and eight lines, for the one line about waiting on what
+    /// happens instead of polling, and publishing (FR-006, FR-017), cut to 309
+    /// characters. Every agent is told it, so both ceilings go up by the same.
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
-            #expect(text.count < 2_100, "\(policy.runtimeID): \(text.count)")
-            #expect(Briefing.lines(for: policy).count <= 7, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false).count < 1_900,
+            #expect(text.count < 2_450, "\(policy.runtimeID): \(text.count)")
+            #expect(Briefing.lines(for: policy).count <= 8, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false).count < 2_250,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }

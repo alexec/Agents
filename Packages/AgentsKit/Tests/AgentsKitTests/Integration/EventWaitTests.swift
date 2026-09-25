@@ -119,6 +119,13 @@ struct EventWaitTests {
         await core.openEventWaits[id] != nil
     }
 
+    @Test func everyAgentIsBriefedAboutWaiting() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.lines(for: policy, managesAgents: false).contains(Briefing.events))
+            #expect(Briefing.lines(for: policy, managesAgents: true).contains(Briefing.events))
+        }
+    }
+
     // MARK: US1: waiting
 
     @Test func aMatchInsideTheHoldAnswersTheCall() async throws {
@@ -299,10 +306,17 @@ struct EventWaitTests {
         try await eventually("turn over") { await core.agents[a]?.state == .finished }
         try await core.prompt(DaemonAPI.PromptRequest(agentID: a, text: "Do this instead."))
         #expect(!(await isWaiting(core, a)))
-        let said = try await core.transcript(.init(agentID: a, before: nil, limit: 500)).entries.compactMap {
-            if case .userMessage(let text, _, .person) = $0.kind { return text } else { return nil }
+        // Recorded when its turn begins, which may be behind the app's own question.
+        try await eventually("the person's prompt went") {
+            try await core.transcript(.init(agentID: a, before: nil, limit: 500)).entries.contains {
+                if case .userMessage(let text, _, .person) = $0.kind { return text == "Do this instead." }
+                return false
+            }
         }
-        #expect(said.last == "Do this instead.", "the bubble is the person's words alone")
+        let said = try await core.transcript(.init(agentID: a, before: nil, limit: 500)).entries.compactMap {
+            if case .userMessage(let text, _, _) = $0.kind { return text } else { return nil }
+        }
+        #expect(!said.contains { $0.contains("(Your wait for") }, "the preface is for the runtime, not the record")
         await core.raise(draft("custom.ping", in: work))
         try await Task.sleep(for: .milliseconds(150))
         #expect(try await wakes(core, a).isEmpty)

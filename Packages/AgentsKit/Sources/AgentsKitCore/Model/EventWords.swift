@@ -139,6 +139,17 @@ public enum EventWords {
         "You've published \(limit) events in the last hour, which is the limit. Try again after \(clock(until))."
     }
 
+    // MARK: The briefing
+
+    /// The paragraph every agent is briefed with (042): wait rather than poll, the turn
+    /// may end while waiting, publish to tell others, and where the names are.
+    public static let briefing = """
+        Wait for something to happen (checks passing, an agent finishing, this Mac waking) \
+        with wait_for_event rather than checking again and again; if told you are still \
+        waiting, you may end your turn and will be started again when it happens. Tell \
+        others something happened with publish_event, using a custom. name.
+        """
+
     // MARK: The person's side
 
     /// The line above the prompt bar while an agent waits: sending takes its place.
