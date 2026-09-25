@@ -1,35 +1,35 @@
-import AgentsKit
+import AgentsKitCore
 import SwiftUI
 
-/// The worktrees this app made for the project, and the way to be done with one (030).
+/// The worktrees the Mac made for this project, and the way to be done with one (030),
+/// as the Mac's project page has them.
 ///
 /// Only the app's own: one made in a terminal, or by a runtime, is somebody else's to
-/// remove. Hidden when there are none, because an empty heading is a question nobody
-/// asked. Archiving an agent never removes its worktree — the work in it may not be
-/// merged — so this is where they go when you are finished with them.
+/// remove. Hidden when there are none. Archiving an agent never removes its worktree —
+/// the work in it may not be merged — so this is where they go when you are finished.
 struct WorktreesSection: View {
-    @Environment(AppModel.self) private var model
-    let folder: URL?
+    @Environment(RemoteModel.self) private var model
+    let folder: URL
 
     private var worktrees: [DaemonAPI.WorktreeSummary] {
-        guard folder != nil, model.draftCwd == folder else { return [] }
-        return model.draftWorktrees.worktrees.filter { $0.madeByApp && !$0.isProjectFolder }
+        model.projectWorktrees.worktrees.filter { $0.madeByApp && !$0.isProjectFolder }
     }
 
     var body: some View {
         if !worktrees.isEmpty {
             SectionHeading(title: "Worktrees")
             ForEach(worktrees) { worktree in
-                WorktreeRow(worktree: worktree)
+                WorktreeRow(worktree: worktree, folder: folder)
             }
         }
     }
 }
 
-/// One worktree: its name, its branch, who is in it, and Remove.
-struct WorktreeRow: View {
-    @Environment(AppModel.self) private var model
+/// One worktree: its name, its branch and who is in it, and Remove.
+private struct WorktreeRow: View {
+    @Environment(RemoteModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
+    let folder: URL
 
     @State private var asking: DaemonAPI.RemovalCheck?
     @State private var isChecking = false
@@ -44,25 +44,25 @@ struct WorktreeRow: View {
                     .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
                     .strikethrough(!worktree.exists)
-                Text(detail)
+                Text(ChoiceRows.worktreeDetail(worktree))
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .help(worktree.root.path(percentEncoded: false))
             Spacer(minLength: 8)
             Button("Remove…") { Task { await remove() } }
                 .buttonStyle(.paper)
-                .appText(.fine)
+                .appText(.supporting)
                 .disabled(isChecking)
+                .accessibilityLabel("Remove \(worktree.name)")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
         .paperRaised(in: RoundedRectangle(cornerRadius: 14))
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {
-                    Task { await model.removeWorktree(worktree.root, confirmed: true) }
+                    Task { await model.removeWorktree(worktree.root, in: folder, confirmed: true) }
                 }
             }
             Button(check.blockedBy.isEmpty ? "Keep it" : "OK", role: .cancel) {}
@@ -71,24 +71,14 @@ struct WorktreeRow: View {
         }
     }
 
-    private var detail: String {
-        let branch = worktree.branch ?? "detached"
-        guard worktree.exists else { return "\(branch) · its folder is gone" }
-        switch worktree.agents.count {
-        case 0: return branch
-        case 1: return "\(branch) · 1 agent working"
-        case let count: return "\(branch) · \(count) agents working"
-        }
-    }
-
     /// Asked first, always; removed straight away only when nothing would be lost and
     /// nobody is in it.
     private func remove() async {
         isChecking = true
         defer { isChecking = false }
-        guard let check = await model.checkWorktreeRemoval(worktree.root) else { return }
+        guard let check = await model.checkWorktreeRemoval(worktree.root, in: folder) else { return }
         if check.blockedBy.isEmpty && !check.losesWork {
-            await model.removeWorktree(worktree.root, confirmed: false)
+            await model.removeWorktree(worktree.root, in: folder, confirmed: false)
         } else {
             asking = check
         }
@@ -104,9 +94,7 @@ struct WorktreeRow: View {
 
     private func message(_ check: DaemonAPI.RemovalCheck) -> String {
         if !check.blockedBy.isEmpty {
-            let names = check.blockedBy.map { id in
-                model.agents.first { $0.id == id }?.title ?? "An agent"
-            }
+            let names = check.blockedBy.map { id in model.work.agent(id)?.title ?? "An agent" }
             return "Still working here: \(names.joined(separator: ", ")). Archive them first."
         }
         var lost: [String] = []

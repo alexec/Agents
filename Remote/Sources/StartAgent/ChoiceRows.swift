@@ -13,6 +13,9 @@ struct ChoiceRows: View {
     var body: some View {
         Section {
             runtimeRow
+            if model.startWorktrees.isRepository {
+                worktreeRow
+            }
         }
         Section {
             switch model.startChoicesState {
@@ -68,6 +71,70 @@ struct ChoiceRows: View {
         }
         .disabled(model.runtimes.isEmpty)
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
+    }
+
+    /// Project folder, a new worktree, or one already there (030), as the Mac's start
+    /// bar offers them. Only on a repository.
+    private var worktreeRow: some View {
+        let listed = model.startWorktrees
+        let others = listed.worktrees.filter { !$0.isProjectFolder }
+        return Menu {
+            Button {
+                Task { await model.chooseWorktree(nil) }
+            } label: {
+                choiceLabel("Project folder", chosen: model.startWorktree == nil)
+                Text("Work alongside anything else here")
+            }
+            Button {
+                Task { await model.chooseWorktree(.new) }
+            } label: {
+                choiceLabel("New worktree", chosen: model.startWorktree == .new)
+                Text(listed.canMakeNew ? "A new branch from the last commit here" : (listed.whyNot ?? ""))
+            }
+            .disabled(!listed.canMakeNew)
+            if !others.isEmpty {
+                Divider()
+                ForEach(others) { worktree in
+                    Button {
+                        Task { await model.chooseWorktree(.existing(worktree.root)) }
+                    } label: {
+                        choiceLabel(worktree.name, chosen: model.startWorktree == .existing(worktree.root))
+                        Text(Self.worktreeDetail(worktree))
+                    }
+                    .disabled(!worktree.exists)
+                }
+            }
+        } label: {
+            LabeledContent("Worktree") {
+                Text(worktreeTitle).foregroundStyle(.secondary)
+            }
+            .appText(.reading)
+        }
+        .accessibilityLabel("Worktree, \(worktreeTitle)")
+    }
+
+    private var worktreeTitle: String {
+        switch model.startWorktree {
+        case nil: "Project folder"
+        case .new: "New worktree"
+        case .existing(let root): root.lastPathComponent
+        }
+    }
+
+    @ViewBuilder
+    private func choiceLabel(_ title: String, chosen: Bool) -> some View {
+        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    /// Its branch and who is in it, as the Mac says it.
+    static func worktreeDetail(_ worktree: DaemonAPI.WorktreeSummary) -> String {
+        guard worktree.exists else { return "Missing" }
+        let branch = worktree.branch ?? "detached"
+        switch worktree.agents.count {
+        case 0: return branch
+        case 1: return "\(branch) · 1 agent working"
+        case let count: return "\(branch) · \(count) agents working"
+        }
     }
 
     @ViewBuilder
