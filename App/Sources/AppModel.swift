@@ -28,8 +28,9 @@ final class AppModel {
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
-    /// What the terminals the daemon is running for an agent have printed so far.
-    private(set) var terminalOutput: [String: String] = [:]
+    /// What the terminals the daemon is running for an agent have printed so far. The
+    /// kit's, so a phone shows the same (033).
+    var terminalOutput: [String: String] { work.terminalOutput }
     private(set) var isConnected = false
     /// Whether the daemon's list of projects has arrived at least once. Until it has,
     /// an empty sidebar means "not yet", not "none".
@@ -406,11 +407,7 @@ final class AppModel {
     /// bounded allowance rather than removing the cap, so an agent let go on once is
     /// still stopped eventually. Applies to that agent alone, and does not resume it.
     func letThisAgentGoOn(_ agent: Agent) async {
-        let ceiling = agent.ceiling(under: costLimits)
-        let currency = ceiling?.currency ?? "USD"
-        let already = agent.costToDate[currency] ?? 0
-        let step = ceiling?.amount ?? already
-        await setCostCeiling(agent.id, to: Cost(amount: already + step, currency: currency))
+        await setCostCeiling(agent.id, to: agent.ceilingToGoOn(under: costLimits))
     }
 
     func refreshProjects() async {
@@ -620,10 +617,6 @@ final class AppModel {
             guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
-
-        case DaemonAPI.Notification.agentTerminalOutput:
-            guard let notification = try? params?.decode(DaemonAPI.TerminalOutputNotification.self) else { return }
-            terminalOutput[notification.terminalID, default: ""] += notification.chunk
 
         default:
             break
@@ -1049,60 +1042,26 @@ final class AppModel {
         }
     }
 
-    /// A choice the person has made and the runtime has not yet confirmed.
-    ///
-    /// The sequence is which write this was. A call that completes clears the entry
-    /// only if it is still the one it wrote, so two clicks in a row settle on the
-    /// later choice whatever order the answers come back in.
-    struct PendingOption: Equatable {
-        var value: JSONValue
-        var sequence: Int
-    }
-
-    /// Held only while the change is in flight, and never written into
-    /// `agent.startOptions`: that is the daemon's record mirrored here, and a client
-    /// that edits it is a client that can disagree with the daemon with no way to
-    /// notice.
-    private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
-    private var pendingOptionSequence = 0
-
     /// What an option control should read: the choice just made, else what is in
-    /// force, else what the runtime says is current.
+    /// force, else what the runtime says is current. The bookkeeping is the kit's, so a
+    /// phone's control settles the same way (033).
     func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
-        pendingOptions[agent.id]?[optionID]?.value
-            ?? agent.startOptions.values[optionID]
-            ?? advertised.currentValue
+        work.chosenOption(optionID, for: agent, advertised: advertised)
     }
 
     /// Set an option on a live agent, and show the choice at once.
     ///
-    /// The control used to read `agent.startOptions` while this wrote only to a
-    /// `Task`, so the menu closed over the old value and stayed there for a JSON-RPC
-    /// hop, an ACP call to a separate process, a broadcast and a client apply. The
-    /// optimistic value closes that gap; it is dropped when the answer arrives, so a
-    /// runtime that refuses settles the control on what is really in force.
     /// Deliberately not `async`. The optimistic value has to be written on the same
     /// turn as the click, and the body of a `Task` does not start until the next one.
     func setOption(agentID: UUID, optionID: String, value: JSONValue) {
-        pendingOptionSequence += 1
-        let sequence = pendingOptionSequence
-        pendingOptions[agentID, default: [:]][optionID] = PendingOption(value: value, sequence: sequence)
-        Task { await send(option: optionID, value: value, to: agentID, sequence: sequence) }
-    }
-
-    private func send(option optionID: String, value: JSONValue,
-                      to agentID: UUID, sequence: Int) async {
-        await attempt {
-            try await self.client.call(DaemonAPI.Method.agentsSetOption,
-                                       DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+        let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
+        Task {
+            await attempt {
+                try await self.client.call(DaemonAPI.Method.agentsSetOption,
+                                           DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+            }
+            work.settleOption(agentID: agentID, optionID: optionID, sequence: sequence)
         }
-        // Dropped whether it succeeded or threw: the record is what is in force, and
-        // a refusal must settle the control on that rather than on what was asked
-        // for. Only if this call is still the last word — a slower earlier call
-        // finishing must not drop a later choice.
-        guard pendingOptions[agentID]?[optionID]?.sequence == sequence else { return }
-        pendingOptions[agentID]?[optionID] = nil
-        if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
     }
 
     // MARK: The mode you keep choosing

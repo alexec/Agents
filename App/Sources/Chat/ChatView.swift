@@ -44,6 +44,16 @@ struct ChatView: View {
         .animation(.snappy(duration: 0.28), value: model.selection)
         .navigationTitle(agent?.title ?? "New agent")
         .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
+        .environment(\.chatActions, chatActions)
+    }
+
+    /// What the shared chat rows mean on a Mac (033).
+    private var chatActions: ChatActions {
+        ChatActions(
+            // The editor the Mac opens that file with, which is the one the user chose.
+            open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
+            terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

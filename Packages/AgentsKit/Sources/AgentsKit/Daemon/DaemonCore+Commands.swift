@@ -498,6 +498,26 @@ extension DaemonCore {
         changed(agent)
     }
 
+    /// Files under this agent's folders worth offering for what follows an `@` (033).
+    ///
+    /// The Mac's window walks the disk itself; a phone cannot, so it asks here, and the
+    /// walk is the same capped one. Off the actor, because even capped it is thousands
+    /// of stat calls, and nothing else the daemon does should wait on it.
+    public func fileMentions(_ request: DaemonAPI.FileMentionRequest) async throws -> [DaemonAPI.FileMentionDTO] {
+        guard let agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        let term = request.term
+        guard !term.isEmpty else { return [] }
+        let folders = [agent.cwd] + agent.additionalDirectories
+        let found = await Task.detached(priority: .userInitiated) {
+            FileMention.matching(term, in: folders)
+        }.value
+        return found.map {
+            DaemonAPI.FileMentionDTO(path: $0.url.path(percentEncoded: false), relativePath: $0.relativePath)
+        }
+    }
+
     /// Send the next thing waiting, if the agent is free to take it.
     ///
     /// One at a time. Each queued prompt is a turn of its own, so the transcript reads

@@ -105,6 +105,31 @@ public final class AgentsModel {
     /// know `wake/state`, which is what lets a new window work against an old daemon.
     public private(set) var wakeState: DaemonAPI.WakeState?
 
+    /// What each command an agent ran has printed, as far as this client heard it (033).
+    ///
+    /// Here rather than in the Mac's own model so a phone shows the same output in a
+    /// call's detail. Only what arrived while this client was listening: the output is
+    /// streamed, not kept in the transcript.
+    public private(set) var terminalOutput: [String: String] = [:]
+    public static let terminalOutputLimit = 200_000
+
+    /// A choice made on a control that the daemon has not yet confirmed (033).
+    ///
+    /// The sequence is which write this was. A call that completes clears the entry
+    /// only if it is still the one it wrote, so two taps in a row settle on the later
+    /// choice whatever order the answers come back in.
+    public struct PendingOption: Equatable, Sendable {
+        public var value: JSONValue
+        public var sequence: Int
+    }
+
+    /// Held only while the change is in flight, and never written into
+    /// `agent.startOptions`: that is the daemon's record mirrored here, and a client
+    /// that edits it is a client that can disagree with the daemon with no way to
+    /// notice.
+    public private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
+    @ObservationIgnored private var pendingOptionSequence = 0
+
     public init() {}
 
     // MARK: What each notification means
@@ -130,6 +155,7 @@ public final class AgentsModel {
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
+        case terminalOutput(DaemonAPI.TerminalOutputNotification)
         /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
         case unreadable
     }
@@ -156,6 +182,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
+        case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
         default: return nil
         }
     }
@@ -245,6 +272,14 @@ public final class AgentsModel {
                 resuming.remove(notification.agentID)
             }
 
+        case .terminalOutput(let notification):
+            var text = terminalOutput[notification.terminalID, default: ""] + notification.chunk
+            // The tail, because a build that prints for ten minutes is read from the end.
+            if text.count > Self.terminalOutputLimit {
+                text = String(text.suffix(Self.terminalOutputLimit))
+            }
+            terminalOutput[notification.terminalID] = text
+
         case .unreadable:
             break
         }
@@ -308,6 +343,38 @@ public final class AgentsModel {
     /// The mode last chosen for this runtime, on any device (029).
     public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
+
+    // MARK: Choices in flight
+
+    /// What an option control should read: the choice just made, else what is in
+    /// force, else what the runtime says is current.
+    public func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
+        pendingOptions[agent.id]?[optionID]?.value
+            ?? agent.startOptions.values[optionID]
+            ?? advertised.currentValue
+    }
+
+    /// Show a choice at once, before the daemon has it. Returns which write this was,
+    /// for `settleOption` when the call comes back.
+    ///
+    /// The control used to read `agent.startOptions` while the change went only to a
+    /// `Task`, so the menu closed over the old value and stayed there for the whole
+    /// round trip. The optimistic value closes that gap.
+    public func beginOption(agentID: UUID, optionID: String, value: JSONValue) -> Int {
+        pendingOptionSequence += 1
+        pendingOptions[agentID, default: [:]][optionID] = PendingOption(value: value, sequence: pendingOptionSequence)
+        return pendingOptionSequence
+    }
+
+    /// The call for one write came back, whether it succeeded or was refused: the
+    /// record is what is in force, and a refusal must settle the control on that rather
+    /// than on what was asked for. Only if this write is still the last word — a slower
+    /// earlier call finishing must not drop a later choice.
+    public func settleOption(agentID: UUID, optionID: String, sequence: Int) {
+        guard pendingOptions[agentID]?[optionID]?.sequence == sequence else { return }
+        pendingOptions[agentID]?[optionID] = nil
+        if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
+    }
 
     /// What this agent has left before it stops, under the limits as they stand.
     /// Nil when uncapped, when unmeasured, or before the daemon has said.

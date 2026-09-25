@@ -85,7 +85,7 @@ struct PromptBar: View {
                                     })
                 }
                 if draftLostSomething {
-                    Text("A picture you had pasted was too large to keep, so it did not come back with the rest.")
+                    Text(PromptWords.draftLostSomething)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
@@ -162,56 +162,14 @@ struct PromptBar: View {
     /// again; continuing is the reader's second act, deliberately.
     @ViewBuilder
     private var atItsLimit: some View {
-        if let agent, agent.isAtCostLimit(under: model.costLimits) {
-            HStack(spacing: 10) {
-                // The failure tint, not attention. An agent at its limit is waiting on
-                // a ceiling being raised, which is a thing broken about its situation
-                // rather than a question it has asked; orange is reserved for the
-                // latter (FR-006a).
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .tinted(.failure)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("This agent has reached its cost limit")
-                        .appText(.fine).fontWeight(.medium)
-                    Text("\(Cost.total(of: agent.costToDate) ?? "") spent. "
-                         + "Anything you send waits until you allow more.")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                SettingsLink { Text("Raise the limit") }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                Button("Let this one go on") {
-                    Task { await model.letThisAgentGoOn(agent) }
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help("Raises this agent's own ceiling. No other agent is changed.")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .paperRaised(in: Capsule())
-        } else if let agent, model.costState?.dayLimitReached == true {
-            HStack(spacing: 10) {
-                Image(systemName: "clock")
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("The day's spending limit has been reached")
-                        .appText(.fine).fontWeight(.medium)
-                    Text("What you send waits here, and goes when the day rolls over.")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
+        // The phone's too (033). Only the way to raise it is the Mac's own.
+        if let agent {
+            CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
+                            goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                 SettingsLink { Text("Raise the limit") }
                     .buttonStyle(.paper)
                     .appText(.fine)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .paperRaised(in: Capsule())
-            .id(agent.id)
         }
     }
 
@@ -220,31 +178,8 @@ struct PromptBar: View {
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
-                // Both of these are settled once the agent exists, so they are
-                // labels rather than controls. They still sit on raised paper: the
-                // transcript scrolls under this row.
-                // In a worktree, the worktree is the place worth naming: its folder
-                // is the project's name again, or a subfolder of it (030).
-                Label(agent.worktree?.name ?? agent.cwd.lastPathComponent,
-                      systemImage: agent.worktree == nil ? "folder" : "arrow.triangle.branch")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .paperRaised(in: Capsule())
-                    .help(agent.cwd.path(percentEncoded: false))
-                Spacer(minLength: 8)
-                ContextMeter(agent: agent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .paperRaised(in: Capsule())
-                Text(runtimeName(agent.runtimeID))
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .paperRaised(in: Capsule())
+                // The phone's row too (033).
+                PromptHeader(agent: agent) { ContextMeter(agent: agent) }
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
@@ -404,7 +339,7 @@ struct PromptBar: View {
             .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
 
             Button(action: send) {
-                Image(systemName: willQueue ? "arrow.up.to.line" : "arrow.up")
+                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
@@ -412,8 +347,8 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
-            .help(willQueue ? "Queue this, to go when the turn ends" : "Send")
-            .accessibilityLabel(willQueue ? "Queue" : "Send")
+            .help(PromptWords.sendHelp(willQueue: willQueue))
+            .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
@@ -441,7 +376,7 @@ struct PromptBar: View {
     /// Our own words before the system's alert, the first time only.
     private var dictationPrimer: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Say it instead of typing it").appText(.reading).fontWeight(.semibold)
+            Text(PromptWords.dictationPrimerTitle).appText(.reading).fontWeight(.semibold)
             Text("The Mac listens while you hold the button on, and what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.")
                 .foregroundStyle(.secondary)
             Text("macOS will ask for the microphone and for speech recognition next.")
@@ -621,17 +556,7 @@ struct PromptBar: View {
         // the typed ones will.
         if let suggestion { return suggestion.prompt }
         guard let agent else { return "Say what's next" }
-        // While it works, the field says what happens to what you type rather than
-        // what the agent is doing. The state line in the transcript says that.
-        if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
-        switch agent.state {
-        // `.starting` cannot reach here — it answers true to `hasTurnInFlight`, so the
-        // guard above has already returned. Named anyway, because the compiler asks and
-        // because a silent `default:` is how the next new state gets the wrong words.
-        case .starting, .running, .waitingOnUser: return "Say what next"
-        case .finished, .stopped: return "Say what next"
-        case .archived: return "Say what next, and this comes back"
-        }
+        return PromptWords.placeholder(for: agent)
     }
 
     // MARK: Whatever this runtime offers
@@ -643,19 +568,11 @@ struct PromptBar: View {
     /// failed and a folder not yet chosen were all the same silent gap.
     @ViewBuilder
     private var options: some View {
-        switch controlsState {
-        case .needsFolder:
-            note("Choose a folder to see what this runtime offers.")
-        case .needsRuntime:
-            note("Choose a runtime to see what it offers.")
-        case .loading(let name):
-            note("Asking \(name) what it offers…")
-        case .nothingOffered(let name):
-            note("\(name) has nothing to adjust.")
-        case .failed(let reason):
-            optionsFailure(reason)
-        case .controls(let shown):
+        if case .controls(let shown) = controlsState {
             optionsRow(shown)
+        } else {
+            // The same sentences the phone says (033).
+            OptionsNote(state: controlsState, retry: { Task { await model.loadDraftOptions() } })
         }
     }
 
@@ -672,31 +589,6 @@ struct PromptBar: View {
             // Only a draft fetches. An agent's options came with it.
             isLoading: agent == nil && model.isLoadingDraftOptions,
             failure: agent == nil ? model.draftOptionsFailure : nil)
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .appText(.fine)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// The one case that may carry the app's error treatment, and the only one with
-    /// something to press.
-    private func optionsFailure(_ reason: String) -> some View {
-        HStack(spacing: 8) {
-            Text(reason)
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Button("Try again") {
-                Task { await model.loadDraftOptions() }
-            }
-            .buttonStyle(.paper)
-            .appText(.fine)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// What the agent is allowed to do first, how well it does it after: permissions on
@@ -815,7 +707,7 @@ struct PromptBar: View {
     /// Whether what is typed now will wait rather than go.
     private var willQueue: Bool {
         guard let agent else { return false }
-        return agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
+        return PromptWords.willQueue(agent)
     }
 
     private func send() {
@@ -882,7 +774,7 @@ struct PromptBar: View {
     }
 
     private func runtimeName(_ id: String) -> String {
-        RuntimeCatalog.runtime(id: id)?.name ?? id
+        PromptWords.runtimeName(id)
     }
 
     /// Open on the runtime and folder already in use. An empty chooser is a click

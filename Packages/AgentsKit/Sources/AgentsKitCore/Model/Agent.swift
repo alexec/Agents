@@ -479,6 +479,20 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         return CostLimits.headroom(of: ceiling(under: limits), against: costToDate)
     }
 
+    /// The ceiling that lets this agent carry on once more, from any device (033).
+    ///
+    /// One more step of the ceiling it is held to, on top of what it has spent — a
+    /// concrete, bounded allowance rather than removing the cap, so an agent let go on
+    /// once is still stopped eventually. With no ceiling at all, the step is what it
+    /// has spent, which doubles it.
+    public func ceilingToGoOn(under limits: CostLimits) -> Cost {
+        let ceiling = ceiling(under: limits)
+        let currency = ceiling?.currency ?? "USD"
+        let already = costToDate[currency] ?? 0
+        let step = ceiling?.amount ?? already
+        return Cost(amount: already + step, currency: currency)
+    }
+
     /// A turn has ended and the runtime said nothing at all about money.
     ///
     /// Two shapes of silence, and both are this: a runtime that sends a usage block

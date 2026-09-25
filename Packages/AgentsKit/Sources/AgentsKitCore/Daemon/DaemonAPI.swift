@@ -77,6 +77,9 @@ public enum DaemonAPI {
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
+        /// Files under an agent's folders matching what follows an `@`, found on the
+        /// Mac, so a phone can name them too (033).
+        public static let filesMention = "files/mention"
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
@@ -535,6 +538,30 @@ public enum DaemonAPI {
     }
 
     /// Take one back off the queue before its turn comes.
+    public struct FileMentionRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var term: String
+        public init(agentID: UUID, term: String) {
+            self.agentID = agentID
+            self.term = term
+        }
+    }
+
+    /// A file on the Mac, named by an `@`. The path is the Mac's, which is where the
+    /// agent reads it, so a phone attaches it as a reference and never by value.
+    public struct FileMentionDTO: Codable, Sendable, Hashable {
+        public var path: String
+        public var relativePath: String
+        public init(path: String, relativePath: String) {
+            self.path = path
+            self.relativePath = relativePath
+        }
+
+        public var mention: FileMention {
+            FileMention(url: URL(filePath: path), relativePath: relativePath)
+        }
+    }
+
     public struct UnqueueRequest: Codable, Sendable {
         public var agentID: UUID
         public var promptID: UUID

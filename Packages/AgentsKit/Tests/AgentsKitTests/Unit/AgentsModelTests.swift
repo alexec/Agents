@@ -379,6 +379,55 @@ struct AgentsModelTests {
         #expect(model.costHeadroom(for: spender) == 0, "its own ceiling wins")
         #expect(model.isAtCostLimit(spender))
     }
+    // MARK: 033: what both chats now read from here
+
+    private var modeOption: ConfigOption {
+        ConfigOption(wire: ["id": "mode", "name": "Mode", "type": "select", "currentValue": "default",
+                            "options": [["value": "default", "name": "Default"],
+                                        ["value": "plan", "name": "Plan"]]])!
+    }
+
+    @Test func aChoiceShowsAtOnceAndGoesWhenItsCallComesBack() {
+        let model = AgentsModel()
+        let agent = self.agent()
+        #expect(model.chosenOption("mode", for: agent, advertised: modeOption) == "default")
+        let sequence = model.beginOption(agentID: agent.id, optionID: "mode", value: "plan")
+        #expect(model.chosenOption("mode", for: agent, advertised: modeOption) == "plan")
+        model.settleOption(agentID: agent.id, optionID: "mode", sequence: sequence)
+        // The record is what is in force now; this agent's record never took it.
+        #expect(model.chosenOption("mode", for: agent, advertised: modeOption) == "default")
+        #expect(model.pendingOptions.isEmpty)
+    }
+
+    /// Two taps in a row, and the first call comes back last. The later choice stays.
+    @Test func aSlowEarlierCallDoesNotDropALaterChoice() {
+        let model = AgentsModel()
+        let agent = self.agent()
+        let first = model.beginOption(agentID: agent.id, optionID: "mode", value: "plan")
+        _ = model.beginOption(agentID: agent.id, optionID: "mode", value: "default")
+        model.settleOption(agentID: agent.id, optionID: "mode", sequence: first)
+        #expect(model.pendingOptions[agent.id]?["mode"]?.value == "default")
+    }
+
+    @Test func aCommandsOutputIsKeptPerTerminalAndByItsTail() throws {
+        let model = AgentsModel()
+        let id = UUID()
+        model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                    try notification(DaemonAPI.TerminalOutputNotification(agentID: id, terminalID: "t1", chunk: "one ")))
+        model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                    try notification(DaemonAPI.TerminalOutputNotification(agentID: id, terminalID: "t2", chunk: "other")))
+        model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                    try notification(DaemonAPI.TerminalOutputNotification(agentID: id, terminalID: "t1", chunk: "two")))
+        #expect(model.terminalOutput["t1"] == "one two")
+        #expect(model.terminalOutput["t2"] == "other")
+
+        let long = String(repeating: "a", count: AgentsModel.terminalOutputLimit) + "END"
+        model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                    try notification(DaemonAPI.TerminalOutputNotification(agentID: id, terminalID: "t1", chunk: long)))
+        #expect(model.terminalOutput["t1"]?.count == AgentsModel.terminalOutputLimit)
+        #expect(model.terminalOutput["t1"]?.hasSuffix("END") == true)
+    }
+
 }
 
 @MainActor
@@ -463,4 +512,5 @@ struct AgentsModelDisplayTests {
         try heard(onPage, by: model, for: id)
         #expect(model.entries.map(\.id) == [onPage.id])
     }
+
 }
