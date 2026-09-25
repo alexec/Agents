@@ -101,6 +101,10 @@ extension DaemonCore {
         }
         for agent in agents.values where agent.state == .finished && inALiveProject(agent) {
             guard let report = agent.report, report.outcome.needsAPerson else { continue }
+            // Looked at already. The agent still wants an answer, and still says so under
+            // Needs attention, but telling the person again is only noise: the same
+            // report once bought fifteen banners (2026-09-24).
+            guard !agent.reportIsSeen else { continue }
             found.append(need(.report(agent.id, report.at), for: agent, kind: .report,
                               wanted: "\(report.outcome.heading): \(report.message)", now: now))
         }
@@ -163,12 +167,15 @@ extension DaemonCore {
         reconsider()
     }
 
-    /// A conversation is in front of somebody: it has been read. Written only when it
-    /// moves the fact, so a window that keeps saying the same thing does not rewrite
-    /// the record.
+    /// A conversation is in front of somebody: it has been read, and so has whatever it
+    /// last reported. Written only when it moves a fact, so a window that keeps saying
+    /// the same thing does not rewrite the record.
     func markRead(_ agentID: UUID) {
-        guard var agent = agents[agentID], agent.isUnread else { return }
+        guard var agent = agents[agentID] else { return }
+        let seesReport = agent.report != nil && !agent.reportIsSeen
+        guard agent.isUnread || seesReport else { return }
         agent.isUnread = false
+        if seesReport { agent.reportSeenAt = agent.report?.at }
         changed(agent)
     }
 

@@ -106,6 +106,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// finished agent: a running chat is not something you have "read", and a stopped
     /// one is under its own heading.
     public var isUnread: Bool
+    /// Which report the person has had in front of them, by its `at`. A report that
+    /// wants a person is news once: seen, it stops being a notification to send, though
+    /// the agent stays under Needs attention until it is answered. A newer report has
+    /// another `at`, so it is news again. The report's own time rather than the clock's,
+    /// so no two clocks are ever compared.
+    public var reportSeenAt: Date?
     public var endedReason: EndedReason?
     public var archivedReason: ArchivedReason?
 
@@ -179,6 +185,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
         isUnread = try c.decodeIfPresent(Bool.self, forKey: .isUnread) ?? false
+        reportSeenAt = try c.decodeIfPresent(Date.self, forKey: .reportSeenAt)
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
         // A state we have never heard of, and no reason beside it, is an ending
         // nothing vouched for. Only when there is no reason: a newer build that wrote
@@ -251,6 +258,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(lastActivityAt, forKey: .lastActivityAt)
         if isUnread { try c.encode(isUnread, forKey: .isUnread) }
+        try c.encodeIfPresent(reportSeenAt, forKey: .reportSeenAt)
         try c.encodeIfPresent(endedReason, forKey: .endedReason)
         try c.encodeIfPresent(archivedReason, forKey: .archivedReason)
         try c.encodeIfPresent(usage, forKey: .usage)
@@ -281,7 +289,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, runtimeID, cwd, title, state, runtimeSessionID, startOptions
-        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread
+        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
@@ -310,6 +318,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 createdAt: Date = Date(),
                 lastActivityAt: Date = Date(),
                 isUnread: Bool = false,
+                reportSeenAt: Date? = nil,
                 endedReason: EndedReason? = nil,
                 archivedReason: Agent.ArchivedReason? = nil,
                 usage: Usage? = nil,
@@ -340,6 +349,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.lastActivityAt = lastActivityAt
         self.isUnread = isUnread
+        self.reportSeenAt = reportSeenAt
         self.endedReason = endedReason
         self.archivedReason = archivedReason
         self.usage = usage
