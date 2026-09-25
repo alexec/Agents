@@ -1,5 +1,6 @@
 ; Vendored by scripts/vendor-grammars.sh from alex-pinkus/tree-sitter-swift 0.7.3-with-generated-files. Do not edit.
-\n; ---- src-alex-pinkus_tree-sitter-swift-0.7.3-with-generated-files/queries/highlights.scm
+
+; ---- src-alex-pinkus_tree-sitter-swift-0.7.3-with-generated-files/queries/highlights.scm
 [
   "."
   ";"

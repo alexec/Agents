@@ -1,5 +1,6 @@
 ; Vendored by scripts/vendor-grammars.sh from tree-sitter-grammars/tree-sitter-markdown v0.5.1. Do not edit.
-\n; ---- src-tree-sitter-grammars_tree-sitter-markdown-v0.5.1/tree-sitter-markdown/queries/highlights.scm
+
+; ---- src-tree-sitter-grammars_tree-sitter-markdown-v0.5.1/tree-sitter-markdown/queries/highlights.scm
 ;From nvim-treesitter/nvim-treesitter
 (atx_heading (inline) @text.title)
 (setext_heading (paragraph) @text.title)

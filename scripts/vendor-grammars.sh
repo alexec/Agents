@@ -104,7 +104,8 @@ EOF
   for q in ${(s:,:)queries}; do
     local qdir=$dir qpath=$q
     if [[ $q == *:* ]]; then qdir=$(clone ${q%%:*}); qpath=${q#*:}; fi
-    print -r -- "\n; ---- ${qdir:t}/$qpath" >> $qout
+    print -r -- "" >> $qout
+    print -r -- "; ---- ${qdir:t}/$qpath" >> $qout
     cat $qdir/$qpath >> $qout
   done
   print "$name: $(du -sk $out | cut -f1) KB of sources, query $(wc -l < $qout | tr -d ' ') lines"

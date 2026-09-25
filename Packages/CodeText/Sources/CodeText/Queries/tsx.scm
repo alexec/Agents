@@ -1,5 +1,6 @@
 ; Vendored by scripts/vendor-grammars.sh from tree-sitter/tree-sitter-typescript v0.23.2. Do not edit.
-\n; ---- src-tree-sitter_tree-sitter-typescript-v0.23.2/queries/highlights.scm
+
+; ---- src-tree-sitter_tree-sitter-typescript-v0.23.2/queries/highlights.scm
 ; Types
 
 (type_identifier) @type
@@ -35,7 +36,8 @@
   "override"
   "satisfies"
 ] @keyword
-\n; ---- src-tree-sitter_tree-sitter-javascript-v0.23.1/queries/highlights-jsx.scm
+
+; ---- src-tree-sitter_tree-sitter-javascript-v0.23.1/queries/highlights-jsx.scm
 (jsx_opening_element (identifier) @tag (#match? @tag "^[a-z][^.]*$"))
 (jsx_closing_element (identifier) @tag (#match? @tag "^[a-z][^.]*$"))
 (jsx_self_closing_element (identifier) @tag (#match? @tag "^[a-z][^.]*$"))
@@ -44,7 +46,8 @@
 (jsx_opening_element (["<" ">"]) @punctuation.bracket)
 (jsx_closing_element (["</" ">"]) @punctuation.bracket)
 (jsx_self_closing_element (["<" "/>"]) @punctuation.bracket)
-\n; ---- src-tree-sitter_tree-sitter-javascript-v0.23.1/queries/highlights.scm
+
+; ---- src-tree-sitter_tree-sitter-javascript-v0.23.1/queries/highlights.scm
 ; Variables
 ;----------
 

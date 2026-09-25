@@ -1,5 +1,6 @@
 ; Vendored by scripts/vendor-grammars.sh from tree-sitter/tree-sitter-python v0.25.0. Do not edit.
-\n; ---- src-tree-sitter_tree-sitter-python-v0.25.0/queries/highlights.scm
+
+; ---- src-tree-sitter_tree-sitter-python-v0.25.0/queries/highlights.scm
 ; Identifier naming conventions
 
 (identifier) @variable

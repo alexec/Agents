@@ -92,7 +92,10 @@ public actor Colourer {
             // A capture across lines (a block comment, a multi-line string) is cut at each
             // line's end, since each line is drawn on its own.
             while from < to, line < lines.upperBound {
-                let lineEnd = min(to, lineStarts[line + 1])
+                // The line's own text, without the newline after it (the last line has none).
+                let isLast = line + 1 == lineStarts.count - 1
+                let textEnd = lineStarts[line + 1] - (isLast ? 0 : 1)
+                let lineEnd = min(to, textEnd)
                 if from < lineEnd {
                     let base = lineStarts[line]
                     Self.lay(CodeSpan(range: (from - base)..<(lineEnd - base), role: role),

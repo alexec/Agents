@@ -33,6 +33,16 @@ enum Grammar {
         await cache.query(for: code)
     }
 
+    /// The query's source, as vendored.
+    static func queryText(for code: CodeLanguage) -> String? {
+        guard let url = queryURL(for: code) else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    static func queryURL(for code: CodeLanguage) -> URL? {
+        Bundle.module.url(forResource: code.rawValue, withExtension: "scm", subdirectory: "Queries")
+    }
+
     private static let cache = QueryCache()
     static let log = Logger(subsystem: "com.alexecollins.Agents", category: "CodeText")
 }
@@ -48,8 +58,7 @@ private actor QueryCache {
             return nil
         }
         do {
-            guard let url = Bundle.module.url(forResource: code.rawValue, withExtension: "scm",
-                                              subdirectory: "Queries") else {
+            guard let url = Grammar.queryURL(for: code) else {
                 throw CocoaError(.fileNoSuchFile)
             }
             let query = try Query(language: language, data: Data(contentsOf: url))

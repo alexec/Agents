@@ -1,5 +1,6 @@
 ; Vendored by scripts/vendor-grammars.sh from tree-sitter/tree-sitter-json v0.24.8. Do not edit.
-\n; ---- src-tree-sitter_tree-sitter-json-v0.24.8/queries/highlights.scm
+
+; ---- src-tree-sitter_tree-sitter-json-v0.24.8/queries/highlights.scm
 (pair
   key: (_) @string.special.key)
 
