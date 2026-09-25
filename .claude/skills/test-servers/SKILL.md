@@ -178,4 +178,3 @@ else is using it. Remove `$ROOT-srv` (made by `server-rpc.sh`) along with the ro
 - The window says "Claude stopped answering" for a runtime that isn't signed in on the server.
 - A login refused with an empty ssh agent is classed as a locked key even when the key has no
   passphrase (the devbox's case, if login ever fails).
-- A PTY or terminal on a Linux server is unproven.
