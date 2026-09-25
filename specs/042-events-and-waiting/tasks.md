@@ -133,7 +133,7 @@ differently yet.
   - a rewrite through rename;
   - an unreadable file moved aside;
   - `nextPosition` surviving a reload.
-- [ ] T015 In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`, add:
+- [X] T015 In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`, add:
   - `lazy var eventStore`, `var eventLog = EventLog()` and `var eventState = EventState()`;
   - `var openEventWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>]`, keyed by agent id;
   - `var eventWaitTimer: Task<Void, Never>?`;
@@ -155,7 +155,7 @@ root, one of them carrying a `fired` consequence and one a `woke` consequence. T
 the phone list both show all three, newest first, with times, sentences, names and scopes. The
 consequences link to their agents.
 
-- [ ] T016 [US2] Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Events.swift` with `@discardableResult func raise(_ draft: EventDraft) -> Event`. It:
+- [X] T016 [US2] Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Events.swift` with `@discardableResult func raise(_ draft: EventDraft) -> Event`. It:
   1. takes `eventState.nextPosition`, bumps it and saves the state;
   2. appends the event through `eventLog.append`, then `eventStore.append`;
   3. broadcasts `events/changed`.
@@ -163,7 +163,7 @@ consequences link to their agents.
   - `func addConsequence(_:to:)`, which appends a consequence line and broadcasts;
   - `func eventsPage(_ request: EventsListRequest) -> EventsPage`;
   - an hourly prune task.
-- [ ] T017 [US2] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, add the `events/list` case, and `events/raise` under `#if DEBUG`. The raise method is refused unless the store root is not the real one (compare with `StoreLocations.default`), and it can attach a consequence given in the request for the look gate. Allow `events/list` over the bridge the way `leases/snapshot` is allowed (find the phone's allowed-method list by grepping for `leasesSnapshot` in `Bridge/` and `Pkg/Sources/AgentsKit/Daemon/DaemonServer.swift`).
+- [X] T017 [US2] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, add the `events/list` case, and `events/raise` under `#if DEBUG`. The raise method is refused unless the store root is not the real one (compare with `StoreLocations.default`), and it can attach a consequence given in the request for the look gate. Allow `events/list` over the bridge the way `leases/snapshot` is allowed (find the phone's allowed-method list by grepping for `leasesSnapshot` in `Bridge/` and `Pkg/Sources/AgentsKit/Daemon/DaemonServer.swift`).
 - [X] T018 [P] [US2] Create `Pkg/Sources/AgentsKitCore/Model/WaitStatus.swift`: `struct WaitStatus: Codable, Hashable, Sendable { line: String, mark: String, cancellable: Bool }` and `static func status(for agent: Agent, names: (UUID) -> String) -> WaitStatus?`.
   - An open `eventWait` gives `◷ Waiting for {pattern} · #44 · since HH:mm · until HH:mm` and the mark `◷ Waiting for pull_request.merged #44`, with `cancellable: true`.
   - An open 039 `Block` with agent waits gives `◷ Waiting for "Fix login" to finish` in both the line and the mark, with `cancellable: false`.

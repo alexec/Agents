@@ -296,6 +296,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.LeaseTokenRequest.self)
                 return .success(["note": .string(try await listLeases(request))])
 
+            case DaemonAPI.Method.eventsList:
+                let request = try require(params, as: DaemonAPI.EventsListRequest.self)
+                return .success(try JSONValue.encoding(eventsPage(request)))
+
+            case DaemonAPI.Method.eventsRaise:
+                let request = try require(params, as: DaemonAPI.EventRaiseRequest.self)
+                return .success(try JSONValue.encoding(try raiseByHand(request)))
+
             case DaemonAPI.Method.leasesSnapshot:
                 return .success(try JSONValue.encoding(await leaseSnapshot()))
 

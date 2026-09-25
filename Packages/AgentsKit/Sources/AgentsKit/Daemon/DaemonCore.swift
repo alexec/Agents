@@ -213,6 +213,27 @@ public actor DaemonCore {
     /// The local day the last tick saw, so the heartbeat can notice a rollover
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
+
+    // MARK: Events (042)
+
+    /// Where the log and the event sources' memory are kept between runs.
+    lazy var eventStore = EventStore(locations: locations)
+    /// Everything that happened, read from disk on first use and appended to after.
+    var eventLog = EventLog()
+    /// The next position, and what the sources remember between runs.
+    var eventState = EventState()
+    var eventLogIsLoaded = false
+    /// `wait_for_event` calls still open, by the agent that made them. One each at
+    /// most, as an agent has one wait at most (FR-007).
+    var openEventWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
+    var openEventWaitStarted: [UUID: Date] = [:]
+    /// The one timer for wait deadlines, aimed at the earliest.
+    var eventWaitTimer: Task<Void, Never>?
+    /// Drops the oldest events once an hour.
+    var eventPruner: Task<Void, Never>?
+    /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
+    /// is one number to measure against the runtimes (research R5). A test shortens it.
+    var eventHoldLimit: Duration = LeaseLimits.waitLimit
     /// Agents that have been told once that a limit is why their queue is not
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
