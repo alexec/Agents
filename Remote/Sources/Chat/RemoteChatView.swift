@@ -77,7 +77,21 @@ struct RemoteChatView: View {
                 if let agent { CurrentPlanStrip(agent: agent) }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { question }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(alignment: .trailing, spacing: 0) {
+                // Over the bar's right-hand end rather than in a toolbar under it: the
+                // figure belongs to the conversation, and the foot of the screen is
+                // the home indicator's.
+                if let agent {
+                    ContextMeter(agent: agent)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .background(Paper.ground)
+                }
+                question
+            }
+        }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
                                     set: { if !$0 { model.fileOnScreen = nil } })) {
             // A look-aside, not a level. On the Mac this is a pane beside the
@@ -113,11 +127,6 @@ struct RemoteChatView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let agent { ChatMenu(agent: agent, isShowingArtifacts: $isShowingArtifacts) }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .bottomBar) {
-                if let agent { ContextMeter(agent: agent) }
             }
         }
     }
