@@ -100,7 +100,7 @@ of Alex's.
 **Independent Test**: quickstart V3 and V4. Following *Your first agent* on the scratch app matches every "You
 should see", and ends in Complete.
 
-- [ ] T009 [US1] Write `docs/index.md`:
+- [X] T009 [US1] Write `docs/index.md`:
   - two sentences on what Agents is, taken from the README's opening but written for a user;
   - one prominent "Start here → Your first agent" link;
   - four cards or links to the sections, each with one line;
@@ -239,7 +239,7 @@ a running agent when the window closes and when the Mac restarts.
 
 **Independent Test**: quickstart V2, plus a pull request with a deliberate break failing `docs-check`.
 
-- [ ] T041 [US5] Write `scripts/docs-check-selftest.sh`. It copies the repository's `mkdocs.yml` and `docs/` into
+- [X] T041 [US5] Write `scripts/docs-check-selftest.sh`. It copies the repository's `mkdocs.yml` and `docs/` into
   `mktemp -d`, and for each break, applied to the copy only, runs `docs-check.py --root <copy>` and the strict
   build. It asserts a non-zero exit and that the output names the broken file. The breaks are:
   - a dead link;
@@ -252,20 +252,20 @@ a running agent when the window closes and when the Mac restarts.
 
   It prints `PASS <break>` or `FAIL <break>` for each, exits non-zero on any FAIL, and deletes the copy on exit.
   It never writes under the real `docs/`.
-- [ ] T042 [US5] Run `scripts/docs-check-selftest.sh`. All must PASS, and `git status docs/` must be clean
+- [X] T042 [US5] Run `scripts/docs-check-selftest.sh`. All must PASS, and `git status docs/` must be clean
   afterwards.
-- [ ] T043 [P] [US5] Create `.github/workflows/docs-check.yml`:
+- [X] T043 [P] [US5] Create `.github/workflows/docs-check.yml`:
   - `on: pull_request` and `push` (all branches);
   - `permissions: contents: read`;
   - one job on `ubuntu-latest` with checkout, `astral-sh/setup-uv@v6`, `scripts/docs.sh check` and
     `scripts/docs-check-selftest.sh`;
   - a 10-minute timeout.
-- [ ] T044 [P] [US5] Add the `## Docs *(mandatory)*` section to `.specify/templates/spec-template.md` after
+- [X] T044 [P] [US5] Add the `## Docs *(mandatory)*` section to `.specify/templates/spec-template.md` after
   Success Criteria, exactly as in `contracts/spec-docs-section.md`.
-- [ ] T045 [P] [US5] Add to `README.md`, near the top, one line: "Using the app? The docs are at
+- [X] T045 [P] [US5] Add to `README.md`, near the top, one line: "Using the app? The docs are at
   https://alexec.github.io/Agents/ (source in `docs/`; preview with `scripts/docs.sh serve`)". Add a sentence to
   "How work happens here" saying each spec's Docs section lists its pages.
-- [ ] T046 [US5] Document redirects in a comment above `redirect_maps` in `mkdocs.yml`: "a moved page leaves
+- [X] T046 [US5] Document redirects in a comment above `redirect_maps` in `mkdocs.yml`: "a moved page leaves
   `old.md: new.md` here".
 
 **Checkpoint**: the check is proven, and CI will run it once pushed.

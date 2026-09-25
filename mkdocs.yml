@@ -58,6 +58,7 @@ nav:
   - Home: index.md
   - Tutorials:
       - tutorials/index.md
+      - tutorials/first-agent.md
   - How-to guides:
       - how-to/index.md
   - Reference:
