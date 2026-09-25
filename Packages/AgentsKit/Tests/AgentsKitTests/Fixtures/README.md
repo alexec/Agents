@@ -21,3 +21,11 @@ calls with several diffs, the call that failed — is as the runtime sent it.
 `claude-edits.expected.json` is the list of edits 035's fold must produce (research R1: the last
 diff of each call, completed calls only), worked out by a throwaway script rather than by the code
 under test. It is SC-002's check.
+
+## GitHub
+
+Responses to `GitHubQuery.text` (038), written by hand in the shape a real response had on
+2026-09-25. Nothing here came from calling GitHub in a test. `pulls-mixed.json` is the wireframes'
+moment: #412 failing and changes requested (with comments from a collaborator, a member, a
+contributor, a stranger, a bot and the viewer), #405 approved, #398 failing through a status
+context, #390 a conflicting draft still running, and #377 timed out.

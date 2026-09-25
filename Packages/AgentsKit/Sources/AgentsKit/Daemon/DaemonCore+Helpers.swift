@@ -76,9 +76,10 @@ extension DaemonCore {
         return (note, agentID)
     }
 
-    /// What an agent wrote for `worktree`, as a choice: nothing, "new", or the name of
-    /// a worktree of this project's repository (030). A name that is not one is said,
-    /// with the names there are, rather than quietly starting in the project folder.
+    /// What an agent wrote for `worktree`, as a choice: nothing, "new", the name of a
+    /// worktree of this project's repository (030), or a branch to make one on. A name
+    /// that is none of those is said, with the names there are, rather than quietly
+    /// starting in the project folder.
     private func helperWorktree(_ written: String?, in folder: URL) async throws -> WorktreeChoice? {
         guard let written = written?.trimmingCharacters(in: .whitespacesAndNewlines), !written.isEmpty else {
             return nil
@@ -92,6 +93,9 @@ extension DaemonCore {
         let others = listed.worktrees.filter { !$0.isProjectFolder }
         if let found = others.first(where: { $0.name == written || $0.branch == written }) {
             return .existing(found.root)
+        }
+        if listed.branches.contains(where: { $0.name == written }) {
+            return .branch(written)
         }
         let names = others.map(\.name)
         throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,

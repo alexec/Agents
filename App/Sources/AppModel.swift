@@ -353,6 +353,105 @@ final class AppModel {
         }
     }
 
+    // MARK: Pull requests (038)
+
+    /// Each GitHub project's Pull requests section, by folder. Absent for a project
+    /// that is not on GitHub, which is how the section is absent there (SC-006).
+    private(set) var pullRequestLists: [URL: PullRequestList] = [:]
+    /// Pull requests being checked out now, by folder and number.
+    private(set) var checkingOut: Set<PullRequestKey> = []
+    /// The last check-out that failed, with its reason, until the next list replaces it.
+    private(set) var checkoutFailures: [PullRequestKey: String] = [:]
+
+    struct PullRequestKey: Hashable {
+        var folder: URL
+        var number: Int
+    }
+
+    /// What the daemon has, at once, then a refresh. Asked for when a project page
+    /// opens; never polled. The daemon's own clock keeps it current after that.
+    func loadPullRequests(for folder: URL) async {
+        let folder = Project.standardize(folder)
+        if let list = try? await client.call(DaemonAPI.Method.pullRequestsList,
+                                             DaemonAPI.PullRequestsRequest(folder: folder),
+                                             returning: PullRequestList?.self) {
+            setPullRequests(list, for: folder)
+        } else {
+            pullRequestLists[folder] = nil
+            return
+        }
+        await refreshPullRequests(for: folder)
+    }
+
+    /// The ↻: refresh now, which the daemon holds to once a minute (FR-008).
+    func refreshPullRequests(for folder: URL) async {
+        let folder = Project.standardize(folder)
+        guard let list = try? await client.call(DaemonAPI.Method.pullRequestsRefresh,
+                                                DaemonAPI.PullRequestsRequest(folder: folder),
+                                                returning: PullRequestList?.self) else { return }
+        setPullRequests(list, for: folder)
+    }
+
+    /// Check a pull request's branch out into a worktree of its own (FR-007). A failure
+    /// stays on its row rather than in an alert: each reason says what to do.
+    func checkOut(_ number: Int, in folder: URL) async {
+        let key = PullRequestKey(folder: Project.standardize(folder), number: number)
+        checkingOut.insert(key)
+        checkoutFailures[key] = nil
+        defer { checkingOut.remove(key) }
+        do {
+            let list = try await client.call(DaemonAPI.Method.pullRequestsCheckout,
+                                             DaemonAPI.PullRequestRequest(folder: key.folder, number: number),
+                                             returning: PullRequestList.self)
+            setPullRequests(list, for: key.folder)
+            // The new worktree belongs in the Worktrees section below too.
+            await loadDraftWorktrees()
+        } catch {
+            checkoutFailures[key] = describe(error)
+        }
+    }
+
+    /// Why Babysit my pull requests was refused, by folder, until it is tried again.
+    private(set) var babysitterRefusals: [URL: String] = [:]
+
+    /// Babysit my pull requests: write the starter workflow (FR-026). A ceiling is said
+    /// under the button rather than in an alert (wireframe G).
+    func addBabysitter(in folder: URL) async {
+        let folder = Project.standardize(folder)
+        babysitterRefusals[folder] = nil
+        do {
+            let summary = try await client.call(DaemonAPI.Method.pullRequestsAddBabysitter,
+                                                DaemonAPI.PullRequestsRequest(folder: folder),
+                                                returning: WorkflowSummary.self)
+            work.upsert(summary)
+            if var list = pullRequestLists[folder] {
+                list.babysitterWorkflowID = summary.workflowID
+                pullRequestLists[folder] = list
+            }
+        } catch {
+            babysitterRefusals[folder] = describe(error)
+        }
+    }
+
+    /// Resume: start babysitting a stopped pull request again (FR-024).
+    func resume(_ number: Int, in folder: URL) async {
+        let folder = Project.standardize(folder)
+        do {
+            let list = try await client.call(DaemonAPI.Method.pullRequestsResume,
+                                             DaemonAPI.PullRequestRequest(folder: folder, number: number),
+                                             returning: PullRequestList.self)
+            setPullRequests(list, for: folder)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    private func setPullRequests(_ list: PullRequestList?, for folder: URL) {
+        pullRequestLists[folder] = list
+        // A failure is true until the list next changes, and no longer.
+        checkoutFailures = checkoutFailures.filter { $0.key.folder != folder }
+    }
+
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
@@ -687,6 +786,11 @@ final class AppModel {
         case DaemonAPI.Notification.runtimeAccountChanged:
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
+
+        case DaemonAPI.Notification.pullRequestsChanged:
+            // The Mac's own, like the shells (038 FR-010).
+            guard let list = try? params?.decode(PullRequestList.self) else { return }
+            setPullRequests(list, for: list.folder)
 
         case DaemonAPI.Notification.cloneChanged:
             guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }

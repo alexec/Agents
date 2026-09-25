@@ -52,6 +52,15 @@ public enum AppTool {
     /// What can be leased on this Mac, and who holds what.
     public static let listResources = "list_resources"
 
+    // Two that act on GitHub for a run a pull-request trigger started (038), and only
+    // on that pull request: the daemon fixes the destination from the run.
+
+    /// Push the worktree's commits to the pull request's own branch. Never forced.
+    public static let pushPullRequest = "push_pull_request"
+
+    /// Reply to a review comment on that pull request, or comment on it.
+    public static let replyOnPullRequest = "reply_on_pull_request"
+
     // The older names for the two halves of `finishTurn`, kept since 2026-09-23 (023).
     // The briefing that named them is sent once and lives in the runtime's own
     // history, so a conversation begun before that date and resumed after it calls

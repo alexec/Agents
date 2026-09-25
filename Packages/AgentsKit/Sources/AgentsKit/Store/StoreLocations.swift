@@ -90,6 +90,9 @@ public struct StoreLocations: Sendable {
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
+    /// What the app remembers about the person's pull requests (038): which changes
+    /// have fired, the babysitting counts, and the last good list for each project.
+    public var pullRequests: URL { root.appendingPathComponent("pull-requests.json") }
     /// Every device that has announced itself to this daemon.
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.

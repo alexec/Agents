@@ -44,6 +44,8 @@ public actor AppService {
     public static let stopAgentToolName = AppTool.stopAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
+    public static let pushPullRequestToolName = AppTool.pushPullRequest
+    public static let replyOnPullRequestToolName = AppTool.replyOnPullRequest
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
@@ -80,7 +82,7 @@ public actor AppService {
     /// which may be none, and the conversation's new title. One sink rather than the
     /// two above in turn, because the daemon refuses the whole call or lands the whole
     /// call, and two sinks could do half of each.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String, BlockWords) async -> Outcome
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
@@ -121,6 +123,16 @@ public actor AppService {
     /// Where those go. A lease call may take up to the wait limit to come back.
     public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
 
+    /// One of the two pull-request calls (038), as the agent made it. Neither names a
+    /// pull request, a branch or a repository: the daemon takes those from the run.
+    public enum PullRequestCall: Sendable, Equatable {
+        case push
+        case reply(body: String, inReplyTo: Int?)
+    }
+
+    /// Where those go.
+    public typealias PullRequestsSink = @Sendable (PullRequestCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -129,6 +141,7 @@ public actor AppService {
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
+    private let pullRequestsSink: PullRequestsSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -150,6 +163,9 @@ public actor AppService {
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
                 },
+                pullRequests: @escaping PullRequestsSink = { _ in
+                    .refused("Only a run started for a pull request can push or reply; ask the person to do it.")
+                },
                 leases: @escaping LeasesSink = { _ in
                     .refused("This app cannot lease resources.")
                 }) {
@@ -161,6 +177,7 @@ public actor AppService {
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
+        self.pullRequestsSink = pullRequests
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -209,8 +226,13 @@ public actor AppService {
             // The three lease tools after those, for every agent: waiting for the
             // simulator is not managing anyone (036).
             let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
+            // The two pull-request tools, for every agent (038 R7): the list is fixed
+            // when a session is made, and a standing or triggering run resumes a session
+            // made long before. Outside such a run they refuse, in words.
+            let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
                                               Self.workflowTool] + agentTools + leaseTools
+                                             + pullRequestTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -235,12 +257,10 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
-                // The title is checked here too, for the same reason the message is:
-                // an agent that left it out is told so while it can still send it,
-                // rather than the row keeping a name for work it is no longer doing.
-                guard let title = Agent.cleanedTitle(arguments?["title"]?.stringValue ?? "") else {
-                    return .success(Self.reply(Self.noTitle, isError: true))
-                }
+                // The title names the conversation's goal, which outlasts a turn, so
+                // it is sent only when the goal changes: one left out, or that cleans
+                // to nothing, keeps the name the row already has.
+                let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
                 let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
                                                    orFirstOf: arguments?["next_prompts"])
                 let words: BlockWords
@@ -281,6 +301,13 @@ public actor AppService {
                 return .success(Self.reply(await workflowSink(action,
                                                               arguments?["id"]?.stringValue,
                                                               arguments?["content"]?.stringValue)))
+            }
+
+            if let call = Self.pullRequestCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await pullRequestsSink(call)))
+                }
             }
 
             if let call = Self.leaseCall(named: name, arguments) {
@@ -360,11 +387,36 @@ public actor AppService {
         return nil
     }
 
+    /// Which of the two pull-request calls a tool name is, with its arguments read.
+    static func pullRequestCall(named name: String,
+                                _ arguments: JSONValue?) -> Result<PullRequestCall, AgentCallProblem>? {
+        if name.hasSuffix(pushPullRequestToolName) { return .success(.push) }
+        if name.hasSuffix(replyOnPullRequestToolName) {
+            let body = arguments?["body"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !body.isEmpty else { return .failure("Nothing was posted: say what to reply, in `body`.") }
+            let inReplyTo = arguments?["in_reply_to"].flatMap { value -> Int? in
+                if let number = value.intValue { return number }
+                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            return .success(.reply(body: body, inReplyTo: inReplyTo))
+        }
+        return nil
+    }
+
     /// Which of the three lease calls a tool name is, with its arguments read. `nil`
     /// when the name is none of them.
     static func leaseCall(named name: String,
                           _ arguments: JSONValue?) -> Result<LeaseCall, AgentCallProblem>? {
         let resource = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Release first: "release_resource" ends with "lease_resource", so a suffix
+        // test for the lease tool matches both, and every release became an
+        // extension. Found on the real app, 2026-09-25.
+        if name.hasSuffix(releaseResourceToolName) {
+            guard !resource.isEmpty else {
+                return .failure("Nothing was released: say which resource, in `name`.")
+            }
+            return .success(.release(name: resource))
+        }
         if name.hasSuffix(leaseResourceToolName) {
             guard !resource.isEmpty else { return .failure(AgentCallProblem(stringLiteral: LeaseWords.emptyName)) }
             let minutes = arguments?["minutes"].flatMap { value -> Int? in
@@ -373,12 +425,6 @@ public actor AppService {
             }
             let wait = arguments?["wait"]?.boolValue
             return .success(.lease(name: resource, minutes: minutes, wait: wait))
-        }
-        if name.hasSuffix(releaseResourceToolName) {
-            guard !resource.isEmpty else {
-                return .failure("Nothing was released: say which resource, in `name`.")
-            }
-            return .success(.release(name: resource))
         }
         if name.hasSuffix(listResourcesToolName) {
             return .success(.list)
@@ -434,11 +480,6 @@ public actor AppService {
     static let noWords = """
         Nothing was recorded: say in a sentence how it went. An outcome with no words \
         is no more use than the turn simply ending.
-        """
-
-    static let noTitle = """
-        Nothing was recorded: give the conversation a title — a few words saying what \
-        it is doing now. It is the name the person sees on its row.
         """
 
     /// A tool result is content plus a flag, and a failure inside the tool is reported
@@ -499,10 +540,12 @@ public actor AppService {
             somebody who has not read the conversation. For needs_answer, the message \
             is the question itself.
 
-            The title is the name on that row: a few words saying what this \
-            conversation is doing now, like "Login redirect fixed" or "Choosing a \
-            test account". Give a fresh one every time, as the work moves on; it \
-            replaces the last one. Keep it short and specific, and do not repeat the \
+            The title is the name on that row: a few words naming what the person \
+            wants from this conversation — its goal, not the step you just took — \
+            like "Login redirect" or "Test account for staging". Send it on your \
+            first turn, and again only when the person moves the conversation on to \
+            a different goal; leave it out otherwise and the name stays as it is. \
+            What you did this turn belongs in the message, not here. Do not put the \
             outcome in it.
 
             With it, offer the one thing the person is most likely to want to say next, \
@@ -536,8 +579,9 @@ public actor AppService {
                 "title": [
                     "type": "string",
                     "description": """
-                        A few words naming what this conversation is doing now. \
-                        Replaces the name on its row.
+                        A few words naming the conversation's goal, which becomes \
+                        the name on its row. Send it on the first turn and when the \
+                        goal changes; leave it out to keep the name as it is.
                         """,
                 ],
                 "waiting_on": [
@@ -576,7 +620,7 @@ public actor AppService {
                     "required": .array(["label", "prompt"]),
                 ],
             ],
-            "required": .array(["outcome", "message", "title"]),
+            "required": .array(["outcome", "message"]),
         ],
     ]
 
@@ -816,7 +860,9 @@ public actor AppService {
                         project folder. "new" makes a fresh git worktree, on its own \
                         branch, named from the prompt — for parallel work that should \
                         not touch the same files. Or the name of a worktree of this \
-                        repository that is already there, as `git worktree list` shows it.
+                        repository that is already there, as `git worktree list` shows it. \
+                        Or the name of a branch not checked out anywhere, local or on a \
+                        remote, to make a fresh worktree on that branch.
                         """,
                 ],
             ],
@@ -869,6 +915,37 @@ public actor AppService {
             many of this project's three places are in use.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    // MARK: Pull requests (038). Words from contracts/pull-requests.md.
+
+    static let pushPullRequestTool: JSONValue = [
+        "name": .string(pushPullRequestToolName),
+        "title": "Push to the pull request",
+        "description": """
+            Push this worktree's commits to the pull request you were started for. Never \
+            force-pushes: if the remote has commits you don't, bring them in first and \
+            push again. Only works in a run started for a pull request.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    static let replyOnPullRequestTool: JSONValue = [
+        "name": .string(replyOnPullRequestToolName),
+        "title": "Reply on the pull request",
+        "description": """
+            Reply on the pull request you were started for. Give in_reply_to (a comment \
+            id from your prompt) to answer a review comment in its thread; leave it out \
+            to comment on the pull request itself.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "body": ["type": "string"],
+                "in_reply_to": ["type": "integer"],
+            ],
+            "required": .array(["body"]),
+        ],
     ]
 
     // MARK: Leases (036). Words from contracts/lease-tools.md.

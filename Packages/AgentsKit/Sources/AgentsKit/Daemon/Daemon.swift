@@ -77,6 +77,7 @@ public final class Daemon: @unchecked Sendable {
         // recovery, so a workflow is never fired at an agent the daemon has not yet
         // worked out is dead.
         await core.startWorkflows()
+        await core.watchPullRequests()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it

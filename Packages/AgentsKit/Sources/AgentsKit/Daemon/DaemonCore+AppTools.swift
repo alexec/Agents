@@ -123,9 +123,8 @@ extension DaemonCore {
                                         checkAgainInMinutes: request.checkAgainInMinutes)
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
-        // the record, and a helper from an older binary sends no title at all — which
-        // leaves the name as it was rather than refusing a call the agent was never
-        // told needed one.
+        // the record. No title — the goal has not changed, or a helper from an older
+        // binary sent none — leaves the name as it was.
         let title = request.title.flatMap(Agent.cleanedTitle)
         let noted = await land(checked.report, prompts: prompts, title: title,
                                on: checked.agent, id: checked.agentID)
