@@ -84,8 +84,8 @@ naming what it wants to do. Tap **Yes**. The agent carries on, and ends in
 
 ## Where next
 
-- [Answer a question or a permission request](../how-to/index.md), including from a
+- [Answer a question or a permission request](../how-to/answer-a-question.md), including from a
   notification when your Mac is not in use.
-- [Start an agent in its own worktree](../how-to/index.md), so two agents in one project
+- [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents in one project
   do not change the same files.
-- [How the phone and iPad reach the Mac](../explanation/index.md).
+- [How the phone and iPad reach the Mac](../explanation/phone-and-ipad.md).

@@ -296,14 +296,14 @@ a running agent when the window closes and when the Mac restarts.
 
 ## Phase 9: Polish and Cross-Cutting
 
-- [ ] T050 Privacy pass (quickstart V6): open every picture under `docs/**/images/` and read every page once.
+- [X] T050 Privacy pass (quickstart V6): open every picture under `docs/**/images/` and read every page once.
   Replace anything showing a real project, path, conversation, address or token, and note in
   `specs/044-docs-site/walk/README.md` that this was done, with the date.
-- [ ] T051 Phone-width pass (SC-007): in `serve`, take screenshots at 390 px wide of the home page, one page of each
+- [X] T051 Phone-width pass (SC-007): in `serve`, take screenshots at 390 px wide of the home page, one page of each
   section and the widest table, and fix any sideways scroll of body text.
-- [ ] T052 Run the full quickstart (V1–V6), and record the results and any gaps in
+- [X] T052 Run the full quickstart (V1–V6), and record the results and any gaps in
   `specs/044-docs-site/walk/README.md`.
-- [ ] T053 Hand quickstart V4's timed run by a new user (SC-001) and the iPhone reading (V7.4) to Alex as the two
+- [X] T053 Hand quickstart V4's timed run by a new user (SC-001) and the iPhone reading (V7.4) to Alex as the two
   things only he can do, listed in the walk README.
 - [ ] T054 Stop the scratch app and its daemon on `/tmp/run-044` by the pid in its `daemon.lock` (never pattern-kill
   `agentsd`), and delete `/tmp/run-044`.

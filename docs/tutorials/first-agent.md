@@ -19,7 +19,7 @@ how every agent in the app works.
 
 - A Mac with Xcode installed.
 - One coding agent installed and signed in on this Mac. This tutorial uses **Claude
-  Code**. Grok, Copilot and Cursor work too; see [Reference](../reference/index.md) for
+  Code**. Grok, Copilot and Cursor work too; see [Runtimes](../reference/runtimes.md) for
   what each needs.
 
 ## 1. Build and open Agents
@@ -161,6 +161,8 @@ whether it runs for a minute or an afternoon.
 ## Where next
 
 - [Follow your agents from your iPhone](follow-from-iphone.md), the next tutorial.
-- [How-to guides](../how-to/index.md), for one task at a time, such as starting an agent
-  in its own worktree or adding a Linux server.
-- [Why agents keep working when the window is closed](../explanation/index.md).
+- [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents
+  in one project do not change the same files.
+- [Read an agent's changes](../how-to/read-an-agents-changes.md), file by file and word by
+  word.
+- [Why agents keep working when the window is closed](../explanation/window-and-daemon.md).
