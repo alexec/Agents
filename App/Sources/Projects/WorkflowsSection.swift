@@ -118,36 +118,10 @@ struct WorkflowsSection: View {
             .padding(.vertical, 6)
     }
 
-    /// Names where the files live, because that is the one fact nobody can guess, and
-    /// both routes to a first workflow.
-    ///
-    /// The second route is the one people stall on: *ask an agent* is only useful if
-    /// you know what asking sounds like. So the example is offered as the sentence
-    /// itself, and tapping it puts those words in the prompt above rather than
-    /// sending them — the same bargain every suggestion in this app makes.
     private var empty: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("""
-                No workflows yet. A workflow is a prompt that runs itself — on a \
-                schedule, or when an agent finishes. Ask an agent to set one up, or \
-                write one into \(WorkflowFile.folderName).
-                """)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button {
-                model.offeredPrompt = WorkflowExample.prompt
-            } label: {
-                Text("“\(WorkflowExample.prompt)”")
-                    .appText(.reading)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .buttonStyle(.link)
-            .help("Put this in the prompt above")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 6)
+        Text("No workflows")
+            .appText(.reading)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
     }
 }

@@ -120,8 +120,14 @@ struct ProjectAgentsView: View {
     private var agents: some View {
         GlassEffectContainer(spacing: Self.cardSpacing) {
             LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                if hasSessions {
+                if folder != nil {
                     SectionHeading(title: "Sessions")
+                    if !hasSessions {
+                        Text("No sessions")
+                            .appText(.reading)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 6)
+                    }
                 }
                 ForEach(AgentGroup.live, id: \.self) { group in
                     let agents = model.agents(in: folder, group: group)
@@ -142,13 +148,6 @@ struct ProjectAgentsView: View {
                 // Under the agents: what will happen, after what is happening. See
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
-
-                if isEmpty {
-                    Text("Nothing here yet. Say what you want done and an agent starts on it.")
-                        .appText(.reading)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 6)
-                }
             }
             .chatColumn()
             .padding(.bottom, 28)
@@ -158,11 +157,6 @@ struct ProjectAgentsView: View {
 
     private var hasSessions: Bool {
         AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
-    }
-
-    private var isEmpty: Bool {
-        folder != nil && AgentGroup.allCases.allSatisfy { model.agents(in: folder, group: $0).isEmpty }
-            && model.workflows(in: folder).isEmpty
     }
 
     private var archived: [Agent] {
