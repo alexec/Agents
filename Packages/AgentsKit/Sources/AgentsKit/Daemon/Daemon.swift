@@ -49,6 +49,10 @@ public final class Daemon: @unchecked Sendable {
             onDisconnected: { connection in
                 Task {
                     await core.forgetPresence(connection: connection)
+                    // A start form's runtime, left behind by a phone that went away.
+                    // Let go after a grace period rather than now, so one that only
+                    // dropped for a moment still finds it (029).
+                    await core.orphanDrafts(connection: connection)
                     // A bridge that has gone carries nothing. Left on the list, the next
                     // withdrawal would be handed to nobody and forgotten (025 US2).
                     await core.forgetCarrier(connection: connection)

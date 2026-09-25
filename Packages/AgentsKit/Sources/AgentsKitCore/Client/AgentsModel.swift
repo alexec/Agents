@@ -95,6 +95,9 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// The mode last chosen for each runtime, as the Mac holds it (029). A copy, kept
+    /// current by `modes/changed`, so a start form can open on it without a round trip.
+    public private(set) var rememberedModes: DaemonAPI.RememberedModes = [:]
     /// Why the Mac is, or is not, being kept awake (024).
     ///
     /// Nil means *not yet heard from*, which is a different fact from *not holding* and
@@ -123,6 +126,7 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
+        case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
@@ -148,6 +152,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
@@ -224,6 +229,9 @@ public final class AgentsModel {
         case .costChanged(let state):
             costState = state
 
+        case .modesChanged(let modes):
+            rememberedModes = modes
+
         case .wakeChanged(let state):
             wakeState = state
 
@@ -295,6 +303,10 @@ public final class AgentsModel {
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceRememberedModes(_ modes: DaemonAPI.RememberedModes) { rememberedModes = modes }
+
+    /// The mode last chosen for this runtime, on any device (029).
+    public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
 
     /// What this agent has left before it stops, under the limits as they stand.
@@ -406,6 +418,22 @@ public final class AgentsModel {
     public func agent(_ id: UUID?) -> Agent? {
         guard let id else { return nil }
         return agents.first { $0.id == id }
+    }
+
+    /// Which runtime a new agent gets when nobody has said.
+    ///
+    /// Whatever the last agent used, when it is still available, because that is the
+    /// one already chosen in every other sense. Here rather than in either app so that
+    /// the Mac and a phone cannot offer different ones for the same work (029).
+    ///
+    /// - Parameter available: the runtimes that can be started now, in the Mac's order.
+    ///   With no agent to go by it is the first of these — by order, not whichever a
+    ///   set happened to hand back, which is what the Mac used to do.
+    public func defaultRuntimeID(available: [String]) -> String? {
+        let startable = Set(available)
+        let recent = agents.filter { startable.contains($0.runtimeID) }
+            .max { $0.lastActivityAt < $1.lastActivityAt }
+        return recent?.runtimeID ?? available.first
     }
 
     /// The projects worth showing, newest activity first.

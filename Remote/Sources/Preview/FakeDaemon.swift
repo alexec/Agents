@@ -70,6 +70,34 @@ private actor FakeState {
             case DaemonAPI.Method.elicitationsPending:
                 return .success(try JSONValue.encoding(forms))
 
+            case DaemonAPI.Method.runtimesList:
+                return .success(try JSONValue.encoding(Canned.runtimes))
+
+            case DaemonAPI.Method.runtimesAccounts:
+                return .success(try JSONValue.encoding([RuntimeAccount]()))
+
+            case DaemonAPI.Method.agentsOptions:
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.OptionsResponse(draftID: UUID(), options: Canned.startOptions)))
+
+            case DaemonAPI.Method.agentsDiscardDraft:
+                return .success(.object([:]))
+
+            case DaemonAPI.Method.agentsStart:
+                let request = try params?.decode(DaemonAPI.StartRequest.self)
+                if let id = request?.requestID, let made = agents.first(where: { $0.startRequestID == id }) {
+                    return .success(try JSONValue.encoding(made.id))
+                }
+                guard let request else { return .failure(JSONRPCError(code: -32602, message: "No start")) }
+                var agent = Agent(runtimeID: request.runtimeID, cwd: request.cwd,
+                                  title: Agent.fallbackTitle(from: request.prompt), state: .running,
+                                  startOptions: request.startOptions,
+                                  startRequestID: request.requestID)
+                agent.lastActivityAt = Date()
+                agents.append(agent)
+                await tell(DaemonAPI.Notification.agentChanged, try? JSONValue.encoding(agent))
+                return .success(try JSONValue.encoding(agent.id))
+
             case DaemonAPI.Method.agentsResuming:
                 return .success(try JSONValue.encoding(DaemonAPI.ResumingResponse(agentIDs: [])))
 

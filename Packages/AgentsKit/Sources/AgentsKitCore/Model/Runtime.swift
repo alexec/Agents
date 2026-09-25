@@ -43,6 +43,21 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
 
     public var id: String { runtime.id }
 
+    /// Why it cannot be started, in the runtime's own terms, or nil when it can. One
+    /// sentence, the same on the Mac and on a phone (029).
+    public var unavailableReason: String? {
+        switch availability {
+        case .available:
+            return nil
+        case .missing(let lookedIn):
+            return "Looked for \(runtime.executable) in \(lookedIn.prefix(4).joined(separator: ", "))…"
+        case .needsSignIn(_, let fixCommand):
+            return fixCommand.map { "Signed out. Run \($0)." } ?? "Signed out."
+        case .failed(let reason):
+            return reason
+        }
+    }
+
     public init(runtime: Runtime, availability: RuntimeAvailability, checkedAt: Date = Date()) {
         self.runtime = runtime
         self.availability = availability

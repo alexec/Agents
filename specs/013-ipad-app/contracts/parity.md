@@ -28,7 +28,7 @@ its browser, its file system at large, its signed-in accounts — is not.
 | The Mac shows | On iPad | Why |
 |---|---|---|
 | The project's name | **Yes** | Built. |
-| A prompt bar with this project's folder fixed | **Yes** | FR-026. **Not built** — corrected 2026-09-19. `ProjectPageView` says so in its own comment and the 2026-09-19 inventory read it as built. T072 builds it. |
+| A prompt bar with this project's folder fixed | **Yes — built 2026-09-24 by 029** | FR-026. Not a bar on the page: New agent in the toolbar opens a sheet with the folder fixed to the project (`StartAgentView`). Not yet seen on an iPad. |
 | Agents grouped "Needs input", "Working", "Completed" via `AgentGroup` | **Yes** | FR-015. Built, same shared file. |
 | Agent cards, with how a completed one ended | **Yes** | FR-019. Built. |
 | Archived agents behind a disclosure, ten at a time | **Yes** | FR-020. Built. |
@@ -56,9 +56,9 @@ its browser, its file system at large, its signed-in accounts — is not.
 | How an agent ended — finished, stopped, the error | **Yes** | FR-019. Built. |
 | Resuming / coming-back state (011) | **Yes** | FR-021. Already true: `AgentCard`, `StatusIcon` and `ComingBackLine` all read the shared `AgentsModel.isComingBack`. |
 | The prompt bar, sending text | **Yes — built 2026-09-19** | FR-025. `Remote/Sources/Chat/PromptBar.swift` (T066a, added because this row was wrong). A field and a send, under the question when there is one. |
-| Attachments on the prompt (`AttachmentStrip`) | **Yes** | FR-025. Built on the model side; the iPad's picker is T074's, and it needs T072's prompt bar to hang on. |
+| Attachments on the prompt (`AttachmentStrip`) | **Yes — on the start sheet only, 029** | FR-025. Pictures (shrunk to 2048 px) and text files, by value, 900 KB in all, because a file on the iPad is a path the Mac cannot open. Other files are refused in a sentence. The conversation's bar still has no picker: that's what is left of T074. |
 | Slash commands offered while typing (`CommandList`) | **Yes — built 2026-09-19** | FR-021. The agent's own `availableCommands`, matched by the shared `SlashCommand.matching`. The row is the way to choose one; there are no arrow keys on a touch screen. |
-| Mode / model / effort / permission controls (`SelectCapsule`, `OptionMenu`, 009) | **Yes** | FR-021 and FR-026. An agent started from the iPad must be startable with the runtimes and options the Mac has. |
+| Mode / model / effort / permission controls (`SelectCapsule`, `OptionMenu`, 009) | **Yes — on the start sheet, built 2026-09-24 by 029** | FR-021 and FR-026. Every option the runtime advertises, in the Mac's order. The mode opens on the one last chosen on any device, which the daemon now remembers (`modes/remembered`). Changing them on a running conversation from the iPad is not built. |
 | Jump to the live end (`JumpToEnd`) | **Yes — built 2026-09-19** | FR-021. It needed the auto-scroll fixed first: the chat used to scroll to the foot on every new entry, so nobody could ever be away from the end. Now it follows only a reader already there. |
 | Dictation (`Dictation`) | **Not judged** | Out of scope by omission on the Mac's terms: it is a Mac input method. The iPad has the system's own. No requirement either way — **the one row here that is a shrug, and it is recorded as one.** |
 | Permission request in full, with the Mac's choices (`PermissionView`) | **Yes** | FR-011. Built. |
@@ -80,7 +80,7 @@ its browser, its file system at large, its signed-in accounts — is not.
 |---|---|---|
 | Runtime accounts, signing in (`RuntimeAccountView`) | **No** | Out of scope: needs the Mac's browser. |
 | The session list, adopting a session (`SessionListView`) | **No** | Out of scope by omission — **this row needs a decision.** It is neither clearly a fact about the work nor clearly driving the Mac. Flagged for `/speckit-clarify`. |
-| Where an agent may work and what it can reach (`AgentReachView`, extra folders, MCP servers) | **Shown, not edited** | FR-021 to show it; choosing folders needs the Mac's file system. |
+| Where an agent may work and what it can reach (`AgentReachView`, extra folders, MCP servers) | **Shown, not edited** | FR-021 to show it; choosing folders needs the Mac's file system. 029 confirmed it for starting too: an agent started from a remote gets no extra folders, MCP servers or extra arguments (029 spec, Assumptions). |
 | Forking an agent (`agents/fork`) | **No** | Out of scope by omission. Not in FR-025 to FR-027. |
 | Paired devices, approve and revoke | **Mac only** | FR of US4: the Mac is where a device is trusted. By design. |
 

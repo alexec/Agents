@@ -31,6 +31,18 @@ public enum DaemonAPI {
         /// file holds and says the choices are not known here yet, rather than offering
         /// an empty menu or inventing one.
         public static let optionsRemembered = "options/remembered"
+        /// Let go of a draft made by `agents/options` that is not going to be started:
+        /// its runtime is a process nobody will talk to. A draft already used, already
+        /// ended or never known is not an error — gone is what was asked for (029).
+        public static let agentsDiscardDraft = "agents/discardDraft"
+        /// The mode last chosen for each runtime, held once on the Mac so that every
+        /// window and every phone offers the same one first (029). The whole map: it is
+        /// a handful of entries, and a client holding a copy needs all of it.
+        public static let modesRemembered = "modes/remembered"
+        /// Modes a window remembered before the daemon did. Fills gaps only: a runtime
+        /// the daemon already has a mode for keeps it, so an old window's memory can
+        /// never overwrite a choice made since on another device (029).
+        public static let modesImport = "modes/import"
         /// Where the person is, told by every surface when it comes to the front, goes
         /// behind, changes conversation, or sees input after a quiet spell (021 FR-011).
         /// No timestamp is accepted: the daemon stamps arrival with its own clock.
@@ -188,6 +200,9 @@ public enum DaemonAPI {
         /// offered last time. Carries the failure instead when the runtime being
         /// started behind that form would not start.
         public static let draftOptions = "agents/draftOptions"
+        /// The remembered modes changed: the whole map, as `modes/remembered` answers
+        /// (029).
+        public static let modesChanged = "modes/changed"
         /// The whole resolved fact for one need: where it should be showing and whether
         /// the person may be buzzed. Broadcast to every connection, not only to `to`,
         /// which is what lets the losers withdraw (021).
@@ -434,12 +449,18 @@ public enum DaemonAPI {
         /// Where in the project to work, when it is not the project folder itself
         /// (030). `cwd` stays the project folder: the worktree is made, or found, from it.
         public var worktree: WorktreeChoice?
+        /// Minted once per send by the caller and reused on every retry of that send.
+        /// A second start with the same one answers with the first start's agent
+        /// rather than making another, which is what lets a phone whose reply was lost
+        /// on the way back try again without starting the work twice. `nil` from
+        /// callers that do not retry.
+        public var requestID: UUID?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
-                    worktree: WorktreeChoice? = nil) {
+                    worktree: WorktreeChoice? = nil, requestID: UUID? = nil) {
             self.worktree = worktree
             self.runtimeID = runtimeID
             self.cwd = cwd
@@ -449,6 +470,7 @@ public enum DaemonAPI {
             self.draftID = draftID
             self.additionalDirectories = additionalDirectories
             self.mcpServers = mcpServers
+            self.requestID = requestID
         }
 
         /// Fields with a sensible default may be left out. A caller that wants an
@@ -465,6 +487,7 @@ public enum DaemonAPI {
             additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
             mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
             worktree = try c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
+            requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -1184,6 +1207,19 @@ public enum DaemonAPI {
     }
 
     /// What this runtime last advertised for this folder. Starts nothing.
+    public struct DiscardDraftRequest: Codable, Sendable {
+        public var draftID: UUID
+        public init(draftID: UUID) { self.draftID = draftID }
+    }
+
+    /// Keyed by runtime id. What `modes/remembered` answers and `modes/changed` carries.
+    public typealias RememberedModes = [String: JSONValue]
+
+    public struct ModesImportRequest: Codable, Sendable {
+        public var modes: RememberedModes
+        public init(modes: RememberedModes) { self.modes = modes }
+    }
+
     public struct RememberedOptionsRequest: Codable, Sendable {
         public var runtimeID: String
         public var cwd: URL

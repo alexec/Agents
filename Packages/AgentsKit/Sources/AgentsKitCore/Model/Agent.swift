@@ -133,6 +133,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The worktree this agent was started in, if it was (030). Its project is the
     /// worktree's project, not its `cwd`.
     public var worktree: AgentWorktree?
+    /// The `requestID` of the start that made this agent, when the caller sent one
+    /// (029). Written on the first save, never changed. It is how a start retried after
+    /// its reply was lost finds the agent the first attempt made, including across a
+    /// daemon restart, and how a phone that dropped mid-send finds it in the list.
+    public var startRequestID: UUID?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -242,6 +247,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
         // New in 030, and optional: every agent before it works in its project folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
+        startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -302,6 +308,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
         try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
         try c.encodeIfPresent(worktree, forKey: .worktree)
+        try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -321,7 +328,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
-        case startedByWorkflow, startedByRun, startedByAgent, chainDepth
+        case startedByWorkflow, startedByRun, startedByAgent, chainDepth, startRequestID
         case worktree
         case restartPickUps
         case report, outcomeAsked
@@ -364,6 +371,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 startedByAgent: UUID? = nil,
                 chainDepth: Int? = nil,
                 worktree: AgentWorktree? = nil,
+                startRequestID: UUID? = nil,
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
@@ -398,6 +406,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.startedByAgent = startedByAgent
         self.chainDepth = chainDepth
         self.worktree = worktree
+        self.startRequestID = startRequestID
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked

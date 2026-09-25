@@ -620,7 +620,7 @@ struct PromptBar: View {
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
         if let suggestion { return suggestion.prompt }
-        guard let agent else { return "Say what you want done" }
+        guard let agent else { return "Say what's next" }
         // While it works, the field says what happens to what you type rather than
         // what the agent is doing. The state line in the transcript says that.
         if agent.state.hasTurnInFlight { return "Say what next, and it goes when this turn ends" }
@@ -768,11 +768,6 @@ struct PromptBar: View {
         }
     }
 
-    /// Which advertised option is the mode, for the runtime in play.
-    private var modeOptionID: String? {
-        ModeMemory.modeOption(in: agent?.advertisedOptions ?? model.draftOptions)?.id
-    }
-
     /// A choice goes to the draft before there is an agent, and to the daemon after.
     ///
     /// Both branches now write somewhere the getter reads. The draft one always did,
@@ -788,11 +783,8 @@ struct PromptBar: View {
             },
             set: { value in
                 guard let value else { return }
-                // Above the split, so one line covers a new chat and a live one.
-                if option.id == modeOptionID,
-                   let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
-                    model.rememberMode(value, for: runtimeID)
-                }
+                // The mode is remembered by the daemon now: on a live conversation's
+                // change, and on the start a draft's choice becomes (029).
                 if let agent {
                     // Synchronous: it writes the optimistic value now and sends in the
                     // background, so the control changes as the menu closes.
