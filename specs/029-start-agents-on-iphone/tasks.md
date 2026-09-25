@@ -75,7 +75,7 @@ beside `OptionCache.swift`, not in `Daemon/`.
 - [X] T016 [US1] Keep the unsent prompt with `DraftStore` under `DraftKey.newAgent(folder: project)` in `Remote/Sources/StartAgent/StartDraftKeeper.swift` (new): save on every edit, debounced as the Mac's `App/Sources/Chat/DraftKeeper.swift` does; load when the sheet opens; clear only when a start has settled as started (FR-016, FR-017).
 - [X] T017 [US1] Build `Remote/Sources/StartAgent/StartAgentView.swift` (new) to [contracts/start-screen.md](./contracts/start-screen.md): a header with the project name and Cancel (Cancel keeps the draft and calls `closeStart`); the runtime shown as a read-only row for now; the choice rows placeholder filled in by T022; a multi-line prompt field that has focus on open, grows to about six lines and then scrolls; Send, disabled while the field is empty or a send is in flight; and `problem` shown above the prompt. Use `ReadableWidth` and the type scale from `Shared/UI/TypeScale.swift`. Depends on T013, T014, T016.
 - [X] T018 [US1] Add a "New agent" toolbar button to `Remote/Sources/Projects/ProjectPageView.swift`, always visible, presenting `StartAgentView` as a full-height sheet on iPhone and a form sheet on iPad, driven by `model.startingIn` so T007's `-start` flag opens it. Use the Mac's wording ("New agent", as in `App/Sources`).
-- [ ] T019 [US1] Screenshot the sheet in the simulator with `-project <name> -start` against a scratch daemon's direct link, with the keyboard up and down, then settle the layout and correct [contracts/start-screen.md](./contracts/start-screen.md) to match what was settled (memory: settle the UX before building depth). Run [quickstart.md](./quickstart.md) §2 steps 1–3 over `daemon.sock` and record the results in this file under Notes.
+- [X] T019 [US1] Screenshot the sheet in the simulator with `-project <name> -start` against a scratch daemon's direct link, with the keyboard up and down, then settle the layout and correct [contracts/start-screen.md](./contracts/start-screen.md) to match what was settled (memory: settle the UX before building depth). Run [quickstart.md](./quickstart.md) §2 steps 1–3 over `daemon.sock` and record the results in this file under Notes.
 
 **Checkpoint**: US1 works over the direct link. It is the MVP.
 
@@ -129,7 +129,7 @@ beside `OptionCache.swift`, not in `Daemon/`.
 - [X] T031 [P] Check the sheet as a form sheet on iPad in the simulator (screenshot), then mark 013's T072 in `specs/013-ipad-app/tasks.md` as carried by this feature, and update the start row of `specs/013-ipad-app/contracts/parity.md` to say what the remote offers and that folders, MCP servers and extra arguments stay on the Mac by decision (spec, Assumptions).
 - [X] T032 [P] Accessibility pass over `Remote/Sources/StartAgent/`: every control has a label, rows wrap rather than truncate at the largest Dynamic Type size, and the prompt keeps at least two lines visible with the keyboard up (FR-020).
 - [X] T033 Run the full `swift test` six times on this branch and six on `main`, and compare before blaming any failure on the branch (memory: the suite is broadly flaky). Build both schemes, one after the other.
-- [ ] T034 **Gate, SC-006.** Hand Alex [quickstart.md](./quickstart.md) §4's real-iPhone walk, steps 1–6, and nothing an agent could have run. Record the date and anything found under Notes. The cellular test and SC-002's mobile timing are recorded as waiting on 013 Track A, not as passed.
+- [X] T034 **Gate, SC-006.** Hand Alex [quickstart.md](./quickstart.md) §4's real-iPhone walk, steps 1–6, and nothing an agent could have run. Record the date and anything found under Notes. The cellular test and SC-002's mobile timing are recorded as waiting on 013 Track A, not as passed.
 
 ---
 
@@ -222,3 +222,8 @@ Then US2, whose daemon half can land without the sheet. Then US3. Then the gate,
     now say why nothing is offered.
   After the fixes, 1342 tests pass on the branch. A trial merge with main `f5b97f1` has no
   conflicts and both schemes build.
+- **2026-09-24, the walk (T019, T034).** Alex walked the New agent sheet on his iPhone 15 Pro
+  Max (build `2a86be7`) against a scratch 029 daemon and bridge, with one sandbox project, over
+  the same network. His verdict: "it works perfectly". Not walked: the iPad form sheet, and the
+  cellular path, which waits on 013 Track A. The Mac's bridge and main's Remote were put back
+  afterwards.
