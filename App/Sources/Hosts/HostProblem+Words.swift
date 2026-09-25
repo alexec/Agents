@@ -28,11 +28,27 @@ extension HostProblem {
             "\(label) didn’t answer. Check it is on and reachable, then try again."
         case .offline:
             "\(label) is offline"
+        case .noDownloader:
+            "\(label) has neither curl nor wget to download Claude."
+        case .noInternet:
+            "\(label) can’t reach the internet to download Claude."
+        case .unsupportedLibc(let libc):
+            "Claude can’t be installed on \(label): it uses \(libc). Install Claude there yourself to use it."
+        case .toolsetChecksum:
+            "The download on \(label) didn’t match its checksum, so nothing was installed."
+        case .toolsetInstallFailed(let detail):
+            detail.isEmpty ? "Installing Claude on \(label) failed." : "Installing Claude on \(label) failed: \(detail)"
+        case .diskFullForTools(let needed, let free):
+            "\(label) needs \(Self.megabytes(needed)) free to install Claude, and has \(Self.megabytes(free))."
         }
     }
 
     /// Whether trying the same thing again could work without the person changing
     /// anything on the server or in their ssh setup first.
+    static func megabytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
     var offersTryAgain: Bool {
         if case .hostKeyChanged = self { return false }
         return true

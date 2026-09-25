@@ -33,7 +33,14 @@ public struct ServerInstaller: Sendable {
     static let probeScript = """
         uname -sm; printf '%s\\n' "$HOME"; df -Pk "$HOME" | tail -1; \
         tr -d '\\n' < "$HOME/.agents-server/install.json" 2>/dev/null; echo; \
-        grep -i '^[[:space:]]*AllowStreamLocalForwarding' /etc/ssh/sshd_config 2>/dev/null || echo default
+        grep -i '^[[:space:]]*AllowStreamLocalForwarding' /etc/ssh/sshd_config 2>/dev/null || echo default; \
+        printf 'libc:%s\\n' "$(ldd --version 2>&1 | head -1)"; \
+        printf 'fetch:%s\\n' "$(command -v curl || command -v wget || echo none)"; \
+        t="$HOME/.agents-server/tools/claude/current"; \
+        printf 'toolset:%s\\n' "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; \
+        ${SHELL:-/bin/sh} -lc 'command -v npx >/dev/null 2>&1 && echo npx:yes || echo npx:no; \
+        [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none' 2>/dev/null </dev/null; \
+        [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none
         """
 
     public func probe() async throws -> ServerFacts {
@@ -58,9 +65,28 @@ public struct ServerInstaller: Sendable {
         let forwarding = lines[4].lowercased()
         let forwardingOff = forwarding.contains("allowstreamlocalforwarding")
             && (forwarding.hasSuffix(" no") || forwarding.hasSuffix(" local"))
-        return ServerFacts(system: uname[0], architecture: Architecture(uname: uname[1]), home: lines[1],
-                           freeBytes: freeKilobytes * 1024, installedVersion: version, installedSHA256: sha,
-                           streamLocalForwarding: !forwardingOff)
+        var facts = ServerFacts(system: uname[0], architecture: Architecture(uname: uname[1]), home: lines[1],
+                                freeBytes: freeKilobytes * 1024, installedVersion: version, installedSHA256: sha,
+                                streamLocalForwarding: !forwardingOff)
+        readClaudeLines(lines.dropFirst(5), into: &facts)
+        return facts
+    }
+
+    /// The lines 043 added, each `key:value`. Found by key rather than by position,
+    /// because the login shell that answers two of them may print a banner of its own.
+    static func readClaudeLines(_ lines: ArraySlice<String>, into facts: inout ServerFacts) {
+        for line in lines {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let key = line[..<colon], value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            switch key {
+            case "libc": facts.libc = Libc(lddFirstLine: value)
+            case "fetch": facts.downloader = value == "none" || value.isEmpty ? nil : (value as NSString).lastPathComponent
+            case "toolset": facts.toolsetID = value == "none" || value.isEmpty ? nil : value
+            case "npx": facts.hasNpx = value == "yes"
+            case "signin": if value == "env" || value == "file" { facts.hasOwnClaudeSignIn = true }
+            default: continue
+            }
+        }
     }
 
     struct InstallRecord: Codable {

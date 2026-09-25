@@ -1,0 +1,5 @@
+#!/bin/sh
+# The fake server's login shell (043): `-lc CMD` without reading this Mac's /etc/profile,
+# whose path_helper would hand the server this Mac's npx and Homebrew.
+[ "$1" = -lc ] && shift && exec /bin/sh -c "$@"
+exec /bin/sh "$@"

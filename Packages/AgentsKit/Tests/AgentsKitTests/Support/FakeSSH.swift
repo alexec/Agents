@@ -30,8 +30,10 @@ struct FakeSSH {
     }
 
     /// What the fake reads. `uname` defaults to an ARM64 Linux server.
-    func environment(fail: String? = nil, uname: String? = nil, knownHosts: URL? = nil) -> [String: String] {
+    func environment(fail: String? = nil, uname: String? = nil, knownHosts: URL? = nil,
+                     extra: [String: String] = [:]) -> [String: String] {
         var env = SSHCommand.environment(from: ProcessInfo.processInfo.environment)
+        env.merge(extra) { _, new in new }
         env["FAKE_SSH_HOME"] = home.path
         if let fail { env["FAKE_SSH_FAIL"] = fail }
         if let uname { env["FAKE_SSH_UNAME"] = uname }
@@ -40,10 +42,10 @@ struct FakeSSH {
     }
 
     func command(name: String = "fakebox", id: String = "fk000001", fail: String? = nil,
-                 uname: String? = nil, knownHosts: URL? = nil) -> SSHCommand {
+                 uname: String? = nil, knownHosts: URL? = nil, extra: [String: String] = [:]) -> SSHCommand {
         var ssh = SSHCommand(executable: Self.executable, name: name,
                              controlPath: hosts.appendingPathComponent("\(id).ctl"))
-        ssh.environment = environment(fail: fail, uname: uname, knownHosts: knownHosts)
+        ssh.environment = environment(fail: fail, uname: uname, knownHosts: knownHosts, extra: extra)
         return ssh
     }
 

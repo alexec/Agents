@@ -38,6 +38,12 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     /// What was shown and accepted when it was added. `known_hosts` is what ssh checks;
     /// this is only so Settings can show it again.
     public var trustedFingerprint: String?
+    /// "Use this server's own sign-in only" (043, FR-014): nothing from Settings is ever
+    /// lent to it. For a box the person shares.
+    public var ownSignInOnly: Bool = false
+    /// The project folders last seen on it, so that after a rebuild the ones it no longer
+    /// has can be shown as gone rather than offline (043, FR-019).
+    public var knownProjects: [String] = []
 
     public struct InvalidName: Error, Equatable, Sendable {
         public var name: String
@@ -49,6 +55,19 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
         self.sshName = sshName
         self.label = Self.label(for: sshName)
         self.addedAt = addedAt
+    }
+
+    /// Written by hand only so that a `hosts.json` from before 043 still reads.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(HostID.self, forKey: .id)
+        sshName = try c.decode(String.self, forKey: .sshName)
+        label = try c.decode(String.self, forKey: .label)
+        addedAt = try c.decode(Date.self, forKey: .addedAt)
+        facts = try c.decodeIfPresent(ServerFacts.self, forKey: .facts)
+        trustedFingerprint = try c.decodeIfPresent(String.self, forKey: .trustedFingerprint)
+        ownSignInOnly = try c.decodeIfPresent(Bool.self, forKey: .ownSignInOnly) ?? false
+        knownProjects = try c.decodeIfPresent([String].self, forKey: .knownProjects) ?? []
     }
 
     /// Not empty, one word, and not something ssh would read as an option. The `--` in
@@ -83,10 +102,23 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     /// False only when `sshd_config` turns Unix-socket forwarding off.
     public var streamLocalForwarding: Bool
     public var probedAt: Date
+    /// What the rest of the probe found for installing Claude there (043, contracts/ssh.md § 1).
+    public var libc: Libc = .unknown
+    /// `curl` or `wget`, whichever the server has; nil for neither.
+    public var downloader: String?
+    /// The Claude toolset `current` points at, when it is whole (`ok` is there).
+    public var toolsetID: String?
+    /// The person's own `npx` on their login PATH (037's way to run Claude).
+    public var hasNpx: Bool = false
+    /// The server has a Claude sign-in of its own: `~/.claude/.credentials.json`, or a
+    /// Claude variable in the login environment. Only ever a yes or no.
+    public var hasOwnClaudeSignIn: Bool = false
 
     public init(system: String, architecture: Architecture, home: String, freeBytes: Int64,
                 installedVersion: String?, installedSHA256: String? = nil,
-                streamLocalForwarding: Bool, probedAt: Date = Date()) {
+                streamLocalForwarding: Bool, probedAt: Date = Date(),
+                libc: Libc = .unknown, downloader: String? = nil, toolsetID: String? = nil,
+                hasNpx: Bool = false, hasOwnClaudeSignIn: Bool = false) {
         self.system = system
         self.architecture = architecture
         self.home = home
@@ -95,11 +127,68 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         self.installedSHA256 = installedSHA256
         self.streamLocalForwarding = streamLocalForwarding
         self.probedAt = probedAt
+        self.libc = libc
+        self.downloader = downloader
+        self.toolsetID = toolsetID
+        self.hasNpx = hasNpx
+        self.hasOwnClaudeSignIn = hasOwnClaudeSignIn
+    }
+
+    /// Written by hand only so that facts saved before 043 still read.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        system = try c.decode(String.self, forKey: .system)
+        architecture = try c.decode(Architecture.self, forKey: .architecture)
+        home = try c.decode(String.self, forKey: .home)
+        freeBytes = try c.decode(Int64.self, forKey: .freeBytes)
+        installedVersion = try c.decodeIfPresent(String.self, forKey: .installedVersion)
+        installedSHA256 = try c.decodeIfPresent(String.self, forKey: .installedSHA256)
+        streamLocalForwarding = try c.decode(Bool.self, forKey: .streamLocalForwarding)
+        probedAt = try c.decode(Date.self, forKey: .probedAt)
+        libc = try c.decodeIfPresent(Libc.self, forKey: .libc) ?? .unknown
+        downloader = try c.decodeIfPresent(String.self, forKey: .downloader)
+        toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
+        hasNpx = try c.decodeIfPresent(Bool.self, forKey: .hasNpx) ?? false
+        hasOwnClaudeSignIn = try c.decodeIfPresent(Bool.self, forKey: .hasOwnClaudeSignIn) ?? false
+    }
+
+    /// Node's official Linux builds need glibc 2.28 or later; musl has none (043, R2).
+    public var canInstallClaude: Bool {
+        if case .glibc(let major, let minor) = libc { return (major, minor) >= (2, 28) }
+        return false
     }
 
     /// Linux on one of the two architectures there is a binary for (FR-004).
     public var isSupported: Bool {
         system == "Linux" && architecture.isSupported
+    }
+}
+
+/// The server's C library, from the first line of `ldd --version`.
+public enum Libc: Codable, Hashable, Sendable {
+    case glibc(major: Int, minor: Int)
+    case musl
+    case unknown
+
+    /// `ldd (Debian GLIBC 2.36-9+deb12u14) 2.36`, `musl libc (aarch64)`, or anything else.
+    public init(lddFirstLine line: String) {
+        let lower = line.lowercased()
+        if lower.contains("musl") { self = .musl; return }
+        if lower.contains("glibc") || lower.contains("gnu libc") || lower.hasPrefix("ldd") {
+            let last = line.split(separator: " ").last.map(String.init) ?? ""
+            let parts = last.split(separator: ".").compactMap { Int($0) }
+            if parts.count >= 2 { self = .glibc(major: parts[0], minor: parts[1]); return }
+        }
+        self = .unknown
+    }
+
+    /// How a sentence names it.
+    public var display: String {
+        switch self {
+        case .glibc(let major, let minor): "glibc \(major).\(minor)"
+        case .musl: "musl (Alpine)"
+        case .unknown: "an unknown C library"
+        }
     }
 }
 
@@ -155,6 +244,14 @@ public enum HostProblem: Error, Hashable, Sendable {
     case installFailed(String)
     case timedOut(String)
     case offline
+    // Installing Claude's toolset (043, contracts/ssh.md § 4). None of these makes the
+    // server unusable: its other runtimes, files and terminal still work.
+    case noDownloader
+    case noInternet(String)
+    case unsupportedLibc(String)
+    case toolsetChecksum
+    case toolsetInstallFailed(String)
+    case diskFullForTools(needed: Int64, free: Int64)
 }
 
 /// The servers, in the order they were added. This Mac is not among them.
