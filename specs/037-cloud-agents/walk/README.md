@@ -64,5 +64,23 @@ Debian bookworm with openssh-server, one user `agents` who logs in with `~/.ssh/
 listening on 127.0.0.1:2222 and nowhere else. Its Dockerfile is in `/tmp/037-devbox/`.
 
 In Add a server, type `agents@127.0.0.1:2222`. From a terminal:
-`ssh -p 2222 agents@127.0.0.1`. It has no agent CLI yet; to run a turn, install one there and log
-in (e.g. `curl -fsSL https://claude.ai/install.sh | bash`, then `claude` once to sign in).
+`ssh -p 2222 agents@127.0.0.1`. Node 22, Claude Code and `@agentclientprotocol/claude-agent-acp`
+are installed there globally; `agents` is not signed in to Claude yet.
+
+Walked with the real `/usr/bin/ssh` on scratch root `/tmp/run-037r` (screenshots in `linux/`):
+
+1. Add a server showed the key fingerprint, and it matched `ssh-keygen -lf` inside the box
+   (`01-connect.png`). Trust and continue installed the aarch64 agentsd (`install.json` has
+   the checksum, `--serve` is running) and the heading came up with a green dot.
+2. New project ▸ 127.0.0.1 ▸ Choose Folder… browsed the box's real home; `~/src/hello` was
+   added as a project (`02-folder.png`, `03-project.png`), and Claude's model menu came from
+   the adapter running on Linux.
+3. A turn (started over the forwarded socket with `rpc.py`: setting the prompt field over
+   AX does not reach its binding, so Send stayed disabled, and Alex was at the keyboard)
+   went through session/create on the box and stopped with the adapter's
+   `Authentication required`. The window listed it at once as hello · 1 stopped
+   (`04-needs-sign-in.png`), but says only "Claude stopped answering", not that Claude
+   needs signing in on the server.
+
+To finish it: `ssh -p 2222 agents@127.0.0.1`, run `claude`, sign in with `/login`, quit, then
+send a turn in the hello project.
