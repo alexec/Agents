@@ -1017,6 +1017,7 @@ final class AppModel {
         if let listed = try? await server.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
                                                returning: [DaemonAPI.ProjectSummary].self) {
             work.replaceProjects(listed, from: host)
+            hosts.noteProjects(host, listed: listed)
             settleProjectSelection()
         }
         let theirs = Set(work.agents.filter { $0.host == host }.map(\.id))

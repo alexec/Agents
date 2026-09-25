@@ -20,6 +20,10 @@ final class HostSet {
     private(set) var states: [HostID: ServerConnection.State] = [:]
     /// When the next attempt is due, for the offline strip's countdown.
     private(set) var nextTry: [HostID: Date] = [:]
+    /// Projects a server had and no longer has: rebuilt or wiped under them (043, FR-019).
+    private(set) var goneProjects: [HostID: [String]] = [:]
+    /// A server whose key changed, waiting on the person to say whether it was rebuilt (043).
+    var rebuiltAsk: HostID?
     /// Claude's toolset on each server (043).
     private(set) var claude: [HostID: ServerConnection.Claude] = [:]
     /// Whether a server should get Claude as it connects: the window has a credential it
@@ -266,6 +270,43 @@ final class HostSet {
         }
     }
 
+    // MARK: A server that comes back empty (043 US3)
+
+    /// What a connected server lists, against what it listed before: a folder it had and
+    /// has no more is gone from it, and stays shown as gone until the person removes it.
+    func noteProjects(_ id: HostID, listed: [DaemonAPI.ProjectSummary]) {
+        guard var host = hosts[id] else { return }
+        let paths = listed.map { $0.folder.path(percentEncoded: false) }
+        let gone = host.knownProjects.filter { !paths.contains($0) }
+        goneProjects[id] = gone
+        let known = paths + gone
+        if known != host.knownProjects {
+            host.knownProjects = known
+            update(host)
+        }
+    }
+
+    func forgetGoneProject(_ id: HostID, path: String) {
+        guard var host = hosts[id] else { return }
+        host.knownProjects.removeAll { $0 == path }
+        goneProjects[id]?.removeAll { $0 == path }
+        update(host)
+    }
+
+    /// The person said the server was rebuilt: forget its old key, trust the one it has
+    /// now, and set it up again as a new server (043, FR-017).
+    func trustRebuilt(_ id: HostID, _ fetched: HostKeyCheck.Fetched) async throws {
+        guard var host = hosts[id] else { return }
+        let ssh = Self.ssh(for: host, locations: locations)
+        let resolved = try await HostKeyCheck.resolve(ssh)
+        try await HostKeyCheck.forget(resolved)
+        try await HostKeyCheck.trust(fetched, into: resolved)
+        host.trustedFingerprint = fetched.fingerprint
+        update(host)
+        log("\(host.label): rebuilt; new key \(fetched.fingerprint) trusted")
+        connect(id)
+    }
+
     /// Install Claude on a server now: chosen there for the first time, or Try again (043).
     func installClaude(_ id: HostID) async {
         await connections[id]?.installClaude()
@@ -273,6 +314,7 @@ final class HostSet {
 
     private func moved(_ id: HostID, to state: ServerConnection.State) async {
         states[id] = state
+        if case .failed(.hostKeyChanged) = state, rebuiltAsk == nil { rebuiltAsk = id }
         log("\(hosts[id]?.label ?? id.rawValue): \(state)")
         switch state {
         case .connected:

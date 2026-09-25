@@ -29,6 +29,7 @@ struct ProjectListView: View {
                 ForEach(model.hosts.hosts.all) { host in
                     Section {
                         projectRows(model.liveProjects.filter { $0.host == host.id })
+                        GoneProjectRows(host: host.id)
                     } header: {
                         HostHeading(host: host.id)
                     }
@@ -386,5 +387,27 @@ private struct WakefulnessRow: View {
         let charge = state.batteryPercent.map { " The battery is at \($0)%." } ?? ""
         return "Work is still in flight, but the battery is low, so this Mac is being "
              + "allowed to sleep." + charge
+    }
+}
+
+/// Projects a server no longer has (043, contracts/ui.md § 6): shown as gone, never as
+/// offline, until the person removes them.
+private struct GoneProjectRows: View {
+    @Environment(AppModel.self) private var model
+    let host: HostID
+
+    var body: some View {
+        ForEach(model.hosts.goneProjects[host] ?? [], id: \.self) { path in
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text((path as NSString).lastPathComponent).foregroundStyle(.secondary)
+                    Text("Gone from \(model.hosts.label(host))").appText(.fine).foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Button("Remove") { model.hosts.forgetGoneProject(host, path: path) }
+                    .controlSize(.small)
+            }
+            .help(path)
+        }
     }
 }

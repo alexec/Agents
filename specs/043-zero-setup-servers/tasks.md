@@ -115,7 +115,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 ### Proof
 
-- [ ] T040 [US1] Linux build gate for both architectures (`scripts/build-linux-agentsd.sh`), and rebuild the bundled Linux binaries
+- [X] T040 [US1] Linux build gate for both architectures (`scripts/build-linux-agentsd.sh`), and rebuild the bundled Linux binaries
 - [ ] T041 [US1] Walk quickstart § 3 steps 1–4 on `agents-bare` with the test-servers skill on a scratch root: time from Add a server to first reply (SC-001 ≤ 5 min), the file on the box, and a re-connect's added time (SC-002 ≤ 5 s); notes in `specs/043-zero-setup-servers/walk/US1.md`
 - [ ] T042 [US1] Walk quickstart step 6 (refused token) and step 7 (own sign-in only on `agents-devbox`, confirming no `credentials/lend` in its daemon log); add to `walk/US1.md`
 
@@ -129,11 +129,11 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 **Independent Test**: quickstart § 3 step 5 — `docker rm -f` + run `agents-bare` again, confirm once, a new Claude agent answers, old projects say "Gone from agents-bare".
 
-- [ ] T043 [P] [US3] `HostKeyCheck.forget(resolved:)`: `ssh-keygen -R <name>` and, if the resolved port ≠ 22, `-R '[host]:port'`, against the person's `known_hosts` (or `FAKE_SSH_KNOWN_HOSTS`), in `Packages/AgentsKit/Sources/AgentsKit/Hosts/HostKeyCheck.swift`, with a fake-ssh test that a changed key is refused, forgotten, fetched and trusted in `Tests/AgentsKitTests/Hosts/RebuiltServerTests.swift`
-- [ ] T044 [US3] On `hostKeyChanged`, show `RebuiltServerSheet` with the saved `trustedFingerprint` and the new one from `HostKeyCheck.fetch`; Cancel is default; "This server was rebuilt" runs forget → trust → normal connect (which re-installs daemon and toolset), in `App/Sources/Hosts/HostSet.swift` and `App/Sources/Hosts/RebuiltServerSheet.swift`
-- [ ] T045 [US3] Record each server's project paths into `ServerHost.knownProjects` in `hosts.json` whenever its project list arrives, in `App/Sources/Hosts/HostSet.swift` and `Packages/AgentsKit/Sources/AgentsKit/Hosts/HostStore.swift`
-- [ ] T046 [US3] After a connect, show recorded paths the server does not list and whose folder is missing (via `files/stat`) as gone rows with Remove (drops the path and its agents' records); never the offline strip for them, in `App/Sources/Projects/ProjectListView.swift` and `App/Sources/AppModel.swift`
-- [ ] T047 [US3] Fake-ssh test: wiping the fake server's `~/.agents-server` with the key unchanged re-installs daemon and toolset on connect without asking (FR-018) in `RebuiltServerTests.swift`
+- [X] T043 [P] [US3] `HostKeyCheck.forget(resolved:)`: `ssh-keygen -R <name>` and, if the resolved port ≠ 22, `-R '[host]:port'`, against the person's `known_hosts` (or `FAKE_SSH_KNOWN_HOSTS`), in `Packages/AgentsKit/Sources/AgentsKit/Hosts/HostKeyCheck.swift`, with a fake-ssh test that a changed key is refused, forgotten, fetched and trusted in `Tests/AgentsKitTests/Integration/RebuiltServerTests.swift`
+- [X] T044 [US3] On `hostKeyChanged`, show `RebuiltServerSheet` with the saved `trustedFingerprint` and the new one from `HostKeyCheck.fetch`; Cancel is default; "This server was rebuilt" runs forget → trust → normal connect (which re-installs daemon and toolset), in `App/Sources/Hosts/HostSet.swift` and `App/Sources/Hosts/RebuiltServerSheet.swift`
+- [X] T045 [US3] Record each server's project paths into `ServerHost.knownProjects` in `hosts.json` whenever its project list arrives, in `App/Sources/Hosts/HostSet.swift` and `Packages/AgentsKit/Sources/AgentsKit/Hosts/HostStore.swift`
+- [X] T046 [US3] After a connect, show recorded paths the server does not list and whose folder is missing (via `files/stat`) as gone rows with Remove (drops the path and its agents' records); never the offline strip for them, in `App/Sources/Projects/ProjectListView.swift` and `App/Sources/AppModel.swift`
+- [X] T047 [US3] Fake-ssh test: wiping the fake server's `~/.agents-server` with the key unchanged re-installs daemon and toolset on connect without asking (FR-018) in `RebuiltServerTests.swift`
 - [ ] T048 [US3] Walk quickstart step 5 on `agents-bare` (SC-004); notes in `specs/043-zero-setup-servers/walk/US3.md`
 
 ---

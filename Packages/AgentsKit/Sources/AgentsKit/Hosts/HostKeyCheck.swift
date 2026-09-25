@@ -116,6 +116,36 @@ public enum HostKeyCheck {
         try handle.write(contentsOf: Data(lines.utf8))
     }
 
+    /// A rebuilt server (043, FR-017): take the old key for this host out of the person's
+    /// known-hosts files, as `ssh-keygen -R` does, so that the new one can be trusted in its
+    /// place. Only ever on the person's explicit "This server was rebuilt".
+    public static func forget(_ resolved: Resolved) async throws {
+        let keygen = SSHCommand(executable: keygen, name: "", controlPath: nil)
+        for file in resolved.knownHostsFiles where FileManager.default.fileExists(atPath: file) {
+            let out = try await keygen.run(["-R", resolved.lookupName, "-f", file])
+            guard out.status == 0 else { throw HostProblem.installFailed(out.stderr) }
+        }
+    }
+
+    /// The fingerprint of the key the person's known hosts has for this host now, if any:
+    /// what the rebuilt sheet shows as Before.
+    public static func knownFingerprint(_ resolved: Resolved) async -> String? {
+        let keygen = SSHCommand(executable: keygen, name: "", controlPath: nil)
+        for file in resolved.knownHostsFiles where FileManager.default.fileExists(atPath: file) {
+            guard let out = try? await keygen.run(["-F", resolved.lookupName, "-f", file]), out.status == 0 else { continue }
+            let line = out.stdout.split(separator: "\n").first { !$0.hasPrefix("#") && !$0.isEmpty }
+            guard let line else { continue }
+            let temp = FileManager.default.temporaryDirectory.appendingPathComponent("agents-known-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: temp) }
+            try? Data((line + "\n").utf8).write(to: temp)
+            if let print = try? await keygen.run(["-lf", temp.path, "-E", "sha256"]),
+               let fingerprint = print.stdout.split(separator: " ").first(where: { $0.hasPrefix("SHA256:") }) {
+                return String(fingerprint)
+            }
+        }
+        return nil
+    }
+
     public static func discard(_ fetched: Fetched) {
         try? FileManager.default.removeItem(at: fetched.file)
         try? FileManager.default.removeItem(atPath: fetched.file.path + ".old")
