@@ -315,22 +315,18 @@ private struct WakefulnessRow: View {
         state.isHolding ? "Keeping this Mac awake" : "Letting this Mac sleep"
     }
 
-    /// The count lives here rather than in the power assertion's reason, which is
-    /// written once when the verdict moves and would go stale the moment a second agent
-    /// started. This is re-sent whenever anything changes, so it can afford to be exact.
+    /// No count of working agents. The daemon tells windows only when the hold is
+    /// taken or let go, not as agents join a hold already in place, so a count here
+    /// froze at whatever it was when the hold began — "1 working" while three ran.
+    /// The sidebar already shows which agents are working; this row says only why
+    /// the Mac is awake.
     private func detail(_ state: DaemonAPI.WakeState) -> String? {
-        if state.isHolding {
-            return state.agentsInFlight == 1 ? "1 working" : "\(state.agentsInFlight) working"
-        }
-        return state.batteryPercent.map { "\($0)%" }
+        state.isHolding ? nil : state.batteryPercent.map { "\($0)%" }
     }
 
     private func help(_ state: DaemonAPI.WakeState) -> String {
         if state.isHolding {
-            let n = state.agentsInFlight
-            return n == 1
-                ? "This Mac will not sleep while 1 agent is mid-turn."
-                : "This Mac will not sleep while \(n) agents are mid-turn."
+            return "This Mac will not sleep while an agent is mid-turn."
         }
         let charge = state.batteryPercent.map { " The battery is at \($0)%." } ?? ""
         return "Work is still in flight, but the battery is low, so this Mac is being "
