@@ -30,6 +30,7 @@ struct CostSettingsView: View {
                      + "on may be a little over the limit — that is the last turn, not a "
                      + "mistake.")
             }
+            .paperListRow()
 
             Section {
                 LimitField(title: "Per day",
@@ -47,6 +48,7 @@ struct CostSettingsView: View {
                      + "finishes its turn and holds. What you typed stays where it is and "
                      + "goes when the day rolls over.")
             }
+            .paperListRow()
 
             Section {
                 Label("A runtime that reports no price cannot be capped. An agent on one "
@@ -55,10 +57,11 @@ struct CostSettingsView: View {
                       systemImage: "questionmark.circle")
                     .foregroundStyle(.secondary)
             }
+            .paperListRow()
 
             if !stoppedByALimit.isEmpty { stopped }
         }
-        .formStyle(.grouped)
+        .paperForm()
         .frame(width: 460)
         .task { await model.refreshCostState() }
     }
@@ -99,6 +102,7 @@ struct CostSettingsView: View {
                 }
             }
         }
+        .paperListRow()
     }
 
     private var stoppedByALimit: [Agent] {

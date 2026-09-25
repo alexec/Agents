@@ -288,7 +288,7 @@ private struct EntryRow: View {
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                     .appText(.reading)
                     .padding(12)
-                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                    .paperWell(in: RoundedRectangle(cornerRadius: 12))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -421,7 +421,7 @@ private struct QueuedPromptRow: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+            .paperWell(in: RoundedRectangle(cornerRadius: 12))
             .overlay {
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -557,7 +557,7 @@ private struct ToolCallLine: View {
                         .padding(10)
                 }
                 .frame(maxHeight: 260)
-                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+                .paperWell(in: RoundedRectangle(cornerRadius: 8))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

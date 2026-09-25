@@ -39,12 +39,21 @@ enum StateTint {
     /// the surface had is not this type's to take away.
     var color: Color? {
         switch self {
-        case .attention: return .orange
-        case .failure: return .red
-        case .vouched: return .green
+        case .attention: return Self.orange
+        case .failure: return Self.red
+        case .vouched: return Self.green
         case .none: return nil
         }
     }
+
+    /// Orange, red and green mixed for paper rather than taken from the system. The
+    /// system's are tuned for a cool white and a glass sheet; on warm off-white they
+    /// read as neon. These are burnt orange, brick and moss: still unmistakably the
+    /// three colours the rules name, and quiet enough that a page with none of them on
+    /// it looks finished rather than drained.
+    private static let orange = Color(light: 0xC2410C, dark: 0xF08A4B)
+    private static let red = Color(light: 0xB42318, dark: 0xF07B6E)
+    private static let green = Color(light: 0x3B7A4A, dark: 0x7FBF8E)
 
     /// The tint as a style, or whatever the surface already draws in when there is
     /// no tint. For the sites that pick between a colour and their own grey.

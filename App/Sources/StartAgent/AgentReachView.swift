@@ -40,7 +40,7 @@ struct AgentReachView: View {
                     }
                 }
                 Button("Add a folder", action: addFolder)
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .appText(.fine)
             }
 
@@ -68,7 +68,7 @@ struct AgentReachView: View {
                     TextField("Command, as you would type it", text: $serverCommand)
                         .textFieldStyle(.roundedBorder)
                     Button("Add", action: addServer)
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                         .disabled(serverName.isEmpty || serverCommand.isEmpty)
                 }
                 Text("A server that will not start is reported against the agent and does not stop it.")
@@ -79,7 +79,7 @@ struct AgentReachView: View {
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .keyboardShortcut(.defaultAction)
             }
         }

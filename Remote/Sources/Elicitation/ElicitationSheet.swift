@@ -46,7 +46,7 @@ struct ElicitationSheet: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .readableWidth()
@@ -113,7 +113,7 @@ struct ElicitationSheet: View {
                 } label: {
                     label(choice.title, note: choice.description, onFill: true)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.paperProminent)
                 .controlSize(.large)
             }
             // Answering with nothing, where the agent said the question may go
@@ -125,7 +125,7 @@ struct ElicitationSheet: View {
                 } label: {
                     label("No answer", note: nil)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .controlSize(.large)
             }
             declineButton
@@ -138,11 +138,11 @@ struct ElicitationSheet: View {
         VStack(spacing: 8) {
             if let url = URL(string: link) {
                 Link(destination: url) { label("Open", note: link, onFill: true) }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.paperProminent)
                     .controlSize(.large)
             }
             Button { send("Done", action: .accept) } label: { label("Done", note: nil) }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
                 .controlSize(.large)
             declineButton
         }
@@ -170,7 +170,7 @@ struct ElicitationSheet: View {
 
     private var declineButton: some View {
         Button { send("No thanks", action: .decline) } label: { label("No thanks", note: nil) }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .controlSize(.large)
     }
 

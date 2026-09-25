@@ -260,7 +260,7 @@ struct LivePage: View {
             .controlSize(.small)
         }
         .padding(8)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+        .paperWell(in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: Typing

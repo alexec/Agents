@@ -92,6 +92,7 @@ struct RemoteChatView: View {
                         }
                 }
             }
+            .paperSheet()
         }
         .sheet(isPresented: $isShowingArtifacts) {
             NavigationStack {
@@ -102,6 +103,7 @@ struct RemoteChatView: View {
                         }
                     }
             }
+            .paperSheet()
         }
         // The agent asking to be looked at. An event, so it opens the moment it
         // arrives and is taken off the model in the same breath.
@@ -341,7 +343,7 @@ private struct JumpToEnd: View {
         .buttonStyle(.plain)
         .appText(.fine)
         .fixedSize()
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .paperRaised(in: .capsule)
         .accessibilityLabel(hasNewBelow
                             ? "Go to the end of the conversation, where something new is"
                             : "Go to the end of the conversation")

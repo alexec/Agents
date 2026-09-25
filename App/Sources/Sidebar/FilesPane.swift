@@ -110,6 +110,7 @@ struct FilesPane: View {
                 }
             }
             .listStyle(.inset)
+            .scrollContentBackground(.hidden)
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }

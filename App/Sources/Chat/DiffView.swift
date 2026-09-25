@@ -35,7 +35,7 @@ struct DiffView: View {
                 .padding(.vertical, 6)
             }
             .frame(maxHeight: 280)
-            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+            .paperWell(in: RoundedRectangle(cornerRadius: 8))
         }
         .textSelection(.enabled)
     }
@@ -74,6 +74,6 @@ struct TerminalOutputView: View {
                 .padding(8)
         }
         .frame(maxHeight: 240)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+        .paperWell(in: RoundedRectangle(cornerRadius: 8))
     }
 }

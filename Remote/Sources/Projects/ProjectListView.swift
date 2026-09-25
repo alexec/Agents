@@ -17,8 +17,11 @@ struct ProjectListView: View {
                 ProjectRow(summary: summary)
             }
             .tag(summary.folder)
+            .paperListRow()
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .paperGround()
         .navigationTitle("Projects")
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .overlay {
