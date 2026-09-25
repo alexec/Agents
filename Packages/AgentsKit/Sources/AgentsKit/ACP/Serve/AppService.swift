@@ -44,6 +44,9 @@ public actor AppService {
     public static let stopAgentToolName = AppTool.stopAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
+    public static let leaseResourceToolName = AppTool.leaseResource
+    public static let releaseResourceToolName = AppTool.releaseResource
+    public static let listResourcesToolName = AppTool.listResources
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -108,6 +111,16 @@ public actor AppService {
     /// Where those go.
     public typealias AgentsSink = @Sendable (AgentCall) async -> Outcome
 
+    /// One of the three lease calls (036), as the agent made it.
+    public enum LeaseCall: Sendable, Equatable {
+        case lease(name: String, minutes: Int?, wait: Bool?)
+        case release(name: String)
+        case list
+    }
+
+    /// Where those go. A lease call may take up to the wait limit to come back.
+    public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -115,6 +128,7 @@ public actor AppService {
     private let workflowSink: WorkflowSink
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
+    private let leasesSink: LeasesSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -135,6 +149,9 @@ public actor AppService {
                 },
                 agents: @escaping AgentsSink = { _ in
                     .refused("This app cannot start or stop agents.")
+                },
+                leases: @escaping LeasesSink = { _ in
+                    .refused("This app cannot lease resources.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -143,6 +160,7 @@ public actor AppService {
         self.workflowSink = workflows
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
+        self.leasesSink = leases
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -188,8 +206,11 @@ public actor AppService {
             let agentTools = managesAgents
                 ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
                 : []
+            // The three lease tools after those, for every agent: waiting for the
+            // simulator is not managing anyone (036).
+            let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
-                                              Self.workflowTool] + agentTools
+                                              Self.workflowTool] + agentTools + leaseTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -260,6 +281,13 @@ public actor AppService {
                                                               arguments?["content"]?.stringValue)))
             }
 
+            if let call = Self.leaseCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await leasesSink(call)))
+                }
+            }
+
             if let call = Self.agentCall(named: name, arguments) {
                 guard managesAgents else {
                     return .success(Self.reply("""
@@ -325,6 +353,32 @@ public actor AppService {
             return .success(name.hasSuffix(stopAgentToolName) ? .stop(agentID: id) : .archive(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
+            return .success(.list)
+        }
+        return nil
+    }
+
+    /// Which of the three lease calls a tool name is, with its arguments read. `nil`
+    /// when the name is none of them.
+    static func leaseCall(named name: String,
+                          _ arguments: JSONValue?) -> Result<LeaseCall, AgentCallProblem>? {
+        let resource = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.hasSuffix(leaseResourceToolName) {
+            guard !resource.isEmpty else { return .failure(AgentCallProblem(stringLiteral: LeaseWords.emptyName)) }
+            let minutes = arguments?["minutes"].flatMap { value -> Int? in
+                if let number = value.intValue { return number }
+                return value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            let wait = arguments?["wait"]?.boolValue
+            return .success(.lease(name: resource, minutes: minutes, wait: wait))
+        }
+        if name.hasSuffix(releaseResourceToolName) {
+            guard !resource.isEmpty else {
+                return .failure("Nothing was released: say which resource, in `name`.")
+            }
+            return .success(.release(name: resource))
+        }
+        if name.hasSuffix(listResourcesToolName) {
             return .success(.list)
         }
         return nil
@@ -802,6 +856,74 @@ public actor AppService {
             The agents you started with start_agent that have not been archived: each \
             one's id, what it is doing, and what it last said about its work. Also how \
             many of this project's three places are in use.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    // MARK: Leases (036). Words from contracts/lease-tools.md.
+
+    static let leaseResourceTool: JSONValue = [
+        "name": .string(leaseResourceToolName),
+        "title": "Take a turn with a shared resource",
+        "description": """
+            Take a turn with something on this Mac that only one agent should use at a \
+            time: a simulator, a browser, the screen (mouse, keyboard, front window), or \
+            anything you name, such as a port. Lease it before you use it, and release it \
+            as soon as you are done. If you already hold it, this extends your lease. If \
+            someone else holds it, this waits for up to 45 seconds. If it is still not \
+            yours after that, you keep your place in line. You can call this again to go \
+            on waiting, or end your turn, and you will be started again when it is yours. \
+            Take several resources in the same order every time. Use list_resources to \
+            see the names.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": [
+                    "type": "string",
+                    "description": """
+                        A name from list_resources, a simulator's UDID, a browser's name, \
+                        or any name of your own. Case and surrounding spaces don't matter.
+                        """,
+                ],
+                "minutes": [
+                    "type": "integer",
+                    "description": "How long. Default 30, at most 240.",
+                ],
+                "wait": [
+                    "type": "boolean",
+                    "description": """
+                        Default true. With false, you are told at once whether you got \
+                        it, and you don't join the line.
+                        """,
+                ],
+            ],
+            "required": .array(["name"]),
+        ],
+    ]
+
+    static let releaseResourceTool: JSONValue = [
+        "name": .string(releaseResourceToolName),
+        "title": "Give back a shared resource",
+        "description": """
+            Give back a lease you hold, or leave the line for a resource you are waiting \
+            for. Do this as soon as you are done with it, so the next agent can have it.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": ["type": "string", "description": "The resource, as you leased it."],
+            ],
+            "required": .array(["name"]),
+        ],
+    ]
+
+    static let listResourcesTool: JSONValue = [
+        "name": .string(listResourcesToolName),
+        "title": "List shared resources",
+        "description": """
+            List what can be leased on this Mac and who holds what, with your own leases \
+            and waits first.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
     ]

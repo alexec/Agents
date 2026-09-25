@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="680" viewBox="0 0 1120 680" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .rb { font-size:14px; font-weight:600; } .r { font-size:14px; } .f { font-size:12px; } .sup { font-size:13px; }
+    .cap { fill:#fbfbfd; stroke:#d1d1d6; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+  <rect x="0.5" y="0.5" width="1119" height="679" rx="12" fill="#fff" stroke="#c7c7cc"/>
+
+  <!-- agent list column -->
+  <rect x="0.5" y="0.5" width="360" height="679" rx="12" fill="#fbfbfd" stroke="#e5e5ea"/>
+  <text x="20" y="34" class="rb t">Agents</text>
+
+  <!-- row 1: holding -->
+  <rect x="10" y="50" width="340" height="96" rx="10" fill="#ececf0"/>
+  <circle cx="30" cy="72" r="5" fill="#6e6e73"/>
+  <text x="44" y="77" class="rb t">Walk the phone</text>
+  <text x="44" y="97" class="sup s">Taking screenshots of the start form…</text>
+  <text x="44" y="121" class="f s">▣ Holds Screen · 18 min</text>
+  <text x="44" y="137" class="f q">and 1 more</text>
+
+  <!-- row 2: waiting, idle -->
+  <rect x="10" y="154" width="340" height="80" rx="10" fill="none"/>
+  <circle cx="30" cy="176" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="44" y="181" class="rb t">Screenshot pass</text>
+  <text x="44" y="201" class="sup s">In line for the screen; ended its turn.</text>
+  <text x="44" y="224" class="f s">◷ Waiting for Screen · 2nd in line</text>
+
+  <!-- row 3: idle holding, ending soon -->
+  <rect x="10" y="242" width="340" height="80" rx="10" fill="none"/>
+  <circle cx="30" cy="264" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="44" y="269" class="rb t">Docs check</text>
+  <text x="44" y="289" class="sup s">Done: checked every page in Chrome.</text>
+  <text x="44" y="312" class="f s">▣ Holds Google Chrome · 4 min left</text>
+
+  <!-- row 4: nothing -->
+  <rect x="10" y="330" width="340" height="60" rx="10" fill="none"/>
+  <circle cx="30" cy="352" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="44" y="357" class="rb t">Tidy the README</text>
+  <text x="44" y="377" class="sup s">Done: trimmed the install section.</text>
+
+  <text x="20" y="430" class="note">Row mark: its own line, under the report. Shows</text>
+  <text x="20" y="446" class="note">the first lease or wait; “and N more” beneath.</text>
+  <text x="20" y="462" class="note">Untinted, secondary text: ▣ holding, ◷ waiting.</text>
+  <text x="20" y="478" class="note">“min left” in the warning window. An idle agent</text>
+  <text x="20" y="494" class="note">that still holds something (row 3) is the thing</text>
+  <text x="20" y="510" class="note">the person most needs to see (US5-AS3).</text>
+  <text x="20" y="526" class="note">No line at all when nothing is held or awaited.</text>
+
+  <!-- chat column -->
+  <text x="390" y="34" class="rb t">Walk the phone</text>
+
+  <!-- transcript fragment -->
+  <text x="400" y="80" class="f q">Leased Screen, mouse and keyboard until 14:12.</text>
+  <text x="400" y="104" class="r t">I have the screen. Launching the scratch app and opening the start form.</text>
+  <rect x="400" y="120" width="560" height="30" rx="6" fill="#f5f5f7"/>
+  <text x="414" y="140" class="f s">▸ Ran 3 commands</text>
+
+  <text x="400" y="186" class="f q">Agents asked</text>
+  <text x="400" y="206" class="sup s">iPhone 17 Pro · iOS 26.0 is yours now. You hold it until 14:25 (30 minutes).</text>
+  <text x="400" y="224" class="sup s">You asked for it at 13:50 and were waiting in line. Carry on with what you</text>
+  <text x="400" y="242" class="sup s">needed it for, and release it with release_resource when you are done.</text>
+  <text x="400" y="266" class="f q">Leased iPhone 17 Pro · iOS 26.0 until 14:25.</text>
+  <text x="400" y="296" class="r t">Got the simulator. Building Remote for it now.</text>
+
+  <text x="980" y="206" class="note">wake prompt:</text>
+  <text x="980" y="222" class="note">drawn as the</text>
+  <text x="980" y="238" class="note">app's, never in</text>
+  <text x="980" y="254" class="note">the person's bubble</text>
+  <text x="980" y="80" class="note">← FR-016 note</text>
+
+  <!-- prompt bar -->
+  <rect x="390" y="420" width="700" height="236" rx="16" fill="#f7f7f9" stroke="#e5e5ea"/>
+
+  <!-- NEW: lease line -->
+  <rect x="406" y="436" width="238" height="26" rx="13" class="cap"/>
+  <text x="420" y="454" class="f s">▣ Screen, mouse and keyboard · 18 min</text>
+  <rect x="652" y="436" width="200" height="26" rx="13" class="cap"/>
+  <text x="666" y="454" class="f s">▣ iPhone 17 Pro · 31 min</text>
+  <text x="870" y="454" class="note">← NEW row; each capsule</text>
+  <text x="870" y="470" class="note">   opens Resources at that row</text>
+
+  <!-- existing whereAndWhat -->
+  <rect x="406" y="478" width="110" height="26" rx="13" class="cap"/>
+  <text x="420" y="496" class="f s">▭ Agents</text>
+  <rect x="890" y="478" width="96" height="26" rx="13" class="cap"/>
+  <text x="904" y="496" class="f s">◔ 41% · £0.84</text>
+  <rect x="994" y="478" width="80" height="26" rx="13" class="cap"/>
+  <text x="1008" y="496" class="f s">Claude</text>
+
+  <!-- field -->
+  <rect x="406" y="516" width="668" height="84" rx="12" fill="#fff" stroke="#d1d1d6"/>
+  <text x="422" y="544" class="r q">Ask for changes…</text>
+  <rect x="406" y="612" width="100" height="26" rx="13" class="cap"/><text x="420" y="630" class="f s">Model ▾</text>
+  <rect x="514" y="612" width="100" height="26" rx="13" class="cap"/><text x="528" y="630" class="f s">Mode ▾</text>
+
+  <!-- variant: waiting -->
+  <text x="390" y="340" class="f s" font-weight="600">The same row on “Screenshot pass”, which is waiting:</text>
+  <rect x="390" y="352" width="400" height="26" rx="13" class="cap"/>
+  <text x="404" y="370" class="f s">◷ Waiting for Screen · held by “Walk the phone” until 14:12 · 2nd</text>
+  <rect x="798" y="352" width="18" height="26" rx="9" fill="none"/>
+  <text x="820" y="370" class="note">holder name opens its chat</text>
+</svg>

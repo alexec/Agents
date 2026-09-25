@@ -58,12 +58,15 @@ struct AppServiceTests {
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
         // The four agent tools (028) sit after the workflow tool, before the older
-        // names, for an agent that may use them — which is the default.
+        // names, for an agent that may use them — which is the default. The three lease
+        // tools (036) follow them, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
+                AppService.leaseResourceToolName, AppService.releaseResourceToolName,
+                AppService.listResourcesToolName,
                 AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]

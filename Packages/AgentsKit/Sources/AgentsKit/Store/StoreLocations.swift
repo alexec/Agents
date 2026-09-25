@@ -122,6 +122,9 @@ public struct StoreLocations: Sendable {
     /// limits and its own day, which is consistent with the root being the daemon's
     /// identity and is worth knowing before wondering why a limit did not bite.
     public var limits: URL { root.appendingPathComponent("limits.json") }
+    /// Every resource lease on the Mac and every line waiting for one (036). One file
+    /// for the root, like the limits: a lease is the Mac's, not a project's.
+    public var leases: URL { root.appendingPathComponent("leases.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather
     /// than starting the day again from zero.

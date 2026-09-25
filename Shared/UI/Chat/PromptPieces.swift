@@ -55,9 +55,23 @@ struct PromptHeader<Meter: View>: View {
     /// The branch the project folder is on, once asked. Nil in a worktree, or in a
     /// folder that is no repository.
     var projectFolderBranch: String?
+    /// What the agent holds and waits for (036), drawn as a row of its own above
+    /// this one. Nil draws nothing.
+    var leaseStatus: LeaseStatus? = nil
+    /// What a lease capsule does when pressed. See `LeaseRow`.
+    var openLease: ((ResourceName) -> Void)? = nil
     @ViewBuilder let meter: () -> Meter
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let leaseStatus {
+                LeaseRow(status: leaseStatus, open: openLease)
+            }
+            facts
+        }
+    }
+
+    private var facts: some View {
         HStack(spacing: 12) {
             // The branch is the place worth naming. In a worktree that is the worktree:
             // its folder is the project's name again, or a subfolder of it (030). In the

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .title { font-size:22px; font-weight:600; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <!-- window -->
+  <rect x="0.5" y="0.5" width="1119" height="759" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
+  <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
+
+  <!-- sidebar -->
+  <rect x="0.5" y="40" width="250" height="719" fill="#f5f5f7" stroke="#e5e5ea"/>
+  <text x="20" y="72" class="h">PROJECTS</text>
+  <rect x="12" y="84" width="226" height="30" rx="6" fill="none"/>
+  <text x="24" y="104" class="r t">Agents</text><text x="220" y="104" class="f s" text-anchor="end">4</text>
+  <text x="24" y="136" class="r t">Paper site</text><text x="220" y="136" class="f s" text-anchor="end">1</text>
+  <text x="24" y="168" class="r t">alexecollins.com</text><text x="220" y="168" class="f s" text-anchor="end">—</text>
+
+  <!-- foot rows -->
+  <line x1="12" y1="640" x2="238" y2="640" stroke="#e5e5ea"/>
+  <rect x="12" y="650" width="226" height="44" rx="8" fill="#dcdce1"/>
+  <text x="24" y="669" class="rb t">Resources</text>
+  <text x="24" y="686" class="f s">4 held · 2 waiting</text>
+  <text x="24" y="722" class="r t">Spending</text>
+  <text x="24" y="740" class="f s">£4.20 today</text>
+  <text x="20" y="598" class="note">New row, above Spending. Its count line</text>
+  <text x="20" y="614" class="note">is absent when nothing is held or waited for.</text>
+
+  <!-- detail -->
+  <text x="290" y="84" class="title t">Resources</text>
+  <text x="290" y="108" class="f s">Things on this Mac that one agent uses at a time. A lease is an agreement between agents, not a lock.</text>
+
+  <!-- SCREEN -->
+  <text x="290" y="146" class="h">SCREEN</text>
+  <rect x="290" y="156" width="800" height="104" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <circle cx="310" cy="180" r="5" fill="#6e6e73"/>
+  <text x="324" y="185" class="rb t">Screen, mouse and keyboard</text>
+  <text x="324" y="205" class="f s">Held by <tspan class="t" text-decoration="underline">“Walk the phone”</tspan> since 13:42 · until 14:12 · 18 min left</text>
+  <rect x="1010" y="170" width="64" height="26" rx="6" class="btn"/><text x="1042" y="188" class="f t" text-anchor="middle">End</text>
+  <line x1="324" y1="218" x2="1074" y2="218" stroke="#f2f2f7"/>
+  <text x="324" y="240" class="f q">IN LINE</text>
+  <text x="384" y="240" class="f t">1  <tspan text-decoration="underline">“Fix login”</tspan> <tspan class="s">asked 13:50 · waiting in its call</tspan></text>
+  <text x="690" y="240" class="f t">2  <tspan text-decoration="underline">“Screenshot pass”</tspan> <tspan class="s">asked 13:58 · will be started</tspan></text>
+  <text x="662" y="241" class="f q">✕</text><text x="1060" y="241" class="f q">✕</text>
+
+  <!-- SIMULATORS -->
+  <text x="290" y="296" class="h">SIMULATORS</text>
+  <rect x="290" y="306" width="800" height="150" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <circle cx="310" cy="330" r="5" fill="#6e6e73"/>
+  <text x="324" y="335" class="rb t">iPhone 17 Pro · iOS 26.0</text>
+    <text x="324" y="355" class="f s">Held by <tspan class="t" text-decoration="underline">“Walk the phone”</tspan> since 13:55 · until 14:25 · 31 min left</text>
+    <rect x="1010" y="320" width="64" height="26" rx="6" class="btn"/><text x="1042" y="338" class="f t" text-anchor="middle">End</text>
+  <line x1="304" y1="368" x2="1076" y2="368" stroke="#f2f2f7"/>
+  <circle cx="310" cy="388" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="324" y="393" class="rb t">iPad Pro 13-inch · iOS 26.0</text>
+  <text x="560" y="393" class="f s">Free</text>
+  <line x1="304" y1="414" x2="1076" y2="414" stroke="#f2f2f7"/>
+  <circle cx="310" cy="434" r="5" fill="#aeaeb2"/>
+  <text x="324" y="439" class="rb q">iPhone 16e · iOS 18.6</text>
+  <text x="500" y="439" class="f s">Gone from this Mac · still held by “Old run” until 14:30</text>
+  <rect x="1010" y="424" width="64" height="26" rx="6" class="btn"/><text x="1042" y="442" class="f t" text-anchor="middle">End</text>
+
+  <!-- BROWSERS -->
+  <text x="290" y="492" class="h">BROWSERS</text>
+  <rect x="290" y="502" width="800" height="96" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <circle cx="310" cy="526" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="324" y="531" class="rb t">Safari</text><text x="560" y="531" class="f s">Free</text>
+  <line x1="304" y1="552" x2="1076" y2="552" stroke="#f2f2f7"/>
+  <circle cx="310" cy="574" r="5" fill="#6e6e73"/>
+  <text x="324" y="579" class="rb t">Google Chrome</text>
+  <rect x="440" y="565" width="84" height="18" rx="9" fill="#f2f2f7" stroke="#aeaeb2"/><text x="482" y="578" class="f t" font-weight="600" text-anchor="middle">ending soon</text>
+  <text x="560" y="579" class="f s">Held by <tspan class="t" text-decoration="underline">“Docs check”</tspan> · until 13:58 · 4 min left</text>
+  <rect x="1010" y="564" width="64" height="26" rx="6" class="btn"/><text x="1042" y="582" class="f t" text-anchor="middle">End</text>
+
+  <!-- NAMED -->
+  <text x="290" y="634" class="h">NAMED BY AGENTS</text>
+  <rect x="290" y="644" width="800" height="52" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <circle cx="310" cy="670" r="5" fill="#6e6e73"/>
+  <text x="324" y="675" class="rb t">port 8080</text>
+  <text x="560" y="675" class="f s">Held by <tspan class="t" text-decoration="underline">“API server”</tspan> · until 15:00 · 1 h left</text>
+  <rect x="1010" y="657" width="64" height="26" rx="6" class="btn"/><text x="1042" y="675" class="f t" text-anchor="middle">End</text>
+  <text x="290" y="722" class="note">Named resources exist only while held or waited for; this section is absent when there are none.</text>
+  <text x="290" y="740" class="note">Underlined names open that agent's chat (US3-AS5). Dot: filled = held, hollow = free, faint = gone. No tint. Free rows have no button: only agents take leases.</text>
+</svg>

@@ -180,7 +180,9 @@ struct PromptBar: View {
             if let agent {
                 // The phone's row too (033).
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
+                             leaseStatus: model.work.leaseStatus(of: agent.id),
+                             openLease: { model.showResources(at: $0) }) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }

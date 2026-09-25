@@ -64,6 +64,10 @@ struct AgentCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // What it holds or waits for, in the Mac row's words (036).
+                    if let leases = model.work.leaseStatus(of: agent.id) {
+                        LeaseMark(status: leases)
+                    }
                     // Blocked (039): what it waits on and when it looks again, in the
                     // Mac row's words. Carry on is in the card's menu and the chat, not
                     // here: the whole card is the one control (see `AgentRow`).

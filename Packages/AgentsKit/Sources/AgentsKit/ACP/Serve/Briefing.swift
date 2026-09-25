@@ -102,6 +102,11 @@ public enum Briefing {
         their part is done. Do not start one for work you could simply do yourself.
         """
 
+    /// Take turns with what only one agent can use at a time (036 FR-015). Every
+    /// agent is told, including one another agent started: they are the ones most
+    /// likely to be running alongside something else.
+    public static let leases = LeaseWords.briefing
+
     /// Ask, rather than guess or stop.
     ///
     /// The act, and then the reason it is worth doing: the question is held by the
@@ -221,6 +226,7 @@ public enum Briefing {
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
+            + [leases]
             + [residue(policy.residue)].compactMap { $0 }
     }
 
