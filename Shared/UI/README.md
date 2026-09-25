@@ -32,8 +32,25 @@ for every sentence the prompt area says.
 What differs by app comes in through `ChatActions` (opening a touched file, a command's
 output, taking a queued prompt back), or through `#if os(...)` inside the shared file
 where the difference is the platform's (a picture's image type, a link's style, a
-thumb-sized target). Each app's prompt field and `MarkdownText` stay its own.
+thumb-sized target). Each app's prompt field stays its own.
 
 `ConsistencyTests` fails if either app declares its own copy of one of these types again,
 or writes a chat sentence in both apps rather than once here.
+
+## `Page/` (034)
+
+The live page, one for both apps: `LivePage`, the one `MarkdownText` (which the chat
+draws too), the passage editor with its `NSTextView` and `UITextView` halves, the caret
+flags, and `FileLines`. What the page decides — following the agent, the one caret, a
+draft carried across a write or a dropped connection — is `PageFollower`'s, in
+AgentsKitCore, under test; the view only draws it.
+
+What differs by app comes in through `PageActions`: where a save goes (both through the
+daemon's `artifact/write`), how a picture is read (the Mac's disk; the phone asks the
+Mac, and draws SVG through an offscreen WebKit view), whether typing is possible now,
+and who to tell that a passage is being typed. `KeepsPlace` holds a reader's place for a
+pane a phone draws afresh when it turns.
+
+`ConsistencyTests` fails if either app declares its own page, `MarkdownText`, passage
+editor or `ShellClient` again.
 

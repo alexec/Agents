@@ -12,8 +12,10 @@ import Testing
 @Suite("Agent grouping")
 struct AgentGroupTests {
     private static func group(_ state: AgentState, eyes: Bool = false,
-                              _ outcome: WorkOutcome? = nil, asked: Bool = false) -> AgentGroup {
-        AgentGroup(for: state, wantsEyes: eyes, report: outcome.map(report), outcomeAsked: asked)
+                              _ outcome: WorkOutcome? = nil, asked: Bool = false,
+                              parked: Bool = false) -> AgentGroup {
+        AgentGroup(for: state, wantsEyes: eyes, report: outcome.map(report), outcomeAsked: asked,
+                   parked: parked)
     }
 
     private static func report(_ outcome: WorkOutcome) -> WorkReport {
@@ -34,23 +36,28 @@ struct AgentGroupTests {
         #expect(Self.group(.archived) == .archived)
     }
 
+    /// Every group but Blocked is reachable from a state alone. Blocked needs a report,
+    /// because it is a thing an agent says rather than a state it is in (039).
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
-        let reached = Set(AgentState.allCases.map { Self.group($0) })
-        #expect(reached == Set(AgentGroup.allCases))
-        #expect(AgentGroup.allCases.count == 5)
+        let reached = Set(AgentState.allCases.flatMap { [Self.group($0), Self.group($0, parked: true)] })
+        #expect(reached == Set(AgentGroup.allCases).subtracting([.blocked]))
+        #expect(Self.group(.finished, .blocked) == .blocked)
+        #expect(AgentGroup.allCases.count == 7)
         #expect(AgentState.allCases.count == 6)
     }
 
-    @Test("the four live groups are in the order the panel draws them")
+    @Test("the live groups are in the order the panel draws them")
     func liveOrder() {
-        #expect(AgentGroup.live == [.needsAttention, .running, .finished, .stopped])
+        #expect(AgentGroup.live == [.needsAttention, .blocked, .running, .finished, .stopped, .parked])
         #expect(!AgentGroup.live.contains(.archived))
     }
 
     /// FR-022 of 019 and FR-023 of 020, stated as a test so it cannot be lost quietly.
-    @Test func noHeadingWasAddedRenamedOrRemoved() {
-        #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped"])
+    /// Two headings added since, on purpose: Blocked (039) and Parked (040).
+    @Test func noHeadingWasRenamedOrRemoved() {
+        #expect(AgentGroup.live.map(\.title)
+            == ["Needs attention", "Blocked", "Working", "Complete", "Stopped", "Parked"])
         #expect(AgentGroup.archived.title == "Archived")
     }
 
@@ -63,14 +70,16 @@ struct AgentGroupTests {
             for eyes in [false, true] {
                 for outcome in Self.reports {
                     for asked in [false, true] {
-                        let group = Self.group(state, eyes: eyes, outcome, asked: asked)
-                        #expect(AgentGroup.allCases.contains(group))
-                        seen += 1
+                        for parked in [false, true] {
+                            let group = Self.group(state, eyes: eyes, outcome, asked: asked, parked: parked)
+                            #expect(AgentGroup.allCases.contains(group))
+                            seen += 1
+                        }
                     }
                 }
             }
         }
-        #expect(seen == 6 * 2 * (1 + WorkOutcome.allCases.count) * 2)
+        #expect(seen == 6 * 2 * (1 + WorkOutcome.allCases.count) * 2 * 2)
     }
 
     /// An agent whose conversation has not begun has not asked anybody to look at
@@ -105,9 +114,69 @@ struct AgentGroupTests {
         for outcome in WorkOutcome.allCases where outcome.needsAPerson {
             #expect(Self.group(.finished, outcome) == .needsAttention)
         }
-        for outcome in WorkOutcome.allCases where !outcome.needsAPerson {
+        for outcome in WorkOutcome.allCases where !outcome.needsAPerson && outcome != .blocked {
             #expect(Self.group(.finished, outcome) == .finished)
         }
+    }
+
+    // MARK: Blocked (039)
+
+    private static func blocked(cleared: Bool) -> WorkReport {
+        WorkReport(outcome: .blocked, message: "waiting on the helpers", at: Date(),
+                   block: Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper")],
+                                clearedAt: cleared ? Date() : nil,
+                                clearedBy: cleared ? .waits : nil))
+    }
+
+    /// Settled and waiting on something that is not a person: its own group, not
+    /// Needs attention and not Complete.
+    @Test func aFinishedAgentWithAnOpenBlockIsBlocked() {
+        for asked in [false, true] {
+            #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: false),
+                               outcomeAsked: asked, parked: false) == .blocked)
+        }
+        // A blocked report that named nothing and gave no time is still blocked.
+        #expect(Self.group(.finished, .blocked) == .blocked)
+    }
+
+    /// A block that cleared is not waiting on anything. The agent is being resumed or was
+    /// dropped, and neither is Blocked.
+    @Test func aClearedBlockIsNotBlocked() {
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: true),
+                           outcomeAsked: false, parked: false) == .finished)
+    }
+
+    /// Asking the person to look outranks waiting on anything else.
+    @Test func eyesOutrankABlock() {
+        #expect(AgentGroup(for: .finished, wantsEyes: true, report: Self.blocked(cleared: false),
+                           outcomeAsked: false, parked: false) == .needsAttention)
+    }
+
+    /// Stopped and archived outrank blocked, as they outrank every report (FR-012). A
+    /// running agent with a blocked report is the resumed turn, which is working.
+    @Test func stoppedArchivedAndRunningIgnoreABlock() {
+        let report = Self.blocked(cleared: false)
+        #expect(AgentGroup(for: .stopped, wantsEyes: false, report: report, outcomeAsked: false, parked: false) == .stopped)
+        #expect(AgentGroup(for: .archived, wantsEyes: false, report: report, outcomeAsked: false, parked: false) == .archived)
+        #expect(AgentGroup(for: .running, wantsEyes: false, report: report, outcomeAsked: false, parked: false) == .running)
+    }
+
+    /// A blocked chat the person has parked sits under Parked: parking is their word
+    /// that it can wait, whatever it waits on (040's assumption about 039).
+    @Test func aParkedBlockIsParked() {
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: false),
+                           outcomeAsked: false, parked: true) == .parked)
+    }
+
+    /// An older phone must not lose a whole project over a group it has never heard of.
+    @Test func countsWithAGroupThisBuildDoesNotKnowStillDecode() throws {
+        let json = #"""
+            {"project":{"folder":"file:///tmp/p/","addedAt":0},"name":"p","exists":true,
+             "lastActivityAt":0,"counts":{"running":2,"someday":1}}
+            """#
+        let decoder = JSONDecoder()
+        let summary = try decoder.decode(DaemonAPI.ProjectSummary.self, from: Data(json.utf8))
+        #expect(summary.counts == [.running: 2])
     }
 
     /// How a turn *ended* outranks what the agent said about the work. An agent
@@ -160,5 +229,56 @@ struct AgentGroupTests {
                 }
             }
         }
+    }
+
+    // MARK: And whether the person parked it (040)
+
+    /// Parked outranks every ending and every arm: the person has seen it and chosen
+    /// later, including a report that wants them and a workflow's turn that wakes it.
+    @Test func aParkedChatIsParkedWhateverItsEndingOrReport() {
+        for state in [AgentState.starting, .running, .finished, .stopped] {
+            for eyes in [false, true] {
+                for outcome in Self.reports {
+                    for asked in [false, true] {
+                        #expect(Self.group(state, eyes: eyes, outcome, asked: asked, parked: true) == .parked)
+                    }
+                }
+            }
+        }
+    }
+
+    /// A question asked mid-turn blocks the agent on the person, and archiving is a
+    /// firmer word than parking. Both outrank it.
+    @Test func aQuestionAndArchivingOutrankParking() {
+        #expect(Self.group(.waitingOnUser, parked: true) == .needsAttention)
+        #expect(Self.group(.archived, parked: true) == .archived)
+    }
+
+    /// Only the parked mark moves a chat. One marked to park when its turn ends is
+    /// grouped as it would be without the mark until the turn does end.
+    @Test func aChatMarkedToParkIsNotParkedYet() {
+        let dir = URL(fileURLWithPath: "/tmp/work")
+        var agent = Agent(runtimeID: "claude", cwd: dir, state: .running)
+        agent.parking = .whenTurnEnds(since: Date())
+        #expect(agent.group(wantsEyes: false) == .running)
+        agent.parking = .parked(at: Date())
+        #expect(agent.group(wantsEyes: false) == .parked)
+    }
+
+    /// The one place that says which button a chat shows (FR-012).
+    @Test func theParkActionIsDecidedOnce() {
+        let dir = URL(fileURLWithPath: "/tmp/work")
+        var agent = Agent(runtimeID: "claude", cwd: dir, state: .finished, endedReason: .endTurn)
+        #expect(agent.parkAction == .park)
+        agent.state = .running
+        #expect(agent.parkAction == .park)
+        agent.parking = .whenTurnEnds(since: Date())
+        #expect(agent.parkAction == .unpark)
+        agent.state = .finished
+        agent.parking = .parked(at: Date())
+        #expect(agent.parkAction == .unpark)
+        agent.parking = nil
+        agent.state = .archived
+        #expect(agent.parkAction == nil)
     }
 }

@@ -198,6 +198,9 @@ final class AppModel {
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
     private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var draftWorktreesGeneration = 0
+    /// The branch each project folder is on, for the chat's folder chip. Missing until
+    /// asked, and for a folder in no repository.
+    private(set) var projectFolderBranches: [URL: String] = [:]
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -271,6 +274,8 @@ final class AppModel {
 
     /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
 
     // MARK: Workflows
 
@@ -837,6 +842,17 @@ final class AppModel {
         draftWorktrees = answer
     }
 
+    /// Ask which branch an agent's project folder is on. Asked when its chat opens and
+    /// when its turn ends, since someone may have checked out another branch meanwhile.
+    func loadProjectFolderBranch(of agent: Agent) async {
+        guard agent.worktree == nil else { return }
+        let folder = agent.projectFolder
+        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                            returning: DaemonAPI.WorktreesListResponse.self)
+        projectFolderBranches[folder] = answer?.projectFolderBranch
+    }
+
     /// A session has to exist before its options do, so choosing a folder and a
     /// runtime starts one. It is kept and used by the start that follows.
     func loadDraftOptions() async {
@@ -978,6 +994,16 @@ final class AppModel {
         }
     }
 
+    /// End a block by hand (039): the prompt Carry on sends, as the person, to an agent
+    /// that need not be the one selected. A person's prompt is what clears a block, so
+    /// this is an ordinary prompt and nothing else.
+    func carryOn(_ id: UUID) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+                                       DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
+        }
+    }
+
     /// Start an agent on this, in this project's folder.
     ///
     /// What the prompt at the top of a project does. There is no separate button for
@@ -1033,6 +1059,12 @@ final class AppModel {
 
     func unarchive(_ id: UUID) async {
         await attempt { try await self.client.call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
+    }
+
+    /// Park or unpark, whichever `Agent.parkAction` offers (040).
+    func perform(_ action: ParkAction, on id: UUID) async {
+        let method = action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark
+        await attempt { try await self.client.call(method, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
     func answer(_ request: PermissionRequest, optionID: String) async {
@@ -1103,21 +1135,10 @@ final class AppModel {
     /// The pane's end of one agent's shell, made once per agent per window.
     func shellClient(for agentID: UUID) -> ShellClient {
         if let existing = shellClients[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, model: self)
+        let fresh = ShellClient(agentID: agentID, client: client,
+                                describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         shellClients[agentID] = fresh
         return fresh
-    }
-
-    func attachShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
-        try await client.call(DaemonAPI.Method.shellAttach,
-                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
-                              returning: DaemonAPI.ShellAttachResponse.self)
-    }
-
-    func restartShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
-        try await client.call(DaemonAPI.Method.shellRestart,
-                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
-                              returning: DaemonAPI.ShellAttachResponse.self)
     }
 
     /// What the person typed on a live page, sent to the daemon to put on disk (022).
@@ -1134,21 +1155,6 @@ final class AppModel {
         } catch {
             return error.localizedDescription
         }
-    }
-
-    /// Detaching never stops anything. A build carries on (FR-026).
-    func detachShell(agentID: UUID) async {
-        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.AgentRequest(agentID: agentID))
-    }
-
-    func sendToShell(agentID: UUID, bytes: Data) async {
-        try? await client.call(DaemonAPI.Method.shellInput,
-                               DaemonAPI.ShellInputRequest(agentID: agentID, bytes: bytes))
-    }
-
-    func resizeShell(agentID: UUID, rows: Int, cols: Int) async {
-        try? await client.call(DaemonAPI.Method.shellResize,
-                               DaemonAPI.ShellResizeRequest(agentID: agentID, rows: rows, cols: cols))
     }
 
     /// A shell that will not start is shown inside the pane, not in the window's alert:

@@ -80,9 +80,22 @@ public enum DaemonAPI {
         /// Files under an agent's folders matching what follows an `@`, found on the
         /// Mac, so a phone can name them too (033).
         public static let filesMention = "files/mention"
+        /// An agent's folder, file and changes, read by the daemon for a device that has
+        /// no disk to read (034). The Mac's own panes read the disk themselves; these are
+        /// the same readers, behind the same scope as `show_file`.
+        public static let filesList = "files/list"
+        public static let filesRead = "files/read"
+        /// Hear `files/changed` for an agent's folders, on this connection only, until
+        /// `files/unwatch` or the connection ends.
+        public static let filesWatch = "files/watch"
+        public static let filesUnwatch = "files/unwatch"
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
+        /// Put a chat down to come back to, or pick it back up (040). The person's
+        /// word about their own attention: no agent tool reaches either.
+        public static let agentsPark = "agents/park"
+        public static let agentsUnpark = "agents/unpark"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
         /// Letting one agent carry on past the per-agent limit, or giving it a
@@ -234,6 +247,9 @@ public enum DaemonAPI {
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
         public static let shellStateChanged = "shell/stateChanged"
+        /// Folders changed under something a connection is watching (034). Sent only to
+        /// the connections that asked, never broadcast.
+        public static let filesChanged = "files/changed"
 
         /// A limit changed, a turn's cost was banked, or the local day rolled over.
         /// Carries the whole resolved fact rather than a delta, for the reason
@@ -358,7 +374,13 @@ public enum DaemonAPI {
             name = try c.decode(String.self, forKey: .name)
             exists = try c.decode(Bool.self, forKey: .exists)
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
-            counts = try c.decode([AgentGroup: Int].self, forKey: .counts)
+            // By the group's name, dropping any this build has never heard of. A plain
+            // `[AgentGroup: Int]` decode throws on an unknown key, which would take the
+            // whole project list down on a phone older than the group (039's `blocked`, 040's `parked`).
+            counts = [:]
+            for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
+                if let group = AgentGroup(rawValue: name) { counts[group] = count }
+            }
             costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
             unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
         }
@@ -588,11 +610,18 @@ public enum DaemonAPI {
         public var token: String
         public var outcome: String
         public var message: String
+        /// Only with `blocked` (039): the agents it waits on, as it wrote them — ids or
+        /// titles, resolved by the daemon. Optional, so an older helper still relays.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
-        public init(token: String, outcome: String, message: String) {
+        public init(token: String, outcome: String, message: String,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 
@@ -623,14 +652,20 @@ public enum DaemonAPI {
         /// relays a call without it, and that call still lands — with the title left
         /// as it was.
         public var title: String?
+        /// Only with `blocked` (039). See `ReportOutcomeRequest`.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
         public init(token: String, outcome: String, message: String,
-                    prompts: [SuggestedPrompt], title: String? = nil) {
+                    prompts: [SuggestedPrompt], title: String? = nil,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
             self.title = title
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 
@@ -650,6 +685,55 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.path = path
             self.text = text
+        }
+    }
+
+    // MARK: Files, for a device (034)
+
+    public struct FilesListRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var folder: String
+
+        public init(agentID: UUID, folder: String) {
+            self.agentID = agentID
+            self.folder = folder
+        }
+    }
+
+    public struct FilesReadRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        /// What the caller already holds. When the file still has it, the answer is
+        /// `unchanged` and nothing is carried again.
+        public var knownStamp: FileStamp?
+
+        public init(agentID: UUID, path: String, knownStamp: FileStamp? = nil) {
+            self.agentID = agentID
+            self.path = path
+            self.knownStamp = knownStamp
+        }
+    }
+
+    /// `files/watch` and `files/unwatch`.
+    public struct FilesWatchRequest: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var folder: String
+
+        public init(agentID: UUID, folder: String) {
+            self.agentID = agentID
+            self.folder = folder
+        }
+    }
+
+    public struct FilesChangedNotification: Codable, Sendable, Equatable {
+        public var agentID: UUID
+        /// Directories, as FSEvents names them: re-list one being shown, re-read a file
+        /// whose folder is here.
+        public var folders: [String]
+
+        public init(agentID: UUID, folders: [String]) {
+            self.agentID = agentID
+            self.folders = folders
         }
     }
 
@@ -1020,10 +1104,17 @@ public enum DaemonAPI {
         /// What the user typed, as bytes. Never a `String`: a keystroke is not always a
         /// character, and an escape sequence is not text.
         public var bytes: Data
+        /// The typist's screen, when it says (034). The shell takes the size of whoever
+        /// typed last, and the daemon is the one place that knows who that was. Older
+        /// clients send neither and nothing is resized.
+        public var rows: Int?
+        public var cols: Int?
 
-        public init(agentID: UUID, bytes: Data) {
+        public init(agentID: UUID, bytes: Data, rows: Int? = nil, cols: Int? = nil) {
             self.agentID = agentID
             self.bytes = bytes
+            self.rows = rows
+            self.cols = cols
         }
     }
 
@@ -1173,6 +1264,10 @@ public enum DaemonAPI {
         public static let notAWorktree = -32030
         /// An agent is still working in the worktree to be removed.
         public static let worktreeInUse = -32031
+        /// The folder or file asked for is not there, or not any more (034).
+        public static let fileGone = -32032
+        /// It is there and cannot be opened (034).
+        public static let fileNotReadable = -32033
     }
 
     // MARK: Workflows
@@ -1346,6 +1441,20 @@ public enum DaemonAPI {
             self.canMakeNew = canMakeNew
             self.whyNot = whyNot
             self.worktrees = worktrees
+        }
+
+        /// The branch the project folder is on, "detached" when it is on none. Nil
+        /// when it is in no repository, or not listed yet.
+        public var projectFolderBranch: String? {
+            worktrees.first(where: \.isProjectFolder).map { $0.branch ?? "detached" }
+        }
+
+        /// What the chooser says under "Project folder": its branch first, since the
+        /// project folder is not always on main.
+        public var projectFolderDescription: String {
+            let alongside = "Work alongside anything else here"
+            guard let branch = projectFolderBranch else { return alongside }
+            return "\(branch) · \(alongside.lowercased())"
         }
 
         public static let notARepository = WorktreesListResponse(isRepository: false)

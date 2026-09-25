@@ -1,19 +1,21 @@
 import AgentsKit
 import SwiftUI
 
-/// The worktrees this app made for the project, and the way to be done with one (030).
+/// Every worktree of the project's repository, and the way to be done with the app's
+/// own (030).
 ///
-/// Only the app's own: one made in a terminal, or by a runtime, is somebody else's to
-/// remove. Hidden when there are none, because an empty heading is a question nobody
-/// asked. Archiving an agent never removes its worktree — the work in it may not be
-/// merged — so this is where they go when you are finished with them.
+/// All of them are listed, because an agent working in one made in a terminal, or by a
+/// runtime, is still working on this project. Only the app's own can be removed: the
+/// others are somebody else's. Hidden when there are none, because an empty heading is
+/// a question nobody asked. Archiving an agent never removes its worktree — the work in
+/// it may not be merged — so this is where they go when you are finished with them.
 struct WorktreesSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
 
     private var worktrees: [DaemonAPI.WorktreeSummary] {
         guard folder != nil, model.draftCwd == folder else { return [] }
-        return model.draftWorktrees.worktrees.filter { $0.madeByApp && !$0.isProjectFolder }
+        return model.draftWorktrees.worktrees.filter { !$0.isProjectFolder }
     }
 
     var body: some View {
@@ -26,7 +28,7 @@ struct WorktreesSection: View {
     }
 }
 
-/// One worktree: its name, its branch, who is in it, and Remove.
+/// One worktree: its name, its branch, who is in it, and Remove when the app made it.
 struct WorktreeRow: View {
     @Environment(AppModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
@@ -35,11 +37,15 @@ struct WorktreeRow: View {
     @State private var isChecking = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        // Laid out the way `AgentRow` and `WorkflowRow` are, so the page has one kind of
+        // card: an icon at the reading size, a semibold name, a grey line under it.
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
-                .appText(.fine)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
                 Text(worktree.name)
                     .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
@@ -51,14 +57,18 @@ struct WorktreeRow: View {
             }
             .help(worktree.root.path(percentEncoded: false))
             Spacer(minLength: 8)
-            Button("Remove…") { Task { await remove() } }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .disabled(isChecking)
+            if worktree.madeByApp {
+                Button("Remove…") { Task { await remove() } }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .disabled(isChecking)
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {

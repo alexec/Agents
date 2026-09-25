@@ -45,7 +45,11 @@ struct PromptBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if isShowingEverything {
-                PromptHeader(agent: agent) { ContextMeter(agent: agent) }
+                PromptHeader(agent: agent,
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                    ContextMeter(agent: agent)
+                }
+                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
                 CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()
@@ -128,6 +132,7 @@ struct PromptBar: View {
                 .appText(.reading)
                 .lineLimit(1...8)
                 .focused($focused)
+                .onChange(of: focused) { _, now in model.isTyping = now }
                 .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
                 // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
                 // a hardware keyboard only, so the on-screen one is left as iOS has it:

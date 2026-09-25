@@ -144,3 +144,37 @@ public struct FileProbe: Sendable, Equatable {
         "ttf": "Font", "otf": "Font", "woff": "Font", "woff2": "Font",
     ]
 }
+
+extension FileReading {
+    /// A file read for a device: `FileProbe`'s decision, carried (034 `files/read`).
+    ///
+    /// The same probe the Mac's pane runs, so the two can never disagree about what a
+    /// file is. A picture is then read whole, if it is small enough to carry.
+    public static func read(_ url: URL, known: FileStamp? = nil) throws -> FileReading {
+        // A `URL` remembers what it was last told about the file, and a stamp read from
+        // that memory would answer "unchanged" about a file that has just changed.
+        var url = url
+        url.removeAllCachedResourceValues()
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey,
+                                                       .isDirectoryKey, .isRegularFileKey])
+        if values?.isDirectory == true { throw FileProbe.Failure.isDirectory }
+        guard let values, values.isRegularFile == true else { throw FileProbe.Failure.gone }
+        let stamp = FileStamp(size: values.fileSize ?? 0,
+                              modifiedAt: values.contentModificationDate ?? .distantPast)
+        if let known, known == stamp { return .unchanged(stamp) }
+
+        let probe = try FileProbe.read(url)
+        switch probe.kind {
+        case .text:
+            return .text(probe.text ?? "", isTruncated: probe.isTruncated, size: probe.size, stamp: stamp)
+        case .image(let describedAs):
+            guard probe.size <= imageLimit else {
+                return .other(describedAs: describedAs, size: probe.size, stamp: stamp)
+            }
+            guard let bytes = try? Data(contentsOf: url) else { throw FileProbe.Failure.notReadable }
+            return .image(bytes, describedAs: describedAs, stamp: stamp)
+        case .binary(let describedAs):
+            return .other(describedAs: describedAs, size: probe.size, stamp: stamp)
+        }
+    }
+}

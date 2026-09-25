@@ -154,3 +154,28 @@ extension TextStep {
         return font.weight(.semibold)
     }
 }
+
+#if os(iOS)
+extension TextStep {
+    /// The same step for a UIKit text view: the page's passage editor (034). The
+    /// phone's side of `nsFont`, resolved here for the same reason.
+    var uiFont: UIFont {
+        switch self {
+        case .title: return Self.serif(.title1)
+        case .reading: return Self.serif(.body)
+        case .supporting: return Self.serif(.subheadline)
+        case .fine: return .preferredFont(forTextStyle: .footnote)
+        case .code: return .monospacedSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
+                                                  weight: .regular)
+        }
+    }
+
+    /// New York at a text style's size, or the system face if the serif design is not
+    /// there.
+    private static func serif(_ style: UIFont.TextStyle) -> UIFont {
+        let base = UIFont.preferredFont(forTextStyle: style)
+        guard let serif = base.fontDescriptor.withDesign(.serif) else { return base }
+        return UIFont(descriptor: serif, size: 0)
+    }
+}
+#endif
