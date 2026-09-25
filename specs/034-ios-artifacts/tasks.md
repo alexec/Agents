@@ -134,7 +134,7 @@ it first. The page opens and follows each step with no tap.
   - image → the disk, with the old cache
   - imagesChanged → `folderEvents` and `ImageStamps`
   - canEdit → true
-- [ ] T027 (deferred to the end, 2026-09-24: Alex chose "build on, walk later" while at the keyboard) [US1] Build the Mac. Run the run-app skill on a scratch root and walk quickstart "The Mac page, unchanged after the move". Screenshot four steps, compare with `specs/022-live-artifacts/walk/`, and put the shots in `specs/034-ios-artifacts/walk/`.
+- [X] T027 (walked 2026-09-24 while Alex was away; see walk/README.md) [US1] Build the Mac. Run the run-app skill on a scratch root and walk quickstart "The Mac page, unchanged after the move". Screenshot four steps, compare with `specs/022-live-artifacts/walk/`, and put the shots in `specs/034-ios-artifacts/walk/`.
 - [X] T028 [US1] Create `Remote/Sources/Panes/PagePane.swift`:
   - It reads `pagePath` through `RemoteFiles.read` and watches its folder.
   - On `files/changed` naming the page's folder, it re-reads with the stamp and hands new text to `LivePage`.
@@ -239,7 +239,7 @@ scrollback is there. Tap ^C once on the phone to interrupt, and the Mac shows th
   - stale: input is disabled and the keyboard dismissed, and on reconnect it re-attaches and replays
   - focus reports to `isTyping`
 - [X] T051 [US4] In `Remote/Sources/RemoteModel.swift`, add `shells: [UUID: ShellClient]`, and route `shell/output` and `shell/stateChanged` to them in the notification switch.
-- [ ] T052 (builds done 2026-09-24; the Mac terminal walk is deferred to the end with T027) [US4] Build Remote (SwiftTerm on iOS for the first time), then the Mac. On the Mac, walk the terminal pane with run-app: attach, `ls`, resize, then Start again after `exit`.
+- [X] T052 (walked 2026-09-24 while Alex was away; see walk/README.md) [US4] Build Remote (SwiftTerm on iOS for the first time), then the Mac. On the Mac, walk the terminal pane with run-app: attach, `ls`, resize, then Start again after `exit`.
 
 ---
 
@@ -269,7 +269,7 @@ to full screen and keeps its place. Switching agents and back keeps each pane.
 - [X] T057 [P] In `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`, fail if `Remote/Sources` declares `struct MarkdownText`, `struct LivePage`, `struct PassageEditor`, `PassageMerge` or `final class ShellClient`, or if `App/Sources` does.
 - [X] T058 [P] Update `Shared/UI/README.md` for `Shared/UI/Page/` and `PageActions`. Update the `FilesPane` doc comment (read-only apart from the page, now on both devices). Update the `RemoteModel` and `FileView`/`ChangesView` doc comments that say the phone cannot read the Mac's disk.
 - [X] T059 Run the full suite six times on this branch and on `main`, and compare the failure sets (memory: the suite is broadly flaky under load). Then build both schemes one after the other.
-- [ ] T060 (deferred with T027 and T052: Alex at the keyboard, 2026-09-24; see walk/README.md) Walk the Mac once more with run-app, covering the page, files and terminal, then stop the scratch app. Record what was seen, and what is Alex's, in `specs/034-ios-artifacts/walk/README.md`.
+- [X] T060 (walked 2026-09-24 while Alex was away; see walk/README.md) Walk the Mac once more with run-app, covering the page, files and terminal, then stop the scratch app. Record what was seen, and what is Alex's, in `specs/034-ios-artifacts/walk/README.md`.
 
 ---
 

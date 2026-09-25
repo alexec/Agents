@@ -26,17 +26,35 @@ What has been proved, and what is left to see.
   a draft carried across the agent's write, a collision, a failed save keeping the draft,
   and a reconnect that saves the draft over what the agent wrote meanwhile.
 
-## Alex's: the Mac (deferred, 2026-09-24)
+## The Mac, walked (2026-09-24, while Alex was away)
 
-The page moved to `Shared/UI/Page`, so it needs seeing once on the Mac. These walks need a
-chat selected, which takes a press, so they wait for a time nobody is at the keyboard.
+Walked on a scratch root (`/tmp/run-p034`) with a real Claude agent, driven through the socket
+and accessibility presses. The screenshots are beside this file.
 
-1. **The page**: in a scratch copy, an agent shows a new `.md` and writes it in four
-   steps. The caret with the agent's name types each block, and the view follows.
-2. **Typing**: click a passage, type, and pause. `cat` shows the edit, with no caret or
-   mark on the page for it.
-3. **A picture**: an SVG beside the document draws. Redraw it and the passage is marked.
-4. **The terminal**: attach, `ls`, resize the pane, `exit`, then New shell.
+1. **The page** (`mac-1`…`mac-4`):
+   - `show_file` opened `plan.md` before it existed.
+   - The agent's caret, flagged "Claude", typed each block in turn, and the view followed it.
+   - The SVG drew at its reference.
+   - The last step rewrote the introduction in place.
+2. **A redrawn picture** (`mac-5`): the agent changed `beds.svg`'s colours, and the page
+   showed the new ones without reloading the text.
+3. **Typing** (`mac-6`, `mac-7`):
+   - The introduction was opened for typing (the person's "Alex" flag) and its text set.
+   - The file on disk had it within 3 s, with no caret or mark for the person's own save.
+   - Asked to carry on, the agent added a section and said it left "your new
+     introduction" as it was. The file agreed.
+4. **The terminal** (`mac-8`…`mac-11`):
+   - Commands typed from a second connection appeared in the pane, both the replayed
+     scrollback and live output.
+   - A keystroke carrying a 20×50 size resized the shell (`stty size` → `20 50`).
+   - `exit` showed "The shell exited." with New shell, which started a new shell at
+     the pane's own size (43×78).
+
+Seen and left alone: the person's flag stands on the line above the caret, as the agent's
+does. That is 022's design, not a regression.
+
+One slip, put right: my first press for the Terminal tab matched an "open in" menu item
+instead. It revealed Terminal.app in a Finder window, which I closed.
 
 ## Alex's: iPhone and iPad
 
@@ -87,4 +105,6 @@ daemon, and the bridge is started by hand as usual.
 ## Not seen by anyone yet
 
 - Anything on an iPhone or iPad. There is no Simulator GUI on this Mac.
+- Typing with real keystrokes on the Mac page. The walk set the editor's text through
+  accessibility, which goes through the same text view but not the keyboard.
 - The SVG raster, the key row's layout, and the column's drag handle.
