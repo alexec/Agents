@@ -99,8 +99,7 @@ struct FilesPane: View {
             if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
                     .appText(.fine)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.paper)
             }
         }
         .buttonStyle(.borderless)
@@ -194,7 +193,8 @@ struct FilesPane: View {
                 // The line at the top, kept on the pane for when it is drawn again.
                 FileLines(text: text, line: state.openLine,
                           place: Binding(get: { state.scrollAnchor[url.path] },
-                                         set: { state.scrollAnchor[url.path] = $0 }))
+                                         set: { state.scrollAnchor[url.path] = $0 }),
+                          path: url.path)
             }
         }
     }

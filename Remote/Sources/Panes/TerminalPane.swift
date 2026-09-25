@@ -69,8 +69,7 @@ struct TerminalPane: View {
             Button("Start again") {
                 Task { await client.restart(rows: rows, cols: cols) }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.paper)
             .disabled(model.isStale)
         }
         .padding(.horizontal, 12)
@@ -225,8 +224,7 @@ private struct Trouble: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Try again") { Task { await retry() } }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.paper)
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

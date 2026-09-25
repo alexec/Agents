@@ -6,8 +6,8 @@ import SwiftUI
 ///
 /// All of them are listed, but only the app's own can be removed: one made in a
 /// terminal, or by a runtime, is somebody else's. Hidden when there are none. Archiving
-/// an agent never removes its worktree — the work in it may not be merged — so this is
-/// where they go when you are finished.
+/// the last agent in one removes it only when everything in it is committed, so this is
+/// where the rest go when you are finished.
 struct WorktreesSection: View {
     @Environment(RemoteModel.self) private var model
     let folder: URL
@@ -55,13 +55,14 @@ private struct WorktreeRow: View {
                 Button("Remove…") { Task { await remove() } }
                     .buttonStyle(.paper)
                     .appText(.supporting)
-                    .disabled(isChecking)
+                    // Not while anyone works in it: archive them first.
+                    .disabled(isChecking || !worktree.agents.isEmpty)
                     .accessibilityLabel("Remove \(worktree.name)")
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {

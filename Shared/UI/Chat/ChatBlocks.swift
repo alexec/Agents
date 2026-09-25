@@ -1,4 +1,5 @@
 import AgentsKitCore
+import CodeText
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -94,17 +95,29 @@ struct BlocksView: View {
     }
 }
 
-/// What changed in a file: the old lines against the new ones.
+/// What changed in a file: a line diff of the old text against the new (041 FR-008).
 ///
 /// Red and green would be the obvious thing and this app has one rule about colour,
-/// which is that it means something went wrong. So a change is shown by its marks and
-/// its weight instead, and the only colour here is the one for a line that was removed.
+/// which is that it means something went wrong. So a change is shown by its marks, its
+/// weight and a faint neutral wash instead; the colour here is the code's own (041 FR-011).
 struct DiffView: View {
     let diff: ToolCallContent.Diff
     /// The conversation caps an edit so one big one does not take the page; the
     /// Changes pane, where the edit is the thing being read, does not (035).
     var maxHeight: CGFloat? = 280
     var showsPath = true
+
+    /// Worked out once per diff, not on every pass of `body`.
+    private let rows: [DiffRow]
+    private let language: CodeLanguage?
+
+    init(diff: ToolCallContent.Diff, maxHeight: CGFloat? = 280, showsPath: Bool = true) {
+        self.diff = diff
+        self.maxHeight = maxHeight
+        self.showsPath = showsPath
+        self.rows = LineDiff.rows(old: diff.oldText, new: diff.newText)
+        self.language = CodeLanguage.detect(path: diff.path, firstLine: nil)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -116,48 +129,14 @@ struct DiffView: View {
                     .truncationMode(.head)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(line.mark)
-                                .appText(.code)
-                                .foregroundStyle(.tertiary)
-                            Text(line.text.isEmpty ? " " : line.text)
-                                .appText(.code)
-                                .foregroundStyle(line.isRemoved ? AnyShapeStyle(.tertiary)
-                                                                : AnyShapeStyle(.primary))
-                                .strikethrough(line.isRemoved)
-                        }
-                        .padding(.horizontal, 8)
-                    }
-                }
-                .padding(.vertical, 6)
+                CodeRows(rows: rows, language: language, oldText: diff.oldText,
+                         newText: diff.newText)
+                    .padding(.vertical, 6)
             }
             .frame(maxHeight: maxHeight)
             .paperWell(in: RoundedRectangle(cornerRadius: 8))
         }
         .textSelection(.enabled)
-    }
-
-    private struct Line {
-        var mark: String
-        var text: String
-        var isRemoved: Bool
-    }
-
-    /// Old lines then new lines. Not a real diff algorithm: the runtimes send the two
-    /// sides and what the reader wants is to see both, not to be told which words moved.
-    private var lines: [Line] {
-        let old = (diff.oldText ?? "").split(separator: "\n", omittingEmptySubsequences: false)
-        let new = diff.newText.split(separator: "\n", omittingEmptySubsequences: false)
-        var lines: [Line] = []
-        if diff.oldText != nil, !(old.count == 1 && old[0].isEmpty) {
-            lines += old.map { Line(mark: "-", text: String($0), isRemoved: true) }
-        }
-        if !(new.count == 1 && new[0].isEmpty) {
-            lines += new.map { Line(mark: "+", text: String($0), isRemoved: false) }
-        }
-        return lines
     }
 }
 

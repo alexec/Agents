@@ -239,6 +239,36 @@ extension DaemonCore {
         }
     }
 
+    /// Take away the worktree an agent was just archived out of, when that loses nothing:
+    /// the app made it, no other agent that is not archived works in it, and everything
+    /// in it is committed. Its branch goes too only when it is merged; otherwise the
+    /// branch stays and holds the commits. Anything short of that leaves it all as it
+    /// is, for the person to remove from the project page.
+    func removeWorktreeIfDone(archiving agentID: UUID) async {
+        guard let worktree = agents[agentID]?.worktree, worktree.madeByApp else { return }
+        let request = DaemonAPI.WorktreeRemovalRequest(project: worktree.project, root: worktree.root,
+                                                       confirmed: false)
+        guard let facts = try? await removalFacts(request), facts.madeByApp, facts.exists,
+              facts.check.blockedBy.isEmpty, facts.check.uncommitted == 0 else { return }
+        do {
+            try await GitWorktrees.remove(facts.root, force: false, in: facts.project)
+            var branchNote = ""
+            if let branch = facts.branch {
+                if Self.isAppBranch(branch), !facts.check.unmerged {
+                    try await GitWorktrees.deleteBranch(branch, force: false, in: facts.project)
+                    branchNote = " and its branch, which was merged"
+                } else {
+                    branchNote = ". Its branch \(branch) is kept"
+                }
+            }
+            await record(.runtimeNote("Removed the worktree \(worktree.name)\(branchNote), since everything in it was committed."),
+                         for: agentID)
+            projectChanged(forAgentIn: facts.project)
+        } catch let failure as GitWorktrees.Failure {
+            DaemonLog.shared.write("left the worktree \(facts.root.path) after archiving \(agentID): \(failure.message)")
+        } catch {}
+    }
+
     /// "3 uncommitted changes and commits not in main", as a removal confirmation says it.
     public static func whatIsLost(_ check: DaemonAPI.RemovalCheck, base: String? = nil) -> String {
         var parts: [String] = []

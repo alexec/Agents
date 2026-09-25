@@ -43,11 +43,18 @@ struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
 
-    /// The conversation, as a path of nothing or one. A chat is somewhere you go from
-    /// the project and come back out of, not a third column.
-    private var openAgent: Binding<[UUID]> {
-        Binding(get: { model.selection.map { [$0] } ?? [] },
-                set: { model.selection = $0.last })
+    /// What is pushed over the project: a workflow's page, a conversation, or a
+    /// conversation opened from a workflow's page, which goes back to it. A chat is
+    /// somewhere you go from the project and come back out of, not a third column.
+    private var path: Binding<[RemoteRoute]> {
+        Binding(get: {
+                    [model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
+                        .compactMap { $0 }
+                },
+                set: { routes in
+                    model.openWorkflow = routes.lazy.compactMap(\.workflowID).first
+                    model.selection = routes.compactMap(\.agentID).last
+                })
     }
 
     var body: some View {
@@ -55,10 +62,15 @@ struct RemoteView: View {
         NavigationSplitView {
             ProjectListView(selection: $model.selectedProject)
         } detail: {
-            NavigationStack(path: openAgent) {
+            NavigationStack(path: path) {
                 ProjectPageView()
                     .paperGround()
-                    .navigationDestination(for: UUID.self) { _ in RemoteChatView().paperGround() }
+                    .navigationDestination(for: RemoteRoute.self) { route in
+                        switch route {
+                        case .agent: RemoteChatView().paperGround()
+                        case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+                        }
+                    }
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -77,5 +89,21 @@ struct RemoteView: View {
         } message: {
             Text(model.problem ?? "")
         }
+    }
+}
+
+/// Somewhere to go from the project page.
+enum RemoteRoute: Hashable {
+    case workflow(Workflow.ID)
+    case agent(UUID)
+
+    var workflowID: Workflow.ID? {
+        if case .workflow(let id) = self { return id }
+        return nil
+    }
+
+    var agentID: UUID? {
+        if case .agent(let id) = self { return id }
+        return nil
     }
 }
