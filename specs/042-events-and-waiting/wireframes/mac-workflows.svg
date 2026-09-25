@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="330" viewBox="0 0 900 330" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; }
+    .rb { font-size:14px; font-weight:600; } .sup { font-size:13px; } .f { font-size:12px; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .link { text-decoration: underline; }
+  </style>
+  <rect x="0.5" y="0.5" width="899" height="329" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="24" y="36" class="rb t">Workflows</text>
+
+  <rect x="16" y="52" width="868" height="74" rx="10" fill="#f5f5f7"/>
+  <text x="32" y="76" class="rb t">Release notes</text>
+  <text x="32" y="96" class="sup s">When one of my pull requests is merged, in a new agent</text>
+  <text x="32" y="116" class="f s">Ran 06:55 on <tspan class="link">pull_request.merged #41</tspan> · <tspan class="link">Release notes · 26 Sep</tspan> ›</text>
+  <text x="820" y="80" class="sup s">▶  ⌫</text>
+
+  <rect x="16" y="136" width="868" height="74" rx="10" fill="#f5f5f7"/>
+  <text x="32" y="160" class="rb t">Babysit my PRs</text>
+  <text x="32" y="180" class="sup s">When one of my pull requests fails its checks, gets review comments or conflicts with its base, in a new agent</text>
+  <text x="32" y="200" class="f s">Refused 06:55 on <tspan class="link">pull_request.merged #41</tspan>: a run is still in flight</text>
+
+  <rect x="16" y="220" width="868" height="74" rx="10" fill="#f5f5f7"/>
+  <text x="32" y="244" class="rb t">Catch up</text>
+  <text x="32" y="264" class="sup s">When the Mac wakes, in its own standing agent</text>
+  <text x="32" y="284" class="f s">Ran 07:12 on <tspan class="link">mac.wake</tspan> · <tspan class="link">Catch up</tspan> ›</text>
+
+  <text x="520" y="316" class="note">The outcome line gains “on {event}”, a link to its row (FR-030).</text>
+</svg>
