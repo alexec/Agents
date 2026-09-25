@@ -52,14 +52,19 @@ enum PromptWords {
 /// its own help text; its place in the row is not.
 struct PromptHeader<Meter: View>: View {
     let agent: Agent
+    /// The branch the project folder is on, once asked. Nil in a worktree, or in a
+    /// folder that is no repository.
+    var projectFolderBranch: String?
     @ViewBuilder let meter: () -> Meter
 
     var body: some View {
         HStack(spacing: 12) {
-            // In a worktree, the worktree is the place worth naming: its folder is the
-            // project's name again, or a subfolder of it (030).
-            Label(agent.worktree?.name ?? agent.cwd.lastPathComponent,
-                  systemImage: agent.worktree == nil ? "folder" : "arrow.triangle.branch")
+            // The branch is the place worth naming. In a worktree that is the worktree:
+            // its folder is the project's name again, or a subfolder of it (030). In the
+            // project folder it is whatever is checked out there, which is not always
+            // main. Only a folder in no repository is named as a folder.
+            Label(branch ?? agent.cwd.lastPathComponent,
+                  systemImage: branch == nil ? "folder" : "arrow.triangle.branch")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -81,6 +86,8 @@ struct PromptHeader<Meter: View>: View {
                 .paperRaised(in: Capsule())
         }
     }
+
+    private var branch: String? { agent.worktree?.name ?? projectFolderBranch }
 }
 
 /// Said above the field when the open agent may take no more prompts, with exactly two

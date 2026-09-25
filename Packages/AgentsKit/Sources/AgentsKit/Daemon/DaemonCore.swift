@@ -128,6 +128,13 @@ public actor DaemonCore {
     /// Changes pane asks and caught up on every ask after (035). Not persisted: the
     /// transcript is the record, and folding it again costs one read.
     var reportedChanges: [UUID: HeldChanges] = [:]
+    /// One folder watch per watched root, shared by every connection watching under
+    /// it, and who is watching what (034). Nothing here outlives its connection.
+    var fileWatches: [URL: FolderWatch] = [:]
+    var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The phones and iPads that have an agent's shell open, by agent (034). A device
+    /// hears a shell's output only while it is here; a window on the Mac hears them all.
+    var shellWatchers: [UUID: Set<UUID>] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]
@@ -267,6 +274,9 @@ public actor DaemonCore {
     /// terminal made during recovery would otherwise have copied nothing and stayed
     /// mute for the rest of the daemon's life.
     let broadcaster = BroadcastBox()
+    /// The other way out: to the connections a predicate picks (034). What a device
+    /// watches, and the shells it has open, go this way.
+    let addressed = AddressedBox()
     var connectionCount = 0
 
     /// The daemon's one way out to the windows, settable once the socket exists and
@@ -283,6 +293,23 @@ public actor DaemonCore {
 
         func callAsFunction(_ method: String, _ params: JSONValue?) {
             lock.withLock { send }?(method, params)
+        }
+    }
+
+    /// `BroadcastBox`'s twin, for notifications that belong to some connections only.
+    public final class AddressedBox: @unchecked Sendable {
+        public typealias Wanted = @Sendable (DaemonServer.ConnectionContext) -> Bool
+        private let lock = NSLock()
+        private var send: (@Sendable (String, JSONValue?, @escaping Wanted) -> Void)?
+
+        var isSet: Bool { lock.withLock { send != nil } }
+
+        func set(_ send: @escaping @Sendable (String, JSONValue?, @escaping Wanted) -> Void) {
+            lock.withLock { self.send = send }
+        }
+
+        func callAsFunction(_ method: String, _ params: JSONValue?, to wanted: @escaping Wanted) {
+            lock.withLock { send }?(method, params, wanted)
         }
     }
 
@@ -380,6 +407,12 @@ public actor DaemonCore {
         self.broadcaster.set(broadcaster)
     }
 
+    public func setAddressedBroadcaster(
+        _ send: @escaping @Sendable (String, JSONValue?, @escaping AddressedBox.Wanted) -> Void
+    ) {
+        addressed.set(send)
+    }
+
     /// Hold lifecycle events rather than acting on them, until `startWorkflows`.
     ///
     /// Called by `Daemon.start()` before `recover()`. Nothing else should need it: it
@@ -399,6 +432,13 @@ public actor DaemonCore {
         guard broadcaster.isSet else { return }
         let params = value.flatMap { try? JSONValue.encoding($0) }
         broadcaster(method, params)
+    }
+
+    /// Tell only the connections `wanted` picks (034).
+    func send(_ method: String, _ value: (some Encodable)?, to wanted: @escaping AddressedBox.Wanted) {
+        guard addressed.isSet else { return }
+        let params = value.flatMap { try? JSONValue.encoding($0) }
+        addressed(method, params, to: wanted)
     }
 
     func changed(_ agent: Agent) {
@@ -487,6 +527,25 @@ public actor DaemonCore {
         // other move — picked up again, stopped, archived — is not a finish, so the
         // flag goes.
         agent.isUnread = next == .finished && !isWatched(agentID)
+        // Parking (040). A chat marked while its turn was in flight is parked the moment
+        // that turn ends, by whatever means, and before anything is told — so the
+        // ending never counts as a need and no banner goes out (FR-006). Not when a
+        // restarting daemon is about to pick it back up: that turn has not ended, and
+        // it parks when it does. Archiving takes the mark away, and unarchiving does
+        // not put it back (FR-010). The triggers below read `next`, never the mark, so
+        // a workflow sees the ending it always did (FR-015).
+        switch next {
+        case .finished, .stopped:
+            if case .whenTurnEnds = agent.parking,
+               !(event == .foundDead && agent.mayBePickedUpAfterRestart) {
+                agent.parking = .parked(at: now())
+                agent.isUnread = false
+            }
+        case .archived:
+            agent.parking = nil
+        case .starting, .running, .waitingOnUser:
+            break
+        }
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
 
@@ -536,6 +595,18 @@ public actor DaemonCore {
         case .starting, .waitingOnUser, .running, .archived:
             break
         }
+        // Anything blocked on this agent (039). Closing is one write per blocked agent;
+        // the resume it may clear is queued in that same moment and sent behind this
+        // call, so this agent's own ending is not held up by another's runtime starting.
+        if let how = waitEnding(for: agent, next: next, event: event,
+                                reasonThisEventSet: reasonThisEventSet) {
+            let at = now()
+            for blocked in closeWaits(on: agentID, how: how) {
+                guard let promptID = queueResume(blocked, now: at) else { continue }
+                Task { await self.sendResume(blocked, promptID: promptID) }
+            }
+        }
+
         // Every way a need begins or ends is a state change or passes through one, and
         // this is the one place every state change passes through. Cheap, and it says
         // nothing unless something changed (021, FR-002).

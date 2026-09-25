@@ -468,11 +468,42 @@ public final class AgentsModel {
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 
+    // MARK: Blocked (039)
+
+    /// The block this agent is sitting in, if it is: a settled agent whose last report
+    /// was `blocked` and has not cleared. Nil for a running agent even when its report
+    /// still says blocked — that is the resumed turn, and it is working.
+    public func openBlock(_ agent: Agent) -> (report: WorkReport, block: Block)? {
+        guard agent.state == .finished, let report = agent.report, report.isOpenBlock
+        else { return nil }
+        return (report, report.block ?? Block())
+    }
+
+    /// What an agent that is waited on is called now: its current title, or the one it
+    /// had when the block was made once it has none or has gone (FR-010).
+    public func waitName(_ wait: Wait) -> String {
+        let title = agent(wait.agentID)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.flatMap { $0.isEmpty ? nil : $0 } ?? wait.nameAtReport
+    }
+
+    /// The lines under a blocked agent's message: one per agent it waits on, and when it
+    /// will check again. The same on the Mac's row and the phone's card (FR-011).
+    public func blockLines(_ agent: Agent) -> [String] {
+        guard let (_, block) = openBlock(agent) else { return [] }
+        return block.waits.map { Block.waitLine(name: waitName($0), ending: $0.ending) }
+            + [block.checkAgainLine()].compactMap { $0 }
+    }
+
+    /// The name of the button that ends a block by hand.
+    public static let carryOnLabel = "Carry on"
+
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.
     public func canStop(_ agent: Agent) -> Bool {
-        agent.state.holdsRuntime || isComingBack(agent)
+        // A blocked chat too (039): it holds nothing, but a resume is coming, and Stop
+        // is how the person calls it off.
+        agent.state.holdsRuntime || isComingBack(agent) || openBlock(agent) != nil
     }
 
     /// The one thing every client says about a chat on its way back, so the window
@@ -517,7 +548,8 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest activity first.
+    /// The agents of one project, in one group, newest activity first — or, under
+    /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
     /// another client would not. Filtered from what is already held, so the archived
@@ -529,7 +561,9 @@ public final class AgentsModel {
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         let wanted = Project.standardize(folder)
-        return agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        let found = agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        guard group == .parked else { return found }
+        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }
     }
 
     /// The agent's folder as projects compare it, remembered after the first ask.

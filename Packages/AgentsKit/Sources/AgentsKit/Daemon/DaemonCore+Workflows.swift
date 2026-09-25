@@ -314,6 +314,11 @@ extension DaemonCore {
         // here waits fifteen seconds for that (024 T033).
         reviseWakefulness(readingPower: true)
 
+        // Blocked agents whose time to check again has come (039). Here, above the
+        // guard below, for the same reason as the battery: the first tick after a start
+        // is exactly when a Mac that slept through the time should catch up.
+        await resumeDueBlocks(now: now)
+
         // The day rolling over, noticed on the heartbeat that is already running
         // rather than on a timer of its own. `now` is the parameter this already
         // takes, so midnight is testable without waiting for it.

@@ -40,11 +40,12 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
                              managesAgents: managesAgents,
-                             finishTurn: { outcome, message, prompts, title in
+                             finishTurn: { outcome, message, prompts, title, words in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                 message: message, prompts: prompts,
-                                                title: title),
+                                                title: title, waitingOn: words.waitingOn,
+                                                checkAgainInMinutes: words.checkAgainInMinutes),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
@@ -59,10 +60,11 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.ManageWorkflowsRequest(token: token, action: action,
                                                      workflowID: workflowID, content: content),
                     fallback: "Done.")
-    } reportOutcome: { outcome, message in
+    } reportOutcome: { outcome, message, words in
         await relay(DaemonAPI.Method.agentsReportOutcome,
                     DaemonAPI.ReportOutcomeRequest(token: token, outcome: outcome,
-                                                   message: message),
+                                                   message: message, waitingOn: words.waitingOn,
+                                                   checkAgainInMinutes: words.checkAgainInMinutes),
                     fallback: "Noted.")
     } agents: { call in
         switch call {

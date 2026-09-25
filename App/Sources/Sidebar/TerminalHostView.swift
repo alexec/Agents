@@ -1,3 +1,4 @@
+import AgentsKit
 import AppKit
 import SwiftTerm
 import SwiftUI

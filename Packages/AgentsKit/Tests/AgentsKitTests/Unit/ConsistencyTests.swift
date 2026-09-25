@@ -62,8 +62,10 @@ struct ConsistencyTests {
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
         (file: "Shared/UI/Chat/TranscriptRows.swift", contains: "foregroundStyle(Color.accentColor)",
          why: "a file a tool call touched, drawn on a phone as the system draws a link (FR-006b, 033)"),
-        (file: "App/Sources/Sidebar/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
          why: "the person's caret flag on a live page, in the colour the system draws their own insertion point"),
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "color: .accentColor",
+         why: "the same flag on a phone, where the accent is the colour of the person's own insertion point (034)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {
@@ -350,6 +352,33 @@ struct ConsistencyTests {
             `Shared/UI/Chat`. Two copies drift; change the shared one, and if the phone \
             genuinely needs to differ, say how through `ChatActions` or a platform \
             branch in the shared file, and add it to 033's Deliberate Differences.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    /// The live page's pieces, one copy for both apps in `Shared/UI/Page` and Core (034).
+    private static let sharedPageTypes = [
+        "MarkdownText", "LivePage", "PassageEditor", "CursorFlag", "FileLines",
+        "PageFollower", "PassageMerge", "ImageStamps", "ShellClient",
+    ]
+
+    /// The page is one page on the Mac and the phone. Two `MarkdownText`s drifted once;
+    /// this is what stops two pages doing the same.
+    @Test func neitherAppHasAPageOfItsOwn() throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
+            scanned += 1
+            for (index, line) in source.lines.enumerated() {
+                guard let name = Self.declaredType(line), Self.sharedPageTypes.contains(name) else { continue }
+                violations.append("\(Self.at(source, index)): \(name)")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            An app declares its own copy of a piece of the live page, which lives in \
+            `Shared/UI/Page` and AgentsKitCore. Change the shared one; what genuinely \
+            differs by app goes through `PageActions` or a platform branch there.
             \(violations.joined(separator: "\n"))
             """)
     }
