@@ -169,7 +169,7 @@ previous state.
 - **First-install failure** removes `~/.agents-server` only if the probe found it absent. A
   failed update removes only the `.part` file (FR-025).
 - **Update** (FR-022): install `agentsd-<new>` beside the old one. Then ask the running daemon
-  `daemon/version`. If `turnsInFlight == 0`, call `daemon/quit`, swap `current`, and `start()`.
+  `daemon/status`. If `turnsInFlight == 0`, call `daemon/quit`, swap `current`, and `start()`.
   Otherwise mark the host `updateWaiting` and ask again on each `agent/changed` that ends a turn.
   Agents that were idle are picked up by the existing restart recovery (025) with nothing lost.
 - **Newer server** (FR-023): the probe's version is newer than the bundled one. Refuse, with no
@@ -179,7 +179,7 @@ previous state.
   record. With the checkbox, also `rm -rf ~/.agents-server`. Project folders are never inside it.
 
 **Version comparison**: the app's marketing version plus build number, stamped into both
-binaries by the build script and returned by `--version` and `daemon/version`. Equal means
+binaries by the build script and returned by `--version` and `daemon/status`. Equal means
 compatible. There is no protocol-range negotiation in v1: the app ships its daemon, and both
 are the same build.
 

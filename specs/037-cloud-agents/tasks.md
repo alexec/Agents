@@ -43,10 +43,10 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ### 2b — Daemon changes
 
-- [ ] T006 [P] Write `Tests/Unit/DaemonCommandLineTests.swift`: `--version` prints `buildVersion` and exits with no root; `--serve` makes `shouldExit` false with no connections and nothing held; `--detach` is stripped from the child's arguments.
-- [ ] T007 Implement `--version`, `--serve` and `--detach` in `Daemon/Sources/main.swift`, `Pkg/Sources/AgentsKit/Daemon/Daemon.swift` and `Daemon/DaemonCore+Lifetime.swift` (`exitsWhenIdle`). Put `buildVersion` in `Pkg/Sources/AgentsKitCore/AgentsKitCore.swift`, read from the `AGENTS_BUILD_VERSION` compile flag with `"dev"` as the fallback. `--detach` re-spawns with `POSIX_SPAWN_SETSID` exactly as `Client/SocketLink.swift` `start()` does, and exits 0 if the lock is held.
-- [ ] T008 [P] Write `Tests/Integration/DaemonVersionQuitTests.swift`: `daemon/version` returns `{version, turnsInFlight, agentsLive}` correctly for idle, mid-turn (fake runtime), and held-but-idle agents. `daemon/quit {stopAgents:false}` refuses with `busy` mid-turn and shuts down when idle. `daemon/quit {stopAgents:true}` stops live agents and shuts down, and the socket is gone afterwards.
-- [ ] T009 Add `daemon/version` and `daemon/quit` to `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift` and `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, implemented in a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Version.swift`.
+- [X] T006 [P] Write `Tests/Unit/DaemonCommandLineTests.swift`: `--version` prints `buildVersion` and exits with no root; `--serve` makes `shouldExit` false with no connections and nothing held; `--detach` is stripped from the child's arguments. **Done: parser, serve and detach covered (6 tests). `--version` dropped; see contracts/daemon.md § Where the version lives.**
+- [X] T007 Implement `--version`, `--serve` and `--detach` in `Daemon/Sources/main.swift`, `Pkg/Sources/AgentsKit/Daemon/Daemon.swift` and `Daemon/DaemonCore+Lifetime.swift` (`exitsWhenIdle`). Put `buildVersion` in `Pkg/Sources/AgentsKitCore/AgentsKitCore.swift`, read from the `AGENTS_BUILD_VERSION` compile flag with `"dev"` as the fallback. `--detach` re-spawns with `POSIX_SPAWN_SETSID` exactly as `Client/SocketLink.swift` `start()` does, and exits 0 if the lock is held. **Done: `DaemonCommandLine.swift`, `Spawn.detached` (SocketLink now uses it too), `exitsWhenIdle`. Smoke: `--serve --detach` on a scratch root stayed up past the idle grace; a second `--detach` exited without a duplicate.**
+- [ ] T008 [P] Write `Tests/Integration/DaemonVersionQuitTests.swift`: `daemon/status` returns `{version, turnsInFlight, agentsLive}` correctly for idle, mid-turn (fake runtime), and held-but-idle agents. `daemon/quit {stopAgents:false}` refuses with `busy` mid-turn and shuts down when idle. `daemon/quit {stopAgents:true}` stops live agents and shuts down, and the socket is gone afterwards.
+- [ ] T009 Add `daemon/status` and `daemon/quit` to `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift` and `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, implemented in a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Version.swift`.
 - [ ] T010 [P] Write `Tests/Integration/RequestIDTests.swift`: `agents/prompt` sent twice with the same `requestID` delivers once and returns the same result both times. Same for `permissions/answer` and `elicitations/answer`. No `requestID` means today's behaviour. The 513th ID evicts the first.
 - [ ] T011 Add the optional `requestID: UUID?` to the three request types in `DaemonAPI.swift`. Implement the 512-entry ring in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Requests.swift`, and check it at the top of the three handlers in `DaemonCore+Commands.swift`.
 
@@ -183,7 +183,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - older + mid-turn: the host is `updateWaiting`, nothing is swapped, and after the fake turn ends the swap happens;
   - newer: `serverNewer`, nothing is written, and no daemon is started or stopped;
   - the old binary is deleted only after the next successful connect.
-- [ ] T046 [US4] Implement the update path in `App/Sources/Hosts/HostSet.swift`, using `ServerInstaller` and `daemon/version`/`daemon/quit`: compare versions on every connect, and re-check `turnsInFlight` on each `agent/changed` from that host while `updateWaiting`. Show `Update waiting` in the heading (T032) and in Settings (T048).
+- [ ] T046 [US4] Implement the update path in `App/Sources/Hosts/HostSet.swift`, using `ServerInstaller` and `daemon/status`/`daemon/quit`: compare versions on every connect, and re-check `turnsInFlight` on each `agent/changed` from that host while `updateWaiting`. Show `Update waiting` in the heading (T032) and in Settings (T048).
 
 ---
 
@@ -239,7 +239,7 @@ Phase 1 (T001–T003)
 - US2–US5 each depend only on US1 and can go in any order after the look gate. US4's heading
   mark and US5's Settings row share `ServersSettingsView`, so do US5's T048 before US4's Settings
   line, or add that line in T048.
-- T041 needs T011 (`requestID`). T046 and T049 need T009 (`daemon/version`, `daemon/quit`).
+- T041 needs T011 (`requestID`). T046 and T049 need T009 (`daemon/status`, `daemon/quit`).
 
 ## Parallel opportunities
 

@@ -40,7 +40,11 @@ extension DaemonCore {
     }
 
     public var shouldExit: Bool {
-        connectionCount == 0 && !isHoldingAgents
+        exitsWhenIdle && connectionCount == 0 && !isHoldingAgents
+    }
+
+    public func setExitsWhenIdle(_ exits: Bool) {
+        exitsWhenIdle = exits
     }
 
     /// Wait until there is nothing left to do and nobody watching.

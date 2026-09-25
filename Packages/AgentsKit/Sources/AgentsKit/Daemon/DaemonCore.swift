@@ -274,6 +274,10 @@ public actor DaemonCore {
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
     var connectionCount = 0
+    /// False on a server, where the daemon is started with `--serve` and stays up with
+    /// no Mac connected, so scheduled workflows keep firing (037). A server has no
+    /// battery to spare and no window that could start it again on its own.
+    var exitsWhenIdle = true
 
     /// The daemon's one way out to the windows, settable once the socket exists and
     /// readable from any thread.

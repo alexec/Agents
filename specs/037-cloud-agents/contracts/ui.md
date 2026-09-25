@@ -83,7 +83,7 @@ re-runs `runtimes/list`.
 - A tab after Devices, with the `server.rack` symbol.
 - Rows as drawn. The subtitle is built from `ServerFacts` and state. The selected row shows
   **Check again** (re-probe + `runtimes/list`) and **Remove…**.
-- The Remove dialog uses `daemon/version.agentsLive` for its number, and its checkbox sets whether
+- The Remove dialog uses `daemon/status.agentsLive` for its number, and its checkbox sets whether
   step 8's `rm -rf` runs.
 - The **+** button opens `AddServerSheet`.
 - Footer: `Servers are reached with your own ssh setup. Nothing on them listens on a network

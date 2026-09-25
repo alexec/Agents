@@ -123,7 +123,7 @@ specs/037-cloud-agents/
 ├── quickstart.md        # how to prove it, fake ssh and real server
 ├── contracts/
 │   ├── ssh.md           # every command the app runs over SSH, and what it expects back
-│   ├── daemon.md        # --serve, daemon/version, requestID, Linux build flags
+│   ├── daemon.md        # --serve, daemon/status, requestID, Linux build flags
 │   └── ui.md            # the five screens, bound to the wireframes
 └── tasks.md             # /speckit-tasks
 ```
@@ -135,7 +135,7 @@ Packages/AgentsKit/
 ├── Package.swift                              # Linux: exclude CloudKit/Network/Security files
 ├── Sources/AgentsKitCore/
 │   ├── Hosts/Host.swift                       # NEW  Host, HostID, HostState (Codable, shared)
-│   ├── Daemon/DaemonAPI.swift                 # + daemon/version, requestID fields
+│   ├── Daemon/DaemonAPI.swift                 # + daemon/status, requestID fields
 │   └── Remote/*                               # #if canImport(CloudKit/CryptoKit) guards
 ├── Sources/AgentsKit/
 │   ├── Hosts/                                 # NEW  (Mac only)
@@ -183,7 +183,7 @@ because a fork of the daemon would drift from the Mac one within a week.
 | Phase | What | Gate |
 |---|---|---|
 | 0 | **Linux build spike.** Install the toolchain and SDK; get `agentsd` to build static for both architectures; run it on a real server; talk to it through a hand-made `ssh -L` forward with `socat`. | Alex runs one command on a server and a turn completes. If this fails, the plan stops here. |
-| 1 | SSH layer + installer + `ServerLink`, fake-ssh tests. `--serve`, `daemon/version`. | `swift test` green; the fake-ssh host installs, starts, forwards, answers `agents/list`. |
+| 1 | SSH layer + installer + `ServerLink`, fake-ssh tests. `--serve`, `daemon/status`. | `swift test` green; the fake-ssh host installs, starts, forwards, answers `agents/list`. |
 | 2 | `HostSet`, host tags, grouped list, Add a server sheet, New project submenus, remote folder sheet. | **Look gate**: walked on a scratch root against the fake-ssh host. |
 | 3 | Offline states, reconnect and catch-up, `requestID`. | Pull the forward mid-turn; the strip shows; Send is disabled; the catch-up matches. |
 | 4 | Server files pane, attachments, hidden Mac-only actions, costs by host. | Files, terminal and a live page work on the fake host. |

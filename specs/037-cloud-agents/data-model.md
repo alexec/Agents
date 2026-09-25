@@ -110,4 +110,4 @@ removed at launch.
 |---|---|---|
 | `exitsWhenIdle` | `DaemonCore` | `false` under `--serve`. |
 | `recentRequests` | `DaemonCore+Requests.swift` | Ring of 512 `(UUID, JSONValue)`; lookup before acting on `agents/prompt`, `permissions/answer`, `elicitations/answer`. |
-| `buildVersion` | `AgentsKitCore` constant stamped by the build | Returned by `--version` and `daemon/version`. |
+| `buildVersion` | `AgentsKitCore` constant stamped by the build | Returned by `--version` and `daemon/status`. |

@@ -6,16 +6,23 @@ The daemon stays single-host and knows nothing about SSH. These are the only cha
 
 | Flag | Meaning |
 |---|---|
-| `--version` | Print `buildVersion` (e.g. `1.14+812`) and exit 0. Checked before anything else, so it works with no root. |
 | `--serve` | Never exit for being idle. `runUntilIdle` keeps reaping shells, but `shouldExit` is always false. |
 | `--detach` | Spawn this same executable with the same arguments minus `--detach`, with `POSIX_SPAWN_SETSID`, stdin `/dev/null`, stdout+stderr appended to `<root>/daemon.log`. Then exit 0. If the lock is already held, exit 0 without spawning. |
 | `--root <path>` | Unchanged. |
 
 ## New methods
 
-### `daemon/version` → `{ version: String, turnsInFlight: Int, agentsLive: Int }`
+### Where the version lives (changed during implementation, 2026-09-25)
 
-`turnsInFlight` counts agents mid-turn, where the update must wait. `agentsLive` counts agents
+A Swift `-D` flag carries no value, so the binary cannot stamp its own version without
+generating source. The installer writes the version instead:
+`~/.agents-server/install.json` holds `{"version": "<CFBundleShortVersionString>+<CFBundleVersion>",
+"sha256": …, "installedAt": …, "installedBy": …}`. The probe reads that file in place of
+`agentsd --version`. The daemon knows nothing of its version, and there is no `--version` flag.
+
+### `daemon/status` → `{ turnsInFlight: Int, agentsLive: Int }`
+
+`turnsInFlight` counts agents starting, running or waiting on the person — where the update must wait. `agentsLive` counts agents
 holding a runtime, used by the remove dialog's number.
 
 ### `daemon/quit` `{ stopAgents: Bool }` → `{}`

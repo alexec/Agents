@@ -56,7 +56,7 @@ Stopped with `ssh -S <ctl> -O exit <name>`, then SIGTERM if still alive after 2 
 
 ```
 ssh M <name> 'uname -sm; printf "%s\n" "$HOME"; df -Pk "$HOME" | tail -1;
-              "$HOME/.agents-server/bin/current/agentsd" --version 2>/dev/null || echo none;
+              cat "$HOME/.agents-server/install.json" 2>/dev/null | tr -d '\n' || true; echo;
               grep -i "^[[:space:]]*AllowStreamLocalForwarding" /etc/ssh/sshd_config 2>/dev/null || echo default'
 ```
 Five lines, parsed into `ServerFacts`. Any other shape → `installFailed` with the output tail.
