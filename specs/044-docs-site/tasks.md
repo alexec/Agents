@@ -305,7 +305,7 @@ a running agent when the window closes and when the Mac restarts.
   `specs/044-docs-site/walk/README.md`.
 - [X] T053 Hand quickstart V4's timed run by a new user (SC-001) and the iPhone reading (V7.4) to Alex as the two
   things only he can do, listed in the walk README.
-- [ ] T054 Stop the scratch app and its daemon on `/tmp/run-044` by the pid in its `daemon.lock` (never pattern-kill
+- [X] T054 Stop the scratch app and its daemon on `/tmp/run-044` by the pid in its `daemon.lock` (never pattern-kill
   `agentsd`), and delete `/tmp/run-044`.
 
 ---
