@@ -352,6 +352,19 @@ public final class AgentsModel {
         resuming.contains(agent.id)
     }
 
+    /// Who started an agent another agent started, as its mark says it (028): that
+    /// agent's title as it is now, or "another agent" once it has none or has gone.
+    /// `nil` for every agent the person or a workflow started. Here rather than in a
+    /// view so the Mac's row and the phone's card cannot word it differently.
+    public func startedByAgentLabel(_ agent: Agent) -> String? {
+        guard let starter = agent.startedByAgent else { return nil }
+        let title = self.agent(starter)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "Started by " + (title.flatMap { $0.isEmpty ? nil : "\u{201C}\($0)\u{201D}" } ?? "another agent")
+    }
+
+    /// The symbol that mark is drawn with.
+    public static let startedByAgentSymbol = "person.2"
+
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.

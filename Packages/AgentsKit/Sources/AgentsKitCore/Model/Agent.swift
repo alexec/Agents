@@ -115,6 +115,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The workflow run that caused this agent, if one did. Read to work out how deep a
     /// chain is when this agent's own events fire something further.
     public var startedByRun: UUID?
+    /// The agent whose `start_agent` call made this one, if one did (028). Set once,
+    /// never changed. It is what lets that agent stop and archive this one, what keeps
+    /// the tools from this one, and what counts it against its project's three.
+    public var startedByAgent: UUID?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -131,6 +135,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// Only `byUser` exists in this feature: nothing archives itself.
     public enum ArchivedReason: String, Codable, Hashable, Sendable {
         case byUser
+        /// Put away by the agent that started it (028).
+        case byAgent
 
         /// Archived for a reason this build does not know is still archived.
         public init(from decoder: any Decoder) throws {
@@ -210,6 +216,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
+        startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -266,6 +273,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !suggestedPrompts.isEmpty { try c.encode(suggestedPrompts, forKey: .suggestedPrompts) }
         try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
+        try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -285,7 +293,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
-        case startedByWorkflow, startedByRun
+        case startedByWorkflow, startedByRun, startedByAgent
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
@@ -323,6 +331,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 suggestedPrompts: [SuggestedPrompt] = [],
                 startedByWorkflow: String? = nil,
                 startedByRun: UUID? = nil,
+                startedByAgent: UUID? = nil,
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
@@ -353,6 +362,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.suggestedPrompts = suggestedPrompts
         self.startedByWorkflow = startedByWorkflow
         self.startedByRun = startedByRun
+        self.startedByAgent = startedByAgent
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked

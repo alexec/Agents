@@ -219,6 +219,24 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ManageWorkflowsRequest.self)
                 return .success(["note": .string(try await manageWorkflows(request))])
 
+            case DaemonAPI.Method.agentsStartHelper:
+                let request = try require(params, as: DaemonAPI.StartHelperRequest.self)
+                let started = try await startHelper(request)
+                return .success(["note": .string(started.note),
+                                 "agentID": .string(started.agentID.uuidString)])
+
+            case DaemonAPI.Method.agentsStopHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try await stopHelper(request))])
+
+            case DaemonAPI.Method.agentsArchiveHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try await archiveHelper(request))])
+
+            case DaemonAPI.Method.agentsListHelpers:
+                let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)
+                return .success(["note": .string(try listHelpers(request))])
+
             case DaemonAPI.Method.agentsReportOutcome:
                 let request = try require(params, as: DaemonAPI.ReportOutcomeRequest.self)
                 return .success(["note": .string(try await reportOutcome(request))])

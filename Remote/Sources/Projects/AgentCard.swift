@@ -17,9 +17,18 @@ struct AgentCard: View {
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(agent.title ?? "Untitled")
-                        .appText(.reading).fontWeight(.semibold)
-                        .lineLimit(2)
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text(agent.title ?? "Untitled")
+                            .appText(.reading).fontWeight(.semibold)
+                            .lineLimit(2)
+                        // Started by another agent (028), marked as the Mac's row
+                        // marks it.
+                        if model.startedByAgentLabel(agent) != nil {
+                            Image(systemName: AgentsModel.startedByAgentSymbol)
+                                .appText(.fine)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
 
                     // The agent's own account of its last turn, and nothing else — the
                     // same two lines as the Mac's row. The state is the icon's; what it
@@ -56,7 +65,7 @@ struct AgentCard: View {
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
-        return [agent.title ?? "Untitled", words, agent.report?.message]
+        return [agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
             .compactMap { $0 }
             .joined(separator: ", ")
     }

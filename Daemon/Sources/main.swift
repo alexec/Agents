@@ -10,6 +10,10 @@ import Foundation
 // server. One binary rather than two, so there is one thing to build, sign and ship.
 if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     let token = CommandLine.arguments[2]
+    // An agent another agent started is not offered the tools for starting, stopping
+    // or archiving agents (028). The daemon says so here, when it hands the runtime
+    // this server; it refuses the calls as well, so this only keeps the menu honest.
+    let managesAgents = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noAgentToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
     // Every tool does the same thing with what it is given: hand it to the daemon
@@ -35,6 +39,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     }
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
+                             managesAgents: managesAgents,
                              finishTurn: { outcome, message, prompts, title in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
@@ -59,6 +64,27 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.ReportOutcomeRequest(token: token, outcome: outcome,
                                                    message: message),
                     fallback: "Noted.")
+    } agents: { call in
+        switch call {
+        case .start(let prompt, let runtime, let model, let permissionMode):
+            return await relay(DaemonAPI.Method.agentsStartHelper,
+                               DaemonAPI.StartHelperRequest(token: token, prompt: prompt,
+                                                            runtime: runtime, model: model,
+                                                            permissionMode: permissionMode),
+                               fallback: "Started.")
+        case .stop(let agentID):
+            return await relay(DaemonAPI.Method.agentsStopHelper,
+                               DaemonAPI.HelperRequest(token: token, agentID: agentID),
+                               fallback: "Stopped.")
+        case .archive(let agentID):
+            return await relay(DaemonAPI.Method.agentsArchiveHelper,
+                               DaemonAPI.HelperRequest(token: token, agentID: agentID),
+                               fallback: "Archived.")
+        case .list:
+            return await relay(DaemonAPI.Method.agentsListHelpers,
+                               DaemonAPI.ListHelpersRequest(token: token),
+                               fallback: "Nothing to list.")
+        }
     }
     let task = Task {
         await service.run()

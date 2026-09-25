@@ -98,9 +98,15 @@ public enum AgentEvent: Hashable, Sendable {
     case permissionAnswered
     case turnEnded(EndedReason)
     case stoppedByUser
+    /// The agent that started this one stopped it (028). The person's stop, with its
+    /// own ending.
+    case stoppedByAgent
     case processDied
     case foundDead
     case archivedByUser
+    /// The agent that started this one put it away (028). The person's archive, with
+    /// its own reason.
+    case archivedByAgent
     case unarchivedByUser
 }
 
@@ -228,6 +234,14 @@ extension AgentState {
         case (_, .stoppedByUser):
             return nil
 
+        // Every row the person's stop has, and no other: an agent's stop is that stop,
+        // saying who made it.
+        case (.starting, .stoppedByAgent), (.running, .stoppedByAgent), (.waitingOnUser, .stoppedByAgent):
+            return Transition(next: .stopped, endedReason: .set(.stoppedByAgent),
+                              clearsPickUpCount: true)
+        case (_, .stoppedByAgent):
+            return nil
+
         case (.starting, .processDied), (.running, .processDied), (.waitingOnUser, .processDied):
             return Transition(next: .stopped, endedReason: .set(.processDied),
                               clearsPickUpCount: true)
@@ -253,6 +267,15 @@ extension AgentState {
             return nil
         case (_, .archivedByUser):
             return Transition(next: .archived, archivedReason: .set(.byUser))
+
+        // Likewise the person's archive, row for row.
+        case (.starting, .archivedByAgent), (.running, .archivedByAgent),
+             (.waitingOnUser, .archivedByAgent):
+            return nil // Stop it first.
+        case (.archived, .archivedByAgent):
+            return nil
+        case (_, .archivedByAgent):
+            return Transition(next: .archived, archivedReason: .set(.byAgent))
 
         case (.archived, .unarchivedByUser):
             // An archived agent with no recorded ending cannot be reached today — the

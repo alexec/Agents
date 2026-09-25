@@ -115,10 +115,18 @@ struct BriefingTests {
     /// Lowered in 023, from 1,650 and six lines. The suggestion line and the outcome
     /// line became one, and the clause ordering them went with it, so the ceiling
     /// comes down rather than up — still a ceiling to notice, not a rule.
+    ///
+    /// Raised in 028, to 1,700 and six lines, for the one line about starting agents
+    /// of its own. Measured then at 1,688 for the longest (Cursor, with the most
+    /// residue), 1,608 and 1,532 for the next two. An agent another agent started is
+    /// not told it, so its briefing is where it was.
     @Test func itStaysShortEnoughToBeRead() {
         for policy in ToolPolicyCatalog.builtIn {
-            #expect(Briefing.text(for: policy).count < 1_500)
-            #expect(Briefing.lines(for: policy).count <= 5)
+            let text = Briefing.text(for: policy)
+            #expect(text.count < 1_700, "\(policy.runtimeID): \(text.count)")
+            #expect(Briefing.lines(for: policy).count <= 6, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false).count < 1_500,
+                    "\(policy.runtimeID), for an agent another agent started")
         }
     }
 
@@ -226,5 +234,34 @@ struct BriefingTests {
 
     @Test func nothingEditedIsNoNote() {
         #expect(Briefing.artifactEdited([]) == nil)
+    }
+
+    // MARK: Agents of its own (028)
+
+    @Test func anAgentThatMayStartAgentsIsToldSoAndHowMany() {
+        for policy in ToolPolicyCatalog.builtIn {
+            let text = Briefing.text(for: policy)
+            #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
+            #expect(text.contains(AppTool.startAgent))
+            #expect(text.contains("three"))
+        }
+    }
+
+    @Test func anAgentAnotherAgentStartedIsNotToldAboutToolsItDoesNotHave() {
+        for policy in ToolPolicyCatalog.builtIn {
+            let text = Briefing.text(for: policy, managesAgents: false)
+            #expect(!text.contains(Briefing.helpers), "\(policy.runtimeID)")
+            #expect(!text.contains(AppTool.startAgent))
+            #expect(text.contains(Briefing.finish), "and is told everything else")
+        }
+    }
+
+    /// After the workflow line, where the other standing things an agent can set going
+    /// are said, and before anything about residue, which is last on purpose.
+    @Test func theLineComesAfterTheWorkflowLine() {
+        for policy in ToolPolicyCatalog.builtIn {
+            let lines = Briefing.lines(for: policy)
+            #expect(lines.firstIndex(of: Briefing.helpers) == 4, "\(policy.runtimeID)")
+        }
     }
 }

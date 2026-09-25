@@ -18,12 +18,19 @@ extension DaemonCore {
     /// The helper is told where this daemon lives rather than left to work it out. A
     /// helper that guesses at the usual place talks to whichever daemon happens to be
     /// there, which is right in the app and wrong everywhere else, tests included.
-    func appServer(token: String) -> MCPServer {
+    ///
+    /// An agent another agent started is told to leave out the tools for starting,
+    /// stopping and archiving agents (028), so it is never offered what the daemon
+    /// would refuse it.
+    func appServer(token: String, managesAgents: Bool = true) -> MCPServer {
         MCPServer(name: "agents",
                   transport: .stdio(command: Self.helperPath,
-                                    args: ["mcp", token],
+                                    args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag]),
                                     env: [StoreLocations.rootVariable: locations.root.path]))
     }
+
+    /// What tells the helper to leave the agent tools out.
+    public static let noAgentToolsFlag = "--no-agent-tools"
 
     /// The binary the runtime is told to run. The daemon's own path: one build, one
     /// signature, and no second thing to install or keep in step.

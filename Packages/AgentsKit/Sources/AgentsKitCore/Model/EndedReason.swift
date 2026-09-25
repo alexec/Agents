@@ -32,6 +32,12 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// reason we do recognise.
     case unrecognised
 
+    /// Stopped by the agent that started this one, through its own stop tool (028).
+    /// The person's stop is `cancelled`; this is kept apart so the row never says
+    /// "Stopped by you" about a stop the person did not make. Not a protocol stop
+    /// reason, so `init(stopReason:)` never produces it.
+    case stoppedByAgent
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -48,6 +54,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .daemonGone: return "Stopped with the daemon"
         case .costLimit: return "Reached its cost limit"
         case .unrecognised: return "Stopped for a reason we do not know"
+        case .stoppedByAgent: return "Stopped by the agent that started it"
         }
     }
 

@@ -249,6 +249,9 @@ final class AppModel {
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 
+    /// "Started by …" for an agent another agent started, and nil otherwise (028).
+    func startedByAgentLabel(_ agent: Agent) -> String? { work.startedByAgentLabel(agent) }
+
     /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
 
