@@ -46,9 +46,11 @@ struct SidebarView: View {
         HStack(spacing: 6) {
             Picker("", selection: Binding(get: { frame.pane },
                                           set: { frame.pane = $0 })) {
+                // Words rather than glyphs: a folder, a terminal, a globe and a tray
+                // had to be learnt, and "Exchanged" has no glyph that says it.
                 ForEach(SidebarPane.allCases) { pane in
-                    Label(pane.title, systemImage: pane.symbol)
-                        .labelStyle(.iconOnly)
+                    Text(pane.title)
+                        .help(pane.title)
                         .tag(pane)
                 }
             }
@@ -108,33 +110,36 @@ private struct NoAgent: View {
 
 /// The draggable edge. Dragging left widens the column, which is the direction the
 /// pointer moves, so the handle follows the hand rather than the number.
+///
+/// The grip is laid out as a strip of its own rather than drawn over its neighbours.
+/// A shell and a web page are AppKit views, and those sit above anything SwiftUI draws
+/// over them, so a grip that overlapped the pane only worked on one side of the line.
+/// And the drag is read in the window's coordinates: the handle moves as the column
+/// widens, and a distance measured from something that is itself moving is measured
+/// twice.
 private struct ResizeHandle: View {
     @Environment(SidebarFrame.self) private var frame
     let windowWidth: Double
     @State private var widthWhenDragBegan: Double?
 
     var body: some View {
-        Divider()
-            .frame(width: 1)
-            .overlay {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: 10)
-                    .contentShape(Rectangle())
-                    .onHover { inside in
-                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+        Rectangle()
+            .fill(.clear)
+            .frame(width: 8)
+            .overlay { Divider() }
+            .contentShape(Rectangle())
+            .pointerStyle(.frameResize(position: .leading))
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        let start = widthWhenDragBegan ?? frame.width
+                        widthWhenDragBegan = start
+                        frame.setWidth(start - value.translation.width,
+                                       inWindowOf: windowWidth)
                     }
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                let start = widthWhenDragBegan ?? frame.width
-                                widthWhenDragBegan = start
-                                frame.setWidth(start - value.translation.width,
-                                               inWindowOf: windowWidth)
-                            }
-                            .onEnded { _ in widthWhenDragBegan = nil }
-                    )
-            }
+                    .onEnded { _ in widthWhenDragBegan = nil }
+            )
+            .accessibilityLabel("Resize the sidebar")
     }
 }
 
@@ -149,7 +154,7 @@ struct SidebarToggle: View {
     var body: some View {
         Button {
             guard fits else { return }
-            frame.isOpen.toggle()
+            if frame.isOpen { frame.isOpen = false } else { frame.open() }
         } label: {
             Image(systemName: "sidebar.trailing")
         }
