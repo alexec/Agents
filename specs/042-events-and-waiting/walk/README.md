@@ -22,3 +22,5 @@ with `events/raise` (a debug-only method, refused on the real root):
 
 Not yet on screen: Waiting now (needs a real wait, Phase 4), the chat capsule and hint line
 (Phase 4), the phone and iPad list (Alex's, on a device).
+
+Look gate (T027): approved by Alex, 2026-09-25 ("The events page looks right"). Phone look not yet done.

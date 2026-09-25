@@ -192,8 +192,8 @@ consequences link to their agents.
   - In `Remote/Sources/Projects/ProjectListView.swift`, add an Events row next to `SpendingRow`, with the same shape.
   - Create `Remote/Sources/Events/EventsListView.swift`: the same `EventRow`s, a single project menu at the top, a read-only detail sheet with no Copy as trigger, and consequences that link to the chat. On iPad the list goes in the detail column.
   - There is no ✕, no subject filter and no Waiting now strip (wireframes §4).
-- [ ] T026 [US2] Build both schemes one after the other with plugin validation skipped (see memory). With the run-app skill, launch on `/tmp/run-042` and raise the wireframe's night of events with `events/raise`: a Mac sleep and wake, #41's checks failing with a `fired` consequence, `custom.build_green` with a `woke` consequence, and #41 merged. Screenshot the page, a detail, and the filter capsules into `specs/042-events-and-waiting/walk/`.
-- [ ] T027 [US2] **Look gate.** Show Alex the screenshots, and ask about the page layout and the sidebar row with `AskUserQuestion`. Do not start Phase 4 until he has answered. The phone look is his to do on a device when he chooses.
+- [X] T026 [US2] Build both schemes one after the other with plugin validation skipped (see memory). With the run-app skill, launch on `/tmp/run-042` and raise the wireframe's night of events with `events/raise`: a Mac sleep and wake, #41's checks failing with a `fired` consequence, `custom.build_green` with a `woke` consequence, and #41 merged. Screenshot the page, a detail, and the filter capsules into `specs/042-events-and-waiting/walk/`.
+- [X] T027 [US2] **Look gate.** Show Alex the screenshots, and ask about the page layout and the sidebar row with `AskUserQuestion`. Do not start Phase 4 until he has answered. The phone look is his to do on a device when he chooses.
 
 **Checkpoint**: The events page and list render live events on both platforms, and the look is
 approved.
