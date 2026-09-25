@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1000" viewBox="0 0 1120 1000" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .o { fill:#c2410c; }
+    .title { font-size:22px; font-weight:600; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .card { fill:#fff; stroke:#e5e5ea; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .badge { fill:#f2f2f7; stroke:#d1d1d6; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <!-- window -->
+  <rect x="0.5" y="0.5" width="1119" height="999" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
+  <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
+
+  <!-- sidebar -->
+  <rect x="0.5" y="40" width="250" height="959" fill="#f5f5f7" stroke="#e5e5ea"/>
+  <text x="20" y="72" class="h">PROJECTS</text>
+  <rect x="12" y="84" width="226" height="30" rx="6" fill="#dcdce1"/>
+  <text x="24" y="104" class="rb t">Agents</text><text x="220" y="104" class="f s" text-anchor="end">2</text>
+  <text x="24" y="136" class="r t">Paper site</text><text x="220" y="136" class="f s" text-anchor="end">1</text>
+  <text x="24" y="168" class="r t">alexecollins.com</text><text x="220" y="168" class="f s" text-anchor="end">—</text>
+  <text x="20" y="210" class="note">Sidebar unchanged. A pull request</text>
+  <text x="20" y="226" class="note">is not an agent and adds no count.</text>
+
+  <!-- detail header -->
+  <text x="290" y="84" class="title t">Agents</text>
+  <text x="290" y="106" class="f s">~/Agents · github.com/alexec/agents</text>
+
+  <!-- SESSIONS -->
+  <text x="290" y="146" class="h">SESSIONS</text>
+  <text x="290" y="172" class="f s">Working <tspan class="q">1</tspan></text>
+  <rect x="290" y="182" width="800" height="58" rx="10" class="card"/>
+  <circle cx="310" cy="202" r="6" fill="none" stroke="#6e6e73" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <text x="326" y="207" class="rb t">Answer review on #412</text>
+  <text x="498" y="207" class="f q">⟳</text>
+  <rect x="514" y="194" width="128" height="18" rx="9" class="badge"/><text x="578" y="207" class="f s" text-anchor="middle">fix-login-redirect</text>
+  <text x="326" y="228" class="f s">Moved the redirect check into LoginRouter, pushing now.</text>
+  <text x="660" y="207" class="note">Existing marks: workflow ⟳, worktree badge.</text>
+
+  <text x="290" y="266" class="f s">Stopped <tspan class="q">1</tspan></text>
+  <rect x="290" y="276" width="800" height="40" rx="10" class="card"/>
+  <circle cx="310" cy="296" r="6" fill="#aeaeb2"/>
+  <text x="326" y="301" class="rb t">Typescale pass</text>
+
+  <!-- PULL REQUESTS -->
+  <text x="290" y="356" class="h">PULL REQUESTS</text>
+  <text x="422" y="356" class="f s">↻</text>
+  <rect x="962" y="340" width="128" height="24" rx="6" class="btn"/><text x="1026" y="357" class="f t" text-anchor="middle">Show babysitter</text>
+  <text x="700" y="356" class="note">“Babysit my pull requests” until one exists →</text>
+
+  <rect x="290" y="372" width="800" height="330" rx="10" class="card"/>
+
+  <!-- #412 -->
+  <text x="310" y="398" class="f s">#412</text>
+  <text x="352" y="398" class="rb t">Fix login redirect</text>
+  <text x="620" y="398" class="f s">✕ checks</text>
+  <text x="690" y="398" class="f s">● changes requested</text>
+  <text x="1074" y="398" class="f q" text-anchor="end">↗</text>
+  <text x="352" y="418" class="f s"><tspan class="t" text-decoration="underline">fix-login-redirect</tspan> · Babysitting now <tspan class="t" text-decoration="underline">→</tspan></text>
+  <line x1="304" y1="434" x2="1076" y2="434" stroke="#f2f2f7"/>
+
+  <!-- #405 -->
+  <text x="310" y="460" class="f s">#405</text>
+  <text x="352" y="460" class="rb t">Paper theme settings card</text>
+  <text x="620" y="460" class="f s">✓ checks</text>
+  <text x="690" y="460" class="f s">✓ approved</text>
+  <text x="1074" y="460" class="f q" text-anchor="end">↗</text>
+  <text x="352" y="480" class="f s"><tspan class="t" text-decoration="underline">project folder</tspan> · Babysat 40 min ago <tspan class="t" text-decoration="underline">→</tspan> · Fixed the snapshot and pushed.</text>
+  <line x1="304" y1="496" x2="1076" y2="496" stroke="#f2f2f7"/>
+
+  <!-- #398 stopped -->
+  <text x="310" y="522" class="f s">#398</text>
+  <text x="352" y="522" class="rb t">Retry flaky upload</text>
+  <text x="620" y="522" class="f s">✕ checks</text>
+  <text x="1074" y="522" class="f q" text-anchor="end">↗</text>
+  <text x="352" y="542" class="f s"><tspan class="t" text-decoration="underline">retry-upload</tspan> · <tspan class="o" font-weight="600">Babysitting stopped after 3 tries in a row</tspan></text>
+  <rect x="690" y="530" width="64" height="20" rx="5" class="btn"/><text x="722" y="544" class="f t" text-anchor="middle">Resume</text>
+  <line x1="304" y1="558" x2="1076" y2="558" stroke="#f2f2f7"/>
+
+  <!-- #390 unmatched -->
+  <text x="310" y="584" class="f s">#390</text>
+  <text x="352" y="584" class="rb t">Docs for leases</text>
+  <rect x="468" y="572" width="42" height="17" rx="8" class="badge"/><text x="489" y="584" class="f s" text-anchor="middle">Draft</text>
+  <text x="620" y="584" class="f s">◌ checks</text>
+  <text x="690" y="584" class="f s">⚠ conflicts</text>
+  <text x="1074" y="584" class="f q" text-anchor="end">↗</text>
+  <text x="352" y="604" class="f s">Not checked out here</text>
+  <rect x="480" y="592" width="160" height="20" rx="5" class="btn"/><text x="560" y="606" class="f t" text-anchor="middle">Check out into a worktree</text>
+  <line x1="304" y1="620" x2="1076" y2="620" stroke="#f2f2f7"/>
+
+  <!-- #377 refused -->
+  <text x="310" y="646" class="f s">#377</text>
+  <text x="352" y="646" class="rb t">Bump SwiftTerm</text>
+  <text x="620" y="646" class="f s">✕ checks</text>
+  <text x="1074" y="646" class="f q" text-anchor="end">↗</text>
+  <text x="352" y="666" class="f s"><tspan class="t" text-decoration="underline">bump-swiftterm</tspan> · Did not run — its worktree has uncommitted changes</text>
+
+  <text x="310" y="690" class="f q">Fetched 2 min ago · 5 open</text>
+
+  <text x="290" y="724" class="note">Rows newest first. Clicking a row (outside its links) opens it on GitHub; ↗ says so. Only the stopped line is tinted (attention).</text>
+  <text x="290" y="740" class="note">Glyphs, not colours. Checks: ✕ failing, ✓ passing, ◌ running, nothing if none. Review: ● changes requested, ✓ approved, ◦ commented.</text>
+
+  <!-- WORKFLOWS -->
+  <text x="290" y="782" class="h">WORKFLOWS</text>
+  <rect x="290" y="792" width="800" height="120" rx="10" class="card"/>
+  <text x="310" y="818" class="rb t">Babysit my pull requests</text>
+  <text x="310" y="838" class="f s">When one of my pull requests fails its checks, gets review comments or conflicts with its base</text>
+  <text x="310" y="858" class="f s">Watching 4 pull requests · <tspan class="t" text-decoration="underline">Running on #412 →</tspan></text>
+  <line x1="304" y1="872" x2="1076" y2="872" stroke="#f2f2f7"/>
+  <text x="310" y="896" class="rb t">Nightly tidy</text>
+  <text x="440" y="896" class="f s">Every day at 02:00 · Next 02:00 · Ran →</text>
+
+  <!-- WORKTREES -->
+  <text x="290" y="944" class="h">WORKTREES</text>
+  <text x="290" y="968" class="f s">fix-login-redirect · retry-upload · bump-swiftterm</text>
+  <text x="290" y="988" class="note">A checked-out pull request's worktree is listed here like any 030 worktree, on its own branch.</text>
+</svg>

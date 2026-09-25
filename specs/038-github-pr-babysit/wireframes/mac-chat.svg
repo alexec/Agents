@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="820" viewBox="0 0 1120 820" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .title { font-size:17px; font-weight:600; }
+    .r { font-size:14px; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .mono { font-family: Menlo, monospace; font-size:12px; }
+    .well { fill:#f2f2f7; }
+    .quote { fill:#fff; stroke:#e5e5ea; }
+    .badge { fill:#f2f2f7; stroke:#d1d1d6; }
+    .tool { fill:#fafafa; stroke:#ececf0; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="1119" height="819" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
+  <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
+
+  <!-- chat header -->
+  <text x="40" y="76" class="r s">‹ Agents</text>
+  <text x="130" y="76" class="title t">Answer review on #412</text>
+  <text x="330" y="76" class="f q">⟳</text>
+  <rect x="346" y="63" width="128" height="18" rx="9" class="badge"/><text x="410" y="76" class="f s" text-anchor="middle">fix-login-redirect</text>
+  <line x1="0" y1="96" x2="1120" y2="96" stroke="#ececf0"/>
+
+  <!-- the prompt, in the well every workflow prompt uses -->
+  <rect x="40" y="116" width="700" height="340" rx="12" class="well"/>
+  <text x="58" y="142" class="r t">Read what changed. Fix what you can, run the build and tests you can, commit,</text>
+  <text x="58" y="162" class="r t">push, and reply to each comment with what you did or why not. If you cannot</text>
+  <text x="58" y="182" class="r t">fix it, say so in one reply and stop.</text>
+
+  <text x="58" y="214" class="f s">(You were started by the workflow “Babysit my pull requests” for pull request #412,</text>
+  <text x="58" y="230" class="f s">“Fix login redirect”, <tspan class="t" text-decoration="underline">github.com/alexec/agents/pull/412</tspan>. Branch <tspan class="mono">fix-login-redirect</tspan> into</text>
+  <text x="58" y="246" class="f s"><tspan class="mono">main</tspan>, checked out here. GitHub has 1 commit you don't: bring it in, don't discard it.)</text>
+
+  <text x="58" y="276" class="f t" font-weight="600">What changed:</text>
+  <text x="58" y="298" class="f t">• jdoe on <tspan class="mono">App/Login/LoginRouter.swift:42</tspan> <tspan class="s">(comment 2210984)</tspan>:</text>
+  <rect x="72" y="306" width="3" height="18" fill="#c7c7cc"/>
+  <text x="84" y="320" class="f s">This should live in the router, not the view.</text>
+  <text x="58" y="346" class="f t">• jdoe, requesting changes <tspan class="s">(comment 2210990)</tspan>:</text>
+  <rect x="72" y="354" width="3" height="18" fill="#c7c7cc"/>
+  <text x="84" y="368" class="f s">Also please add a test for the expired-session case.</text>
+
+  <text x="58" y="404" class="f s">Push with push_pull_request, and reply with reply_on_pull_request. Never force-push,</text>
+  <text x="58" y="420" class="f s">and never use git push or gh yourself.</text>
+
+  <text x="760" y="124" class="note">The prompt shows where every workflow run's prompt</text>
+  <text x="760" y="140" class="note">shows today. The pull request block is new (FR-018).</text>
+  <text x="760" y="166" class="note">Top: the starter's own words (R10), which the</text>
+  <text x="760" y="182" class="note">person can change in the workflow file.</text>
+  <text x="760" y="300" class="note">Reviewers' words are quoted and attributed,</text>
+  <text x="760" y="316" class="note">never run into the instructions (R10). A</text>
+  <text x="760" y="332" class="note">stranger's comment isn't here at all (FR-011a).</text>
+  <text x="760" y="246" class="note">Behind or diverged: said here (edge case).</text>
+
+  <!-- agent -->
+  <text x="40" y="484" class="r t">Moving the redirect check into LoginRouter and adding the expired-session test.</text>
+
+  <rect x="40" y="500" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="520" class="f s">✎  Edit  <tspan class="mono">LoginRouter.swift</tspan>, <tspan class="mono">LoginView.swift</tspan>, <tspan class="mono">LoginRouterTests.swift</tspan></text>
+  <rect x="40" y="536" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="556" class="f s">▸  Run  <tspan class="mono">swift test --filter LoginRouter</tspan> · passed</text>
+  <rect x="40" y="572" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="592" class="f s">▸  Run  <tspan class="mono">git pull --no-rebase</tspan> · <tspan class="mono">git commit</tspan></text>
+  <rect x="40" y="608" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="628" class="f t">↑  Push to pull request  <tspan class="s">Pushed 3f9c2a1 to fix-login-redirect (#412)</tspan></text>
+  <rect x="40" y="644" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="664" class="f t">↩  Reply on pull request  <tspan class="s">to jdoe on LoginRouter.swift:42</tspan></text>
+  <rect x="40" y="680" width="700" height="30" rx="7" class="tool"/>
+  <text x="56" y="700" class="f t">↩  Reply on pull request  <tspan class="s">on #412, answering the review</tspan></text>
+
+  <text x="760" y="556" class="note">Under the starter's acceptEdits, these two stop</text>
+  <text x="760" y="572" class="note">and ask the person first (section 5, kept on purpose).</text>
+  <text x="760" y="628" class="note">The two app tools, named in words like</text>
+  <text x="760" y="644" class="note">other app tools. Never asked about: they are</text>
+  <text x="760" y="660" class="note">auto-allowed and can only reach #412 (R7).</text>
+
+  <text x="40" y="746" class="r t">Done: the check is in LoginRouter, there's a test for the expired session, and both</text>
+  <text x="40" y="766" class="r t">comments have replies. Checks are running again.</text>
+
+  <text x="40" y="802" class="note">The report is what the pull request's row and the workflow's row show after “Babysat … →”.</text>
+</svg>

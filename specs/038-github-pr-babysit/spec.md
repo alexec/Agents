@@ -36,6 +36,7 @@ workflow file with new triggers. It is listed, archived, run by hand and capped 
 - Q: Which of the person's pull requests does a babysitting workflow watch? → A: All of their open pull requests in the project that have a local worktree. There is no opt-in for each pull request. A workflow with a pull-request trigger applies to every pull request that qualifies (FR-012). Archiving the workflow is how to stop it.
 - Q: What may the babysitting agent do on GitHub by itself? → A: Push to the pull request's branch, and reply to review comments. Both act as the person's own account (FR-020 to FR-022).
 - Q: How does the app tell that a project is on GitHub? → A: The host of the project's `origin` remote contains `github`. That covers github.com and GitHub Enterprise hosts such as `github.example.com` (FR-001).
+- Q: Whose review comments start babysitting, given that comment text goes into the prompt of an agent that can push as the person? → A: Only comments from people with write access to the repository: its owner, members of the owning organisation, and collaborators. Anyone else's comment never fires a trigger and never goes into a prompt (FR-011a).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -153,6 +154,7 @@ triggers in plain words, and fires on the next failing check.
 - **App not running when something changed**: the first refresh after it starts sees the pull request as it is now. A condition that still holds (checks failing, unanswered comments, a conflict) fires once. Unlike a missed schedule, the state is still there to act on.
 - **Several pull requests change at once**: each is its own fire. The project and machine workflow ceilings (008 FR-031b) still apply. Ones over the ceiling are looked at again on the next refresh.
 - **A reviewer comments on the pull request as a whole**, not a line: counts as a review comment. The reply goes on the pull request.
+- **A comment from someone without write access** (anyone, on a public repository): never fires, and is left out of every prompt. Their text never reaches an agent that can push as the person.
 - **The person's own comments**: never fire. The person and the babysitting agent use the same account, so the app cannot tell them apart. Any comment from that account counts as not new.
 - **Sign-in lost or rate-limited mid-way**: the section says so. The list keeps showing the last good state, marked with when it was fetched. No fires happen on stale state.
 - **Remote renamed or changed to a non-GitHub host**: the section disappears on the next refresh. Workflows with pull-request triggers stay listed and do not fire.
@@ -179,7 +181,8 @@ triggers in plain words, and fires on the next failing check.
 
 **Triggers**
 
-- **FR-011**: Workflows MUST gain three triggers: *pull request checks failed* (a check that was not failing is now failing); *pull request review comments* (a review asking for changes, or a comment by anyone but the current user, that is newer than the last fire for that pull request); *pull request conflicts* (the pull request can no longer merge cleanly into its base).
+- **FR-011**: Workflows MUST gain three triggers: *pull request checks failed* (a check that was not failing is now failing); *pull request review comments* (a review asking for changes, or a comment by anyone but the current user, that is newer than the last fire for that pull request, from someone with write access as FR-011a says); *pull request conflicts* (the pull request can no longer merge cleanly into its base).
+- **FR-011a**: A review or comment MUST count for *pull request review comments* only when its author has write access to the repository (owner, organisation member or collaborator). Comments from anyone else MUST NOT fire a trigger and MUST NOT appear in a prompt.
 - **FR-012**: A pull-request trigger MUST apply to every open pull request by the current user in that project that has a matched worktree. There is no per-pull-request opt-in.
 - **FR-013**: Each trigger MUST fire once for each distinct change, not once per refresh. The same failing check run, the same comments, or the same conflict MUST NOT fire twice.
 - **FR-014**: A workflow's in-flight rule (008 FR-023) MUST apply per pull request. A change that arrives while a run is in flight on that pull request MUST be looked at again when the run ends, and fire then if it still holds.
