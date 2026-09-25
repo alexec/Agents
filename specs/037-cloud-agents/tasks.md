@@ -82,8 +82,8 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - `freeBytes` under 200 MB gives `diskFull` before any write;
   - remove with `purge` deletes `~/.agents-server` and nothing else in `$FAKE_SSH_HOME`.
 - [X] T022 Implement `Pkg/Sources/AgentsKit/Hosts/ServerInstaller.swift` (`probe`, `install(binary:version:sha256:)`, `swapCurrent`, `purge`), per contracts/ssh.md §§ 5, 6, 8. **Done, plus `removeBinaries(except:)` and `startDaemon()`.**
-- [ ] T023 [P] Write `Tests/Integration/ServerLinkTests.swift`: with the fake master up and no daemon, `DaemonClient(link: ServerLink(...)).connect()` runs `start()`, the Mac `agentsd --serve --detach` comes up under `$FAKE_SSH_HOME/.agents-server/root`, and `agents/list` answers through the forward. With the master down, `connect` throws within 1 s and never starts a master.
-- [ ] T024 Extract `SocketLink`'s connect body into a shared `connectUnixSocket(path:)` in `Pkg/Sources/AgentsKit/Client/SocketLink.swift`. Implement `Pkg/Sources/AgentsKit/Hosts/ServerLink.swift` (R5).
+- [X] T023 [P] Write `Tests/Integration/ServerLinkTests.swift`: with the fake master up and no daemon, `DaemonClient(link: ServerLink(...)).connect()` runs `start()`, the Mac `agentsd --serve --detach` comes up under `$FAKE_SSH_HOME/.agents-server/root`, and `agents/list` answers through the forward. With the master down, `connect` throws within 1 s and never starts a master. **Done: 2 tests; the first installs the Mac `agentsd` over the fake ssh, starts it over ssh, and gets `agents/list` through the forward.**
+- [X] T024 Extract `SocketLink`'s connect body into a shared `connectUnixSocket(path:)` in `Pkg/Sources/AgentsKit/Client/SocketLink.swift`. Implement `Pkg/Sources/AgentsKit/Hosts/ServerLink.swift` (R5). **Done: `connectUnixSocket(path:)` shared by both links.**
 
 ### 2e — The window can hold many daemons
 
