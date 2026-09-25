@@ -10,6 +10,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case running
     case finished
     case stopped
+    /// Put down by the person to come back to (040). Below the others and always open.
+    case parked
     case archived
 
     /// The heading this group is drawn under.
@@ -19,13 +21,15 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .running: return "Working"
         case .finished: return "Complete"
         case .stopped: return "Stopped"
+        case .parked: return "Parked"
         case .archived: return "Archived"
         }
     }
 
-    /// The four the panel always shows, in the order it shows them. `archived` is not
-    /// here because it is only drawn when the user asks for it.
-    public static let live: [AgentGroup] = [.needsAttention, .running, .finished, .stopped]
+    /// The groups the panel always shows, in the order it shows them. `archived` is not
+    /// here because it is only drawn when the user asks for it. `parked` is, last, so
+    /// every window that draws this list draws its heading in the same place (040).
+    public static let live: [AgentGroup] = [.needsAttention, .running, .finished, .stopped, .parked]
 
     /// One state in, exactly one group out.
     ///
@@ -81,10 +85,23 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// answers ends `finished` with the flag still up, which is the unaccounted ending
     /// 014 already draws (FR-017).
     ///
-    /// Still total over `(AgentState, Bool, WorkReport?, Bool)`, so an agent is in
+    /// `parked` is the person saying "later" (040). It outranks every ending and every
+    /// arm above, because the person has seen the chat and chosen not to look at it now
+    /// — including a report that wants them, and a workflow's turn that wakes it. Two
+    /// things outrank it: `archived`, which is a firmer word than parking, and a
+    /// question asked mid-turn, which blocks the agent on the person whatever else is
+    /// true. A chat only marked to park when its turn ends is not parked yet, and the
+    /// caller passes `false` for it.
+    ///
+    /// Still total over `(AgentState, Bool, WorkReport?, Bool, Bool)`, so an agent is in
     /// exactly one group and never in none.
-    public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool) {
+    public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
+                parked: Bool) {
         let wantsAnswer = report?.outcome.needsAPerson == true
+        if parked, state != .archived, state != .waitingOnUser {
+            self = .parked
+            return
+        }
         switch state {
         // Grouped with the working agents, and without `running`'s `wantsEyes` arm: an
         // agent whose conversation has not begun has not asked anybody to look at
@@ -120,7 +137,7 @@ extension AgentGroup: CodingKeyRepresentable {
 }
 
 public extension Agent {
-    /// Which of the five this agent falls in — the one way to ask.
+    /// Which of the six this agent falls in — the one way to ask.
     ///
     /// The argument is the one fact only a window holds: whether this agent asked the
     /// person to look at something and they have not. `false` is honest from anything
@@ -128,7 +145,8 @@ public extension Agent {
     /// and a lie from anything that is. There is no version without the argument,
     /// because the version without it was the bug (FR-001, FR-004).
     func group(wantsEyes: Bool) -> AgentGroup {
-        AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked)
+        AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
+                   parked: parking?.isParked == true)
     }
 
     /// Whether somebody has to do something about this agent.

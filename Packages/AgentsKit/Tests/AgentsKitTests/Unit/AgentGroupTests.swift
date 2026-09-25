@@ -12,8 +12,10 @@ import Testing
 @Suite("Agent grouping")
 struct AgentGroupTests {
     private static func group(_ state: AgentState, eyes: Bool = false,
-                              _ outcome: WorkOutcome? = nil, asked: Bool = false) -> AgentGroup {
-        AgentGroup(for: state, wantsEyes: eyes, report: outcome.map(report), outcomeAsked: asked)
+                              _ outcome: WorkOutcome? = nil, asked: Bool = false,
+                              parked: Bool = false) -> AgentGroup {
+        AgentGroup(for: state, wantsEyes: eyes, report: outcome.map(report), outcomeAsked: asked,
+                   parked: parked)
     }
 
     private static func report(_ outcome: WorkOutcome) -> WorkReport {
@@ -36,21 +38,22 @@ struct AgentGroupTests {
 
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
-        let reached = Set(AgentState.allCases.map { Self.group($0) })
+        let reached = Set(AgentState.allCases.flatMap { [Self.group($0), Self.group($0, parked: true)] })
         #expect(reached == Set(AgentGroup.allCases))
-        #expect(AgentGroup.allCases.count == 5)
+        #expect(AgentGroup.allCases.count == 6)
         #expect(AgentState.allCases.count == 6)
     }
 
-    @Test("the four live groups are in the order the panel draws them")
+    @Test("the live groups are in the order the panel draws them")
     func liveOrder() {
-        #expect(AgentGroup.live == [.needsAttention, .running, .finished, .stopped])
+        #expect(AgentGroup.live == [.needsAttention, .running, .finished, .stopped, .parked])
         #expect(!AgentGroup.live.contains(.archived))
     }
 
     /// FR-022 of 019 and FR-023 of 020, stated as a test so it cannot be lost quietly.
-    @Test func noHeadingWasAddedRenamedOrRemoved() {
-        #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped"])
+    /// 040 added one heading, last, and renamed and removed none.
+    @Test func noHeadingWasRenamedOrRemoved() {
+        #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped", "Parked"])
         #expect(AgentGroup.archived.title == "Archived")
     }
 
@@ -63,14 +66,16 @@ struct AgentGroupTests {
             for eyes in [false, true] {
                 for outcome in Self.reports {
                     for asked in [false, true] {
-                        let group = Self.group(state, eyes: eyes, outcome, asked: asked)
-                        #expect(AgentGroup.allCases.contains(group))
-                        seen += 1
+                        for parked in [false, true] {
+                            let group = Self.group(state, eyes: eyes, outcome, asked: asked, parked: parked)
+                            #expect(AgentGroup.allCases.contains(group))
+                            seen += 1
+                        }
                     }
                 }
             }
         }
-        #expect(seen == 6 * 2 * (1 + WorkOutcome.allCases.count) * 2)
+        #expect(seen == 6 * 2 * (1 + WorkOutcome.allCases.count) * 2 * 2)
     }
 
     /// An agent whose conversation has not begun has not asked anybody to look at
@@ -160,5 +165,56 @@ struct AgentGroupTests {
                 }
             }
         }
+    }
+
+    // MARK: And whether the person parked it (040)
+
+    /// Parked outranks every ending and every arm: the person has seen it and chosen
+    /// later, including a report that wants them and a workflow's turn that wakes it.
+    @Test func aParkedChatIsParkedWhateverItsEndingOrReport() {
+        for state in [AgentState.starting, .running, .finished, .stopped] {
+            for eyes in [false, true] {
+                for outcome in Self.reports {
+                    for asked in [false, true] {
+                        #expect(Self.group(state, eyes: eyes, outcome, asked: asked, parked: true) == .parked)
+                    }
+                }
+            }
+        }
+    }
+
+    /// A question asked mid-turn blocks the agent on the person, and archiving is a
+    /// firmer word than parking. Both outrank it.
+    @Test func aQuestionAndArchivingOutrankParking() {
+        #expect(Self.group(.waitingOnUser, parked: true) == .needsAttention)
+        #expect(Self.group(.archived, parked: true) == .archived)
+    }
+
+    /// Only the parked mark moves a chat. One marked to park when its turn ends is
+    /// grouped as it would be without the mark until the turn does end.
+    @Test func aChatMarkedToParkIsNotParkedYet() {
+        let dir = URL(fileURLWithPath: "/tmp/work")
+        var agent = Agent(runtimeID: "claude", cwd: dir, state: .running)
+        agent.parking = .whenTurnEnds(since: Date())
+        #expect(agent.group(wantsEyes: false) == .running)
+        agent.parking = .parked(at: Date())
+        #expect(agent.group(wantsEyes: false) == .parked)
+    }
+
+    /// The one place that says which button a chat shows (FR-012).
+    @Test func theParkActionIsDecidedOnce() {
+        let dir = URL(fileURLWithPath: "/tmp/work")
+        var agent = Agent(runtimeID: "claude", cwd: dir, state: .finished, endedReason: .endTurn)
+        #expect(agent.parkAction == .park)
+        agent.state = .running
+        #expect(agent.parkAction == .park)
+        agent.parking = .whenTurnEnds(since: Date())
+        #expect(agent.parkAction == .unpark)
+        agent.state = .finished
+        agent.parking = .parked(at: Date())
+        #expect(agent.parkAction == .unpark)
+        agent.parking = nil
+        agent.state = .archived
+        #expect(agent.parkAction == nil)
     }
 }

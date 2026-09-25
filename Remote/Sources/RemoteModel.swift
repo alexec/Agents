@@ -1111,6 +1111,10 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    /// Park or unpark, whichever `Agent.parkAction` offers (040).
+    func perform(_ action: ParkAction, on agentID: UUID) async {
+        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
+    }
 
     private func act(_ method: String, _ agentID: UUID) async {
         guard !isStale else {

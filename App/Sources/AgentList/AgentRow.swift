@@ -30,7 +30,8 @@ struct AgentRow: View {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
-                       ending: agent.endedReason?.summary)
+                       ending: agent.endedReason?.summary,
+                       isParked: agent.parking?.isParked == true)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -78,6 +79,13 @@ struct AgentRow: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Parked, and since when; or that it will park when this turn ends
+                // (040). How it ended stays the icon's to say.
+                if let line = ParkWords.line(agent.parking) {
+                    Text(line)
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -90,6 +98,12 @@ struct AgentRow: View {
             } else {
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
+                if let action = agent.parkAction {
+                    Button(ParkWords.label(action), systemImage: ParkWords.symbol(action)) {
+                        Task { await model.perform(action, on: agent.id) }
+                    }
+                    .help(ParkWords.help(action))
+                }
                 Button("Archive") { Task { await model.archive(agent.id) } }
             }
             Divider()
@@ -131,6 +145,9 @@ struct StatusIcon: View {
     var isUnaccountedFor = false
     /// Why it stopped, where it did, in `EndedReason`'s words.
     var ending: String?
+    /// Parked (040): the shape still says how it ended, but it is not orange, because
+    /// the person has seen it and chosen later.
+    var isParked = false
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
@@ -142,7 +159,7 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
-                    .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
+                    .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 ProgressView()

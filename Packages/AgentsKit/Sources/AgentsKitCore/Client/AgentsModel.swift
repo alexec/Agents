@@ -517,7 +517,8 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest activity first.
+    /// The agents of one project, in one group, newest activity first — or, under
+    /// Parked, most recently parked first (040, FR-003).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
     /// another client would not. Filtered from what is already held, so the archived
@@ -529,7 +530,9 @@ public final class AgentsModel {
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard let folder else { return [] }
         let wanted = Project.standardize(folder)
-        return agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        let found = agents.filter { self.projectFolder(of: $0) == wanted && self.group(of: $0) == group }
+        guard group == .parked else { return found }
+        return found.sorted { ($0.parking?.parkedAt ?? .distantPast) > ($1.parking?.parkedAt ?? .distantPast) }
     }
 
     /// The agent's folder as projects compare it, remembered after the first ask.

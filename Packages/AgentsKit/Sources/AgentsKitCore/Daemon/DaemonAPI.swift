@@ -83,6 +83,10 @@ public enum DaemonAPI {
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
+        /// Put a chat down to come back to, or pick it back up (040). The person's
+        /// word about their own attention: no agent tool reaches either.
+        public static let agentsPark = "agents/park"
+        public static let agentsUnpark = "agents/unpark"
         public static let agentsTranscript = "agents/transcript"
         public static let agentsSetOption = "agents/setOption"
         /// Letting one agent carry on past the per-agent limit, or giving it a
@@ -358,7 +362,13 @@ public enum DaemonAPI {
             name = try c.decode(String.self, forKey: .name)
             exists = try c.decode(Bool.self, forKey: .exists)
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
-            counts = try c.decode([AgentGroup: Int].self, forKey: .counts)
+            // By the group's name, dropping any this build has never heard of. A plain
+            // `[AgentGroup: Int]` decode throws on an unknown key, which would take the
+            // whole project list down on a phone older than the group (040, R7).
+            counts = [:]
+            for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
+                if let group = AgentGroup(rawValue: name) { counts[group] = count }
+            }
             costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
             unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
         }

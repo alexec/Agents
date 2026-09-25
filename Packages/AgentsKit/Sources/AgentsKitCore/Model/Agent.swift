@@ -90,6 +90,13 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// person. One ask per silence, and the agent cannot write it.
     public var outcomeAsked: Bool
 
+    /// Whether the person has put this chat down to come back to (040). Absent is not
+    /// parked. It sits beside `state`, `endedReason` and `report` and replaces none of
+    /// them, so unparking is only removing it and the chat is back where its ending
+    /// says. Written by the daemon alone: a person parks and unparks, a person's prompt
+    /// unparks, and archiving clears it.
+    public var parking: Parking?
+
     /// Whether the title is the agent's own, given with the call that ends its turn.
     ///
     /// Once it is, a title from the runtime no longer replaces it. That is not a
@@ -259,6 +266,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
         titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
+        // New in 040. A record written before it was never parked.
+        parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -313,6 +322,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
+        try c.encodeIfPresent(parking, forKey: .parking)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -333,6 +343,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
+        case parking
     }
 
     struct AnyKey: CodingKey {
@@ -376,6 +387,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
                 titledByAgent: Bool = false,
+                parking: Parking? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -411,6 +423,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.report = report
         self.outcomeAsked = outcomeAsked
         self.titledByAgent = titledByAgent
+        self.parking = parking
         self.unknownFields = unknownFields
     }
 
