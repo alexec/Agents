@@ -9,87 +9,64 @@ import SwiftUI
 /// paragraph of.
 struct RemoteChatView: View {
     @Environment(RemoteModel.self) private var model
-    @State private var isLoadingEarlier = false
-    @State private var hasSettled = false
-    @State private var isShowingArtifacts = false
-    /// How far the foot of the conversation is below the foot of the screen. Zero
-    /// means the reader is at the live end.
-    @State private var distanceFromEnd: CGFloat = 0
-    /// Something arrived while the reader was up the conversation reading.
-    @State private var hasNewBelow = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// How much of the foot of the screen the prompt area and any card above it cover.
+    @State private var formHeight: CGFloat = 0
 
     private var agent: Agent? { model.selectedAgent }
 
     var body: some View {
-        ScrollViewReader { scroller in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if model.hasMoreBefore {
-                        // No button. Reaching the top is the ask.
-                        ProgressView()
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    }
-                    ForEach(model.transcriptItems) { item in
-                        EntryView(item: item).id(item.id)
-                    }
-                    // Live, and so at the foot rather than in the record: the chat
-                    // itself says what the card in the list says, and it stops saying
-                    // it the moment the prompt lands.
-                    if let agent, model.isComingBack(agent) {
-                        ComingBackLine()
-                    }
-                    Color.clear.frame(height: 1).id(bottom)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .readableWidth()
-            }
-            .onScrollGeometryChange(for: Place.self) { Place($0) } action: { _, place in
-                if place.offset < 400 { loadEarlier(keeping: scroller) }
-                distanceFromEnd = place.distanceFromEnd
-                // Back at the end, so there is nothing new below any more — whether
-                // they got here by the button or by scrolling.
-                if place.isAtEnd { hasNewBelow = false }
-                // The conversation is the only thing that knows how tall it is, and
-                // the page it asks for next should be sized to that (SC-007).
-                model.measure(transcriptHeight: place.height)
-            }
-            .task(id: model.selection) { await settle(scroller) }
-            .onChange(of: model.entries.count) { before, after in
-                guard after > before, !isLoadingEarlier, hasSettled else { return }
-                // Only when they are already at the end. Dragging somebody to the foot
-                // of the conversation because a tool call landed is taking the screen
-                // off the person reading it.
-                guard isAtEnd else { hasNewBelow = true; return }
-                withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(bottom, anchor: .bottom) }
-            }
-            .overlay(alignment: .bottom) { jumpToEnd(scroller) }
+        if let agent {
+            // The conversation with its panes beside it or over it (034).
+            PaneHost(agent: agent) { conversation }
+        } else {
+            conversation
         }
+    }
+
+    private var conversation: some View {
+        // The Mac's shape (033): the conversation runs the full height and the prompt
+        // area floats over its foot, with a question floating above that. The
+        // conversation is told how tall they are so the last thing said can still be
+        // scrolled clear of them.
+        ZStack(alignment: .bottom) {
+            if let agent {
+                ChatTranscript(agent: agent,
+                               items: model.transcriptItems,
+                               hasMore: model.hasMoreBefore,
+                               entryCount: model.entries.count,
+                               isComingBack: model.isComingBack(agent),
+                               settleKey: model.selection,
+                               loadEarlier: { await model.loadEarlier() },
+                               bottomInset: formHeight,
+                               scrollToEndToken: model.scrollToEndToken,
+                               // The conversation is the only thing that knows how tall
+                               // it is, and the page it asks for next should be sized to
+                               // that (SC-007).
+                               onHeight: { model.measure(transcriptHeight: $0) })
+            }
+            form
+        }
+        .environment(\.chatActions, actions)
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
+                // Why it is under Parked, and since when (040, FR-011).
+                if let line = ParkWords.line(agent?.parking) {
+                    Label(line, systemImage: ParkWords.symbol)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(alignment: .trailing, spacing: 0) {
-                // Over the bar's right-hand end rather than in a toolbar under it: the
-                // figure belongs to the conversation, and the foot of the screen is
-                // the home indicator's.
-                if let agent {
-                    ContextMeter(agent: agent)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 6)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .background(Paper.ground)
-                }
-                question
+                // The agent asked to be looked at while something was being typed: said
+                // here, to be opened when the person chooses (034 FR-005).
+                if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -98,7 +75,7 @@ struct RemoteChatView: View {
             // conversation; a sheet is what that is on a screen with one column.
             NavigationStack {
                 if let path = model.fileOnScreen {
-                    FileView(path: path)
+                    ChangesView(path: path)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { model.fileOnScreen = nil }
@@ -108,135 +85,149 @@ struct RemoteChatView: View {
             }
             .paperSheet()
         }
-        .sheet(isPresented: $isShowingArtifacts) {
-            NavigationStack {
-                ArtifactsList()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { isShowingArtifacts = false }
-                        }
-                    }
-            }
-            .paperSheet()
-        }
         // The agent asking to be looked at. An event, so it opens the moment it
         // arrives and is taken off the model in the same breath.
         .onChange(of: model.fileTheAgentWants) { _, wanted in
             if wanted != nil { model.openFileTheAgentWants() }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if let agent { ChatMenu(agent: agent, isShowingArtifacts: $isShowingArtifacts) }
+            // The Mac's two verbs, where the Mac has them (033). Stop keeps the chat
+            // on screen, because someone who stops a chat that has gone the wrong way
+            // wants to keep reading it and say what next. Archive goes back to the
+            // project, because the thing being read has been put away.
+            // Blocked (039): the card's Carry on, where the chat's own controls are.
+            if let agent, model.isBlocked(agent) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await model.carryOn(agent.id) }
+                    } label: {
+                        Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                    }
+                    .disabled(model.isStale)
+                    .accessibilityHint("Tells it the block has cleared, and lets it carry on")
+                }
+            }
+            if let agent, model.canStop(agent) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Label("Stop", systemImage: "stop.circle")
+                    }
+                    .disabled(model.isStale)
+                    .accessibilityHint("Stops this agent and stays on the chat")
+                }
+            }
+            if let agent, agent.state != .archived {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            await model.archive(agent.id)
+                            model.selection = nil
+                        }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox")
+                    }
+                    .disabled(model.isStale)
+                    .accessibilityHint("Archives this chat and goes back to the project")
+                }
+            }
+            if let agent {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // The Mac's side panes: Page, Files, Terminal, Exchanged (034). One
+                    // tap opens the last one used; the switch at its top reaches the rest.
+                    Button {
+                        let state = model.panes.state(for: agent.id)
+                        if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
+                    } label: {
+                        Label("Panes", systemImage: sizeClass == .regular ? "sidebar.right" : "doc.text")
+                    }
+                    .accessibilityHint("Shows the page, files and terminal for this agent")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    ChatMenu(agent: agent)
+                }
             }
         }
     }
 
-    /// The question, over the foot of the conversation, with the prompt bar under it.
+    /// The question, the form and the prompt, floating over the foot of the
+    /// conversation in its column, as on the Mac (FR-018).
     ///
-    /// The question takes the place of the bar rather than sitting above it: an agent
-    /// waiting on an answer wants the answer, and a text field beside the buttons is
-    /// an invitation to type past the thing that is blocking it.
-    @ViewBuilder
-    private var question: some View {
-        if let request = model.questionForSelection {
-            // A fresh sheet per question, so a tap in flight on the last one is not
-            // carried over to the next.
-            PermissionSheet(request: request)
-                .id(request.id)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if let form = model.formForSelection {
-            // The other kind of blocked, and it takes the bar for the same reason: an
-            // agent waiting on an answer wants the answer, not a way to type past it.
-            ElicitationSheet(request: form)
-                .id(form.id)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if let agent, agent.state != .archived {
-            // Nothing to say to an agent that has been put away. Bringing it back is
-            // in the menu, and that is the move to make first.
-            PromptBar(agent: agent)
-        }
-    }
-
-    private var bottom: String { "bottom" }
-
-    /// Within a screen's-worth of the foot counts as being at the end: a reader who
-    /// has nudged the scroll a little has not gone anywhere, and a button that appears
-    /// for that is a button that flickers.
-    private var isAtEnd: Bool { distanceFromEnd < 120 }
-
-    /// The way back to the live end. Shown only when it would do something — there is
-    /// more conversation than screen, and the reader is not already at the foot of it.
-    @ViewBuilder
-    private func jumpToEnd(_ scroller: ScrollViewProxy) -> some View {
-        if !isAtEnd, hasSettled {
-            JumpToEnd(hasNewBelow: hasNewBelow) {
-                hasNewBelow = false
-                withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
+    /// The prompt stays under a question rather than giving way to it, so what would be
+    /// typed past it is in view. The question card keeps the phone's own shape — its
+    /// options stacked and what it covers shown in full — because a row of buttons at
+    /// a large text size is a row of truncated words.
+    private var form: some View {
+        VStack(spacing: 12) {
+            if let request = model.questionForSelection {
+                // A fresh sheet per question, so a tap in flight on the last one is not
+                // carried over to the next.
+                PermissionSheet(request: request)
+                    .id(request.id)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if let form = model.formForSelection {
+                ElicitationSheet(request: form)
+                    .id(form.id)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .padding(.bottom, 12)
-            .transition(.opacity)
+            if let agent, agent.state != .archived {
+                // Nothing to say to an agent that has been put away. Bringing it back is
+                // in the menu, and that is the move to make first.
+                PromptBar(agent: agent, isQuestionUp: isQuestionUp)
+            }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+        .animation(.snappy(duration: 0.2), value: isQuestionUp)
     }
 
-    /// Open at the end, the way every chat does, and only then let reaching the top
-    /// mean something. Without the wait, a transcript that arrives a beat after the
-    /// screen does would be read as "the user scrolled up" and pull the whole history
-    /// in at once.
-    private func settle(_ scroller: ScrollViewProxy) async {
-        hasSettled = false
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-        while model.entries.isEmpty, ContinuousClock.now < deadline, !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(30))
-        }
-        guard !Task.isCancelled else { return }
-        scroller.scrollTo(bottom, anchor: .bottom)
-        try? await Task.sleep(for: .milliseconds(400))
-        guard !Task.isCancelled else { return }
-        hasNewBelow = false
-        hasSettled = true
+    private var isQuestionUp: Bool {
+        model.questionForSelection != nil || model.formForSelection != nil
     }
 
-    /// Another page, and the reader left looking at the line they were on. That is the
-    /// difference between reading backwards through a conversation and being thrown
-    /// about by it.
-    private func loadEarlier(keeping scroller: ScrollViewProxy) {
-        guard hasSettled, !isLoadingEarlier, model.hasMoreBefore else { return }
-        isLoadingEarlier = true
-        let anchor = model.transcriptItems.first?.id
-        Task {
-            await model.loadEarlier()
-            if let anchor { scroller.scrollTo(anchor, anchor: .top) }
-            try? await Task.sleep(for: .milliseconds(250))
-            isLoadingEarlier = false
-        }
+    /// What the shared chat rows mean on a phone. A file a tool call touched opens as it
+    /// is now, in Files at the line the call named, with what the agent did one tap from
+    /// there (034 FR-014). A Mac too old to read files for the phone gets 033's sheet of
+    /// the change instead.
+    private var actions: ChatActions {
+        ChatActions(
+            open: { [model] location in
+                guard !model.macLacksPanes, let agentID = model.selection else {
+                    model.fileOnScreen = location.path
+                    return
+                }
+                model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
+            },
+            terminalOutput: { [model] id in model.terminalOutput(id) },
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
 }
 
-/// What can be done to this agent from here. A menu rather than a row of buttons: on a
-/// phone the transcript is the screen, and these are the rare things.
+/// The rarer things to do with this agent. Stop and Archive are buttons in the bar, as
+/// on the Mac (033); what is left here is what the Mac keeps elsewhere.
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
-    @Binding var isShowingArtifacts: Bool
 
     var body: some View {
         Menu {
-            Button("Exchanged", systemImage: "doc") { isShowingArtifacts = true }
-            Divider()
-            if model.canStop(agent) {
-                Button("Stop", systemImage: "stop.circle") {
-                    Task { await model.stop(agent.id) }
+            Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
+            // Park goes back to the project, as on the Mac: the person is done with it
+            // for now (040).
+            if let action = agent.parkAction {
+                Button(ParkWords.label(action), systemImage: ParkWords.symbol(action)) {
+                    Task {
+                        await model.perform(action, on: agent.id)
+                        if action == .park { model.selection = nil }
+                    }
                 }
                 .disabled(model.isStale)
+                .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
             }
             if agent.state == .archived {
+                Divider()
                 Button("Bring back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
-                }
-                .disabled(model.isStale)
-            } else {
-                Button("Archive", systemImage: "archivebox") {
-                    Task { await model.archive(agent.id) }
                 }
                 .disabled(model.isStale)
             }
@@ -305,56 +296,37 @@ struct ContextMeter: View {
     }
 }
 
-/// Where the reader is in the conversation, in one value, because `onScrollGeometryChange`
-/// fires on one.
-private struct Place: Equatable {
-    var offset: CGFloat
-    var distanceFromEnd: CGFloat
-    /// The height of the visible part, which is what a page should be sized to.
-    var height: CGFloat
-
-    init(_ geometry: ScrollGeometry) {
-        offset = geometry.contentOffset.y
-        height = geometry.containerSize.height
-        // What is below the foot of the screen. Negative while rubber-banding past the
-        // end, which is still the end, so it is floored at zero.
-        distanceFromEnd = max(0, geometry.contentSize.height
-                                 - geometry.containerSize.height
-                                 - geometry.contentOffset.y)
-    }
-
-    var isAtEnd: Bool { distanceFromEnd < 120 }
-}
-
-/// The way back to the live end of a conversation.
+/// "Wants you to see plan.md", with Open and not now (034 FR-005).
 ///
-/// The Mac's control, at a size a thumb can hit. No colour — colour means something
-/// has gone wrong in this app, and being three screens up a conversation is not that.
-/// New lines arriving while you read are said in words.
-private struct JumpToEnd: View {
-    let hasNewBelow: Bool
-    let go: () -> Void
+/// The agent's request, kept on the chat rather than taking the screen: somebody typing
+/// is not somebody to interrupt, and the file will still be there when they are done.
+private struct OfferedFileStrip: View {
+    @Environment(RemoteModel.self) private var model
+    let file: ShownFile
 
     var body: some View {
-        Button(action: go) {
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.down")
-                    // Decorative: a glyph in a capsule, not text (FR-015).
-                    .font(.system(size: 11, weight: .semibold))
-                if hasNewBelow {
-                    Text("Something new")
-                }
+        HStack(spacing: 10) {
+            Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            (Text("Wants you to see ") + Text(file.name).fontWeight(.semibold))
+                .appText(.supporting)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Button("Open") { model.openOfferedFile() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            Button {
+                model.dismissOfferedFile()
+            } label: {
+                Label("Not now", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
             }
-            .padding(.horizontal, hasNewBelow ? 14 : 12)
-            .padding(.vertical, 10)
-            .contentShape(.capsule)
+            .buttonStyle(.borderless)
         }
-        .buttonStyle(.plain)
-        .appText(.fine)
-        .fixedSize()
-        .paperRaised(in: .capsule)
-        .accessibilityLabel(hasNewBelow
-                            ? "Go to the end of the conversation, where something new is"
-                            : "Go to the end of the conversation")
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .paperWell(in: Rectangle())
     }
 }

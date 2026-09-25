@@ -125,6 +125,32 @@ struct ArtifactWriteTests {
         } ?? []
     }
 
+    /// A phone typing on the page goes through the same door as the Mac, and the
+    /// agent is told the same way (034 FR-006, FR-007).
+    @Test func anEditFromAPhoneIsThePersonsJustTheSame() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try await core(launcher, locations: locations, watching: Broadcasts())
+        let id = try await started(launcher, core, in: work)
+        _ = await sent(to: launcher, beginningWith: "go")
+
+        let path = work.appendingPathComponent("notes.md").path
+        try "# T\n\nOne.\n\nTwo.\n".write(toFile: path, atomically: true, encoding: .utf8)
+        let phone = UUID()
+        let result = await core.handle(
+            method: DaemonAPI.Method.artifactWrite,
+            params: try JSONValue.encoding(DaemonAPI.ArtifactWriteRequest(agentID: id, path: path,
+                                                                          text: "# T\n\nOne, mine.\n\nTwo.\n")),
+            from: .device(phone), connection: phone)
+        guard case .success = result else { Issue.record("the phone's write was refused: \(result)"); return }
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "# T\n\nOne, mine.\n\nTwo.\n")
+
+        try await core.prompt(.init(agentID: id, text: "carry on"))
+        let blocks = await sent(to: launcher, beginningWith: "carry on")
+        let expected = Briefing.artifactEdited([.init(path: path, lines: 3...3, text: "One, mine.")])
+        #expect(blocks.last?["text"]?.stringValue == expected)
+    }
+
     @Test func aPassageThePersonChangedIsToldToTheAgentOnItsNextTurn() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()

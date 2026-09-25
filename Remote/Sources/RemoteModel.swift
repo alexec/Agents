@@ -70,9 +70,48 @@ final class RemoteModel {
     private var reconnecting: Task<Void, Never>?
     private var isLoadingEarlier = false
 
+    /// The agent's files as the Mac reads them, and where each agent's pane is (034).
+    let files: RemoteFiles
+    let panes = RemotePanes()
+    let pictures: PhonePictures
+    /// This device's end of each agent's shell it has opened (034). The shell is the
+    /// Mac's; these only know how to reach it.
+    @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+
+    func shellClient(for agentID: UUID) -> ShellClient {
+        if let existing = shells[agentID] { return existing }
+        let fresh = ShellClient(agentID: agentID, client: client, describe: { error in
+            (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
+        })
+        shells[agentID] = fresh
+        return fresh
+    }
+
     init(link: any DaemonLink) {
         client = DaemonClient(link: link)
+        files = RemoteFiles(client: client)
+        pictures = PhonePictures(files: files)
     }
+
+    /// Put what the person typed on a page on disk, through the daemon, which is the one
+    /// writer and the one that tells the agent (022). The same request the Mac's page
+    /// makes, so a phone's edit is the person's in exactly the same way (034 FR-006).
+    /// Answers why it did not land, or nil.
+    func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
+        guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
+        do {
+            try await client.call(DaemonAPI.Method.artifactWrite,
+                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "Your Mac is not answering. What you typed is kept here."
+        }
+    }
+
+    /// The Mac predates the panes, and the phone does what it did before them (FR-029).
+    var macLacksPanes: Bool { files.macLacksPanes }
 
     // MARK: What the screens read
 
@@ -86,8 +125,8 @@ final class RemoteModel {
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
-    /// What the reader will allow, as the Mac has it. The phone shows limits and
-    /// never sets them, so there is no setter beside this.
+    /// What the reader will allow, as the Mac has it. The phone shows limits and does
+    /// not set them; it can only let one agent go on past its own (033).
     var costState: DaemonAPI.CostState? { work.costState }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     var hasMoreBefore: Bool { work.hasMoreBefore }
@@ -115,6 +154,10 @@ final class RemoteModel {
     private static let entryHeight: CGFloat = 80
     /// Screens' worth to hold: enough to scroll a couple before going back for more.
     private static let screensHeld: CGFloat = 3
+
+    /// Somebody asked for the end of the conversation: a prompt went. A counter, so two
+    /// asks in a row both land (033, the Mac's own rule).
+    private(set) var scrollToEndToken = 0
 
     /// Told by the conversation, which is the only thing that knows how tall it is.
     func measure(transcriptHeight height: CGFloat) {
@@ -408,6 +451,21 @@ final class RemoteModel {
 
     // MARK: The project's worktrees (030)
 
+    /// The branch each project folder is on, for the chat's folder chip, as the Mac
+    /// shows it. Missing until asked, and for a folder in no repository.
+    private(set) var projectFolderBranches: [URL: String] = [:]
+
+    /// Asked when a chat opens and when its turn ends, since someone may have checked
+    /// out another branch meanwhile. Never polled.
+    func loadProjectFolderBranch(of agent: Agent) async {
+        guard agent.worktree == nil else { return }
+        let folder = agent.projectFolder
+        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                            returning: DaemonAPI.WorktreesListResponse.self)
+        projectFolderBranches[folder] = answer?.projectFolderBranch
+    }
+
     /// The app's worktrees for the project on screen, for its Worktrees section.
     private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var projectWorktreesFolder: URL?
@@ -495,6 +553,10 @@ final class RemoteModel {
 
     /// Whether the menu offers Stop: the same answer the Mac gives.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
+    /// End a block by hand (039), as the person. See the Mac's `carryOn`.
+    func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
@@ -522,11 +584,81 @@ final class RemoteModel {
         return work.filesToShow[selection]
     }
 
+    // MARK: Which files the agent changed (034)
+
+    /// What the agent touched in the part of its conversation before the page loaded,
+    /// per agent. Fetched once, when Files first opens for it.
+    private var touchedEarlier: [UUID: TouchedPaths] = [:]
+    private var touchedHistoryAsked: Set<UUID> = []
+
+    /// The files an agent changed since it started, as the Mac marks them: from the
+    /// transcript, never the disk (FR-011). The page of it that is loaded, plus what was
+    /// read of the rest when Files opened.
+    func touchedPaths(for agentID: UUID) -> TouchedPaths {
+        var touched = touchedEarlier[agentID] ?? TouchedPaths()
+        if selection == agentID { for entry in work.entries { touched.absorb(entry) } }
+        return touched
+    }
+
+    /// Read the part of the conversation the chat has not loaded, once, so a file the
+    /// agent edited an hour ago is marked here as it is on the Mac (research §5). Paged,
+    /// backwards, as "load earlier" is; kept apart from the chat's own page.
+    func loadTouchedHistory(for agentID: UUID) async {
+        guard !touchedHistoryAsked.contains(agentID) else { return }
+        touchedHistoryAsked.insert(agentID)
+        var before: Int? = selection == agentID ? work.firstEntryIndex : nil
+        if before == 0 { return }
+        var touched = TouchedPaths()
+        while true {
+            guard let page = try? await client.call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: agentID, before: before, limit: 500),
+                returning: TranscriptPage.self) else {
+                // Try again next time Files opens; the marks are short, not wrong.
+                touchedHistoryAsked.remove(agentID)
+                break
+            }
+            for entry in page.entries { touched.absorb(entry) }
+            guard page.hasMoreBefore else { break }
+            before = page.firstIndex
+        }
+        touchedEarlier[agentID] = touched
+    }
+
+    /// Something is being typed on this device: the prompt, a passage on a page, the
+    /// terminal. While it is, an agent asking to be looked at is offered, not opened,
+    /// so the screen is not taken from under somebody's fingers (034 FR-005).
+    var isTyping = false
+
     /// Open what the agent asked for, and take it off the model so it is asked once.
     /// "Look at this" is about a moment, and the moment has passed by the next launch.
+    ///
+    /// Where it opens is the Mac's answer (034 FR-004): a Markdown file on the Page, any
+    /// other file in Files at the line. A Mac without the panes gets today's sheet.
+    /// While the person is typing it is left where it is, and the chat offers it.
     func openFileTheAgentWants() {
+        guard !isTyping, let selection, let file = work.takeFileToShow(for: selection) else { return }
+        open(file, for: selection)
+    }
+
+    /// The strip's Open, which the person chose, typing or not.
+    func openOfferedFile() {
         guard let selection, let file = work.takeFileToShow(for: selection) else { return }
-        fileOnScreen = file.path
+        open(file, for: selection)
+    }
+
+    /// The strip's ✕: not now. Taken off, as an opened one would be.
+    func dismissOfferedFile() {
+        guard let selection else { return }
+        _ = work.takeFileToShow(for: selection)
+    }
+
+    private func open(_ file: ShownFile, for agentID: UUID) {
+        if macLacksPanes {
+            fileOnScreen = file.path
+        } else {
+            panes.state(for: agentID).open(file: file.url, line: file.line)
+        }
     }
 
     /// Whether what is on screen can still be trusted, and acted on.
@@ -581,6 +713,7 @@ final class RemoteModel {
             await identify()
             startPresence()
             presence?.connected()
+            await files.reconnected()
             await refreshEverything()
             return true
         } catch {
@@ -610,6 +743,20 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.draftOptions,
                    let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
                     self.settleStartDraft(change)
+                }
+                // The Mac sends a device only the shells it has open (034).
+                if notification.method == DaemonAPI.Notification.shellOutput,
+                   let params = notification.params,
+                   let output = DaemonAPI.ShellOutputNotification(params: params) {
+                    self.shells[output.agentID]?.received(output.bytes)
+                }
+                if notification.method == DaemonAPI.Notification.shellStateChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+                    self.shells[change.agentID]?.received(change.state)
+                }
+                if notification.method == DaemonAPI.Notification.filesChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
+                    self.files.apply(change)
                 }
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()
@@ -966,7 +1113,7 @@ final class RemoteModel {
         }
     }
 
-    /// Say something to an agent that already exists.
+    /// Say something to an agent that already exists, with whatever goes with it.
     ///
     /// Answers whether it went, so the prompt bar can keep what was typed when it did
     /// not. A prompt that could not be delivered and was cleared from the field anyway
@@ -974,15 +1121,26 @@ final class RemoteModel {
     ///
     /// An agent mid-turn is not refused — the daemon queues it and gets to it after
     /// this turn. That is the daemon's rule and it is deliberately not second-guessed
-    /// from here.
-    func send(_ what: String, to agentID: UUID) async -> Bool {
+    /// from here. What is attached is checked first, by the same rules as a start from
+    /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
+    func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that was not sent."
             return false
         }
+        let capabilities = promptCapabilities(for: work.agent(agentID)?.runtimeID)
+        if let refused = attachments.lazy.compactMap({ PhoneAttachment.refusal(for: $0, from: capabilities) }).first {
+            problem = refused
+            return false
+        }
+        if let tooMuch = PhoneAttachment.totalRefusal(attachments) {
+            problem = tooMuch
+            return false
+        }
         do {
             try await client.call(DaemonAPI.Method.agentsPrompt,
-                                  DaemonAPI.PromptRequest(agentID: agentID, text: what))
+                                  DaemonAPI.PromptRequest(agentID: agentID, text: what,
+                                                          attachments: attachments))
             return true
         } catch {
             problem = "That did not reach your Mac. What you typed is still there."
@@ -990,9 +1148,101 @@ final class RemoteModel {
         }
     }
 
+    /// Back to the end of the conversation, as the Mac does when a prompt goes.
+    func scrollToEnd() { scrollToEndToken += 1 }
+
+    // MARK: The agent's own controls (033)
+
+    /// What an option control should read. The same bookkeeping as the Mac's, in the
+    /// kit, so a choice made here shows at once and settles the same way.
+    func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
+        work.chosenOption(optionID, for: agent, advertised: advertised)
+    }
+
+    /// Change one of a running agent's options, from the phone. Not `async`, so the
+    /// choice is on the control as the menu closes.
+    func setOption(agentID: UUID, optionID: String, value: JSONValue) {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
+        Task {
+            do {
+                try await client.call(DaemonAPI.Method.agentsSetOption,
+                                      DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+            } catch {
+                problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+            }
+            work.settleOption(agentID: agentID, optionID: optionID, sequence: sequence)
+        }
+    }
+
+    /// What the controls row shows for an agent that exists. Its options came with it,
+    /// so there is nothing to load.
+    func controlsState(for agent: Agent) -> PromptControlsState {
+        PromptControlsState.resolve(agentOptions: agent.advertisedOptions,
+                                    draftOptions: [],
+                                    hasFolder: true,
+                                    hasRuntime: true,
+                                    runtimeName: PromptWords.runtimeName(agent.runtimeID),
+                                    isLoading: false,
+                                    failure: nil)
+    }
+
+    /// Let this one agent carry on past its limit: one more step of its ceiling, the
+    /// same step the Mac takes. No other agent is changed.
+    func letThisAgentGoOn(_ agent: Agent) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            let changed = try await client.call(
+                DaemonAPI.Method.agentsSetCeiling,
+                DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits)),
+                returning: Agent.self)
+            work.upsert(changed)
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// Files under the agent's folders for what follows an `@`, found on the Mac.
+    /// Empty when the Mac is not answering: an empty list is not a problem to show.
+    func mentions(_ term: String, for agentID: UUID) async -> [FileMention] {
+        guard !isStale, !term.isEmpty else { return [] }
+        let found = try? await client.call(DaemonAPI.Method.filesMention,
+                                           DaemonAPI.FileMentionRequest(agentID: agentID, term: term),
+                                           returning: [DaemonAPI.FileMentionDTO].self)
+        return (found ?? []).map(\.mention)
+    }
+
+    /// Take something back off the queue before it goes (033). The same call the Mac
+    /// makes; the row goes on both when the daemon says the agent changed.
+    func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be taken back."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsUnqueue,
+                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// What a command an agent ran has printed, as far as this phone heard it.
+    func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
+
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    /// Park or unpark, whichever `Agent.parkAction` offers (040).
+    func perform(_ action: ParkAction, on agentID: UUID) async {
+        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
+    }
 
     private func act(_ method: String, _ agentID: UUID) async {
         guard !isStale else {

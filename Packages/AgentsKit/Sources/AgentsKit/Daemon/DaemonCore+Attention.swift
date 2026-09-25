@@ -105,6 +105,9 @@ extension DaemonCore {
             // Needs attention, but telling the person again is only noise: the same
             // report once bought fifteen banners (2026-09-24).
             guard !agent.reportIsSeen else { continue }
+            // Parked: the person has seen it and chosen later. The report is kept and
+            // asks again once it is unparked (040, FR-004).
+            guard agent.parking?.isParked != true else { continue }
             found.append(need(.report(agent.id, report.at), for: agent, kind: .report,
                               wanted: "\(report.outcome.heading): \(report.message)", now: now))
         }

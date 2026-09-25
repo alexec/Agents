@@ -103,6 +103,12 @@ public enum AgentEvent: Hashable, Sendable {
     case stoppedByAgent
     case processDied
     case foundDead
+    /// The person stopped an agent whose turn had ended blocked (039). The only stop a
+    /// finished agent takes: it has no turn to cancel, but it has a resume coming, and
+    /// stopping it is how the person says it should not come.
+    case stoppedWaitingByUser
+    /// The agent that started this one stopped it while it was blocked (039).
+    case stoppedWaitingByAgent
     case archivedByUser
     /// The agent that started this one put it away (028). The person's archive, with
     /// its own reason.
@@ -240,6 +246,20 @@ extension AgentState {
             return Transition(next: .stopped, endedReason: .set(.stoppedByAgent),
                               clearsPickUpCount: true)
         case (_, .stoppedByAgent):
+            return nil
+
+        // Only from finished, which is the one place a blocked agent can be (039). The
+        // daemon sends these only when the report is an open block; the table cannot
+        // see the report, so it takes the daemon's word for that part.
+        case (.finished, .stoppedWaitingByUser):
+            return Transition(next: .stopped, endedReason: .set(.cancelled),
+                              clearsPickUpCount: true)
+        case (_, .stoppedWaitingByUser):
+            return nil
+        case (.finished, .stoppedWaitingByAgent):
+            return Transition(next: .stopped, endedReason: .set(.stoppedByAgent),
+                              clearsPickUpCount: true)
+        case (_, .stoppedWaitingByAgent):
             return nil
 
         case (.starting, .processDied), (.running, .processDied), (.waitingOnUser, .processDied):

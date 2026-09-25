@@ -1,18 +1,19 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The worktrees the Mac made for this project, and the way to be done with one (030),
-/// as the Mac's project page has them.
+/// Every worktree of the project's repository, and the way to be done with the Mac's
+/// own (030), as the Mac's project page has them.
 ///
-/// Only the app's own: one made in a terminal, or by a runtime, is somebody else's to
-/// remove. Hidden when there are none. Archiving an agent never removes its worktree —
-/// the work in it may not be merged — so this is where they go when you are finished.
+/// All of them are listed, but only the app's own can be removed: one made in a
+/// terminal, or by a runtime, is somebody else's. Hidden when there are none. Archiving
+/// an agent never removes its worktree — the work in it may not be merged — so this is
+/// where they go when you are finished.
 struct WorktreesSection: View {
     @Environment(RemoteModel.self) private var model
     let folder: URL
 
     private var worktrees: [DaemonAPI.WorktreeSummary] {
-        model.projectWorktrees.worktrees.filter { $0.madeByApp && !$0.isProjectFolder }
+        model.projectWorktrees.worktrees.filter { !$0.isProjectFolder }
     }
 
     var body: some View {
@@ -25,7 +26,7 @@ struct WorktreesSection: View {
     }
 }
 
-/// One worktree: its name, its branch and who is in it, and Remove.
+/// One worktree: its name, its branch and who is in it, and Remove when the Mac made it.
 private struct WorktreeRow: View {
     @Environment(RemoteModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
@@ -50,11 +51,13 @@ private struct WorktreeRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            Button("Remove…") { Task { await remove() } }
-                .buttonStyle(.paper)
-                .appText(.supporting)
-                .disabled(isChecking)
-                .accessibilityLabel("Remove \(worktree.name)")
+            if worktree.madeByApp {
+                Button("Remove…") { Task { await remove() } }
+                    .buttonStyle(.paper)
+                    .appText(.supporting)
+                    .disabled(isChecking)
+                    .accessibilityLabel("Remove \(worktree.name)")
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)

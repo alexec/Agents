@@ -14,13 +14,13 @@ struct WorkOutcomeTests {
             #expect(!outcome.heading.isEmpty)
             _ = outcome.needsAPerson
         }
-        #expect(WorkOutcome.allCases.count == 5)
+        #expect(WorkOutcome.allCases.count == 6)
     }
 
     @Test("the three that want a person are the three the spec names")
     func whichOnesWantAPerson() {
         #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer, .partlyDone, .stuck])
-        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo])
+        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .blocked])
     }
 
     /// Two outcomes that read the same are two outcomes a person cannot tell apart,
@@ -43,7 +43,7 @@ struct WorkOutcomeTests {
     @Test("the wire spellings are the ones the tool offers")
     func wireSpellings() {
         #expect(WorkOutcome.allCases.map(\.rawValue)
-            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck"])
+            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck", "blocked"])
         for outcome in WorkOutcome.allCases {
             #expect(WorkOutcome(wire: outcome.rawValue) == outcome)
         }
@@ -77,5 +77,32 @@ struct WorkOutcomeTests {
     @Test("the words are trimmed of what surrounds them")
     func theMessageIsTrimmed() {
         #expect(WorkReport(outcome: .done, wire: "  it is done.\n")?.message == "it is done.")
+    }
+
+    // MARK: Blocked (039)
+
+    @Test("a blocked report keeps its block through the record")
+    func aBlockRoundTrips() throws {
+        let block = Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper",
+                                       ending: WaitEnding(at: Date(timeIntervalSince1970: 5),
+                                                          how: .finished(outcome: .done, message: "ok")))],
+                          checkAgainAt: Date(timeIntervalSince1970: 100))
+        let report = WorkReport(outcome: .blocked, message: "waiting", at: Date(timeIntervalSince1970: 1),
+                                block: block)
+        let back = try JSONDecoder().decode(WorkReport.self, from: JSONEncoder().encode(report))
+        #expect(back == report)
+    }
+
+    /// A word from a newer build is a report that never arrived, and the rest of the
+    /// agent is untouched (research R8).
+    @Test("an outcome this build does not know drops the report, not the agent")
+    func anUnknownOutcomeDropsOnlyTheReport() throws {
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"), title: "Kept")
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(agent)) as! [String: Any]
+        object["report"] = ["outcome": "someday", "message": "words", "at": 0]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let back = try JSONDecoder().decode(Agent.self, from: data)
+        #expect(back.report == nil)
+        #expect(back.title == "Kept")
     }
 }

@@ -60,7 +60,7 @@ struct ContentView: View {
         state.openFile = file.url
         state.openLine = file.line
         frame.pane = .files
-        frame.isOpen = true
+        if !frame.isOpen { frame.open() }
     }
 
     /// A conversation and, when it is open and there is room, the sidebar beside it.
@@ -76,6 +76,8 @@ struct ContentView: View {
             }
         }
         .paperGround()
+        // What the chat does not need is how wide the sidebar opens (`SidebarFrame.open`).
+        .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.paneWidth = $0 }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 SidebarToggle(windowWidth: width)
@@ -122,6 +124,7 @@ struct ContentView: View {
                 }
             }
         }
+        .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
         .environment(frame)
         .environment(sidebarStates)
         .environment(webHolders)

@@ -45,6 +45,16 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
+    /// Parking is the person's word about their own attention. No tool the app gives
+    /// an agent parks or unparks anything (040, FR-016).
+    @Test func noAgentIsOfferedATooltoPark() async throws {
+        let (client, service) = await pair()
+        let listed = try await names(client)
+        #expect(!listed.isEmpty)
+        #expect(listed.allSatisfy { !$0.lowercased().contains("park") }, "\(listed)")
+        await service.close()
+    }
+
     @Test func anAgentAnotherAgentStartedIsNotOfferedThem() async throws {
         let (client, service) = await pair(managesAgents: false)
         let listed = try await names(client)

@@ -121,6 +121,10 @@ targets:
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
+      # The terminal's emulator and view (034). An emulator only: SwiftTerm's
+      # `LocalProcess` half is macOS-only, so no process or PTY reaches the phone, and
+      # the shell it draws is the one the Mac's daemon holds.
+      - package: SwiftTerm
       # The notification service extension: the banner's words are assembled on the
       # device, from a sealed push (021 T068).
       - target: RemoteNotify

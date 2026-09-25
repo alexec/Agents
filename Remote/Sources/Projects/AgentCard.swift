@@ -23,7 +23,8 @@ struct AgentCard: View {
         NavigationLink(value: agent.id) {
             HStack(alignment: .top, spacing: 12) {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
-                           outcome: agent.report?.outcome)
+                           outcome: agent.report?.outcome,
+                           isParked: agent.parking?.isParked == true)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -63,6 +64,21 @@ struct AgentCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // Blocked (039): what it waits on and when it looks again, in the
+                    // Mac row's words. Carry on is in the card's menu and the chat, not
+                    // here: the whole card is the one control (see `AgentRow`).
+                    ForEach(model.blockLines(agent), id: \.self) { line in
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    // As on the Mac's row (040).
+                    if let line = ParkWords.line(agent.parking) {
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -73,6 +89,15 @@ struct AgentCard: View {
             .paperRow()
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if model.isBlocked(agent) {
+                Button {
+                    Task { await model.carryOn(agent.id) }
+                } label: {
+                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                }
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -88,8 +113,8 @@ struct AgentCard: View {
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
-        return [agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
-            .compactMap { $0 }
+        return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
+            .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
     }
 }
@@ -104,6 +129,8 @@ struct StatusIcon: View {
     var isComingBack = false
     /// What the agent said about the work, where it said anything.
     var outcome: WorkOutcome?
+    /// Parked (040): the shape, but not orange. See the Mac's `StatusIcon`.
+    var isParked = false
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
@@ -115,7 +142,7 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .font(.system(size: 16))
-                    .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
+                    .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 ProgressView()

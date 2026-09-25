@@ -236,9 +236,30 @@ struct CostLimitTests {
         let empty = try JSONDecoder().decode(CostLimits.self, from: Data("{}".utf8))
         #expect(empty.isEmpty)
     }
+    // MARK: Letting one go on (033: the phone does it too)
+
+    @Test("going on adds one more step of the agent's own ceiling")
+    func goingOnAddsAStepOfItsOwnCeiling() {
+        let a = agent(spent: ["USD": 5], ceiling: usd(5))
+        #expect(a.ceilingToGoOn(under: CostLimits(perAgent: usd(2))) == usd(10))
+    }
+
+    @Test("with no ceiling of its own the app-wide one is the step")
+    func goingOnUsesTheAppWideStepWhenItHasNone() {
+        let a = agent(spent: ["GBP": 3])
+        #expect(a.ceilingToGoOn(under: CostLimits(perAgent: gbp(2))) == gbp(5))
+    }
+
+    @Test("with no ceiling anywhere it doubles what was spent")
+    func goingOnWithNoCeilingDoubles() {
+        let a = agent(spent: ["USD": 4])
+        #expect(a.ceilingToGoOn(under: CostLimits()) == usd(8))
+    }
+
 }
 
 private extension CostLimits {
     /// Reads better in a test than `!isEmpty` where the point is that something is set.
     var isAtLeastOneLimitSet: Bool { !isEmpty }
+
 }

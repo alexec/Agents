@@ -1,3 +1,4 @@
+import AgentsKit
 import Foundation
 import Observation
 
@@ -40,7 +41,9 @@ final class SidebarFrame {
     /// The narrowest the column is worth being, and the widest before it is taking the
     /// window rather than sharing it.
     static let minimumWidth: Double = 280
-    static let maximumWidth: Double = 900
+    /// Wide enough for a large display. The chat's column stops at its measure however
+    /// wide the pane is, so past that the room is the sidebar's to use.
+    static let maximumWidth: Double = 2000
 
     /// Below this, the conversation and the sidebar cannot both be usable, and the app
     /// has to choose. It chooses the conversation. Picked in front of the running app;
@@ -71,6 +74,11 @@ final class SidebarFrame {
     var pane: SidebarPane {
         didSet { defaults.set(pane.rawValue, forKey: Key.pane) }
     }
+
+    /// How wide the window and the pane beside the project list are. Measured by the
+    /// window as it lays out and never stored: they are facts about now.
+    var windowWidth: Double = 0
+    var paneWidth: Double = 0
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -126,6 +134,18 @@ final class SidebarFrame {
     /// rather than doing nothing, which is the spec's narrow-window edge case.
     static func fits(inWindowOf total: Double) -> Bool {
         total >= minimumConversationWidth + minimumWidth
+    }
+
+    /// Open the column across what the chat does not need.
+    ///
+    /// The chat's text stops at `ChatMetrics.measureCap` however wide its pane, so
+    /// anything past its comfortable width is margin. Opening gives that margin to the
+    /// sidebar, and never less than the document pane needs to be read. A width dragged
+    /// to afterwards is kept until the column is next opened.
+    func open() {
+        let remaining = paneWidth - ChatMetrics.comfortablePane
+        setWidth(max(Self.readableWidth, remaining), inWindowOf: windowWidth)
+        isOpen = true
     }
 
     func setWidth(_ proposed: Double, inWindowOf total: Double) {

@@ -1,17 +1,22 @@
 import AppKit
 import SwiftUI
 
-/// Push a card to the left with two fingers and that chat goes in the archive.
+/// Push a card to the left with two fingers and its Archive button is uncovered.
 ///
 /// A `List` gets this from `swipeActions`. These are glass cards in a stack, so the
 /// gesture is ours to read. AppKit sends a two-finger swipe as a scroll event, and a
 /// scroll event going sideways over a card is never anything else: the page under it
 /// only goes up and down, and wanted none of them.
 ///
+/// The swipe uncovers the button rather than archiving by itself, the way a row does
+/// in Mail: a gesture that ends in the chat being gone is too easy to make by accident
+/// while scrolling past it. Pushing the card back, or moving the pointer off it, puts
+/// the button away again.
+///
 /// The events are watched only while the pointer is over the card, so there is one
 /// watcher at a time however many cards are on the page.
 struct SwipeToArchive: ViewModifier {
-    /// What the swipe does, once it has gone far enough to mean it.
+    /// What the button does.
     let archive: () async -> Void
 
     /// How far left the card has been pushed. Never positive: there is nothing on the
@@ -25,11 +30,13 @@ struct SwipeToArchive: ViewModifier {
     @State private var swallowsMomentum = false
     @State private var watcher: Any?
 
-    /// Far enough to mean it.
-    private static let commit: CGFloat = 96
+    /// Where the card rests with the button showing: the button's width and a margin.
+    private static let open: CGFloat = 112
+    /// Far enough to mean it. Less than that and the card goes back.
+    private static let commit: CGFloat = 48
     /// As far as a card goes while a finger is still on it, so the gesture keeps some
     /// weight past the point where it is already decided.
-    private static let limit: CGFloat = 132
+    private static let limit: CGFloat = 148
 
     func body(content: Content) -> some View {
         ZStack(alignment: .trailing) {
@@ -43,18 +50,28 @@ struct SwipeToArchive: ViewModifier {
         .accessibilityAction(named: "Archive") { Task { await archive() } }
     }
 
-    /// What is behind the card, uncovered as it moves: grey, like everything that is
-    /// not asking for a person.
+    /// What is behind the card, uncovered as it moves: the one thing to do with it.
     @ViewBuilder
     private var reveal: some View {
         if offset < 0 {
-            Label("Archive", systemImage: "archivebox")
-                .appText(.reading).fontWeight(.medium)
-                .foregroundStyle(offset <= -Self.commit ? Color.primary : Color.secondary)
-                .opacity(min(1, -offset / Self.commit))
-                .padding(.trailing, 18)
-                .accessibilityHidden(true)
+            Button {
+                close()
+                Task { await archive() }
+            } label: {
+                Label("Archive", systemImage: "archivebox")
+            }
+            .buttonStyle(.paper)
+            .appText(.fine)
+            .opacity(min(1, -offset / Self.commit))
+            .frame(width: Self.open - 12)
+            .padding(.trailing, 6)
+            .help("Archive this")
+            .accessibilityHidden(true)
         }
+    }
+
+    private func close() {
+        withAnimation(.spring(duration: 0.28)) { offset = 0 }
     }
 
     private func watch() {
@@ -78,7 +95,7 @@ struct SwipeToArchive: ViewModifier {
         guard let watcher else { return }
         NSEvent.removeMonitor(watcher)
         self.watcher = nil
-        if offset != 0 { withAnimation(.spring(duration: 0.28)) { offset = 0 } }
+        if offset != 0 { close() }
         isSwiping = false
         swallowsMomentum = false
     }
@@ -111,8 +128,7 @@ struct SwipeToArchive: ViewModifier {
             let farEnough = phase == .ended && offset <= -Self.commit
             isSwiping = false
             swallowsMomentum = true
-            withAnimation(.spring(duration: 0.28)) { offset = 0 }
-            if farEnough { Task { await archive() } }
+            withAnimation(.spring(duration: 0.28)) { offset = farEnough ? -Self.open : 0 }
             return true
         default:
             // The coast a trackpad sends after a swipe: the page must not inherit it.
@@ -126,7 +142,7 @@ struct SwipeToArchive: ViewModifier {
 }
 
 extension View {
-    /// Two fingers to the left, and this chat goes in the archive.
+    /// Two fingers to the left, and this chat's Archive button shows.
     func swipeToArchive(_ archive: @escaping () async -> Void) -> some View {
         modifier(SwipeToArchive(archive: archive))
     }

@@ -101,7 +101,8 @@ extension DaemonCore {
     /// order of the writes cannot drift between them.
     public func reportOutcome(_ request: DaemonAPI.ReportOutcomeRequest) async throws -> String {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
-                                        message: request.message)
+                                        message: request.message, waitingOn: request.waitingOn,
+                                        checkAgainInMinutes: request.checkAgainInMinutes)
         return await land(checked.report, prompts: nil, on: checked.agent, id: checked.agentID)
     }
 
@@ -118,7 +119,8 @@ extension DaemonCore {
     /// earlier call in the same turn left.
     public func finishTurn(_ request: DaemonAPI.FinishTurnRequest) async throws -> String {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
-                                        message: request.message)
+                                        message: request.message, waitingOn: request.waitingOn,
+                                        checkAgainInMinutes: request.checkAgainInMinutes)
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
         // the record, and a helper from an older binary sends no title at all — which
@@ -137,7 +139,8 @@ extension DaemonCore {
     /// The one worth the words is the third. Claiming the work is settled while the
     /// app is holding a form or a permission for the person would tell them the
     /// opposite of the truth, so the agent is sent back to its own question first.
-    private func checkedReport(token: String, outcome rawOutcome: String, message: String)
+    private func checkedReport(token: String, outcome rawOutcome: String, message: String,
+                               waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil)
         throws -> (agentID: UUID, agent: Agent, report: WorkReport) {
         guard let agentID = appTokens[token], let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -149,7 +152,7 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: """
                                 Nothing was recorded: outcome has to be one of done, \
-                                nothing_to_do, needs_answer, partly_done or stuck.
+                                nothing_to_do, needs_answer, partly_done, stuck or blocked.
                                 """)
         }
         let waiting = pendingPermissions.values.contains { $0.agentID == agentID }
@@ -162,13 +165,22 @@ extension DaemonCore {
                                 let it be answered.
                                 """)
         }
-        guard let report = WorkReport(outcome: outcome, wire: message) else {
+        guard var report = WorkReport(outcome: outcome, wire: message) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: """
                                 Nothing was recorded: say in a sentence how it went. An \
                                 outcome with no words is no more use than the turn simply \
                                 ending.
                                 """)
+        }
+        // Last, because it is the only check that reads other agents (039): everything
+        // about this call alone has passed by now.
+        if outcome == .blocked {
+            report.block = try checkedBlock(for: agent, waitingOn: waitingOn ?? [],
+                                            checkAgainInMinutes: checkAgainInMinutes, at: report.at)
+        } else if waitingOn?.isEmpty == false || checkAgainInMinutes != nil {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Nothing was recorded: waiting_on and check_again_in_minutes only go with blocked.")
         }
         return (agentID, agent, report)
     }
@@ -196,6 +208,12 @@ extension DaemonCore {
         // A report that says the agent is stuck begins a need without a state change,
         // which is why this is the one place besides `move` that has to ask (021).
         reconsider()
+        if report.outcome == .blocked {
+            // Reported after its turn had already ended, with everything it named
+            // already over by then: nothing else will pass through `move` for it.
+            await resumeIfCleared(agentID)
+            return Self.blockedNote(report.block, names: { self.waitName($0) })
+        }
         return report.outcome.needsAPerson
             ? """
                 Noted. The person will see this conversation under "Needs attention", \
