@@ -47,6 +47,9 @@ public actor AppService {
     public static let pushPullRequestToolName = AppTool.pushPullRequest
     public static let replyOnPullRequestToolName = AppTool.replyOnPullRequest
     public static let leaseResourceToolName = AppTool.leaseResource
+    public static let waitForEventToolName = AppTool.waitForEvent
+    public static let cancelWaitToolName = AppTool.cancelWait
+    public static let publishEventToolName = AppTool.publishEvent
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
 
@@ -123,6 +126,17 @@ public actor AppService {
     /// Where those go. A lease call may take up to the wait limit to come back.
     public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
 
+    /// One of the three event calls (042), as the agent made it.
+    public enum EventCall: Sendable, Equatable {
+        case wait(action: String?, events: [String]?, where: [String: String]?, from: Int64?,
+                  untilMinutes: Int?, limit: Int?)
+        case cancel
+        case publish(name: String, message: String?, details: [String: String]?)
+    }
+
+    /// Where those go. A wait may take up to the hold limit to come back.
+    public typealias EventsSink = @Sendable (EventCall) async -> Outcome
+
     /// One of the two pull-request calls (038), as the agent made it. Neither names a
     /// pull request, a branch or a repository: the daemon takes those from the run.
     public enum PullRequestCall: Sendable, Equatable {
@@ -141,6 +155,7 @@ public actor AppService {
     private let outcomeSink: OutcomeSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
+    private let eventsSink: EventsSink
     private let pullRequestsSink: PullRequestsSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
@@ -168,6 +183,9 @@ public actor AppService {
                 },
                 leases: @escaping LeasesSink = { _ in
                     .refused("This app cannot lease resources.")
+                },
+                events: @escaping EventsSink = { _ in
+                    .refused("This app cannot wait on or publish events.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -177,6 +195,7 @@ public actor AppService {
         self.outcomeSink = reportOutcome
         self.agentsSink = agents
         self.leasesSink = leases
+        self.eventsSink = events
         self.pullRequestsSink = pullRequests
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
@@ -230,9 +249,11 @@ public actor AppService {
             // when a session is made, and a standing or triggering run resumes a session
             // made long before. Outside such a run they refuse, in words.
             let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
+            // The three event tools, for every agent (042).
+            let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
                                               Self.workflowTool] + agentTools + leaseTools
-                                             + pullRequestTools
+                                             + eventTools + pullRequestTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -307,6 +328,13 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await pullRequestsSink(call)))
+                }
+            }
+
+            if let call = Self.eventCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await eventsSink(call)))
                 }
             }
 
@@ -428,6 +456,47 @@ public actor AppService {
         }
         if name.hasSuffix(listResourcesToolName) {
             return .success(.list)
+        }
+        return nil
+    }
+
+    /// Which of the three event calls a tool name is, with its arguments read (042).
+    static func eventCall(named name: String,
+                          _ arguments: JSONValue?) -> Result<EventCall, AgentCallProblem>? {
+        func strings(_ value: JSONValue?) -> [String: String]? {
+            guard let object = value?.objectValue else { return nil }
+            var out: [String: String] = [:]
+            for (key, value) in object {
+                if let text = value.stringValue { out[key] = text }
+                else if let number = value.intValue { out[key] = String(number) }
+                else if let flag = value.boolValue { out[key] = String(flag) }
+            }
+            return out
+        }
+        func integer(_ value: JSONValue?) -> Int? {
+            if let number = value?.intValue { return number }
+            return value?.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        }
+        if name.hasSuffix(waitForEventToolName) {
+            var events = arguments?["events"]?.arrayValue?.compactMap(\.stringValue)
+            // One name given as a string rather than a list of one.
+            if events == nil, let one = arguments?["events"]?.stringValue { events = [one] }
+            return .success(.wait(action: arguments?["action"]?.stringValue, events: events,
+                                  where: strings(arguments?["where"]),
+                                  from: integer(arguments?["from"]).map(Int64.init),
+                                  untilMinutes: integer(arguments?["until_minutes"]),
+                                  limit: integer(arguments?["limit"])))
+        }
+        if name.hasSuffix(cancelWaitToolName) {
+            return .success(.cancel)
+        }
+        if name.hasSuffix(publishEventToolName) {
+            let event = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !event.isEmpty else {
+                return .failure("Nothing was published: say what happened in `name`, e.g. custom.build_green.")
+            }
+            return .success(.publish(name: event, message: arguments?["message"]?.stringValue,
+                                     details: strings(arguments?["details"])))
         }
         return nil
     }
@@ -945,6 +1014,97 @@ public actor AppService {
                 "in_reply_to": ["type": "integer"],
             ],
             "required": .array(["body"]),
+        ],
+    ]
+
+    // MARK: Events (042). Words from contracts/event-tools.md.
+
+    static let waitForEventTool: JSONValue = [
+        "name": .string(waitForEventToolName),
+        "title": "Wait for something to happen",
+        "description": """
+            Wait until something happens: an event in this project or on this Mac, such as \
+            pull_request.checks_passed, agent.finished, mac.wake or custom.build_green. Your \
+            turn can end while you wait, and it costs nothing: when the event happens you \
+            are started again with it. The call itself waits up to 45 seconds; if nothing \
+            has happened by then it says you are still waiting and keeps your place. Use \
+            this instead of polling. Also lists recent events (action "recent") and every \
+            event you can wait on (action "list"). The same names work as workflow triggers.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "action": [
+                    "type": "string",
+                    "enum": ["wait", "recent", "list"],
+                    "description": "wait (the default), recent, or list.",
+                ],
+                "events": [
+                    "type": "array",
+                    "items": ["type": "string"],
+                    "description": """
+                        What to wait for; any one will do. A name, or a subject with .* such \
+                        as pull_request.*.
+                        """,
+                ],
+                "where": [
+                    "type": "object",
+                    "description": """
+                        Narrow them by their details, e.g. {"number": "41"} or \
+                        {"agent": "Fix login"}.
+                        """,
+                ],
+                "from": [
+                    "type": "integer",
+                    "description": """
+                        Only events after this position count. Take it from recent, so that \
+                        nothing between checking and waiting is missed.
+                        """,
+                ],
+                "until_minutes": [
+                    "type": "integer",
+                    "description": "Give up after this many minutes, 1 to 1440. You are started again either way.",
+                ],
+                "limit": [
+                    "type": "integer",
+                    "description": "For recent: how many, 1 to 50. Default 20.",
+                ],
+            ],
+        ],
+    ]
+
+    static let cancelWaitTool: JSONValue = [
+        "name": .string(cancelWaitToolName),
+        "title": "Stop waiting",
+        "description": "Stop waiting. Nothing will start you again for the wait you had.",
+        "inputSchema": ["type": "object", "properties": [:]],
+    ]
+
+    static let publishEventTool: JSONValue = [
+        "name": .string(publishEventToolName),
+        "title": "Say that something happened",
+        "description": """
+            Tell other agents and workflows in this project that something happened. The \
+            name must start with custom., e.g. custom.build_green. Agents waiting on it are \
+            started, and workflows that trigger on it run. At most 30 an hour.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": [
+                    "type": "string",
+                    "description": "custom. and lowercase letters, digits and _, up to 40 characters.",
+                ],
+                "message": [
+                    "type": "string",
+                    "description": "A short message for whoever wakes on it, up to 500 characters.",
+                ],
+                "details": [
+                    "type": "object",
+                    "description": "Up to 10 string details, which waits and workflows can narrow by.",
+                ],
+            ],
+            "required": .array(["name"]),
         ],
     ]
 

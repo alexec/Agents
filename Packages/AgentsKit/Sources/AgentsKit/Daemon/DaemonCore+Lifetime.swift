@@ -41,6 +41,10 @@ extension DaemonCore {
         // for does not: when it runs out there is nothing to do but free it, and the
         // next daemon to start does that as it reads the book (research R10).
         if leaseBook.hasWaiters { return true }
+        // An agent waiting on events (042). Nothing but a running daemon can hear its
+        // event, and a daemon that goes takes the Mac's wake, a pull request's change
+        // and every other agent's news with it.
+        if agents.values.contains(where: { $0.eventWait?.isOpen == true }) { return true }
         return agents.values.contains { $0.state.holdsRuntime }
     }
 

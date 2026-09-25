@@ -86,6 +86,9 @@ public final class Daemon: @unchecked Sendable {
         await core.pickUpAfterRestart(recovered)
         // After the pick-ups are known, so a wait on a chat coming back stays open (039).
         await core.resumeBlocksAfterRestart()
+        // And the waits on events (042): a wake queued and never sent goes now, and a
+        // deadline that passed while nothing ran ends now.
+        await core.resumeEventWaitsAfterRestart()
         // Last of all, once the agents that are coming back are back. A daemon
         // restarting under resumed agents is holding work from its first moment, and
         // without this it would not take the assertion until one of them next changed

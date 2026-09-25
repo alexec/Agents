@@ -105,8 +105,11 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     ///
     /// Still total over `(AgentState, Bool, WorkReport?, Bool, Bool)`, so an agent is in
     /// exactly one group and never in none.
+    ///
+    /// `waitingOnEvents` is an open wait on events (042): Blocked like a block, and under
+    /// the same arms — settled, and outranked by wanting a person.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
-                parked: Bool) {
+                parked: Bool, waitingOnEvents: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         if parked, state != .archived, state != .waitingOnUser {
             self = .parked
@@ -119,9 +122,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .starting: self = .running
         case .waitingOnUser: self = .needsAttention
         // Answering the app's question: where it was, not Working. See above.
-        case .running where outcomeAsked: self = Self.settled(wantsEyes || wantsAnswer, report)
+        case .running where outcomeAsked:
+            self = Self.settled(wantsEyes || wantsAnswer, report, waitingOnEvents: waitingOnEvents)
         case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = Self.settled(wantsEyes || wantsAnswer, report)
+        case .finished: self = Self.settled(wantsEyes || wantsAnswer, report, waitingOnEvents: waitingOnEvents)
         case .stopped: self = .stopped
         case .archived: self = .archived
         }
@@ -131,9 +135,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// it is waiting on something that is not a person (039), and Complete otherwise.
     /// Wanting a person outranks being blocked — an agent that asked to be looked at is
     /// asking you, whatever else it is waiting on.
-    private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?) -> AgentGroup {
+    private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?,
+                                waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
-        if report?.isOpenBlock == true { return .blocked }
+        if report?.isOpenBlock == true || waitingOnEvents { return .blocked }
         return .finished
     }
 }
@@ -166,7 +171,7 @@ public extension Agent {
     /// because the version without it was the bug (FR-001, FR-004).
     func group(wantsEyes: Bool) -> AgentGroup {
         AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
-                   parked: parking?.isParked == true)
+                   parked: parking?.isParked == true, waitingOnEvents: eventWait?.isOpen == true)
     }
 
     /// Whether somebody has to do something about this agent.
