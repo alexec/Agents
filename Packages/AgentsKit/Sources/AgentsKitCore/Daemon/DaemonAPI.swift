@@ -358,7 +358,12 @@ public enum DaemonAPI {
             name = try c.decode(String.self, forKey: .name)
             exists = try c.decode(Bool.self, forKey: .exists)
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
-            counts = try c.decode([AgentGroup: Int].self, forKey: .counts)
+            // Read as plain names, so a group this build does not know (039's `blocked`,
+            // seen by an older phone) is dropped rather than failing the whole project.
+            let named = try c.decode([String: Int].self, forKey: .counts)
+            counts = Dictionary(uniqueKeysWithValues: named.compactMap { key, value in
+                AgentGroup(rawValue: key).map { ($0, value) }
+            })
             costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
             unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
         }
