@@ -94,6 +94,14 @@ public enum GitWorktrees {
             .split(separator: "\n").count
     }
 
+    /// Uncommitted changes outside the app's own `.agents` folder (038). A workflow just
+    /// written there, the babysitter included, is not somebody's work in progress, and
+    /// counting it would refuse every pull request checked out in the project folder.
+    public static func workInProgressCount(in folder: URL) async throws -> Int {
+        try await git(["status", "--porcelain", "--", ".", ":(exclude).agents"], in: folder)
+            .split(separator: "\n").count
+    }
+
     /// Whether every commit on `branch` is already in `base`.
     public static func isAncestor(_ branch: String, of base: String, in folder: URL) async -> Bool {
         (try? await git(["merge-base", "--is-ancestor", branch, base], in: folder)) != nil

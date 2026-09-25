@@ -63,8 +63,6 @@ struct PullRequestSandbox {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(text.utf8).write(to: WorkflowFile.url(for: id, in: project))
         }
-        // The workflows folder is the project's own, and not a change to its work.
-        try "/.agents/\n".write(to: project.appending(path: ".git/info/exclude"), atomically: true, encoding: .utf8)
 
         let locations = StoreLocations(root: root.appending(path: "store"))
         let launcher = FakeLauncher(script: script)

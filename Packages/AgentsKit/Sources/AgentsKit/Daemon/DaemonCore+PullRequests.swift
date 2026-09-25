@@ -208,7 +208,7 @@ extension DaemonCore {
         if let record, record.isStopped {
             return .babysittingStopped(pr: number, runs: record.consecutiveRuns)
         }
-        if let dirty = try? await GitWorktrees.statusCount(in: worktree.root), dirty > 0 {
+        if let dirty = try? await GitWorktrees.workInProgressCount(in: worktree.root), dirty > 0 {
             return .worktreeDirty(pr: number)
         }
         if agents(in: worktree, folder: fire.folder).contains(where: { $0.state.holdsRuntime }) {

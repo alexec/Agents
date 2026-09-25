@@ -88,6 +88,16 @@ struct PullRequestFireTests {
         #expect(refusal.rowMessage == "its worktree has uncommitted changes")
     }
 
+    /// Found on the live run: the starter lands in the project's `.agents`, untracked,
+    /// and must not make a pull request checked out in the project folder look dirty.
+    @Test func theAppsOwnFolderIsNotWorkInProgress() async throws {
+        let box = try await sandbox()
+        try "x".write(to: box.project.appending(path: ".agents/note.md"), atomically: true, encoding: .utf8)
+        #expect(try await GitWorktrees.workInProgressCount(in: box.project) == 0)
+        try "y".write(to: box.project.appending(path: "real-change.txt"), atomically: true, encoding: .utf8)
+        #expect(try await GitWorktrees.workInProgressCount(in: box.project) == 1)
+    }
+
     @Test func theSameStateDoesNotFireTwice() async throws {
         let box = try await sandbox()
         _ = await box.core.refreshPullRequestsNow(in: box.project)
