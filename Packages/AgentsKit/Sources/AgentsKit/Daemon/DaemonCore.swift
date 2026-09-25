@@ -124,6 +124,13 @@ public actor DaemonCore {
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
     /// and a daemon that restarts has nothing to apologise for (022 FR-016).
     var artifactEdits: [UUID: [ArtifactEdit]] = [:]
+    /// One folder watch per watched root, shared by every connection watching under
+    /// it, and who is watching what (034). Nothing here outlives its connection.
+    var fileWatches: [URL: FolderWatch] = [:]
+    var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The phones and iPads that have an agent's shell open, by agent (034). A device
+    /// hears a shell's output only while it is here; a window on the Mac hears them all.
+    var shellWatchers: [UUID: Set<UUID>] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]
@@ -263,6 +270,9 @@ public actor DaemonCore {
     /// terminal made during recovery would otherwise have copied nothing and stayed
     /// mute for the rest of the daemon's life.
     let broadcaster = BroadcastBox()
+    /// The other way out: to the connections a predicate picks (034). What a device
+    /// watches, and the shells it has open, go this way.
+    let addressed = AddressedBox()
     var connectionCount = 0
 
     /// The daemon's one way out to the windows, settable once the socket exists and
@@ -279,6 +289,23 @@ public actor DaemonCore {
 
         func callAsFunction(_ method: String, _ params: JSONValue?) {
             lock.withLock { send }?(method, params)
+        }
+    }
+
+    /// `BroadcastBox`'s twin, for notifications that belong to some connections only.
+    public final class AddressedBox: @unchecked Sendable {
+        public typealias Wanted = @Sendable (DaemonServer.ConnectionContext) -> Bool
+        private let lock = NSLock()
+        private var send: (@Sendable (String, JSONValue?, @escaping Wanted) -> Void)?
+
+        var isSet: Bool { lock.withLock { send != nil } }
+
+        func set(_ send: @escaping @Sendable (String, JSONValue?, @escaping Wanted) -> Void) {
+            lock.withLock { self.send = send }
+        }
+
+        func callAsFunction(_ method: String, _ params: JSONValue?, to wanted: @escaping Wanted) {
+            lock.withLock { send }?(method, params, wanted)
         }
     }
 
@@ -376,6 +403,12 @@ public actor DaemonCore {
         self.broadcaster.set(broadcaster)
     }
 
+    public func setAddressedBroadcaster(
+        _ send: @escaping @Sendable (String, JSONValue?, @escaping AddressedBox.Wanted) -> Void
+    ) {
+        addressed.set(send)
+    }
+
     /// Hold lifecycle events rather than acting on them, until `startWorkflows`.
     ///
     /// Called by `Daemon.start()` before `recover()`. Nothing else should need it: it
@@ -395,6 +428,13 @@ public actor DaemonCore {
         guard broadcaster.isSet else { return }
         let params = value.flatMap { try? JSONValue.encoding($0) }
         broadcaster(method, params)
+    }
+
+    /// Tell only the connections `wanted` picks (034).
+    func send(_ method: String, _ value: (some Encodable)?, to wanted: @escaping AddressedBox.Wanted) {
+        guard addressed.isSet else { return }
+        let params = value.flatMap { try? JSONValue.encoding($0) }
+        addressed(method, params, to: wanted)
     }
 
     func changed(_ agent: Agent) {

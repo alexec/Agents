@@ -70,9 +70,48 @@ final class RemoteModel {
     private var reconnecting: Task<Void, Never>?
     private var isLoadingEarlier = false
 
+    /// The agent's files as the Mac reads them, and where each agent's pane is (034).
+    let files: RemoteFiles
+    let panes = RemotePanes()
+    let pictures: PhonePictures
+    /// This device's end of each agent's shell it has opened (034). The shell is the
+    /// Mac's; these only know how to reach it.
+    @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+
+    func shellClient(for agentID: UUID) -> ShellClient {
+        if let existing = shells[agentID] { return existing }
+        let fresh = ShellClient(agentID: agentID, client: client, describe: { error in
+            (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
+        })
+        shells[agentID] = fresh
+        return fresh
+    }
+
     init(link: any DaemonLink) {
         client = DaemonClient(link: link)
+        files = RemoteFiles(client: client)
+        pictures = PhonePictures(files: files)
     }
+
+    /// Put what the person typed on a page on disk, through the daemon, which is the one
+    /// writer and the one that tells the agent (022). The same request the Mac's page
+    /// makes, so a phone's edit is the person's in exactly the same way (034 FR-006).
+    /// Answers why it did not land, or nil.
+    func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
+        guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
+        do {
+            try await client.call(DaemonAPI.Method.artifactWrite,
+                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "Your Mac is not answering. What you typed is kept here."
+        }
+    }
+
+    /// The Mac predates the panes, and the phone does what it did before them (FR-029).
+    var macLacksPanes: Bool { files.macLacksPanes }
 
     // MARK: What the screens read
 
@@ -545,11 +584,81 @@ final class RemoteModel {
         return work.filesToShow[selection]
     }
 
+    // MARK: Which files the agent changed (034)
+
+    /// What the agent touched in the part of its conversation before the page loaded,
+    /// per agent. Fetched once, when Files first opens for it.
+    private var touchedEarlier: [UUID: TouchedPaths] = [:]
+    private var touchedHistoryAsked: Set<UUID> = []
+
+    /// The files an agent changed since it started, as the Mac marks them: from the
+    /// transcript, never the disk (FR-011). The page of it that is loaded, plus what was
+    /// read of the rest when Files opened.
+    func touchedPaths(for agentID: UUID) -> TouchedPaths {
+        var touched = touchedEarlier[agentID] ?? TouchedPaths()
+        if selection == agentID { for entry in work.entries { touched.absorb(entry) } }
+        return touched
+    }
+
+    /// Read the part of the conversation the chat has not loaded, once, so a file the
+    /// agent edited an hour ago is marked here as it is on the Mac (research §5). Paged,
+    /// backwards, as "load earlier" is; kept apart from the chat's own page.
+    func loadTouchedHistory(for agentID: UUID) async {
+        guard !touchedHistoryAsked.contains(agentID) else { return }
+        touchedHistoryAsked.insert(agentID)
+        var before: Int? = selection == agentID ? work.firstEntryIndex : nil
+        if before == 0 { return }
+        var touched = TouchedPaths()
+        while true {
+            guard let page = try? await client.call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: agentID, before: before, limit: 500),
+                returning: TranscriptPage.self) else {
+                // Try again next time Files opens; the marks are short, not wrong.
+                touchedHistoryAsked.remove(agentID)
+                break
+            }
+            for entry in page.entries { touched.absorb(entry) }
+            guard page.hasMoreBefore else { break }
+            before = page.firstIndex
+        }
+        touchedEarlier[agentID] = touched
+    }
+
+    /// Something is being typed on this device: the prompt, a passage on a page, the
+    /// terminal. While it is, an agent asking to be looked at is offered, not opened,
+    /// so the screen is not taken from under somebody's fingers (034 FR-005).
+    var isTyping = false
+
     /// Open what the agent asked for, and take it off the model so it is asked once.
     /// "Look at this" is about a moment, and the moment has passed by the next launch.
+    ///
+    /// Where it opens is the Mac's answer (034 FR-004): a Markdown file on the Page, any
+    /// other file in Files at the line. A Mac without the panes gets today's sheet.
+    /// While the person is typing it is left where it is, and the chat offers it.
     func openFileTheAgentWants() {
+        guard !isTyping, let selection, let file = work.takeFileToShow(for: selection) else { return }
+        open(file, for: selection)
+    }
+
+    /// The strip's Open, which the person chose, typing or not.
+    func openOfferedFile() {
         guard let selection, let file = work.takeFileToShow(for: selection) else { return }
-        fileOnScreen = file.path
+        open(file, for: selection)
+    }
+
+    /// The strip's ✕: not now. Taken off, as an opened one would be.
+    func dismissOfferedFile() {
+        guard let selection else { return }
+        _ = work.takeFileToShow(for: selection)
+    }
+
+    private func open(_ file: ShownFile, for agentID: UUID) {
+        if macLacksPanes {
+            fileOnScreen = file.path
+        } else {
+            panes.state(for: agentID).open(file: file.url, line: file.line)
+        }
     }
 
     /// Whether what is on screen can still be trusted, and acted on.
@@ -604,6 +713,7 @@ final class RemoteModel {
             await identify()
             startPresence()
             presence?.connected()
+            await files.reconnected()
             await refreshEverything()
             return true
         } catch {
@@ -633,6 +743,20 @@ final class RemoteModel {
                 if notification.method == DaemonAPI.Notification.draftOptions,
                    let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
                     self.settleStartDraft(change)
+                }
+                // The Mac sends a device only the shells it has open (034).
+                if notification.method == DaemonAPI.Notification.shellOutput,
+                   let params = notification.params,
+                   let output = DaemonAPI.ShellOutputNotification(params: params) {
+                    self.shells[output.agentID]?.received(output.bytes)
+                }
+                if notification.method == DaemonAPI.Notification.shellStateChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+                    self.shells[change.agentID]?.received(change.state)
+                }
+                if notification.method == DaemonAPI.Notification.filesChanged,
+                   let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
+                    self.files.apply(change)
                 }
                 if notification.method == DaemonAPI.Notification.runtimeChanged {
                     await self.refreshRuntimes()

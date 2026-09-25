@@ -1135,21 +1135,10 @@ final class AppModel {
     /// The pane's end of one agent's shell, made once per agent per window.
     func shellClient(for agentID: UUID) -> ShellClient {
         if let existing = shellClients[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, model: self)
+        let fresh = ShellClient(agentID: agentID, client: client,
+                                describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         shellClients[agentID] = fresh
         return fresh
-    }
-
-    func attachShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
-        try await client.call(DaemonAPI.Method.shellAttach,
-                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
-                              returning: DaemonAPI.ShellAttachResponse.self)
-    }
-
-    func restartShell(agentID: UUID, rows: Int, cols: Int) async throws -> DaemonAPI.ShellAttachResponse {
-        try await client.call(DaemonAPI.Method.shellRestart,
-                              DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
-                              returning: DaemonAPI.ShellAttachResponse.self)
     }
 
     /// What the person typed on a live page, sent to the daemon to put on disk (022).
@@ -1166,21 +1155,6 @@ final class AppModel {
         } catch {
             return error.localizedDescription
         }
-    }
-
-    /// Detaching never stops anything. A build carries on (FR-026).
-    func detachShell(agentID: UUID) async {
-        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.AgentRequest(agentID: agentID))
-    }
-
-    func sendToShell(agentID: UUID, bytes: Data) async {
-        try? await client.call(DaemonAPI.Method.shellInput,
-                               DaemonAPI.ShellInputRequest(agentID: agentID, bytes: bytes))
-    }
-
-    func resizeShell(agentID: UUID, rows: Int, cols: Int) async {
-        try? await client.call(DaemonAPI.Method.shellResize,
-                               DaemonAPI.ShellResizeRequest(agentID: agentID, rows: rows, cols: cols))
     }
 
     /// A shell that will not start is shown inside the pane, not in the window's alert:

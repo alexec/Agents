@@ -9,13 +9,22 @@ import SwiftUI
 /// paragraph of.
 struct RemoteChatView: View {
     @Environment(RemoteModel.self) private var model
-    @State private var isShowingArtifacts = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
     /// How much of the foot of the screen the prompt area and any card above it cover.
     @State private var formHeight: CGFloat = 0
 
     private var agent: Agent? { model.selectedAgent }
 
     var body: some View {
+        if let agent {
+            // The conversation with its panes beside it or over it (034).
+            PaneHost(agent: agent) { conversation }
+        } else {
+            conversation
+        }
+    }
+
+    private var conversation: some View {
         // The Mac's shape (033): the conversation runs the full height and the prompt
         // area floats over its foot, with a question floating above that. The
         // conversation is told how tall they are so the last thing said can still be
@@ -55,6 +64,9 @@ struct RemoteChatView: View {
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
+                // The agent asked to be looked at while something was being typed: said
+                // here, to be opened when the person chooses (034 FR-005).
+                if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -63,24 +75,13 @@ struct RemoteChatView: View {
             // conversation; a sheet is what that is on a screen with one column.
             NavigationStack {
                 if let path = model.fileOnScreen {
-                    FileView(path: path)
+                    ChangesView(path: path)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { model.fileOnScreen = nil }
                             }
                         }
                 }
-            }
-            .paperSheet()
-        }
-        .sheet(isPresented: $isShowingArtifacts) {
-            NavigationStack {
-                ArtifactsList()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { isShowingArtifacts = false }
-                        }
-                    }
             }
             .paperSheet()
         }
@@ -131,8 +132,21 @@ struct RemoteChatView: View {
                     .accessibilityHint("Archives this chat and goes back to the project")
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                if let agent { ChatMenu(agent: agent, isShowingArtifacts: $isShowingArtifacts) }
+            if let agent {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // The Mac's side panes: Page, Files, Terminal, Exchanged (034). One
+                    // tap opens the last one used; the switch at its top reaches the rest.
+                    Button {
+                        let state = model.panes.state(for: agent.id)
+                        if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
+                    } label: {
+                        Label("Panes", systemImage: sizeClass == .regular ? "sidebar.right" : "doc.text")
+                    }
+                    .accessibilityHint("Shows the page, files and terminal for this agent")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    ChatMenu(agent: agent)
+                }
             }
         }
     }
@@ -171,12 +185,19 @@ struct RemoteChatView: View {
         model.questionForSelection != nil || model.formForSelection != nil
     }
 
-    /// What the shared chat rows mean on a phone (033). A file a tool call touched
-    /// opens the change the agent made to it, in a sheet: the phone cannot open the
-    /// Mac's disk, and that is the one deliberate difference in these rows.
+    /// What the shared chat rows mean on a phone. A file a tool call touched opens as it
+    /// is now, in Files at the line the call named, with what the agent did one tap from
+    /// there (034 FR-014). A Mac too old to read files for the phone gets 033's sheet of
+    /// the change instead.
     private var actions: ChatActions {
         ChatActions(
-            open: { [model] location in model.fileOnScreen = location.path },
+            open: { [model] location in
+                guard !model.macLacksPanes, let agentID = model.selection else {
+                    model.fileOnScreen = location.path
+                    return
+                }
+                model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
+            },
             terminalOutput: { [model] id in model.terminalOutput(id) },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
     }
@@ -187,11 +208,10 @@ struct RemoteChatView: View {
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
-    @Binding var isShowingArtifacts: Bool
 
     var body: some View {
         Menu {
-            Button("Exchanged", systemImage: "doc") { isShowingArtifacts = true }
+            Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             // Park goes back to the project, as on the Mac: the person is done with it
             // for now (040).
             if let action = agent.parkAction {
@@ -273,5 +293,40 @@ struct ContextMeter: View {
     private func label(_ usage: Usage) -> String {
         let tokens = "\(usage.used.formatted()) of \(usage.size.formatted()) tokens"
         return usage.isCloseToFull ? "Context nearly full — \(tokens)" : tokens
+    }
+}
+
+/// "Wants you to see plan.md", with Open and not now (034 FR-005).
+///
+/// The agent's request, kept on the chat rather than taking the screen: somebody typing
+/// is not somebody to interrupt, and the file will still be there when they are done.
+private struct OfferedFileStrip: View {
+    @Environment(RemoteModel.self) private var model
+    let file: ShownFile
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            (Text("Wants you to see ") + Text(file.name).fontWeight(.semibold))
+                .appText(.supporting)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Button("Open") { model.openOfferedFile() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            Button {
+                model.dismissOfferedFile()
+            } label: {
+                Label("Not now", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .paperWell(in: Rectangle())
     }
 }

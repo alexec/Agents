@@ -181,6 +181,24 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.FileMentionRequest.self)
                 return .success(try JSONValue.encoding(try await fileMentions(request)))
 
+            case DaemonAPI.Method.filesList:
+                let request = try require(params, as: DaemonAPI.FilesListRequest.self)
+                return .success(try JSONValue.encoding(try listFiles(request)))
+
+            case DaemonAPI.Method.filesRead:
+                let request = try require(params, as: DaemonAPI.FilesReadRequest.self)
+                return .success(try JSONValue.encoding(try readFile(request)))
+
+            case DaemonAPI.Method.filesWatch:
+                let request = try require(params, as: DaemonAPI.FilesWatchRequest.self)
+                try watchFiles(request, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.filesUnwatch:
+                let request = try require(params, as: DaemonAPI.FilesWatchRequest.self)
+                unwatchFiles(request, connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.agentsStop:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await stop(request.agentID)
@@ -298,11 +316,11 @@ extension DaemonCore {
 
             case DaemonAPI.Method.shellAttach:
                 let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
-                return .success(try JSONValue.encoding(try attachShell(request)))
+                return .success(try JSONValue.encoding(try attachShell(request, from: surface, connection: connection)))
 
             case DaemonAPI.Method.shellDetach:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                detachShell(request.agentID)
+                detachShell(request.agentID, connection: connection)
                 return .success([:])
 
             case DaemonAPI.Method.shellInput:
@@ -322,7 +340,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.shellRestart:
                 let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
-                return .success(try JSONValue.encoding(try restartShell(request)))
+                return .success(try JSONValue.encoding(try restartShell(request, from: surface, connection: connection)))
 
             default:
                 return .failure(.methodNotFound(method))

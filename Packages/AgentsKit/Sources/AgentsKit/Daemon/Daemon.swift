@@ -56,6 +56,8 @@ public final class Daemon: @unchecked Sendable {
                     // A bridge that has gone carries nothing. Left on the list, the next
                     // withdrawal would be handed to nobody and forgotten (025 US2).
                     await core.forgetCarrier(connection: connection)
+                    // What it was watching and which shells it had open (034).
+                    await core.connectionEnded(connection)
                 }
             },
             handler: { context, method, params in
@@ -65,6 +67,9 @@ public final class Daemon: @unchecked Sendable {
         self.server = server
         await core.setBroadcaster { method, params in
             server.broadcast(method, params)
+        }
+        await core.setAddressedBroadcaster { method, params, wanted in
+            server.broadcast(method, params, to: wanted)
         }
         // Shell output goes out the same door as every other notification.
         await core.connectShells()

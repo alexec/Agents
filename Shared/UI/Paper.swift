@@ -80,6 +80,18 @@ private extension NSColor {
     }
 }
 #else
+extension UIColor {
+    /// Paper for the phone's terminal, which takes a `UIColor` (034). The same values
+    /// as the Mac's, dynamic in the same way.
+    static let paperGround = UIColor(light: 0xFBF9F4, dark: 0x1C1B19)
+    static let paperInk = UIColor(light: 0x1F1D1A, dark: 0xECE7DC)
+    static let paperSelection = UIColor(light: 0xE4DCC8, dark: 0x3A3630)
+
+    private convenience init(light: UInt32, dark: UInt32) {
+        self.init { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) }
+    }
+}
+
 private extension UIColor {
     convenience init(hex: UInt32) {
         self.init(red: CGFloat((hex >> 16) & 0xFF) / 255,
