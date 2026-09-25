@@ -18,7 +18,7 @@ struct WorktreesSection: View {
 
     var body: some View {
         if !worktrees.isEmpty {
-            GroupHeading(title: "Worktrees", count: worktrees.count)
+            SectionHeading(title: "Worktrees")
             ForEach(worktrees) { worktree in
                 WorktreeRow(worktree: worktree)
             }
