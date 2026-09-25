@@ -142,6 +142,7 @@ private struct FileLineRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 1)
         .background(named ? AnyShapeStyle(.tint.opacity(0.18)) : AnyShapeStyle(.clear))
-        .onAppear { document?.appear(line: number - 1) }
+        // On appearing, and again when the document arrives after the row did.
+        .task(id: document.map(ObjectIdentifier.init)) { document?.appear(line: number - 1) }
     }
 }

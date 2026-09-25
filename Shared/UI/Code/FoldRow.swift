@@ -15,6 +15,10 @@ struct FoldRow: View {
                     .imageScale(.small)
                 Text(count == 1 ? "1 unchanged line" : "\(count) unchanged lines")
             }
+            // One line whatever the width: inside a sideways-scrolling diff there is no
+            // width to wrap against, and it folded to a word a line (walked 2026-09-25).
+            .lineLimit(1)
+            .fixedSize()
             .appText(.fine)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)

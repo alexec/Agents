@@ -145,7 +145,10 @@ private struct DiffRowView: View {
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(row.kind == .removed ? AnyShapeStyle(CodeInk.removedWash) : AnyShapeStyle(.clear))
-        .onAppear {
+        // On appearing, and again when the document arrives: a row drawn before its
+        // colour existed would otherwise never ask for it (walked 2026-09-25: Whole file
+        // lost its colour past line 200).
+        .task(id: document.map(ObjectIdentifier.init)) {
             if let index { document?.appear(line: index) }
         }
     }
