@@ -72,8 +72,8 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 - [X] T019 [P] [US2] `CredentialStore` (Mac only): Keychain generic password, service `agents.runtime-credential.<root-id>`, account = runtime id; `credentials.json` in the root with `kind`, `lastFour`, `addedAt`, `lastWorked?`, `lastRefused?` and never the secret; save/replace/remove/read, in `Packages/AgentsKit/Sources/AgentsKit/Credentials/CredentialStore.swift`; exclude from the Linux build in `Packages/AgentsKit/Package.swift`
 - [X] T020 [P] [US2] Tests for T019 on a throwaway Keychain service name: save then read, replace, remove leaves neither item nor record, `credentials.json` never contains the secret, in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/CredentialStoreTests.swift`
 - [X] T021 [P] [US2] `CredentialCheck` (Mac only): `GET /v1/models` with the header T010 proved for each kind, 10 s timeout; 200 → works, 401/403 → refused, else → can't check; injectable `URLSession` for tests, in `Packages/AgentsKit/Sources/AgentsKit/Credentials/CredentialCheck.swift` with tests in `Tests/AgentsKitTests/Unit/CredentialCheckTests.swift`
-- [ ] T022 [US2] Wire `CredentialRow` to T019/T021: paste → kind check → save → spinner → Works / refused (field kept) / "Can't check right now — saved…"; masked view with added/last worked; Replace and Remove, in `App/Sources/Settings/CredentialRow.swift` and `App/Sources/Settings/ServersSettingsView.swift`
-- [ ] T023 [US2] Make sure no log line, `print`, crash annotation or `DaemonClient` request log can carry a `Secret` (grep for interpolation of the store's values; route through `Secret.description`) in `App/Sources/Settings/` and `Packages/AgentsKit/Sources/AgentsKit/Credentials/`
+- [X] T022 [US2] Wire `CredentialRow` to T019/T021: paste → kind check → save → spinner → Works / refused (field kept) / "Can't check right now — saved…"; masked view with added/last worked; Replace and Remove, in `App/Sources/Settings/CredentialRow.swift` and `App/Sources/Settings/ServersSettingsView.swift`
+- [X] T023 [US2] Make sure no log line, `print`, crash annotation or `DaemonClient` request log can carry a `Secret` (grep for interpolation of the store's values; route through `Secret.description`) in `App/Sources/Settings/` and `Packages/AgentsKit/Sources/AgentsKit/Credentials/`
 - [ ] T024 [US2] Walk US2's Independent Test on a scratch root (run-app skill); record in `specs/043-zero-setup-servers/walk/US2.md`
 
 **Checkpoint**: Settings holds and checks a token; nothing reaches a server yet.
@@ -153,10 +153,10 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T053 [P] `scripts/leak-check.sh <token>`: grep the scratch root, `~/Library/Preferences/*Agents*`, the app's logs, `/usr/bin/log show --info` for the last day, and each server's home over ssh for the full token; exit non-zero on any hit
+- [X] T053 [P] `scripts/leak-check.sh <token>`: grep the scratch root, `~/Library/Preferences/*Agents*`, the app's logs, `/usr/bin/log show --info` for the last day, and each server's home over ssh for the full token; exit non-zero on any hit
 - [ ] T054 Run T053 after the walks (SC-003) and quickstart step 9 (purge leaves no `~/.agents-server`, and the person's own Node untouched on `agents-devbox`) (FR-008); notes in `specs/043-zero-setup-servers/walk/README.md`
-- [ ] T055 [P] Update the test-servers skill (`.claude/skills/test-servers/`) with `agents-bare`, the token step and the rebuilt walk
-- [ ] T056 [P] Update 037's `specs/037-cloud-agents/spec.md` Assumptions to point at 043 for runtimes on servers (D4)
+- [X] T055 [P] Update the test-servers skill (`.claude/skills/test-servers/`) with `agents-bare`, the token step and the rebuilt walk
+- [X] T056 [P] Update 037's `specs/037-cloud-agents/spec.md` Assumptions to point at 043 for runtimes on servers (D4)
 - [ ] T057 Six full suite runs compared with T002's baseline; both schemes build; Linux gate passes
 - [ ] T058 Record what is left for Alex (token paste for walks, any look notes) and SC results in `specs/043-zero-setup-servers/walk/README.md`
 

@@ -52,6 +52,30 @@ instead, so poking at the box by hand never touches theirs.
 `devbox.sh fresh` stops the server daemon by its lock pid and removes `~/.agents-server`: the next
 connect is a first install. `devbox.sh logs` is the server's `daemon.log`.
 
+### The bare box (043, zero-setup servers)
+
+```sh
+$T/bare.sh up            # agents-bare on 127.0.0.1:2223: ssh, curl, xz, git — nothing else
+$T/bare.sh status        # node/npx/sign-in (all none), agentsd, Claude toolset
+$T/bare.sh rebuild       # a new container: blank disk and a NEW host key — a rebuilt server
+```
+
+In the app, `agents@127.0.0.1:2223`. No volume and no fixed host key, on purpose: `rebuild` is
+exactly what 043's "This server was rebuilt" sheet is for. `bare.sh ssh` trusts whatever key it
+has now and never touches `~/.ssh/known_hosts`.
+
+What the app installs there is **Claude's toolset**: Node and claude-agent-acp, pinned in
+`App/Resources/toolsets/claude/` (`scripts/update-claude-toolset.sh` makes a new pin), into
+`~/.agents-server/tools/claude/<id>/`, ~484 MB, ~15 s on this Mac's network. It installs as the
+server connects when **Settings ▸ Servers ▸ Signing in on servers** has a Claude token, otherwise
+the first time Claude is started there. A turn then needs that token: it is the person's
+(`claude setup-token`), pasted into the scratch window's Settings — never into a file, a command
+line or this conversation. Without one, a made-up `sk-ant-oat01-…` still proves the install, the
+lend and the refusal ("Claude refused the token in Settings").
+
+After a walk with a real token, `scripts/leak-check.sh $ROOT ssh://agents@127.0.0.1:2223` (the token
+on stdin) must say `clean` (SC-003).
+
 ## 2. The window, against the box
 
 ```sh
@@ -149,6 +173,10 @@ fresh root:
 | First install | `devbox.sh fresh`, then connect |
 | Remove | Settings ▸ Servers ▸ Remove; with purge, `~/.agents-server` is gone on the box, `~/src` is not |
 | Files pane | open a server chat's files: it reads through `files/browse`, not this Mac's disk |
+| Zero-setup (043) | `bare.sh rebuild`, token in Settings, Add a server: Install Claude ticks, a Claude agent answers |
+| Refused token (043) | a made-up token in Settings: the agent stops with "Claude refused the token in Settings", Settings shows Refused |
+| Rebuilt (043) | `bare.sh rebuild` under a connected window: "has a new identity" sheet, This server was rebuilt, set up again, old projects Gone |
+| Own sign-in only (043) | toggle it on the devbox (signed in by `claude login`): agents answer, no `credentials/lend` ever sent |
 | Linux binary itself | `scripts/build-linux-agentsd.sh --check`; copy + `--serve --detach` by hand is in `specs/037-cloud-agents/walk/README.md` |
 
 Record what you saw in `specs/037-cloud-agents/walk/README.md`, with screenshots in `walk/linux/`
@@ -175,6 +203,7 @@ else is using it. Remove `$ROOT-srv` (made by `server-rpc.sh`) along with the ro
 
 - Browser pane and workflows list do not work for server projects yet.
 - A Mac file attached to a *new* server agent's first prompt isn't carried over.
-- The window says "Claude stopped answering" for a runtime that isn't signed in on the server.
+- ~~The window says "Claude stopped answering" for a runtime that isn't signed in on the server.~~
+  043: a refused sign-in says so; no sign-in at all asks for a token before starting.
 - A login refused with an empty ssh agent is classed as a locked key even when the key has no
   passphrase (the devbox's case, if login ever fails).
