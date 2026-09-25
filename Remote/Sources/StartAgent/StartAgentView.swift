@@ -104,7 +104,7 @@ struct StartAgentView: View {
                 .disabled(!canSend)
                 .opacity(canSend ? 1 : 0.4)
                 .accessibilityLabel("Start agent")
-                .accessibilityValue(model.isStarting ? "Starting" : "")
+                .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
             }
         }
         .padding(.horizontal, 12)

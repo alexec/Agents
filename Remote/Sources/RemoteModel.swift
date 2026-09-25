@@ -198,7 +198,14 @@ final class RemoteModel {
     /// that follows uses it. Answered from what it offered last time when the Mac has
     /// that, and put right by `agents/draftOptions` if it has moved.
     func loadStartChoices() async {
-        guard let folder = startingIn, let runtimeID = startRuntimeID else { return }
+        guard let folder = startingIn else { return }
+        guard let runtimeID = startRuntimeID else {
+            // Not "asking": there is nobody to ask.
+            startChoicesState = .failed(runtimes.isEmpty
+                ? "No runtimes are set up on the Mac. Set one up there to start an agent."
+                : "None of the Mac's runtimes can start right now.")
+            return
+        }
         startGeneration += 1
         let generation = startGeneration
         discardStartDraft()
@@ -298,10 +305,14 @@ final class RemoteModel {
             startRefusal = tooMuch
             return false
         }
+        // The unsettled start's id only for the same project: sent again there, the Mac
+        // answers with the agent it made if it made one. Anywhere else it is a new
+        // start, and reusing the id would be answered with the other project's agent.
+        let retrying = unsettledStart?.cwd == folder ? unsettledStart?.requestID : nil
         let request = DaemonAPI.StartRequest(
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
-            requestID: unsettledStart?.requestID ?? UUID())
+            requestID: retrying ?? UUID())
         return await send(start: request)
     }
 
@@ -327,11 +338,15 @@ final class RemoteModel {
         }
     }
 
-    private func started(_ id: UUID, in folder: URL) async {
+    /// - Parameter open: go to it. True when the person is waiting on the sheet; false
+    ///   when a lost answer is settled later, perhaps while they read something else,
+    ///   and taking the screen from them would be the surprise.
+    private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
         unsettledStart = nil
-        startDraftID = nil
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
         StartDraftKeeper.shared.clear(in: folder)
+        guard open else { return }
+        startDraftID = nil
         await refreshAgents()
         await refreshProjects()
         startingIn = nil
@@ -347,7 +362,7 @@ final class RemoteModel {
     private func settleUnsettledStart() async {
         guard let request = unsettledStart, let requestID = request.requestID else { return }
         if let made = work.agents.first(where: { $0.startRequestID == requestID }) {
-            await started(made.id, in: request.cwd)
+            await started(made.id, in: request.cwd, open: startingIn == request.cwd)
             return
         }
         guard startingIn == request.cwd else { return }

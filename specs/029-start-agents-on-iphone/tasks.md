@@ -210,3 +210,15 @@ Then US2, whose daemon half can land without the sheet. Then US3. Then the gate,
     base `9a9c7d9` 5/6 (1310 tests), one `aWindowThatHasGoneLeavesNoDescriptorBehind` failure,
     a known flake on the base. Both schemes build.
   - What remains: T019 and T034, Alex's walk on a device.
+- **2026-09-24, review against main.** Correction to the T033 note: the six runs covered
+  `2c581cf`, before T032's edits. `f9d3235` broke `noCallSiteSpellsOutTheWordForAStartingAgent`
+  by writing "Starting" into the Start agent button's accessibility value. That's fixed with
+  `AgentState.startingLabel`. The review also fixed three phone bugs:
+  - A dropped send's request id was reused by the next Send in any project, which could open
+    another project's agent and clear the new prompt. It's now reused only in the same project.
+  - Settling a lost start on reconnect always switched to that agent, even if you were reading
+    something else. It now only clears the draft unless the sheet is still open on that project.
+  - With no runtime that could start, the choices said "Asking… what it offers" for ever. They
+    now say why nothing is offered.
+  After the fixes, 1342 tests pass on the branch. A trial merge with main `f5b97f1` has no
+  conflicts and both schemes build.

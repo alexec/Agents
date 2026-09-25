@@ -38,7 +38,7 @@ struct ChoiceRows: View {
                 }
             }
         } footer: {
-            if case .failed = model.startChoicesState {
+            if case .failed = model.startChoicesState, model.startRuntimeID != nil {
                 Text("You can still start it with what \(runtimeName) chooses by itself.")
             }
         }
