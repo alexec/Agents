@@ -121,15 +121,21 @@ final class HostSet {
 
     // MARK: -
 
+    /// The ssh command for a host, its control socket under this root's `hosts/`.
+    static func ssh(for host: ServerHost, locations: StoreLocations) -> SSHCommand {
+        SSHCommand(executable: sshExecutable, name: host.sshName,
+                   controlPath: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).ctl"))
+    }
+
+    static func connection(for host: ServerHost, locations: StoreLocations) -> ServerConnection {
+        ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
+                         socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
+                         installedBy: ServerHost.currentMacName,
+                         binary: { await ServerBinaries.binary(for: $0) })
+    }
+
     private func makeConnection(_ host: ServerHost) -> ServerConnection {
-        let hostsFolder = locations.hostsFolder
-        var ssh = SSHCommand(executable: Self.sshExecutable, name: host.sshName,
-                             controlPath: hostsFolder.appendingPathComponent("\(host.id.rawValue).ctl"))
-        ssh.environment = SSHCommand.environment(from: ProcessInfo.processInfo.environment)
-        let connection = ServerConnection(hostID: host.id, ssh: ssh,
-                                          socket: hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
-                                          installedBy: ServerHost.currentMacName,
-                                          binary: { await ServerBinaries.binary(for: $0) })
+        let connection = Self.connection(for: host, locations: locations)
         Task {
             await connection.setOnState { [weak self] state in
                 await self?.moved(host.id, to: state)
