@@ -58,3 +58,30 @@ After merging main (037 is there), the server connection turns out to be held by
 never sees a server go offline or come back. `server.offline` and `server.online` stay in the
 catalogue with no source. Raising them needs the app to report connection changes to the
 daemon, which is left for a follow-up.
+
+## After merging main (`eb63bab`), 2026-09-25
+
+**Builds**: both schemes build (an empty `App/Resources/servers` is needed locally for the Mac
+scheme: 037's Linux binaries are a build output, not in git).
+
+**Full suite, three runs** (1921 tests, 216 suites, while another lane's suite was also
+running on this Mac):
+- Every run: `noCallSiteNamesAStateColourItself` (main's own `WorktreeRow.swift:94`, from
+  main's `3a540ba` — it fails on main too), `twoHelpersFinishingGiveOneResumeNamingEach` and
+  `anAgentCanStartInANewWorktreeOnALocalBranch` (main's known flakes).
+- Some runs: `aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack` (main's known lease
+  flake), `theSettlingPauseIsNotStartedAgainByARestart`, `workThatWouldBeLostIsSaidFirst`,
+  `theEndingAPersonsPromptOvertookIsNotAskedAbout`. The last three pass 3/3 alone.
+- No 042 test failed in any of the three runs.
+
+**Grok and Cursor as the waiter** (T066), scratch root `/tmp/run-042`, the event raised with
+`events/raise` carrying a message:
+- Grok: called `wait_for_event` without asking, was told "still waiting" after the 45 s hold,
+  ended its turn with the wait open, was woken by the event and answered "The ping carried:
+  hello-grok".
+- Cursor: asked permission for the tool first (as Claude does), then the same: still waiting,
+  turn ended, woken, "It carried: hello-cursor".
+- Claude: proven earlier with a real publisher (above).
+
+**Left for Alex**: the phone and iPad look (T025/T029 on a device); a real Mac sleep/wake and
+screen lock (quickstart §4, T067); the pull-request walk on his sandbox repository (T068).

@@ -389,7 +389,7 @@ each respond to one of them.
 - [X] T060 [US5] In `DaemonCore+EventSources.swift`, start the watch when the daemon starts and stop it when it goes. Map each `MachineChange` to `raise` of `mac.sleep`, `mac.wake`, `person.away` or `person.back`, with Mac scope and a plain sentence ("This Mac woke up"). Inject it through `useForEvents(machineWatch:)` in tests.
 - [X] T061 [US5] `cost.limit_reached` (R11): where `isDayLimitReached` and `agent.isAtCostLimit` refuse in `DaemonCore+Commands.swift`, raise it once per crossing. Use `limit: day` with Mac scope, or `limit: agent` with project scope and `agent`, remembered in `eventState.costCrossings` by day.
 - [X] T062 [US5] Lease events: in `DaemonCore+Leases.swift`, `settle`, raise `lease.granted` (with `resource` and `agent`) for `.granted`, and `lease.released` (with `resource` and `how`: released, ended or expired) for `.released`, both with Mac scope.
-- [ ] T063 [US5] Server events: if 037 (servers) is on `main` by now, raise `server.offline` and `server.online` from its connection-state change, with `server`. If it isn't, leave the two kinds in the catalogue with no source, and note that in `walk/README.md`.
+- [X] T063 [US5] Server events: if 037 (servers) is on `main` by now, raise `server.offline` and `server.online` from its connection-state change, with `server`. If it isn't, leave the two kinds in the catalogue with no source, and note that in `walk/README.md`.
 - [X] T064 [P] [US5] Create `Pkg/Tests/AgentsKitTests/Integration/MachineEventTests.swift` with `FakeMachineWatch`. Cover:
   - sleep then wake gives both events in order;
   - a wait on `mac.wake` from project P wakes, and a workflow on `mac.wake` in project Q fires (US5-AS3);
@@ -404,12 +404,12 @@ not landed.
 
 ## Phase 8: Polish and proof
 
-- [ ] T065 Build both schemes one after the other with plugin validation skipped, then run the full `swift test` six times. Compare the failures with T002's baseline on `main`, and treat only new ones as this lane's.
-- [ ] T066 Run quickstart §3 with the run-app skill on `/tmp/run-042`: "Waiter" and "Pinger" with Claude, then Grok and Cursor as Waiter. Record what each runtime did with the 45 s hold. Screenshot the Events page, the waiting chat (capsule and hint line) and the workflow row link into `specs/042-events-and-waiting/walk/`.
+- [X] T065 Build both schemes one after the other with plugin validation skipped, then run the full `swift test` six times. Compare the failures with T002's baseline on `main`, and treat only new ones as this lane's.
+- [X] T066 Run quickstart §3 with the run-app skill on `/tmp/run-042`: "Waiter" and "Pinger" with Claude, then Grok and Cursor as Waiter. Record what each runtime did with the 45 s hold. Screenshot the Events page, the waiting chat (capsule and hint line) and the workflow row link into `specs/042-events-and-waiting/walk/`.
 - [ ] T067 Run quickstart §4 (sleep and wake, lock and unlock) only when Alex is away, after checking idle and lock state first (see memory). Otherwise list it for him in `walk/README.md`.
 - [ ] T068 Quickstart §5: commit on a scratch project's default branch and see `branch.moved`. For the pull-request events on `alexec/agents-babysit-sandbox`, ask Alex with `AskUserQuestion` before pushing to or merging his sandbox pull request.
-- [ ] T069 [P] Write `specs/042-events-and-waiting/walk/README.md`: what was walked, the screenshots, what each runtime did, what is left for Alex (the phone and iPad look, and the Mac sleep if it was not run), and any known gaps.
-- [ ] T070 Merge `main` into the branch again, check `git merge-base --is-ancestor main HEAD`, rebuild both schemes and run the event suites. Then report to Alex that the branch is ready, and do not merge it into `main` until he says it is this lane's turn.
+- [X] T069 [P] Write `specs/042-events-and-waiting/walk/README.md`: what was walked, the screenshots, what each runtime did, what is left for Alex (the phone and iPad look, and the Mac sleep if it was not run), and any known gaps.
+- [X] T070 Merge `main` into the branch again, check `git merge-base --is-ancestor main HEAD`, rebuild both schemes and run the event suites. Then report to Alex that the branch is ready, and do not merge it into `main` until he says it is this lane's turn.
 
 ---
 
