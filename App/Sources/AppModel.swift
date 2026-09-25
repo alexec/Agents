@@ -59,6 +59,8 @@ final class AppModel {
     /// What the reader will allow and what today has cost. Nil until the daemon has
     /// said, which is how every surface knows to show nothing rather than a zero.
     var costState: DaemonAPI.CostState? { work.costState }
+    /// Every resource an agent can lease and who holds it (036).
+    var leases: DaemonAPI.LeaseSnapshot? { work.leases }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
@@ -93,6 +95,7 @@ final class AppModel {
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
+            showsResources = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -102,6 +105,39 @@ final class AppModel {
         }
     }
 
+    /// Whether the window is showing Resources: who holds the Mac's shared things
+    /// and who is waiting (036). A page like Spending, and not persisted for the same
+    /// reason: it is somewhere you go to answer a question.
+    var showsResources = false {
+        didSet {
+            guard showsResources, showsResources != oldValue else { return }
+            showsSpending = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
+    var resourcesFocus: ResourceName?
+
+    /// Resources, at one resource if a chat's capsule asked for it.
+    func showResources(at name: ResourceName? = nil) {
+        resourcesFocus = name
+        showsResources = true
+    }
+
+    /// An agent's chat, from the Resources page or a capsule naming its holder: its
+    /// own project first, as a banner does, so the sidebar and the page agree.
+    func openAgent(_ agentID: UUID) {
+        showsSpending = false
+        showsResources = false
+        if let agent = agents.first(where: { $0.id == agentID }) {
+            selectedProject = agent.projectFolder
+        }
+        openWorkflow = nil
+        selection = agentID
+    }
+
     /// What is picked in the sidebar, as one value.
     ///
     /// The projects and Spending share a column, so they have to share a selection:
@@ -109,13 +145,19 @@ final class AppModel {
     /// stored fact — it is what the window reopens on — and this is the view of it
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
-        get { showsSpending ? .spending : selectedProject.map(SidebarItem.project) }
+        get {
+            showsResources ? .resources
+                : showsSpending ? .spending : selectedProject.map(SidebarItem.project)
+        }
         set {
             switch newValue {
             case .spending:
                 showsSpending = true
+            case .resources:
+                showResources()
             case .project(let folder):
                 showsSpending = false
+                showsResources = false
                 showProject(folder)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -140,8 +182,10 @@ final class AppModel {
     /// daemon.
     func showProject(_ folder: URL) {
         // Going to a project is going away from Spending, wherever the ask came from
-        // — a new project being added, a menu item, the list itself.
+        // — a new project being added, a menu item, the list itself. And from
+        // Resources, for the same reason.
         showsSpending = false
+        showsResources = false
         selectedProject = folder
         selection = nil
         openWorkflow = nil
@@ -309,6 +353,105 @@ final class AppModel {
         }
     }
 
+    // MARK: Pull requests (038)
+
+    /// Each GitHub project's Pull requests section, by folder. Absent for a project
+    /// that is not on GitHub, which is how the section is absent there (SC-006).
+    private(set) var pullRequestLists: [URL: PullRequestList] = [:]
+    /// Pull requests being checked out now, by folder and number.
+    private(set) var checkingOut: Set<PullRequestKey> = []
+    /// The last check-out that failed, with its reason, until the next list replaces it.
+    private(set) var checkoutFailures: [PullRequestKey: String] = [:]
+
+    struct PullRequestKey: Hashable {
+        var folder: URL
+        var number: Int
+    }
+
+    /// What the daemon has, at once, then a refresh. Asked for when a project page
+    /// opens; never polled. The daemon's own clock keeps it current after that.
+    func loadPullRequests(for folder: URL) async {
+        let folder = Project.standardize(folder)
+        if let list = try? await client.call(DaemonAPI.Method.pullRequestsList,
+                                             DaemonAPI.PullRequestsRequest(folder: folder),
+                                             returning: PullRequestList?.self) {
+            setPullRequests(list, for: folder)
+        } else {
+            pullRequestLists[folder] = nil
+            return
+        }
+        await refreshPullRequests(for: folder)
+    }
+
+    /// The ↻: refresh now, which the daemon holds to once a minute (FR-008).
+    func refreshPullRequests(for folder: URL) async {
+        let folder = Project.standardize(folder)
+        guard let list = try? await client.call(DaemonAPI.Method.pullRequestsRefresh,
+                                                DaemonAPI.PullRequestsRequest(folder: folder),
+                                                returning: PullRequestList?.self) else { return }
+        setPullRequests(list, for: folder)
+    }
+
+    /// Check a pull request's branch out into a worktree of its own (FR-007). A failure
+    /// stays on its row rather than in an alert: each reason says what to do.
+    func checkOut(_ number: Int, in folder: URL) async {
+        let key = PullRequestKey(folder: Project.standardize(folder), number: number)
+        checkingOut.insert(key)
+        checkoutFailures[key] = nil
+        defer { checkingOut.remove(key) }
+        do {
+            let list = try await client.call(DaemonAPI.Method.pullRequestsCheckout,
+                                             DaemonAPI.PullRequestRequest(folder: key.folder, number: number),
+                                             returning: PullRequestList.self)
+            setPullRequests(list, for: key.folder)
+            // The new worktree belongs in the Worktrees section below too.
+            await loadDraftWorktrees()
+        } catch {
+            checkoutFailures[key] = describe(error)
+        }
+    }
+
+    /// Why Babysit my pull requests was refused, by folder, until it is tried again.
+    private(set) var babysitterRefusals: [URL: String] = [:]
+
+    /// Babysit my pull requests: write the starter workflow (FR-026). A ceiling is said
+    /// under the button rather than in an alert (wireframe G).
+    func addBabysitter(in folder: URL) async {
+        let folder = Project.standardize(folder)
+        babysitterRefusals[folder] = nil
+        do {
+            let summary = try await client.call(DaemonAPI.Method.pullRequestsAddBabysitter,
+                                                DaemonAPI.PullRequestsRequest(folder: folder),
+                                                returning: WorkflowSummary.self)
+            work.upsert(summary)
+            if var list = pullRequestLists[folder] {
+                list.babysitterWorkflowID = summary.workflowID
+                pullRequestLists[folder] = list
+            }
+        } catch {
+            babysitterRefusals[folder] = describe(error)
+        }
+    }
+
+    /// Resume: start babysitting a stopped pull request again (FR-024).
+    func resume(_ number: Int, in folder: URL) async {
+        let folder = Project.standardize(folder)
+        do {
+            let list = try await client.call(DaemonAPI.Method.pullRequestsResume,
+                                             DaemonAPI.PullRequestRequest(folder: folder, number: number),
+                                             returning: PullRequestList.self)
+            setPullRequests(list, for: folder)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    private func setPullRequests(_ list: PullRequestList?, for folder: URL) {
+        pullRequestLists[folder] = list
+        // A failure is true until the list next changes, and no longer.
+        checkoutFailures = checkoutFailures.filter { $0.key.folder != folder }
+    }
+
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
@@ -377,6 +520,32 @@ final class AppModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.WakeState.self) else { return }
         work.replaceWakeState(state)
+    }
+
+    /// Every resource and who holds it (036). A daemon too old to know the method
+    /// leaves `leases` nil, and nothing about leases is drawn.
+    func refreshLeases() async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+                                                    Optional<String>.none,
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
+    /// The person ending whoever holds a resource (036 US4). Never a way to take one.
+    func endLease(_ name: ResourceName) async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesEnd,
+                                                    DaemonAPI.PersonEndRequest(name: name.key),
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
+    }
+
+    /// The person taking one agent out of one line (036 US4).
+    func removeFromLine(_ name: ResourceName, agentID: UUID) async {
+        guard let snapshot = try? await client.call(
+            DaemonAPI.Method.leasesRemoveWaiter,
+            DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
+            returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
     }
 
     func refreshCostState() async {
@@ -618,6 +787,11 @@ final class AppModel {
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
 
+        case DaemonAPI.Notification.pullRequestsChanged:
+            // The Mac's own, like the shells (038 FR-010).
+            guard let list = try? params?.decode(PullRequestList.self) else { return }
+            setPullRequests(list, for: list.folder)
+
         case DaemonAPI.Notification.cloneChanged:
             guard let change = try? params?.decode(DaemonAPI.CloneNotification.self) else { return }
             clones.removeAll { $0.id == change.clone.id }
@@ -649,10 +823,11 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
+        async let leases: Void = refreshLeases()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, cloning, wake, modes, transcript)
+                   elicitations, attention, resuming, cost, cloning, wake, leases, modes, transcript)
     }
 
     func refreshElicitations() async {
@@ -706,15 +881,10 @@ final class AppModel {
         guard presence == nil else { return }
         notifier.open = { [weak self] agentID in
             guard let self else { return }
-            self.showsSpending = false
             // Its own project first, because picking a project empties the selection:
             // a chat opened from a banner under some other project's heading is a
             // sidebar and a page that disagree about where you are.
-            if let agent = self.agents.first(where: { $0.id == agentID }) {
-                self.selectedProject = agent.projectFolder
-            }
-            self.openWorkflow = nil
-            self.selection = agentID
+            self.openAgent(agentID)
         }
         let reporter = PresenceReporter { [weak self] watching, active in
             guard let self else { return }

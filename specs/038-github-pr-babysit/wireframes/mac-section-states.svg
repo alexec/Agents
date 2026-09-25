@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="820" viewBox="0 0 1120 820" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .cap { font-size:13px; font-weight:600; fill:#1d1d1f; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .mono { font-family: Menlo, monospace; font-size:12px; }
+    .card { fill:#fff; stroke:#e5e5ea; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+  <rect x="0.5" y="0.5" width="1119" height="819" rx="12" fill="#fafafa" stroke="#c7c7cc"/>
+
+  <!-- A: gh not signed in -->
+  <text x="30" y="36" class="cap">A · No sign-in that can read the repository (FR-003)</text>
+  <text x="30" y="66" class="h">PULL REQUESTS</text><text x="162" y="66" class="f s">↻</text>
+  <rect x="30" y="76" width="500" height="44" rx="10" class="card"/>
+  <text x="48" y="103" class="f s">Can't see pull requests: gh isn't signed in. Run <tspan class="mono t">gh auth login</tspan> in Terminal.</text>
+  <text x="30" y="140" class="note">One line instead of the rows. No Babysit button: nothing to babysit.</text>
+
+  <!-- B: gh missing / no access -->
+  <text x="590" y="36" class="cap">B · The same line, for the other two causes</text>
+  <text x="590" y="66" class="h">PULL REQUESTS</text><text x="722" y="66" class="f s">↻</text>
+  <rect x="590" y="76" width="500" height="44" rx="10" class="card"/>
+  <text x="608" y="103" class="f s">Can't see pull requests: the GitHub CLI isn't installed. <tspan class="mono t">brew install gh</tspan></text>
+  <rect x="590" y="130" width="500" height="44" rx="10" class="card"/>
+  <text x="608" y="157" class="f s">Can't see pull requests on alexec/agents with the account <tspan class="t">acollins</tspan>.</text>
+  <text x="590" y="194" class="note">Each names its fix. The command text can be selected and copied; it is not a button.</text>
+
+  <!-- C: unreachable with cache -->
+  <text x="30" y="236" class="cap">C · GitHub unreachable, last good list kept (FR-009)</text>
+  <text x="30" y="266" class="h">PULL REQUESTS</text><text x="162" y="266" class="f s">↻</text>
+  <rect x="30" y="276" width="500" height="126" rx="10" class="card"/>
+  <text x="48" y="302" class="f s">#412</text><text x="86" y="302" class="rb t">Fix login redirect</text><text x="330" y="302" class="f s">✕ checks  ● changes requested</text>
+  <text x="86" y="322" class="f s"><tspan class="t" text-decoration="underline">fix-login-redirect</tspan> · Babysat 1 h ago →</text>
+  <line x1="44" y1="338" x2="516" y2="338" stroke="#f2f2f7"/>
+  <text x="48" y="362" class="f s">#405</text><text x="86" y="362" class="rb t">Paper theme settings card</text><text x="330" y="362" class="f s">✓ checks  ✓ approved</text>
+  <text x="48" y="390" class="f q">Couldn't reach GitHub · showing 14:02</text>
+  <text x="30" y="422" class="note">Rows stay as they were, not faded. Nothing fires on this state.</text>
+
+  <!-- D: no PRs -->
+  <text x="590" y="236" class="cap">D · Signed in, no open pull requests of mine</text>
+  <text x="590" y="266" class="h">PULL REQUESTS</text><text x="722" y="266" class="f s">↻</text>
+  <rect x="932" y="250" width="158" height="24" rx="6" class="btn"/><text x="1011" y="267" class="f t" text-anchor="middle">Babysit my pull requests</text>
+  <rect x="590" y="282" width="500" height="44" rx="10" class="card"/>
+  <text x="608" y="309" class="f s">No open pull requests of yours on alexec/agents</text>
+  <text x="590" y="346" class="note">Section still shown on a GitHub project, like “No sessions”, so the</text>
+  <text x="590" y="362" class="note">babysitter can be set up before the first pull request.</text>
+
+  <!-- E: checkout in progress / failed -->
+  <text x="30" y="470" class="cap">E · Check out into a worktree (FR-007): working, then failed</text>
+  <rect x="30" y="484" width="500" height="120" rx="10" class="card"/>
+  <text x="48" y="510" class="f s">#390</text><text x="86" y="510" class="rb t">Docs for leases</text><text x="330" y="510" class="f s">◌ checks</text>
+  <text x="86" y="530" class="f s">Checking out <tspan class="mono">docs-for-leases</tspan>…</text>
+  <line x1="44" y1="546" x2="516" y2="546" stroke="#f2f2f7"/>
+  <text x="48" y="570" class="f s">#381</text><text x="86" y="570" class="rb t">Old spike</text>
+  <text x="86" y="590" class="f s">Couldn't check out: <tspan class="mono">old-spike</tspan> is checked out in ~/scratch/agents</text>
+  <text x="30" y="624" class="note">On success the row just becomes matched. A failure stays on the row, grey, until the next</text>
+  <text x="30" y="640" class="note">refresh. No alert: the three reasons (exists, checked out elsewhere, fetch failed) say what to do.</text>
+
+  <!-- F: refusals and the workflow row -->
+  <text x="590" y="470" class="cap">F · The workflow row, when fires are refused</text>
+  <rect x="590" y="484" width="500" height="84" rx="10" class="card"/>
+  <text x="608" y="510" class="rb t">Babysit my pull requests</text>
+  <text x="608" y="530" class="f s">When one of my pull requests fails its checks, gets review…</text>
+  <text x="608" y="552" class="f s">Watching 3 · Did not run 4 times — #377's worktree has uncommitted changes</text>
+  
+  <text x="590" y="600" class="note">The same refusal line 008 uses, one per pull request, collapsed when it repeats.</text>
+  <text x="590" y="616" class="note">Grey. Only “babysitting stopped” asks for a person, and it is orange on both rows.</text>
+
+  <!-- G: ceiling / exists -->
+  <text x="30" y="690" class="cap">G · Babysit my pull requests, refused</text>
+  <rect x="30" y="704" width="500" height="64" rx="10" class="card"/>
+  <text x="48" y="730" class="f s">This project already runs its 3 workflows. Archive another in this project to let it run.</text>
+  <text x="48" y="752" class="f q">The words the ceiling uses on every workflow row (FR-026), under the button.</text>
+  <text x="590" y="690" class="cap">H · Not on GitHub (SC-006)</text>
+  <text x="590" y="730" class="f s">No section, no button, no line. The page is exactly as it is today.</text>
+</svg>

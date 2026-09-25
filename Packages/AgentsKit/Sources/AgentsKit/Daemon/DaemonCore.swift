@@ -185,6 +185,31 @@ public actor DaemonCore {
     /// restart, and it counts agents that have since ended or been archived, so it
     /// cannot be derived from the agents that happen to still be about.
     lazy var spendLedger = SpendLedger(locations: locations)
+
+    // MARK: Leases (036)
+
+    /// Where the lease book is kept between runs.
+    lazy var leaseStore = LeaseStore(locations: locations)
+    /// Every lease on the Mac and everyone waiting. Read from disk on first use, and
+    /// written back after every change, so a restart finds it as it was (FR-008).
+    var leaseBook = LeaseBook()
+    var leaseBookIsLoaded = false
+    /// Lease calls waiting their turn, by the id the book knows the waiter's call by.
+    /// Answered when the lease comes, the wait runs out, or the agent is stopped.
+    var openWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
+    var openWaitStarted: [UUID: Date] = [:]
+    /// The one timer, aimed at the book's next deadline. Re-aimed after every change.
+    var leaseTimer: Task<Void, Never>?
+    /// Tells the windows once a minute while anything is held, so "minutes left"
+    /// keeps counting down on screen.
+    var leaseMinuteTicker: Task<Void, Never>?
+    /// How long a lease call may stay open. A test shortens it.
+    var leaseWaitLimit: Duration = LeaseLimits.waitLimit
+    /// What the Mac has that can be leased. A test gives it a fixed list.
+    var resourceCatalog: any ResourceFinding = ResourceCatalog()
+    /// What the catalog last said, so a snapshot can be drawn without waiting on it.
+    /// Nil until it has answered once: before that, nothing held can be called gone.
+    var foundResources: [FoundResource]?
     /// The local day the last tick saw, so the heartbeat can notice a rollover
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
@@ -237,6 +262,28 @@ public actor DaemonCore {
     /// The runs in flight, by `Workflow.id`. This is what a second fire collides with,
     /// and what a fired agent's own events read to work out how deep they are.
     var workflowRuns: [String: WorkflowRun] = [:]
+    // MARK: Pull requests (038)
+
+    /// What the daemon remembers about the person's pull requests.
+    lazy var pullRequestStore = PullRequestStore(locations: locations)
+    /// Each GitHub project's section, by folder. Started from the last good lists on
+    /// disk, so a restarted daemon shows something before its first refresh (R12).
+    lazy var pullRequestLists: [URL: PullRequestList] = Dictionary(
+        pullRequestStore.load().lists.map { ($0.folder, $0) }, uniquingKeysWith: { _, last in last })
+    /// Projects whose refresh is running now, so a tick and a button never run two.
+    var pullRequestRefreshes: Set<URL> = []
+    /// The sweep the ticker started, while it runs. One at a time, projects one after
+    /// another, so a slow GitHub never holds up the clock.
+    var pullRequestSweep: Task<Void, Never>?
+    /// The person's `gh`. A test gives it a fake.
+    var gitHubCLI = GitHubCLI()
+    /// Projects due a look sooner than their five minutes, because a pull request's run
+    /// just ended there (FR-014), and from when.
+    var pullRequestsDueAt: [URL: Date] = [:]
+    /// Whether the ticker refreshes pull requests by itself. Off until the daemon turns
+    /// it on, so the many tests that drive the ticker by hand never run git or `gh` on
+    /// the side; one that wants the sweep turns it on.
+    var watchesPullRequests = false
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?

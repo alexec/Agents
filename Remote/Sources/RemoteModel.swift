@@ -792,6 +792,7 @@ final class RemoteModel {
         await refreshAttention()
         await refreshResuming()
         await refreshCostState()
+        await refreshLeases()
         await refreshWorkflows()
         await refreshRuntimes()
         await refreshModes()
@@ -956,6 +957,15 @@ final class RemoteModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
+    }
+
+    /// What each agent holds and waits for (036). The phone only reads it: the
+    /// Resources page and ending a lease are the Mac's (FR-011).
+    private func refreshLeases() async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+                                                    Optional<String>.none,
+                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        work.replaceLeases(snapshot)
     }
 
     private func refreshProjects() async {

@@ -5,14 +5,14 @@ import Foundation
 /// Closed, with one open case. `unrecognised` is what lets the format grow: a file
 /// written against a later version, or by hand against next year's documentation, is
 /// listed and inert rather than rejected. The triggers this version defers — file and
-/// glob changes, git events, GitHub pull requests and CI — arrive as new cases here and
-/// change nothing about a file already on disk.
+/// glob changes, git events, CI — arrive as new cases here and change nothing about a
+/// file already on disk. GitHub pull requests arrived that way (038).
 ///
 /// Running a workflow by hand is deliberately not in here. Run now is offered on every
 /// workflow whatever its triggers, including one whose triggers this version cannot
 /// act on, so modelling it as a trigger would make it conditional on the very thing it
 /// exists to work around.
-public enum WorkflowTrigger: Codable, Hashable, Sendable {
+public enum WorkflowTrigger: Hashable, Sendable {
     /// On a clock.
     case schedule(WorkflowSchedule)
     /// An agent in this project ended a turn having completed its work.
@@ -26,6 +26,13 @@ public enum WorkflowTrigger: Codable, Hashable, Sendable {
     case agentStopped
     /// Another workflow's run completed. `nil` means any workflow in this project.
     case workflowCompleted(id: String?)
+    /// A check that was not failing on one of my pull requests now is (038).
+    case pullRequestChecksFailed
+    /// One of my pull requests has review comments, from somebody with write access,
+    /// newer than the last fire for it.
+    case pullRequestReviewComments
+    /// One of my pull requests can no longer merge cleanly into its base.
+    case pullRequestConflicts
     /// Understood to be a trigger, and not one this version knows. Kept whole so that
     /// writing the file back does not quietly delete it.
     case unrecognised(name: String, keys: [String: JSONValue])
@@ -39,6 +46,9 @@ public enum WorkflowTrigger: Codable, Hashable, Sendable {
         case .agentAskedForm: return "agent-asked-form"
         case .agentStopped: return "agent-stopped"
         case .workflowCompleted: return "workflow-completed"
+        case .pullRequestChecksFailed: return "pull-request-checks-failed"
+        case .pullRequestReviewComments: return "pull-request-review-comments"
+        case .pullRequestConflicts: return "pull-request-conflicts"
         case .unrecognised(let name, _): return name
         }
     }
@@ -47,6 +57,18 @@ public enum WorkflowTrigger: Codable, Hashable, Sendable {
     public var isSupported: Bool {
         if case .unrecognised = self { return false }
         return true
+    }
+
+    /// The three that watch the viewer's own pull requests (038).
+    public static let pullRequestTriggers: [WorkflowTrigger] =
+        [.pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts]
+
+    /// Whether it watches pull requests, and so fires once for each one.
+    public var isPullRequest: Bool {
+        switch self {
+        case .pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts: return true
+        default: return false
+        }
     }
 
     /// The schedule this carries, if it is one.
@@ -65,6 +87,9 @@ public enum WorkflowTrigger: Codable, Hashable, Sendable {
         case .agentStopped: return "When an agent stops without finishing"
         case .workflowCompleted(let id):
             return id.map { "When \($0) finishes" } ?? "When any workflow finishes"
+        case .pullRequestChecksFailed: return "When checks fail on one of my pull requests"
+        case .pullRequestReviewComments: return "When one of my pull requests gets review comments"
+        case .pullRequestConflicts: return "When one of my pull requests conflicts with its base"
         case .unrecognised(let name, _):
             return "Waits for \"\(name)\", which this version does not know about yet"
         }
@@ -79,6 +104,53 @@ public enum WorkflowTrigger: Codable, Hashable, Sendable {
         default:
             return false
         }
+    }
+}
+
+/// Written by hand so that the pull-request triggers go over the wire in the shape
+/// `.unrecognised` has (038 R11). An older Mac or phone then reads a babysitting
+/// workflow as a trigger it does not know yet, and lists it as inert, rather than
+/// failing to read the whole project's workflows. Every other case keeps exactly the
+/// shape the compiler gave it, through `Stored`.
+extension WorkflowTrigger: Codable {
+    private enum Stored: Codable {
+        case schedule(WorkflowSchedule)
+        case agentFinished
+        case agentAskedPermission
+        case agentAskedForm
+        case agentStopped
+        case workflowCompleted(id: String?)
+        case unrecognised(name: String, keys: [String: JSONValue])
+    }
+
+    public init(from decoder: any Decoder) throws {
+        switch try Stored(from: decoder) {
+        case .schedule(let schedule): self = .schedule(schedule)
+        case .agentFinished: self = .agentFinished
+        case .agentAskedPermission: self = .agentAskedPermission
+        case .agentAskedForm: self = .agentAskedForm
+        case .agentStopped: self = .agentStopped
+        case .workflowCompleted(let id): self = .workflowCompleted(id: id)
+        case .unrecognised(let name, let keys):
+            self = Self.pullRequestTriggers.first { $0.name == name && keys.isEmpty }
+                ?? .unrecognised(name: name, keys: keys)
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        let stored: Stored
+        switch self {
+        case .schedule(let schedule): stored = .schedule(schedule)
+        case .agentFinished: stored = .agentFinished
+        case .agentAskedPermission: stored = .agentAskedPermission
+        case .agentAskedForm: stored = .agentAskedForm
+        case .agentStopped: stored = .agentStopped
+        case .workflowCompleted(let id): stored = .workflowCompleted(id: id)
+        case .pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts:
+            stored = .unrecognised(name: name, keys: [:])
+        case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)
+        }
+        try stored.encode(to: encoder)
     }
 }
 

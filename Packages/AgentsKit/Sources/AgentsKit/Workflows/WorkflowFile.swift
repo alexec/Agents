@@ -174,6 +174,14 @@ public enum WorkflowFile {
         case "agent-asked-form": return .agentAskedForm
         case "agent-stopped": return .agentStopped
         case "workflow-completed": return .workflowCompleted(id: keys["id"]?.scalar)
+        case "pull-request-checks-failed", "pull-request-review-comments", "pull-request-conflicts":
+            // They take no settings (038). One given something to say is a file that
+            // expects a behaviour this version does not have, and saying so beats
+            // quietly ignoring half of what was asked for.
+            guard keys.isEmpty else {
+                throw YAMLNode.Failure("\"\(name)\" takes no settings")
+            }
+            return WorkflowTrigger.pullRequestTriggers.first { $0.name == name }!
         default:
             // Kept whole, with whatever it came with. This is the case that lets the
             // format grow without anything already on disk changing shape.

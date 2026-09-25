@@ -180,7 +180,9 @@ struct PromptBar: View {
             if let agent {
                 // The phone's row too (033).
                 PromptHeader(agent: agent,
-                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
+                             leaseStatus: model.work.leaseStatus(of: agent.id),
+                             openLease: { model.showResources(at: $0) }) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
@@ -831,7 +833,19 @@ struct PromptBar: View {
                     .disabled(!worktree.exists)
                 }
             }
+            if !listed.branches.isEmpty {
+                Divider().padding(.vertical, 4)
+                BranchChoices(branches: listed.branches, chosen: chosenBranch) { name in
+                    model.chooseWorktree(.branch(name))
+                    dismiss()
+                }
+            }
         }
+    }
+
+    private var chosenBranch: String? {
+        if case .branch(let name) = model.draftWorktree { return name }
+        return nil
     }
 
     /// Its branch and who is in it, so a worktree someone is already working in is
@@ -851,6 +865,7 @@ struct PromptBar: View {
         case nil: "Project folder"
         case .new: "New worktree"
         case .existing(let root): root.lastPathComponent
+        case .branch(let name): name
         }
     }
 
@@ -868,6 +883,58 @@ struct PromptBar: View {
         if panel.runModal() == .OK {
             model.draftCwd = panel.url
             Task { await model.loadDraftOptions() }
+        }
+    }
+}
+
+/// Branches a new worktree can be made on, in the Worktree chooser. A repository can
+/// have hundreds, so they scroll, and past a handful there is a field to find one.
+private struct BranchChoices: View {
+    let branches: [DaemonAPI.BranchSummary]
+    let chosen: String?
+    let choose: (String) -> Void
+
+    @State private var filter = ""
+
+    private var shown: [DaemonAPI.BranchSummary] {
+        let words = filter.trimmingCharacters(in: .whitespaces)
+        guard !words.isEmpty else { return branches }
+        return branches.filter { $0.name.localizedCaseInsensitiveContains(words) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("New worktree on a branch")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+            if branches.count > 6 {
+                TextField("Find a branch", text: $filter)
+                    .textFieldStyle(.roundedBorder)
+                    .appText(.fine)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+            }
+            // A popover sizes to what is in it, and a scroll view has no size of its
+            // own, so a short list is laid out as it is and a long one given a height.
+            if branches.count > 6 {
+                ScrollView { rows }.frame(height: 220)
+            } else {
+                rows
+            }
+        }
+    }
+
+    private var rows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(shown) { branch in
+                SelectChoice(title: branch.name,
+                             description: branch.remote.map { "From \($0)" },
+                             isChosen: chosen == branch.name) {
+                    choose(branch.name)
+                }
+            }
         }
     }
 }
