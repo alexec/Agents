@@ -1,0 +1,11 @@
+{
+  "name": "till",
+  "version": "1.4.0",
+  "private": true,
+  "float": 150.0,
+  "mask": 255,
+  "currencies": ["GBP", "EUR"],
+  "open": null,
+  "hours": { "monday": [9, 17], "sunday": null },
+  "escaped": "a \"quoted\" word and a tab\t"
+}

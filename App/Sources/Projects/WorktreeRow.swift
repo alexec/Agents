@@ -7,8 +7,8 @@ import SwiftUI
 /// All of them are listed, because an agent working in one made in a terminal, or by a
 /// runtime, is still working on this project. Only the app's own can be removed: the
 /// others are somebody else's. Hidden when there are none, because an empty heading is
-/// a question nobody asked. Archiving an agent never removes its worktree — the work in
-/// it may not be merged — so this is where they go when you are finished with them.
+/// a question nobody asked. One goes with its last agent's archive only when everything
+/// in it is committed, so this is where the rest go when you are finished with them.
 struct WorktreesSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
@@ -50,7 +50,7 @@ struct WorktreeRow: View {
                     .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
                     .strikethrough(!worktree.exists)
-                Text(detail)
+                detail
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -58,10 +58,12 @@ struct WorktreeRow: View {
             .help(worktree.root.path(percentEncoded: false))
             Spacer(minLength: 8)
             if worktree.madeByApp {
+                // Not while anyone works in it: archive them first.
                 Button("Remove…") { Task { await remove() } }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                    .disabled(isChecking)
+                    .disabled(isChecking || !worktree.agents.isEmpty)
+                    .help(worktree.agents.isEmpty ? "" : "Archive the agents working here to remove it.")
             }
         }
         .padding(.horizontal, 16)
@@ -81,13 +83,20 @@ struct WorktreeRow: View {
         }
     }
 
-    private var detail: String {
+    /// Branch, git status, who is in it. One concatenated `Text`, so the row stays a
+    /// single element to accessibility; work that would be lost is orange.
+    private var detail: Text {
         let branch = worktree.branch ?? "detached"
-        guard worktree.exists else { return "\(branch) · its folder is gone" }
+        guard worktree.exists else { return Text("\(branch) · its folder is gone") }
+        var text = Text(branch)
+        if let status = worktree.status {
+            let summary = Text(status.summary)
+            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundColor(.orange) : summary)
+        }
         switch worktree.agents.count {
-        case 0: return branch
-        case 1: return "\(branch) · 1 agent working"
-        case let count: return "\(branch) · \(count) agents working"
+        case 0: return text
+        case 1: return text + Text(" · 1 agent working")
+        case let count: return text + Text(" · \(count) agents working")
         }
     }
 

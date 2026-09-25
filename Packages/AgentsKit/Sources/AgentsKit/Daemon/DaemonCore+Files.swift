@@ -170,6 +170,8 @@ extension DaemonCore {
         }
         let scope = agent.folderScope
         let url = URL(filePath: path).standardizedFileURL.resolvingSymlinksInPath()
+        // The runtime's own plan, shown to be read, and nothing else beside it.
+        if isShownPlan(url, for: agentID) { return (url, url.deletingLastPathComponent()) }
         guard scope.allows(url.path) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: scope.refusal(for: path))
         }

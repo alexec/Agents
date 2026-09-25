@@ -1,4 +1,5 @@
 import AgentsKitCore
+import CodeText
 import SwiftUI
 
 /// Markdown, drawn, the same on the Mac and the phone (034).
@@ -105,7 +106,9 @@ struct MarkdownText: View {
                 }
                 // Code keeps its own shape, so it scrolls rather than wraps.
                 ScrollView(.horizontal, showsIndicators: false) {
-                    self.text(AttributedString(text), caret: caret)
+                    // Coloured by its tag, in the same inks as files and diffs (041 US4).
+                    CodeBlockText(text: text, language: CodeLanguage.fence(tag: language),
+                                  caret: caret)
                         .appText(.code)
                         .textSelection(.enabled)
                         .padding(10)

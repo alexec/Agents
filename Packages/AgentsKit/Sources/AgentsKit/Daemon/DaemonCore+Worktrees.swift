@@ -162,7 +162,7 @@ extension DaemonCore {
         let entries = (try? await GitWorktrees.list(in: project)) ?? []
         let here = Project.standardize(repository.toplevel)
         let working = agents.values.filter { $0.state != .archived }
-        let summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
+        var summaries = entries.filter { !$0.isBare }.map { entry -> DaemonAPI.WorktreeSummary in
             let root = Self.canonical(entry.path)
             let inside = root.path + "/"
             let agentsHere = working.filter {
@@ -183,6 +183,8 @@ extension DaemonCore {
                 madeByApp: Self.isMadeByApp(root, branch: entry.branch, in: repository),
                 agents: own.sorted { $0.createdAt < $1.createdAt }.map(\.id))
         }
+        let statuses = await Self.statuses(of: summaries, base: await GitWorktrees.base(in: project))
+        for index in summaries.indices { summaries[index].status = statuses[summaries[index].root] }
         // A branch checked out anywhere cannot be checked out again; its worktree is
         // already on the list.
         let checkedOut = Set(entries.compactMap(\.branch))
@@ -193,6 +195,30 @@ extension DaemonCore {
             isRepository: true, canMakeNew: hasCommit,
             whyNot: hasCommit ? nil : "There is no commit here yet to base a worktree on.",
             worktrees: summaries, branches: branches)
+    }
+
+    /// Each worktree's git status, worked out side by side: a project with a dozen
+    /// worktrees shouldn't wait on three dozen git calls one after another.
+    static func statuses(of worktrees: [DaemonAPI.WorktreeSummary],
+                         base: String?) async -> [URL: DaemonAPI.WorktreeStatus] {
+        await withTaskGroup(of: (URL, DaemonAPI.WorktreeStatus?).self) { group in
+            for worktree in worktrees where worktree.exists {
+                group.addTask {
+                    let root = worktree.root
+                    guard let uncommitted = try? await GitWorktrees.statusCount(in: root) else { return (root, nil) }
+                    let tracking = await GitWorktrees.aheadBehind(in: root)
+                    var unmerged: Int?
+                    if !worktree.isProjectFolder, let branch = worktree.branch, let base, base != branch {
+                        unmerged = await GitWorktrees.commitCount(from: base, to: branch, in: root)
+                    }
+                    return (root, DaemonAPI.WorktreeStatus(uncommitted: uncommitted, ahead: tracking?.ahead,
+                                                           behind: tracking?.behind, unmerged: unmerged))
+                }
+            }
+            var result: [URL: DaemonAPI.WorktreeStatus] = [:]
+            for await (root, status) in group { result[root] = status }
+            return result
+        }
     }
 
     // MARK: Cleaning up (US3)
@@ -237,6 +263,36 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
                                message: "Could not remove \(facts.root.lastPathComponent): \(failure.message)")
         }
+    }
+
+    /// Take away the worktree an agent was just archived out of, when that loses nothing:
+    /// the app made it, no other agent that is not archived works in it, and everything
+    /// in it is committed. Its branch goes too only when it is merged; otherwise the
+    /// branch stays and holds the commits. Anything short of that leaves it all as it
+    /// is, for the person to remove from the project page.
+    func removeWorktreeIfDone(archiving agentID: UUID) async {
+        guard let worktree = agents[agentID]?.worktree, worktree.madeByApp else { return }
+        let request = DaemonAPI.WorktreeRemovalRequest(project: worktree.project, root: worktree.root,
+                                                       confirmed: false)
+        guard let facts = try? await removalFacts(request), facts.madeByApp, facts.exists,
+              facts.check.blockedBy.isEmpty, facts.check.uncommitted == 0 else { return }
+        do {
+            try await GitWorktrees.remove(facts.root, force: false, in: facts.project)
+            var branchNote = ""
+            if let branch = facts.branch {
+                if Self.isAppBranch(branch), !facts.check.unmerged {
+                    try await GitWorktrees.deleteBranch(branch, force: false, in: facts.project)
+                    branchNote = " and its branch, which was merged"
+                } else {
+                    branchNote = ". Its branch \(branch) is kept"
+                }
+            }
+            await record(.runtimeNote("Removed the worktree \(worktree.name)\(branchNote), since everything in it was committed."),
+                         for: agentID)
+            projectChanged(forAgentIn: facts.project)
+        } catch let failure as GitWorktrees.Failure {
+            DaemonLog.shared.write("left the worktree \(facts.root.path) after archiving \(agentID): \(failure.message)")
+        } catch {}
     }
 
     /// "3 uncommitted changes and commits not in main", as a removal confirmation says it.

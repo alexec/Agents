@@ -142,15 +142,17 @@ struct ChoiceRows: View {
         if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
     }
 
-    /// Its branch and who is in it, as the Mac says it.
+    /// Its branch, its git status and who is in it, as the Mac says it.
     static func worktreeDetail(_ worktree: DaemonAPI.WorktreeSummary) -> String {
         guard worktree.exists else { return "Missing" }
-        let branch = worktree.branch ?? "detached"
+        var parts = [worktree.branch ?? "detached"]
+        if let status = worktree.status { parts.append(status.summary) }
         switch worktree.agents.count {
-        case 0: return branch
-        case 1: return "\(branch) · 1 agent working"
-        case let count: return "\(branch) · \(count) agents working"
+        case 0: break
+        case 1: parts.append("1 agent working")
+        case let count: parts.append("\(count) agents working")
         }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder

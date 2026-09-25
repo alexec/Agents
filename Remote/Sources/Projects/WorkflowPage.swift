@@ -24,6 +24,9 @@ struct WorkflowPage: View {
     /// daemon's memory. Nil until asked; empty when it has nothing.
     @State private var remembered: [ConfigOption]?
     @State private var shownRuns = Self.runsAtFirst
+    /// Whether the Mac has runs past the ones shown. Archived runs are not in the
+    /// phone's list until this page asks for them, so it cannot count them itself.
+    @State private var moreRuns = false
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -54,6 +57,20 @@ struct WorkflowPage: View {
             }
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
+        // Its runs, archived ones too, a page at a time; again when one starts.
+        .task(id: RunsAsk(workflowID: workflowID, shown: shownRuns, held: summary.map(started)?.count ?? 0)) {
+            guard let summary else { return }
+            moreRuns = await model.loadRuns(of: summary.workflowID, in: summary.workflow.folder,
+                                            limit: shownRuns)
+        }
+    }
+
+    /// The agents it started that the phone holds, newest first.
+    private func started(_ summary: WorkflowSummary) -> [Agent] {
+        let folder = Project.standardize(summary.workflow.folder)
+        return model.work.agents
+            .filter { $0.projectFolder == folder && $0.startedByWorkflow == summary.workflowID }
+            .sorted { $0.createdAt > $1.createdAt }
     }
 
     private func content(_ summary: WorkflowSummary) -> some View {
@@ -381,8 +398,8 @@ struct WorkflowPage: View {
             ForEach(started.prefix(shownRuns)) { agent in
                 AgentCard(agent: agent)
             }
-            if started.count > shownRuns {
-                Button("Show more (\(started.count - shownRuns) more)") {
+            if started.count > shownRuns || moreRuns {
+                Button("Show more") {
                     shownRuns += Self.runsPerMore
                 }
                 .appText(.reading)
@@ -433,4 +450,11 @@ struct WorkflowPage: View {
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
+}
+
+/// When a workflow page fetches its runs: opened, paged, or a run arrived.
+private struct RunsAsk: Equatable {
+    var workflowID: Workflow.ID
+    var shown: Int
+    var held: Int
 }
