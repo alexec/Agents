@@ -13,6 +13,9 @@ struct TerminalHostView: NSViewRepresentable {
     /// Told the size whenever the view is laid out, so the pty can be resized and a
     /// full-screen program reflows (FR-021).
     let onSize: (Int, Int) -> Void
+    /// Read so that a change of appearance calls `updateNSView`, where the paper
+    /// colours are resolved again: SwiftTerm takes a colour's value when it is set.
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeCoordinator() -> Coordinator {
         Coordinator(client: client, onSize: onSize)
@@ -22,6 +25,7 @@ struct TerminalHostView: NSViewRepresentable {
         let view = TerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
         view.terminalDelegate = context.coordinator
         view.configureNativeColors()
+        Self.paint(view)
         context.coordinator.view = view
 
         // Everything the daemon sends is fed here. The emulator is this side of the
@@ -35,6 +39,18 @@ struct TerminalHostView: NSViewRepresentable {
 
     func updateNSView(_ view: TerminalView, context: Context) {
         context.coordinator.client = client
+        Self.paint(view)
+    }
+
+    /// On paper, like the page around it. Only the ground, the ink, the caret and the
+    /// selection: the sixteen ANSI colours are the program's to choose.
+    private static func paint(_ view: TerminalView) {
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.nativeBackgroundColor = NSColor.paperGround.usingColorSpace(.sRGB) ?? .paperGround
+            view.nativeForegroundColor = NSColor.paperInk.usingColorSpace(.sRGB) ?? .paperInk
+            view.caretColor = NSColor.paperInk.usingColorSpace(.sRGB) ?? .paperInk
+            view.selectedTextBackgroundColor = NSColor.paperSelection.usingColorSpace(.sRGB) ?? .paperSelection
+        }
     }
 
     @MainActor

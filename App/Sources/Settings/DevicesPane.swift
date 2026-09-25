@@ -27,8 +27,9 @@ struct DevicesPane: View {
                 Text("A device is told when an agent needs you and your Mac is not in use. "
                      + "What it is told is sealed to that device alone.")
             }
+            .paperListRow()
         }
-        .formStyle(.grouped)
+        .paperForm()
         .task { await model.refreshDevices() }
     }
 }

@@ -163,9 +163,10 @@ struct SuggestedPromptTests {
             SuggestedPrompt(label: "Commit it", prompt: "Commit this with a message saying why"),
         ]))
 
-        #expect(await core.agent(id)?.suggestedPrompts.map(\.label) == ["Run the tests", "Commit it"])
-        // The agent is told what became of them, because it asked.
-        #expect(note.contains("2"))
+        // The first, and only the first (031).
+        #expect(await core.agent(id)?.suggestedPrompts.map(\.label) == ["Run the tests"])
+        // The agent is told what became of it, because it asked.
+        #expect(note == DaemonCore.shownNote)
     }
 
     @Test func aTokenTheDaemonDoesNotKnowIsRefused() async throws {
@@ -204,7 +205,7 @@ struct SuggestedPromptTests {
         }
     }
 
-    @Test func fourIsTheMostThatAreKept() async throws {
+    @Test func oneIsTheMostThatIsKept() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
@@ -215,7 +216,7 @@ struct SuggestedPromptTests {
             SuggestedPrompt(label: "\($0)", prompt: "Do \($0)")
         }))
 
-        #expect(await core.agent(id)?.suggestedPrompts.count == SuggestedPrompt.limit)
+        #expect(await core.agent(id)?.suggestedPrompts.map(\.label) == ["1"])
     }
 
     // MARK: Asking for them

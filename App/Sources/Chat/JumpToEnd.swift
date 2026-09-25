@@ -23,11 +23,12 @@ struct JumpToEnd: View {
             }
             .padding(.horizontal, hasNewBelow ? 12 : 9)
             .padding(.vertical, 7)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .appText(.fine)
         .fixedSize()
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .paperRaised(in: .capsule)
         .help(hasNewBelow ? "Go to the end, where something new is" : "Go to the end")
         .accessibilityLabel(hasNewBelow
                             ? "Go to the end of the conversation, where something new is"

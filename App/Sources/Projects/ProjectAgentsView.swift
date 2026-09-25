@@ -20,7 +20,7 @@ struct ProjectAgentsView: View {
     /// this window already holds every one of them.
     @State private var archivedShown = Self.pageSize
     static let pageSize = 10
-    static let cardSpacing: CGFloat = 10
+    static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -129,14 +129,15 @@ struct ProjectAgentsView: View {
                     }
                 }
 
-                // Under the agents, above the archive: what will happen, after what is
-                // happening. See `WorkflowsSection` for why that order.
+                // The archive closes the chats, before the workflows start.
+                archivedSection
+
+                // Under the agents: what will happen, after what is happening. See
+                // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
 
                 // Worktrees the app made here, which outlive the agents in them (030).
                 WorktreesSection(folder: folder)
-
-                archivedSection
 
                 if isEmpty {
                     Text("Nothing here yet. Say what you want done and an agent starts on it.")
@@ -164,17 +165,32 @@ struct ProjectAgentsView: View {
     }
 
     /// Out of the way until it is wanted, because looking at what you archived is a
-    /// rare thing to want.
+    /// rare thing to want. Behind the same chevron heading as archived workflows.
     @ViewBuilder
     private var archivedSection: some View {
-        if showsArchived {
-            GroupHeading(title: "Archived", count: archived.count)
-            if archived.isEmpty {
-                Text("Nothing archived in this project yet.")
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 4)
-            } else {
+        if folder != nil, !archived.isEmpty {
+            Button {
+                withAnimation(.snappy(duration: 0.18)) { showsArchived.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showsArchived ? "chevron.down" : "chevron.right")
+                        .appText(.fine)
+                    Text("Archived")
+                    Text("\(archived.count)")
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .appText(.fine).fontWeight(.medium)
+            .foregroundStyle(.secondary)
+            .padding(.top, 14)
+            .padding(.leading, 2)
+            .accessibilityAddTraits(.isHeader)
+
+            if showsArchived {
                 ForEach(archived.prefix(archivedShown)) { agent in
                     AgentCard(id: agent.id, selection: $selection) {
                         AgentRow(agent: agent)
@@ -182,28 +198,17 @@ struct ProjectAgentsView: View {
                 }
                 if archived.count > archivedShown {
                     Button("Show more") { archivedShown += Self.pageSize }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                 }
             }
-            // A link, not a button: putting the archive away again is an aside, and
-            // the buttons on this page are for the work.
-            Button("Hide archived") { showsArchived = false }
-                .buttonStyle(.link)
-                .appText(.reading)
-                .padding(.top, 6)
-        } else if folder != nil, !archived.isEmpty {
-            Button("Show archived (\(archived.count))") { showsArchived = true }
-                .buttonStyle(.link)
-                .appText(.reading)
-                .padding(.top, 10)
         }
     }
 }
 
 /// One agent, as a card you can go into.
 ///
-/// It is a real control — the whole card opens that conversation — which is what
-/// earns it interactive glass rather than a decorated background.
+/// It is a real control — the whole card opens that conversation — which is why it
+/// is a paper row that answers the pointer rather than a line of text.
 private struct AgentCard<Content: View>: View {
     let id: UUID
     @Binding var selection: UUID?
@@ -218,7 +223,7 @@ private struct AgentCard<Content: View>: View {
                 .padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(RoundedRectangle(cornerRadius: 14))
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+                .paperRow()
         }
         .buttonStyle(.plain)
     }

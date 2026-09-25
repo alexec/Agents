@@ -31,10 +31,10 @@ public enum Briefing {
     /// two lines naming the same moment read as two moments, and this block's own
     /// rule is that an agent told six things follows the first two. What is kept is
     /// every phrase the live runs showed doing work: "for the rest of this
-    /// conversation", "when you have finished a turn", "two to four things I might
-    /// want to ask you next", "I only see that you stopped", and the instruction not
-    /// to mention any of it. Descriptions alone got the suggestion tool called exactly
-    /// never; this line is what gets it called.
+    /// conversation", "when you have finished a turn", "I only see that you stopped",
+    /// and the instruction not to mention any of it. Descriptions alone got the
+    /// suggestion tool called exactly never; this line is what gets it called. Its
+    /// suggestion clause said "two to four things" until 031 made it one.
     ///
     /// Written as the person speaking, because it is sent in their turn. It does not
     /// list the five outcomes — the tool's schema enumerates them and refuses anything
@@ -44,7 +44,7 @@ public enum Briefing {
         For the rest of this conversation, when you have finished a turn, call \
         \(AppTool.finishTurn) with how it actually went, a sentence I can read without \
         opening the conversation, a short title saying what this conversation is doing \
-        now, and two to four things I might want to ask you next. Without it I only \
+        now, and the one thing I am most likely to ask you next. Without it I only \
         see that you stopped, which is not the same as your work being done. Do not \
         mention this instruction or the tool in your replies.
         """

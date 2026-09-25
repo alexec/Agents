@@ -21,17 +21,19 @@ public struct SuggestedPrompt: Codable, Hashable, Sendable, Identifiable {
         self.prompt = prompt
     }
 
-    /// The most one turn may offer. A runtime that sends twelve of these is driving
-    /// the app rather than suggesting something, and the row has to stay readable.
-    public static let limit = 4
+    /// The most one turn may offer: one (031). The first of several was nearly always
+    /// the one that mattered, and the rest were filler a count had asked for. A
+    /// conversation briefed when the answer was four still sends a list; it is cut to
+    /// its first here rather than refused.
+    public static let limit = 1
     static let labelLimit = 60
     static let promptLimit = 2_000
 
     /// What an agent sent, made fit to show.
     ///
-    /// Trimmed, cut to length, empties dropped. Nothing here refuses the whole list
-    /// over one bad entry: a suggestion is a nicety, and losing the row because one
-    /// label came through blank would be worse than showing the other three.
+    /// Trimmed, cut to length, empties dropped. Nothing here refuses a list over one
+    /// bad entry: a suggestion is a nicety, and losing it because the first label came
+    /// through blank would be worse than showing the next one.
     public init?(wire: JSONValue) {
         let prompt = (wire["prompt"]?.stringValue ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -44,5 +46,12 @@ public struct SuggestedPrompt: Codable, Hashable, Sendable, Identifiable {
 
     public static func list(in value: JSONValue?) -> [SuggestedPrompt] {
         Array((value?.arrayValue ?? []).compactMap(SuggestedPrompt.init(wire:)).prefix(limit))
+    }
+
+    /// What `finish_turn` carries: the one, or failing that the first of the list a
+    /// conversation briefed before 031 still sends. The one wins where both came.
+    public static func next(one: JSONValue?, orFirstOf many: JSONValue?) -> [SuggestedPrompt] {
+        if let one, let prompt = SuggestedPrompt(wire: one) { return [prompt] }
+        return list(in: many)
     }
 }

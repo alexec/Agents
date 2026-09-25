@@ -3,11 +3,21 @@ import SwiftUI
 
 /// One agent, as a card you can go into.
 ///
-/// The whole card is the control, which is what earns it interactive glass rather than
-/// a decorated background — and what makes it a target a thumb can hit without aiming.
+/// The whole card is the control, which is why it is a paper row rather than a
+/// line of text — and what makes it a target a thumb can hit without aiming.
 struct AgentCard: View {
     @Environment(RemoteModel.self) private var model
-    let agent: Agent
+    /// The agent as the list had it when it drew this card. Only its id is trusted.
+    private let given: Agent
+
+    init(agent: Agent) {
+        given = agent
+    }
+
+    /// The agent as the phone has it now, read from the model rather than kept. A card
+    /// that drew the copy it was handed kept its first render when it moved between
+    /// groups in the lazy stack — the Mac's row did exactly that; see `AgentRow`.
+    private var agent: Agent { model.work.agent(given.id) ?? given }
 
     var body: some View {
         NavigationLink(value: agent.id) {
@@ -60,7 +70,7 @@ struct AgentCard: View {
             .padding(.vertical, 13)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 14))
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+            .paperRow()
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)

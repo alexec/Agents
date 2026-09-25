@@ -26,7 +26,7 @@ struct CommandList: View {
             .frame(maxHeight: 220)
             .onChange(of: selected) { scroller.scrollTo(selected, anchor: .center) }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func row(_ command: SlashCommand, isSelected: Bool) -> some View {
@@ -50,7 +50,7 @@ struct CommandList: View {
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+        .background(isSelected ? AnyShapeStyle(Paper.wash) : AnyShapeStyle(.clear),
                     in: RoundedRectangle(cornerRadius: 7))
     }
 }

@@ -230,7 +230,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // Newer than the field above, and on the record rather than held in memory so
         // the chips are still there when the app is opened again on a turn that ended
         // last night.
-        suggestedPrompts = try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? []
+        // Cut to one since 031: a record written when a turn could offer four opens
+        // offering its first.
+        suggestedPrompts = Array((try c.decodeIfPresent([SuggestedPrompt].self, forKey: .suggestedPrompts) ?? [])
+            .prefix(SuggestedPrompt.limit))
         // New in 008, and optional, so every record written before workflows existed
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)

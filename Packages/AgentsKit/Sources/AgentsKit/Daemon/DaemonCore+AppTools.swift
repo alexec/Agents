@@ -85,7 +85,7 @@ extension DaemonCore {
         }
         agent.suggestedPrompts = prompts
         changed(agent)
-        return Self.shownNote(count: prompts.count)
+        return Self.shownNote
     }
 
     /// An agent has said how the work actually went.
@@ -127,7 +127,7 @@ extension DaemonCore {
         let title = request.title.flatMap(Agent.cleanedTitle)
         let noted = await land(checked.report, prompts: prompts, title: title,
                                on: checked.agent, id: checked.agentID)
-        return prompts.isEmpty ? noted : noted + " " + Self.shownNote(count: prompts.count)
+        return prompts.isEmpty ? noted : noted + " " + Self.shownNote
     }
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the
@@ -204,12 +204,9 @@ extension DaemonCore {
             : "Noted. This conversation now reads as \"\(report.outcome.heading)\" wherever the person looks."
     }
 
-    /// What an agent is told about its chips, by either door.
-    static func shownNote(count: Int) -> String {
-        count == 1
-            ? "Shown above the prompt. The person may tap it, edit it, or ignore it."
-            : "\(count) shown above the prompt. The person may tap one, edit it, or ignore them."
-    }
+    /// What an agent is told about its suggestion, by either door. There is only
+    /// ever one to tell it about (031), whatever it sent.
+    static let shownNote = "Shown in the person's empty prompt. They may take it, edit it, or ignore it."
 
     /// An agent has asked that a file be put in front of the user.
     ///

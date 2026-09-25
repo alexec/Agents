@@ -102,7 +102,7 @@ private struct Empty: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.background)
+        .background(Paper.ground)
     }
 }
 
@@ -126,7 +126,7 @@ private struct Failed: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.background)
+        .background(Paper.ground)
     }
 }
 
