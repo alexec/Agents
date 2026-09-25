@@ -18,3 +18,19 @@ Six full `swift test --package-path Packages/AgentsKit` runs, 2026-09-25: 1830 t
 | `aChainShortOfTheCeilingCarriesOnFromTheRestoredDepth` | 1 |
 
 `noCallSiteNamesAStateColourItself` fails 6/6: a source-scan test on main, not timing. The rest are main's known lease/blocked/helper/worktree timing flakes. 043 is judged against this list.
+
+## Branch runs (T057), 2026-09-25
+
+Six full runs at `4f265c6` (1886 tests): every run fails, on main's own tests as in the baseline
+(`noCallSiteNamesAStateColourItself` 6/6, the worktree and ending-overtaken races), **plus two
+that passed 6/6 in the baseline**:
+
+| Test | Branch | Baseline | Alone on the branch |
+|---|---|---|---|
+| `aListCanLeaveThemOffArchivedAgentsOnly` (main's 949630f) | 4/6 | 0/6 | 5/5 pass |
+| `aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack` (036) | 4/6 | 0/6 | 5/5 pass |
+
+Three more full runs skipping 043's two fake-ssh suites still failed them (2/3 and 1/3), so it
+is not those suites' load alone. Neither test reaches 043's code paths: they drive the core
+directly on a Mac daemon, where `launchEnvironment` returns at once. **Open:** a same-time run of
+the baseline commit, to tell today's machine load from a change; a first attempt was cut off.
