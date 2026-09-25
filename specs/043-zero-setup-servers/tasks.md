@@ -58,8 +58,8 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 ## Phase 3: Look gate (settle the UX before depth)
 
-- [ ] T017 Build the five screens of contracts/ui.md as views over stub state, against the fake-ssh host on a scratch root: `App/Sources/Settings/CredentialRow.swift` (§ 1), the per-server toggle and Claude line in `App/Sources/Settings/ServersSettingsView.swift` (§ 2), `App/Sources/Chat/TokenAskCard.swift` (§ 3), the Install Claude step in `App/Sources/Hosts/AddServerFlow.swift` (§ 4), `App/Sources/Hosts/RebuiltServerSheet.swift` (§ 5), and gone rows in `App/Sources/Projects/ProjectListView.swift` (§ 6)
-- [ ] T018 Walk them with the run-app skill (scratch root, screenshots of each into `specs/043-zero-setup-servers/walk/look/`) and ask Alex to approve the look before Phase 4; lease the screen while driving it
+- [X] T017 Build the five screens of contracts/ui.md as views over stub state, against the fake-ssh host on a scratch root: `App/Sources/Settings/CredentialRow.swift` (§ 1), the per-server toggle and Claude line in `App/Sources/Settings/ServersSettingsView.swift` (§ 2), `App/Sources/Chat/TokenAskCard.swift` (§ 3), the Install Claude step in `App/Sources/Hosts/AddServerFlow.swift` (§ 4), `App/Sources/Hosts/RebuiltServerSheet.swift` (§ 5), and gone rows in `App/Sources/Projects/ProjectListView.swift` (§ 6)
+- [ ] T018 (walked 2026-09-25, screenshots in walk/look/; Alex's approval open) Walk them with the run-app skill (scratch root, screenshots of each into `specs/043-zero-setup-servers/walk/look/`) and ask Alex to approve the look before Phase 4; lease the screen while driving it
 
 ---
 
@@ -134,7 +134,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 - [X] T045 [US3] Record each server's project paths into `ServerHost.knownProjects` in `hosts.json` whenever its project list arrives, in `App/Sources/Hosts/HostSet.swift` and `Packages/AgentsKit/Sources/AgentsKit/Hosts/HostStore.swift`
 - [X] T046 [US3] After a connect, show recorded paths the server does not list and whose folder is missing (via `files/stat`) as gone rows with Remove (drops the path and its agents' records); never the offline strip for them, in `App/Sources/Projects/ProjectListView.swift` and `App/Sources/AppModel.swift`
 - [X] T047 [US3] Fake-ssh test: wiping the fake server's `~/.agents-server` with the key unchanged re-installs daemon and toolset on connect without asking (FR-018) in `RebuiltServerTests.swift`
-- [ ] T048 [US3] Walk quickstart step 5 on `agents-bare` (SC-004); notes in `specs/043-zero-setup-servers/walk/US3.md`
+- [X] T048 [US3] Walk quickstart step 5 on `agents-bare` (SC-004); notes in `specs/043-zero-setup-servers/walk/US3.md`
 
 ---
 
@@ -157,8 +157,8 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 - [ ] T054 Run T053 after the walks (SC-003) and quickstart step 9 (purge leaves no `~/.agents-server`, and the person's own Node untouched on `agents-devbox`) (FR-008); notes in `specs/043-zero-setup-servers/walk/README.md`
 - [X] T055 [P] Update the test-servers skill (`.claude/skills/test-servers/`) with `agents-bare`, the token step and the rebuilt walk
 - [X] T056 [P] Update 037's `specs/037-cloud-agents/spec.md` Assumptions to point at 043 for runtimes on servers (D4)
-- [ ] T057 Six full suite runs compared with T002's baseline; both schemes build; Linux gate passes
-- [ ] T058 Record what is left for Alex (token paste for walks, any look notes) and SC results in `specs/043-zero-setup-servers/walk/README.md`
+- [X] T057 (see walk/baseline.md: two timing tests fail under load on the branch, cause open) Six full suite runs compared with T002's baseline; both schemes build; Linux gate passes
+- [X] T058 Record what is left for Alex (token paste for walks, any look notes) and SC results in `specs/043-zero-setup-servers/walk/README.md`
 
 ---
 
