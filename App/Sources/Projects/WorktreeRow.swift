@@ -35,11 +35,15 @@ struct WorktreeRow: View {
     @State private var isChecking = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        // Laid out the way `AgentRow` and `WorkflowRow` are, so the page has one kind of
+        // card: an icon at the reading size, a semibold name, a grey line under it.
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
-                .appText(.fine)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
                 Text(worktree.name)
                     .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
@@ -56,9 +60,11 @@ struct WorktreeRow: View {
                 .appText(.fine)
                 .disabled(isChecking)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {
