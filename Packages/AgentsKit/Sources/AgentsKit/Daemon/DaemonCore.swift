@@ -728,6 +728,9 @@ public actor DaemonCore {
     private func handle(_ event: ACPSessionEvent, agentID: UUID, reader: UUID) async {
         switch event {
         case .entry(let kind):
+            // Nothing to read, so nothing to keep: not written, not broadcast, and not
+            // counted as the agent doing something.
+            guard !kind.isInvisibleAgentText else { return }
             await record(kind, for: agentID)
 
         case .optionsChanged(let options):

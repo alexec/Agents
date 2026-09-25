@@ -1032,9 +1032,14 @@ extension DaemonCore {
     /// It names the one tool a fresh conversation was told about (023). An agent
     /// briefed with the older name answers by that name all the same, because the
     /// older names are accepted everywhere the new one is.
+    ///
+    /// It used to end "and say nothing else", and Opus 5.5 took that literally: after
+    /// the call it still owes a reply, and the nothing it wrote was zero-width spaces —
+    /// one, usually, and once twenty-two thousand of them. Nothing is said about what
+    /// comes after the call now; the call is what is asked for.
     static let askForOutcome = """
         That turn ended without a report. Call \(AppTool.finishTurn) now with how it \
-        actually went, and say nothing else. If the work is done, that is done.
+        actually went. If the work is done, that is done.
         """
 
     private func turnFailed(agentID: UUID, error: any Error) async {

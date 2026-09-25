@@ -66,6 +66,25 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+extension TranscriptEntry.Kind {
+    /// A piece of an agent's reply that shows nothing at all: every character in it is
+    /// a zero-width format character, like U+200B.
+    ///
+    /// Opus 5.5 answers "say nothing" this way. Asked to report a silent turn and say
+    /// nothing else, it calls finish_turn and then writes a zero-width space — once in
+    /// a while not one but tens of thousands, streamed as one chunk each, which filled
+    /// a transcript with 2,800 entries in two minutes and drew as an empty bubble.
+    ///
+    /// Only format characters, and not whitespace: a chunk of `\n\n` inside a real
+    /// reply is the break between two paragraphs, and dropping it would glue them.
+    public var isInvisibleAgentText: Bool {
+        guard case .agentMessage(_, let text, let blocks) = self, blocks.isEmpty, !text.isEmpty else {
+            return false
+        }
+        return text.unicodeScalars.allSatisfy { $0.properties.generalCategory == .format }
+    }
+}
+
 extension TranscriptEntry {
     /// The blocks of a message, for the places that draw rather than read. A record
     /// written before 003 has only text, so it becomes one text block.
