@@ -1118,6 +1118,15 @@ final class AppModel {
     @discardableResult
     func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let host = work.agent(selection)?.host ?? .mac
+        if host != .mac {
+            let sendID = UUID()
+            return await sendToServer(host) { client in
+                try await client.call(DaemonAPI.Method.agentsPrompt,
+                                      DaemonAPI.PromptRequest(agentID: selection, text: text,
+                                                              attachments: attachments, sendID: sendID))
+            }
+        }
         return await attempt {
             try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
@@ -1199,6 +1208,16 @@ final class AppModel {
     }
 
     func answer(_ request: PermissionRequest, optionID: String) async {
+        let host = work.agent(request.agentID)?.host ?? .mac
+        if host != .mac {
+            let sendID = UUID()
+            _ = await sendToServer(host) { client in
+                try await client.call(DaemonAPI.Method.permissionsAnswer,
+                                      DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID,
+                                                              sendID: sendID))
+            }
+            return
+        }
         await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.permissionsAnswer,
                                        DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID))
@@ -1434,6 +1453,33 @@ final class AppModel {
     /// Whether the work went through, for the callers that must undo something when
     /// it did not.
     @discardableResult
+    /// A send to a server, delivered once or reported as not sent (037, FR-020).
+    ///
+    /// The caller makes the `sendID` once, so every retry here is the same send: a
+    /// daemon that acted on the first try and lost its reply with the connection answers
+    /// the retry as it did, and acts once. A transport error is retried as the server
+    /// comes back, for up to 30 seconds; a refusal from the daemon is its answer and is
+    /// not retried.
+    private func sendToServer(_ host: HostID,
+                              _ work: @escaping (DaemonClient) async throws -> Void) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        while true {
+            do {
+                try await work(client(for: host))
+                return true
+            } catch let refused as JSONRPCError {
+                problem = describe(refused)
+                return false
+            } catch {
+                guard ContinuousClock.now < deadline else {
+                    problem = "Not sent — \(hosts.label(host)) went offline."
+                    return false
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
     private func attempt(_ work: () async throws -> Void) async -> Bool {
         do {
             try await work()

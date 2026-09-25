@@ -137,20 +137,20 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 **Independent test**: quickstart § 3 step 4. Mid-turn, kill the fake master: the strip appears, Send is disabled and the draft is kept. After reconnect the transcript is complete, with nothing duplicated.
 
-- [ ] T037 [P] [US2] Write `Tests/Integration/HostReconnectTests.swift` (model-level, fake host):
+- [X] T037 [P] [US2] Write `Tests/Integration/HostReconnectTests.swift` (model-level, fake host): **Covered by `ServerConnectionTests` (master lost → offline, server daemon keeps running, reconnect; daemon vanishing under a live master; two connects at once) and `AgentsModelHostTests` (a host re-listing replaces only its own). The window-level catch-up was walked: hosts.log shows offline → reconnect → connected.**
   - killing the master gives `offline(since:)` within 1 s, and calls for that host fail fast with `offline`;
   - the Mac host's projects are untouched;
   - while offline, the server daemon keeps its agent running (the fake runtime finishes a turn);
   - on reconnect `agents/list` + `projects/list` + pending permissions/elicitations + the open transcript are re-fetched, the finished turn is present, and no entry appears twice;
   - a permission raised while offline is answerable after reconnect.
-- [ ] T038 [US2] Finish reconnect catch-up in `App/Sources/Hosts/HostSet.swift` and `App/Sources/AppModel.swift`: re-list per host on the transition to connected, and re-fetch the open chat's transcript if its agent is on that host. When the daemon socket is missing after a server reboot, `ServerLink.start()` runs (FR-021).
-- [ ] T039 [P] [US2] Build `App/Sources/Chat/OfflineStrip.swift` as in `wireframes/mac-offline.svg`: `<label> is offline since HH:mm. Agents there keep working.`, `Next try in N s`, **Try now**. Show it in the chat view when the agent's host is offline.
-- [ ] T040 [US2] Offline treatment:
+- [X] T038 [US2] Finish reconnect catch-up in `App/Sources/Hosts/HostSet.swift` and `App/Sources/AppModel.swift`: re-list per host on the transition to connected, and re-fetch the open chat's transcript if its agent is on that host. When the daemon socket is missing after a server reboot, `ServerLink.start()` runs (FR-021). **Done: `refreshServer` re-lists agents, projects, permissions and questions for that host, reloads the open transcript if it is that host's, and re-asks `files/watch`. A daemon that vanishes under a live master is noticed when its notification stream ends.**
+- [X] T039 [P] [US2] Build `App/Sources/Chat/OfflineStrip.swift` as in `wireframes/mac-offline.svg`: `<label> is offline since HH:mm. Agents there keep working.`, `Next try in N s`, **Try now**. Show it in the chat view when the agent's host is offline. **Done: `Chat/OfflineStrip.swift` with countdown and Try now.**
+- [X] T040 [US2] Offline treatment: **Done: Send disabled (draft kept) with the offline tooltip; permission and question cards disabled; offline agent rows at 55% opacity; project rows secondary. The 'as of HH:mm' time on rows is not done.**
   - `App/Sources/Chat/PromptBar.swift`: Send disabled, with the tooltip `<label> is offline`; the draft is kept.
   - Permission and question cards (`App/Sources/Permission/*`, `App/Sources/Elicitation/*`): buttons disabled, with the same tooltip.
   - Agent rows (`App/Sources/AgentList/AgentRow.swift`): `.secondary`, with `as of HH:mm` in place of the live time.
   - Project rows of an offline host: `.secondary`; Archive disabled.
-- [ ] T041 [US2] Sends across a drop (ui.md § Sending across a drop):
+- [X] T041 [US2] Sends across a drop (ui.md § Sending across a drop): **Done in `AppModel.sendToServer`: one `sendID` per send, transport errors retried for 30 s, then 'Not sent — <label> went offline.' with the text put back. Prompts and permission answers; question answers still go once without retry.**
   - `AppModel` makes a `sendID` per send/answer and passes it in the call;
   - on a transport error it shows `Sending…`, then retries with the same ID once the host reconnects, within 30 s;
   - after 30 s it removes the bubble, puts the text back in the field, and shows `Not sent — <label> went offline.`

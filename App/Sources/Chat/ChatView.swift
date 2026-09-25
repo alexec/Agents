@@ -25,7 +25,12 @@ struct ChatView: View {
                         // Over the chat rather than in the toolbar, whose trailing end
                         // is above the sidebar whenever the sidebar is open. The
                         // transcript scrolls on under it, as it does under the prompt.
-                        .safeAreaInset(edge: .top, spacing: 0) { actions(for: agent) }
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            VStack(spacing: 0) {
+                                OfflineStrip(host: agent.host)
+                                actions(for: agent)
+                            }
+                        }
                     form
                 }
                 // Back to the project the way Safari goes back a page.
@@ -134,10 +139,22 @@ struct ChatView: View {
         }
     }
 
+    private var selectedHostOffline: Bool {
+        model.hosts.isOffline(model.selectedAgent?.host ?? .mac)
+    }
+
+    private var offlineHelp: String {
+        "\(model.hosts.label(model.selectedAgent?.host ?? .mac)) is offline"
+    }
+
     private var form: some View {
         VStack(spacing: 12) {
             if let request = model.permissionForSelection {
+                // Shown while its server is offline, but not answerable: the answer
+                // would go nowhere (037).
                 PermissionView(request: request)
+                    .disabled(selectedHostOffline)
+                    .help(selectedHostOffline ? offlineHelp : "")
             }
             // A form waits the same way a permission question does, and floats with it.
             if let request = model.elicitationForSelection {
@@ -145,6 +162,8 @@ struct ChatView: View {
                 // are not carried into the next.
                 ElicitationView(request: request)
                     .id(request.id)
+                    .disabled(selectedHostOffline)
+                    .help(selectedHostOffline ? offlineHelp : "")
             }
             PromptBar()
         }
