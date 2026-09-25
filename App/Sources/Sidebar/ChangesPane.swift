@@ -291,7 +291,9 @@ private struct NothingToShow: View {
                 .foregroundStyle(.tertiary)
             Text("Nothing to show")
                 .appText(.reading).fontWeight(.semibold)
-            Text("\(runtime.capitalized) doesn't report its edits, and \(reason), so what this agent changed can't be shown here.")
+            // True of every runtime: some never report, and one that does may simply
+            // not have edited yet. What cannot be seen is a change made another way.
+            Text("\(runtime.capitalized) hasn't reported any edits, and \(reason), so a change made any other way, by a command say, can't be shown here.")
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
