@@ -288,7 +288,7 @@ a running agent when the window closes and when the Mac restarts.
 - [X] T048 [US6] Ask Alex (AskUserQuestion) to confirm that the account has GitHub Pro or above, and whether to turn
   on Pages with `gh api -X POST repos/alexec/Agents/pages -f build_type=workflow` or through Settings himself.
   Do not run it unasked (research R4).
-- [ ] T049 [US6] After the branch merges (when Alex says it is this lane's turn), watch the first `docs-publish` run
+- [X] T049 [US6] After the branch merges (when Alex says it is this lane's turn), watch the first `docs-publish` run
   with `gh run watch`, open `https://alexec.github.io/Agents/`, and record the time from merge to live (SC-005)
   in `specs/044-docs-site/walk/README.md`.
 

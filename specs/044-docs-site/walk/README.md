@@ -75,7 +75,18 @@ specs. I reviewed a page from each section before committing (`293a990`). What t
   - V6: done above.
   - V7 waits for the merge.
 
+## First publish (T049)
+
+Merged into main as `cc37074` on 2026-09-25, and main was pushed. That push carried the 250 local commits, rescanned
+first with no secrets found. The `docs-publish` run built, checked and deployed in 39 s (23:39:18 to 23:39:57 UTC),
+well inside SC-005's 10 minutes. `docs-check` passed on the same commit. https://alexec.github.io/Agents/ serves
+the home page, pages from every section and the tutorial pictures.
+
+Two things to tidy in the workflows, neither blocking:
+- **Node 20 deprecation.** GitHub warns that `actions/checkout@v4`, `configure-pages@v5` and `setup-uv@v6` target
+  Node 20.
+- **uv cache.** `setup-uv` warns that its cache has no lock file to key on. It could be turned off.
+
 ## Still to do after the gate
 
-- Pages is on and the repository is public (Alex's choice, 2026-09-25). The first publish happens when this branch merges (T049).
 - Alex's: the iPhone pictures for the second tutorial (T014), a timed run of the first tutorial by someone new to the app (SC-001), and reading the site on the iPhone (SC-007).
