@@ -182,14 +182,14 @@ removed and one added, with the word washed on both. A new file is all added.
 
 **Tests first**
 
-- [ ] T028 [P] [US2] `CT/Tests/CodeTextTests/LineDiffTests.swift` for `LineDiff.rows(old:new:)`:
+- [X] T028 [P] [US2] `CT/Tests/CodeTextTests/LineDiffTests.swift` for `LineDiff.rows(old:new:)`:
   - (a) Identical texts give all context.
   - (b) One changed line in 40 gives 39 context rows, one removed and one added, with the removed row before the added one.
   - (c) old nil gives all `.added`, no `changed`.
   - (d) A pure insertion gives no `.removed`.
   - (e) Round-trip (contract invariant 3): context + removed rows rebuild old, and context + added rows rebuild new, for 200 random edit pairs from a seeded generator over the Swift sample.
   - (f) Trailing newline differences survive the round-trip.
-- [ ] T029 [P] [US2] `CT/Tests/CodeTextTests/WordDiffTests.swift`:
+- [X] T029 [P] [US2] `CT/Tests/CodeTextTests/WordDiffTests.swift`:
   - `let total = 10` → `let total = 12` marks only `10`/`12`.
   - An indentation-only change marks the leading whitespace.
   - Two lines sharing fewer than a third of their tokens get no `changed`.
@@ -197,7 +197,7 @@ removed and one added, with the word washed on both. A new file is all added.
   - A block of 201 pairs gets none.
   - Pairing is removed *i* ↔ added *i* within a change block, with the unmatched remainder unpaired.
   - Ranges are UTF-16 and valid on lines with emoji and combining marks.
-- [ ] T030 [P] [US2] `CT/Tests/CodeTextTests/FoldTests.swift` for `Folds.of(_:context:minimum:)`:
+- [X] T030 [P] [US2] `CT/Tests/CodeTextTests/FoldTests.swift` for `Folds.of(_:context:minimum:)`:
   - A run of 8 context rows is not folded; a run of 9 between changes folds to 3 + fold + 3.
   - A leading run keeps 3 only before the first change, and a trailing run keeps 3 only after the last.
   - All-added rows give no folds.
@@ -205,34 +205,34 @@ removed and one added, with the word washed on both. A new file is all added.
 
 **Implementation**
 
-- [ ] T031 [US2] `CT/Sources/CodeText/LineDiff.swift`: `DiffRow` per the contract, and `rows(old:new:)` via `new.split(…omittingEmptySubsequences: false).difference(from: old…)`, walked in order into rows (research R5). Makes T028 pass.
-- [ ] T032 [US2] `CT/Sources/CodeText/WordDiff.swift`:
+- [X] T031 [US2] `CT/Sources/CodeText/LineDiff.swift`: `DiffRow` per the contract, and `rows(old:new:)` via `new.split(…omittingEmptySubsequences: false).difference(from: old…)`, walked in order into rows (research R5). Makes T028 pass.
+- [X] T032 [US2] `CT/Sources/CodeText/WordDiff.swift`:
   - Tokenise into identifier runs (letters, digits, `_`), whitespace runs and single other characters.
   - Diff the tokens with `CollectionDifference`, and turn the removed and inserted token offsets into UTF-16 ranges.
   - Skip when shared tokens are under 1/3 of the longer line's tokens, or past `Limits`.
   - `LineDiff` calls it for each pair. Makes T029 pass.
-- [ ] T033 [US2] `CT/Sources/CodeText/Folds.swift`: `Fold`, and `Folds.of`. Makes T030 pass.
-- [ ] T034 [US2] Extend `Shared/UI/Code/CodeLine.swift` with `kind` and `changed`:
+- [X] T033 [US2] `CT/Sources/CodeText/Folds.swift`: `Fold`, and `Folds.of`. Makes T030 pass.
+- [X] T034 [US2] Extend `Shared/UI/Code/CodeLine.swift` with `kind` and `changed`:
   - Syntax colour stays underneath (US2 AS5).
   - Removed rows are struck through with tertiary opacity, as 035 did.
   - Added rows are semibold, as 035 did.
   - The whole row sits on `CodeInk.removedWash` for removed rows and none for added. Changed ranges sit on `changedWash` on both sides.
   - The mark column (`+`, `−`) and the line number are separate `Text`s outside the selectable line.
   - Accessibility label prefix: "Added: " / "Removed: ".
-- [ ] T035 [US2] `Shared/UI/Code/FoldRow.swift`: "↕ N unchanged lines" in `.appText(.fine)`, `.secondary`, as a `.plain` `Button` that is the whole row (see memory: SwiftUI card taps). Opening it replaces the fold with its rows in place, without moving what is above.
-- [ ] T036 [US2] `Shared/UI/Code/CodeRows.swift`: a lazy stack over `[DiffRow]` plus folds (open state in `@State Set<Int>`) plus a `CodeDocument` for colour.
+- [X] T035 [US2] `Shared/UI/Code/FoldRow.swift`: "↕ N unchanged lines" in `.appText(.fine)`, `.secondary`, as a `.plain` `Button` that is the whole row (see memory: SwiftUI card taps). Opening it replaces the fold with its rows in place, without moving what is above.
+- [X] T036 [US2] `Shared/UI/Code/CodeRows.swift`: a lazy stack over `[DiffRow]` plus folds (open state in `@State Set<Int>`) plus a `CodeDocument` for colour.
   - Colour the new side's lines by parsing the new text, and the removed lines by parsing the old text, as two documents keyed by side.
   - Each row calls `appear`.
   - Used by T037 and T046.
-- [ ] T037 [US2] Rewrite the body of `DiffView` in `Shared/UI/Chat/ChatBlocks.swift`:
+- [X] T037 [US2] Rewrite the body of `DiffView` in `Shared/UI/Chat/ChatBlocks.swift`:
   - Draw with `CodeRows(LineDiff.rows(old: diff.oldText, new: diff.newText), language: CodeLanguage.detect(path: diff.path, firstLine: nil))`.
   - Keep the signature, `maxHeight` (280 in the conversation, nil in Changes), `showsPath`, `paperWell` and horizontal scrolling for long lines.
   - Delete the old `lines` builder and its "Not a real diff algorithm" comment.
-- [ ] T038 [US2] Check every `DiffView` caller: `Shared/UI/Chat/TranscriptRows.swift:345`, `App/Sources/Sidebar/ChangeFileView.swift:250`, `Remote/Sources/Chat/ChangesView.swift:101`, `Remote/Sources/Permission/PermissionSheet.swift:59`. All still compile and need no change. Note here any that needed one.
-- [ ] T039 [US2] Keep 035's `ChangeFileView.drawLimit` gate as it is, in front of the new rows. Confirm "N lines changed in M edits" + Show changes still appears for a 2,001-line change.
-- [ ] T040 [US2] Build `Agents` then `Remote`, and run `CT` tests.
-- [ ] T041 [US2] Measure SC-004 in a test in `CT/Tests/CodeTextTests/LineDiffTests.swift`: a one-word change in a 40-line passage gives at most 10 visible rows after folding (3 + 1 + 1 + 3 + two folds).
-- [ ] T042 [US2] Walk on scratch with a real Claude agent (quickstart §4):
+- [X] T038 [US2] Check every `DiffView` caller: `Shared/UI/Chat/TranscriptRows.swift:345`, `App/Sources/Sidebar/ChangeFileView.swift:250`, `Remote/Sources/Chat/ChangesView.swift:101`, `Remote/Sources/Permission/PermissionSheet.swift:59`. All still compile and need no change. Note here any that needed one. **None needed a change.**
+- [X] T039 [US2] Keep 035's `ChangeFileView.drawLimit` gate as it is, in front of the new rows. Confirm "N lines changed in M edits" + Show changes still appears for a 2,001-line change.
+- [X] T040 [US2] Build `Agents` then `Remote`, and run `CT` tests.
+- [X] T041 [US2] Measure SC-004 in a test in `CT/Tests/CodeTextTests/LineDiffTests.swift`: a one-word change in a 40-line passage gives at most 10 visible rows after folding (3 + 1 + 1 + 3 + two folds).
+- [X] T042 [US2] Walk on scratch with a real Claude agent (quickstart §4):
   - Ask it to change one word in the middle of a 40-line function in `sample.swift`.
   - Ask it to add a new function to `sample.py`.
   - Screenshot the conversation and Changes in Light and Dark into `walk/03-*.png`.
@@ -247,20 +247,20 @@ removed and one added, with the word washed on both. A new file is all added.
 **Independent test**: Two changes 400 lines apart show with folds between them. Next moves to
 the second.
 
-- [ ] T044 [P] [US3] Tests in `CT/Tests/CodeTextTests/LineDiffTests.swift` for `LineDiff.rows(whole:)`:
+- [X] T044 [P] [US3] Tests in `CT/Tests/CodeTextTests/LineDiffTests.swift` for `LineDiff.rows(whole:)`:
   - Kinds and `newLine` are carried through unchanged.
   - Removed/added pairs in a change block get `changed`.
   - `LineDiff.changeStops(_:)` gives the first row index of each change block.
-- [ ] T045 [US3] Implement `rows(whole:)` and `changeStops` in `CT/Sources/CodeText/LineDiff.swift`.
-- [ ] T046 [US3] Replace `WholeLine` and the `wholeFile` body in `App/Sources/Sidebar/ChangeFileView.swift`:
+- [X] T045 [US3] Implement `rows(whole:)` and `changeStops` in `CT/Sources/CodeText/LineDiff.swift`.
+- [X] T046 [US3] Replace `WholeLine` and the `wholeFile` body in `App/Sources/Sidebar/ChangeFileView.swift`:
   - Map `[DiffLine]` to the tuple input at the call site.
   - Draw with `CodeRows` and folds, with the line number column kept as 035 has it (40 pt, `.quaternary`, blank for removed rows; FR-013).
   - Keep the draw-limit gate and the `wholeProblem`/progress states.
-- [ ] T047 [US3] Add Previous and Next change buttons (`chevron.up` / `chevron.down`, `.borderless`, `.help("Previous change")` / `.help("Next change")`) to `ChangeFileView`'s header, shown only in Whole file:
+- [X] T047 [US3] Add Previous and Next change buttons (`chevron.up` / `chevron.down`, `.borderless`, `.help("Previous change")` / `.help("Next change")`) to `ChangeFileView`'s header, shown only in Whole file:
   - They scroll the `ScrollViewReader` to the stop above or below the current one.
   - A stop inside a closed fold opens it first.
   - They are disabled at the ends.
-- [ ] T048 [US3] Walk on a git scratch project (quickstart §4 step 3). Screenshot `walk/04-whole.png`, then Next, then `walk/05-whole-next.png`.
+- [X] T048 [US3] Walk on a git scratch project (quickstart §4 step 3). Screenshot `walk/04-whole.png`, then Next, then `walk/05-whole-next.png`.
 
 ## Phase 6: User Story 4 — Code in the conversation and pages matches (P3)
 
