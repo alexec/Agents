@@ -6,14 +6,16 @@
 | US2 edits as real diffs | Mac, light and dark: one word, a new function | line/word diff and fold tests; one-word change ≤ 10 lines (SC-004) |
 | US3 Whole file | Mac, light and dark: two changes 400 lines apart, fold opened in place | change stops tested; Previous/Next pressed |
 | US4 fenced blocks | Mac: swift/ts/py coloured, untagged plain, in a message and on a page | fence tag tests |
-| US5 phone and iPad | **not yet**: installing replaces Alex's own Remote, so that is his call | the phone app builds in Debug and Release with it |
+| US5 phone and iPad | installed on both; Alex: "looks right on both" | the phone app builds in Debug and Release with it |
 
 Measured: first coloured screen of 5,000 Swift lines in 29 ms (Release, T054); a 30 MB file
 or a 286 KB one-line file shown plain in well under a second (T053); the Mac app +18.1 MB
 installed / +2.0 MB zipped, the phone app +17.2 / +1.9 (T058).
 
-Still to see: the "Shown without colour" line and scrolling a 5,000-line file on screen (the
-screen locked before they could be captured), and everything on the phone and iPad.
+Still to see: the scroll comparison against main with Instruments (SC-002). The "Shown without colour"
+line is seen:
+
+![plain, a line too long](07-light-plain-too-long.png)
 
 ![fences in a message](06-light-fences-chat.png)
 

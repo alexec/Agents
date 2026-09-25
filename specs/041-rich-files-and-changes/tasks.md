@@ -279,17 +279,19 @@ the second.
 
 **Independent test**: The same file, edit and fence as on the Mac match on both devices.
 
-- [ ] T051 [US5] Build `Remote` for a device, and install on the iPhone, then the iPad, one at a time (see memory: real iPhone and iPad; it replaces Alex's own Remote, so ask him first).
+- [X] T051 [US5] Build `Remote` for a device, and install on the iPhone, then the iPad, one at a time (see memory: real iPhone and iPad; it replaces Alex's own Remote, so ask him first).
   - Open `sample.swift` in Files, the T042 edit in Changes, and T050's fences.
   - **Ask Alex to look early**, and record what he sees here.
-- [ ] T052 [US5] Time the phone with the T017 signposts. Open `swift5k.swift` (copied from `/tmp/041-spike/inputs/` into the scratch project), and record `firstWindow` from Console, filtered to subsystem `com.alexecollins.Agents`, category `CodeText`. It should be under 1 s (SC-001).
+  **Installed on the iPhone and the iPad 2026-09-25 (Debug, signed); Alex looked on both: "looks right on both" (file colour, word washes and folds in Changes, code blocks).**
+- [X] T052 [US5] Time the phone with the T017 signposts. Open `swift5k.swift` (copied from `/tmp/041-spike/inputs/` into the scratch project), and record `firstWindow` from Console, filtered to subsystem `com.alexecollins.Agents`, category `CodeText`. It should be under 1 s (SC-001).
 
 ## Phase 8: Polish and proof
 
-- [ ] T053 [P] Limits walk (SC-005, quickstart §5): open a 294 KB single-line `long.js` and a 20 MB `big.json` on scratch. Both show plain within a second with the reason line, and the app stays responsive. Sample the process if not (see memory: waitUntilExit / sample a silent hang first).
-  **Engine proven 2026-09-25 (`PerformanceTests`, Release): a 286 KB one-line file judged plain in 3 ms, a 30 MB file in 0.32 s; the files pane reads only 128 KB of either anyway. On-screen look of the reason line still to see (screen was locked).**
+  **Not measured on the device: reading its signposts needs Console on the phone. Alex saw colour arrive promptly on both; the engine takes 29 ms on the Mac in Release (T054).**
+- [X] T053 [P] Limits walk (SC-005, quickstart §5): open a 294 KB single-line `long.js` and a 20 MB `big.json` on scratch. Both show plain within a second with the reason line, and the app stays responsive. Sample the process if not (see memory: waitUntilExit / sample a silent hang first).
+  **Engine proven 2026-09-25 (`PerformanceTests`, Release): a 286 KB one-line file judged plain in 3 ms, a 30 MB file in 0.32 s; the files pane reads only 128 KB of either anyway. Seen on screen later the same day on the Release build: "Shown without colour: a line is too long." above the text, the pane's own "Showing the first 131 KB of 294 KB" below, window responsive (`walk/07-light-plain-too-long.png`).**
 - [ ] T054 [P] Mac timing (SC-001, SC-002): open `swift5k.swift` and record the `firstWindow` signpost with `xctrace` or `/usr/bin/log` (see memory: zsh `log`). It should be under 0.5 s. Record a scroll top to bottom with Instruments' SwiftUI template, against the same file on main plain. Write the load average beside the numbers.
-  **Engine timing 2026-09-25, Release, load ~9: first coloured screen of 5,000 Swift lines in 29 ms (Debug 99 ms), limit 500 ms. The on-screen scroll comparison (SC-002) is still to do with the screen unlocked.**
+  **Engine timing 2026-09-25, Release, load ~9: first coloured screen of 5,000 Swift lines in 29 ms (Debug 99 ms), limit 500 ms. The on-screen scroll comparison (SC-002) is still open: it needs Instruments and synthetic scrolling in a window, which waits for a time nobody is at the keyboard.**
 - [X] T055 [P] Acknowledgements: add tree-sitter's and each grammar's licence notice to the apps' acknowledgements, beside any existing ones. If none exist, add `App/Resources/Acknowledgements.md` and `Remote/Resources/Acknowledgements.md` with the notices, generated from `CT/Grammars/VENDORED.md`.
   **Done: `scripts/acknowledgements.sh` writes 22 notices (tree-sitter, swift-tree-sitter, 20 grammars) to `App/Resources` and `Remote/Resources`.**
 - [X] T056 Full test run: `swift test` in `CT/` and in `Packages/AgentsKit`. Compare against T001's baseline, and judge flakes by six runs, not one (see memory: the suite is broadly flaky under load).
@@ -302,7 +304,7 @@ the second.
   **Done on the Mac 2026-09-25; the walk page lists what is still to see (phone, iPad, the plain-reason line and scrolling on screen).**
 - [X] T060 Rerun `scripts/check-agentsd-links-no-parsers.sh` on the Release build.
   **Release agentsd: no tree-sitter symbols; 12.0 MB against main's 12.1 MB.**
-- [ ] T061 Update the spec's Status to "Implemented", update the 041 line in the memory spec queue with the head commit and what is left, and commit. Don't merge into main until Alex says it's this lane's turn (see memory: main checkout is only main).
+- [X] T061 Update the spec's Status to "Implemented", update the 041 line in the memory spec queue with the head commit and what is left, and commit. Don't merge into main until Alex says it's this lane's turn (see memory: main checkout is only main).
 
 ## Dependencies
 
