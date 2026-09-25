@@ -246,7 +246,15 @@ private struct PagePicture: View {
             }
         }
         .task(id: url) {
-            loaded = await actions.image(url)
+            // Asked more than once: on a phone a picture is drawn by WebKit, and a
+            // drawing that failed the first time can come out the second (034). On the
+            // Mac a missing file is simply missing, and asking again costs a stat.
+            for attempt in 0..<3 {
+                if attempt > 0 { try? await Task.sleep(for: .milliseconds(600)) }
+                guard !Task.isCancelled else { return }
+                loaded = await actions.image(url)
+                if loaded != nil { break }
+            }
             tried = true
         }
     }

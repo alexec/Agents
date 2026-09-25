@@ -1,0 +1,596 @@
+[
+ {
+  "path": "/fixture/f0/spec.md",
+  "toolCallID": "toolu_01AcgfXdvVmu5bRTPB98Stxz",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f0/spec.md",
+  "toolCallID": "toolu_01DxXc9JyV63YDng4s3Ra4b4",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f0/spec.md",
+  "toolCallID": "toolu_015cjjJc7zsun818hcwSCcQC",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f1/research.md",
+  "toolCallID": "toolu_01L7Fr6GFiS6UiiDAx7r87F4",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f2/transport.md",
+  "toolCallID": "toolu_011aTRazvQxPBGfmKDbKyWQr",
+  "index": 0,
+  "isNew": true
+ },
+ {
+  "path": "/fixture/f3/plan.md",
+  "toolCallID": "toolu_018Gi4C6gA1nb2nGAs1pQ8e7",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f3/plan.md",
+  "toolCallID": "toolu_01D2kSyGSCYrLamms7MMqBXb",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f3/plan.md",
+  "toolCallID": "toolu_019r3JzftyeXM8M9DJQi5GBx",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f3/plan.md",
+  "toolCallID": "toolu_01HQceJi9jA9BeKYSFi5QM2e",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f3/plan.md",
+  "toolCallID": "toolu_01XsnGjjkqcuiPXWmPhtrcgi",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f4/tasks.md",
+  "toolCallID": "toolu_01JUWKRRdw4JS4bYwQ7GgG3G",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f5/InheritedDescriptorTests.swift",
+  "toolCallID": "toolu_01Nu7pPNu31pmpMSYoLYj6BW",
+  "index": 0,
+  "isNew": true
+ },
+ {
+  "path": "/fixture/f5/InheritedDescriptorTests.swift",
+  "toolCallID": "toolu_018nGQFnwJoL2k96hV1dZ2CN",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f5/InheritedDescriptorTests.swift",
+  "toolCallID": "toolu_014FKVpqRdW1MWZZBDhahiHq",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f5/InheritedDescriptorTests.swift",
+  "toolCallID": "toolu_014FKVpqRdW1MWZZBDhahiHq",
+  "index": 1,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f6/Eventually.swift",
+  "toolCallID": "toolu_016RGtvhVMoEGRNH6Qs89a5Q",
+  "index": 0,
+  "isNew": true
+ },
+ {
+  "path": "/fixture/f7/PlanTests.swift",
+  "toolCallID": "toolu_013xqAZFGYAtsTZr6X9P4iTV",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f8/TurnUsageTests.swift",
+  "toolCallID": "toolu_01QQ4V6VUifY84MMZCLQHYBx",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f9/QueuedPromptTests.swift",
+  "toolCallID": "toolu_01MJPBPNXCmXQ8NB1RwjXxo9",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f9/QueuedPromptTests.swift",
+  "toolCallID": "toolu_01KJM3hs8C5pKQrGh1e9t99a",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f9/QueuedPromptTests.swift",
+  "toolCallID": "toolu_0138pD39D83AypChEDP9cJVt",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_015dzyT7rXLMmQHGVDehy3Dh",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01JT1nCcDugpBZC9qDx7rRJi",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01MjmxgvBbmFBijen7czWSbr",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01CQpry9nAtkcX7nq4rJ3hmC",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_017EE5CqdJN39v7rZjcreLPh",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_017EE5CqdJN39v7rZjcreLPh",
+  "index": 1,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01Nnt2sVS8rrDJ8tqdu9dKwx",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_019jEgAcFLiPbDb46joyTa8a",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_019pMX3bWE9GospXC8f6GoBk",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01GeDWakeigHRtBpwHU2B4NW",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01Ha8LTE9c92Y5YAM4aCdUMs",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_016de3F6cXwYXAYM5Yug8zxm",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_017C7EB6pLYYkzKfKa9Hqngm",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01C6JeqYCSwJeREJFSRvpfLf",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01TDxStaynURdPp8hhrq9QsQ",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01Weafb3rGWQwQFbA3PPYGgB",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01FuJhMwem2i25VGxA3GuUFF",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_018sabM6zDaFK2yQA7zLPLSw",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01QABRPAUpAixUhuz4RKEkCC",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01R2hiFNTHN1Lbv5qDSmxMn1",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01WpSBBN6YyCKgNGyhZzZ9PZ",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01MPRvU7ZAgHntf7H7tjM9Sm",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f10/DaemonTests.swift",
+  "toolCallID": "toolu_01QPx2yeAVoxZJ1ezkcr38Rr",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f8/TurnUsageTests.swift",
+  "toolCallID": "toolu_01Axe7nTaMzRcFrZnszKF6LW",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f8/TurnUsageTests.swift",
+  "toolCallID": "toolu_01BqpeBrd2XwAPL8hkDYr1hJ",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f8/TurnUsageTests.swift",
+  "toolCallID": "toolu_01GaFhiMCCCr2gqx96XD7s53",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f12/ServingTests.swift",
+  "toolCallID": "toolu_016D8PrCEwpmXdncFn2t4XbF",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f12/ServingTests.swift",
+  "toolCallID": "toolu_01EBgeBVwpL1KXWV1p6TaAoc",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f9/QueuedPromptTests.swift",
+  "toolCallID": "toolu_01ReNDMyLc97BvvCmBnpjXJB",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f13/SuggestedPromptTests.swift",
+  "toolCallID": "toolu_01KuyoucsTMrCrFBpN5BYnYt",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f14/CloseOnExecTests.swift",
+  "toolCallID": "toolu_01VKY6u7sEgynjHba68jnfDT",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f15/FolderWatchTests.swift",
+  "toolCallID": "toolu_017VpxpHW1VuArnWFDjVei3e",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f16/ACPSessionTests.swift",
+  "toolCallID": "toolu_01UHNa8q2tt9EjJ9Y39BhVyu",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f8/TurnUsageTests.swift",
+  "toolCallID": "toolu_01CPUqumzMVNEXRVvbx3E9RV",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f17/TerminalService.swift",
+  "toolCallID": "toolu_01QST23uxADg3GwKYKA4NcAY",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f17/TerminalService.swift",
+  "toolCallID": "toolu_01312YzeJRMLfa8oSSJM3bbY",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f17/TerminalService.swift",
+  "toolCallID": "toolu_019TLAhHFZSTxkLx4T6m9QGx",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f17/TerminalService.swift",
+  "toolCallID": "toolu_01TcnA6VR3XEo6pVCG4KpnPn",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f17/TerminalService.swift",
+  "toolCallID": "toolu_01N8P3MjrAz3nD6vqyRhKVdK",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f19/TerminalOutputTests.swift",
+  "toolCallID": "toolu_01U8LBdHU34CgxcqNwyXwQAK",
+  "index": 0,
+  "isNew": true
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_018kE6qDHvkkih4wbvKLKikS",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_019AWK4nDNErBmjnbzdYLxK6",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_01YbcsZFwenBR5PWvSNfxvWE",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f21/DaemonCore+Serving.swift",
+  "toolCallID": "toolu_01PsVCw5qBo6iFeWJQFvRhNr",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f21/DaemonCore+Serving.swift",
+  "toolCallID": "toolu_01PBpTDxCAKEPyCNeLjiN5zJ",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01Lz4Yr7XuZqeeYhhoGY2iRs",
+  "index": 0,
+  "isNew": true
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01CpFfYnsobiaaxEKvCQWhCE",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01YGhdQbtoSh26QQpaMuFPic",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_01REfW4FrR7AtPpLx5ujqfnP",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_016H3iLXLML4yEGsBPo59946",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_015yBoS8fkEWJbKpf4wNmbSz",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_01YGVKqnU7PaSU1SL5qDbL3D",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f24/DaemonCore+Commands.swift",
+  "toolCallID": "toolu_01UR6ZNVAkZjf7xdFHhs76rM",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01TojUkwyJTCKxkZfH3BpvhN",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01L4D7zDGTRWVM6ZQpvduUBp",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01L4D7zDGTRWVM6ZQpvduUBp",
+  "index": 1,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f25/FakeACPAgent.swift",
+  "toolCallID": "toolu_01Kna4ZkxCT3bTP1y53w5rjH",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f25/FakeACPAgent.swift",
+  "toolCallID": "toolu_01WkBC6oBhoMRPYW1z8k4Kcn",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01YKZWMr1rtGrC4xdqkoJ2VE",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f22/EventStreamHandoverTests.swift",
+  "toolCallID": "toolu_01YKZWMr1rtGrC4xdqkoJ2VE",
+  "index": 1,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f20/DaemonCore.swift",
+  "toolCallID": "toolu_01J41sLUZ3JxL4BrtM4yddjq",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_016TLhQBfiBjdHC9cqV9bnty",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f26/JSONRPCConnection.swift",
+  "toolCallID": "toolu_014a5HbWNM8wRmPpJUesUTHi",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_019hw3p33oYC2qnMWoyJDXW2",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01MWzDqKcKA9pGm4hktW3Mm2",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01MWzDqKcKA9pGm4hktW3Mm2",
+  "index": 1,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01CU7Ahb315jjvv6Tur7dSeN",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f23/ACPSession.swift",
+  "toolCallID": "toolu_01V5xyFhFtzHBdTgvUmSQh21",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01RGhzE9SYEmaSxEe7WH6Vsh",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01StUUchd7wdSxtyBCzx3Tqe",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01EyUX2ddLwWPkp8uLgZZ1eR",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01UWxAKmvDYpSy6P5SyAFw5V",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01MyFd95QYBK68uP2fDsRRix",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01G9uQSbHTTyE46uMBGav33L",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f27/PTYTests.swift",
+  "toolCallID": "toolu_017At9B7Mxv1cNQhhfZ9vZiX",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_019BS1AbxJrTpp7ubR1UNPea",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01DrZRHAAfnk1x7YCsVjbqkL",
+  "index": 0,
+  "isNew": false
+ },
+ {
+  "path": "/fixture/f11/PTY.swift",
+  "toolCallID": "toolu_01LKcYiJWf5Rc6RjF2RhHofw",
+  "index": 0,
+  "isNew": false
+ }
+]

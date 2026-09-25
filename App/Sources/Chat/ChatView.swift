@@ -13,6 +13,8 @@ import SwiftUI
 /// agent said can still be scrolled clear of it.
 struct ChatView: View {
     @Environment(AppModel.self) private var model
+    @Environment(SidebarFrame.self) private var frame
+    @Environment(SidebarStates.self) private var states
     @State private var formHeight: CGFloat = 0
 
     private var agent: Agent? { model.selectedAgent }
@@ -53,7 +55,15 @@ struct ChatView: View {
             // The editor the Mac opens that file with, which is the one the user chose.
             open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
-            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            // The sidebar's Changes pane, open at that edit (035 FR-014).
+            showEdit: { [frame, states, agent] diff, toolCallID in
+                guard let agent else { return }
+                states.state(for: agent.id).changesSelection = ChangesSelection(
+                    path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
+                frame.pane = .changes
+                if !frame.isOpen { frame.open() }
+            })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
