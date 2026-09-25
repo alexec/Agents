@@ -1366,6 +1366,20 @@ public enum DaemonAPI {
             self.worktrees = worktrees
         }
 
+        /// The branch the project folder is on, "detached" when it is on none. Nil
+        /// when it is in no repository, or not listed yet.
+        public var projectFolderBranch: String? {
+            worktrees.first(where: \.isProjectFolder).map { $0.branch ?? "detached" }
+        }
+
+        /// What the chooser says under "Project folder": its branch first, since the
+        /// project folder is not always on main.
+        public var projectFolderDescription: String {
+            let alongside = "Work alongside anything else here"
+            guard let branch = projectFolderBranch else { return alongside }
+            return "\(branch) · \(alongside.lowercased())"
+        }
+
         public static let notARepository = WorktreesListResponse(isRepository: false)
 
         public init(from decoder: any Decoder) throws {
