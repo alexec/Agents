@@ -1002,11 +1002,41 @@ public enum DaemonAPI {
 
     public struct ListRequest: Codable, Sendable {
         public var includeArchived: Bool
-        public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
+        /// Whether an archived agent comes with its slash commands. The Mac's archived
+        /// chat still has a prompt bar and wants them; the phone's has none. They were
+        /// nine tenths of a 5.4 MB `agents/list` on 2026-09-25 (seventy commands each,
+        /// 220 archived agents). Unarchiving sends the whole agent again.
+        public var archivedCommands: Bool
+        /// Only archived agents. With `folder`, one project's Archived section, which
+        /// the phone asks for when it is opened rather than with everything else:
+        /// archived agents outnumber the live ones many times over.
+        public var archivedOnly: Bool
+        /// Only agents in this project.
+        public var folder: URL?
+        /// Only the agents this workflow started, for its Recent runs.
+        public var startedByWorkflow: String?
+        /// At most this many, newest activity first.
+        public var limit: Int?
+
+        public init(includeArchived: Bool = true, archivedCommands: Bool = true,
+                    archivedOnly: Bool = false, folder: URL? = nil,
+                    startedByWorkflow: String? = nil, limit: Int? = nil) {
+            self.includeArchived = includeArchived
+            self.archivedCommands = archivedCommands
+            self.archivedOnly = archivedOnly
+            self.folder = folder
+            self.startedByWorkflow = startedByWorkflow
+            self.limit = limit
+        }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             includeArchived = try c.decodeIfPresent(Bool.self, forKey: .includeArchived) ?? true
+            archivedCommands = try c.decodeIfPresent(Bool.self, forKey: .archivedCommands) ?? true
+            archivedOnly = try c.decodeIfPresent(Bool.self, forKey: .archivedOnly) ?? false
+            folder = try c.decodeIfPresent(URL.self, forKey: .folder)
+            startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
+            limit = try c.decodeIfPresent(Int.self, forKey: .limit)
         }
     }
 

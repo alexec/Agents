@@ -1247,6 +1247,7 @@ extension DaemonCore {
         stops[agentID, default: 0] += 1
         // Archived is never resumed (FR-017): the block goes before anything is awaited.
         dropBlock(agentID)
+        shownPlanFiles.removeValue(forKey: agentID)
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)

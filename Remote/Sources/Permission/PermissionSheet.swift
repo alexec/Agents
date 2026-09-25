@@ -25,7 +25,7 @@ struct PermissionSheet: View {
                 Text(request.toolCall.title)
                     .appText(.reading).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)
-                if let kind = request.toolCall.kind {
+                if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
                     Text(kind).appText(.fine).foregroundStyle(.secondary)
                 }
             }
@@ -49,9 +49,15 @@ struct PermissionSheet: View {
 
     /// What it actually wants to do: the command, or the change. Shown, not summarised
     /// — the point of being asked is to see what is being asked.
+    ///
+    /// Except a plan the runtime wrote to a file: that is a page, opened as one, and a
+    /// whole plan in this card would push the answers off the screen.
     @ViewBuilder
     private var detail: some View {
-        if !request.toolCall.content.isEmpty {
+        if let plan = request.toolCall.planFile {
+            Button("Show plan") { model.openPlan(plan) }
+                .buttonStyle(.paper)
+        } else if !request.toolCall.content.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(request.toolCall.content.enumerated()), id: \.offset) { _, piece in
                     switch piece {
