@@ -185,7 +185,7 @@ struct ProjectAgentsView: View {
 
     /// Every agent's state on this page, archived ones included.
     private var states: [AgentState] {
-        AgentGroup.allCases.flatMap { model.agents(in: folder, group: $0) }.map(\.state)
+        AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
     }
 
     private var archived: [Agent] {
