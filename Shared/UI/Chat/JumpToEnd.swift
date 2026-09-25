@@ -11,6 +11,12 @@ struct JumpToEnd: View {
     let hasNewBelow: Bool
     let go: () -> Void
 
+    #if os(iOS)
+    private static let touch: CGFloat = 1.4
+    #else
+    private static let touch: CGFloat = 1
+    #endif
+
     var body: some View {
         Button(action: go) {
             HStack(spacing: 5) {
@@ -21,8 +27,9 @@ struct JumpToEnd: View {
                     Text("Something new")
                 }
             }
-            .padding(.horizontal, hasNewBelow ? 12 : 9)
-            .padding(.vertical, 7)
+            // A thumb, not a pointer, on a touch screen: the same capsule, larger.
+            .padding(.horizontal, hasNewBelow ? 12 * Self.touch : 9 * Self.touch)
+            .padding(.vertical, 7 * Self.touch)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

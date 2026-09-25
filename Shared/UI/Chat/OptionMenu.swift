@@ -1,4 +1,4 @@
-import AgentsKit
+import AgentsKitCore
 import SwiftUI
 
 /// One option a runtime advertises.

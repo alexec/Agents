@@ -56,12 +56,12 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: Change each control from the phone, attach, dictate, and send while working; the Mac shows it all.
 
-- [ ] T016 [US2] Add to `Remote/Sources/RemoteModel.swift`: `chosenOption`/`setOption` using the T003 bookkeeping over `agents/setOption`; `send(_:attachments:to:)` that refuses with `PhoneAttachment.totalRefusal` first; `promptCapabilities(for:)` already exists
-- [ ] T017 [P] [US2] Create `Remote/Sources/Chat/OptionCapsule.swift`: a select option as a capsule `Menu` (grouped with headings, checkmark on the chosen), a boolean as a capsule toggle, and `.unsupported` as nothing, matching `App/Sources/StartAgent/OptionMenu.swift`
-- [ ] T018 [P] [US2] Create `Shared/UI/Chat/OptionsNote.swift`, holding the six `PromptControlsState` sentences and "Try again" moved from `App/Sources/Chat/PromptBar.swift`, and use it there
-- [ ] T019 [US2] Move `App/Sources/Chat/Dictation.swift` to `Shared/UI/Chat/Dictation.swift`, adding an `#if os(iOS)` `AVAudioSession` record setup before the engine starts; add `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` to `Remote/Info.plist` in the Mac's words
-- [ ] T020 [US2] Rebuild `Remote/Sources/Chat/PromptBar.swift` to the Mac's structure: attachment strip (029's `AttachmentStrip`), command list, suggestion chip, the field with `AttachButton`, a dictate button (with the one-time primer sheet) and a send button that shows `arrow.up.to.line` / "Queue" while the agent holds its runtime, and an options row (a horizontal scroll, permission options first, `Spacer`, the rest), or `OptionsNote` when there are no controls
-- [ ] T021 [US2] Keep words and attachments in the field when a send fails, and clear only on success, in `Remote/Sources/Chat/PromptBar.swift`
+- [X] T016 [US2] Add to `Remote/Sources/RemoteModel.swift`: `chosenOption`/`setOption` using the T003 bookkeeping over `agents/setOption`; `send(_:attachments:to:)` that refuses with `PhoneAttachment.totalRefusal` first; `promptCapabilities(for:)` already exists
+- [X] T017 [P] [US2] Create `Remote/Sources/Chat/OptionCapsule.swift`: a select option as a capsule `Menu` (grouped with headings, checkmark on the chosen), a boolean as a capsule toggle, and `.unsupported` as nothing, matching `App/Sources/StartAgent/OptionMenu.swift`
+- [X] T018 [P] [US2] Create `Shared/UI/Chat/OptionsNote.swift`, holding the six `PromptControlsState` sentences and "Try again" moved from `App/Sources/Chat/PromptBar.swift`, and use it there
+- [X] T019 [US2] Move `App/Sources/Chat/Dictation.swift` to `Shared/UI/Chat/Dictation.swift`, adding an `#if os(iOS)` `AVAudioSession` record setup before the engine starts; add `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` to `Remote/Info.plist` in the Mac's words
+- [X] T020 [US2] Rebuild `Remote/Sources/Chat/PromptBar.swift` to the Mac's structure: attachment strip (029's `AttachmentStrip`), command list, suggestion chip, the field with `AttachButton`, a dictate button (with the one-time primer sheet) and a send button that shows `arrow.up.to.line` / "Queue" while the agent holds its runtime, and an options row (a horizontal scroll, permission options first, `Spacer`, the rest), or `OptionsNote` when there are no controls
+- [X] T021 [US2] Keep words and attachments in the field when a send fails, and clear only on success, in `Remote/Sources/Chat/PromptBar.swift`
 
 ---
 
@@ -71,10 +71,10 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: An agent in a worktree at its limit: the worktree, meter and runtime above the field, and the banner; "Let this one go on" works.
 
-- [ ] T022 [P] [US3] Create `Shared/UI/Chat/PromptHeader.swift` (the worktree or folder capsule, a meter slot and the runtime capsule) from `App/Sources/Chat/PromptBar.swift` `whereAndWhat`'s agent branch, and use it there
-- [ ] T023 [P] [US3] Create `Shared/UI/Chat/CostLimitBanner.swift` with the own-limit and day-limit banners moved from `App/Sources/Chat/PromptBar.swift` `atItsLimit`. `raise` is optional; when it is nil the banner says "Change the limit in Settings on your Mac." Use it on the Mac with `SettingsLink`
-- [ ] T024 [US3] Add `letThisAgentGoOn` to `Remote/Sources/RemoteModel.swift` via `agents/setCeiling` and `ceilingToGoOn`
-- [ ] T025 [US3] Put `PromptHeader` (with the phone's `ContextMeter`) and `CostLimitBanner` at the top of the phone prompt bar, and remove the bottom-bar `ContextMeter` toolbar item from `Remote/Sources/Chat/RemoteChatView.swift`
+- [X] T022 [P] [US3] Create `Shared/UI/Chat/PromptHeader.swift` (the worktree or folder capsule, a meter slot and the runtime capsule) from `App/Sources/Chat/PromptBar.swift` `whereAndWhat`'s agent branch, and use it there
+- [X] T023 [P] [US3] Create `Shared/UI/Chat/CostLimitBanner.swift` with the own-limit and day-limit banners moved from `App/Sources/Chat/PromptBar.swift` `atItsLimit`. `raise` is optional; when it is nil the banner says "Change the limit in Settings on your Mac." Use it on the Mac with `SettingsLink`
+- [X] T024 [US3] Add `letThisAgentGoOn` to `Remote/Sources/RemoteModel.swift` via `agents/setCeiling` and `ceilingToGoOn`
+- [X] T025 [US3] Put `PromptHeader` (with the phone's `ContextMeter`) and `CostLimitBanner` at the top of the phone prompt bar, and remove the bottom-bar `ContextMeter` toolbar item from `Remote/Sources/Chat/RemoteChatView.swift`
 
 ---
 
@@ -84,9 +84,9 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: A streaming reply follows with no taps; scrolling up holds; sending returns to the end.
 
-- [ ] T026 [US4] Extract the scroll behaviour of `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptScroller.swift` with the inputs in `contracts/chat-surface.md`, and move `App/Sources/Chat/JumpToEnd.swift` into `Shared/UI/Chat/`. Keep the Mac's thresholds (160 to leave, 40 to be back) and its comments
+- [X] T026 [US4] Extract the scroll behaviour of `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptScroller.swift` with the inputs in `contracts/chat-surface.md`, and move `App/Sources/Chat/JumpToEnd.swift` into `Shared/UI/Chat/`. Keep the Mac's thresholds (160 to leave, 40 to be back) and its comments
 - [ ] T027 [US4] Make `App/Sources/Chat/Transcript.swift` a thin wrapper over `TranscriptScroller`; confirm on a scratch root that following, jump-to-end, earlier pages and focus-an-entry behave as before
-- [ ] T028 [US4] Add `scrollToEndToken` to `Remote/Sources/RemoteModel.swift` (bumped on a successful send), and rebuild `Remote/Sources/Chat/RemoteChatView.swift` as a `ZStack(alignment: .bottom)` of `TranscriptScroller` and the form stack, measured into `bottomInset`, passing `measure(transcriptHeight:)` as `onHeight`. Delete the phone's own `Place`, `JumpToEnd`, `settle` and `loadEarlier`
+- [X] T028 [US4] Add `scrollToEndToken` to `Remote/Sources/RemoteModel.swift` (bumped on a successful send), and rebuild `Remote/Sources/Chat/RemoteChatView.swift` as a `ZStack(alignment: .bottom)` of `TranscriptScroller` and the form stack, measured into `bottomInset`, passing `measure(transcriptHeight:)` as `onHeight`. Delete the phone's own `Place`, `JumpToEnd`, `settle` and `loadEarlier`
 
 ---
 
@@ -96,8 +96,8 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: A permission request and then a form; each floats above the prompt area and clears on both when answered.
 
-- [ ] T029 [US5] In `Remote/Sources/Chat/RemoteChatView.swift`, make the form stack `PermissionSheet`, then `ElicitationSheet`, then `PromptBar` (not archived), in that order, all in the chat column. While a card is up and the field is not focused, the bar shows only its field row
-- [ ] T030 [P] [US5] Give `Remote/Sources/Permission/PermissionSheet.swift` the Mac's prominence rule (an `allows` option drawn prominent, the rest plain), keeping its stacked layout and full detail
+- [X] T029 [US5] In `Remote/Sources/Chat/RemoteChatView.swift`, make the form stack `PermissionSheet`, then `ElicitationSheet`, then `PromptBar` (not archived), in that order, all in the chat column. While a card is up and the field is not focused, the bar shows only its field row
+- [X] T030 [P] [US5] Give `Remote/Sources/Permission/PermissionSheet.swift` the Mac's prominence rule (an `allows` option drawn prominent, the rest plain), keeping its stacked layout and full detail
 
 ---
 
@@ -107,19 +107,19 @@ All paths are relative to `/tmp/w-033`.
 
 **Independent Test**: Stop, then Archive (which leaves the chat); switch conversations with a draft; an iPad keyboard; `@Trans`.
 
-- [ ] T031 [US6] In `Remote/Sources/Chat/RemoteChatView.swift`, add Stop as a top-bar button when `canStop`, and Archive beside it, which archives and clears the selection so the view returns to the project. The "…" menu keeps "Exchanged" and "Bring back"
-- [ ] T032 [US6] Keep the phone's draft per conversation with `DraftStore` and `DraftKey.agent(id)` in `Remote/Sources/Chat/PromptBar.swift`: restore on appear and on selection change, save on change (debounced) and when going to the background, and clear on a successful send
-- [ ] T033 [US6] Apply the Mac field's `onKeyPress` handlers (Return, Option-Return, Tab, the arrows, Escape) and a highlighted row in the command and mention lists in `Remote/Sources/Chat/PromptBar.swift`
-- [ ] T034 [US6] Add `DaemonAPI.Method.filesMention`, `FileMentionRequest` and `FileMentionDTO` to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, and dispatch it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`: an empty term returns `[]`, an unknown agent returns "No such agent", and the search covers `[cwd] + additionalDirectories` with limit 30
-- [ ] T035 [P] [US6] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FileMentionTests.swift` covering a match, an empty term, an unknown agent, and additional directories
-- [ ] T036 [US6] Phone `@` mentions: `RemoteModel.mentions(term:for:)` over `files/mention`, cancelled per keystroke, drawn as a list in `Remote/Sources/Chat/PromptBar.swift`; choosing one completes the name and appends `.file(URL(filePath: path))`
+- [X] T031 [US6] In `Remote/Sources/Chat/RemoteChatView.swift`, add Stop as a top-bar button when `canStop`, and Archive beside it, which archives and clears the selection so the view returns to the project. The "…" menu keeps "Exchanged" and "Bring back"
+- [X] T032 [US6] Keep the phone's draft per conversation with `DraftStore` and `DraftKey.agent(id)` in `Remote/Sources/Chat/PromptBar.swift`: restore on appear and on selection change, save on change (debounced) and when going to the background, and clear on a successful send
+- [X] T033 [US6] Apply the Mac field's `onKeyPress` handlers (Return, Option-Return, Tab, the arrows, Escape) and a highlighted row in the command and mention lists in `Remote/Sources/Chat/PromptBar.swift`
+- [X] T034 [US6] Add `DaemonAPI.Method.filesMention`, `FileMentionRequest` and `FileMentionDTO` to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, and dispatch it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`: an empty term returns `[]`, an unknown agent returns "No such agent", and the search covers `[cwd] + additionalDirectories` with limit 30
+- [X] T035 [P] [US6] Integration test in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/FileMentionTests.swift` covering a match, an empty term, an unknown agent, and additional directories
+- [X] T036 [US6] Phone `@` mentions: `RemoteModel.mentions(term:for:)` over `files/mention`, cancelled per keystroke, drawn as a list in `Remote/Sources/Chat/PromptBar.swift`; choosing one completes the name and appends `.file(URL(filePath: path))`
 
 ---
 
 ## Phase 9: Polish & cross-cutting
 
-- [ ] T037 FR-021 scan in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`: fails if `Remote/Sources` declares `EntryRow`, `ToolRunRow`, `ToolCallLine`, `StateLine`, `WorkReportLine`, `JumpToEnd` or `QueuedPromptRow`, or if any string literal of 12+ characters in `Shared/UI/Chat/*.swift` also appears in `App/Sources/Chat` or `Remote/Sources/Chat`
-- [ ] T038 Update `Shared/UI/README.md` for the `Chat/` folder and `ChatActions`
+- [X] T037 FR-021 scan in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`: fails if `Remote/Sources` declares `EntryRow`, `ToolRunRow`, `ToolCallLine`, `StateLine`, `WorkReportLine`, `JumpToEnd` or `QueuedPromptRow`, or if any string literal of 12+ characters in `Shared/UI/Chat/*.swift` also appears in `App/Sources/Chat` or `Remote/Sources/Chat`
+- [X] T038 Update `Shared/UI/README.md` for the `Chat/` folder and `ChatActions`
 - [ ] T039 Full gate: `swift test` (compare any failures with the baseline, per the flaky-suite memory), both schemes built, and a Mac run-app walk of a live conversation
 - [ ] T040 Record the deliberate differences and the phone walk (quickstart §4) as Alex's in the feature notes, and commit on `033-mobile-chat-parity`
 

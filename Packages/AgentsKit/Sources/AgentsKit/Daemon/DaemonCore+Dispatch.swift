@@ -172,6 +172,10 @@ extension DaemonCore {
                 try await unqueue(request)
                 return .success([:])
 
+            case DaemonAPI.Method.filesMention:
+                let request = try require(params, as: DaemonAPI.FileMentionRequest.self)
+                return .success(try JSONValue.encoding(try await fileMentions(request)))
+
             case DaemonAPI.Method.agentsStop:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await stop(request.agentID)

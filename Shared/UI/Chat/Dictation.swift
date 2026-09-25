@@ -1,5 +1,8 @@
 import AVFoundation
 import Foundation
+#if os(iOS)
+import UIKit
+#endif
 import Observation
 import Speech
 
@@ -54,14 +57,26 @@ final class Dictation {
         /// switch is somewhere most people have never been, so it is worth opening for
         /// them rather than describing the way and wishing them luck.
         var settings: URL {
+            #if os(iOS)
+            // A phone has one place for an app's switches, and this app's page is it.
+            return URL(string: UIApplication.openSettingsURLString)!
+            #else
             switch self {
             case .microphone:
-                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+                return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
             case .speechRecognition:
-                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")!
+                return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")!
             }
+            #endif
         }
     }
+
+    /// Where the switches are, in each system's own words.
+    #if os(iOS)
+    private static let whereTheSwitchIs = "Turn it on in Settings, under this app."
+    #else
+    private static let whereTheSwitchIs = "Turn it on in System Settings, under Privacy & Security."
+    #endif
 
     private(set) var isListening = false
     private(set) var problem: Problem?
@@ -135,13 +150,13 @@ final class Dictation {
     private func requestAccessThenListen() async {
         let speech = await Self.askForSpeech()
         guard speech == .authorized else {
-            problem = Problem(message: "Dictation needs permission to recognise speech. Turn it on in System Settings, under Privacy & Security.",
+            problem = Problem(message: "Dictation needs permission to recognise speech. " + Self.whereTheSwitchIs,
                               permission: .speechRecognition)
             return
         }
         let microphone = await Self.askForMicrophone()
         guard microphone else {
-            problem = Problem(message: "Dictation needs the microphone. Turn it on in System Settings, under Privacy & Security.",
+            problem = Problem(message: "Dictation needs the microphone. " + Self.whereTheSwitchIs,
                               permission: .microphone)
             return
         }
@@ -166,6 +181,13 @@ final class Dictation {
     /// The microphone, opened once and left open for as long as dictation is on.
     private func openMicrophone() throws {
         guard !engine.isRunning else { return }
+        #if os(iOS)
+        // A phone shares one audio route between everything on it, and the microphone
+        // is not the app's until the app says it is recording.
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        #endif
 
         // The tap is called by the audio realtime thread. A closure written inside a
         // main-actor method belongs to the main actor, and Swift checks that where it
@@ -194,7 +216,7 @@ final class Dictation {
     private func listenForAnUtterance(with recogniser: SFSpeechRecognizer) {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        // Keep it on the Mac where the Mac can do it. What is said to an agent is the
+        // Keep it on the device where the device can do it. What is said to an agent is the
         // agent's business and nobody else's.
         request.requiresOnDeviceRecognition = recogniser.supportsOnDeviceRecognition
         self.request = request
@@ -255,6 +277,10 @@ final class Dictation {
         task?.cancel()
         request = nil
         task = nil
+        #if os(iOS)
+        // Give the route back, so whatever was playing before carries on.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     func toggle(appendingTo base: String, onText: @escaping (String) -> Void) {
