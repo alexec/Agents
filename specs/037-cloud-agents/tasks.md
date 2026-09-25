@@ -207,13 +207,13 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 ## Phase 8: Polish, costs and the real server
 
-- [ ] T050 [P] Costs across hosts (R7):
+- [X] T050 [P] Costs across hosts (R7): **Done: a server's cost/wake/modes/attention notifications no longer overwrite the Mac's; `serverCosts` per host; limits pushed to each server on connect and on change; 'X on servers' under Today; the daily-limit footer says each server keeps it on its own. No unit test (app target).**
   - `App/Sources/Spending/*` and the project list's spending row sum each connected host's `cost/state` and add `· £X on servers`;
   - `cost/setLimits` is pushed to every host on change and on connect;
   - `App/Sources/Settings/CostSettingsView.swift` gains `Each server keeps to this limit on its own.` under the daily limit.
   - Test the sum in `Tests/Unit/AgentsModelHostTests.swift`.
 - [ ] T051 [P] Attachments to server projects: add `files/write` to `DaemonAPI.swift`/`DaemonCore` (writes under `<project>/.agents/attachments/`, 25 MB cap, refusing paths outside the project), with a test in `Tests/Integration/`. Use it from `App/Sources/Chat/PromptBar.swift` for server projects, with the too-big message from ui.md.
-- [ ] T052 Build `project.yml`: copy `App/Resources/servers/*` into the app bundle's `Resources/servers/`. Run `scripts/build-linux-agentsd.sh` before `xcodegen`. Both schemes build sequentially with `-skipPackagePluginValidation` (memory).
+- [X] T052 Build `project.yml`: copy `App/Resources/servers/*` into the app bundle's `Resources/servers/`. Run `scripts/build-linux-agentsd.sh` before `xcodegen`. Both schemes build sequentially with `-skipPackagePluginValidation` (memory). **Done: `App/Resources/servers` is an optional folder reference, so it lands as Resources/servers/; binaries rebuilt after the daemon changes (x86_64 58 MB, aarch64 55 MB). Run the script before a release build.**
 - [ ] T053 Run the full `swift test` six times on this branch and on its merge-base, and compare against T002 before blaming anything on this branch (memory: the suite is flaky under load). Run `scripts/build-linux-agentsd.sh --check`.
 - [ ] T054 Write `specs/037-cloud-agents/walk/README.md` listing the real-server checks from [quickstart § 4](quickstart.md#4-real-server-phase-6-alex) (SC-001, SC-002/003, SC-005, SC-006, SC-007, two Macs, reboot), each with the exact steps and what passing looks like. Those are Alex's to run.
 

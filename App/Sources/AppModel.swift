@@ -454,6 +454,23 @@ final class AppModel {
             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
             returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
+        // Every connected server keeps to the same limits, each on its own (037, R7).
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            serverCosts[host.id] = try? await client(for: host.id).call(
+                DaemonAPI.Method.costSetLimits,
+                DaemonAPI.SetLimitsRequest(perAgent: .some(state.limits.perAgent), daily: .some(state.limits.daily)),
+                returning: DaemonAPI.CostState.self)
+        }
+    }
+
+    /// Each server's spending, as it last said (037).
+    private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+
+    /// What the servers have spent today, together, per currency. Empty when nothing.
+    var serversToday: [String: Decimal] {
+        serverCosts.values.reduce(into: [:]) { sum, state in
+            for (currency, amount) in state.today { sum[currency, default: 0] += amount }
+        }
     }
 
     /// Letting one agent carry on past the per-agent limit, or giving it one of its
@@ -725,6 +742,19 @@ final class AppModel {
     }
 
     private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {
+        // What is about the whole of a daemon rather than its work is the Mac's alone in
+        // the model: a server's spending is kept beside it, and a server's wakefulness,
+        // modes and notices have no place in this window (037).
+        switch method {
+        case DaemonAPI.Notification.costChanged:
+            serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
+            return
+        case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
+             DaemonAPI.Notification.attentionChanged:
+            return
+        default:
+            break
+        }
         if work.apply(method, params, from: host) {
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
             return
@@ -765,6 +795,15 @@ final class AppModel {
         // for again, and everything it shows is read again.
         await serverFilesByHost[host]?.reconnected()
         await refreshServerRuntimes(host)
+        // The Mac's limits hold on every server too; each keeps to them on its own.
+        if let limits = work.costState?.limits {
+            serverCosts[host] = try? await server.call(
+                DaemonAPI.Method.costSetLimits,
+                DaemonAPI.SetLimitsRequest(perAgent: .some(limits.perAgent), daily: .some(limits.daily)),
+                returning: DaemonAPI.CostState.self)
+        } else {
+            serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
+        }
         if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(),
                                                returning: [Agent].self) {
             work.replaceAgents(listed, from: host)

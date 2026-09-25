@@ -271,6 +271,11 @@ private struct SpendingRow: View {
                     if let today {
                         Text(today).monospacedDigit()
                     }
+                    // Beside this Mac's, never added in: each daemon keeps its own day
+                    // and its own limit (037).
+                    if let servers = Cost.total(of: model.serversToday) {
+                        Text("\(servers) on servers").monospacedDigit().appText(.fine)
+                    }
                     // Nothing when there is no limit: headroom that does not exist is
                     // not a thing to draw an empty gauge for.
                     if let state = model.costState, let left = state.dayHeadroom,
