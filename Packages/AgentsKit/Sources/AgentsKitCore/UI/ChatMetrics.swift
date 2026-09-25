@@ -60,7 +60,7 @@ public struct ChatMetrics: Hashable, Sendable {
     /// the cap plus the full padding — the first width at which the column no longer
     /// needs to give anything up.
     static let narrowPane: Double = 320
-    static let comfortablePane: Double = measureCap + widePadding * 2
+    public static let comfortablePane: Double = measureCap + widePadding * 2
 
     /// The column for a pane of this width.
     ///

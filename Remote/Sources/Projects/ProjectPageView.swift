@@ -39,13 +39,6 @@ struct ProjectPageView: View {
                 }
                 .disabled(model.selectedProject == nil)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
-                    TotalsView()
-                } label: {
-                    Label("Spending", systemImage: "sterlingsign.circle")
-                }
-            }
         }
         .onChange(of: model.selectedProject) { archivedShown = pageSize }
         .sheet(isPresented: Binding(get: { model.startingIn != nil },
@@ -87,6 +80,11 @@ struct ProjectPageView: View {
 
                 WorkflowsSection()
 
+                // Worktrees the Mac made here, which outlive the agents in them (030).
+                if let folder = model.selectedProject {
+                    WorktreesSection(folder: folder)
+                }
+
                 if isEmpty {
                     Text("Nothing here yet. Start an agent with New agent and it appears here.")
                         .appText(.reading)
@@ -100,6 +98,11 @@ struct ProjectPageView: View {
             .readableWidth()
         }
         .markedStale(model.isStale)
+        // Asked when the page opens and when its archive changes (who is working in a
+        // worktree moves then), never polled.
+        .task(id: WorktreesAsk(project: model.selectedProject, archived: archived.count)) {
+            if let folder = model.selectedProject { await model.loadProjectWorktrees(in: folder) }
+        }
         .refreshable { await model.refreshEverything() }
     }
 
@@ -206,4 +209,10 @@ struct GroupHeading: View {
         .padding(.leading, 2)
         .accessibilityAddTraits(.isHeader)
     }
+}
+
+/// What the Worktrees section is asked again for.
+private struct WorktreesAsk: Equatable {
+    var project: URL?
+    var archived: Int
 }

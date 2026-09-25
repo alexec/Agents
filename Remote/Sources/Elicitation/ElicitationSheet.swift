@@ -8,12 +8,11 @@ import SwiftUI
 /// is that a question reaches you wherever you are, and "wherever you are" was a desk.
 ///
 /// Built on `PermissionSheet` rather than on the Mac's `ElicitationView`, deliberately.
-/// The Mac's version pages through a form of several questions with arrows and a Send;
-/// that is a good answer for a window and a poor one for a phone held in one hand. What
-/// a phone is good at is the case that actually arrives — one question, a few answers,
-/// one tap — which is what this app's own question tool sends and what every runtime
-/// raising a choice sends. So that case gets the whole screen and one tap, and the rarer
-/// shapes are honest about needing the Mac rather than half-drawn here.
+/// What a phone is good at is the case that actually arrives — one question, a few
+/// answers, one tap — which is what this app's own question tool sends and what every
+/// runtime raising a choice sends. So that case gets the whole screen and one tap.
+/// Anything more — several questions, text, a number, a list to tick — is paged one
+/// question at a time by `FormPages`, the way the Mac pages it.
 struct ElicitationSheet: View {
     @Environment(RemoteModel.self) private var model
     let request: ElicitationRequest
@@ -60,7 +59,10 @@ struct ElicitationSheet: View {
             if let choice = Self.oneTapChoice(in: schema) {
                 oneTap(schema, choice)
             } else {
-                needsTheMac
+                FormPages(request: request, schema: schema) { what, action, content in
+                    send(what, action: action, content: content)
+                }
+                .disabled(model.isStale)
             }
         case .url(let link):
             page(link)
@@ -149,53 +151,14 @@ struct ElicitationSheet: View {
         .disabled(model.isStale)
     }
 
-    /// A form of several questions, free text or a number: shapes that cannot be
-    /// answered by one tap.
-    ///
-    /// Said plainly rather than drawn badly. A half-filled form that looks answerable
-    /// is worse than one that admits where it can be answered — and declining is still
-    /// offered, because leaving an agent blocked on a form you cannot fill in from here
-    /// is the thing this is trying to avoid.
-    private var needsTheMac: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("This one asks for more than a single choice, so it wants your Mac.")
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            declineButton
-        }
-        .disabled(model.isStale)
-    }
-
     private var declineButton: some View {
         Button { send("No thanks", action: .decline) } label: { label("No thanks", note: nil) }
             .buttonStyle(.paper)
             .controlSize(.large)
     }
 
-    /// Full width, wrapping rather than truncating — the largest Dynamic Type sizes are
-    /// exactly when a one-word button becomes half a word.
-    ///
-    /// `onFill` is about contrast and was found by looking at it. What a choice *means*
-    /// is often the whole substance of the question — "quicker, and slow to undo" is the
-    /// part you are actually deciding on — and drawn as `.secondary` it comes out grey on
-    /// a saturated blue fill, which is the one place that colour has no contrast left.
-    /// On a fill the note is white held back a little; off one, `.secondary` as usual.
     private func label(_ title: String, note: String?, onFill: Bool = false) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-            if let note, !note.isEmpty {
-                Text(note)
-                    .appText(.fine)
-                    .foregroundStyle(onFill ? AnyShapeStyle(.white.opacity(0.85))
-                                            : AnyShapeStyle(.secondary))
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
+        AnswerLabel(title: title, note: note, onFill: onFill)
     }
 
     private func send(_ what: String,

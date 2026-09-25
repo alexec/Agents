@@ -643,7 +643,13 @@ struct PromptBar: View {
         .scrollIndicators(.never)
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { optionsWidth = $0 }
+        // The visible width as the scroll view itself has it, rather than the width of
+        // its frame from outside: the frame came back some twenty points wider or
+        // narrower than what is shown, and the right-hand controls stopped that far
+        // short of the prompt's edge.
+        .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, width in
+            optionsWidth = width
+        }
     }
 
     @ViewBuilder
