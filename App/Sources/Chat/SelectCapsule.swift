@@ -23,12 +23,15 @@ struct SelectCapsule<Content: View>: View {
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
+            // The capsule is the button, not the words in it: padding put on outside
+            // a plain button is paper that takes no clicks.
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .appText(.fine)
         .fixedSize()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
         .paperRaised(in: .capsule)
         .help(name)
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
@@ -68,12 +71,13 @@ struct BooleanCapsule: View {
                     .foregroundStyle(isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 Text(name)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .appText(.fine)
         .fixedSize()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
         .paperRaised(in: .capsule)
         .help(name)
         .accessibilityValue(isOn ? "on" : "off")

@@ -723,12 +723,13 @@ struct PromptBar: View {
                                 .font(.system(size: 8, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .appText(.fine)
                     .fixedSize()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
                     .paperRaised(in: .capsule)
                     .help("Folders and MCP servers this agent may reach")
                 }
