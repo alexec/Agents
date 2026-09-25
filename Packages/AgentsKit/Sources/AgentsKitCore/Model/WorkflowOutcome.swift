@@ -84,11 +84,12 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case folderGone
     /// The day's spending limit has been reached, so nothing new may start.
     case dayLimitReached
-    /// The file names a permission mode, a runtime or a model that cannot be had, so
-    /// nothing was started rather than something being started differently.
+    /// The file names a permission mode, a runtime, a model, an effort or an option
+    /// that cannot be had, so nothing was started rather than something being started
+    /// differently.
     ///
     /// `setting` is the key as the file spells it — `permission-mode`, `runtime`,
-    /// `model` — and `detail` is the whole sentence, naming what the runtime does
+    /// `model`, `effort`, or an option's own id from under `options:` — and `detail` is the whole sentence, naming what the runtime does
     /// offer. The two are apart rather than one string because the reason a row
     /// collapses on is the setting, while the sentence carries a list that may change
     /// between one fire and the next.

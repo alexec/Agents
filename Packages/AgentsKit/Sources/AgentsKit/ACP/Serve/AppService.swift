@@ -700,12 +700,19 @@ public actor AppService {
             prompt, sent verbatim.
 
             A workflow may also say how its agent runs: `permission-mode:` (the \
-            runtime's own mode, e.g. a read-only or plan mode), `runtime:` and \
-            `model:`. Leave them out and it runs on the default runtime with that \
-            runtime's own defaults. Set `permission-mode:` when the person says the \
-            workflow must not change anything — a workflow runs unattended, so this is \
-            the only chance to say so. A mode the runtime does not offer stops the \
-            workflow running rather than falling back.
+            runtime's own mode, e.g. a read-only or plan mode), `runtime:`, `model:`, \
+            `effort:` (how hard it thinks, e.g. `low` or `high`), and under \
+            `options:` any other option the runtime offers, by its own id — for \
+            example `fast: true` for fast mode. Leave them out and it runs on the \
+            default runtime with that runtime's own defaults. Set `permission-mode:` \
+            when the person says the workflow must not change anything — a workflow \
+            runs unattended, so this is the only chance to say so. A value the runtime \
+            does not offer stops the workflow running rather than falling back.
+
+            Once its runtime has been used in this project, reading a workflow also \
+            lists what that runtime offers for each of these, in the words the file \
+            takes. To change how an existing workflow runs, \
+            read it, then write it back whole with the settings changed.
 
             Listing and reading ask nobody. Creating, changing or removing one asks the \
             person first, in plain words, and does nothing if they decline.

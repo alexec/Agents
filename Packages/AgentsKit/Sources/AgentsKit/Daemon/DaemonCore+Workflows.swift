@@ -802,7 +802,7 @@ extension DaemonCore {
     ///
     /// The one place in this app that edits a document a person wrote, which is why
     /// every step of it refuses rather than doing its best, and why nothing is written
-    /// until all three keys have been applied to the text in hand. A file half-edited
+    /// until every key has been applied to the text in hand. A file half-edited
     /// and then refused would be worse than one not edited at all: the person would be
     /// left with a change they did not ask for and no message saying what happened.
     public func setWorkflowSettings(_ request: DaemonAPI.WorkflowSettingsRequest) throws -> WorkflowSummary {
@@ -823,8 +823,16 @@ extension DaemonCore {
         do {
             for (key, value) in [(WorkflowSettings.Setting.permissionMode, request.settings.permissionMode),
                                  (WorkflowSettings.Setting.runtime, request.settings.runtimeID),
-                                 (WorkflowSettings.Setting.model, request.settings.model)] {
+                                 (WorkflowSettings.Setting.model, request.settings.model),
+                                 (WorkflowSettings.Setting.effort, request.settings.effort)] {
                 edited = try FrontMatterEdit.set(key, to: value, in: edited)
+            }
+            // Only the ones that differ, in id order: a key left as it was is not
+            // touched, so its line, its quoting and its comment stay the author's.
+            let ids = Set(existing.settings.options.keys).union(request.settings.options.keys)
+            for id in ids.sorted() where existing.settings.options[id] != request.settings.options[id] {
+                edited = try FrontMatterEdit.set(id, under: WorkflowSettings.Setting.options,
+                                                 to: request.settings.options[id], in: edited)
             }
         } catch let refusal as FrontMatterEdit.Refusal {
             // The editor's own sentence, unchanged. It is the one that knows what it

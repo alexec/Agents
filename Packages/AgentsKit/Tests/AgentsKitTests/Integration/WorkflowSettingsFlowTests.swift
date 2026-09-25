@@ -225,6 +225,30 @@ struct WorkflowSettingsFlowTests {
             with: "agent: new   # a fresh one every time\npermission-mode: plan\n---"))
     }
 
+    @Test func effortAndFastModeAreWrittenAndTakenAwayAgain() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let url = try write(file("name: Say hello"), as: "say-hello", in: work)
+        let original = try String(contentsOf: url, encoding: .utf8)
+
+        let (core, _) = try await core(locations)
+        await core.rescanWorkflows(in: work)
+        let summary = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings(effort: "high",
+                                                                         options: ["fast": "true"])))
+        #expect(summary.workflow.settings.effort == "high")
+        #expect(summary.workflow.settings.options == ["fast": "true"])
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(written.contains("effort: high\noptions:\n  fast: true\n---"))
+
+        // Back to the runtime's defaults is the file as it was, byte for byte.
+        _ = try await core.setWorkflowSettings(
+            DaemonAPI.WorkflowSettingsRequest(folder: work, workflowID: "say-hello",
+                                              settings: WorkflowSettings()))
+        #expect(try String(contentsOf: url, encoding: .utf8) == original)
+    }
+
     @Test func theWindowHearsAboutItWithoutWaitingForTheWatcher() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
