@@ -96,4 +96,87 @@ extension DaemonCore {
                              details: ["branch": branch, "from": String(old.prefix(12)), "to": String(tip.prefix(12))]))
         }
     }
+
+    // MARK: mac.* and person.* (R10)
+
+    /// Start hearing the Mac. The real watch in the daemon; a fake one in a test.
+    public func startWatchingMachine(_ watch: any MachineWatch = IOKitMachineWatch()) {
+        machineWatch?.stop()
+        machineWatch = watch
+        watch.start { [weak self] change in
+            Task { await self?.machineChanged(change) }
+        }
+    }
+
+    /// One change, as its event, for every project to hear (US5-AS3).
+    func machineChanged(_ change: MachineChange) {
+        let draft: EventDraft
+        switch change {
+        case .sleep:
+            draft = EventDraft(name: "mac.sleep", at: now(), scope: .mac, sentence: "This Mac went to sleep.")
+        case .wake:
+            draft = EventDraft(name: "mac.wake", at: now(), scope: .mac, sentence: "This Mac woke up.")
+        case .away(let why):
+            draft = EventDraft(name: "person.away", at: now(), scope: .mac,
+                               sentence: why == "locked" ? "You locked the screen." : "You stepped away.",
+                               details: ["why": why])
+        case .back(let why):
+            draft = EventDraft(name: "person.back", at: now(), scope: .mac,
+                               sentence: why == "locked" ? "You unlocked the screen." : "You came back.",
+                               details: ["why": why])
+        }
+        raise(draft)
+    }
+
+    // MARK: cost.limit_reached (R11)
+
+    /// A spending limit was reached, said once a day for each limit (and each agent's
+    /// own): the day's in the Mac's scope, an agent's in its project's.
+    func raiseCostLimit(_ limit: String, agent: Agent?) {
+        loadEventsIfNeeded()
+        let day = Self.dayKey(now())
+        let key = agent.map { "agent:\($0.id.uuidString)" } ?? limit
+        guard !(eventState.costCrossings[day] ?? []).contains(key) else { return }
+        // Only today's are worth keeping.
+        eventState.costCrossings = [day: (eventState.costCrossings[day] ?? []) + [key]]
+        eventStore.saveState(eventState)
+        if let agent {
+            raise(EventDraft(name: "cost.limit_reached", at: now(), scope: .project(folder: agent.projectFolder),
+                             sentence: "\(LeaseWords.agentName(agent.title)) reached its spending limit.",
+                             details: ["limit": limit].merging(agentDetails(agent)) { $1 }))
+        } else {
+            raise(EventDraft(name: "cost.limit_reached", at: now(), scope: .mac,
+                             sentence: "The day's spending limit was reached.", details: ["limit": limit]))
+        }
+    }
+
+    static func dayKey(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    // MARK: lease.* (036)
+
+    /// A lease given or given back, on the Mac's log.
+    func raiseLeaseEvent(_ event: LeaseEvent) {
+        switch event {
+        case .granted(let lease, _, _):
+            raise(EventDraft(name: "lease.granted", at: now(), scope: .mac,
+                             sentence: "\(holderName(lease.holder)) was given \(lease.displayName).",
+                             details: ["resource": lease.resource.key, "agent": lease.holder.uuidString,
+                                       "agent_title": agents[lease.holder]?.title ?? "Untitled"]))
+        case .released(let lease, let ending):
+            let how: String
+            switch ending {
+            case .expired: how = "expired"
+            case .endedByPerson, .holderStopped, .holderArchived, .couldNotStart: how = "ended"
+            case .released: how = "released"
+            }
+            raise(EventDraft(name: "lease.released", at: now(), scope: .mac,
+                             sentence: "\(lease.displayName) was \(how == "expired" ? "let go: its lease ran out" : how == "ended" ? "taken back" : "given back").",
+                             details: ["resource": lease.resource.key, "how": how]))
+        default:
+            break
+        }
+    }
 }

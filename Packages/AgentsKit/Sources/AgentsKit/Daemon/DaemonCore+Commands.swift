@@ -552,10 +552,12 @@ extension DaemonCore {
         // its own transcript saying so on every drain attempt.
         let limits = limitStore.load()
         if agent.isAtCostLimit(under: limits) {
+            raiseCostLimit("agent", agent: agent)
             await holdForCostLimit(agentID)
             return
         }
         if isDayLimitReached(under: limits) {
+            raiseCostLimit("day", agent: nil)
             if held.insert(agentID).inserted {
                 await record(.runtimeNote(
                     "What you sent is waiting: the day's spending limit has been reached. "
@@ -940,6 +942,8 @@ extension DaemonCore {
                 let limits = limitStore.load()
                 crossedItsLimit = agent.isAtCostLimit(under: limits)
                 changed(agent)
+                if crossedItsLimit { raiseCostLimit("agent", agent: agent) }
+                if isDayLimitReached(under: limits) { raiseCostLimit("day", agent: nil) }
                 if usage.cost != nil { broadcastCostState() }
             }
         }

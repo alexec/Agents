@@ -315,6 +315,7 @@ extension DaemonCore {
     func settle(_ events: [LeaseEvent]) async {
         let at = now()
         for event in events {
+            raiseLeaseEvent(event)
             switch event {
             case .granted(let lease, let waiter, let capped):
                 guard let waiter else {

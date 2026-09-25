@@ -214,6 +214,23 @@ under launchd. If they do not, the app sends lock and unlock through the `presen
 already sends, and the daemon raises the events from that. Sleep and wake from IOKit don't
 depend on the spike.
 
+**As built (T058, 2026-09-25)**: the spike was not run as planned, because it needed the
+screen locked while Alex was at it, and because `agentsd` parks its main thread in
+`dispatchMain()` with no CFRunLoop, so a distributed notification would likely never be
+delivered to it anyway. Instead the watch needs nothing delivered:
+- Sleep and wake: `IORegisterForSystemPower` with `IONotificationPortSetDispatchQueue`, so the
+  power messages arrive on a dispatch queue.
+- Lock: `CGSessionCopyCurrentDictionary()["CGSSessionScreenIsLocked"]`, read every 10 s.
+- Idle: `HIDIdleTime` from `IOHIDSystem`, read every 10 s.
+
+Both reads were probed from a plain command-line process (session dictionary present,
+unlocked; idle 449 s). The sleep/wake and lock walks with the real Mac are quickstart §4.
+
+**R7, as built**: today's nine trigger names keep firing from where they always did, and
+only gain a causing event, so the log shows their fires. Only the new dotted names are
+matched in `raise`. Moving the old ones behind `raise` as well would have changed a
+live-proven firing path for no difference the person can see, and risked firing twice.
+
 ## R11. `cost.limit_reached`
 
 **Decision**: The event is raised where the daemon already refuses for a limit:

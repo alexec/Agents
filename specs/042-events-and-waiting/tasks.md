@@ -380,17 +380,17 @@ consequence.
 scratch root. Each appears in the log labelled "This Mac", and a waiting agent and a workflow
 each respond to one of them.
 
-- [ ] T058 [US5] **Spike, ten minutes, first.** In a scratch Swift file under `/tmp/042-spike`, not in the repository, check that `DistributedNotificationCenter` delivers `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` to a process that runs `dispatchMain()` under launchd, as agentsd does. Write the result in `research.md` R10. If it fails, T059 takes lock and unlock from the app's `presence/report` instead.
-- [ ] T059 [US5] Create `Pkg/Sources/AgentsKit/Power/MachineWatch.swift`.
+- [X] T058 [US5] **Spike, ten minutes, first.** In a scratch Swift file under `/tmp/042-spike`, not in the repository, check that `DistributedNotificationCenter` delivers `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` to a process that runs `dispatchMain()` under launchd, as agentsd does. Write the result in `research.md` R10. If it fails, T059 takes lock and unlock from the app's `presence/report` instead.
+- [X] T059 [US5] Create `Pkg/Sources/AgentsKit/Power/MachineWatch.swift`.
   - `protocol MachineWatch: AnyObject, Sendable { func start(_ report: @escaping @Sendable (MachineChange) -> Void); func stop() }`, where `MachineChange` is `sleep, wake, away(why: String), back(why: String)`.
   - The IOKit implementation, behind `#if canImport(IOKit)`, uses `IORegisterForSystemPower` for will-sleep (call `IOAllowPowerChange` after reporting) and has-powered-on, the lock notifications (or presence, per T058), and a 30 s `HIDIdleTime` poll with a 300 s threshold. It raises no idle "away" while locked.
   - Add `FakeMachineWatch` in `Pkg/Tests/AgentsKitTests/Support/`.
   - On Linux there is no watch at all.
-- [ ] T060 [US5] In `DaemonCore+EventSources.swift`, start the watch when the daemon starts and stop it when it goes. Map each `MachineChange` to `raise` of `mac.sleep`, `mac.wake`, `person.away` or `person.back`, with Mac scope and a plain sentence ("This Mac woke up"). Inject it through `useForEvents(machineWatch:)` in tests.
-- [ ] T061 [US5] `cost.limit_reached` (R11): where `isDayLimitReached` and `agent.isAtCostLimit` refuse in `DaemonCore+Commands.swift`, raise it once per crossing. Use `limit: day` with Mac scope, or `limit: agent` with project scope and `agent`, remembered in `eventState.costCrossings` by day.
-- [ ] T062 [US5] Lease events: in `DaemonCore+Leases.swift`, `settle`, raise `lease.granted` (with `resource` and `agent`) for `.granted`, and `lease.released` (with `resource` and `how`: released, ended or expired) for `.released`, both with Mac scope.
+- [X] T060 [US5] In `DaemonCore+EventSources.swift`, start the watch when the daemon starts and stop it when it goes. Map each `MachineChange` to `raise` of `mac.sleep`, `mac.wake`, `person.away` or `person.back`, with Mac scope and a plain sentence ("This Mac woke up"). Inject it through `useForEvents(machineWatch:)` in tests.
+- [X] T061 [US5] `cost.limit_reached` (R11): where `isDayLimitReached` and `agent.isAtCostLimit` refuse in `DaemonCore+Commands.swift`, raise it once per crossing. Use `limit: day` with Mac scope, or `limit: agent` with project scope and `agent`, remembered in `eventState.costCrossings` by day.
+- [X] T062 [US5] Lease events: in `DaemonCore+Leases.swift`, `settle`, raise `lease.granted` (with `resource` and `agent`) for `.granted`, and `lease.released` (with `resource` and `how`: released, ended or expired) for `.released`, both with Mac scope.
 - [ ] T063 [US5] Server events: if 037 (servers) is on `main` by now, raise `server.offline` and `server.online` from its connection-state change, with `server`. If it isn't, leave the two kinds in the catalogue with no source, and note that in `walk/README.md`.
-- [ ] T064 [P] [US5] Create `Pkg/Tests/AgentsKitTests/Integration/MachineEventTests.swift` with `FakeMachineWatch`. Cover:
+- [X] T064 [P] [US5] Create `Pkg/Tests/AgentsKitTests/Integration/MachineEventTests.swift` with `FakeMachineWatch`. Cover:
   - sleep then wake gives both events in order;
   - a wait on `mac.wake` from project P wakes, and a workflow on `mac.wake` in project Q fires (US5-AS3);
   - lock and unlock give away and back with `why: locked`;

@@ -238,6 +238,8 @@ public actor DaemonCore {
     var branchWatchers: [URL: FolderWatch] = [:]
     /// The one pending look at each project's branch tips, so a rebase is one look.
     var branchChecks: [URL: Task<Void, Never>] = [:]
+    /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
+    var machineWatch: (any MachineWatch)?
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit
@@ -957,6 +959,8 @@ public actor DaemonCore {
         for (_, task) in workflowRescans { task.cancel() }
         workflowRescans.removeAll()
         stopWatchingAllWorkflows()
+        machineWatch?.stop()
+        machineWatch = nil
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this
