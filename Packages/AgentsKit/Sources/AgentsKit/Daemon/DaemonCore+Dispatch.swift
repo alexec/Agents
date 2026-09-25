@@ -140,7 +140,12 @@ extension DaemonCore {
 
             case DaemonAPI.Method.agentsOptions:
                 let request = try require(params, as: DaemonAPI.OptionsRequest.self)
-                return .success(try JSONValue.encoding(try await options(request)))
+                return .success(try JSONValue.encoding(try await options(request, connection: connection)))
+
+            case DaemonAPI.Method.agentsDiscardDraft:
+                let request = try require(params, as: DaemonAPI.DiscardDraftRequest.self)
+                await discardDraft(request)
+                return .success([:])
 
             case DaemonAPI.Method.optionsRemembered:
                 let request = try require(params, as: DaemonAPI.RememberedOptionsRequest.self)

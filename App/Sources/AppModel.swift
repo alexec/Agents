@@ -777,6 +777,7 @@ final class AppModel {
         draftOptions = []
         draftCommands = []
         draftChosen = [:]
+        letGo(draft: draftID)
         draftID = nil
         do {
             let response = try await client.call(DaemonAPI.Method.agentsOptions,
@@ -784,8 +785,9 @@ final class AppModel {
                                                                           mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
             // An answer for a folder or runtime the user has since moved away from is
-            // not an answer to the question now being asked.
-            guard generation == draftOptionsGeneration else { return }
+            // not an answer to the question now being asked — and its runtime is one
+            // nobody will talk to.
+            guard generation == draftOptionsGeneration else { letGo(draft: response.draftID); return }
             draftID = response.draftID
             show(options: response.options, commands: response.commands, opening: true)
         } catch {
@@ -795,6 +797,16 @@ final class AppModel {
             draftOptionsFailure = describe(error)
         }
         if generation == draftOptionsGeneration { isLoadingDraftOptions = false }
+    }
+
+    /// A draft this window has replaced is a runtime nobody will talk to. Not waited
+    /// on, and a daemon too old to know the method has nothing to be told (029).
+    private func letGo(draft: UUID?) {
+        guard let draft else { return }
+        Task {
+            _ = try? await client.call(DaemonAPI.Method.agentsDiscardDraft,
+                                       DaemonAPI.DiscardDraftRequest(draftID: draft))
+        }
     }
 
     /// Draw the form.
@@ -907,15 +919,10 @@ final class AppModel {
         }
     }
 
-    /// Which runtime a new agent gets when nobody has said.
-    ///
-    /// Whatever the last agent used, when it is still available, because that is the
-    /// one already chosen in every other sense. It can be changed from the chat.
+    /// Which runtime a new agent gets when nobody has said. The rule is the kit's, so
+    /// a phone offers the same one (029). It can be changed from the chat.
     var defaultRuntimeID: String? {
-        let available = Set(availableRuntimes.map(\.runtime.id))
-        let recent = agents.sorted { $0.lastActivityAt > $1.lastActivityAt }
-            .first { available.contains($0.runtimeID) }?.runtimeID
-        return recent ?? available.first
+        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id))
     }
 
     /// Take something back off the queue before it goes.

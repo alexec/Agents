@@ -408,6 +408,22 @@ public final class AgentsModel {
         return agents.first { $0.id == id }
     }
 
+    /// Which runtime a new agent gets when nobody has said.
+    ///
+    /// Whatever the last agent used, when it is still available, because that is the
+    /// one already chosen in every other sense. Here rather than in either app so that
+    /// the Mac and a phone cannot offer different ones for the same work (029).
+    ///
+    /// - Parameter available: the runtimes that can be started now, in the Mac's order.
+    ///   With no agent to go by it is the first of these — by order, not whichever a
+    ///   set happened to hand back, which is what the Mac used to do.
+    public func defaultRuntimeID(available: [String]) -> String? {
+        let startable = Set(available)
+        let recent = agents.filter { startable.contains($0.runtimeID) }
+            .max { $0.lastActivityAt < $1.lastActivityAt }
+        return recent?.runtimeID ?? available.first
+    }
+
     /// The projects worth showing, newest activity first.
     public var liveProjects: [DaemonAPI.ProjectSummary] {
         projects.filter { !$0.project.isArchived }

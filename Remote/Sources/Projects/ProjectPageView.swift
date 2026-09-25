@@ -8,9 +8,9 @@ import SwiftUI
 /// headings. The Mac's 144pt gutter is not here: a phone is 390 points wide and a
 /// gutter that size would leave a column of text a hundred points across.
 ///
-/// The prompt bar is not here yet. Starting an agent from the remote is US3 — T072 —
-/// and this page is built now so the layout under it has stopped moving by the time it
-/// arrives. parity.md said it was built; it was not, and now says so.
+/// New agent is in the toolbar, where it is in reach without scrolling however long
+/// the page is, and opens a sheet of its own (029): the choices that go with starting
+/// an agent do not belong over a list of the ones already working.
 struct ProjectPageView: View {
     @Environment(RemoteModel.self) private var model
     @State private var showsArchived = false
@@ -32,6 +32,14 @@ struct ProjectPageView: View {
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    model.startingIn = model.selectedProject
+                } label: {
+                    Label("New agent", systemImage: "plus")
+                }
+                .disabled(model.selectedProject == nil)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     TotalsView()
                 } label: {
@@ -40,6 +48,14 @@ struct ProjectPageView: View {
             }
         }
         .onChange(of: model.selectedProject) { archivedShown = pageSize }
+        .sheet(isPresented: Binding(get: { model.startingIn != nil },
+                                    set: { if !$0 { model.startingIn = nil } })) {
+            if let project = model.startingIn {
+                StartAgentView(project: project)
+                    .presentationDetents([.large])
+                    .presentationSizing(.form)
+            }
+        }
     }
 
     private var page: some View {
@@ -68,7 +84,7 @@ struct ProjectPageView: View {
                 WorkflowsSection()
 
                 if isEmpty {
-                    Text("Nothing here yet. Start an agent on the Mac and it appears here.")
+                    Text("Nothing here yet. Start an agent with New agent and it appears here.")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
