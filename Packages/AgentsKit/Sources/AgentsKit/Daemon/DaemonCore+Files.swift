@@ -114,6 +114,7 @@ extension DaemonCore {
     /// would run for the rest of the daemon's life.
     public func connectionEnded(_ connection: UUID) {
         forgetShellWatcher(connection)
+        forgetCredentials(connection)
         guard let interests = fileInterests.removeValue(forKey: connection) else { return }
         for root in Set(interests.map(\.root)) { stopWatchingIfUnwanted(root) }
     }

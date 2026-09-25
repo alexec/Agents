@@ -4,6 +4,9 @@ import Foundation
 public struct RuntimeDiscovery: Sendable {
     public var searchPaths: [String]
     public var fileExists: @Sendable (String) -> Bool
+    /// On a server (`--serve`), the home whose `.agents-server/tools/` holds the toolsets
+    /// the app installed (043). Nil on the Mac, which never looks there.
+    public var serverHome: String?
 
     public init(searchPaths: [String]? = nil,
                 fileExists: (@Sendable (String) -> Bool)? = nil) {
@@ -17,6 +20,15 @@ public struct RuntimeDiscovery: Sendable {
     /// starting three runtimes to draw a list would make opening the app slow and, for
     /// the Claude adapter on a cold npm cache, very slow.
     public func locate(_ runtime: Runtime) -> RuntimeAvailability {
+        // The app's own toolset first, when it is whole: its `npx` is a shim that runs the
+        // pinned adapter and reaches for no network (043, R4). Then the person's own.
+        if let serverHome {
+            let current = "\(serverHome)/\(Toolset.serverFolder(runtimeID: runtime.id))/current"
+            let shim = "\(current)/bin/\(runtime.executable)"
+            if FileManager.default.fileExists(atPath: "\(current)/ok"), fileExists(shim) {
+                return .available(path: shim, supportsResume: false)
+            }
+        }
         if runtime.executable.contains("/") {
             return fileExists(runtime.executable)
                 ? .available(path: runtime.executable, supportsResume: false)

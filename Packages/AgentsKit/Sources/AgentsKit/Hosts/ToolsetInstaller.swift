@@ -79,7 +79,12 @@ public struct ToolsetInstaller: Sendable {
             mkdir node; tar -xJf node.tar.xz -C node --strip-components=1; rm -f node.tar.xz fetch.err; \
             PATH="$P/node/bin:$PATH" npm ci --prefix "$P/lib" --ignore-scripts --omit=dev --no-audit --no-fund \
             --cache "$P/.npm" >"$P/npm.log" 2>&1 || { tail -5 "$P/npm.log" >&2; exit 23; }; \
-            rm -rf "$P/.npm" "$P/npm.log"; : > "$P/ok"; \
+            rm -rf "$P/.npm" "$P/npm.log"; mkdir "$P/bin"; \
+            printf '%s\\n' '#!/bin/sh' \
+            '# Agents (043): not npx. Runs the Claude adapter this toolset was installed with.' \
+            'd=$(cd "$(dirname "$0")/.." && pwd -P)' \
+            'PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/\(toolset.manifest.entryPath)"' > "$P/bin/npx"; \
+            chmod 700 "$P/bin/npx"; : > "$P/ok"; \
             rm -rf "$T/\(id)"; trap - EXIT; mv "$P" "$T/\(id)"
             """
     }

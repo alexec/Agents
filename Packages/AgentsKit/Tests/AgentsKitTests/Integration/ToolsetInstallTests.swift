@@ -78,6 +78,12 @@ extension FakeSSHSuites {
 
             let again = try await ServerInstaller(ssh: setup.ssh).probe()
             #expect(again.toolsetID == id)
+
+            // The shim the server's daemon starts in place of npx runs the toolset's own node.
+            let shim = setup.claude.appendingPathComponent("current/bin/npx")
+            #expect(FileManager.default.isExecutableFile(atPath: shim.path))
+            let ran = try await setup.ssh.run(setup.ssh.runArguments("\"$HOME/.agents-server/tools/claude/current/bin/npx\" -y whatever"))
+            #expect(ran.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == FakeToolset.nodeVersion)
         }
 
         static func expectNothingLeft(_ setup: Setup) {

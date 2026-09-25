@@ -25,6 +25,8 @@ public final class Daemon: @unchecked Sendable {
         self.lock = lock
         DaemonLog.shared.setDestination(locations.log)
         let store = try AgentStore(locations: locations)
+        var discovery = discovery
+        if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery, launcher: launcher)
         self.serve = serve
     }

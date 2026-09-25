@@ -385,9 +385,14 @@ extension DaemonCore {
                                message: "\(runtime.name) is not installed, or is not where we looked.",
                                data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
         }
+        // Before anything starts, and outside the catch below: wanting a credential is not
+        // the runtime failing, and the window answers it by lending one (043).
+        let lent = try launchEnvironment(for: runtime.id)
         var launched: ACPSession?
         do {
-            let session = try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+            let session = try LentEnvironment.$value.withValue(lent) {
+                try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+            }
             launched = session
             let handshake = try await session.initialize()
             // Recorded here rather than after the session is made, because the reason
@@ -741,8 +746,13 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.worktreeMissing,
                                message: "The worktree \(worktree.name) is gone, so this agent cannot be picked up where it was.")
         }
+        // Before anything is said or started: wanting a credential leaves the agent as it
+        // was, and the window lends one and asks again (043).
+        let lent = try launchEnvironment(for: runtime.id)
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
-        let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        let session = try LentEnvironment.$value.withValue(lent) {
+            try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        }
         do {
             return try await connect(session, runtime: runtime, for: agent)
         } catch {
