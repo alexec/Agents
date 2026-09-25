@@ -26,6 +26,12 @@ enum CodeInk {
         return container
     }
 
+    /// A removed line sits on this: a faint neutral wash, never a colour (035 FR-013).
+    static let removedWash = Paper.ink.opacity(0.06)
+    /// The words that changed within a changed line, on both sides: the same neutral,
+    /// stronger, so the change is found before the line is read (041 FR-009).
+    static let changedWash = Paper.ink.opacity(0.14)
+
     private static let colors: [CodeRole: Color] = Dictionary(uniqueKeysWithValues:
         CodeRole.allCases.compactMap { role in
             guard let light = InkValues.light[role], let dark = InkValues.dark[role] else {

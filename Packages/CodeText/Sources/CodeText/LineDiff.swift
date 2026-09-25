@@ -32,7 +32,11 @@ public struct DiffRow: Hashable, Sendable {
 public enum LineDiff {
     /// The rows of an edit. No old text, or empty old text, is a file being made: every
     /// line added, and nothing to fold or mark.
+    /// No new text is a passage deleted: every old line removed, and no empty line added.
     public static func rows(old: String?, new: String) -> [DiffRow] {
+        if new.isEmpty, let old, !old.isEmpty {
+            return split(old).enumerated().map { DiffRow(kind: .removed, text: $1, oldIndex: $0) }
+        }
         let newLines = split(new)
         guard let old, !old.isEmpty else {
             return newLines.enumerated().map { DiffRow(kind: .added, text: $1, newIndex: $0) }

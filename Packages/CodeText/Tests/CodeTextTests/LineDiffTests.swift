@@ -36,6 +36,10 @@ struct LineDiffTests {
         #expect(Folds.of(rows).isEmpty)
     }
 
+    @Test func aDeletedPassageIsAllRemovedWithNoEmptyLineAdded() {
+        #expect(Self.kinds(LineDiff.rows(old: "a\nb", new: "")) == "--")
+    }
+
     @Test func aPureInsertionHasNoRemovedRows() {
         let rows = LineDiff.rows(old: "a\nb\nc", new: "a\nb\nnew\nc")
         #expect(Self.kinds(rows) == "  + ")
