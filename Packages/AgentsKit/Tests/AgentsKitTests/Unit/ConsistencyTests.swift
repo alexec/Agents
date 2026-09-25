@@ -62,8 +62,10 @@ struct ConsistencyTests {
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
         (file: "Shared/UI/Chat/TranscriptRows.swift", contains: "foregroundStyle(Color.accentColor)",
          why: "a file a tool call touched, drawn on a phone as the system draws a link (FR-006b, 033)"),
-        (file: "App/Sources/Sidebar/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
          why: "the person's caret flag on a live page, in the colour the system draws their own insertion point"),
+        (file: "Shared/UI/Page/CursorFlag.swift", contains: "color: .accentColor",
+         why: "the same flag on a phone, where the accent is the colour of the person's own insertion point (034)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {

@@ -101,12 +101,12 @@ put a pane.
 **Independent Test**: Ask an agent from the phone to write a Markdown document in steps, showing
 it first. The page opens and follows each step with no tap.
 
-- [ ] T021 [US1] Create `Packages/AgentsKit/Sources/AgentsKitCore/Model/PageFollower.swift` by lifting the logic out of `App/Sources/Sidebar/LivePage.swift`:
+- [X] T021 [US1] Create `Packages/AgentsKit/Sources/AgentsKitCore/Model/PageFollower.swift` by lifting the logic out of `App/Sources/Sidebar/LivePage.swift`:
   - state: `passages`, `lastLoaded`, `lastWritten`, `editing`, `revealing`, `pending`, `marked`, `collision` and `saveProblem`
   - operations: `load`, `follow(_:)`, `begin`, `edit`, `commit`, `close`, `saved(problem:)`, `tick` and `line(_:)`, each returning `[PageEffect]` (`.scroll(to:)`, `.save(document:)`)
   - `typingStep = 2` and `typingTick = 40 ms` move here as constants
   - the behaviour, and every comment that explains it, stays exactly as in `LivePage` today
-- [ ] T022 [P] [US1] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PageFollowerTests.swift`. It checks:
+- [X] T022 [P] [US1] Write `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PageFollowerTests.swift`. It checks:
   - loading splits
   - a write queues its changed blocks in document order, with one caret
   - a second write completes the first reveal before queueing
@@ -114,22 +114,22 @@ it first. The page opens and follows each step with no tap.
   - a delete, which has nothing to type, scrolls to its first change
   - `line(n)` scrolls to and marks the passage holding n
   - opening a passage that is being revealed moves the caret on
-- [ ] T023 [US1] Create `Shared/UI/Page/PageActions.swift`, an environment value following data-model.md "PageActions":
+- [X] T023 [US1] Create `Shared/UI/Page/PageActions.swift`, an environment value following data-model.md "PageActions":
   - `save(path, document) async -> String?`
   - `image(at: URL) async -> PlatformImage?`, where `PlatformImage` is `NSImage` or `UIImage` under `#if os(macOS)`
   - `imagesChanged: Int`, bumped per folder event
   - `canEdit: Bool`
   - no-op defaults
-- [ ] T024 [US1] Move `App/Sources/Chat/MarkdownText.swift` to `Shared/UI/Page/MarkdownText.swift`, and `App/Sources/Sidebar/CursorFlag.swift` to `Shared/UI/Page/CursorFlag.swift`:
+- [X] T024 [US1] Move `App/Sources/Chat/MarkdownText.swift` to `Shared/UI/Page/MarkdownText.swift`, and `App/Sources/Sidebar/CursorFlag.swift` to `Shared/UI/Page/CursorFlag.swift`:
   - Replace the `NSImage` cache with `PageActions.image`, loaded in a `.task(id:)` per image with a placeholder while it loads.
   - Put AppKit-only modifiers under `#if os(macOS)`.
   - Delete `Remote/Sources/Chat/MarkdownText.swift`, and fix the phone's callers (`DocumentView`, `PlanView` and any in `Shared/UI/Chat`) to the shared signature.
-- [ ] T025 [US1] Move `App/Sources/Sidebar/LivePage.swift` to `Shared/UI/Page/LivePage.swift`:
+- [X] T025 [US1] Move `App/Sources/Sidebar/LivePage.swift` to `Shared/UI/Page/LivePage.swift`:
   - It drives a `@State var follower: PageFollower`, runs the tick task and performs `.scroll` effects with its `ScrollViewProxy`.
   - It performs `.save` through `PageActions.save`, and replaces `@Environment(AppModel.self)` with `PageActions`.
   - The image-change mark reads `PageActions.imagesChanged` and a per-platform "which passage's picture changed" answer. On the Mac, `ImageStamps` stays in `App/Sources/Sidebar` and feeds it.
   - Typing (`PassageEditor`) stays Mac-only under `#if os(macOS)` until T034.
-- [ ] T026 [US1] In `App/Sources/Sidebar/FilesPane.swift`, inject `PageActions` for the Mac:
+- [X] T026 [US1] In `App/Sources/Sidebar/FilesPane.swift`, inject `PageActions` for the Mac:
   - save → `model.writeArtifact`
   - image → the disk, with the old cache
   - imagesChanged → `folderEvents` and `ImageStamps`
@@ -164,13 +164,13 @@ to a dropped connection.
 page. Prompt "carry on", and the agent keeps the edit.
 
 - [ ] T032 [US2] Add `reconnected(_ fresh:)` to `PageFollower`. With a draft open, it runs `follow` against `fresh` with the same `PassageMerge` carry, and returns `.save`. `saved(problem:)` keeps the draft and sets `saveProblem` on failure. A later `follow` never clears a `saveProblem` while the draft differs from what is on disk.
-- [ ] T033 [P] [US2] Extend `PageFollowerTests`:
+- [X] T033 [P] [US2] Extend `PageFollowerTests`:
   - an agent's write elsewhere while a passage is open leaves the draft and produces no scroll
   - a write to the same passage gives a collision, keeps mine and saves
   - the echo after a save closes nothing
   - a reconnect with a draft carries it and saves
   - a failed save keeps the draft and the problem
-- [ ] T034 [US2] Move `App/Sources/Sidebar/PassageEditor.swift` to `Shared/UI/Page/PassageEditor.swift`:
+- [X] T034 [US2] Move `App/Sources/Sidebar/PassageEditor.swift` to `Shared/UI/Page/PassageEditor.swift`:
   - macOS keeps the `NSTextView`. iOS gets a `UIViewRepresentable` `UITextView` with the same `draft` binding, `onCommit` after `pauseBeforeSaving` (1 s), `onClose` on end-editing, height fitting to its content, and the paper colours.
   - `LivePage` uses it on both platforms, and opens passages only when `PageActions.canEdit`.
 - [ ] T035 [US2] Add `writeArtifact(agentID:path:text:) async -> String?` to `Remote/Sources/RemoteModel.swift`, over `artifact/write`, with the Mac's wording for failures (copy `AppModel.writeArtifact`). `PagePane`'s `PageActions.save` calls it, and `canEdit = !model.isStale`. The editor reports focus to `isTyping`.

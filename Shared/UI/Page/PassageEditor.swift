@@ -1,5 +1,9 @@
-import AppKit
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// One passage of a live page, open for typing.
 ///
@@ -12,8 +16,9 @@ import SwiftUI
 ///
 /// The caret carries the person's name above it, because the agent may be typing on
 /// the same page at the same moment and a bare caret no longer says whose it is. That
-/// is why this is an `NSTextView` rather than a `TextEditor`: a `TextEditor` does not
-/// say where its caret is, and the flag has to stand on it.
+/// is why this is an `NSTextView` on the Mac and a `UITextView` on a phone rather than a
+/// `TextEditor`: a `TextEditor` does not say where its caret is, and the flag has to
+/// stand on it.
 ///
 /// There is no "done". A pause writes; losing focus writes and closes; Escape closes,
 /// writing first if there is anything to write. Return is a newline, because a passage
@@ -65,6 +70,7 @@ struct PassageEditor: View {
     }
 }
 
+#if os(macOS)
 /// The text view itself: as tall as its text, as wide as it is offered, and saying
 /// where its caret is whenever that moves.
 private struct PassageTextView: NSViewRepresentable {
@@ -214,3 +220,94 @@ private final class EndingTextView: NSTextView {
         onMove?()
     }
 }
+#else
+/// The phone's text view (034): as tall as its text, as wide as it is offered, and
+/// saying where its caret is whenever that moves. There is no Escape on a touch
+/// keyboard; the passage ends when focus leaves it — another passage tapped, the
+/// keyboard put away, the pane left.
+private struct PassageTextView: UIViewRepresentable {
+    @Binding var text: String
+    @Binding var caret: CGRect?
+    /// Focus going elsewhere.
+    let onEnd: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView(usingTextLayoutManager: false)
+        view.delegate = context.coordinator
+        view.backgroundColor = .clear
+        view.font = TextStep.reading.uiFont
+        view.adjustsFontForContentSizeCategory = true
+        view.textColor = .label
+        // No inset and no padding, so the first character sits where the rendered one
+        // did and opening the passage moves nothing.
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.isScrollEnabled = false
+        view.autocorrectionType = .default
+        view.smartQuotesType = .no
+        view.smartDashesType = .no
+        view.text = text
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // A beat later, so the keyboard comes up for the passage that was tapped and not
+        // for whatever held focus as it was drawn.
+        Task { @MainActor [weak view] in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard let view else { return }
+            view.becomeFirstResponder()
+            let end = view.endOfDocument
+            view.selectedTextRange = view.textRange(from: end, to: end)
+            context.coordinator.report(view)
+        }
+        return view
+    }
+
+    func updateUIView(_ view: UITextView, context: Context) {
+        context.coordinator.parent = self
+        // Only when the text changed from outside — "Use theirs" — never on the
+        // person's own keystroke coming back, which would put the caret at the end.
+        if view.text != text {
+            view.text = text
+            context.coordinator.report(view)
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView view: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width.isFinite else { return nil }
+        let fitted = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        let line = view.font?.lineHeight ?? TextStep.reading.uiFont.lineHeight
+        return CGSize(width: width, height: ceil(max(fitted.height, line)))
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: PassageTextView
+
+        init(_ parent: PassageTextView) { self.parent = parent }
+
+        func textViewDidChange(_ view: UITextView) {
+            parent.text = view.text
+            report(view)
+        }
+
+        func textViewDidChangeSelection(_ view: UITextView) {
+            report(view)
+        }
+
+        func textViewDidEndEditing(_ view: UITextView) {
+            // Afterwards, not during: closing removes this view while focus is moving.
+            Task { @MainActor [parent] in parent.onEnd() }
+        }
+
+        /// Where the caret is now, for the flag. After the layout has caught up.
+        func report(_ view: UITextView) {
+            Task { @MainActor [weak self, weak view] in
+                guard let self, let view, let range = view.selectedTextRange else { return }
+                let rect = view.caretRect(for: range.end)
+                parent.caret = rect.isNull || rect.isInfinite ? nil : rect
+            }
+        }
+    }
+}
+#endif

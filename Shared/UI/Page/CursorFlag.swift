@@ -1,5 +1,7 @@
-import AppKit
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Whose caret is whose on a live page.
 ///
@@ -18,13 +20,18 @@ struct CursorFlag: Hashable {
         CursorFlag(name: name, color: .blue)
     }
 
-    /// The person's, by their first name: "Alex".
+    /// The person's, by their first name on the Mac: "Alex". A phone has no user
+    /// name to ask, and whoever is holding it is "You".
+    #if os(macOS)
     static let person = CursorFlag(name: personName, color: Color(nsColor: .controlAccentColor))
 
     private static let personName: String = {
         let full = NSFullUserName()
         return full.split(separator: " ").first.map(String.init) ?? NSUserName()
     }()
+    #else
+    static let person = CursorFlag(name: "You", color: .accentColor)
+    #endif
 
     /// The name, as the one `Text` both flags are drawn from, so the pill above the
     /// person's caret and the one the renderer draws above the agent's are the same.

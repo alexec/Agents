@@ -1,11 +1,13 @@
-import AgentsKit
+import AgentsKitCore
 import SwiftUI
 
-/// Markdown, drawn.
+/// Markdown, drawn, the same on the Mac and the phone (034).
 ///
-/// Used twice: for what an agent said in the conversation, and for a document in the
-/// files pane. The blocks are split in AgentsKit, where tests can reach the decision;
-/// what each one looks like is here.
+/// Used twice: for what an agent said in the conversation, and for a document on a
+/// live page. The blocks are split in AgentsKitCore, where tests can reach the
+/// decision; what each one looks like is here. There were two of these, one per app,
+/// and they had drifted: the phone's drew no pictures and no caret, the Mac's had never
+/// been told a paragraph must not be cut off at a narrow width. This is both.
 ///
 /// Inline marks arrive as attributes on the text, from the same parse that found the
 /// blocks. Nothing here parses anything.
@@ -67,6 +69,7 @@ struct MarkdownText: View {
         switch block {
         case .paragraph(let text):
             self.text(text, caret: caret).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
 
         case .heading(let level, let text):
             // Not a step of the scale: `TextStep.heading` says why, and resolves the
@@ -74,9 +77,10 @@ struct MarkdownText: View {
             self.text(text, caret: caret)
                 .font(TextStep.heading(level: level))
                 .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
 
         case .list(let ordered, let start, let items):
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Self.itemSpacing) {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         marker(ordered: ordered, number: start + index, checked: item.checked)
@@ -181,44 +185,26 @@ struct MarkdownText: View {
 
     /// An image in a document, found beside the document.
     ///
-    /// Only from disk, and only from under the folder the document is in. Nothing here
+    /// A file beside the document, inside its folder tree, and nothing else: no
+    /// address on the network and no path that climbs out (022 FR-019). Nothing here
     /// makes a network request on a document's behalf (FR-011), so a remote image is
-    /// its alternative text — which is what alternative text is for.
+    /// its alternative text — which is what alternative text is for. How the file is
+    /// read is the app's: the Mac's disk, or the phone asking the Mac.
     @ViewBuilder
     private func image(source: String, alt: String) -> some View {
-        // A file beside the document, inside its folder tree, and nothing else: no
-        // address on the network and no path that climbs out (022 FR-019). Anything
-        // refused here shows its alternative text below, as it always has.
-        if let base,
-           let url = URL(string: source, relativeTo: base)?.standardizedFileURL,
-           url.isFileURL,
-           url.path.hasPrefix(base.deletingLastPathComponent().standardizedFileURL.path),
-           let loaded = Self.image(at: url) {
-            Image(nsImage: loaded)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+        if let base, let url = ImageStamps.url(of: source, base: base) {
+            PagePicture(url: url, source: source, alt: alt)
         } else {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "photo").foregroundStyle(.tertiary)
-                Text(alt.isEmpty ? source : alt).foregroundStyle(.secondary)
-            }
-            .appText(.supporting)
+            PictureAlternative(source: source, alt: alt)
         }
     }
 
-    /// Decoded once per file. `body` runs whenever the page redraws — a passage
-    /// being marked, say — and reading the picture off the disk each time was the
-    /// one slow thing on a page of text.
-    private static let images = NSCache<NSURL, NSImage>()
-
-    private static func image(at url: URL) -> NSImage? {
-        if let cached = images.object(forKey: url as NSURL) { return cached }
-        guard let loaded = NSImage(contentsOf: url) else { return nil }
-        images.setObject(loaded, forKey: url as NSURL)
-        return loaded
-    }
+    /// Lists sit a little looser on a touch screen, where a line is a target.
+    #if os(macOS)
+    private static let itemSpacing: CGFloat = 4
+    #else
+    private static let itemSpacing: CGFloat = 6
+    #endif
 
     /// What the dashes under the header said about this column.
     private func columnAlignment(_ table: MarkdownBlock.Table, _ index: Int) -> HorizontalAlignment {
@@ -228,5 +214,55 @@ struct MarkdownText: View {
         case .centre: return .center
         case .trailing: return .trailing
         }
+    }
+}
+
+/// A picture on the page, read through the app (034).
+///
+/// Loaded once per identity. The page gives a passage a new identity when its
+/// picture's file changes, which is what makes this read it again.
+private struct PagePicture: View {
+    @Environment(\.pageActions) private var actions
+    let url: URL
+    let source: String
+    let alt: String
+
+    @State private var loaded: PlatformImage?
+    @State private var tried = false
+
+    var body: some View {
+        Group {
+            if let loaded {
+                Image(platformImage: loaded)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+            } else if tried {
+                PictureAlternative(source: source, alt: alt)
+            } else {
+                // Held open while it loads, so the words below do not jump twice.
+                Color.clear.frame(height: 24)
+            }
+        }
+        .task(id: url) {
+            loaded = await actions.image(url)
+            tried = true
+        }
+    }
+}
+
+/// A picture that cannot be drawn: its alternative text, or its name.
+private struct PictureAlternative: View {
+    let source: String
+    let alt: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "photo").foregroundStyle(.tertiary)
+            Text(alt.isEmpty ? URL(string: source)?.lastPathComponent ?? source : alt)
+                .foregroundStyle(.secondary)
+        }
+        .appText(.supporting)
     }
 }

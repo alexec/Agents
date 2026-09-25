@@ -177,9 +177,11 @@ struct FilesPane: View {
                     Divider()
                 }
                 LivePage(text: probe?.text ?? "", url: url, line: state.openLine,
-                         agentID: agent.id,
                          agentName: RuntimeCatalog.runtime(id: agent.runtimeID)?.name ?? agent.runtimeID,
                          folderEvent: folderEvents)
+                    // The page is shared with the phone (034); where it saves and how it
+                    // reads a picture are the Mac's.
+                    .environment(\.pageActions, MacPageActions.make(model: model, agentID: agent.id))
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
