@@ -174,19 +174,8 @@ private struct RuntimeMissingLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(status.runtime.name).appText(.reading).fontWeight(.medium)
-            switch status.availability {
-            case .missing(let lookedIn):
-                Text("Looked for \(status.runtime.executable) in \(lookedIn.prefix(4).joined(separator: ", "))…")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            case .needsSignIn(_, let fixCommand):
-                Text(fixCommand.map { "Signed out. Run \($0)." } ?? "Signed out.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            case .failed(let reason):
+            if let reason = status.unavailableReason {
                 Text(reason).appText(.fine).foregroundStyle(.secondary)
-            case .available:
-                EmptyView()
             }
         }
     }

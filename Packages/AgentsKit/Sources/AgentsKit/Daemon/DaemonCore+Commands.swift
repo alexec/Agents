@@ -13,14 +13,16 @@ extension DaemonCore {
     /// last time, so a remembered answer goes back at once and the session carries on
     /// being made behind it. What the runtime actually says is broadcast when it says
     /// it, and is what the start applies the user's choices to either way.
-    public func options(_ request: DaemonAPI.OptionsRequest) async throws -> DaemonAPI.OptionsResponse {
+    public func options(_ request: DaemonAPI.OptionsRequest,
+                        connection: UUID? = nil) async throws -> DaemonAPI.OptionsResponse {
         let draftID = UUID()
         let pending = Task { [self] in
             try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
                                    mcpServers: request.mcpServers)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
-                                mcpServers: request.mcpServers, pending: pending)
+                                mcpServers: request.mcpServers, pending: pending,
+                                connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
         if let remembered = rememberedOptions(for: key) {
@@ -112,8 +114,82 @@ extension DaemonCore {
         try? optionCache.save(rememberedOptions ?? [:])
     }
 
+    /// A start from a window or a phone.
+    ///
+    /// With a request id, a start sent again is the same start: one still under way is
+    /// waited on, and one that finished is found by the id on its record. A refused
+    /// start leaves nothing behind under the id, so trying again once the reason has
+    /// gone starts it (029).
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
-        try await start(request, startedBy: nil)
+        let id = try await startOnce(request)
+        // The person's choice, so remembered for the next one on any device. Only
+        // here: an agent started by another agent was not the person choosing.
+        if let agent = agents[id] {
+            rememberMode(in: request.startOptions.values, runtimeID: agent.runtimeID,
+                         options: agent.advertisedOptions)
+        }
+        return id
+    }
+
+    private func startOnce(_ request: DaemonAPI.StartRequest) async throws -> UUID {
+        guard let requestID = request.requestID else {
+            return try await start(request, startedBy: nil)
+        }
+        if let underWay = startsByRequest[requestID] { return try await underWay.value }
+        if let made = agents.values.first(where: { $0.startRequestID == requestID }) { return made.id }
+        let starting = Task { try await self.start(request, startedBy: nil) }
+        startsByRequest[requestID] = starting
+        defer { startsByRequest[requestID] = nil }
+        return try await starting.value
+    }
+
+    // MARK: The mode each runtime was last started in (029)
+
+    public func rememberedModes() -> DaemonAPI.RememberedModes {
+        modeStore.remembered()
+    }
+
+    /// A window's memory from before the daemon kept one. Fills gaps only.
+    public func importModes(_ request: DaemonAPI.ModesImportRequest) -> DaemonAPI.RememberedModes {
+        if (try? modeStore.importing(request.modes)) == true { tellModes() }
+        return modeStore.remembered()
+    }
+
+    /// Remember the mode among these values, if one of them is this runtime's mode.
+    func rememberMode(in values: [String: JSONValue], runtimeID: String, options: [ConfigOption]) {
+        guard let mode = ModeMemory.modeOption(in: options), let value = values[mode.id] else { return }
+        if (try? modeStore.remember(value, for: runtimeID)) == true { tellModes() }
+    }
+
+    private func tellModes() {
+        broadcast(DaemonAPI.Notification.modesChanged, modeStore.remembered())
+    }
+
+    /// Let go of a draft that is not going to be started. Not there is not an error:
+    /// gone is what was asked for, and a phone discarding on its way out cannot know
+    /// whether the start it raced got there first (029).
+    public func discardDraft(_ request: DaemonAPI.DiscardDraftRequest) async {
+        guard let draft = drafts.removeValue(forKey: request.draftID) else { return }
+        await endDraft(draft)
+    }
+
+    /// A connection went. Its drafts are let go once the grace period passes, unless
+    /// something has used or discarded them by then (029).
+    func orphanDrafts(connection: UUID) {
+        let when = now()
+        for (id, draft) in drafts where draft.connection == connection && draft.orphanedAt == nil {
+            drafts[id]?.orphanedAt = when
+            Task { [self, grace = draftGracePeriod] in
+                try? await Task.sleep(for: grace)
+                await self.endOrphan(id, orphanedAt: when)
+            }
+        }
+    }
+
+    private func endOrphan(_ id: UUID, orphanedAt: Date) async {
+        guard let draft = drafts[id], draft.orphanedAt == orphanedAt else { return }
+        drafts.removeValue(forKey: id)
+        await endDraft(draft)
     }
 
     /// A start, made on behalf of another agent when `starter` is set (028). Not on
@@ -200,7 +276,8 @@ extension DaemonCore {
                           // before the next one never finds this agent looking like the
                           // person's — with the tools, and holding no place.
                           startedByAgent: starter,
-                          chainDepth: chainDepth)
+                          chainDepth: chainDepth,
+                          startRequestID: request.requestID)
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -1120,6 +1197,8 @@ extension DaemonCore {
             }
             agent.startOptions.values[request.optionID] = request.value
             changed(agent)
+            rememberMode(in: [request.optionID: request.value], runtimeID: agent.runtimeID,
+                         options: agent.advertisedOptions)
             await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
             return []
         }
@@ -1128,6 +1207,10 @@ extension DaemonCore {
             agent.advertisedOptions = options
             agent.startOptions.values[request.optionID] = request.value
             changed(agent)
+            // Changing a conversation's mode says what you want next time too, as it
+            // always has on the Mac.
+            rememberMode(in: [request.optionID: request.value], runtimeID: agent.runtimeID,
+                         options: options)
         }
         await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
         return options

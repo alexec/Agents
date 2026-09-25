@@ -17,6 +17,13 @@ public actor DaemonCore {
     var eventTasks: [UUID: Task<Void, Never>] = [:]
     var turnTasks: [UUID: Task<Void, Never>] = [:]
     var drafts: [UUID: Draft] = [:]
+    /// How long a draft outlives the connection that asked for it (029).
+    let draftGracePeriod: Duration
+    /// Starts still under way, by the request id their caller sent (029). A repeat
+    /// that arrives while the first is still making its session waits on this rather
+    /// than making a second; one that arrives after finds the agent by
+    /// `Agent.startRequestID`, which is also what survives a restart.
+    var startsByRequest: [UUID: Task<UUID, any Error>] = [:]
     /// Places taken by agents being started for another agent, and not yet made
     /// (028), by project. The start's checks run before its first `await`, but making
     /// the session takes seconds of them, and a second start weighed in that time
@@ -149,6 +156,8 @@ public actor DaemonCore {
     /// What each runtime last advertised, so a start form does not wait for a runtime
     /// to say what it said last time. Read from disk the first time it is wanted.
     lazy var optionCache = OptionCache(locations: locations)
+    /// The mode last chosen for each runtime (029).
+    lazy var modeStore = ModeStore(locations: locations, now: now)
     var rememberedOptions: [String: OptionCache.Entry]?
 
     // MARK: Money
@@ -293,6 +302,13 @@ public actor DaemonCore {
         /// Fixed when the session is made, so a draft made for an agent that may not
         /// start others cannot be used for one that may, or the other way round.
         var managesAgents = true
+        /// The connection that asked for it (029). `nil` for a draft the daemon made
+        /// for itself — a workflow's — which no connection going can orphan.
+        var connection: UUID?
+        /// When that connection went. The draft is let go once the grace period has
+        /// passed without anyone using it; a phone that drops and comes back inside it
+        /// still finds its runtime waiting.
+        var orphanedAt: Date?
     }
 
     struct Pending: Sendable {
@@ -308,8 +324,10 @@ public actor DaemonCore {
                 thresholds: AttentionThresholds = .standard,
                 mailbox: (any Mailbox)? = nil,
                 power: (any PowerSource)? = nil,
-                wakefulness: (any Wakefulness)? = nil) {
+                wakefulness: (any Wakefulness)? = nil,
+                draftGracePeriod: Duration = .seconds(30)) {
         self.store = store
+        self.draftGracePeriod = draftGracePeriod
         self.locations = locations
         self.discovery = discovery
         self.launcher = launcher ?? ProcessSessionLauncher(locations: locations)

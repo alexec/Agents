@@ -37,6 +37,35 @@ enum Canned {
 
     static func ago(_ minutes: Int) -> Date { Date(timeIntervalSinceNow: -Double(minutes) * 60) }
 
+    /// What a runtime offers on the start sheet: a mode, a model, an effort, a switch.
+    static let startOptions: [ConfigOption] = [
+        ConfigOption(id: "model", name: "Model", category: "model", type: "select",
+                     currentValue: "opus",
+                     options: [ConfigChoice(value: "opus", name: "Opus"),
+                               ConfigChoice(value: "sonnet", name: "Sonnet"),
+                               ConfigChoice(value: "haiku", name: "Haiku")]),
+        ConfigOption(id: "mode", name: "Mode", category: "mode", type: "select",
+                     currentValue: "default",
+                     options: [ConfigChoice(value: "default", name: "Ask before edits"),
+                               ConfigChoice(value: "acceptEdits", name: "Accept edits"),
+                               ConfigChoice(value: "plan", name: "Plan")]),
+        ConfigOption(id: "effort", name: "Effort", category: "thought_level", type: "select",
+                     currentValue: "medium",
+                     options: [ConfigChoice(value: "low", name: "Low"),
+                               ConfigChoice(value: "medium", name: "Medium"),
+                               ConfigChoice(value: "high", name: "High")]),
+    ]
+
+    /// Two that start and one that does not, so the start sheet's list shows a reason.
+    static let runtimes: [RuntimeStatus] = [
+        RuntimeStatus(runtime: Runtime(id: "claude", name: "Claude Code", executable: "npx", arguments: []),
+                      availability: .available(path: "/opt/homebrew/bin/npx", supportsResume: true)),
+        RuntimeStatus(runtime: Runtime(id: "codex", name: "Codex", executable: "codex-acp", arguments: []),
+                      availability: .available(path: "/opt/homebrew/bin/codex-acp", supportsResume: true)),
+        RuntimeStatus(runtime: Runtime(id: "grok", name: "Grok", executable: "grok", arguments: []),
+                      availability: .needsSignIn(authMethods: [], fixCommand: "grok login")),
+    ]
+
     static var agents: [Agent] {
         [
             Agent(id: waiting, runtimeID: "claude", cwd: agentsFolder,

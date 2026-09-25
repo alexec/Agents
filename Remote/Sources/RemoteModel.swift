@@ -125,6 +125,283 @@ final class RemoteModel {
 
     func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedProject, group: group) }
 
+    // MARK: Starting an agent (029)
+
+    /// The project a New agent sheet is open on, if one is. On the model rather than in
+    /// the page's `@State` so a launch argument can open it, and so the sheet can close
+    /// itself when the agent it started is ready to be looked at.
+    var startingIn: URL? {
+        didSet {
+            guard startingIn != oldValue else { return }
+            if let startingIn { Task { await openStart(in: startingIn) } } else { closeStart() }
+        }
+    }
+
+    enum StartChoicesState: Equatable {
+        case loading
+        case ready
+        case failed(String)
+    }
+
+    /// The runtime the sheet will start. Seeded with the one the Mac would offer.
+    private(set) var startRuntimeID: String?
+    /// What that runtime offers, in the order they are drawn.
+    private(set) var startOptions: [ConfigOption] = []
+    /// What has been chosen, by option id. Sent as the start's options.
+    private(set) var startChosen: [String: JSONValue] = [:]
+    private(set) var startChoicesState: StartChoicesState = .loading
+    /// Why the last Send did not start anything, in one sentence. Shown in the sheet
+    /// rather than as the app's alert, which a sheet would hide.
+    private(set) var startRefusal: String?
+    /// A start sent whose answer never came back. Its request id is reused by every
+    /// retry, so the Mac answers with the agent the first one made rather than
+    /// starting the work twice.
+    private(set) var unsettledStart: DaemonAPI.StartRequest?
+    private(set) var isStarting = false
+    private var startDraftID: UUID?
+    /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
+    /// person has since moved off is recognised as that and let go.
+    private var startGeneration = 0
+
+    var startRuntime: RuntimeStatus? { runtimes.first { $0.runtime.id == startRuntimeID } }
+
+    private func openStart(in folder: URL) async {
+        startRefusal = nil
+        if startRuntimeID == nil || !availableRuntimeIDs.contains(startRuntimeID ?? "") {
+            startRuntimeID = work.defaultRuntimeID(available: availableRuntimeIDs)
+        }
+        await loadStartChoices()
+    }
+
+    /// Put the sheet away. Its runtime is let go; what was typed is the keeper's.
+    private func closeStart() {
+        startGeneration += 1
+        discardStartDraft()
+        startOptions = []
+        startChosen = [:]
+        startChoicesState = .loading
+        startRefusal = nil
+    }
+
+    func chooseRuntime(_ runtimeID: String) async {
+        guard runtimeID != startRuntimeID else { return }
+        startRuntimeID = runtimeID
+        startRefusal = nil
+        await loadStartChoices()
+    }
+
+    func choose(_ value: JSONValue, for optionID: String) {
+        startChosen[optionID] = value
+    }
+
+    /// A runtime is started behind the form so its choices are real ones; the start
+    /// that follows uses it. Answered from what it offered last time when the Mac has
+    /// that, and put right by `agents/draftOptions` if it has moved.
+    func loadStartChoices() async {
+        guard let folder = startingIn else { return }
+        guard let runtimeID = startRuntimeID else {
+            // Not "asking": there is nobody to ask.
+            startChoicesState = .failed(runtimes.isEmpty
+                ? "No runtimes are set up on the Mac. Set one up there to start an agent."
+                : "None of the Mac's runtimes can start right now.")
+            return
+        }
+        startGeneration += 1
+        let generation = startGeneration
+        discardStartDraft()
+        startOptions = []
+        startChosen = [:]
+        startChoicesState = .loading
+        do {
+            let response = try await client.call(DaemonAPI.Method.agentsOptions,
+                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder),
+                                                 returning: DaemonAPI.OptionsResponse.self)
+            guard generation == startGeneration else { discard(draft: response.draftID); return }
+            startDraftID = response.draftID
+            showStart(response.options, opening: true)
+        } catch {
+            guard generation == startGeneration else { return }
+            startChoicesState = .failed(sentence(for: error))
+        }
+    }
+
+    /// Draw what the runtime offers, keeping every choice already made that is still
+    /// one of the choices.
+    ///
+    /// On the first draw only, the mode opens on the one last chosen for this runtime
+    /// on any device, as the Mac's form does: a correction arriving behind a form drawn
+    /// from memory must not undo a mode chosen since.
+    private func showStart(_ options: [ConfigOption], opening: Bool = false) {
+        startOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
+        var kept: [String: JSONValue] = [:]
+        for option in startOptions {
+            if let chosen = startChosen[option.id],
+               option.isBoolean || (option.options ?? []).contains(where: { $0.value == chosen }) {
+                kept[option.id] = chosen
+            } else if let current = option.currentValue {
+                kept[option.id] = current
+            }
+        }
+        if opening, let runtimeID = startRuntimeID, let mode = ModeMemory.modeOption(in: startOptions),
+           let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
+            kept[mode.id] = value
+        }
+        startChosen = kept
+        startChoicesState = .ready
+    }
+
+    private func settleStartDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
+        guard notification.draftID == startDraftID else { return }
+        if let failure = notification.failure {
+            startDraftID = nil
+            startOptions = []
+            startChosen = [:]
+            startChoicesState = .failed(failure)
+            return
+        }
+        showStart(notification.options)
+    }
+
+    private func discardStartDraft() {
+        guard let startDraftID else { return }
+        self.startDraftID = nil
+        discard(draft: startDraftID)
+    }
+
+    /// Not waited on: the sheet has moved on, and a Mac too old to know the method has
+    /// nothing to be told.
+    private func discard(draft: UUID) {
+        Task { _ = try? await client.call(DaemonAPI.Method.agentsDiscardDraft,
+                                          DaemonAPI.DiscardDraftRequest(draftID: draft)) }
+    }
+
+    /// Start an agent in the sheet's project. Answers whether it started, so the sheet
+    /// keeps what was typed when it did not.
+    ///
+    /// Refused here, before anything is sent, when the Mac is not answering or the
+    /// project cannot take a new agent. Refused by the Mac, its sentence is shown as it
+    /// is. Lost on the way back, nothing is assumed: the start is kept, and settled by
+    /// its request id once the Mac is heard from again.
+    func startAgent(prompt: String, attachments: [Attachment] = []) async -> Bool {
+        let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty, !isStarting, let folder = startingIn else { return false }
+        if let refusal = startRefusalBeforeSending(in: folder) {
+            startRefusal = refusal
+            return false
+        }
+        guard let runtimeID = startRuntimeID else {
+            startRefusal = "Choose a runtime to start."
+            return false
+        }
+        // Before sending, and in the Mac's words: a runtime that will not take what is
+        // attached would refuse the whole prompt after the agent had started.
+        let capabilities = promptCapabilities(for: runtimeID)
+        if let refused = attachments.first(where: { PhoneAttachment.refusal(for: $0, from: capabilities) != nil }),
+           let reason = PhoneAttachment.refusal(for: refused, from: capabilities) {
+            startRefusal = "\(refused.displayName): \(reason)."
+            return false
+        }
+        if let tooMuch = PhoneAttachment.totalRefusal(attachments) {
+            startRefusal = tooMuch
+            return false
+        }
+        // The unsettled start's id only for the same project: sent again there, the Mac
+        // answers with the agent it made if it made one. Anywhere else it is a new
+        // start, and reusing the id would be answered with the other project's agent.
+        let retrying = unsettledStart?.cwd == folder ? unsettledStart?.requestID : nil
+        let request = DaemonAPI.StartRequest(
+            runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
+            startOptions: StartOptions(values: startChosen), draftID: startDraftID,
+            requestID: retrying ?? UUID())
+        return await send(start: request)
+    }
+
+    private func send(start request: DaemonAPI.StartRequest) async -> Bool {
+        isStarting = true
+        defer { isStarting = false }
+        startRefusal = nil
+        unsettledStart = request
+        do {
+            let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            await started(id, in: request.cwd)
+            return true
+        } catch let refused as JSONRPCError {
+            // The Mac said no, so nothing was started under this id and a later
+            // Send is a fresh start.
+            unsettledStart = nil
+            startRefusal = refused.message
+            return false
+        } catch {
+            startRefusal = "Your Mac stopped answering before it said whether the agent started. "
+                + "This will be checked when it is back."
+            return false
+        }
+    }
+
+    /// - Parameter open: go to it. True when the person is waiting on the sheet; false
+    ///   when a lost answer is settled later, perhaps while they read something else,
+    ///   and taking the screen from them would be the surprise.
+    private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
+        unsettledStart = nil
+        // Only now: a draft is kept until the agent it was typed for exists (FR-017).
+        StartDraftKeeper.shared.clear(in: folder)
+        guard open else { return }
+        startDraftID = nil
+        await refreshAgents()
+        await refreshProjects()
+        startingIn = nil
+        selectedProject = folder
+        // A beat, so the sheet has gone before the conversation is pushed. Two
+        // presentations in one turn of the loop is not something to ask of a split view.
+        try? await Task.sleep(for: .milliseconds(400))
+        selection = id
+    }
+
+    /// A start whose answer was lost: find the agent it made, or send it again with the
+    /// same id, which the Mac answers with that agent if it did make one.
+    private func settleUnsettledStart() async {
+        guard let request = unsettledStart, let requestID = request.requestID else { return }
+        if let made = work.agents.first(where: { $0.startRequestID == requestID }) {
+            await started(made.id, in: request.cwd, open: startingIn == request.cwd)
+            return
+        }
+        guard startingIn == request.cwd else { return }
+        _ = await send(start: request)
+    }
+
+    private func startRefusalBeforeSending(in folder: URL) -> String? {
+        if isStale { return "Your Mac is not answering, so nothing was started." }
+        guard let summary = work.project(folder) else { return nil }
+        if summary.project.isArchived { return "This project was archived on the Mac, so nothing was started." }
+        if !summary.exists { return "This project's folder is not on the Mac any more, so nothing was started." }
+        if let runtime = startRuntime, let reason = runtime.unavailableReason {
+            return "\(runtime.runtime.name) cannot start: \(reason)"
+        }
+        return nil
+    }
+
+    private func sentence(for error: any Error) -> String {
+        (error as? JSONRPCError)?.message ?? "Your Mac did not answer."
+    }
+
+    // MARK: The Mac's runtimes (029)
+
+    /// Every runtime the Mac knows, in the Mac's order, startable or not. The start
+    /// sheet lists the ones that cannot start too, with why, because a runtime that
+    /// silently is not there reads as one the phone forgot.
+    private(set) var runtimes: [RuntimeStatus] = []
+    private var accounts: [String: RuntimeAccount] = [:]
+
+    var availableRuntimeIDs: [String] {
+        runtimes.filter(\.availability.isAvailable).map(\.runtime.id)
+    }
+
+    /// What this runtime says it will take in a prompt, as the Mac reads it. Nothing
+    /// is refused on a guess: unknown is the protocol's baseline.
+    func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
+        runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+    }
+
     /// A project's counts from the same grouping its page uses, so the list and the
     /// page cannot disagree about what needs attention.
     func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
@@ -249,6 +526,17 @@ final class RemoteModel {
                    let change = try? notification.params?.decode(DaemonAPI.AttentionNotification.self) {
                     await self.notifier.apply(change, me: .device(self.deviceID))
                 }
+                if notification.method == DaemonAPI.Notification.draftOptions,
+                   let change = try? notification.params?.decode(DaemonAPI.DraftOptionsNotification.self) {
+                    self.settleStartDraft(change)
+                }
+                if notification.method == DaemonAPI.Notification.runtimeChanged {
+                    await self.refreshRuntimes()
+                }
+                if notification.method == DaemonAPI.Notification.runtimeAccountChanged,
+                   let account = try? notification.params?.decode(RuntimeAccount.self) {
+                    self.accounts[account.runtimeID] = account
+                }
                 if notification.method == DaemonAPI.Notification.deviceChanged,
                    let change = try? notification.params?.decode(DaemonAPI.DeviceNotification.self),
                    change.id == self.deviceID {
@@ -277,6 +565,9 @@ final class RemoteModel {
         await refreshResuming()
         await refreshCostState()
         await refreshWorkflows()
+        await refreshRuntimes()
+        await refreshModes()
+        await settleUnsettledStart()
         await loadTranscript()
         settleSelection()
         if let pendingOpen { open(pendingOpen) }
@@ -478,6 +769,28 @@ final class RemoteModel {
         work.replaceWorkflows(listed)
     }
 
+    /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
+    /// current afterwards. A Mac too old to know the method leaves the sheet opening
+    /// on each runtime's own current mode.
+    private func refreshModes() async {
+        guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
+                                                 returning: DaemonAPI.RememberedModes.self) else { return }
+        work.replaceRememberedModes(modes)
+    }
+
+    private func refreshRuntimes() async {
+        if let listed = try? await client.call(DaemonAPI.Method.runtimesList,
+                                               Optional<String>.none,
+                                               returning: [RuntimeStatus].self) {
+            runtimes = listed
+        }
+        if let listed = try? await client.call(DaemonAPI.Method.runtimesAccounts,
+                                               Optional<Int>.none,
+                                               returning: [RuntimeAccount].self) {
+            accounts = Dictionary(uniqueKeysWithValues: listed.map { ($0.runtimeID, $0) })
+        }
+    }
+
     private func refreshResuming() async {
         let response = try? await client.call(DaemonAPI.Method.agentsResuming,
                                               Optional<String>.none,
@@ -634,6 +947,12 @@ final class RemoteModel {
         if let name = value("-project"),
            let summary = work.projects.first(where: { $0.name == name }) {
             selectedProject = summary.folder
+            // `-start` opens New agent on that project: the sheet is the one screen in
+            // this app that cannot be reached by naming what to look at.
+            if arguments.contains("-start") {
+                try? await Task.sleep(for: .milliseconds(600))
+                startingIn = summary.folder
+            }
         }
         if let title = value("-agent"),
            let agent = work.agents.first(where: { $0.title == title }) {
