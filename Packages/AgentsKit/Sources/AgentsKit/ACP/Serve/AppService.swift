@@ -363,6 +363,15 @@ public actor AppService {
     static func leaseCall(named name: String,
                           _ arguments: JSONValue?) -> Result<LeaseCall, AgentCallProblem>? {
         let resource = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Release first: "release_resource" ends with "lease_resource", so a suffix
+        // test for the lease tool matches both, and every release became an
+        // extension. Found on the real app, 2026-09-25.
+        if name.hasSuffix(releaseResourceToolName) {
+            guard !resource.isEmpty else {
+                return .failure("Nothing was released: say which resource, in `name`.")
+            }
+            return .success(.release(name: resource))
+        }
         if name.hasSuffix(leaseResourceToolName) {
             guard !resource.isEmpty else { return .failure(AgentCallProblem(stringLiteral: LeaseWords.emptyName)) }
             let minutes = arguments?["minutes"].flatMap { value -> Int? in
@@ -371,12 +380,6 @@ public actor AppService {
             }
             let wait = arguments?["wait"]?.boolValue
             return .success(.lease(name: resource, minutes: minutes, wait: wait))
-        }
-        if name.hasSuffix(releaseResourceToolName) {
-            guard !resource.isEmpty else {
-                return .failure("Nothing was released: say which resource, in `name`.")
-            }
-            return .success(.release(name: resource))
         }
         if name.hasSuffix(listResourcesToolName) {
             return .success(.list)
