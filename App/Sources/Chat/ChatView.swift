@@ -65,6 +65,18 @@ struct ChatView: View {
                 // Beside Archive, and unlike it the page stays: someone who stops a chat
                 // that has gone the wrong way wants to keep reading it and say what next.
                 // ⌘. lives on the button, so it exists exactly when the button does.
+                // A blocked chat (039): what the card's Carry on does, where the chat's
+                // own controls are.
+                if model.isBlocked(agent) {
+                    Button {
+                        Task { await model.carryOn(agent.id) }
+                    } label: {
+                        Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                    }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help("Tell it the block has cleared, and let it carry on")
+                }
                 if model.canStop(agent) {
                     Button {
                         Task { await model.stop(agent.id) }
