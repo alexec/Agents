@@ -40,6 +40,14 @@ public struct ToolsetInstaller: Sendable {
         guard out.status == 0 else { throw Self.problem(status: out.status, stderr: out.stderr) }
     }
 
+    /// Whether a whole toolset with this id is already on the server, beside `current` or
+    /// as it: an update installed earlier and still waiting to be swapped in.
+    public func isInstalled(_ id: String) async -> Bool {
+        let out = try? await ssh.run(ssh.runArguments(
+            "[ -f \"$HOME/\(Toolset.serverFolder(runtimeID: "claude"))/\(id)/ok\" ]"))
+        return out?.status == 0
+    }
+
     /// Point `current` at an installed toolset. Last, and on its own, so an update can wait
     /// for a turn to end between installing and swapping.
     public func swap(to id: String) async throws {

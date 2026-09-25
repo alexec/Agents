@@ -144,9 +144,9 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 
 **Independent Test**: quickstart § 3 step 8 — bump the pin, connect with an agent mid-turn: waits; after the turn: swapped, next agent uses it.
 
-- [ ] T049 [US4] Add `tools.claude {toolset, busy}` to `daemon/status` (busy = Claude agents mid-turn) in `Packages/AgentsKit/Sources/AgentsKit/Daemon/` and `Sources/AgentsKitCore/Daemon/DaemonAPI.swift`
-- [ ] T050 [US4] In `ServerConnection`, when the probe's `toolsetID` ≠ the app's and a toolset exists: install beside, then swap `current` only when `busy == 0`, showing `updateWaiting` meanwhile; remove old toolsets after the next good Claude start, in `Packages/AgentsKit/Sources/AgentsKit/Hosts/ServerConnection.swift`
-- [ ] T051 [US4] Fake-ssh test: a busy Claude agent holds the swap; it happens after the turn ends; agents started after use the new `current`, in `ToolsetInstallTests.swift`
+- [X] T049 [US4] ~~Add `tools.claude {toolset, busy}` to `daemon/status`~~ Not needed: 037's `turnsInFlight` is used, which waits for any turn on the server, not only Claude's — stricter, never wrong. Was: add `tools.claude {toolset, busy}` to `daemon/status` (busy = Claude agents mid-turn) in `Packages/AgentsKit/Sources/AgentsKit/Daemon/` and `Sources/AgentsKitCore/Daemon/DaemonAPI.swift`
+- [X] T050 [US4] In `ServerConnection`, when the probe's `toolsetID` ≠ the app's and a toolset exists: install beside, then swap `current` only when `busy == 0`, showing `updateWaiting` meanwhile; remove old toolsets after the next good Claude start, in `Packages/AgentsKit/Sources/AgentsKit/Hosts/ServerConnection.swift`
+- [X] T051 [US4] Fake-ssh test: a busy Claude agent holds the swap; it happens after the turn ends; agents started after use the new `current`, in `ToolsetInstallTests.swift`
 - [ ] T052 [US4] Walk quickstart step 8; notes in `specs/043-zero-setup-servers/walk/US4.md`
 
 ---

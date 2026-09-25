@@ -263,6 +263,15 @@ final class HostSet {
 
     private func claudeMoved(_ id: HostID, to next: ServerConnection.Claude) {
         claude[id] = next
+        // A newer toolset waits beside the old for the turns on it to end; look again in
+        // half a minute, as 037 does for the daemon (FR-007).
+        if case .updateWaiting = next {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard let self, case .updateWaiting = self.claude[id] else { return }
+                await self.installClaude(id)
+            }
+        }
         log("\(hosts[id]?.label ?? id.rawValue): claude \(next)")
         if case .ready(let toolset) = next, var host = hosts[id], host.facts?.toolsetID != toolset {
             host.facts?.toolsetID = toolset

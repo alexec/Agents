@@ -221,7 +221,12 @@ public actor ServerConnection {
     /// has a credential for it. Never throws: the server is usable either way.
     private func settleClaude(_ probed: ServerFacts) async {
         guard let toolset = toolset() else { return await moveClaude(.unknown) }
-        if probed.toolsetID == toolset.id { return await moveClaude(.ready(toolset.id)) }
+        if probed.toolsetID == toolset.id {
+            // Old toolsets go only when nothing could still be running from one: an agent
+            // idle between turns keeps its process, and that process its files.
+            if await agentsLive() == 0 { try? await tools.removeOthers(except: toolset.id) }
+            return await moveClaude(.ready(toolset.id))
+        }
         if probed.toolsetID == nil, probed.hasNpx { return await moveClaude(.own) }
         let wanted = await wantsClaude()
         guard probed.toolsetID != nil || wanted else { return await moveClaude(.notInstalled) }
@@ -239,14 +244,18 @@ public actor ServerConnection {
     private func install(_ toolset: Toolset, on facts: ServerFacts) async {
         await moveClaude(.installing)
         do {
-            try await tools.install(toolset, on: facts)
+            // An update already downloaded and waiting for a turn to end is not fetched again.
+            if !(await tools.isInstalled(toolset.id)) {
+                try await tools.install(toolset, on: facts)
+            }
             // Replacing one in use waits for its turns to end (FR-007): what is running
             // keeps its files; the swap is tried again on the next connect.
             if facts.toolsetID != nil, (try? await daemonIsBusy()) == true {
                 return await moveClaude(.updateWaiting)
             }
             try await tools.swap(to: toolset.id)
-            try? await tools.removeOthers(except: toolset.id)
+            // A first install has nothing to tidy; an update's old toolset is removed on a
+            // later connect with no agent live (see `settleClaude`).
             self.facts?.toolsetID = toolset.id
             await moveClaude(.ready(toolset.id))
         } catch let problem as HostProblem {

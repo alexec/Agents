@@ -237,5 +237,31 @@ extension FakeSSHSuites {
             await server.disconnect()
             #expect(before == after)
         }
+    
+        // MARK: Updates (US4)
+
+        @Test func aNewerToolsetWaitsBesideTheOldUntilSwapped() async throws {
+            let setup = try await Self.setUp()
+            defer { Task { await Self.tearDown(setup) } }
+            let facts = try await ServerInstaller(ssh: setup.ssh).probe()
+            let installer = ToolsetInstaller(ssh: setup.ssh)
+            let old = setup.tools.toolset
+            try await installer.install(old, on: facts)
+            try await installer.swap(to: old.id)
+
+            // The same files under another id stand in for a newer pin.
+            var newer = old
+            newer.id = "fedcba9876543210"
+            #expect(await installer.isInstalled(newer.id) == false)
+            try await installer.install(newer, on: facts)
+            #expect(await installer.isInstalled(newer.id))
+            let current = setup.claude.appendingPathComponent("current").path
+            #expect(try FileManager.default.destinationOfSymbolicLink(atPath: current) == old.id,
+                    "what is running keeps its files until the swap")
+            try await installer.swap(to: newer.id)
+            #expect(try FileManager.default.destinationOfSymbolicLink(atPath: current) == newer.id)
+            try await installer.removeOthers(except: newer.id)
+            #expect(await installer.isInstalled(old.id) == false)
+        }
     }
 }
