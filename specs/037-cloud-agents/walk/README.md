@@ -35,3 +35,24 @@ Still to see: the offline heading and the offline strip (T039), a real agent on 
 server files pane.
 
 Noticed, not yet changed: the server folder sheet lists hidden folders (`.agents-server`, `.git`).
+
+# On a real server (Alex's)
+
+Everything above ran against a fake: a folder on this Mac and this Mac's own `agentsd`. None of it
+has run on Linux. These are the checks that need a real server — any Linux box, x86-64 or ARM64,
+reachable with key-based `ssh` from this Mac, with one agent CLI (say Claude Code) installed and
+logged in there.
+
+Before starting: run `scripts/build-linux-agentsd.sh`, then build and launch the app from this
+branch. Nothing here touches your real agents; a scratch root is fine.
+
+| # | Check | Do this | Passes when |
+|---|---|---|---|
+| 1 | First connection (SC-001) | Settings ▸ Servers ▸ Add a server, type the ssh alias. Time it to an agent's first reply. | The fingerprint matches `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the box; the four steps tick; your runtime is listed; under 2 minutes; you typed nothing on the box. |
+| 2 | The daemon runs on Linux (T005) | New project ▸ <server> ▸ Choose Folder…, pick a repo, start an agent: "Create hello.txt and run uname -a". | hello.txt exists on the box, not the Mac; the reply says Linux; the files pane shows hello.txt; the terminal pane works. |
+| 3 | Lid closed (SC-002/003) | Start a 5-minute task, close the lid for 10 minutes, open it. | The window is current within 10 s with no clicks; the task finished while you were away; its whole transcript is there. |
+| 4 | Failures (SC-005) | Add `devbx` (typo); a host whose key is not in the agent (`ssh-add -D` first); a macOS host; a box with no CLI. | Each says its sentence within 30 s; `ls -a ~` on the box shows no `.agents-server` after the failed ones. |
+| 5 | No listener (SC-006) | `ss -ltnp` on the box before adding it and after an agent has run. | Nothing new listening. |
+| 6 | Update (SC-007) | Rebuild the Linux binaries after any change and reconnect: once idle, once with an agent mid-turn. | Idle: new binary, conversations intact. Mid-turn: orange "Update waiting", then the swap once the turn ends. |
+| 7 | Reboot | `sudo reboot` the box while idle; wait; reconnect. | The window comes back on its own and the daemon is started again. |
+| 8 | Remove | Settings ▸ Servers ▸ Remove…, with and without the checkbox. | Projects leave the list; the daemon is gone on the box; with the checkbox `~/.agents-server` is gone; your repos are untouched. |
