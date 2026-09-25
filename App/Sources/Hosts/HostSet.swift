@@ -127,6 +127,32 @@ final class HostSet {
         try? store.save(hosts)
     }
 
+    /// "Use this server's own sign-in only" (043, FR-014). Takes effect on the next
+    /// connect, which is at once: the window tells the server what it may be lent then.
+    func setOwnSignInOnly(_ id: HostID, _ on: Bool) {
+        guard var host = hosts[id], host.ownSignInOnly != on else { return }
+        host.ownSignInOnly = on
+        update(host)
+        connect(id)
+    }
+
+    /// How Claude stands on a server, in one line for Settings (043, contracts/ui.md § 2).
+    func claudeLine(_ id: HostID, hasCredential: Bool) -> String {
+        guard let host = hosts[id], let facts = host.facts else { return "Claude: not checked yet" }
+        let signIn = host.ownSignInOnly ? " · its own sign-in only"
+            : hasCredential ? " · signs in with the token in Settings"
+            : facts.hasOwnClaudeSignIn ? " · its own sign-in" : " · needs a token"
+        if facts.toolsetID != nil { return "Claude: ready (installed by Agents)" + signIn }
+        if facts.hasNpx { return "Claude: the server’s own" + signIn }
+        if !facts.canInstallClaude {
+            return "Claude can’t be installed here: it uses \(facts.libc.display). Install it there yourself to use it."
+        }
+        if facts.downloader == nil { return "Claude can’t be installed here: it has neither curl nor wget." }
+        return hasCredential && !host.ownSignInOnly
+            ? "Claude: installed when \(host.label) next connects"
+            : "Claude: installed the first time you start it here"
+    }
+
     /// How many agents removing this server would stop, for the Remove dialog.
     func agentsLive(_ id: HostID) async -> Int {
         await connections[id]?.agentsLive() ?? 0

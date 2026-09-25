@@ -295,6 +295,8 @@ final class AppModel {
     private let client = DaemonClient()
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
+    /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
+    let credentials = ServerCredentials(locations: .default)
     /// What a server with no connection answers through: nothing, at once.
     private static let unreachable = DaemonClient(link: UnreachableLink())
 
