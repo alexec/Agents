@@ -51,7 +51,8 @@ struct FakeSSH {
     /// pid is in its `.ctl` file; nothing is killed by name.
     func tearDown() {
         if let names = try? FileManager.default.contentsOfDirectory(atPath: hosts.path) {
-            for name in names where name.hasSuffix(".ctl") {
+            // A master killed outright leaves its relay behind; a real ssh has none.
+            for name in names where name.hasSuffix(".ctl.relay") || name.hasSuffix(".ctl") {
                 if let text = try? String(contentsOfFile: hosts.appendingPathComponent(name).path, encoding: .utf8),
                    let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
                     kill(pid, SIGTERM)

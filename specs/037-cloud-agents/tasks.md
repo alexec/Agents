@@ -94,7 +94,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - `project(_ key:)`, `agents(in:group:)`, `counts(in:)` and `unreadCount(in:)` take `ProjectKey`;
   - records decoded without `host` are `.mac`.
 - [X] T026 Add `host: HostID` (client-assigned, default `.mac`, not encoded) to `DaemonAPI.ProjectSummary` and `Agent` in `Pkg/Sources/AgentsKitCore/Model/`. Change `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift` to key projects by `ProjectKey` and to add `apply(_:from:)`. Keep URL-taking shims that mean `.mac` until T028 has moved every caller, then delete them. **Done. URL-taking queries stay (the phone uses them, and they mean any host); keyed ones added beside them. T028 moves the Mac's callers.**
-- [ ] T027 Create `App/Sources/Hosts/HostSet.swift` (`@Observable @MainActor`):
+- [ ] T027 Create `App/Sources/Hosts/HostSet.swift` (`@Observable @MainActor`): **In progress: the per-host sequence is `AgentsKit/Hosts/ServerConnection.swift` (master → probe → refuse / install / update-when-idle → forward → connect; offline on master loss), 7 tests in `Integration/ServerConnectionTests.swift`. The app-side `HostSet` wrapper is next.**
   - hosts `[HostID: HostConnection]`, `.mac` first, the rest loaded from `HostStore`;
   - each `HostConnection` has its `DaemonClient`, link, `SSHMaster?` and `HostState` (data-model.md state diagram);
   - `client(for:)` throws `offline` fast when the host is not connected;

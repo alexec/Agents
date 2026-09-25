@@ -61,6 +61,8 @@ case "$op" in
 esac
 
 if [ $master = 1 ]; then
+    # A master that was killed outright could not stop its relay; this one does.
+    [ -f "$ctl.relay" ] && kill "$(cat "$ctl.relay")" 2>/dev/null
     echo $$ > "$ctl"
     trap 'rm -f "$ctl"; [ -n "$local" ] && rm -f "$local"; exit 0' TERM INT
     if [ -n "$forward" ]; then
@@ -69,7 +71,8 @@ if [ $master = 1 ]; then
         # exec would lose the trap; the relay runs as a child and dies with us.
         /usr/bin/python3 "$here/relay.py" "$local" "$remote" &
         relay=$!
-        trap 'kill $relay 2>/dev/null; rm -f "$ctl" "$local"; exit 0' TERM INT
+        echo $relay > "$ctl.relay"
+        trap 'kill $relay 2>/dev/null; rm -f "$ctl" "$ctl.relay" "$local"; exit 0' TERM INT
         wait $relay
     else
         while :; do sleep 1; done
