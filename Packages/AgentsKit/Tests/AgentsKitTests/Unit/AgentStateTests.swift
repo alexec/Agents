@@ -292,4 +292,38 @@ struct AgentStateTests {
         archived.archivedReason = .byUser
         #expect(!archived.isConsistent)
     }
+
+    // MARK: An agent's own stop and archive (028)
+
+    /// A stop made by the agent that started this one goes exactly where the person's
+    /// stop goes, from exactly the same states, and differs only in the ending it
+    /// writes. Derived from the person's rows so the two cannot drift.
+    @Test func anAgentsStopIsThePersonsStopWithItsOwnEnding() {
+        for state in AgentState.allCases {
+            let persons = state.applying(.stoppedByUser)
+            let agents = state.applying(.stoppedByAgent)
+            #expect((persons == nil) == (agents == nil), "\(state)")
+            guard let persons, let agents else { continue }
+            #expect(agents.next == persons.next, "\(state)")
+            #expect(agents.endedReason == .set(.stoppedByAgent), "\(state)")
+            #expect(agents.archivedReason == persons.archivedReason, "\(state)")
+            #expect(agents.clearsPickUpCount == persons.clearsPickUpCount, "\(state)")
+        }
+    }
+
+    /// And an agent's archive is the person's archive, saying who did it.
+    @Test func anAgentsArchiveIsThePersonsArchiveWithItsOwnReason() {
+        for state in AgentState.allCases {
+            for ending in [EndedReason?.none] + EndedReason.allCases.map(Optional.some) {
+                let persons = state.applying(.archivedByUser, endedReason: ending)
+                let agents = state.applying(.archivedByAgent, endedReason: ending)
+                #expect((persons == nil) == (agents == nil), "\(state)")
+                guard let persons, let agents else { continue }
+                #expect(agents.next == persons.next, "\(state)")
+                #expect(agents.endedReason == persons.endedReason, "\(state)")
+                #expect(agents.archivedReason == .set(.byAgent), "\(state)")
+                #expect(agents.clearsPickUpCount == persons.clearsPickUpCount, "\(state)")
+            }
+        }
+    }
 }

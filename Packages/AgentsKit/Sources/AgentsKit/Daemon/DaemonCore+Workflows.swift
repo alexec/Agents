@@ -486,8 +486,10 @@ extension DaemonCore {
         var detail: String
     }
 
-    /// Start a new agent for a workflow, in the mode, on the runtime and with the model
-    /// its file asks for — or start nothing at all.
+    /// A start in the mode, on the runtime and with the model a workflow's file asks
+    /// for — or a refusal, having started nothing at all. Shared by workflows and by an
+    /// agent starting another (028), so `runtime:`, `model:` and `permission-mode:`
+    /// mean one thing in both.
     ///
     /// The refusal cannot be decided before a session exists. Whether a runtime offers
     /// `plan` is a fact about a live session with that runtime, and there are only two
@@ -507,8 +509,13 @@ extension DaemonCore {
     ///
     /// So the session is made first, and it is made as a `Draft`, which `start` then
     /// takes and reuses: one process, whether the settings are honoured or refused.
-    private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String) async throws -> UUID {
-        let runtimeID = workflow.settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
+    ///
+    /// `managesAgents` is whether the agent this makes may start agents of its own; it
+    /// has to be known here because a session with settings is made now, as a draft,
+    /// and its MCP server is fixed when it is made.
+    func startRequest(settings: WorkflowSettings, folder: URL, prompt: String,
+                      managesAgents: Bool) async throws -> DaemonAPI.StartRequest {
+        let runtimeID = settings.runtimeID ?? RuntimeCatalog.builtIn[0].id
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             // A runtime this version has never heard of. Not rehomed onto the default
             // one: a workflow that says `runtime: grok` and quietly runs on Claude is
@@ -520,16 +527,21 @@ extension DaemonCore {
                     + RuntimeCatalog.builtIn.map(\.id).joined(separator: ", "))
         }
 
-        let request: DaemonAPI.StartRequest
-        if workflow.settings.isEmpty {
+        if settings.isEmpty {
             // Today's path exactly, and no draft. Most workflows say nothing about how
             // they run, and for those there is nothing to check, so there is no reason
             // to make a session early or to keep one in hand (SC-006).
-            request = DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: workflow.folder, prompt: prompt)
-        } else {
-            request = try await settled(workflow, runtime: runtime, prompt: prompt)
+            return DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: prompt)
         }
+        return try await settled(settings, folder: folder, runtime: runtime, prompt: prompt,
+                                 managesAgents: managesAgents)
+    }
 
+    /// Start a new agent for a workflow, as its file says, and mark it as the
+    /// workflow's.
+    private func startAgent(for workflow: Workflow, run: WorkflowRun, prompt: String) async throws -> UUID {
+        let request = try await startRequest(settings: workflow.settings, folder: workflow.folder,
+                                             prompt: prompt, managesAgents: true)
         let agentID = try await start(request)
         if var agent = agents[agentID] {
             agent.startedByWorkflow = workflow.workflowID
@@ -542,14 +554,15 @@ extension DaemonCore {
 
     /// Make the session, ask it what it offers, and turn the file's words into a start
     /// — or throw, having started nothing and left no agent behind.
-    private func settled(_ workflow: Workflow, runtime: Runtime,
-                         prompt: String) async throws -> DaemonAPI.StartRequest {
+    private func settled(_ settings: WorkflowSettings, folder: URL, runtime: Runtime,
+                         prompt: String, managesAgents: Bool) async throws -> DaemonAPI.StartRequest {
         let draftID = UUID()
         let pending = Task { [self] in
-            try await freshSession(runtimeID: runtime.id, cwd: workflow.folder, mcpServers: [])
+            try await freshSession(runtimeID: runtime.id, cwd: folder, mcpServers: [],
+                                   managesAgents: managesAgents)
         }
-        let draft = Draft(runtimeID: runtime.id, cwd: workflow.folder,
-                          mcpServers: [], pending: pending)
+        let draft = Draft(runtimeID: runtime.id, cwd: folder,
+                          mcpServers: [], pending: pending, managesAgents: managesAgents)
         drafts[draftID] = draft
 
         let made: DaemonCore.MadeSession
@@ -566,7 +579,7 @@ extension DaemonCore {
         // The authoritative list, from `session/new` — what this runtime, in this
         // folder, is offering right now.
         let advertised = await made.session.options
-        switch WorkflowSettings.resolve(workflow.settings, against: advertised) {
+        switch WorkflowSettings.resolve(settings, against: advertised) {
         case .refused(let setting, let value, let offered):
             // No agent is created. The session that was made to ask the question is
             // ended, because nothing is going to use it.
@@ -579,7 +592,7 @@ extension DaemonCore {
         case .resolved(let options):
             // The same session, handed on. `start` takes the draft by this id and
             // reuses it, so asking what the runtime offered costs no second process.
-            return DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: workflow.folder,
+            return DaemonAPI.StartRequest(runtimeID: runtime.id, cwd: folder,
                                           prompt: prompt, startOptions: options,
                                           draftID: draftID)
         }
@@ -639,7 +652,17 @@ extension DaemonCore {
     /// a finished agent's depth unfindable — and a depth that silently resets to zero is
     /// a loop the limit never stops.
     func workflowChainDepth(causedBy agentID: UUID) -> Int {
-        guard let (_, run) = runInFlight(for: agentID) else { return 0 }
+        guard let (_, run) = runInFlight(for: agentID) else {
+            // An agent another agent started has no run of its own, but it is still
+            // part of whatever chain its starter is in (028). Without this, a workflow
+            // whose agent starts one that fires the same workflow again would begin
+            // again at depth zero every time round — the loop the limit exists for.
+            // One step only: an agent another agent started cannot start one itself.
+            if let starter = agents[agentID]?.startedByAgent, starter != agentID {
+                return workflowChainDepth(causedBy: starter)
+            }
+            return 0
+        }
         return run.depth + 1
     }
 

@@ -17,6 +17,12 @@ public actor DaemonCore {
     var eventTasks: [UUID: Task<Void, Never>] = [:]
     var turnTasks: [UUID: Task<Void, Never>] = [:]
     var drafts: [UUID: Draft] = [:]
+    /// Places taken by agents being started for another agent, and not yet made
+    /// (028), by project. The start's checks run before its first `await`, but making
+    /// the session takes seconds of them, and a second start weighed in that time
+    /// has to see the first's place as taken. In memory only: a start does not
+    /// survive a restart, so neither does its reservation.
+    var reservedStarts: [URL: Int] = [:]
     var pendingPermissions: [UUID: Pending] = [:]
     /// Forms an agent is blocked on, held here for the same reason permissions are:
     /// the question can arrive while no window is open.
@@ -275,6 +281,10 @@ public actor DaemonCore {
         /// is shown while its runtime is still starting. Whoever needs the session —
         /// the start, or the refresh behind the form — waits here for it.
         var pending: Task<MadeSession, any Error>
+        /// Whether the session's MCP server offers the tools for starting agents (028).
+        /// Fixed when the session is made, so a draft made for an agent that may not
+        /// start others cannot be used for one that may, or the other way round.
+        var managesAgents = true
     }
 
     struct Pending: Sendable {

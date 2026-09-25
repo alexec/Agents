@@ -291,6 +291,7 @@ private struct StateLine: View {
         case .stopped:
             switch reason {
             case .cancelled: return "You stopped it"
+            case .stoppedByAgent: return "The agent that started it stopped it"
             case .processDied: return "The runtime crashed"
             case .daemonGone: return "Stopped when the daemon did"
             case .maxTokens: return "Ran out of room"

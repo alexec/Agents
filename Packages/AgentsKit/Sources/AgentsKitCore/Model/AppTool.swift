@@ -23,6 +23,22 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
+    // Four more that act on other agents (028): start one in this project, and stop,
+    // archive or list the ones this agent started. Never offered to an agent another
+    // agent started.
+
+    /// Start an agent in the caller's own project.
+    public static let startAgent = "start_agent"
+
+    /// Stop an agent the caller started.
+    public static let stopAgent = "stop_agent"
+
+    /// Archive an agent the caller started, which gives its place back.
+    public static let archiveAgent = "archive_agent"
+
+    /// The agents the caller started that are still here, and the places in use.
+    public static let listMyAgents = "list_my_agents"
+
     // The older names for the two halves of `finishTurn`, kept since 2026-09-23 (023).
     // The briefing that named them is sent once and lives in the runtime's own
     // history, so a conversation begun before that date and resumed after it calls

@@ -109,6 +109,13 @@ public enum DaemonAPI {
         public static let workflowsSettings = "workflows/settings"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
+        /// What the MCP helper relays when an agent calls `start_agent`,
+        /// `stop_agent`, `archive_agent` or `list_my_agents` (028). The caller is the
+        /// token, and the token alone decides the project and what it may touch.
+        public static let agentsStartHelper = "agents/startHelper"
+        public static let agentsStopHelper = "agents/stopHelper"
+        public static let agentsArchiveHelper = "agents/archiveHelper"
+        public static let agentsListHelpers = "agents/listHelpers"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
@@ -1089,6 +1096,10 @@ public enum DaemonAPI {
         public static let folderInTheWay = -32025
         /// Git could not clone it. The message says why in a sentence.
         public static let cloneFailed = -32026
+        /// An agent asked to do something to an agent that is not its to touch, or
+        /// past its project's limit, or was itself started by an agent (028). The
+        /// message is the sentence the agent is shown.
+        public static let notYours = -32027
     }
 
     // MARK: Workflows
@@ -1176,6 +1187,48 @@ public enum DaemonAPI {
             self.action = action
             self.workflowID = workflowID
             self.content = content
+        }
+    }
+
+    // MARK: Agents started by agents (028)
+
+    /// What an agent passes to `start_agent`. There is no folder: the new agent
+    /// always starts in the caller's own project, which the token decides.
+    public struct StartHelperRequest: Codable, Sendable {
+        public var token: String
+        public var prompt: String
+        public var runtime: String?
+        public var model: String?
+        public var permissionMode: String?
+
+        public init(token: String, prompt: String, runtime: String? = nil,
+                    model: String? = nil, permissionMode: String? = nil) {
+            self.token = token
+            self.prompt = prompt
+            self.runtime = runtime
+            self.model = model
+            self.permissionMode = permissionMode
+        }
+    }
+
+    /// What an agent passes to `stop_agent` or `archive_agent`. The id is a string
+    /// so one that is not a UUID is refused in words rather than failing to decode.
+    public struct HelperRequest: Codable, Sendable {
+        public var token: String
+        public var agentID: String
+
+        public init(token: String, agentID: String) {
+            self.token = token
+            self.agentID = agentID
+        }
+    }
+
+    /// What an agent passes to `list_my_agents`: nothing but who it is.
+    public struct ListHelpersRequest: Codable, Sendable {
+        public var token: String
+
+        public init(token: String) {
+            self.token = token
         }
     }
 

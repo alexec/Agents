@@ -57,10 +57,14 @@ struct AppServiceTests {
         // The one call that ends a turn first, the two that act mid-turn after it,
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
+        // The four agent tools (028) sit after the workflow tool, before the older
+        // names, for an agent that may use them — which is the default.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
-                AppService.workflowToolName, AppService.toolName,
-                AppService.reportOutcomeToolName])
+                AppService.workflowToolName,
+                AppService.startAgentToolName, AppService.stopAgentToolName,
+                AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
+                AppService.toolName, AppService.reportOutcomeToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
@@ -76,7 +80,8 @@ struct AppServiceTests {
         #expect(next?["items"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["label", "prompt"])
 
-        let items = tools[3]["inputSchema"]?["properties"]?["prompts"]?["items"]
+        let suggest = tools.first { $0["name"]?.stringValue == AppService.toolName }
+        let items = suggest?["inputSchema"]?["properties"]?["prompts"]?["items"]
         #expect(items?["properties"]?["label"] != nil)
         #expect(items?["properties"]?["prompt"] != nil)
 

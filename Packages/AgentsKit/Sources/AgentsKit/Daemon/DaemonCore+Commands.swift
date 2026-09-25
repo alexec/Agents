@@ -113,6 +113,13 @@ extension DaemonCore {
     }
 
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
+        try await start(request, startedBy: nil)
+    }
+
+    /// A start, made on behalf of another agent when `starter` is set (028). Not on
+    /// the wire: nothing a window or a phone sends can say an agent started this one,
+    /// so nothing but `startHelper` can make an agent the tools are kept from.
+    func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?) async throws -> UUID {
         // Before the session is made. Refusing after spawning a runtime costs a
         // process for a turn that was never going to run. A new agent has no queue
         // to wait on, which is why this is a refusal where a prompt is a hold — and
@@ -144,7 +151,8 @@ extension DaemonCore {
         // never heard about a server would attach it in name only.
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == request.cwd
-                                     && $0.mcpServers == request.mcpServers ? $0 : nil }
+                                     && $0.mcpServers == request.mcpServers
+                                     && $0.managesAgents == (starter == nil) ? $0 : nil }
         if let usable {
             // The session may still be being made: a form shown from memory is quicker
             // than the runtime behind it. Waiting here is waiting for the start that
@@ -159,7 +167,8 @@ extension DaemonCore {
             // on a session it has already decided against.
             if let draft { Task { [self] in await endDraft(draft) } }
             let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
-                                              mcpServers: request.mcpServers)
+                                              mcpServers: request.mcpServers,
+                                              managesAgents: starter == nil)
             session = made.session
             sessionID = made.sessionID
             appToken = made.appToken
@@ -182,7 +191,11 @@ extension DaemonCore {
                           // would pick the agent up and spend a turn asking it to
                           // work with nothing to work on.
                           queuedPrompts: [QueuedPrompt(text: request.prompt,
-                                                       attachments: request.attachments)])
+                                                       attachments: request.attachments)],
+                          // On the record from the first save, so a daemon killed
+                          // before the next one never finds this agent looking like the
+                          // person's — with the tools, and holding no place.
+                          startedByAgent: starter)
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -198,6 +211,10 @@ extension DaemonCore {
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindAppToken(appToken, to: agent.id)
+        // The first line of its chat, before its first prompt: who started it (028).
+        if let starter {
+            await record(.runtimeNote("Started by \(starterName(starter))."), for: agent.id)
+        }
         // The first prompt of the conversation is the one that carries the briefing.
         needsBriefing.insert(agent.id)
         listen(to: session, agentID: agent.id)
@@ -252,7 +269,8 @@ extension DaemonCore {
     /// session before there is an agent, so that it can refuse a setting the runtime
     /// will not take without an agent ever existing to be refused on.
     func freshSession(runtimeID: String, cwd: URL,
-                              mcpServers: [MCPServer] = []) async throws -> MadeSession {
+                              mcpServers: [MCPServer] = [],
+                              managesAgents: Bool = true) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -278,7 +296,7 @@ extension DaemonCore {
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [appServer(token: token)],
+                                                      mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
                                                       meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
@@ -455,7 +473,9 @@ extension DaemonCore {
     /// Not after the user stopped it: stop means stop, and the queue stays put for
     /// them to send or throw away themselves.
     func drainQueue(after agentID: UUID) async {
-        guard agents[agentID]?.endedReason != .cancelled else { return }
+        // Nor after the agent that started it stopped it (028): that is a stop too.
+        guard agents[agentID]?.endedReason != .cancelled,
+              agents[agentID]?.endedReason != .stoppedByAgent else { return }
         // A limit is not a failure to send. `sendNextQueued` holds the words and
         // says which limit did it, so nothing extra belongs here — a second copy of
         // that decision is a second chance for the two to drift.
@@ -615,7 +635,9 @@ extension DaemonCore {
         // A new process is a new MCP server, so a new token. The old one stopped
         // working when the last process died.
         let token = mintAppToken()
-        let servers = agent.mcpServers + [appServer(token: token)]
+        // Picked back up as what it was: an agent another agent started still has no
+        // tools for starting agents (028).
+        let servers = agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil)]
         bindAppToken(token, to: agent.id)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
@@ -709,7 +731,11 @@ extension DaemonCore {
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
-            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID))))
+            // An agent another agent started hears nothing about starting agents: it
+            // was not given the tools (028).
+            let managesAgents = agents[agentID]?.startedByAgent == nil
+            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
+                                                managesAgents: managesAgents)))
         }
         // What the person changed on a live page since this agent last took a turn
         // (022 FR-016). Told once, here, after their words and in the briefing's
@@ -930,7 +956,22 @@ extension DaemonCore {
 
     // MARK: Stopping, archiving, picking back up
 
-    public func stop(_ agentID: UUID) async throws {
+    /// Who asked for a stop or an archive (028). The person, from a window or the
+    /// phone, or the agent that started this one, through its own tools. Everything a
+    /// stop does is the same either way; the ending and the line in the transcript say
+    /// which.
+    public enum StopCause: Sendable, Equatable {
+        case person
+        case agent(UUID)
+
+        /// The agent that asked, when one did.
+        public var starter: UUID? {
+            if case .agent(let id) = self { return id }
+            return nil
+        }
+    }
+
+    public func stop(_ agentID: UUID, by cause: StopCause = .person) async throws {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
@@ -980,12 +1021,21 @@ extension DaemonCore {
         // here so the code says what it means instead of leaning on a refusal to
         // undo a call it should not have made.
         if agents[agentID]?.state.holdsRuntime == true {
-            await move(agentID, on: .stoppedByUser)
+            switch cause {
+            case .person:
+                await move(agentID, on: .stoppedByUser)
+            case .agent(let starter):
+                // Said before the ending lands, so the transcript reads in the order
+                // it happened: who stopped it, then that it stopped.
+                await record(.runtimeNote("\(starterName(starter)) stopped this agent."), for: agentID)
+                await move(agentID, on: .stoppedByAgent)
+            }
         }
         // Only when there was in fact a pick-up to withdraw. An ordinary stop should
         // not gain a line about something that was never going to happen.
         if hadPickUpPending {
-            await record(.runtimeNote("You stopped this agent before it was picked back up."),
+            let who = cause.starter.map(starterName) ?? "You"
+            await record(.runtimeNote("\(who) stopped this agent before it was picked back up."),
                          for: agentID)
             DaemonLog.shared.write("withdrew the pick-up for agent \(agentID): stopped first")
         }
@@ -993,21 +1043,36 @@ extension DaemonCore {
         // when it goes, and the window keeps showing them it is there.
         if !agent.queuedPrompts.isEmpty {
             let count = agent.queuedPrompts.count
+            let because = cause == .person ? "because you stopped it" : "because it was stopped"
             await record(.runtimeNote(count == 1
-                ? "The message you queued was not sent, because you stopped it. It is still waiting."
-                : "The \(count) messages you queued were not sent, because you stopped it. They are still waiting."),
+                ? "The message you queued was not sent, \(because). It is still waiting."
+                : "The \(count) messages you queued were not sent, \(because). They are still waiting."),
                          for: agentID)
         }
         await releaseRuntime(for: agentID)
     }
 
-    public func archive(_ agentID: UUID) async throws {
+    public func archive(_ agentID: UUID, by cause: StopCause = .person) async throws {
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         stops[agentID, default: 0] += 1
-        if agent.state.holdsRuntime { try await stop(agentID) }
-        await move(agentID, on: .archivedByUser)
+        if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
+        switch cause {
+        case .person:
+            await move(agentID, on: .archivedByUser)
+        case .agent(let starter):
+            await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
+            await move(agentID, on: .archivedByAgent)
+        }
+    }
+
+    /// What an agent that started others is called in their transcripts: its title
+    /// as it is now, or a plain word when it has none or has gone.
+    func starterName(_ starter: UUID) -> String {
+        guard let title = agents[starter]?.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty else { return "Another agent" }
+        return "\u{201C}\(title)\u{201D}"
     }
 
     public func unarchive(_ agentID: UUID) async throws {

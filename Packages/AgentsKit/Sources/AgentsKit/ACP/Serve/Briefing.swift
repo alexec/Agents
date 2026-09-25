@@ -89,6 +89,19 @@ public enum Briefing {
             """
     }
 
+    /// Agents of its own (028), and when not to.
+    ///
+    /// Only for an agent that has the tools: one another agent started is not told
+    /// about tools it was never given. The restraint is the second sentence, for the
+    /// reason the workflow line gives — an agent told it can start agents will start
+    /// agents — and the limit is said here as well as in the tool's description so it
+    /// is known before the first call rather than learned from a refusal.
+    public static let helpers = """
+        If a piece of the work can go on alongside the rest, you can start up to three \
+        agents in this project with \(AppTool.startAgent), and stop or archive them when \
+        their part is done. Do not start one for work you could simply do yourself.
+        """
+
     /// Ask, rather than guess or stop.
     ///
     /// The act, and then the reason it is worth doing: the question is held by the
@@ -198,17 +211,21 @@ public enum Briefing {
     /// actually has: the workflow line is shorter where the scheduling tools are gone,
     /// and the residue line exists only where something conflicting could not be
     /// removed. A tool the app does not serve yet still gets no line at all.
-    public static func lines(for policy: ToolPolicy) -> [String] {
+    ///
+    /// `managesAgents` is false for an agent another agent started, which gets no line
+    /// about starting agents because it has no tools for it (028).
+    public static func lines(for policy: ToolPolicy, managesAgents: Bool = true) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [finish,
                 liveDocument,
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
+            + (managesAgents ? [helpers] : [])
             + [residue(policy.residue)].compactMap { $0 }
     }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
-    public static func text(for policy: ToolPolicy) -> String {
-        lines(for: policy).joined(separator: "\n\n")
+    public static func text(for policy: ToolPolicy, managesAgents: Bool = true) -> String {
+        lines(for: policy, managesAgents: managesAgents).joined(separator: "\n\n")
     }
 }

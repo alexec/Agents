@@ -33,6 +33,15 @@ struct AgentRow: View {
                             .help("Started by the workflow \(workflowName)")
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
+                    // Started by another agent (028): the same kind of mark, for the
+                    // same reason — this is not something the person typed for.
+                    if let starter = model.startedByAgentLabel(agent) {
+                        Image(systemName: AgentsModel.startedByAgentSymbol)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .help(starter)
+                            .accessibilityLabel(starter)
+                    }
                 }
 
                 // The agent's own account of its last turn, and nothing else. This line

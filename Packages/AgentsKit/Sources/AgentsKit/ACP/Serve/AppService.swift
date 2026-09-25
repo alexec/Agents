@@ -10,8 +10,10 @@ import Foundation
 /// session is made, and all four runtimes take them. So the app offers the agent
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
-/// that act mid-turn, `show_file` and `manage_workflows`. Two older names for the
-/// halves of the first are still served, for conversations briefed with them.
+/// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
+/// agents — `start_agent`, `stop_agent`, `archive_agent` and `list_my_agents` (028) —
+/// and are offered only to an agent the person or a workflow started. Two older names
+/// for the halves of the first are still served, for conversations briefed with them.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC over a pipe, which is what `JSONRPCConnection` already does for ACP.
@@ -34,6 +36,14 @@ public actor AppService {
 
     /// And the older name for the outcome half: say how the work went, on its own.
     public static let reportOutcomeToolName = AppTool.reportOutcome
+
+    /// And four that act on other agents (028), offered only to an agent the person or
+    /// a workflow started: start one in this project, and stop, archive or list the
+    /// ones this agent started.
+    public static let startAgentToolName = AppTool.startAgent
+    public static let stopAgentToolName = AppTool.stopAgent
+    public static let archiveAgentToolName = AppTool.archiveAgent
+    public static let listMyAgentsToolName = AppTool.listMyAgents
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -69,15 +79,33 @@ public actor AppService {
     /// call, and two sinks could do half of each.
     public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String) async -> Outcome
 
+    /// One of the four calls that act on other agents (028), as the agent made it.
+    /// Nothing is decided here beyond whether the words are there at all: the daemon
+    /// is what knows whose agent is whose.
+    public enum AgentCall: Sendable, Equatable {
+        case start(prompt: String, runtime: String?, model: String?, permissionMode: String?)
+        case stop(agentID: String)
+        case archive(agentID: String)
+        case list
+    }
+
+    /// Where those go.
+    public typealias AgentsSink = @Sendable (AgentCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
     private let fileSink: FileSink
     private let workflowSink: WorkflowSink
     private let outcomeSink: OutcomeSink
+    private let agentsSink: AgentsSink
+    /// Whether the four agent tools are offered. False for an agent another agent
+    /// started (028), which the daemon says by starting this with `--no-agent-tools`.
+    private let managesAgents: Bool
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
+                managesAgents: Bool = true,
                 finishTurn: @escaping FinishSink = { _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
@@ -88,6 +116,9 @@ public actor AppService {
                 },
                 reportOutcome: @escaping OutcomeSink = { _, _ in
                     .refused("This app cannot record an outcome.")
+                },
+                agents: @escaping AgentsSink = { _ in
+                    .refused("This app cannot start or stop agents.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -95,6 +126,8 @@ public actor AppService {
         self.fileSink = showFile
         self.workflowSink = workflows
         self.outcomeSink = reportOutcome
+        self.agentsSink = agents
+        self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -134,9 +167,14 @@ public actor AppService {
         case "tools/list":
             // The one that ends a turn first, the two that act mid-turn, and the two
             // older names last, described as such (023).
+            // The four agent tools after the workflow tool, and only for an agent that
+            // may use them (028).
+            let agentTools = managesAgents
+                ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
+                : []
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
-                                              Self.workflowTool, Self.tool,
-                                              Self.reportOutcomeTool])])
+                                              Self.workflowTool] + agentTools
+                                             + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -202,6 +240,19 @@ public actor AppService {
                                                               arguments?["content"]?.stringValue)))
             }
 
+            if let call = Self.agentCall(named: name, arguments) {
+                guard managesAgents else {
+                    return .success(Self.reply("""
+                        Nothing was done: an agent that another agent started cannot \
+                        start, stop, archive or list agents of its own.
+                        """, isError: true))
+                }
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await agentsSink(call)))
+                }
+            }
+
             if name.hasSuffix(Self.reportOutcomeToolName) {
                 // Checked here as well as at the daemon, so an agent that sent a word
                 // we do not know is told which five we do before the call goes any
@@ -226,6 +277,39 @@ public actor AppService {
         default:
             return .failure(.methodNotFound(method))
         }
+    }
+
+    /// Which of the four agent calls a tool name is, with its arguments read — or the
+    /// sentence saying what was missing. `nil` when the name is none of them.
+    static func agentCall(named name: String,
+                          _ arguments: JSONValue?) -> Result<AgentCall, AgentCallProblem>? {
+        func text(_ key: String) -> String? {
+            let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+        if name.hasSuffix(startAgentToolName) {
+            guard let prompt = text("prompt") else {
+                return .failure("Nothing was started: say what the agent is to do, in `prompt`.")
+            }
+            return .success(.start(prompt: prompt, runtime: text("runtime"), model: text("model"),
+                                   permissionMode: text("permission_mode")))
+        }
+        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(archiveAgentToolName) {
+            guard let id = text("id") else {
+                return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
+            }
+            return .success(name.hasSuffix(stopAgentToolName) ? .stop(agentID: id) : .archive(agentID: id))
+        }
+        if name.hasSuffix(listMyAgentsToolName) {
+            return .success(.list)
+        }
+        return nil
+    }
+
+    /// What was wrong with an agent call's arguments, in the sentence the agent reads.
+    struct AgentCallProblem: Error, ExpressibleByStringLiteral {
+        let message: String
+        init(stringLiteral value: String) { message = value }
     }
 
     /// The two refusals an outcome can meet before it reaches the daemon, by either
@@ -526,6 +610,107 @@ public actor AppService {
             ],
             "required": .array(["action"]),
         ],
+    ]
+
+    /// Start an agent in this project (028).
+    ///
+    /// The description carries the limits because the agent needs them before it
+    /// calls, not in a refusal after: this project only, three at once across the
+    /// project, archiving gives a place back. And the restraint, as the workflow tool
+    /// carries its own — an agent told it can start agents will start agents.
+    static let startAgentTool: JSONValue = [
+        "name": .string(startAgentToolName),
+        "title": "Start an agent in this project",
+        "description": """
+            Start another agent in this project, with a prompt of its own, to do a part \
+            of the work that can run alongside the rest. It starts in this project's \
+            folder — there is no way to start one anywhere else — and appears in the \
+            person's list of agents, marked as started by you. The person can open it, \
+            talk to it, stop it or archive it at any time.
+
+            At most three agents started by agents can exist in this project at once, \
+            counting every agent here, and stopped or finished ones still count. \
+            Archiving one with archive_agent frees its place. Use list_my_agents to see \
+            yours and how many places are in use.
+
+            Start one only when part of the work can genuinely run alongside the rest. \
+            Do not start one for work you could simply do yourself. The agent you \
+            start cannot start agents of its own.
+
+            Returns the new agent's id, which stop_agent and archive_agent take.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "prompt": [
+                    "type": "string",
+                    "description": "What the new agent is to do. Sent to it as its first message.",
+                ],
+                "runtime": [
+                    "type": "string",
+                    "description": "Optional. The runtime to run it on, as a workflow's `runtime:`.",
+                ],
+                "model": [
+                    "type": "string",
+                    "description": "Optional. The model, as a workflow's `model:`.",
+                ],
+                "permission_mode": [
+                    "type": "string",
+                    "description": """
+                        Optional. The runtime's own permission mode, as a workflow's \
+                        `permission-mode:` — e.g. a read-only or plan mode.
+                        """,
+                ],
+            ],
+            "required": .array(["prompt"]),
+        ],
+    ]
+
+    /// The id schema stop and archive share.
+    private static let agentIDSchema: JSONValue = [
+        "type": "object",
+        "properties": [
+            "id": [
+                "type": "string",
+                "description": "The id start_agent or list_my_agents gave.",
+            ],
+        ],
+        "required": .array(["id"]),
+    ]
+
+    static let stopAgentTool: JSONValue = [
+        "name": .string(stopAgentToolName),
+        "title": "Stop an agent you started",
+        "description": """
+            Stop an agent you started with start_agent, as the person's own Stop would. \
+            It stays in the list with its conversation, and keeps its place until it is \
+            archived. Only agents you started can be stopped this way; not yourself, \
+            and not anyone else's.
+            """,
+        "inputSchema": agentIDSchema,
+    ]
+
+    static let archiveAgentTool: JSONValue = [
+        "name": .string(archiveAgentToolName),
+        "title": "Archive an agent you started",
+        "description": """
+            Archive an agent you started with start_agent, as the person's own Archive \
+            would, stopping it first if it is working. This gives its place in the \
+            project back. Only agents you started can be archived this way; not \
+            yourself, and not anyone else's.
+            """,
+        "inputSchema": agentIDSchema,
+    ]
+
+    static let listMyAgentsTool: JSONValue = [
+        "name": .string(listMyAgentsToolName),
+        "title": "List the agents you started",
+        "description": """
+            The agents you started with start_agent that have not been archived: each \
+            one's id, what it is doing, and what it last said about its work. Also how \
+            many of this project's three places are in use.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
     ]
 
     /// The older name for the outcome half of `finishTurnTool`. See `tool`.
