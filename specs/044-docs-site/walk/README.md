@@ -35,6 +35,11 @@ The five pictures in the tutorial come from that run.
 - **A fresh worktree does not build** until `App/Resources/servers/` exists. It is gitignored (037's Linux
   binaries). The build copies it as a folder and fails if it is missing. An empty folder was enough here.
 
+## The gate's answer
+
+Approved by Alex on 2026-09-25: the other pages follow this layout, tone and depth. The question about the iPhone
+tutorial's bridge warning went unanswered, so it is published as drafted, with the warning box.
+
 ## Still to do after the gate
 
 - The ten how-to guides, the six reference pages and the five explanations (T017–T040).

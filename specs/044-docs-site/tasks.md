@@ -127,9 +127,9 @@ should see", and ends in Complete.
 - [ ] T014 [US1] Ask Alex (AskUserQuestion) for the iPhone screenshots for T013 against the scratch root, with the
   list of shots. Save them in `docs/tutorials/images/`. Until then, the page uses Mac pictures where they apply
   and states which steps have no picture yet.
-- [ ] T015 [US1] Fill in `docs/tutorials/index.md` and the Tutorials section of `nav:` in `mkdocs.yml`, then run
+- [X] T015 [US1] Fill in `docs/tutorials/index.md` and the Tutorials section of `nav:` in `mkdocs.yml`, then run
   `scripts/docs.sh check`.
-- [ ] T016 [US1] **Look gate**: run `scripts/docs.sh serve`, screenshot the home page and the tutorial at desktop
+- [X] T016 [US1] **Look gate**: run `scripts/docs.sh serve`, screenshot the home page and the tutorial at desktop
   and phone widths, and ask Alex (AskUserQuestion, screenshots attached through `show_file`) whether the layout,
   tone and depth are right before writing more pages. Apply the answer to the page template in
   `contracts/page-front-matter.md` if anything changes.
