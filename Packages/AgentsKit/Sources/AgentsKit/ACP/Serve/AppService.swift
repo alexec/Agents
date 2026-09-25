@@ -801,11 +801,11 @@ public actor AppService {
     static let workflowTool: JSONValue = [
         "name": .string(workflowToolName),
         "title": "Manage this project's workflows",
-        "description": """
+        "description": .string("""
             List, read, create, change and remove this project's agentic workflows. A \
             workflow is a prompt that runs itself when something happens — on a \
             schedule, or when an agent finishes, asks for permission, raises a form, \
-            or stops.
+            or stops, or on any event below.
 
             A workflow is a Markdown file with YAML front matter. The front matter says \
             what makes it run (`on:`) and which agent runs it (`agent:` — `new`, \
@@ -829,7 +829,11 @@ public actor AppService {
 
             Listing and reading ask nobody. Creating, changing or removing one asks the \
             person first, in plain words, and does nothing if they decline.
-            """,
+
+            Under on:, besides schedule and today's hyphenated names (agent-finished and \
+            the rest), any event name works, narrowed by its details written under it, \
+            e.g. `- pull_request.merged:` with `number: 41` under it.
+            """ + "\n" + EventCatalogue.describe()),
         "inputSchema": [
             "type": "object",
             "properties": [

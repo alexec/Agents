@@ -749,4 +749,11 @@ struct AppServiceTests {
             }
         }
     }
+
+    /// The workflow tool and the wait tool describe the same catalogue in the same words
+    /// (042 FR-024).
+    @Test func theWorkflowToolListsTheSameEventsTheWaitToolDoes() {
+        let description = AppService.workflowTool["description"]?.stringValue ?? ""
+        #expect(description.hasSuffix(EventCatalogue.describe()))
+    }
 }

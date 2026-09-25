@@ -289,14 +289,14 @@ each fire shows as a consequence on its event.
 
 ### Tests for User Story 3
 
-- [ ] T043 [P] [US3] Create `Pkg/Tests/AgentsKitTests/Unit/WorkflowTriggerEventTests.swift`. Cover:
+- [X] T043 [P] [US3] Create `Pkg/Tests/AgentsKitTests/Unit/WorkflowTriggerEventTests.swift`. Cover:
   - Every `.md` under `.agents/workflows/` in this repository, and every `WorkflowExample`, parses to the same `[WorkflowTrigger]` as before. Compare with a fixture captured from `main` in this task, before any parser change.
   - `mac.wake`, `custom.build_green`, `pull_request.*` and `pull_request.merged: {number: 41}` parse to `.event`.
   - `pull_request.merged: {branch: x}` is a file error that names `number`.
   - An unknown dotted name stays `.unrecognised`.
   - `.event` encodes as `.unrecognised(name, keys)`, and a copy of `main`'s `Stored` decoder reads it as a trigger it does not know (FR-025).
   - `summary` for `agent-finished` equals the summary for `agent.finished` (FR-022).
-- [ ] T044 [P] [US3] Create `Pkg/Tests/AgentsKitTests/Integration/EventWorkflowTests.swift`. Cover:
+- [X] T044 [P] [US3] Create `Pkg/Tests/AgentsKitTests/Integration/EventWorkflowTests.swift`. Cover:
   - A workflow on `mac.wake` fires once per raised `mac.wake`, and its fire is a `fired` consequence.
   - One on `custom.ping` with `agent: triggering` fires in the publisher. On `mac.wake` it is refused with `noTriggeringAgent`, and that refusal is a `refused` consequence (FR-023).
   - An `agent-finished` workflow fires exactly once per finish, both before and after the switch in T047 (it must never fire twice).
@@ -306,24 +306,24 @@ each fire shows as a consequence on its event.
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] In `Pkg/Sources/AgentsKitCore/Model/WorkflowTrigger.swift`:
+- [X] T045 [US3] In `Pkg/Sources/AgentsKitCore/Model/WorkflowTrigger.swift`:
   - Add `case event(EventPattern)` and `var patterns: [EventPattern]`, which maps today's cases (`agentStopped` gives `[agent.stopped, agent.failed]`, and `schedule` and `unrecognised` give `[]`).
   - Give `.event` its `summary` from `EventPattern.summary`, and `isSupported` is true for it.
   - In the hand-written `Codable`, encode `.event(p)` as `Stored.unrecognised(name: p.name, keys: p.filters.mapValues(JSONValue.string))`. When decoding `.unrecognised`, try `EventPattern.parse` before falling back, keeping 038's pull-request mapping first.
   - Add `func matches(_ event: Event) -> Bool` over `patterns`.
-- [ ] T046 [US3] In `Pkg/Sources/AgentsKit/Workflows/WorkflowFile.swift`, `trigger(named:keys:)`: after the nine old names, try `EventPattern.parse(name, filters: keys as strings)`. A parse failure for a known subject or kind is a `YAMLNode.Failure` with the pattern's message. An unknown name stays `.unrecognised`. The file is never written back.
-- [ ] T047 [US3] Move the agent-event firing behind `raise` (R7). Fill in `fireWorkflows(for: event)` in `DaemonCore+Events.swift`:
+- [X] T046 [US3] In `Pkg/Sources/AgentsKit/Workflows/WorkflowFile.swift`, `trigger(named:keys:)`: after the nine old names, try `EventPattern.parse(name, filters: keys as strings)`. A parse failure for a known subject or kind is a `YAMLNode.Failure` with the pattern's message. An unknown name stays `.unrecognised`. The file is never written back.
+- [X] T047 [US3] Move the agent-event firing behind `raise` (R7). Fill in `fireWorkflows(for: event)` in `DaemonCore+Events.swift`:
   - For each workflow in the event's project (or in every project for a `.mac` event) that is not archived and has a trigger where `trigger.matches(event)` holds, fire it on a detached task, as `workflowsRespond` does, with `depth: event.chainDepth` and `triggeringAgentID` from `details["agent"]`.
   - Keep `deferredLifecycleEvents` holding the workflow matching (not the logging) until `workflowsAreStarted`.
   - Delete the direct `workflowsRespond` calls from T038's sites, so there is exactly one route.
   - `workflowRunFinished` raises `workflow.completed` and stops firing `respondsToCompletion` directly.
   - Pull-request triggers written with the old names stay in 038's `firePullRequestTriggers` (R8). Exclude them here with `trigger.isPullRequest`.
-- [ ] T048 [US3] Consequences and causing events:
+- [X] T048 [US3] Consequences and causing events:
   - `fire(_:on:…)` takes `causingEvent: EventPosition?`, and records a `fired` or `refused` consequence against it.
   - `record(_:for:)` raises `workflow.ran` or `workflow.refused`.
   - In `Pkg/Sources/AgentsKitCore/Model/WorkflowOutcome.swift`, `.ran` and `.refused` gain `causingEvent: EventPosition?`, encoded only when present.
   - 038's `firePullRequestTriggers` passes the position of the matching `pull_request.*` event raised in T050, so 038 fires still show on the log.
-- [ ] T049 [US3] `manage_workflows`: in `AppService.swift`, append `EventCatalogue.describe()` to its description, under "Triggers you can use", so it is the same text as `wait_for_event`'s `list` (FR-024). Extend the `AppServiceTests` assertion to compare the two strings.
+- [X] T049 [US3] `manage_workflows`: in `AppService.swift`, append `EventCatalogue.describe()` to its description, under "Triggers you can use", so it is the same text as `wait_for_event`'s `list` (FR-024). Extend the `AppServiceTests` assertion to compare the two strings.
 - [ ] T050 [US3] Pull-request events, in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+PullRequests.swift`, after each refresh (R8):
   - Diff the new `PullRequestList` against `eventState.pullRequestsSeen[folder]` and raise `opened`, `checks_failed`, `checks_passed`, `approved`, `changes_requested`, `conflicts` and `review_comments`, each followed by `pull_request.changed` with `what`.
   - For a number that has left the open list, make one `gh api graphql` call through the injected `GitHubCLI` for `pullRequest(number:){ state }`, which gives `merged` or `closed`. If that fails, raise nothing and try again at the next refresh.
@@ -335,7 +335,7 @@ each fire shows as a consequence on its event.
   - Run `git rev-parse` for the default branch and the branch of each live agent's worktree, off the actor. Compare with `eventState.branchTips` and raise one event per change, with `branch`, `from` and `to`.
   - At start, store the tips and raise nothing, apart from a tip that moved while the daemon was down, which carries the time it was noticed.
   - Add tests with a temporary git repository in `Pkg/Tests/AgentsKitTests/Integration/BranchEventTests.swift`.
-- [ ] T052 [US3] Workflow row link: in `App/Sources/Projects/WorkflowRow.swift`, the latest-outcome line reads "Ran 06:55 on pull_request.merged #41 ›" when `causingEvent` is set. The event part links to that row on the Events page, and the run link still goes to the agent (FR-030, wireframes §3).
+- [X] T052 [US3] Workflow row link: in `App/Sources/Projects/WorkflowRow.swift`, the latest-outcome line reads "Ran 06:55 on pull_request.merged #41 ›" when `causingEvent` is set. The event part links to that row on the Events page, and the run link still goes to the agent (FR-030, wireframes §3).
 - [ ] T053 [US3] Run `swift test --filter 'Workflow|PullRequest|EventWorkflow|BranchEvent|WorkflowTriggerEvent'`. Every existing workflow and 038 suite must pass without edits (SC-006).
 
 **Checkpoint**: Workflows and waits read one catalogue through one route. Old files are
