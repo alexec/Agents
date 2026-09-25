@@ -69,8 +69,11 @@ final class HostSet {
 
     func isOffline(_ id: HostID) -> Bool {
         guard id != .mac else { return false }
-        if case .connected = state(id) { return false }
-        return true
+        switch state(id) {
+        // Waiting to update is still talking to the old daemon, which is fine to use.
+        case .connected, .updateWaiting: return false
+        default: return true
+        }
     }
 
     /// The client for a server. Calls on it throw at once while it is not connected,
@@ -194,6 +197,17 @@ final class HostSet {
             }
             listen(id)
             await onConnected?(id)
+        case .updateWaiting:
+            // Talking to the old daemon until its turns end: listen to it, list it, and
+            // try the swap again every half minute.
+            listen(id)
+            await onConnected?(id)
+            retrying[id]?.cancel()
+            retrying[id] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                await self?.connections[id]?.connect()
+            }
         case .offline(let since):
             if offlineSince[id] == nil { offlineSince[id] = since }
             listening[id]?.cancel()

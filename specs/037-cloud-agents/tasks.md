@@ -178,12 +178,12 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 **Independent test**: quickstart § 4 SC-007 on the fake host. Stamp the "installed" binary's `--version` lower with a wrapper script.
 
-- [ ] T045 [P] [US4] Write `Tests/Integration/ServerUpdateTests.swift`:
+- [X] T045 [P] [US4] Write `Tests/Integration/ServerUpdateTests.swift`: **Partly: idle update (new daemon on the new binary, answering, old binary removed) and newer-server refusal are tested in `ServerConnectionTests`. The mid-turn wait is not tested: the fake server runs a real `agentsd`, which has no fake runtime to hold a turn open.**
   - older + idle: install new, `daemon/quit`, swap, start; projects and transcripts are intact;
   - older + mid-turn: the host is `updateWaiting`, nothing is swapped, and after the fake turn ends the swap happens;
   - newer: `serverNewer`, nothing is written, and no daemon is started or stopped;
   - the old binary is deleted only after the next successful connect.
-- [ ] T046 [US4] Implement the update path in `App/Sources/Hosts/HostSet.swift`, using `ServerInstaller` and `daemon/status`/`daemon/quit`: compare versions on every connect, and re-check `turnsInFlight` on each `agent/changed` from that host while `updateWaiting`. Show `Update waiting` in the heading (T032) and in Settings (T048).
+- [X] T046 [US4] Implement the update path in `App/Sources/Hosts/HostSet.swift`, using `ServerInstaller` and `daemon/status`/`daemon/quit`: compare versions on every connect, and re-check `turnsInFlight` on each `agent/changed` from that host while `updateWaiting`. Show `Update waiting` in the heading (T032) and in Settings (T048). **Done: `ServerConnection` installs beside, waits while `daemon/status` shows a turn, then quits the old daemon, waits for its socket to go, swaps and reconnects. The window keeps using the old daemon while `updateWaiting`, shows the orange heading, and retries every 30 s.**
 
 ---
 
@@ -193,15 +193,15 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 
 **Independent test**: quickstart § 2 remove cases, then Settings ▸ Servers on the fake host.
 
-- [ ] T047 [P] [US5] Write `Tests/Integration/RemoveServerTests.swift`:
+- [X] T047 [P] [US5] Write `Tests/Integration/RemoveServerTests.swift`: **Done: 2 tests in `ServerConnectionTests` (daemon gone, folders kept; purge removes only ~/.agents-server).**
   - idle: `daemon/quit {stopAgents:false}`, master stopped, host record gone, its projects gone from the model, `~/.agents-server` still present;
   - with purge: `~/.agents-server` gone and a project folder elsewhere in `$FAKE_SSH_HOME` byte-identical;
   - busy: `daemon/quit {stopAgents:true}` stops the fake agents first.
-- [ ] T048 [US5] Build `App/Sources/Hosts/ServersSettingsView.swift` as in `wireframes/mac-settings-servers.svg`:
+- [X] T048 [US5] Build `App/Sources/Hosts/ServersSettingsView.swift` as in `wireframes/mac-settings-servers.svg`: **Done: `Settings/ServersSettingsView.swift`, including the remove sheet with its live-agent count and purge toggle.**
   - rows with state, `ServerFacts`, version, project count and runtimes; **Check again**, **Remove…** and **+**;
   - the Remove dialog uses `agentsLive` for `N agents are running on <label> and will be stopped.` and **Stop N and Remove**, plus the purge checkbox (off by default);
   - add the tab with `server.rack` after Devices in `App/Sources/AgentsApp.swift`.
-- [ ] T049 [US5] Implement `HostSet.remove(_:purge:)` in `App/Sources/Hosts/HostSet.swift`, following contracts/ssh.md § 8.
+- [X] T049 [US5] Implement `HostSet.remove(_:purge:)` in `App/Sources/Hosts/HostSet.swift`, following contracts/ssh.md § 8. **Done: `ServerConnection.remove(purge:)` → `HostSet.remove` → `AppModel.removeServer`, which also clears that host's records from the window.**
 
 ---
 
