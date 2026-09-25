@@ -88,3 +88,8 @@ send a turn in the hello project.
 After merging main (2026-09-25): relaunching on the new build updated the box by itself (new
 binary, old daemon quit, new one answering, about 2 s in `hosts.log`), and `shell/attach` over the
 forward gave a login bash on `/dev/pts/0` in `~/src/hello` that ran a command and echoed it back.
+
+After Alex signed in to Claude in the box (`claude login`, 2026-09-25): a turn through the window's
+forward read the README, ran `uname -a` (aarch64 Linux), asked permission to write, wrote
+`from-the-mac.txt` in `~/src/hello` on the box (nothing on the Mac), answered, and reported with
+`finish_turn`: the app's agent tools work for a runtime on the server. About 12 s end to end.
