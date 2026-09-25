@@ -132,6 +132,9 @@ public actor DaemonCore {
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
     var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The plan files each agent has had shown, which a device may read although they
+    /// sit outside the agent's folders (`~/.claude/plans`). The file, never its folder.
+    var shownPlanFiles: [UUID: Set<String>] = [:]
     /// The phones and iPads that have an agent's shell open, by agent (034). A device
     /// hears a shell's output only while it is here; a window on the Mac hears them all.
     var shellWatchers: [UUID: Set<UUID>] = [:]
@@ -355,6 +358,15 @@ public actor DaemonCore {
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
     var connectionCount = 0
+    /// False on a server, where the daemon is started with `--serve` and stays up with
+    /// no Mac connected, so scheduled workflows keep firing (037). A server has no
+    /// battery to spare and no window that could start it again on its own.
+    var exitsWhenIdle = true
+    /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
+    var quitRequested = false
+    /// The last few hundred sends that carried a `sendID`, and what each came to (037).
+    var recentSends: [UUID: Task<JSONValue, any Error>] = [:]
+    var recentSendOrder: [UUID] = []
 
     /// The daemon's one way out to the windows, settable once the socket exists and
     /// readable from any thread.
@@ -755,6 +767,22 @@ public actor DaemonCore {
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
+    /// `agents/list`, narrowed the way the request asks.
+    public func listAgents(_ request: DaemonAPI.ListRequest) -> [Agent] {
+        let folder = request.folder.map(Project.standardize)
+        var listed = allAgents(includeArchived: request.includeArchived || request.archivedOnly)
+            .filter { agent in
+                (!request.archivedOnly || agent.state == .archived)
+                    && (folder == nil || agent.projectFolder == folder)
+                    && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
+            }
+        if let limit = request.limit { listed = Array(listed.prefix(max(0, limit))) }
+        if !request.archivedCommands {
+            for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }
+        }
+        return listed
+    }
+
     public func agent(_ id: UUID) -> Agent? { agents[id] }
 
     public func runtimeStatuses() -> [RuntimeStatus] {
@@ -793,6 +821,7 @@ public actor DaemonCore {
             // counted as the agent doing something.
             guard !kind.isInvisibleAgentText else { return }
             await record(kind, for: agentID)
+            notePlanning(kind, agentID: agentID)
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }
@@ -894,6 +923,12 @@ public actor DaemonCore {
             // runs while the question is still outstanding.
             let cause = raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
             workflowsRespond(to: .askedPermission, agentID: agentID, causingEvent: cause)
+            // The plan, as a page beside the question about it. Asked to approve
+            // something is asked to read it first.
+            if let plan = request.toolCall.planFile,
+               FileManager.default.fileExists(atPath: plan.path) {
+                showPlan(plan, for: agentID)
+            }
             reconsider()
 
         case .processExited:

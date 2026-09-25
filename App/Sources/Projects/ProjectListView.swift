@@ -12,13 +12,27 @@ struct ProjectListView: View {
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     @State private var isChoosingFolder = false
     @State private var isCloning = false
+    /// Which machine the New project menu was pointed at (037).
+    @State private var targetHost: HostID = .mac
+    @State private var isChoosingServerFolder = false
+    @State private var isAddingServer = false
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(model.liveProjects) { summary in
-                ProjectRow(summary: summary)
-                    .tag(SidebarItem.project(summary.folder))
-                    .contextMenu { menu(for: summary) }
+            if model.hosts.isEmpty {
+                // With no server the list is exactly what it always was: no headings.
+                projectRows(model.liveProjects)
+            } else {
+                Section { projectRows(model.liveProjects.filter { $0.host == .mac }) } header: {
+                    HostHeading(host: .mac)
+                }
+                ForEach(model.hosts.hosts.all) { host in
+                    Section {
+                        projectRows(model.liveProjects.filter { $0.host == host.id })
+                    } header: {
+                        HostHeading(host: host.id)
+                    }
+                }
             }
             // Where the project will be once it is one (027).
             ForEach(model.clones) { clone in
@@ -27,7 +41,7 @@ struct ProjectListView: View {
 
             if !model.archivedProjects.isEmpty {
                 Section(isExpanded: $showsArchived) {
-                    ForEach(model.archivedProjects) { summary in
+                    ForEach(model.archivedProjects, id: \.key) { summary in
                         ArchivedProjectRow(summary: summary)
                     }
                 } header: {
@@ -86,8 +100,20 @@ struct ProjectListView: View {
             // that is not yet (027).
             ToolbarItem {
                 Menu {
-                    Button("Choose Folder…") { isChoosingFolder = true }
-                    Button("Clone Git URL…") { isCloning = true }
+                    if model.hosts.isEmpty {
+                        newProjectItems(on: .mac)
+                    } else {
+                        Menu("This Mac") { newProjectItems(on: .mac) }
+                        ForEach(model.hosts.hosts.all) { host in
+                            let offline = model.hosts.isOffline(host.id)
+                            Menu(offline ? "\(host.label) — Offline" : host.label) {
+                                newProjectItems(on: host.id)
+                            }
+                            .disabled(offline)
+                        }
+                    }
+                    Divider()
+                    Button("Add a server…") { isAddingServer = true }
                 } label: {
                     Label("New project", systemImage: "plus")
                 }
@@ -98,18 +124,47 @@ struct ProjectListView: View {
             guard case .success(let folder) = result else { return }
             Task { await model.addProject(folder) }
         }
-        .sheet(isPresented: $isCloning) { CloneSheet().paperSheet() }
+        .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
+        .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
+        .sheet(isPresented: $isAddingServer) { AddServerSheet().paperSheet() }
+    }
+
+    @ViewBuilder
+    private func projectRows(_ summaries: [DaemonAPI.ProjectSummary]) -> some View {
+        ForEach(summaries, id: \.key) { summary in
+            ProjectRow(summary: summary)
+                .tag(SidebarItem.project(summary.key))
+                .contextMenu { menu(for: summary) }
+                // Last known, not current: the server is not answering (037).
+                .foregroundStyle(model.hosts.isOffline(summary.host) ? .secondary : .primary)
+        }
+    }
+
+    @ViewBuilder
+    private func newProjectItems(on host: HostID) -> some View {
+        Button("Choose Folder…") {
+            targetHost = host
+            if host == .mac { isChoosingFolder = true } else { isChoosingServerFolder = true }
+        }
+        Button("Clone Git URL…") {
+            targetHost = host
+            isCloning = true
+        }
     }
 
     @ViewBuilder
     private func menu(for summary: DaemonAPI.ProjectSummary) -> some View {
         Button("Archive") {
-            Task { await model.archiveProject(summary.folder) }
+            Task { await model.archiveProject(summary.key) }
         }
-        Button("Show in Finder") {
-            NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
+        .disabled(model.hosts.isOffline(summary.host))
+        // A server's folder is not on this Mac, so there is nothing for Finder to show.
+        if summary.host == .mac {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
+            }
+            .disabled(!summary.exists)
         }
-        .disabled(!summary.exists)
     }
 }
 
@@ -130,14 +185,14 @@ private struct ArchivedProjectRow: View {
             }
             Spacer()
             Button("Unarchive") {
-                Task { await model.unarchiveProject(summary.folder) }
+                Task { await model.unarchiveProject(summary.key) }
             }
             .buttonStyle(.link)
             .appText(.fine)
         }
         .contextMenu {
             Button("Unarchive") {
-                Task { await model.unarchiveProject(summary.folder) }
+                Task { await model.unarchiveProject(summary.key) }
             }
         }
     }
@@ -151,7 +206,7 @@ private struct EmptyProjectList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if model.availableRuntimes.isEmpty {
+            if model.macRuntimesAvailable.isEmpty {
                 Text("No agent runtime found")
                     .appText(.reading).fontWeight(.semibold)
                 Text("Agents runs the coding CLIs you already have. Install one and it appears here.")
@@ -248,8 +303,12 @@ private struct SpendingRow: View {
               : "What every agent has cost today. Opens Spending.")
     }
 
+    /// This Mac's day and every server's, as one figure: what the work cost is the
+    /// question, not where it ran. Each daemon still keeps its own day and its own limit
+    /// (037); only the reading is added up.
     private var today: String? {
-        model.costState.flatMap { Cost.total(of: $0.today) }
+        guard let state = model.costState else { return nil }
+        return Cost.total(of: state.today.merging(model.serversToday, uniquingKeysWith: +))
     }
 
     /// Colour means the limit is about to bite. The app's existing threshold for a

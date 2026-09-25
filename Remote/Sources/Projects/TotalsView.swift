@@ -10,7 +10,7 @@ import SwiftUI
 ///
 /// The grand total and the shares beneath it are folded from the same array in the
 /// same render — the Mac's rule, kept — so the total cannot disagree with the lines
-/// under it. It fetches nothing.
+/// under it. It fetches only the archived projects, which nothing else here needs.
 ///
 /// Read only. Setting a limit stays at the Mac (spec, Out of scope): this page says
 /// what has been spent, and nothing on it changes what may be.
@@ -42,7 +42,11 @@ struct TotalsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .markedStale(model.isStale)
-        .refreshable { await model.refreshEverything() }
+        .task { await model.loadArchivedProjects() }
+        .refreshable {
+            await model.refreshEverything()
+            await model.loadArchivedProjects()
+        }
     }
 
     /// The first thing on the page, because it is the question the page answers. One

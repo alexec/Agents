@@ -1,0 +1,98 @@
+#!/bin/sh
+# A stand-in for /usr/bin/ssh, for 037's tests. Not a simulation of the protocol: it runs
+# the "remote" command on this Mac under a fake home, which is the whole of what the app
+# asks ssh to do. See Tests/AgentsKitTests/Support/FakeSSH.swift.
+#
+#   FAKE_SSH_HOME         the server's $HOME (required for anything that runs a command)
+#   FAKE_SSH_FAIL         name of a file in stderr/ to print, then exit 255, for every call
+#   FAKE_SSH_UNAME        what `uname -sm` says on the server (default "Linux aarch64")
+#   FAKE_SSH_KNOWN_HOSTS  what `ssh -G` reports as userknownhostsfile
+#   FAKE_SSH_LOG          every argv is appended here, one per line
+
+here=$(cd "$(dirname "$0")" && pwd)
+[ -n "$FAKE_SSH_LOG" ] && printf '%s\n' "$*" >> "$FAKE_SSH_LOG"
+
+resolve=0; master=0; ctl=""; op=""; forward=""; knownhosts=""; auth=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -G) resolve=1 ;;
+        -M) master=1 ;;
+        -N) ;;
+        -S) shift; ctl="$1" ;;
+        -O) shift; op="$1" ;;
+        -L) shift; forward="$1" ;;
+        -o) shift
+            case "$1" in
+                UserKnownHostsFile=*) knownhosts="${1#UserKnownHostsFile=}" ;;
+                PreferredAuthentications=*) auth="${1#PreferredAuthentications=}" ;;
+            esac ;;
+        --) shift; break ;;
+        -*) ;;
+        *) break ;;
+    esac
+    shift
+done
+name="$1"; [ $# -gt 0 ] && shift
+
+if [ -n "$FAKE_SSH_FAIL" ]; then
+    cat "$here/stderr/$FAKE_SSH_FAIL.txt" >&2
+    exit 255
+fi
+
+if [ $resolve = 1 ]; then
+    printf 'user %s\nhostname %s\nport 22\n' "${USER:-alex}" "$name"
+    printf 'userknownhostsfile %s\nhashknownhosts no\nproxyjump none\n' "${FAKE_SSH_KNOWN_HOSTS:-/dev/null}"
+    exit 0
+fi
+
+# Step 3 of contracts/ssh.md: record the host key, offer no credentials, fail.
+if [ "$auth" = "none" ] && [ -n "$knownhosts" ]; then
+    printf '%s %s\n' "$name" "$(cat "$here/host_key.pub")" > "$knownhosts"
+    echo "$name: Permission denied (publickey)." >&2
+    exit 255
+fi
+
+alive() { [ -f "$ctl" ] && kill -0 "$(cat "$ctl")" 2>/dev/null; }
+
+case "$op" in
+    check) alive && { echo "Master running (pid=$(cat "$ctl"))" >&2; exit 0; }
+           echo "Control socket connect($ctl): No such file or directory" >&2; exit 255 ;;
+    exit)  alive && kill "$(cat "$ctl")"; rm -f "$ctl"; echo "Exit request sent." >&2; exit 0 ;;
+esac
+
+if [ $master = 1 ]; then
+    # A master that was killed outright could not stop its relay; this one does.
+    [ -f "$ctl.relay" ] && kill "$(cat "$ctl.relay")" 2>/dev/null
+    echo $$ > "$ctl"
+    trap 'rm -f "$ctl"; [ -n "$local" ] && rm -f "$local"; exit 0' TERM INT
+    if [ -n "$forward" ]; then
+        local="${forward%%:*}"; remote="${forward#*:}"
+        rm -f "$local"
+        # exec would lose the trap; the relay runs as a child and dies with us.
+        /usr/bin/python3 "$here/relay.py" "$local" "$remote" &
+        relay=$!
+        echo $relay > "$ctl.relay"
+        trap 'kill $relay 2>/dev/null; rm -f "$ctl" "$ctl.relay" "$local"; exit 0' TERM INT
+        wait $relay
+    else
+        # `wait` and not a foreground sleep: sh runs a trap only once the foreground
+        # command returns, which made every -O exit take up to a second.
+        # Its pid goes where a relay's would, so a master killed outright leaves
+        # nothing that the next master or FakeSSH.tearDown does not stop.
+        sleep 2147483647 &
+        sleeper=$!
+        echo $sleeper > "$ctl.relay"
+        trap 'kill $sleeper 2>/dev/null; rm -f "$ctl" "$ctl.relay"; exit 0' TERM INT
+        wait $sleeper
+    fi
+    exit 0
+fi
+
+# An ordinary command over the master.
+if [ -n "$ctl" ] && ! alive; then
+    echo "Control socket connect($ctl): No such file or directory" >&2
+    exit 255
+fi
+[ -n "$FAKE_SSH_HOME" ] || { echo "fake ssh: FAKE_SSH_HOME is not set" >&2; exit 255; }
+cd "$FAKE_SSH_HOME" || exit 255
+HOME="$FAKE_SSH_HOME" PATH="$here/bin:$PATH" exec /bin/sh -c "$*"

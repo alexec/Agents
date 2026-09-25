@@ -12,6 +12,9 @@ import SwiftUI
 struct OpenElsewhere: View {
     let url: URL
     let description: String
+    /// The server the file is on (037). It is not on this Mac, so nothing here can open
+    /// or reveal it; the pane says where it is instead.
+    var server: String? = nil
 
     var body: some View {
         VStack(spacing: 6) {
@@ -25,6 +28,12 @@ struct OpenElsewhere: View {
             Text(description)
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
+            if let server {
+                Text("On \(server). Open it there.")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 10)
+            } else {
             HStack(spacing: 8) {
                 if let app = defaultApp {
                     Button("Open in \(app)") { NSWorkspace.shared.open(url) }
@@ -34,6 +43,7 @@ struct OpenElsewhere: View {
                     .buttonStyle(.bordered)
             }
             .padding(.top, 10)
+            }
         }
         .multilineTextAlignment(.center)
         .padding(20)

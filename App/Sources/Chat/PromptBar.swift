@@ -246,8 +246,18 @@ struct PromptBar: View {
                     }
                 }
                 .disabled(model.availableRuntimes.isEmpty)
+                .help(noServerRuntime ?? "")
             }
         }
+    }
+
+    /// A server with nothing to start agents with says so where the runtime is chosen
+    /// (037, FR-012).
+    private var noServerRuntime: String? {
+        let host = model.selectedProjectHost
+        guard agent == nil, host != .mac, !model.hosts.isOffline(host), model.availableRuntimes.isEmpty else { return nil }
+        let label = model.hosts.label(host)
+        return "No agent runtime on \(label). Install one there and log in, then choose Check again."
     }
 
     // MARK: What you want done
@@ -357,7 +367,8 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
-            .help(PromptWords.sendHelp(willQueue: willQueue))
+            .help(targetOffline ? "\(model.hosts.label(targetHost)) is offline"
+                                : PromptWords.sendHelp(willQueue: willQueue))
             .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
         }
         .padding(14)
@@ -708,8 +719,14 @@ struct PromptBar: View {
     /// An agent that is working is not a reason to refuse. The daemon holds what is
     /// typed and sends it when the turn ends, which is what the queue below the
     /// prompt is showing.
+    /// The machine this prompt would go to (037).
+    private var targetHost: HostID { agent?.host ?? model.selectedProjectHost }
+    private var targetOffline: Bool { model.hosts.isOffline(targetHost) }
+
     private var canSend: Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        // Kept in the field, never sent into nothing.
+        guard !targetOffline else { return false }
         if agent != nil { return true }
         return model.draftCwd != nil && model.draftRuntimeID != nil
     }

@@ -1,3 +1,5 @@
+// Not on Linux: the server build of agentsd has no CryptoKit and no use for this (037).
+#if canImport(CryptoKit)
 import CryptoKit
 import Foundation
 import Security
@@ -118,3 +120,4 @@ public struct DeviceKey: Sendable {
         case keychain(OSStatus)
     }
 }
+#endif

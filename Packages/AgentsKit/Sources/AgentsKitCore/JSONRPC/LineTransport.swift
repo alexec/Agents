@@ -56,7 +56,7 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
             var splitter = LineSplitter()
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while true {
-                let n = buffer.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress, $0.count) }
+                let n = buffer.withUnsafeMutableBytes { POSIX.read(fd, $0.baseAddress, $0.count) }
                 if n > 0 {
                     buffer.withUnsafeBufferPointer { splitter.append(UnsafeBufferPointer(rebasing: $0[0..<n])) }
                     while let line = splitter.next() { continuation.yield(line) }
@@ -83,7 +83,7 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         var offset = 0
         while offset < data.count {
             let written = data[offset...].withUnsafeBufferPointer {
-                Darwin.write(writeFD, $0.baseAddress, $0.count)
+                POSIX.write(writeFD, $0.baseAddress, $0.count)
             }
             if written > 0 {
                 offset += written
@@ -105,8 +105,8 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
         // Shutting down returns it zero at once. A pipe is not a socket, and the call
         // simply fails on one.
         if writeFD == readFD { shutdown(readFD, SHUT_RDWR) }
-        Darwin.close(readFD)
-        if writeFD != readFD { Darwin.close(writeFD) }
+        POSIX.close(readFD)
+        if writeFD != readFD { POSIX.close(writeFD) }
     }
 }
 
@@ -117,7 +117,11 @@ public final class FDTransport: LineTransport, @unchecked Sendable {
 /// that line some three hundred times; this remembers how far it has already looked.
 /// Lines that are only whitespace are dropped and a trailing `\r` is left off, which
 /// is what trimming the whole line did, without walking it twice to do it.
-struct LineSplitter {
+///
+/// Every reader of lines uses it — the socket, the phone's network link, the bridge.
+/// The network two kept their own copy of the old search until 2026-09-25, and a
+/// phone reading `agents/list` in Wi‑Fi-sized pieces spent seconds on it.
+public struct LineSplitter {
     private var pending: [UInt8] = []
     /// Where the next line starts.
     private var start = 0
@@ -127,7 +131,13 @@ struct LineSplitter {
     /// byte once; the tests hold it to that.
     private(set) var examined = 0
 
-    mutating func append(_ bytes: UnsafeBufferPointer<UInt8>) {
+    public init() {}
+
+    public mutating func append(_ data: Data) {
+        data.withUnsafeBytes { append($0.bindMemory(to: UInt8.self)) }
+    }
+
+    public mutating func append(_ bytes: UnsafeBufferPointer<UInt8>) {
         // Taken lines are dropped from the front only once they are most of the
         // buffer, so a burst of short lines does not shuffle the rest along each time.
         if start > 0, start >= pending.count / 2 {
@@ -138,7 +148,7 @@ struct LineSplitter {
         pending.append(contentsOf: bytes)
     }
 
-    mutating func next() -> String? {
+    public mutating func next() -> String? {
         while true {
             let found: Int? = pending.withUnsafeBufferPointer { all in
                 let from = searched

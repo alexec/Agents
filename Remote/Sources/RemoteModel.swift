@@ -119,7 +119,11 @@ final class RemoteModel {
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
     /// Archived ones too, for the spending page. A project put away still cost what it
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
-    var allProjects: [DaemonAPI.ProjectSummary] { work.projects }
+    /// The archived ones are fetched when that page opens (`loadArchivedProjects`).
+    var allProjects: [DaemonAPI.ProjectSummary] {
+        let held = Set(work.projects.map(\.folder))
+        return work.projects + archivedProjects.filter { !held.contains($0.folder) }
+    }
     /// The open project's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
 
@@ -660,6 +664,13 @@ final class RemoteModel {
         _ = work.takeFileToShow(for: selection)
     }
 
+    /// A plan being approved, reopened from its question card: the same page the
+    /// daemon opened when it was asked.
+    func openPlan(_ file: ShownFile) {
+        guard let selection else { return }
+        open(file, for: selection)
+    }
+
     private func open(_ file: ShownFile, for agentID: UUID) {
         if macLacksPanes {
             fileOnScreen = file.path
@@ -791,9 +802,10 @@ final class RemoteModel {
     }
 
     func refreshEverything() async {
-        await refreshAgents()
-        // After the agents, because a project's counts are worked out from them.
+        // Projects first: the screen the app opens on, and a row's counts are read from
+        // the agents as they land, so the list is there while they are still coming.
         await refreshProjects()
+        await refreshAgents()
         await refreshPermissions()
         await refreshElicitations()
         await refreshAttention()
@@ -952,11 +964,52 @@ final class RemoteModel {
         await notifier.sweep(keeping: pending, me: .device(deviceID))
     }
 
+    /// The live agents only. Archived ones outnumber them many times over and are
+    /// almost never looked at, so they come when a page asks for them — a project's
+    /// Archived section, a workflow's runs — and not on every connection.
+    ///
+    /// Archived agents already fetched are kept: an open archived chat stays open. One
+    /// brought back while this phone was away is in the live list, and that copy wins.
     private func refreshAgents() async {
         guard let listed = try? await client.call(DaemonAPI.Method.agentsList,
-                                                  DaemonAPI.ListRequest(),
+                                                  DaemonAPI.ListRequest(includeArchived: false),
                                                   returning: [Agent].self) else { return }
-        work.replaceAgents(listed)
+        let live = Set(listed.map(\.id))
+        work.replaceAgents(listed + work.agents.filter { $0.state == .archived && !live.contains($0.id) })
+    }
+
+    /// The newest `limit` archived agents in a project, for its Archived section when
+    /// it is opened. Without their slash commands: an archived chat has no prompt bar
+    /// here to use them.
+    func loadArchivedAgents(in folder: URL, limit: Int) async {
+        let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
+                                            folder: folder, limit: limit)
+        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
+                                                  returning: [Agent].self) else { return }
+        for agent in listed { work.upsert(agent) }
+    }
+
+    /// A workflow's newest `limit` runs, archived ones included, for its page. Answers
+    /// whether there are more than that.
+    func loadRuns(of workflowID: String, in folder: URL, limit: Int) async -> Bool {
+        let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
+                                            startedByWorkflow: workflowID, limit: limit + 1)
+        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
+                                                  returning: [Agent].self) else { return false }
+        for agent in listed.prefix(limit) { work.upsert(agent) }
+        return listed.count > limit
+    }
+
+    /// Archived projects, for Spending only: what they cost still counts. Asked for when
+    /// that page opens.
+    private(set) var archivedProjects: [DaemonAPI.ProjectSummary] = []
+
+    func loadArchivedProjects() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
+                                                  DaemonAPI.ProjectsListRequest(includeArchived: true),
+                                                  returning: [DaemonAPI.ProjectSummary].self)
+        else { return }
+        archivedProjects = listed.filter(\.project.isArchived)
     }
 
     /// What today has cost and what the reader will allow. The phone shows limits
@@ -995,8 +1048,9 @@ final class RemoteModel {
     }
 
     private func refreshProjects() async {
+        // Live ones only; Spending asks for the archived ones when it opens.
         guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
-                                                  DaemonAPI.ProjectsListRequest(),
+                                                  DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                   returning: [DaemonAPI.ProjectSummary].self)
         else { return }
         work.replaceProjects(listed)

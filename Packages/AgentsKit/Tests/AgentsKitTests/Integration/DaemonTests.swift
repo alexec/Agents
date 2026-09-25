@@ -960,6 +960,33 @@ struct DaemonSlashCommandTests {
         #expect(agent?.availableCommands.last?.inputHint == "directory")
     }
 
+    /// The phone's list leaves them off archived agents, which were most of a 5.4 MB
+    /// reply; the Mac's, whose archived chats still have a prompt bar, keeps them.
+    @Test func aListCanLeaveThemOffArchivedAgentsOnly() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.updates = [commandsUpdate]
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher(script: script))
+        let kept = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        let archived = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        for id in [kept, archived] {
+            await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        }
+        try await core.archive(archived)
+
+        func commands(_ request: DaemonAPI.ListRequest) async -> [UUID: [String]] {
+            Dictionary(uniqueKeysWithValues: await core.listAgents(request).map {
+                ($0.id, $0.availableCommands.map(\.name))
+            })
+        }
+        #expect(await commands(.init())[archived] == ["review", "add-dir"])
+        let phone = await commands(.init(archivedCommands: false))
+        #expect(phone[kept] == ["review", "add-dir"])
+        #expect(phone[archived] == [])
+        #expect(await core.agent(archived)?.availableCommands.count == 2, "only the reply is trimmed")
+    }
+
     @Test func aPickedUpAgentKeepsTheCommandsItsNewRuntimeDoesNotRepeat() async throws {
         let (locations, work) = try temporary()
         var advertises = FakeACPAgent.Script()

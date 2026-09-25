@@ -58,7 +58,7 @@ func log(_ message: String) {
 final class Relay {
     private let device: NWConnection
     private var daemon: (any LineTransport)?
-    private var pending = Data()
+    private var splitter = LineSplitter()
 
     init(device: NWConnection) {
         self.device = device
@@ -114,13 +114,8 @@ final class Relay {
     /// Whole lines only. A line can arrive in three pieces and two lines can arrive as
     /// one read, and the daemon's protocol is one JSON object per line.
     private func forward(_ data: Data) {
-        pending.append(data)
-        while let i = pending.firstIndex(of: UInt8(ascii: "\n")) {
-            let line = String(decoding: pending[pending.startIndex..<i], as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            pending = pending[pending.index(after: i)...]
-            if !line.isEmpty { try? daemon?.write(line: line) }
-        }
+        splitter.append(data)
+        while let line = splitter.next() { try? daemon?.write(line: line) }
     }
 
     private func send(_ line: String) {

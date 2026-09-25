@@ -70,6 +70,12 @@ struct ProjectAgentsView: View {
             Text(summary?.name ?? "Project")
                 .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
+            // Which machine, when it is not this one (037).
+            if let summary, summary.host != .mac {
+                Text("on \(model.hosts.label(summary.host))")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             if let summary, !summary.exists {
                 Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
                     .appText(.supporting)
@@ -135,7 +141,7 @@ struct ProjectAgentsView: View {
                     }
                 }
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    let agents = model.agents(in: folder, group: group)
+                    let agents = model.agents(in: model.selectedProjectKey, group: group)
                     if !agents.isEmpty {
                         GroupHeading(title: group.title, count: agents.count)
                         ForEach(agents) { agent in
@@ -168,16 +174,22 @@ struct ProjectAgentsView: View {
         // Parking moves a chat without changing its state (040).
         .animation(.default, value: model.agents.map(\.parking))
         // Who is working in which worktree changes when an agent is archived or
-        // brought back, so the list is asked for again then. Not polled.
-        .onChange(of: archived.count) { Task { await model.loadDraftWorktrees() } }
+        // brought back, and a worktree's git status as a turn ends, so the list is
+        // asked for again whenever an agent here changes state. Not polled.
+        .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
     }
 
     private var hasSessions: Bool {
-        AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
+        AgentGroup.allCases.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
+    }
+
+    /// Every agent's state on this page, archived ones included.
+    private var states: [AgentState] {
+        AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
     }
 
     private var archived: [Agent] {
-        model.agents(in: folder, group: .archived)
+        model.agents(in: model.selectedProjectKey, group: .archived)
     }
 
     /// Out of the way until it is wanted, because looking at what you archived is a

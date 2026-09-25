@@ -76,7 +76,7 @@ final class AppModel {
     var selectedProject: URL? {
         didSet {
             guard selectedProject != oldValue else { return }
-            UserDefaults.standard.set(selectedProject?.path, forKey: Self.selectedProjectKey)
+            UserDefaults.standard.set(selectedProjectKey?.stored, forKey: Self.selectedProjectDefault)
             // Picking a project shows the project, not a conversation, and not a
             // workflow either. Both are things you go into from here, and come back
             // out of.
@@ -85,7 +85,17 @@ final class AppModel {
         }
     }
 
-    static let selectedProjectKey = "selectedProjectFolder"
+    static let selectedProjectDefault = "selectedProjectFolder"
+
+    /// Which machine the selected project is on (037). Set with it, by `select`, never
+    /// on its own: a folder names a project only together with its host.
+    private(set) var selectedProjectHost: HostID = .mac
+
+    /// The selected project as the window identifies projects now that a server can
+    /// have the same path as this Mac.
+    var selectedProjectKey: ProjectKey? {
+        selectedProject.map { ProjectKey(host: selectedProjectHost, folder: $0) }
+    }
 
     /// Whether the window is showing Spending rather than a project.
     ///
@@ -148,7 +158,7 @@ final class AppModel {
 
     /// A workflow's page, from an event that fired or was refused by it.
     func showWorkflow(folder: URL, workflowID: String) {
-        showProject(folder)
+        showProject(ProjectKey(folder: folder))
         openWorkflow = Project.standardize(folder).path + "/" + workflowID
     }
 
@@ -168,7 +178,7 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         if let agent = agents.first(where: { $0.id == agentID }) {
-            selectedProject = agent.projectFolder
+            select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         }
         openWorkflow = nil
         selection = agentID
@@ -183,7 +193,7 @@ final class AppModel {
     var sidebarItem: SidebarItem? {
         get {
             showsEvents ? .events : showsResources ? .resources
-                : showsSpending ? .spending : selectedProject.map(SidebarItem.project)
+                : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
             switch newValue {
@@ -193,11 +203,11 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
-            case .project(let folder):
+            case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
-                showProject(folder)
+                showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
@@ -219,16 +229,27 @@ final class AppModel {
     /// This is that rule as something callable. It touches no agent: `selection` only
     /// decides which transcript this window is watching, and the turn belongs to the
     /// daemon.
-    func showProject(_ folder: URL) {
+    func showProject(_ key: ProjectKey) {
         // Going to a project is going away from Spending, wherever the ask came from
         // — a new project being added, a menu item, the list itself. And from
         // Resources, for the same reason.
         showsSpending = false
         showsResources = false
         showsEvents = false
-        selectedProject = folder
+        select(key)
         selection = nil
         openWorkflow = nil
+    }
+
+    /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
+    /// and compares the pair rather than a folder paired with the last host (037).
+    func select(_ key: ProjectKey?) {
+        if let key, key.host != selectedProjectHost {
+            selectedProjectHost = key.host
+            // The same folder on another host is another project.
+            if selectedProject == key.folder { selectedProject = nil }
+        }
+        selectedProject = key?.folder
     }
 
     /// Bumped when something asks the conversation to go to its end.
@@ -312,6 +333,24 @@ final class AppModel {
     private var draftID: UUID?
 
     private let client = DaemonClient()
+    /// The servers (037). This Mac is `client`, as it always was.
+    let hosts = HostSet(locations: .default)
+    /// What a server with no connection answers through: nothing, at once.
+    private static let unreachable = DaemonClient(link: UnreachableLink())
+
+    /// The client for work on a host. A server that is not connected answers with an
+    /// error straight away, never with the Mac's daemon.
+    func client(for host: HostID) -> DaemonClient {
+        host == .mac ? client : hosts.client(for: host) ?? Self.unreachable
+    }
+
+    private func client(forAgent id: UUID?) -> DaemonClient {
+        client(for: work.agent(id)?.host ?? .mac)
+    }
+
+    /// Where a new agent, a draft, a worktree or a session list for the selected
+    /// project goes: that project's host.
+    private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }
     private var listening: Task<Void, Never>?
 
     /// The panes listening for shell output, one per agent in this window. Shell
@@ -328,8 +367,29 @@ final class AppModel {
 
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
+    /// What a new agent can be started with, on the machine it would start on: the
+    /// selected project's (037). A server's runtimes are the ones installed there.
     var availableRuntimes: [RuntimeStatus] {
+        runtimes(on: selectedProjectHost).filter { $0.availability.isAvailable }
+    }
+
+    /// This Mac's, whatever is selected: for saying nothing is installed on this Mac.
+    var macRuntimesAvailable: [RuntimeStatus] {
         runtimes.filter { $0.availability.isAvailable }
+    }
+
+    /// Each server's runtimes, as it last listed them (037).
+    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
+
+    func runtimes(on host: HostID) -> [RuntimeStatus] {
+        host == .mac ? runtimes : serverRuntimes[host] ?? []
+    }
+
+    func refreshServerRuntimes(_ host: HostID) async {
+        if let listed = try? await client(for: host).call(DaemonAPI.Method.runtimesList, Optional<String>.none,
+                                                          returning: [RuntimeStatus].self) {
+            serverRuntimes[host] = listed
+        }
     }
 
     // MARK: Projects
@@ -339,16 +399,16 @@ final class AppModel {
 
     var archivedProjects: [DaemonAPI.ProjectSummary] { work.archivedProjects }
 
-    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
+    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProjectKey) }
 
     /// A project's agents in one group, newest first.
-    func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
-        work.agents(in: folder, group: group)
+    func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
+        work.agents(in: key, group: group)
     }
 
     /// This window's own counts for a project, from the grouping its panel uses.
-    func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
-    func unreadCount(in folder: URL?) -> Int { work.unreadCount(in: folder) }
+    func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
+    func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
@@ -539,7 +599,7 @@ final class AppModel {
     /// Empty is an answer, not a failure: it means nothing has been remembered for this
     /// runtime here yet, and the page says so rather than offering a menu it made up.
     func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
-        (try? await client.call(DaemonAPI.Method.optionsRemembered,
+        (try? await selectedHostClient.call(DaemonAPI.Method.optionsRemembered,
                                 DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd),
                                 returning: [ConfigOption].self)) ?? []
     }
@@ -626,12 +686,29 @@ final class AppModel {
             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
             returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
+        // Every connected server keeps to the same limits, each on its own (037, R7).
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            serverCosts[host.id] = try? await client(for: host.id).call(
+                DaemonAPI.Method.costSetLimits,
+                DaemonAPI.SetLimitsRequest(perAgent: .some(state.limits.perAgent), daily: .some(state.limits.daily)),
+                returning: DaemonAPI.CostState.self)
+        }
+    }
+
+    /// Each server's spending, as it last said (037).
+    private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+
+    /// What the servers have spent today, together, per currency. Empty when nothing.
+    var serversToday: [String: Decimal] {
+        serverCosts.values.reduce(into: [:]) { sum, state in
+            for (currency, amount) in state.today { sum[currency, default: 0] += amount }
+        }
     }
 
     /// Letting one agent carry on past the per-agent limit, or giving it one of its
     /// own. Does not resume it — continuing is the reader's second, deliberate act.
     func setCostCeiling(_ agentID: UUID, to ceiling: Cost?) async {
-        guard let agent = try? await client.call(
+        guard let agent = try? await client(forAgent: agentID).call(
             DaemonAPI.Method.agentsSetCeiling,
             DaemonAPI.SetCeilingRequest(agentID: agentID, ceiling: ceiling),
             returning: Agent.self) else { return }
@@ -649,9 +726,9 @@ final class AppModel {
 
     func refreshProjects() async {
         do {
-            work.replaceProjects(try await client.call(DaemonAPI.Method.projectsList,
-                                                       DaemonAPI.ProjectsListRequest(),
-                                                       returning: [DaemonAPI.ProjectSummary].self))
+            let listed = try await client.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
+                                               returning: [DaemonAPI.ProjectSummary].self)
+            work.replaceProjects(listed, from: .mac)
             hasLoadedProjects = true
             settleProjectSelection()
         } catch {
@@ -665,19 +742,21 @@ final class AppModel {
     /// puts at the top.
     private func settleProjectSelection() {
         let live = liveProjects
-        if let selectedProject, live.contains(where: { $0.folder == selectedProject }) { return }
-        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectKey)
-            .map { Project.standardize(URL(filePath: $0)) }
-        if let stored, live.contains(where: { $0.folder == stored }) {
-            selectedProject = stored
+        if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
+        // `host|path`, or a bare path from before servers, which is this Mac's.
+        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectDefault)
+            .flatMap(ProjectKey.init(stored:))
+            .map { ProjectKey(host: $0.host, folder: Project.standardize($0.folder)) }
+        if let stored, live.contains(where: { $0.key == stored }) {
+            select(stored)
         } else {
-            selectedProject = live.first?.folder
+            select(live.first?.key)
         }
     }
 
-    func addProject(_ folder: URL) async {
-        await callProject(DaemonAPI.Method.projectsAdd, folder) { [weak self] summary in
-            self?.selectedProject = summary.folder
+    func addProject(_ folder: URL, on host: HostID = .mac) async {
+        await callProject(DaemonAPI.Method.projectsAdd, ProjectKey(host: host, folder: folder)) { [weak self] summary in
+            self?.select(summary.key)
         }
     }
 
@@ -685,13 +764,14 @@ final class AppModel {
     ///
     /// Returns as soon as the daemon answers, which is when the clone has finished; the
     /// row the window draws meanwhile comes from `clone/changed`, not from waiting here.
-    func cloneProject(_ url: String) async {
+    func cloneProject(_ url: String, on host: HostID = .mac) async {
         do {
-            let summary = try await client.call(DaemonAPI.Method.projectsClone,
+            var summary = try await client(for: host).call(DaemonAPI.Method.projectsClone,
                                                 DaemonAPI.CloneRequest(url: url),
                                                 returning: DaemonAPI.ProjectSummary.self)
+            summary.host = host
             upsert(summary)
-            selectedProject = summary.folder
+            select(summary.key)
             settleProjectSelection()
         } catch {
             // Written for the person already: which host, which folder, what to do.
@@ -705,21 +785,22 @@ final class AppModel {
         clones = running
     }
 
-    func archiveProject(_ folder: URL) async {
-        await callProject(DaemonAPI.Method.projectsArchive, folder)
+    func archiveProject(_ key: ProjectKey) async {
+        await callProject(DaemonAPI.Method.projectsArchive, key)
     }
 
-    func unarchiveProject(_ folder: URL) async {
-        await callProject(DaemonAPI.Method.projectsUnarchive, folder) { [weak self] summary in
-            self?.selectedProject = summary.folder
+    func unarchiveProject(_ key: ProjectKey) async {
+        await callProject(DaemonAPI.Method.projectsUnarchive, key) { [weak self] summary in
+            self?.select(summary.key)
         }
     }
 
-    private func callProject(_ method: String, _ folder: URL,
+    private func callProject(_ method: String, _ key: ProjectKey,
                              then: ((DaemonAPI.ProjectSummary) -> Void)? = nil) async {
         do {
-            let summary = try await client.call(method, DaemonAPI.ProjectRequest(folder: folder),
-                                                returning: DaemonAPI.ProjectSummary.self)
+            var summary = try await client(for: key.host).call(method, DaemonAPI.ProjectRequest(folder: key.folder),
+                                                                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
             upsert(summary)
             then?(summary)
             settleProjectSelection()
@@ -786,6 +867,7 @@ final class AppModel {
             startPresence()
             presence?.connected()
             await refreshEverything()
+            startHosts()
         } catch {
             isConnected = false
             problem = describe(error)
@@ -867,6 +949,129 @@ final class AppModel {
 
     // MARK: Asking
 
+    // MARK: Servers (037)
+
+    @ObservationIgnored private var hostsStarted = false
+    /// Each server's end of `files/*`, made when first wanted (037).
+    @ObservationIgnored private var serverFilesByHost: [HostID: RemoteFiles] = [:]
+
+    @ObservationIgnored private var serverPicturesByHost: [HostID: ServerPictures] = [:]
+
+    /// A server's pictures for its live pages, kept while the app runs (037).
+    func serverPictures(_ host: HostID) -> ServerPictures {
+        if let known = serverPicturesByHost[host] { return known }
+        let made = ServerPictures(files: serverFiles(host))
+        serverPicturesByHost[host] = made
+        return made
+    }
+
+    /// How the files pane reads a server agent's folder: through that server's daemon,
+    /// because the folder is not on this Mac.
+    func serverFiles(_ host: HostID) -> RemoteFiles {
+        if let known = serverFilesByHost[host] { return known }
+        let made = RemoteFiles(client: client(for: host))
+        serverFilesByHost[host] = made
+        return made
+    }
+
+    /// Once, after the Mac's own daemon has answered: the servers come after the Mac,
+    /// so a slow server never holds up the window's first list.
+    private func startHosts() {
+        guard !hostsStarted else { return }
+        hostsStarted = true
+        hosts.onNotification = { [weak self] host, method, params in
+            await self?.receivedFromServer(host, method, params)
+        }
+        hosts.onConnected = { [weak self] host in
+            await self?.refreshServer(host)
+        }
+        hosts.start()
+    }
+
+    private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {
+        // What is about the whole of a daemon rather than its work is the Mac's alone in
+        // the model: a server's spending is kept beside it, and a server's wakefulness,
+        // modes and notices have no place in this window (037).
+        switch method {
+        case DaemonAPI.Notification.costChanged:
+            serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
+            return
+        case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
+             DaemonAPI.Notification.attentionChanged:
+            return
+        default:
+            break
+        }
+        if work.apply(method, params, from: host) {
+            if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
+            return
+        }
+        // A server's shells print to this window the same way the Mac's do. Nothing
+        // else a server says is about this window: its devices, runtimes and clones
+        // are asked for when they are wanted.
+        switch method {
+        case DaemonAPI.Notification.runtimeChanged:
+            await refreshServerRuntimes(host)
+        case DaemonAPI.Notification.filesChanged:
+            guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
+            serverFiles(host).apply(change)
+        case DaemonAPI.Notification.shellOutput, DaemonAPI.Notification.shellStateChanged,
+             DaemonAPI.Notification.draftOptions:
+            await received(method, params, nil)
+        default:
+            break
+        }
+    }
+
+    /// Everything a server has, after it connects or comes back. Replaces only that
+    /// server's own, so the Mac's list is never emptied by a server re-listing, and
+    /// whatever happened while the Mac was away is simply what the server now says.
+    /// Remove a server, and everything the window held from it (037 US5).
+    func removeServer(_ host: HostID, purge: Bool) async {
+        await hosts.remove(host, purge: purge)
+        work.replaceAgents([], from: host)
+        work.replaceProjects([], from: host)
+        serverRuntimes[host] = nil
+        serverFilesByHost[host] = nil
+        if selectedProjectHost == host { select(liveProjects.first?.key) }
+    }
+
+    func refreshServer(_ host: HostID) async {
+        let server = client(for: host)
+        // A new connection watches nothing; what the files pane was watching is asked
+        // for again, and everything it shows is read again.
+        await serverFilesByHost[host]?.reconnected()
+        await refreshServerRuntimes(host)
+        // The Mac's limits hold on every server too; each keeps to them on its own.
+        if let limits = work.costState?.limits {
+            serverCosts[host] = try? await server.call(
+                DaemonAPI.Method.costSetLimits,
+                DaemonAPI.SetLimitsRequest(perAgent: .some(limits.perAgent), daily: .some(limits.daily)),
+                returning: DaemonAPI.CostState.self)
+        } else {
+            serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
+        }
+        if let listed = try? await server.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(),
+                                               returning: [Agent].self) {
+            work.replaceAgents(listed, from: host)
+        }
+        if let listed = try? await server.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
+                                               returning: [DaemonAPI.ProjectSummary].self) {
+            work.replaceProjects(listed, from: host)
+            settleProjectSelection()
+        }
+        let theirs = Set(work.agents.filter { $0.host == host }.map(\.id))
+        if let listed = try? await server.call(DaemonAPI.Method.permissionsPending,
+                                               returning: [PermissionRequest].self) {
+            work.replacePermissions(work.permissions.filter { !theirs.contains($0.agentID) } + listed)
+        }
+        if let listed = try? await server.call(DaemonAPI.Method.elicitationsPending,
+                                               returning: [ElicitationRequest].self) {
+            work.replaceElicitations(work.elicitations.filter { !theirs.contains($0.agentID) } + listed)
+        }
+        if let watching = selection, theirs.contains(watching) { await loadTranscript() }
+    }
+
     func refreshEverything() async {
         await refreshAgents()
         // After the agents, because a project's counts are worked out from them and a
@@ -898,7 +1103,16 @@ final class AppModel {
         guard let list = try? await client.call(DaemonAPI.Method.elicitationsPending,
                                                 Optional<Int>.none,
                                                 returning: [ElicitationRequest].self) else { return }
-        work.replaceElicitations(list)
+        work.replaceElicitations(elicitationsOnServers + list)
+    }
+
+    /// What is held for the servers' agents, kept when the Mac's own are re-listed (037).
+    private var elicitationsOnServers: [ElicitationRequest] {
+        work.elicitations.filter { work.agent($0.agentID).map { $0.host != .mac } ?? false }
+    }
+
+    private var permissionsOnServers: [PermissionRequest] {
+        work.permissions.filter { work.agent($0.agentID).map { $0.host != .mac } ?? false }
     }
 
     /// The form waiting for this agent, if there is one. Held by the daemon, so it is
@@ -910,7 +1124,7 @@ final class AppModel {
             let listed = try await self.client.call(DaemonAPI.Method.agentsList,
                                                     DaemonAPI.ListRequest(),
                                                     returning: [Agent].self)
-            self.work.replaceAgents(listed)
+            self.work.replaceAgents(listed, from: .mac)
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
         }
@@ -964,10 +1178,10 @@ final class AppModel {
 
     func refreshPermissions() async {
         await attempt {
-            self.work.replacePermissions(
-                try await self.client.call(DaemonAPI.Method.permissionsPending,
-                                           Optional<String>.none,
-                                           returning: [PermissionRequest].self))
+            self.work.replacePermissions(self.permissionsOnServers
+                + (try await self.client.call(DaemonAPI.Method.permissionsPending,
+                                              Optional<String>.none,
+                                              returning: [PermissionRequest].self)))
         }
     }
 
@@ -986,7 +1200,7 @@ final class AppModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         await attempt {
-            let page = try await self.client.call(DaemonAPI.Method.agentsTranscript,
+            let page = try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsTranscript,
                                                   DaemonAPI.TranscriptRequest(agentID: selection),
                                                   returning: TranscriptPage.self)
             // Clicking through chats quickly can have the answer for the last one
@@ -1002,7 +1216,7 @@ final class AppModel {
     func loadEarlier() async {
         guard let selection, work.hasMoreBefore else { return }
         await attempt {
-            let page = try await self.client.call(
+            let page = try await self.client(forAgent: selection).call(
                 DaemonAPI.Method.agentsTranscript,
                 DaemonAPI.TranscriptRequest(agentID: selection, before: self.work.firstEntryIndex),
                 returning: TranscriptPage.self)
@@ -1037,7 +1251,7 @@ final class AppModel {
     func checkWorktreeRemoval(_ root: URL) async -> DaemonAPI.RemovalCheck? {
         guard let project = draftCwd else { return nil }
         do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
+            return try await selectedHostClient.call(DaemonAPI.Method.worktreesCheck,
                                          DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
@@ -1051,7 +1265,7 @@ final class AppModel {
     func removeWorktree(_ root: URL, confirmed: Bool) async {
         guard let project = draftCwd else { return }
         do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
+            _ = try await selectedHostClient.call(DaemonAPI.Method.worktreesRemove,
                                       DaemonAPI.WorktreeRemovalRequest(project: project, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
@@ -1083,7 +1297,7 @@ final class AppModel {
         draftWorktreesGeneration += 1
         let generation = draftWorktreesGeneration
         guard let folder = draftCwd else { return }
-        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
+        let answer = (try? await selectedHostClient.call(DaemonAPI.Method.worktreesList,
                                              DaemonAPI.WorktreesListRequest(folder: folder),
                                              returning: DaemonAPI.WorktreesListResponse.self))
             ?? .notARepository
@@ -1096,7 +1310,7 @@ final class AppModel {
     func loadProjectFolderBranch(of agent: Agent) async {
         guard agent.worktree == nil else { return }
         let folder = agent.projectFolder
-        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+        let answer = try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
                                             DaemonAPI.WorktreesListRequest(folder: folder),
                                             returning: DaemonAPI.WorktreesListResponse.self)
         projectFolderBranches[folder] = answer?.projectFolderBranch
@@ -1116,7 +1330,7 @@ final class AppModel {
         letGo(draft: draftID)
         draftID = nil
         do {
-            let response = try await client.call(DaemonAPI.Method.agentsOptions,
+            let response = try await selectedHostClient.call(DaemonAPI.Method.agentsOptions,
                                                  DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
                                                                           mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
@@ -1140,7 +1354,7 @@ final class AppModel {
     private func letGo(draft: UUID?) {
         guard let draft else { return }
         Task {
-            _ = try? await client.call(DaemonAPI.Method.agentsDiscardDraft,
+            _ = try? await selectedHostClient.call(DaemonAPI.Method.agentsDiscardDraft,
                                        DaemonAPI.DiscardDraftRequest(draftID: draft))
         }
     }
@@ -1211,7 +1425,7 @@ final class AppModel {
                                              mcpServers: draftServers,
                                              worktree: draftWorktree)
         do {
-            _ = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            _ = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
             // Back to the project folder, and the list fetched again: the start may
             // have made a worktree, and it has put an agent in one.
@@ -1236,8 +1450,18 @@ final class AppModel {
     @discardableResult
     func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let host = work.agent(selection)?.host ?? .mac
+        if host != .mac {
+            guard let carried = await carry(attachments, to: host, for: selection) else { return false }
+            let sendID = UUID()
+            return await sendToServer(host) { client in
+                try await client.call(DaemonAPI.Method.agentsPrompt,
+                                      DaemonAPI.PromptRequest(agentID: selection, text: text,
+                                                              attachments: carried, sendID: sendID))
+            }
+        }
         return await attempt {
-            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+            try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
         }
@@ -1248,7 +1472,7 @@ final class AppModel {
     /// this is an ordinary prompt and nothing else.
     func carryOn(_ id: UUID) async {
         await attempt {
-            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
         }
     }
@@ -1262,7 +1486,7 @@ final class AppModel {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty, let runtimeID = defaultRuntimeID else { return }
         await attempt {
-            let id = try await self.client.call(
+            let id = try await self.selectedHostClient.call(
                 DaemonAPI.Method.agentsStart,
                 DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words),
                 returning: UUID.self)
@@ -1279,7 +1503,7 @@ final class AppModel {
     /// Take something back off the queue before it goes.
     func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
         await attempt {
-            try await self.client.call(DaemonAPI.Method.agentsUnqueue,
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsUnqueue,
                                        DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
         }
     }
@@ -1299,26 +1523,36 @@ final class AppModel {
     }
 
     func stop(_ id: UUID) async {
-        await attempt { try await self.client.call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id)) }
+        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
     func archive(_ id: UUID) async {
-        await attempt { try await self.client.call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
+        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
     func unarchive(_ id: UUID) async {
-        await attempt { try await self.client.call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
+        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
     /// Park or unpark, whichever `Agent.parkAction` offers (040).
     func perform(_ action: ParkAction, on id: UUID) async {
         let method = action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark
-        await attempt { try await self.client.call(method, DaemonAPI.AgentRequest(agentID: id)) }
+        await attempt { try await self.client(forAgent: id).call(method, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
     func answer(_ request: PermissionRequest, optionID: String) async {
+        let host = work.agent(request.agentID)?.host ?? .mac
+        if host != .mac {
+            let sendID = UUID()
+            _ = await sendToServer(host) { client in
+                try await client.call(DaemonAPI.Method.permissionsAnswer,
+                                      DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID,
+                                                              sendID: sendID))
+            }
+            return
+        }
         await attempt {
-            try await self.client.call(DaemonAPI.Method.permissionsAnswer,
+            try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.permissionsAnswer,
                                        DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID))
         }
     }
@@ -1338,7 +1572,7 @@ final class AppModel {
         let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
         Task {
             await attempt {
-                try await self.client.call(DaemonAPI.Method.agentsSetOption,
+                try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSetOption,
                                            DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
             }
             work.settleOption(agentID: agentID, optionID: optionID, sequence: sequence)
@@ -1384,7 +1618,7 @@ final class AppModel {
     /// The pane's end of one agent's shell, made once per agent per window.
     func shellClient(for agentID: UUID) -> ShellClient {
         if let existing = shellClients[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, client: client,
+        let fresh = ShellClient(agentID: agentID, client: client(forAgent: agentID),
                                 describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         shellClients[agentID] = fresh
         return fresh
@@ -1396,7 +1630,7 @@ final class AppModel {
     /// kept.
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
         do {
-            try await client.call(DaemonAPI.Method.artifactWrite,
+            try await client(forAgent: agentID).call(DaemonAPI.Method.artifactWrite,
                                   DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text))
             return nil
         } catch let error as JSONRPCError {
@@ -1485,7 +1719,7 @@ final class AppModel {
 
     func runtimeSessions(runtimeID: String, cwd: URL) async -> [RuntimeSession] {
         do {
-            return try await client.call(DaemonAPI.Method.sessionsList,
+            return try await selectedHostClient.call(DaemonAPI.Method.sessionsList,
                                          DaemonAPI.SessionsListRequest(runtimeID: runtimeID, cwd: cwd),
                                          returning: [RuntimeSession].self)
         } catch {
@@ -1496,7 +1730,7 @@ final class AppModel {
 
     func adopt(runtimeID: String, session: RuntimeSession) async {
         do {
-            let id = try await client.call(DaemonAPI.Method.sessionsAdopt,
+            let id = try await selectedHostClient.call(DaemonAPI.Method.sessionsAdopt,
                                            DaemonAPI.AdoptRequest(runtimeID: runtimeID,
                                                                   sessionID: session.sessionID,
                                                                   cwd: session.cwd),
@@ -1510,7 +1744,7 @@ final class AppModel {
 
     func deleteRuntimeSession(runtimeID: String, sessionID: String) async {
         await attempt {
-            try await self.client.call(DaemonAPI.Method.sessionsDelete,
+            try await self.selectedHostClient.call(DaemonAPI.Method.sessionsDelete,
                                        DaemonAPI.DeleteSessionRequest(runtimeID: runtimeID,
                                                                       sessionID: sessionID,
                                                                       confirmed: true))
@@ -1519,7 +1753,7 @@ final class AppModel {
 
     func fork(_ id: UUID) async {
         do {
-            let branch = try await client.call(DaemonAPI.Method.agentsFork,
+            let branch = try await client(forAgent: id).call(DaemonAPI.Method.agentsFork,
                                                DaemonAPI.AgentRequest(agentID: id),
                                                returning: UUID.self)
             await refreshAgents()
@@ -1535,7 +1769,7 @@ final class AppModel {
                            action: DaemonAPI.AnswerElicitationRequest.Action,
                            content: [String: JSONValue] = [:]) async {
         await attempt {
-            try await self.client.call(DaemonAPI.Method.elicitationsAnswer,
+            try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
                                                                           content: content))
@@ -1552,6 +1786,69 @@ final class AppModel {
     /// Whether the work went through, for the callers that must undo something when
     /// it did not.
     @discardableResult
+    /// Files attached from this Mac, copied to the server first (037, FR-015). A path
+    /// on the Mac means nothing to an agent on a server, so each file that exists here
+    /// is written into the agent's folder there, and the attachment points at that
+    /// copy. Pictures already travel as bytes, and a file named from the server's own
+    /// files pane is already a path there. Nil, with the reason said, when a file
+    /// cannot go: the prompt then stays in the field.
+    private func carry(_ attachments: [Attachment], to host: HostID, for agentID: UUID) async -> [Attachment]? {
+        var carried: [Attachment] = []
+        for attachment in attachments {
+            guard case .resourceLink(let uri, let name, let mimeType, _, _) = attachment.block,
+                  let url = URL(string: uri), url.isFileURL,
+                  let agent = work.agent(agentID),
+                  !url.path.hasPrefix(agent.cwd.path),
+                  FileManager.default.fileExists(atPath: url.path) else {
+                carried.append(attachment)
+                continue
+            }
+            guard let data = try? Data(contentsOf: url), data.count <= DaemonAPI.attachmentLimit else {
+                problem = "\(name) is too big to send to \(hosts.label(host))."
+                return nil
+            }
+            do {
+                let written = try await client(for: host).call(
+                    DaemonAPI.Method.filesWrite, DaemonAPI.FilesWriteRequest(agentID: agentID, name: name, data: data),
+                    returning: DaemonAPI.FilesWriteResponse.self)
+                carried.append(Attachment(block: .resourceLink(uri: URL(filePath: written.path).absoluteString,
+                                                               name: name, mimeType: mimeType, size: data.count),
+                                          displayName: attachment.displayName, byteCount: data.count))
+            } catch {
+                problem = "\(name) could not be sent to \(hosts.label(host))."
+                return nil
+            }
+        }
+        return carried
+    }
+
+    /// A send to a server, delivered once or reported as not sent (037, FR-020).
+    ///
+    /// The caller makes the `sendID` once, so every retry here is the same send: a
+    /// daemon that acted on the first try and lost its reply with the connection answers
+    /// the retry as it did, and acts once. A transport error is retried as the server
+    /// comes back, for up to 30 seconds; a refusal from the daemon is its answer and is
+    /// not retried.
+    private func sendToServer(_ host: HostID,
+                              _ work: @escaping (DaemonClient) async throws -> Void) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        while true {
+            do {
+                try await work(client(for: host))
+                return true
+            } catch let refused as JSONRPCError {
+                problem = describe(refused)
+                return false
+            } catch {
+                guard ContinuousClock.now < deadline else {
+                    problem = "Not sent — \(hosts.label(host)) went offline."
+                    return false
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
     private func attempt(_ work: () async throws -> Void) async -> Bool {
         do {
             try await work()

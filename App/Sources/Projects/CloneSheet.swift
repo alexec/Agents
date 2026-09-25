@@ -11,6 +11,8 @@ import SwiftUI
 struct CloneSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    /// Where the clone goes: this Mac, or a server's home folder (037).
+    var host: HostID = .mac
     @State private var text = ""
     @FocusState private var isFocused: Bool
 
@@ -26,7 +28,9 @@ struct CloneSheet: View {
                 .onSubmit(clone)
             Group {
                 if let remote {
-                    Text("Clones into \(destination(for: remote)) and adds it as a project.")
+                    Text(host == .mac
+                         ? "Clones into \(destination(for: remote)) and adds it as a project."
+                         : "Clones into ~/\(remote.folderName) on \(model.hosts.label(host)) and adds it as a project.")
                         .foregroundStyle(.secondary)
                 } else if text.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text("Paste an HTTPS or SSH address.")
@@ -66,7 +70,7 @@ struct CloneSheet: View {
     private func clone() {
         guard let remote else { return }
         dismiss()
-        Task { await model.cloneProject(remote.url) }
+        Task { await model.cloneProject(remote.url, on: host) }
     }
 }
 

@@ -17,7 +17,8 @@ public final class Daemon: @unchecked Sendable {
 
     public init(locations: StoreLocations = .default,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
-                launcher: (any SessionLauncher)? = nil) throws {
+                launcher: (any SessionLauncher)? = nil,
+                serve: Bool = false) throws {
         self.locations = locations
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
@@ -25,13 +26,18 @@ public final class Daemon: @unchecked Sendable {
         DaemonLog.shared.setDestination(locations.log)
         let store = try AgentStore(locations: locations)
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery, launcher: launcher)
+        self.serve = serve
     }
+
+    /// Started with `--serve`: a server's daemon, which does not leave for being idle.
+    private let serve: Bool
 
     /// Recover first, then open the door.
     public func start() async throws {
         // Endings are about to be discovered, and no workflow has been read yet. Hold
         // what they raise rather than firing it into a layer that cannot act — see
         // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
+        await core.setExitsWhenIdle(!serve)
         await core.holdWorkflowEventsUntilStarted()
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).

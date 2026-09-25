@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="720" viewBox="0 0 1120 720" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .title { font-size:22px; font-weight:600; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; } .rb { font-size:14px; font-weight:600; } .f { font-size:12px; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .dis { fill:#f5f5f7; stroke:#e5e5ea; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="1119" height="699" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
+  <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
+
+  <!-- agent list column -->
+  <rect x="0.5" y="40" width="300" height="659" fill="#f5f5f7" stroke="#e5e5ea"/>
+  <text x="20" y="72" class="rb t">ml-pipeline</text>
+  <text x="20" y="90" class="f s">on devbox</text>
+  <circle cx="24" cy="112" r="4" fill="#aeaeb2"/><text x="34" y="116" class="f s">Offline · 14:02</text>
+
+  <rect x="12" y="132" width="276" height="54" rx="8" fill="#dcdce1"/>
+  <circle cx="28" cy="150" r="5" fill="#9fc6f5"/>
+  <text x="42" y="155" class="rb s">Tune the tokenizer</text>
+  <text x="42" y="175" class="f q">Working · as of 14:02</text>
+  <rect x="12" y="194" width="276" height="54" rx="8" fill="none"/>
+  <circle cx="28" cy="212" r="5" fill="#e6c08a"/>
+  <text x="42" y="217" class="r s">Port loader to Arrow</text>
+  <text x="42" y="237" class="f q">Needs you · as of 14:02</text>
+
+  <text x="20" y="290" class="note">Rows keep their last state at reduced</text>
+  <text x="20" y="306" class="note">contrast; “as of” replaces the live time.</text>
+
+  <!-- chat -->
+  <rect x="320" y="56" width="780" height="44" rx="8" fill="#f2f2f7"/>
+  <circle cx="340" cy="78" r="4" fill="#aeaeb2"/>
+  <text x="352" y="83" class="r t">devbox is offline since 14:02. Agents there keep working.</text>
+  <text x="752" y="83" class="f s">Next try in 30 s</text>
+  <rect x="1010" y="64" width="78" height="28" rx="6" class="btn"/><text x="1049" y="83" class="f t" text-anchor="middle">Try now</text>
+
+  <text x="340" y="140" class="f s">You · 13:48</text>
+  <text x="340" y="162" class="r t">The tokenizer is slow on long docs. Profile it and fix the worst hotspot.</text>
+  <text x="340" y="204" class="f s">Claude · 13:49</text>
+  <text x="340" y="226" class="r t">Profiling with py-spy on the 10k-doc fixture. The merge loop is quadratic —</text>
+  <text x="340" y="246" class="r t">rewriting it with a heap.</text>
+  <rect x="340" y="262" width="740" height="36" rx="6" fill="#f5f5f7"/>
+  <text x="354" y="285" class="f s">▸ Ran pytest tests/tokenizer -x  ·  41 passed</text>
+  <rect x="340" y="306" width="740" height="36" rx="6" fill="#f5f5f7"/>
+  <text x="354" y="329" class="f s">▸ Running pytest tests/tokenizer/test_long.py …</text>
+
+  <text x="340" y="378" class="note">Everything shown is what the Mac last had. On reconnect, what happened in the gap is appended here</text>
+  <text x="340" y="394" class="note">in order and the strip goes away. No toast, no “n new messages”.</text>
+
+  <!-- prompt bar -->
+  <rect x="320" y="590" width="780" height="90" rx="12" fill="#fff" stroke="#e5e5ea"/>
+  <text x="340" y="620" class="r t">When that passes, run the long-doc benchmark and paste the numbers</text>
+  <rect x="1000" y="640" width="84" height="28" rx="6" class="dis"/><text x="1042" y="659" class="f q" text-anchor="middle">Send</text>
+  <text x="820" y="700" class="note">Send disabled; tooltip “devbox is offline”. The draft is kept.</text>
+</svg>

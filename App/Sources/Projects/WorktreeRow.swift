@@ -50,7 +50,7 @@ struct WorktreeRow: View {
                     .appText(.reading).fontWeight(.semibold)
                     .lineLimit(1)
                     .strikethrough(!worktree.exists)
-                Text(detail)
+                detail
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -83,13 +83,20 @@ struct WorktreeRow: View {
         }
     }
 
-    private var detail: String {
+    /// Branch, git status, who is in it. One concatenated `Text`, so the row stays a
+    /// single element to accessibility; work that would be lost is orange.
+    private var detail: Text {
         let branch = worktree.branch ?? "detached"
-        guard worktree.exists else { return "\(branch) · its folder is gone" }
+        guard worktree.exists else { return Text("\(branch) · its folder is gone") }
+        var text = Text(branch)
+        if let status = worktree.status {
+            let summary = Text(status.summary)
+            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundColor(.orange) : summary)
+        }
         switch worktree.agents.count {
-        case 0: return branch
-        case 1: return "\(branch) · 1 agent working"
-        case let count: return "\(branch) · \(count) agents working"
+        case 0: return text
+        case 1: return text + Text(" · 1 agent working")
+        case let count: return text + Text(" · \(count) agents working")
         }
     }
 

@@ -43,7 +43,7 @@ struct ProjectRow: View {
         // that is already selected. `simultaneousGesture` is the one gesture form that
         // sits alongside the list's own handling rather than replacing it, so the
         // highlight, the keyboard and the context menu all keep working.
-        .simultaneousGesture(TapGesture().onEnded { model.showProject(summary.folder) })
+        .simultaneousGesture(TapGesture().onEnded { model.showProject(summary.key) })
         .help(abbreviatedPath)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
@@ -56,7 +56,7 @@ struct ProjectRow: View {
     /// for one. This window has that fact, so it completes the count itself — and the
     /// number on this row is then the number of rows under the heading, at the same
     /// moment, by construction (FR-007, FR-009).
-    private var counts: [AgentGroup: Int] { model.counts(in: summary.folder) }
+    private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
     /// Whether this project wants the person: exactly when something in it is under
     /// Needs attention, and on no other reckoning (FR-008). It used to OR the daemon's
@@ -78,7 +78,7 @@ struct ProjectRow: View {
         // (working, unread), and when there are none of those, what is left
         // (complete, stopped) — and is quiet only for a project with nothing in it.
         let working = counts[.running] ?? 0
-        let unread = model.unreadCount(in: summary.folder)
+        let unread = model.unreadCount(in: summary.key)
         var parts: [String] = []
         if working > 0 { parts.append("\(working) working") }
         if unread > 0 { parts.append("\(unread) unread") }

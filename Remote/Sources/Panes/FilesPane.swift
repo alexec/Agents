@@ -263,28 +263,107 @@ struct FilesPane: View {
     }
 }
 
-/// A picture, fitted, and pinched to look closer.
-private struct Picture: View {
+/// A picture, fitted, and pinched to look closer: pinch to zoom, drag to move about,
+/// double-tap to go between fitted and close up at the place tapped.
+///
+/// UIKit's own zooming scroll view rather than a SwiftUI scale: a scale effect leaves
+/// the layout the size it was, so a zoomed picture could not be dragged to its edges,
+/// which are the details a screenshot is zoomed into to read.
+private struct Picture: UIViewRepresentable {
     let image: UIImage
     let description: String
-    @State private var scale: CGFloat = 1
-    @GestureState private var pinch: CGFloat = 1
 
-    var body: some View {
-        ScrollView([.horizontal, .vertical]) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .scaleEffect(scale * pinch)
-                .padding(12)
-                .accessibilityLabel(description)
+    func makeUIView(context: Context) -> ZoomingPictureView {
+        let view = ZoomingPictureView()
+        view.show(image)
+        view.imageView.accessibilityLabel = description
+        return view
+    }
+
+    func updateUIView(_ view: ZoomingPictureView, context: Context) {
+        view.imageView.accessibilityLabel = description
+        if view.imageView.image !== image { view.show(image) }
+    }
+}
+
+final class ZoomingPictureView: UIScrollView, UIScrollViewDelegate {
+    let imageView = UIImageView()
+    /// Most a picture is blown up past its own size. Past this a screenshot is squares.
+    private static let most: CGFloat = 8
+    /// Whether to refit as the pane changes size, as it does when the phone turns.
+    /// Cleared by any zoom but back to fitted.
+    private var fitted = true
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        delegate = self
+        bouncesZoom = true
+        showsHorizontalScrollIndicator = true
+        showsVerticalScrollIndicator = true
+        contentInsetAdjustmentBehavior = .never
+        imageView.isAccessibilityElement = true
+        addSubview(imageView)
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        addGestureRecognizer(doubleTap)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// Draws a new picture, fitted. A rewrite of the file is a new picture, and where
+    /// the reader was in the old one says nothing about the new one.
+    func show(_ image: UIImage) {
+        zoomScale = 1
+        imageView.image = image
+        imageView.frame = CGRect(origin: .zero, size: image.size)
+        contentSize = image.size
+        fitted = true
+        setNeedsLayout()
+    }
+
+    /// The scale that shows the whole picture, never more than its own size: a
+    /// 48-point icon blown up to fill the pane is not a preview of the icon.
+    private var fitScale: CGFloat {
+        let size = imageView.image?.size ?? .zero
+        guard size.width > 0, size.height > 0, bounds.width > 0, bounds.height > 0 else { return 1 }
+        return min(1, bounds.width / size.width, bounds.height / size.height)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        minimumZoomScale = fitScale
+        maximumZoomScale = max(Self.most, fitScale)
+        if fitted, abs(zoomScale - fitScale) > 0.0001 { zoomScale = fitScale }
+        centre()
+    }
+
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) { centre() }
+
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        fitted = abs(scale - fitScale) < 0.0001
+    }
+
+    /// Keeps a picture smaller than the pane in the middle of it rather than the corner.
+    private func centre() {
+        let x = max(0, (bounds.width - contentSize.width) / 2)
+        let y = max(0, (bounds.height - contentSize.height) / 2)
+        contentInset = UIEdgeInsets(top: y, left: x, bottom: y, right: x)
+    }
+
+    @objc private func doubleTapped(_ recognizer: UITapGestureRecognizer) {
+        if fitted {
+            // To the picture's own size; one that already fits at its own size would
+            // not move, so twice it instead.
+            let scale: CGFloat = fitScale < 1 ? 1 : 2
+            let point = recognizer.location(in: imageView)
+            let size = CGSize(width: bounds.width / scale, height: bounds.height / scale)
+            zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
+                            width: size.width, height: size.height), animated: true)
+        } else {
+            setZoomScale(fitScale, animated: true)
         }
-        .gesture(
-            MagnifyGesture()
-                .updating($pinch) { value, state, _ in state = value.magnification }
-                .onEnded { value in scale = min(6, max(1, scale * value.magnification)) }
-        )
-        .onTapGesture(count: 2) { scale = scale > 1 ? 1 : 2 }
     }
 }
 

@@ -1265,6 +1265,7 @@ extension DaemonCore {
         // and so does a wait on events (042).
         dropBlock(agentID)
         endWait(agentID, by: .archived)
+        shownPlanFiles.removeValue(forKey: agentID)
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)

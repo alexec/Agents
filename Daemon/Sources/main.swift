@@ -149,9 +149,32 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     }
 }
 
+let commandLine = DaemonCommandLine(CommandLine.arguments)
+guard case .daemon(let serve, let detach) = commandLine.mode else { exit(2) }
+
+// `--detach` (037): a server's daemon is started by an ssh command that should finish
+// at once. Start a copy of this process in a session of its own, told everything but
+// `--detach`, and leave. A daemon already holding the lock means there is nothing to
+// start, and the copy would only find that out and exit.
+if detach {
+    let locations = StoreLocations.default
+    do {
+        try locations.createDirectories()
+        guard let probe = DaemonLock(at: locations.lock) else { exit(0) }
+        probe.release()
+        let me = URL(filePath: Bundle.main.executablePath ?? CommandLine.arguments[0])
+        try Spawn.detached(executable: me, arguments: commandLine.childArguments,
+                           environment: ProcessInfo.processInfo.environment, log: locations.log)
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("agentsd could not detach: \(error)\n".utf8))
+        exit(1)
+    }
+}
+
 let daemon: Daemon
 do {
-    daemon = try Daemon()
+    daemon = try Daemon(serve: serve)
 } catch Daemon.StartError.alreadyRunning {
     // Another daemon holds the lock. That is the ordinary case when two windows open
     // at once, and there is nothing to say about it.

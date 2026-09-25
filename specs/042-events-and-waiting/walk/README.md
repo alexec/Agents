@@ -50,3 +50,11 @@ At `3110fa4`, run 1: 1820 tests in 199 suites, 2 failures, both main's own known
 Run 2 (cut short by an app restart) caught a real ordering bug: machine changes were each
 delivered on their own Task, so a wake could be logged before its sleep. Fixed by delivering
 them through one stream; MachineEventTests then passed 5/5. More full runs are still owed.
+
+## Server events (T063): not raised in this version
+
+After merging main (037 is there), the server connection turns out to be held by the Mac app
+(`App/Sources/Hosts/HostSet.swift` → `ServerConnection`), not by `agentsd`, so the daemon
+never sees a server go offline or come back. `server.offline` and `server.online` stay in the
+catalogue with no source. Raising them needs the app to report connection changes to the
+daemon, which is left for a follow-up.
