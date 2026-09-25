@@ -277,7 +277,7 @@ a running agent when the window closes and when the Mac restarts.
 
 **Independent Test**: quickstart V7.
 
-- [ ] T047 [US6] Create `.github/workflows/docs-publish.yml`:
+- [X] T047 [US6] Create `.github/workflows/docs-publish.yml`:
   - **Trigger**: `on: push: branches: [main], paths: [docs/**, mkdocs.yml, scripts/docs*, .github/workflows/docs-publish.yml]`,
     plus `workflow_dispatch`.
   - **Concurrency**: `group: pages`, `cancel-in-progress: false`.
