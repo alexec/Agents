@@ -166,6 +166,11 @@ public enum DaemonAPI {
         public static let elicitationsAnswer = "elicitations/answer"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
+        /// How busy a daemon is, so a server is updated only between turns and removed
+        /// only after saying how many agents that stops (037).
+        public static let daemonStatus = "daemon/status"
+        /// Go now, rather than when idle. A server's daemon never leaves for being idle.
+        public static let daemonQuit = "daemon/quit"
 
         // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
         // which is 003's and belongs to the agent. Different owner, different
@@ -1236,6 +1241,8 @@ public enum DaemonAPI {
         public static let noSuchDevice = -32020
         /// A need id that is not outstanding — met, or never existed (021).
         public static let noSuchNeed = -32021
+        /// A daemon asked to quit while a turn is in flight (037).
+        public static let busy = -32040
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -1643,5 +1650,28 @@ public enum DaemonAPI {
             self.to = to
             self.alert = alert
         }
+    }
+}
+
+public extension DaemonAPI {
+    /// `daemon/status` (037).
+    struct DaemonStatus: Codable, Hashable, Sendable {
+        /// Agents starting, running or waiting on the person: an update waits for zero.
+        public var turnsInFlight: Int
+        /// Agents holding a runtime: what removing the server would stop.
+        public var agentsLive: Int
+
+        public init(turnsInFlight: Int, agentsLive: Int) {
+            self.turnsInFlight = turnsInFlight
+            self.agentsLive = agentsLive
+        }
+    }
+
+    /// `daemon/quit` (037).
+    struct QuitRequest: Codable, Hashable, Sendable {
+        /// Stop every live agent first. Without it, a turn in flight refuses the quit.
+        public var stopAgents: Bool
+
+        public init(stopAgents: Bool) { self.stopAgents = stopAgents }
     }
 }

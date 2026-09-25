@@ -14,6 +14,14 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.daemonStatus:
+                return .success(try JSONValue.encoding(status()))
+
+            case DaemonAPI.Method.daemonQuit:
+                let request = try require(params, as: DaemonAPI.QuitRequest.self)
+                try await quit(request)
+                return .success([:])
+
             case DaemonAPI.Method.presenceReport:
                 let report = try require(params, as: DaemonAPI.PresenceReport.self)
                 try reportPresence(report, from: surface, connection: connection)

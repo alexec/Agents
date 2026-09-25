@@ -278,6 +278,8 @@ public actor DaemonCore {
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
     /// battery to spare and no window that could start it again on its own.
     var exitsWhenIdle = true
+    /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
+    var quitRequested = false
 
     /// The daemon's one way out to the windows, settable once the socket exists and
     /// readable from any thread.

@@ -59,6 +59,9 @@ extension DaemonCore {
             // The same tick that asks whether to exit also lets go of shells nobody
             // has touched for hours (FR-028).
             reapIdleShells()
+            // Asked to go (037). No grace: the grace is for a window reopening, and
+            // whoever asked has already said what they want.
+            if quitRequested { return }
             if shouldExit {
                 let start = idleSince ?? ContinuousClock.now
                 idleSince = start

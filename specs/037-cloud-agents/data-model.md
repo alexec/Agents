@@ -26,7 +26,7 @@ never be read as an `ssh` option. Two hosts may not share an `sshName`.
 | `architecture` | `Architecture` | `.x86_64` / `.aarch64` / `.other(String)` |
 | `home` | `String` | Absolute. Used to build the forward target. |
 | `freeBytes` | `Int64` | From `df -Pk`. Install refuses under 200 MB with the disk-full message. |
-| `installedVersion` | `String?` | `agentsd --version`, or nil. |
+| `installedVersion` | `String?` | `version` from `~/.agents-server/install.json`, or nil. |
 | `streamLocalForwarding` | `Bool` | False only if `sshd_config` says `AllowStreamLocalForwarding no` or `local`. |
 | `probedAt` | `Date` | |
 
@@ -72,7 +72,7 @@ Classified from `ssh`'s exit status and stderr by `SSHCommand.classify` (see
 
 ```
 ~/.agents-server/                 0700
-├── install.json                  { "installedAt", "installedBy": "<Mac name>", "versions": [...] }
+├── install.json                  { "version", "sha256", "installedAt", "installedBy": "<Mac name>" }
 ├── bin/
 │   ├── agentsd-1.14+812          0700, static
 │   ├── agentsd-1.13+790          kept until the next successful update, then deleted
@@ -110,4 +110,3 @@ removed at launch.
 |---|---|---|
 | `exitsWhenIdle` | `DaemonCore` | `false` under `--serve`. |
 | `recentRequests` | `DaemonCore+Requests.swift` | Ring of 512 `(UUID, JSONValue)`; lookup before acting on `agents/prompt`, `permissions/answer`, `elicitations/answer`. |
-| `buildVersion` | `AgentsKitCore` constant stamped by the build | Returned by `--version` and `daemon/status`. |
