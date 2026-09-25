@@ -18,23 +18,23 @@ struct HostHeading: View {
     private var mark: some View {
         switch model.hosts.state(host) {
         case .connected:
-            dot(.green)
+            dot(.vouched)
         case .connecting, .idle:
             ProgressView().controlSize(.mini)
         case .offline(let since):
-            dot(.gray)
+            dot(.none)
             Text("Offline · \(since.formatted(date: .omitted, time: .shortened))")
                 .textCase(nil).foregroundStyle(.secondary)
         case .updateWaiting:
-            dot(.orange)
+            dot(.attention)
             Text("Update waiting").textCase(nil).foregroundStyle(.secondary)
         case .failed:
-            dot(.red)
+            dot(.failure)
             Text("Can’t connect").textCase(nil).foregroundStyle(.secondary)
         }
     }
 
-    private func dot(_ color: Color) -> some View {
-        Circle().fill(color).frame(width: 7, height: 7)
+    private func dot(_ tint: StateTint) -> some View {
+        Circle().fill(tint.style(or: .secondary)).frame(width: 7, height: 7)
     }
 }

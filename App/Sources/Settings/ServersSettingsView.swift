@@ -58,7 +58,7 @@ private struct ServerLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Circle().fill(color).frame(width: 8, height: 8)
+                Circle().fill(tint.style(or: .secondary)).frame(width: 8, height: 8)
                 Text(host.label).fontWeight(.semibold)
                 Spacer()
                 let count = model.liveProjects.filter { $0.host == host.id }.count
@@ -78,13 +78,12 @@ private struct ServerLine: View {
         .padding(.vertical, 4)
     }
 
-    private var color: Color {
+    private var tint: StateTint {
         switch model.hosts.state(host.id) {
-        case .connected: .green
-        case .offline, .idle: .gray
-        case .connecting: .gray
-        case .updateWaiting: .orange
-        case .failed: .red
+        case .connected: .vouched
+        case .offline, .idle, .connecting: .none
+        case .updateWaiting: .attention
+        case .failed: .failure
         }
     }
 

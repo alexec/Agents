@@ -51,7 +51,7 @@ struct AddServerSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("First time connecting to \(flow.label).")
                 Text("Its host key fingerprint is").foregroundStyle(.secondary)
-                Text(fingerprint).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                Text(fingerprint).appText(.code).textSelection(.enabled)
                 Text("Check it matches the server.").foregroundStyle(.secondary)
             }
             .appText(.fine)
@@ -134,11 +134,11 @@ struct AddServerSheet: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Group {
                 switch mark {
-                case .done: Image(systemName: "checkmark").foregroundStyle(.green)
+                case .done: Image(systemName: "checkmark").tinted(.vouched)
                 case .current: ProgressView().controlSize(.small)
                 case .waiting: Image(systemName: "circle").foregroundStyle(.tertiary)
-                case .warning: Image(systemName: "exclamationmark").foregroundStyle(.orange)
-                case .failed: Image(systemName: "xmark").foregroundStyle(.red)
+                case .warning: Image(systemName: "exclamationmark").tinted(.attention)
+                case .failed: Image(systemName: "xmark").tinted(.failure)
                 }
             }
             .frame(width: 16)
@@ -146,7 +146,7 @@ struct AddServerSheet: View {
                 Text(title).appText(.reading).foregroundStyle(mark == .waiting ? .tertiary : .primary)
                 if let detail {
                     Text(detail).appText(.fine)
-                        .foregroundStyle(mark == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                        .foregroundStyle((mark == .failed ? StateTint.failure : .none).style(or: .secondary))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
