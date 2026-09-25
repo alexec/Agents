@@ -38,7 +38,7 @@ Replies before exiting. The socket going away is the signal that it has finished
 ## Changed methods
 
 `agents/prompt`, `permissions/answer`, `elicitations/answer` gain an optional
-`requestID: UUID`. If present and seen in the last 512, the daemon returns the stored result and
+`sendID: UUID`. If present and seen in the last 512, the daemon returns the stored result and
 does nothing. Absent means today's behaviour, which is what the phone and every older client send.
 
 ## Linux build

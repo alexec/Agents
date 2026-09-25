@@ -109,4 +109,4 @@ removed at launch.
 | Name | Where | What |
 |---|---|---|
 | `exitsWhenIdle` | `DaemonCore` | `false` under `--serve`. |
-| `recentRequests` | `DaemonCore+Requests.swift` | Ring of 512 `(UUID, JSONValue)`; lookup before acting on `agents/prompt`, `permissions/answer`, `elicitations/answer`. |
+| `recentSends` | `DaemonCore+Sends.swift` | Ring of 512 `(UUID, JSONValue)`; lookup before acting on `agents/prompt`, `permissions/answer`, `elicitations/answer`. |

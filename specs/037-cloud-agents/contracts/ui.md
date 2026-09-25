@@ -73,7 +73,7 @@ re-runs `runtimes/list`.
 
 ## Sending across a drop
 
-- Send makes a `requestID`. If the call fails with a transport error, the bubble shows
+- Send makes a `sendID`. If the call fails with a transport error, the bubble shows
   `Sending…` and the call is retried with the same ID on reconnect for up to 30 s. After that,
   the bubble is removed, the text is put back into the prompt field, and the fine line under the
   field reads `Not sent — <label> went offline.`

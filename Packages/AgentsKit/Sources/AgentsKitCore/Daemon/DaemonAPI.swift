@@ -539,13 +539,19 @@ public enum DaemonAPI {
         /// that ended without saying how it went, and only the person's clears what
         /// the agent last said about the turn before.
         public var from: PromptOrigin
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
 
         public init(agentID: UUID, text: String, attachments: [Attachment] = [],
-                    from: PromptOrigin = .person) {
+                    from: PromptOrigin = .person, sendID: UUID? = nil) {
             self.agentID = agentID
             self.text = text
             self.attachments = attachments
             self.from = from
+            self.sendID = sendID
         }
 
         /// An older app sends only the text, so attachments are optional on the way in.
@@ -557,6 +563,7 @@ public enum DaemonAPI {
             text = try c.decode(String.self, forKey: .text)
             attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
             from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
+            sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
         }
 
         public var blocks: [ContentBlock] {
@@ -904,9 +911,15 @@ public enum DaemonAPI {
     public struct AnswerRequest: Codable, Sendable {
         public var permissionID: UUID
         public var optionID: String
-        public init(permissionID: UUID, optionID: String) {
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
+        public init(permissionID: UUID, optionID: String, sendID: UUID? = nil) {
             self.permissionID = permissionID
             self.optionID = optionID
+            self.sendID = sendID
         }
     }
 
@@ -1034,15 +1047,22 @@ public enum DaemonAPI {
         public var requestID: UUID
         public var action: Action
         public var content: [String: JSONValue]
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
 
         public enum Action: String, Codable, Sendable {
             case accept, decline, cancel
         }
 
-        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:]) {
+        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:],
+                    sendID: UUID? = nil) {
             self.requestID = requestID
             self.action = action
             self.content = content
+            self.sendID = sendID
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1050,6 +1070,7 @@ public enum DaemonAPI {
             requestID = try c.decode(UUID.self, forKey: .requestID)
             action = try c.decodeIfPresent(Action.self, forKey: .action) ?? .cancel
             content = try c.decodeIfPresent([String: JSONValue].self, forKey: .content) ?? [:]
+            sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
         }
     }
 

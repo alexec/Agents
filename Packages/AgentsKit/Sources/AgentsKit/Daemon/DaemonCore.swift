@@ -280,6 +280,9 @@ public actor DaemonCore {
     var exitsWhenIdle = true
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
     var quitRequested = false
+    /// The last few hundred sends that carried a `sendID`, and what each came to (037).
+    var recentSends: [UUID: Task<JSONValue, any Error>] = [:]
+    var recentSendOrder: [UUID] = []
 
     /// The daemon's one way out to the windows, settable once the socket exists and
     /// readable from any thread.

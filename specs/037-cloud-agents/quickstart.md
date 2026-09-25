@@ -35,7 +35,7 @@ swift test --filter Hosts
 Covers, through the fake `ssh` fixture and the Mac `agentsd`: resolve → unknown key → trust →
 master → probe → install → start → forward → `agents/list`. Also: the checksum mismatch leaves
 nothing; update waits for `turnsInFlight == 0`; newer server refused; remove with and without the
-checkbox; the stderr classifier against captured fixtures; `requestID` repeat returns the first
+checkbox; the stderr classifier against captured fixtures; `sendID` repeat returns the first
 result.
 
 ## 3. The window against the fake host (Phase 2 look gate)

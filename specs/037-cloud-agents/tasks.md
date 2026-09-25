@@ -47,8 +47,8 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
 - [X] T007 Implement `--version`, `--serve` and `--detach` in `Daemon/Sources/main.swift`, `Pkg/Sources/AgentsKit/Daemon/Daemon.swift` and `Daemon/DaemonCore+Lifetime.swift` (`exitsWhenIdle`). Put `buildVersion` in `Pkg/Sources/AgentsKitCore/AgentsKitCore.swift`, read from the `AGENTS_BUILD_VERSION` compile flag with `"dev"` as the fallback. `--detach` re-spawns with `POSIX_SPAWN_SETSID` exactly as `Client/SocketLink.swift` `start()` does, and exits 0 if the lock is held. **Done: `DaemonCommandLine.swift`, `Spawn.detached` (SocketLink now uses it too), `exitsWhenIdle`. Smoke: `--serve --detach` on a scratch root stayed up past the idle grace; a second `--detach` exited without a duplicate.**
 - [X] T008 [P] Write `Tests/Integration/DaemonVersionQuitTests.swift`: `daemon/status` returns `{version, turnsInFlight, agentsLive}` correctly for idle, mid-turn (fake runtime), and held-but-idle agents. `daemon/quit {stopAgents:false}` refuses with `busy` mid-turn and shuts down when idle. `daemon/quit {stopAgents:true}` stops live agents and shuts down, and the socket is gone afterwards. **Done: `Integration/DaemonStatusQuitTests.swift`, 5 tests.**
 - [X] T009 Add `daemon/status` and `daemon/quit` to `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift` and `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, implemented in a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Version.swift`. **Done in `DaemonCore+Status.swift` (named for `daemon/status`); `busy` is -32040.**
-- [ ] T010 [P] Write `Tests/Integration/RequestIDTests.swift`: `agents/prompt` sent twice with the same `requestID` delivers once and returns the same result both times. Same for `permissions/answer` and `elicitations/answer`. No `requestID` means today's behaviour. The 513th ID evicts the first.
-- [ ] T011 Add the optional `requestID: UUID?` to the three request types in `DaemonAPI.swift`. Implement the 512-entry ring in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Requests.swift`, and check it at the top of the three handlers in `DaemonCore+Commands.swift`.
+- [X] T010 [P] Write `Tests/Integration/SendOnceTests.swift`: `agents/prompt` sent twice with the same `sendID` delivers once and returns the same result both times. Same for `permissions/answer` and `elicitations/answer`. No `sendID` means today's behaviour. The 513th ID evicts the first. **Done: `Integration/SendOnceTests.swift`, 3 tests (prompt path end to end; eviction on `once` directly).**
+- [X] T011 Add the optional `sendID: UUID?` to the three request types in `DaemonAPI.swift`. Implement the 512-entry ring in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Sends.swift`, and check it at the top of the three handlers in `DaemonCore+Commands.swift`. **Done: named `sendID`, because `AnswerElicitationRequest` already has a `requestID` (the question's own id). `DaemonCore+Sends.swift`; a repeat arriving while the first is in hand waits for it.**
 
 ### 2c — Host record and store
 
@@ -151,7 +151,7 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - Agent rows (`App/Sources/AgentList/AgentRow.swift`): `.secondary`, with `as of HH:mm` in place of the live time.
   - Project rows of an offline host: `.secondary`; Archive disabled.
 - [ ] T041 [US2] Sends across a drop (ui.md § Sending across a drop):
-  - `AppModel` makes a `requestID` per send/answer and passes it in the call;
+  - `AppModel` makes a `sendID` per send/answer and passes it in the call;
   - on a transport error it shows `Sending…`, then retries with the same ID once the host reconnects, within 30 s;
   - after 30 s it removes the bubble, puts the text back in the field, and shows `Not sent — <label> went offline.`
   - Test in `Tests/Integration/HostReconnectTests.swift`: drop the forward right after the daemon acts, and exactly one prompt is delivered.
@@ -239,7 +239,7 @@ Phase 1 (T001–T003)
 - US2–US5 each depend only on US1 and can go in any order after the look gate. US4's heading
   mark and US5's Settings row share `ServersSettingsView`, so do US5's T048 before US4's Settings
   line, or add that line in T048.
-- T041 needs T011 (`requestID`). T046 and T049 need T009 (`daemon/status`, `daemon/quit`).
+- T041 needs T011 (`sendID`). T046 and T049 need T009 (`daemon/status`, `daemon/quit`).
 
 ## Parallel opportunities
 

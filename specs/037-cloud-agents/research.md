@@ -267,7 +267,7 @@ already does).
 ## R10 — Exactly-once prompt and answer
 
 **Decision**: `agents/prompt`, `permissions/answer` and `elicitations/answer` gain an optional
-`requestID: UUID`. The daemon keeps the last 512 `(requestID → result)` pairs in memory. A repeat
+`sendID: UUID`. The daemon keeps the last 512 `(sendID → result)` pairs in memory. A repeat
 returns the stored result without acting again. The client makes the ID once per send and retries
 with the same ID after a reconnect if the first attempt's reply never came. If the retry cannot be
 made within 30 s, the prompt bar shows the text as *not sent* and puts it back in the field

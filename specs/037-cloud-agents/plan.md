@@ -37,7 +37,7 @@ work. So a server is **the same daemon, built for Linux, reached through SSH**:
    files pane, image preview, live pages and attachments use the `files/*` methods 034 adds for
    the phone. Show in Finder, Open in…, and Keep awake are hidden (R9, FR-015/016).
 8. **Exactly-once sends.** `agents/prompt` and the two answer methods gain an optional
-   client-made `requestID`. The daemon remembers the last few hundred and repeats the first
+   client-made `sendID`. The daemon remembers the last few hundred and repeats the first
    answer to a retry, so a send that raced a dropped connection is retried safely (R10, FR-020).
 
 See [research.md](research.md) for each decision, [data-model.md](data-model.md) for the new
@@ -123,7 +123,7 @@ specs/037-cloud-agents/
 ├── quickstart.md        # how to prove it, fake ssh and real server
 ├── contracts/
 │   ├── ssh.md           # every command the app runs over SSH, and what it expects back
-│   ├── daemon.md        # --serve, daemon/status, requestID, Linux build flags
+│   ├── daemon.md        # --serve, daemon/status, sendID, Linux build flags
 │   └── ui.md            # the five screens, bound to the wireframes
 └── tasks.md             # /speckit-tasks
 ```
@@ -135,7 +135,7 @@ Packages/AgentsKit/
 ├── Package.swift                              # Linux: exclude CloudKit/Network/Security files
 ├── Sources/AgentsKitCore/
 │   ├── Hosts/Host.swift                       # NEW  Host, HostID, HostState (Codable, shared)
-│   ├── Daemon/DaemonAPI.swift                 # + daemon/status, requestID fields
+│   ├── Daemon/DaemonAPI.swift                 # + daemon/status, sendID fields
 │   └── Remote/*                               # #if canImport(CloudKit/CryptoKit) guards
 ├── Sources/AgentsKit/
 │   ├── Hosts/                                 # NEW  (Mac only)
@@ -151,7 +151,7 @@ Packages/AgentsKit/
 │   ├── Client/SocketLink.swift                # Darwin.connect → platform connect
 │   └── Daemon/
 │       ├── DaemonCore+Lifetime.swift          # --serve: never idle-exit
-│       ├── DaemonCore+Requests.swift          # NEW  requestID memory
+│       ├── DaemonCore+Sends.swift          # NEW  sendID memory
 │       └── DaemonServer.swift                 # platform socket calls
 ├── Tests/AgentsKitTests/Hosts/                # NEW  fake-ssh end-to-end, parser, installer
 Daemon/Sources/main.swift                      # --serve, --version
@@ -185,7 +185,7 @@ because a fork of the daemon would drift from the Mac one within a week.
 | 0 | **Linux build spike.** Install the toolchain and SDK; get `agentsd` to build static for both architectures; run it on a real server; talk to it through a hand-made `ssh -L` forward with `socat`. | Alex runs one command on a server and a turn completes. If this fails, the plan stops here. |
 | 1 | SSH layer + installer + `ServerLink`, fake-ssh tests. `--serve`, `daemon/status`. | `swift test` green; the fake-ssh host installs, starts, forwards, answers `agents/list`. |
 | 2 | `HostSet`, host tags, grouped list, Add a server sheet, New project submenus, remote folder sheet. | **Look gate**: walked on a scratch root against the fake-ssh host. |
-| 3 | Offline states, reconnect and catch-up, `requestID`. | Pull the forward mid-turn; the strip shows; Send is disabled; the catch-up matches. |
+| 3 | Offline states, reconnect and catch-up, `sendID`. | Pull the forward mid-turn; the strip shows; Send is disabled; the catch-up matches. |
 | 4 | Server files pane, attachments, hidden Mac-only actions, costs by host. | Files, terminal and a live page work on the fake host. |
 | 5 | Settings ▸ Servers, remove, update-when-idle, newer-server refusal. | Version swap with a mid-turn agent waits, then swaps. |
 | 6 | Real server walk (Alex's): SC-001…SC-007. | Alex. |
@@ -196,4 +196,4 @@ because a fork of the daemon would drift from the Mac one within a week.
 |---|---|---|
 | A second build toolchain (swift.org + Static Linux SDK) | The daemon must run on Linux | Building on the server needs Swift there. A Linux container needs a runtime this Mac does not have. A port to another language is a second daemon. |
 | `AppModel` goes from one client to many | A project lives on one host (Alex) | Federating through the Mac daemon means every one of ~90 methods is proxied, and the Mac daemon becomes a single point of failure for server work. Noted in R7 as the way to give the phone servers later. |
-| `requestID` on three methods | FR-020 exactly-once over a link that drops | Not retrying loses sends. Retrying without it sends twice. |
+| `sendID` on three methods | FR-020 exactly-once over a link that drops | Not retrying loses sends. Retrying without it sends twice. |
