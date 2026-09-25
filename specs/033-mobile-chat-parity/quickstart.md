@@ -46,3 +46,21 @@ Expected: up to 30 entries under the agent's folder, each with `path` and `relat
 9. Type in one chat, open another, come back: the draft is there and only there.
 10. iPad with a keyboard: Return sends, Option-Return adds a line, `/` plus arrows plus Tab picks
     a command, and Escape puts the list away.
+
+## Status (2026-09-24)
+
+- §1 done: 1406 tests green (1393 before, 13 new), both schemes build.
+- §2 done on scratch root `/tmp/run-c033c`. A real Claude agent with a tool run, a slow turn
+  and a queued prompt behind it: the Mac chat draws the shared rows, "Waiting its turn" with
+  its remove button, the header row (folder, meter, runtime), attach, dictate, the queue icon
+  on Send, and the options row. It looks as it did before the move.
+- §3 is covered by `FileMentionTests`, which go through `handle(method:)`, the same path as the
+  socket.
+- §4 is Alex's. It needs a real iPhone and iPad, and the Remote app needs rebuilding and
+  installing from this branch.
+- Found on the way: `FileMention` showed the whole path, not the part under the folder, for a
+  folder reached through a symlink (`/tmp`, `/var`). Fixed with `realpath`. The Mac had the
+  same bug.
+- Not done: `MarkdownText` stays each app's own (the Mac's draws a document caret; the phone's
+  scrolls code sideways). Pasting a picture on the phone is in the attach menu ("Paste
+  Picture"), because iOS has no picture paste into a text field.

@@ -46,7 +46,7 @@ All paths are relative to `/tmp/w-033`.
 - [X] T012 [P] [US1] Give the Remote the per-app types the shared rows call: `TerminalOutputView(text:)` in `Remote/Sources/Chat/BlocksView.swift`, and a Mac-compatible `ServedRequestLine` if the Mac's is not already in the moved set. Match signatures to `App/Sources/Chat/DiffView.swift`
 - [X] T013 [US1] Add `unqueue(_:from:)` and `terminalOutput` pass-through to `Remote/Sources/RemoteModel.swift`
 - [X] T014 [US1] Replace `EntryView` in `Remote/Sources/Chat/RemoteChatView.swift` with the shared rows plus `QueuedPromptRow` and `WorkingLine`, inject `ChatActions` (open sets `fileOnScreen`), and delete `Remote/Sources/Chat/EntryView.swift`. Keep `WrappingHStack` only if still used
-- [ ] T015 [US1] Build both schemes; screenshot the Mac chat on a scratch root with the run-app skill and compare with the baseline
+- [X] T015 [US1] Build both schemes; screenshot the Mac chat on a scratch root with the run-app skill and compare with the baseline
 
 ---
 
@@ -85,7 +85,7 @@ All paths are relative to `/tmp/w-033`.
 **Independent Test**: A streaming reply follows with no taps; scrolling up holds; sending returns to the end.
 
 - [X] T026 [US4] Extract the scroll behaviour of `App/Sources/Chat/Transcript.swift` into `Shared/UI/Chat/TranscriptScroller.swift` with the inputs in `contracts/chat-surface.md`, and move `App/Sources/Chat/JumpToEnd.swift` into `Shared/UI/Chat/`. Keep the Mac's thresholds (160 to leave, 40 to be back) and its comments
-- [ ] T027 [US4] Make `App/Sources/Chat/Transcript.swift` a thin wrapper over `TranscriptScroller`; confirm on a scratch root that following, jump-to-end, earlier pages and focus-an-entry behave as before
+- [X] T027 [US4] Make `App/Sources/Chat/Transcript.swift` a thin wrapper over `TranscriptScroller`; confirm on a scratch root that following, jump-to-end, earlier pages and focus-an-entry behave as before
 - [X] T028 [US4] Add `scrollToEndToken` to `Remote/Sources/RemoteModel.swift` (bumped on a successful send), and rebuild `Remote/Sources/Chat/RemoteChatView.swift` as a `ZStack(alignment: .bottom)` of `TranscriptScroller` and the form stack, measured into `bottomInset`, passing `measure(transcriptHeight:)` as `onHeight`. Delete the phone's own `Place`, `JumpToEnd`, `settle` and `loadEarlier`
 
 ---
@@ -120,8 +120,8 @@ All paths are relative to `/tmp/w-033`.
 
 - [X] T037 FR-021 scan in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/ConsistencyTests.swift`: fails if `Remote/Sources` declares `EntryRow`, `ToolRunRow`, `ToolCallLine`, `StateLine`, `WorkReportLine`, `JumpToEnd` or `QueuedPromptRow`, or if any string literal of 12+ characters in `Shared/UI/Chat/*.swift` also appears in `App/Sources/Chat` or `Remote/Sources/Chat`
 - [X] T038 Update `Shared/UI/README.md` for the `Chat/` folder and `ChatActions`
-- [ ] T039 Full gate: `swift test` (compare any failures with the baseline, per the flaky-suite memory), both schemes built, and a Mac run-app walk of a live conversation
-- [ ] T040 Record the deliberate differences and the phone walk (quickstart §4) as Alex's in the feature notes, and commit on `033-mobile-chat-parity`
+- [X] T039 Full gate: `swift test` (compare any failures with the baseline, per the flaky-suite memory), both schemes built, and a Mac run-app walk of a live conversation
+- [X] T040 Record the deliberate differences and the phone walk (quickstart §4) as Alex's in the feature notes, and commit on `033-mobile-chat-parity`
 
 ---
 
