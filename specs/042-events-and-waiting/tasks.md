@@ -174,21 +174,21 @@ consequences link to their agents.
   - a block on one agent and on two agents;
   - the block-versus-`agent.finished` equality;
   - `nil` for a plain agent.
-- [ ] T020 [US2] In `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift`, add `Update.eventsChanged(EventsChange)` and decode it for `DaemonAPI.Notification.eventsChanged`. Keep `recentEvents: [Event]`, the newest 200 inserted or replaced by `position`, plus `waiting: [WaitingAgent]` and a `loadEvents(before:)` that calls `events/list`. The Remote model reads the same fields (`Remote/Sources/RemoteModel.swift`, beside its `leasesSnapshot` call).
-- [ ] T021 [P] [US2] Create `Shared/UI/Events/EventRow.swift`, the one row both platforms draw:
+- [X] T020 [US2] In `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift`, add `Update.eventsChanged(EventsChange)` and decode it for `DaemonAPI.Notification.eventsChanged`. Keep `recentEvents: [Event]`, the newest 200 inserted or replaced by `position`, plus `waiting: [WaitingAgent]` and a `loadEvents(before:)` that calls `events/list`. The Remote model reads the same fields (`Remote/Sources/RemoteModel.swift`, beside its `leasesSnapshot` call).
+- [X] T021 [P] [US2] Create `Shared/UI/Events/EventRow.swift`, the one row both platforms draw:
   - the time; the sentence in `reading` size; the name in `fine` monospace with its scope ("This Mac" or the project name); the subject glyph; `×N` when `count > 1`.
   - Consequences are indented under the event, each starting with ↳: *Woke*, *Fired*, *Refused by* with the reason, and *Could not wake* with the reason.
   - Agent names are links through a closure the platform supplies. Workflow names are links on the Mac and plain text on the phone.
   - There is no tint. The whole row is one accessibility element with one label (see memory: stacked accessibility labels crash AppKit).
-- [ ] T022 [US2] Add the Mac page: `App/Sources/Projects/SidebarItem.swift` gains `.events`, and `App/Sources/Projects/ProjectListView.swift` gets an Events row in the sidebar foot above Resources and Spending, with the same shape. Its line says "Last HH:mm", with no count.
-- [ ] T023 [US2] Create `App/Sources/Events/EventsView.swift`, the page in wireframes §1:
+- [X] T022 [US2] Add the Mac page: `App/Sources/Projects/SidebarItem.swift` gains `.events`, and `App/Sources/Projects/ProjectListView.swift` gets an Events row in the sidebar foot above Resources and Spending, with the same shape. Its line says "Last HH:mm", with no count.
+- [X] T023 [US2] Create `App/Sources/Events/EventsView.swift`, the page in wireframes §1:
   - a project menu (All, This Mac, then each project) and the six subject capsules, which combine;
   - day headings (Today, Yesterday, then dates);
   - live insertion at the top that does not move what the person is reading, and a "1 new" capsule when scrolled down;
   - paging older events with `loadEvents(before:)`;
   - a "Waiting now" strip at the top listing every `WaitingAgent` with its line and ✕ (✕ calls `events/cancelWait`, wired in T041). The strip is absent when nobody is waiting.
-- [ ] T024 [P] [US2] Create `App/Sources/Events/EventDetailView.swift`, the right-hand detail for a clicked row: every detail, the publisher and message for `custom.*`, and the position. A **Copy as trigger** button puts `on:\n  - pull_request.merged:\n      number: 41` on the pasteboard, using the event's filterable details.
-- [ ] T025 [P] [US2] Phone and iPad:
+- [X] T024 [P] [US2] Create `App/Sources/Events/EventDetailView.swift`, the right-hand detail for a clicked row: every detail, the publisher and message for `custom.*`, and the position. A **Copy as trigger** button puts `on:\n  - pull_request.merged:\n      number: 41` on the pasteboard, using the event's filterable details.
+- [X] T025 [P] [US2] Phone and iPad:
   - In `Remote/Sources/Projects/ProjectListView.swift`, add an Events row next to `SpendingRow`, with the same shape.
   - Create `Remote/Sources/Events/EventsListView.swift`: the same `EventRow`s, a single project menu at the top, a read-only detail sheet with no Copy as trigger, and consequences that link to the chat. On iPad the list goes in the detail column.
   - There is no ✕, no subject filter and no Waiting now strip (wireframes §4).

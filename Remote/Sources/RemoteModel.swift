@@ -979,7 +979,7 @@ final class RemoteModel {
     }
 
     /// The newest events and who is waiting (042). The phone only reads them.
-    private func refreshEvents() async {
+    func refreshEvents() async {
         guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
         work.takeEvents(page)
