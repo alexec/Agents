@@ -45,8 +45,9 @@ extension DaemonCore {
         reservedStarts[folder, default: 0] += 1
         defer { reservedStarts[folder, default: 1] -= 1 }
 
-        let settings = WorkflowSettings(permissionMode: request.permissionMode,
-                                        runtimeID: request.runtime, model: request.model)
+        let settings = WorkflowSettings(
+            permissionMode: request.permissionMode ?? inheritedMode(from: caller, runtime: request.runtime),
+            runtimeID: request.runtime, model: request.model)
         let agentID: UUID
         do {
             let worktree = try await helperWorktree(request.worktree, in: folder)
@@ -74,6 +75,24 @@ extension DaemonCore {
                 + (worktree.branch.map { " on \($0)." } ?? ".")
         }
         return (note, agentID)
+    }
+
+    /// The permission mode the caller is working in, for a helper that named none.
+    ///
+    /// A helper is the caller's work carried on in another conversation, so it may do
+    /// what the caller may and no more — the person chose that mode for this work, and
+    /// a helper that quietly started in the runtime's default would be a way round it.
+    /// Only on the caller's own runtime: a mode is a runtime's own string, and the same
+    /// word on another runtime is not known to be the same promise (see
+    /// `WorkflowSettings`). There the helper starts as the named runtime starts.
+    func inheritedMode(from caller: Agent, runtime: String?) -> String? {
+        let runtimeID = runtime ?? RuntimeCatalog.builtIn[0].id
+        guard runtimeID == caller.runtimeID,
+              let option = ModeMemory.modeOption(in: caller.advertisedOptions),
+              let value = caller.startOptions.values[option.id] ?? option.currentValue else {
+            return nil
+        }
+        return value.stringValue
     }
 
     /// What an agent wrote for `worktree`, as a choice: nothing, "new", the name of a

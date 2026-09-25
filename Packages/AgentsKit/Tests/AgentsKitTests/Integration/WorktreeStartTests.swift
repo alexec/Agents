@@ -273,6 +273,27 @@ struct WorktreeStartTests {
         #expect(byName["gone"]?.exists == false)
     }
 
+    @Test func eachWorktreeSaysItsGitStatus() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let dirty = try await addByHand(repo, "dirty")
+        _ = try await addByHand(repo, "clean")
+        try "work".write(to: dirty.appending(path: "COMMITTED"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "COMMITTED"], in: dirty)
+        _ = try await git(["commit", "-q", "-m", "work"], in: dirty)
+        try "more".write(to: dirty.appending(path: "LOOSE"), atomically: true, encoding: .utf8)
+
+        let listed = await core.listWorktrees(for: repo.project)
+        let byName = Dictionary(uniqueKeysWithValues: listed.worktrees.map { ($0.name, $0) })
+
+        let status = try #require(byName["dirty"]?.status)
+        #expect(status.uncommitted == 1)
+        #expect(status.unmerged == 1)
+        #expect(status.ahead == nil, "it tracks nothing")
+        #expect(byName["clean"]?.status == DaemonAPI.WorktreeStatus(uncommitted: 0, unmerged: 0))
+        #expect(byName[repo.top.lastPathComponent]?.status?.unmerged == nil, "the project folder is the base")
+    }
+
     @Test func aRepositoryWithNoCommitCannotMakeOne() async throws {
         let repo = try await repository(committed: false)
         let core = try await makeCore(repo, FakeLauncher())

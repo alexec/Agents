@@ -850,7 +850,9 @@ public actor AppService {
                     "type": "string",
                     "description": """
                         Optional. The runtime's own permission mode, as a workflow's \
-                        `permission-mode:` — e.g. a read-only or plan mode.
+                        `permission-mode:` — e.g. a read-only or plan mode. Leave out \
+                        to start it in the mode you are in now, when it runs on your \
+                        runtime.
                         """,
                 ],
                 "worktree": [

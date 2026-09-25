@@ -164,6 +164,13 @@ public enum GitWorktrees {
         return (parts[0], parts[1])
     }
 
+    /// How many commits `branch` has that `base` doesn't, or nil when either is unknown.
+    public static func commitCount(from base: String, to branch: String, in folder: URL) async -> Int? {
+        guard let count = try? await git(["rev-list", "--count", "\(base)..\(branch)"], in: folder)
+        else { return nil }
+        return Int(count)
+    }
+
     // MARK: Writing
 
     /// Fetch `refspec` from `remote`, which is a remote's name or a URL (038 R5).

@@ -11,8 +11,9 @@ import SwiftUI
 /// the kit's list that lied about its contents — lands on `OpenElsewhere` with the same
 /// words any other binary gets.
 ///
-/// Scaled to fit the pane and never past its own size. A 48-pixel icon blown up to 380
-/// points is not a preview of the icon.
+/// Opens fitted to the pane and never past its own size — a 48-pixel icon blown up to
+/// 380 points is not a preview of the icon — and can then be zoomed into and moved
+/// about, because the reason to open an agent's screenshot is usually a detail in it.
 struct ImageFile: View {
     let url: URL
     /// What the pane read, so a rewrite of the same path draws again. The URL alone
@@ -25,23 +26,26 @@ struct ImageFile: View {
 
     @State private var image: NSImage?
     @State private var failed = false
+    @State private var zoom = ImageZoom()
 
     var body: some View {
         Group {
             if let image {
                 VStack(spacing: 0) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: image.size.width, maxHeight: image.size.height)
-                        .padding(12)
+                    ZoomingImage(image: image, zoom: zoom, label: url.lastPathComponent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .accessibilityLabel(url.lastPathComponent)
                     Divider()
-                    Text(caption(for: image))
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .padding(10)
+                    HStack(spacing: 6) {
+                        Text(caption(for: image))
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        zoomControls
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                 }
             } else if failed {
                 OpenElsewhere(url: url, description: description, server: server)
@@ -54,6 +58,31 @@ struct ImageFile: View {
             image = loaded
             failed = loaded == nil
         }
+    }
+
+    /// Out, in, and back to the whole picture, beside how close it is. Pinching and
+    /// double-clicking do the same; these are for a mouse, and for finding out it zooms.
+    private var zoomControls: some View {
+        HStack(spacing: 4) {
+            Button(action: zoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
+                .disabled(!zoom.canZoomOut)
+                .help("Zoom out")
+            Button(action: zoom.actualSize) {
+                Text(zoom.level, format: .percent.precision(.fractionLength(0)))
+                    .appText(.fine)
+                    .monospacedDigit()
+                    .frame(minWidth: 36)
+            }
+            .help("Actual size")
+            Button(action: zoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
+                .disabled(!zoom.canZoomIn)
+                .help("Zoom in")
+            Button("Fit", action: zoom.fit)
+                .appText(.fine)
+                .disabled(zoom.isFitted)
+                .help("Fit the picture to the pane")
+        }
+        .buttonStyle(.borderless)
     }
 
     /// The kit's words for the file, then the size in pixels, which is the number a

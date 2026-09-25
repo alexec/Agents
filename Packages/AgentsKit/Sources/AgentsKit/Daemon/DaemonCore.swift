@@ -132,6 +132,9 @@ public actor DaemonCore {
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
     var fileInterests: [UUID: Set<FileInterest>] = [:]
+    /// The plan files each agent has had shown, which a device may read although they
+    /// sit outside the agent's folders (`~/.claude/plans`). The file, never its folder.
+    var shownPlanFiles: [UUID: Set<String>] = [:]
     /// The phones and iPads that have an agent's shell open, by agent (034). A device
     /// hears a shell's output only while it is here; a window on the Mac hears them all.
     var shellWatchers: [UUID: Set<UUID>] = [:]
@@ -725,6 +728,22 @@ public actor DaemonCore {
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
+    /// `agents/list`, narrowed the way the request asks.
+    public func listAgents(_ request: DaemonAPI.ListRequest) -> [Agent] {
+        let folder = request.folder.map(Project.standardize)
+        var listed = allAgents(includeArchived: request.includeArchived || request.archivedOnly)
+            .filter { agent in
+                (!request.archivedOnly || agent.state == .archived)
+                    && (folder == nil || agent.projectFolder == folder)
+                    && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
+            }
+        if let limit = request.limit { listed = Array(listed.prefix(max(0, limit))) }
+        if !request.archivedCommands {
+            for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }
+        }
+        return listed
+    }
+
     public func agent(_ id: UUID) -> Agent? { agents[id] }
 
     public func runtimeStatuses() -> [RuntimeStatus] {
@@ -762,7 +781,14 @@ public actor DaemonCore {
             // Nothing to read, so nothing to keep: not written, not broadcast, and not
             // counted as the agent doing something.
             guard !kind.isInvisibleAgentText else { return }
+            // The runtime moving itself to another mode — Claude leaving plan mode —
+            // is the agent's mode now, and what an agent it starts inherits.
+            if case .optionChanged(let id, let value) = kind, var agent = agents[agentID] {
+                agent.startOptions.values[id] = value
+                changed(agent)
+            }
             await record(kind, for: agentID)
+            notePlanning(kind, agentID: agentID)
 
         case .optionsChanged(let options):
             guard var agent = agents[agentID] else { return }
@@ -862,6 +888,12 @@ public actor DaemonCore {
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
             workflowsRespond(to: .askedPermission, agentID: agentID)
+            // The plan, as a page beside the question about it. Asked to approve
+            // something is asked to read it first.
+            if let plan = request.toolCall.planFile,
+               FileManager.default.fileExists(atPath: plan.path) {
+                showPlan(plan, for: agentID)
+            }
             reconsider()
 
         case .processExited:
