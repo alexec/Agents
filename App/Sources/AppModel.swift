@@ -179,8 +179,24 @@ final class AppModel {
     // What the prompt bar is holding before there is an agent to hold it. It lives
     // here rather than in the view so that starting an agent does not throw it away
     // half way through the bar moving down the pane.
-    var draftCwd: URL?
+    var draftCwd: URL? {
+        didSet {
+            guard draftCwd != oldValue else { return }
+            // A worktree belongs to one repository, so a new folder is a new question.
+            draftWorktree = nil
+            draftWorktrees = .notARepository
+            Task { await loadDraftWorktrees() }
+        }
+    }
     var draftRuntimeID: String?
+    /// Where in the project the next agent works, when not the project folder (030).
+    /// Deliberately not kept with the rest of the form: a worktree is decided per
+    /// agent, so it goes back to the project folder after every start (FR-004).
+    var draftWorktree: WorktreeChoice?
+    /// What the draft folder's repository has, for the Worktree chooser. Not a
+    /// repository until the daemon says otherwise, which keeps the chooser hidden.
+    private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    private var draftWorktreesGeneration = 0
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -696,7 +712,7 @@ final class AppModel {
             // a chat opened from a banner under some other project's heading is a
             // sidebar and a page that disagree about where you are.
             if let agent = self.agents.first(where: { $0.id == agentID }) {
-                self.selectedProject = Project.standardize(agent.cwd)
+                self.selectedProject = agent.projectFolder
             }
             self.openWorkflow = nil
             self.selection = agentID
@@ -766,10 +782,71 @@ final class AppModel {
 
     // MARK: Doing
 
+    /// Where the draft session is made: in a worktree already there when one is chosen,
+    /// so the start can use it (research R2). A new worktree has no folder until the
+    /// start makes it, so its draft is the project folder's and the start lets it go.
+    private var draftOptionsFolder: URL? {
+        if case .existing(let root) = draftWorktree { return root }
+        return draftCwd
+    }
+
+    /// Choose where the next agent works, and make the draft there if that moved it.
+    func chooseWorktree(_ choice: WorktreeChoice?) {
+        let before = draftOptionsFolder
+        draftWorktree = choice
+        if draftOptionsFolder != before, draftRuntimeID != nil {
+            Task { await loadDraftOptions() }
+        }
+    }
+
+    /// What removing one of the project's worktrees would lose, or nil when it could
+    /// not be asked (and `problem` says why).
+    func checkWorktreeRemoval(_ root: URL) async -> DaemonAPI.RemovalCheck? {
+        guard let project = draftCwd else { return nil }
+        do {
+            return try await client.call(DaemonAPI.Method.worktreesCheck,
+                                         DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                         returning: DaemonAPI.RemovalCheck.self)
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    /// Remove one of the project's worktrees. `confirmed` is the person having seen
+    /// what would be lost; the daemon checks again either way.
+    func removeWorktree(_ root: URL, confirmed: Bool) async {
+        guard let project = draftCwd else { return }
+        do {
+            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
+                                      DaemonAPI.WorktreeRemovalRequest(project: project, root: root,
+                                                                       confirmed: confirmed),
+                                      returning: DaemonAPI.WorktreeRemoved.self)
+        } catch {
+            problem = describe(error)
+        }
+        await loadDraftWorktrees()
+    }
+
+    /// What the draft folder's repository has. Asked once each time the folder
+    /// changes or an agent starts, never polled; an answer for a folder since left is
+    /// dropped.
+    func loadDraftWorktrees() async {
+        draftWorktreesGeneration += 1
+        let generation = draftWorktreesGeneration
+        guard let folder = draftCwd else { return }
+        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
+                                             DaemonAPI.WorktreesListRequest(folder: folder),
+                                             returning: DaemonAPI.WorktreesListResponse.self))
+            ?? .notARepository
+        guard generation == draftWorktreesGeneration else { return }
+        draftWorktrees = answer
+    }
+
     /// A session has to exist before its options do, so choosing a folder and a
     /// runtime starts one. It is kept and used by the start that follows.
     func loadDraftOptions() async {
-        guard let runtimeID = draftRuntimeID, let cwd = draftCwd else { return }
+        guard let runtimeID = draftRuntimeID, let cwd = draftOptionsFolder else { return }
         draftOptionsGeneration += 1
         let generation = draftOptionsGeneration
         isLoadingDraftOptions = true
@@ -860,10 +937,15 @@ final class AppModel {
                                              startOptions: StartOptions(values: draftChosen),
                                              draftID: draftID,
                                              additionalDirectories: draftFolders,
-                                             mcpServers: draftServers)
+                                             mcpServers: draftServers,
+                                             worktree: draftWorktree)
         do {
             _ = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
+            // Back to the project folder, and the list fetched again: the start may
+            // have made a worktree, and it has put an agent in one.
+            draftWorktree = nil
+            Task { await loadDraftWorktrees() }
             await refreshAgents()
             await refreshProjects()
             // Deliberately not selected. Saying what you want done is not the same as

@@ -147,6 +147,15 @@ extension DaemonCore {
                 message: "The limit for each agent is set to nothing, so no agent can start. "
                     + "Raise it to start this one.")
         }
+        // The worktree first, before any runtime: a start that cannot have the folder it
+        // asked for starts nothing (FR-013). From here on `cwd` is where the agent
+        // works, which for a new worktree is a folder no draft was made in, so the
+        // draft below is let go and the runtime starts inside the worktree (R2).
+        var placed: (cwd: URL, worktree: AgentWorktree)?
+        if let choice = request.worktree {
+            placed = try await prepareWorktree(choice, from: request.cwd, prompt: request.prompt)
+        }
+        let cwd = placed?.cwd ?? request.cwd
         let session: ACPSession
         let sessionID: String
         let appToken: String
@@ -154,7 +163,7 @@ extension DaemonCore {
         // They are read once, when the session is made, so reusing a session that
         // never heard about a server would attach it in name only.
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
-        let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == request.cwd
+        let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
                                      && $0.mcpServers == request.mcpServers
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
         if let usable {
@@ -170,7 +179,7 @@ extension DaemonCore {
             // in its own time: it may still be starting, and this start is not waiting
             // on a session it has already decided against.
             if let draft { Task { [self] in await endDraft(draft) } }
-            let made = try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
+            let made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
                                               mcpServers: request.mcpServers,
                                               managesAgents: starter == nil)
             session = made.session
@@ -179,7 +188,7 @@ extension DaemonCore {
         }
 
         var agent = Agent(runtimeID: request.runtimeID,
-                          cwd: request.cwd,
+                          cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
                           runtimeSessionID: sessionID,
                           startOptions: request.startOptions,
@@ -200,7 +209,8 @@ extension DaemonCore {
                           // before the next one never finds this agent looking like the
                           // person's — with the tools, and holding no place.
                           startedByAgent: starter,
-                          chainDepth: chainDepth)
+                          chainDepth: chainDepth,
+                          worktree: placed?.worktree)
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -219,6 +229,10 @@ extension DaemonCore {
         // The first line of its chat, before its first prompt: who started it (028).
         if let starter {
             await record(.runtimeNote("Started by \(starterName(starter))."), for: agent.id)
+        }
+        // Where it is working, when that is not the project folder (030).
+        if let worktree = placed?.worktree {
+            await record(.runtimeNote(Self.worktreeNote(worktree)), for: agent.id)
         }
         // The first prompt of the conversation is the one that carries the briefing.
         needsBriefing.insert(agent.id)
@@ -618,6 +632,12 @@ extension DaemonCore {
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "\(runtime.name) is not installed any more.")
+        }
+        // Its worktree gone is said, not worked around: starting it in the project
+        // folder instead would put its work somewhere nobody asked for (FR-017).
+        if let worktree = agent.worktree, !Self.isDirectory(agent.cwd) {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeMissing,
+                               message: "The worktree \(worktree.name) is gone, so this agent cannot be picked up where it was.")
         }
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
         let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)

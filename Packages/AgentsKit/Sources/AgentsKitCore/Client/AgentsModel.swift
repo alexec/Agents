@@ -440,7 +440,7 @@ public final class AgentsModel {
     /// The agent's folder as projects compare it, remembered after the first ask.
     private func projectFolder(of agent: Agent) -> URL {
         if let known = folders[agent.id] { return known }
-        let standardized = Project.standardize(agent.cwd)
+        let standardized = agent.projectFolder
         folders[agent.id] = standardized
         return standardized
     }

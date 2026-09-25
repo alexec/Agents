@@ -26,7 +26,7 @@ public enum HelperLimit {
         let folder = Project.standardize(project)
         return agents
             .filter { $0.startedByAgent != nil && $0.state != .archived
-                      && Project.standardize($0.cwd) == folder }
+                      && $0.projectFolder == folder }
             .sorted { $0.createdAt < $1.createdAt }
     }
 }

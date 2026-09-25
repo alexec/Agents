@@ -367,7 +367,7 @@ final class RemoteModel {
             return
         }
         pendingOpen = nil
-        selectedProject = Project.standardize(agent.cwd)
+        selectedProject = agent.projectFolder
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
             self.selection = agentID
@@ -637,7 +637,7 @@ final class RemoteModel {
         }
         if let title = value("-agent"),
            let agent = work.agents.first(where: { $0.title == title }) {
-            selectedProject = agent.cwd
+            selectedProject = agent.projectFolder
             // A beat, so the project has been pushed before the conversation is. Two
             // pushes in one turn of the loop is not something to ask of a split view.
             try? await Task.sleep(for: .milliseconds(600))

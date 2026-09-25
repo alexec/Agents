@@ -116,6 +116,13 @@ public enum DaemonAPI {
         public static let agentsStopHelper = "agents/stopHelper"
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
+        /// A folder's repository and its worktrees, for the start bar's chooser and the
+        /// project page (030). Asked for when something is shown, never polled.
+        public static let worktreesList = "worktrees/list"
+        /// What removing a worktree would lose, asked before it is removed.
+        public static let worktreesCheck = "worktrees/check"
+        /// Remove a worktree the app made, and its branch when that is safe.
+        public static let worktreesRemove = "worktrees/remove"
         /// The agent saying how the work actually went, at the end of it. The app
         /// cannot know this any other way — a turn giving itself back says nothing
         /// about whether the work is finished. Since 023 the older door for the
@@ -424,11 +431,16 @@ public enum DaemonAPI {
         public var draftID: UUID?
         public var additionalDirectories: [URL]
         public var mcpServers: [MCPServer]
+        /// Where in the project to work, when it is not the project folder itself
+        /// (030). `cwd` stays the project folder: the worktree is made, or found, from it.
+        public var worktree: WorktreeChoice?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
-                    additionalDirectories: [URL] = [], mcpServers: [MCPServer] = []) {
+                    additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
+                    worktree: WorktreeChoice? = nil) {
+            self.worktree = worktree
             self.runtimeID = runtimeID
             self.cwd = cwd
             self.prompt = prompt
@@ -452,6 +464,7 @@ public enum DaemonAPI {
             draftID = try c.decodeIfPresent(UUID.self, forKey: .draftID)
             additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
             mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
+            worktree = try c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -1100,6 +1113,16 @@ public enum DaemonAPI {
         /// past its project's limit, or was itself started by an agent (028). The
         /// message is the sentence the agent is shown.
         public static let notYours = -32027
+        /// Making a worktree failed, or it could not be made at all (030). The message
+        /// is git's own words, and no agent was started.
+        public static let worktreeFailed = -32028
+        /// The worktree an agent works in is not there any more.
+        public static let worktreeMissing = -32029
+        /// The folder named is not a worktree of this project's repository, or not one
+        /// the app made, where only those will do.
+        public static let notAWorktree = -32030
+        /// An agent is still working in the worktree to be removed.
+        public static let worktreeInUse = -32031
     }
 
     // MARK: Workflows
@@ -1200,9 +1223,14 @@ public enum DaemonAPI {
         public var runtime: String?
         public var model: String?
         public var permissionMode: String?
+        /// `"new"`, or the name of a worktree of the caller's repository, as the agent
+        /// wrote it (030). Resolved by the daemon, which alone can say what exists.
+        public var worktree: String?
 
         public init(token: String, prompt: String, runtime: String? = nil,
-                    model: String? = nil, permissionMode: String? = nil) {
+                    model: String? = nil, permissionMode: String? = nil,
+                    worktree: String? = nil) {
+            self.worktree = worktree
             self.token = token
             self.prompt = prompt
             self.runtime = runtime
@@ -1230,6 +1258,125 @@ public enum DaemonAPI {
         public init(token: String) {
             self.token = token
         }
+    }
+
+    // MARK: Worktrees (030)
+
+    /// `worktrees/list`: everything about a folder's repository the chooser needs.
+    public struct WorktreesListRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    public struct WorktreesListResponse: Codable, Hashable, Sendable {
+        /// False hides the chooser altogether.
+        public var isRepository: Bool
+        /// False when the repository has nothing to base a worktree on.
+        public var canMakeNew: Bool
+        /// Why a new worktree cannot be made, said where the choice is.
+        public var whyNot: String?
+        public var worktrees: [WorktreeSummary]
+
+        public init(isRepository: Bool, canMakeNew: Bool = false, whyNot: String? = nil,
+                    worktrees: [WorktreeSummary] = []) {
+            self.isRepository = isRepository
+            self.canMakeNew = canMakeNew
+            self.whyNot = whyNot
+            self.worktrees = worktrees
+        }
+
+        public static let notARepository = WorktreesListResponse(isRepository: false)
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            isRepository = try c.decodeIfPresent(Bool.self, forKey: .isRepository) ?? false
+            canMakeNew = try c.decodeIfPresent(Bool.self, forKey: .canMakeNew) ?? false
+            whyNot = try c.decodeIfPresent(String.self, forKey: .whyNot)
+            worktrees = try c.decodeIfPresent([WorktreeSummary].self, forKey: .worktrees) ?? []
+        }
+    }
+
+    /// One worktree of a repository, as git lists it and as the app knows it.
+    public struct WorktreeSummary: Codable, Hashable, Sendable, Identifiable {
+        public var name: String
+        public var root: URL
+        /// Nil when its HEAD is detached.
+        public var branch: String?
+        /// The project folder itself, listed so the chooser can leave it out.
+        public var isProjectFolder: Bool
+        /// False when its folder is gone.
+        public var exists: Bool
+        public var madeByApp: Bool
+        /// Agents not archived whose folder is in it.
+        public var agents: [UUID]
+
+        public var id: URL { root }
+
+        public init(name: String, root: URL, branch: String?, isProjectFolder: Bool,
+                    exists: Bool, madeByApp: Bool, agents: [UUID]) {
+            self.name = name
+            self.root = root
+            self.branch = branch
+            self.isProjectFolder = isProjectFolder
+            self.exists = exists
+            self.madeByApp = madeByApp
+            self.agents = agents
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = try c.decode(String.self, forKey: .name)
+            root = try c.decode(URL.self, forKey: .root)
+            branch = try c.decodeIfPresent(String.self, forKey: .branch)
+            isProjectFolder = try c.decodeIfPresent(Bool.self, forKey: .isProjectFolder) ?? false
+            exists = try c.decodeIfPresent(Bool.self, forKey: .exists) ?? true
+            madeByApp = try c.decodeIfPresent(Bool.self, forKey: .madeByApp) ?? false
+            agents = try c.decodeIfPresent([UUID].self, forKey: .agents) ?? []
+        }
+    }
+
+    /// `worktrees/check` and `worktrees/remove`.
+    public struct WorktreeRemovalRequest: Codable, Sendable {
+        public var project: URL
+        public var root: URL
+        /// The person has seen what would be lost and said yes.
+        public var confirmed: Bool
+
+        public init(project: URL, root: URL, confirmed: Bool = false) {
+            self.project = project
+            self.root = root
+            self.confirmed = confirmed
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            project = try c.decode(URL.self, forKey: .project)
+            root = try c.decode(URL.self, forKey: .root)
+            confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+        }
+    }
+
+    /// What removing a worktree would lose, said before anything is removed.
+    public struct RemovalCheck: Codable, Hashable, Sendable {
+        /// Agents still working in it. Any at all and it is not removed.
+        public var blockedBy: [UUID]
+        /// Files changed and not committed.
+        public var uncommitted: Int
+        /// Commits on its branch that are not in the branch it came from.
+        public var unmerged: Bool
+
+        public var losesWork: Bool { uncommitted > 0 || unmerged }
+
+        public init(blockedBy: [UUID] = [], uncommitted: Int = 0, unmerged: Bool = false) {
+            self.blockedBy = blockedBy
+            self.uncommitted = uncommitted
+            self.unmerged = unmerged
+        }
+    }
+
+    public struct WorktreeRemoved: Codable, Hashable, Sendable {
+        public var removedBranch: Bool
+        public init(removedBranch: Bool) { self.removedBranch = removedBranch }
     }
 
     // MARK: Attention (021)

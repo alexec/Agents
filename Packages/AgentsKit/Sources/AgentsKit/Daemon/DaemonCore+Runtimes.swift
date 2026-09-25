@@ -180,7 +180,10 @@ extension DaemonCore {
                          availableCommands: agent.availableCommands,
                          endedReason: .endTurn,
                          additionalDirectories: agent.additionalDirectories,
-                         mcpServers: agent.mcpServers)
+                         mcpServers: agent.mcpServers,
+                         // Where the conversation was happening goes with it: the branch
+                         // works in the same worktree and belongs to the same project (030).
+                         worktree: agent.worktree)
         agents[copy.id] = copy
         try await store.save(copy)
         // The history so far is ours, so the branch starts with a copy of it rather

@@ -23,6 +23,10 @@ public actor DaemonCore {
     /// has to see the first's place as taken. In memory only: a start does not
     /// survive a restart, so neither does its reservation.
     var reservedStarts: [URL: Int] = [:]
+    /// Worktree names chosen by starts that have not finished making them, as
+    /// `<worktrees folder>/<name>` (030). Held the same way and for the same reason as
+    /// `reservedStarts`: two starts from the same words must not both take one name.
+    var reservedWorktreeNames: Set<String> = []
     var pendingPermissions: [UUID: Pending] = [:]
     /// Forms an agent is blocked on, held here for the same reason permissions are:
     /// the question can arrive while no window is open.
@@ -382,7 +386,7 @@ public actor DaemonCore {
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
-        projectChanged(forAgentIn: agent.cwd)
+        projectChanged(forAgentIn: agent.projectFolder)
         // Here and **not** in `move(_:on:)`, though that is the single transition
         // writer and the tidier-looking hook. An agent is created with
         // `agents[agent.id] = agent` directly in `start(_:)` before any transition

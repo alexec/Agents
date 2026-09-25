@@ -701,7 +701,7 @@ extension DaemonCore {
                  depth: depth ?? workflowChainDepth(causedBy: agentID)))
             return
         }
-        let folder = Project.standardize(agent.cwd)
+        let folder = agent.projectFolder
         guard let byID = workflows[folder], !byID.isEmpty else { return }
         let depth = depth ?? workflowChainDepth(causedBy: agentID)
         let records = workflowStore.load()

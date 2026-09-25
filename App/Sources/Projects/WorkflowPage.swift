@@ -379,7 +379,7 @@ struct WorkflowPage: View {
     private func runs(_ workflow: Workflow) -> some View {
         let folder = Project.standardize(workflow.folder)
         let started = model.agents
-            .filter { Project.standardize($0.cwd) == folder && $0.startedByWorkflow == workflow.workflowID }
+            .filter { $0.projectFolder == folder && $0.startedByWorkflow == workflow.workflowID }
             .sorted { $0.createdAt > $1.createdAt }
         return VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Recent runs")

@@ -21,7 +21,7 @@ extension DaemonCore {
         // lock: two starts arriving together are decided one after the other here, and
         // the place the first takes is already counted when the second is weighed.
         let caller = try helperCaller(token: request.token, refusing: "Nothing was started")
-        let folder = Project.standardize(caller.cwd)
+        let folder = caller.projectFolder
         let prompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
@@ -49,8 +49,10 @@ extension DaemonCore {
                                         runtimeID: request.runtime, model: request.model)
         let agentID: UUID
         do {
-            let start = try await startRequest(settings: settings, folder: folder,
+            let worktree = try await helperWorktree(request.worktree, in: folder)
+            var start = try await startRequest(settings: settings, folder: folder,
                                                prompt: prompt, managesAgents: false)
+            start.worktree = worktree
             agentID = try await self.start(start, startedBy: caller.id, chainDepth: depth)
         } catch let refused as SettingRefused {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
@@ -65,9 +67,37 @@ extension DaemonCore {
         // has not yet let go of.
         let now = HelperLimit.placesInUse(in: folder, agents: agents.values,
                                           reserved: reservedStarts[folder, default: 1] - 1)
-        let note = "Started \u{201C}\(title)\u{201D} (id \(agentID.uuidString)). "
+        var note = "Started \u{201C}\(title)\u{201D} (id \(agentID.uuidString)). "
             + "\(now) of \(HelperLimit.perProject) places in this project are now in use."
+        if let worktree = agents[agentID]?.worktree {
+            note += " It is working in worktree \(worktree.name)"
+                + (worktree.branch.map { " on \($0)." } ?? ".")
+        }
         return (note, agentID)
+    }
+
+    /// What an agent wrote for `worktree`, as a choice: nothing, "new", or the name of
+    /// a worktree of this project's repository (030). A name that is not one is said,
+    /// with the names there are, rather than quietly starting in the project folder.
+    private func helperWorktree(_ written: String?, in folder: URL) async throws -> WorktreeChoice? {
+        guard let written = written?.trimmingCharacters(in: .whitespacesAndNewlines), !written.isEmpty else {
+            return nil
+        }
+        if written.lowercased() == "new" { return .new }
+        let listed = await listWorktrees(for: folder)
+        guard listed.isRepository else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,
+                               message: "this project is not a git repository, so it has no worktrees")
+        }
+        let others = listed.worktrees.filter { !$0.isProjectFolder }
+        if let found = others.first(where: { $0.name == written || $0.branch == written }) {
+            return .existing(found.root)
+        }
+        let names = others.map(\.name)
+        throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,
+                           message: "there is no worktree called \"\(written)\" here. "
+                               + (names.isEmpty ? "There are none yet; say \"new\" to make one."
+                                                : "There are: \(names.joined(separator: ", ")), or say \"new\"."))
     }
 
     // MARK: Stopping and archiving
@@ -87,7 +117,7 @@ extension DaemonCore {
 
     public func archiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
         let (caller, target) = try helperTarget(request, doing: "archive")
-        let folder = Project.standardize(caller.cwd)
+        let folder = caller.projectFolder
         try await archive(target.id, by: .agent(caller.id))
         let now = HelperLimit.placesInUse(in: folder, agents: agents.values,
                                           reserved: reservedStarts[folder, default: 0])
@@ -99,7 +129,7 @@ extension DaemonCore {
 
     public func listHelpers(_ request: DaemonAPI.ListHelpersRequest) throws -> String {
         let caller = try helperCaller(token: request.token, refusing: "Nothing was listed")
-        let folder = Project.standardize(caller.cwd)
+        let folder = caller.projectFolder
         let inUse = HelperLimit.placesInUse(in: folder, agents: agents.values,
                                             reserved: reservedStarts[folder, default: 0])
         let places = "\(inUse) of \(HelperLimit.perProject) places in this project are in use."

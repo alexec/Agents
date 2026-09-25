@@ -28,6 +28,19 @@ struct AgentCard: View {
                                 .appText(.fine)
                                 .foregroundStyle(.tertiary)
                         }
+                        // Working in a worktree (030), named as on the Mac's row. The
+                        // phone cannot see the Mac's disk, so a worktree that has gone
+                        // is not marked here.
+                        if let worktree = agent.worktree {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.triangle.branch")
+                                Text(worktree.name).lineLimit(1)
+                            }
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("in worktree \(worktree.name)")
+                        }
                     }
 
                     // The agent's own account of its last turn, and nothing else — the

@@ -83,7 +83,8 @@ public actor AppService {
     /// Nothing is decided here beyond whether the words are there at all: the daemon
     /// is what knows whose agent is whose.
     public enum AgentCall: Sendable, Equatable {
-        case start(prompt: String, runtime: String?, model: String?, permissionMode: String?)
+        case start(prompt: String, runtime: String?, model: String?, permissionMode: String?,
+                   worktree: String? = nil)
         case stop(agentID: String)
         case archive(agentID: String)
         case list
@@ -292,7 +293,8 @@ public actor AppService {
                 return .failure("Nothing was started: say what the agent is to do, in `prompt`.")
             }
             return .success(.start(prompt: prompt, runtime: text("runtime"), model: text("model"),
-                                   permissionMode: text("permission_mode")))
+                                   permissionMode: text("permission_mode"),
+                                   worktree: text("worktree")))
         }
         if name.hasSuffix(stopAgentToolName) || name.hasSuffix(archiveAgentToolName) {
             guard let id = text("id") else {
@@ -659,6 +661,16 @@ public actor AppService {
                     "description": """
                         Optional. The runtime's own permission mode, as a workflow's \
                         `permission-mode:` — e.g. a read-only or plan mode.
+                        """,
+                ],
+                "worktree": [
+                    "type": "string",
+                    "description": """
+                        Optional. Where the new agent works. Leave out to work in the \
+                        project folder. "new" makes a fresh git worktree, on its own \
+                        branch, named from the prompt — for parallel work that should \
+                        not touch the same files. Or the name of a worktree of this \
+                        repository that is already there, as `git worktree list` shows it.
                         """,
                 ],
             ],
