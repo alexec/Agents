@@ -202,7 +202,9 @@ struct PaperProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(Paper.ground)
-            .padding(.horizontal, 14)
+            // `.paper`'s padding, so a prominent button beside plain ones — send next
+            // to attach and dictate — is the same size as they are.
+            .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(Paper.ink.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
             .opacity(isEnabled ? 1 : 0.4)
