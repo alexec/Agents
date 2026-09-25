@@ -168,7 +168,7 @@ prove.
   - With no pull requests, "No open pull requests of yours on <owner>/<name>", and the button stays (D).
 - [X] T026 [US1] Put `PullRequestsSection` in `App/Sources/Projects/ProjectAgentsView.swift`, after `archivedSection` and before `WorkflowsSection`. It is present only when a list exists for the folder, so there is nothing on a non-GitHub project (H). Depends on T024 and T025.
 - [X] T027 [US1] Build the `agentsd` scheme, then the `Agents` scheme. Run `swift test --filter 'GitHub|PullRequestList'`.
-- [ ] T028 [US1] **Gate: the look.** With the run-app skill on a scratch root, add this repository (its `origin` is on GitHub) as a project, open it, and screenshot the Pull requests section, including a check-out. Compare it with `wireframes/mac-project.svg`, then settle the layout with Alex (ask with the question tool) before starting Phase 4. Record what was decided in this file's Notes.
+- [X] T028 [US1] **Gate: the look.** With the run-app skill on a scratch root, add this repository (its `origin` is on GitHub) as a project, open it, and screenshot the Pull requests section, including a check-out. Compare it with `wireframes/mac-project.svg`, then settle the layout with Alex (ask with the question tool) before starting Phase 4. Record what was decided in this file's Notes.
 
 **Checkpoint**: US1 works alone. The section lists, matches, checks out and says what's wrong, with no triggers yet.
 
@@ -350,6 +350,7 @@ prove.
   repositories cloned read-only: kitproj/kit #116 (draft, passing, changes requested, not checked
   out, then checked out into `discussion-useful-hooks` on `copilot/discussion-useful-hooks` and
   listed under Worktrees) and alexec/EquilibriumApp #85 (passing, commented, in the project folder).
-  A failed check-out (a leftover folder) shows its reason on the row. Decisions:
+  A failed check-out (a leftover folder) shows its reason on the row. Decisions: Alex approved the
+  layout on 2026-09-25 as built, one card per pull request (not the wireframe's shared card). US2 next.
 - Screenshot differences (T052):
 - Live run and audit (T053):
