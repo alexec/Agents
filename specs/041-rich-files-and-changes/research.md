@@ -71,4 +71,159 @@ highlight.js: 308 KB script plus about 330 KB of Swift wrapper, about 0.1 MB com
 
 ### Decision
 
-_Pending Alex's choice (asked 2026-09-25)._
+**tree-sitter, trimmed** (chosen by Alex, 2026-09-25), used directly through `swift-tree-sitter`
+0.25.0, without Neon.
+
+- **Rationale**: It puts colour on the first screen 10–20× sooner than highlight.js does on large
+  files. It reparses incrementally as an agent writes. It is native code with no JavaScript
+  engine, and it uses half the memory. The size cost is bounded by leaving out the three heaviest
+  grammars.
+- **Alternatives considered**:
+  - All 24 grammars: 37 MB installed, and SQL alone is 10.8 MB.
+  - highlight.js through HighlightSwift: 0.3 MB, but whole-file only and slow, and its
+    AttributedString step goes through WebKit.
+  - Splash: Swift only.
+  - Runestone: a UIKit editor, not a highlighter, with no macOS support.
+- **Why no Neon**: Neon drives a text view's storage (`NSTextView`/`UITextView`). The app draws
+  code as SwiftUI rows in a lazy stack (`FileLines`, `DiffView`), so the parts of Neon we would
+  use (a visible-range query and incremental reparse) are a few dozen lines against
+  `swift-tree-sitter` (R3, R7).
+
+## R2. The grammar set
+
+**Decision**: 20 grammars, vendored as C sources under `Packages/CodeText/Grammars/`, each
+pinned to the tag measured in R1 and listed in `VENDORED.md` with its licence.
+`scripts/vendor-grammars.sh <name>` re-fetches one.
+
+| Grammar | Tag | Covers |
+|---|---|---|
+| swift | alex-pinkus 0.7.3-with-generated-files | .swift |
+| c | v0.24.1 | .c, .h, **.m** (Objective-C as C) |
+| cpp | v0.23.4 | .cc .cpp .cxx .hpp .hh .mm |
+| python | v0.25.0 | .py .pyi, `#!…python` |
+| javascript | v0.23.1 | .js .mjs .cjs .jsx, `#!…node` |
+| typescript / tsx | v0.23.2 | .ts .mts .cts / .tsx |
+| json | v0.24.8 | .json .jsonc, `.babelrc` etc. |
+| go | v0.25.0 | .go |
+| rust | v0.24.2 | .rs |
+| java | v0.23.5 | .java |
+| ruby | v0.23.1 | .rb, Gemfile, Rakefile, `#!…ruby` |
+| bash | v0.25.1 | .sh .bash .zsh, .zshrc .bashrc, `#!…sh` |
+| yaml | v0.7.2 | .yml .yaml |
+| toml | v0.7.0 | .toml |
+| html | v0.23.2 | .html .htm |
+| css | v0.23.2 | .css |
+| markdown (block only) | v0.5.1 | .md in a diff or Whole file. The files pane shows Markdown as a page (022), and fenced blocks use their own grammar. |
+| dockerfile | v0.2.0 | Dockerfile, *.dockerfile |
+| make | main @ pinned commit | Makefile, *.mk |
+
+It adds about 17 MB installed and 1.9 MB compressed (R1). Kotlin (.kt, .kts) and SQL (.sql) are
+plain. `.h` is coloured as C: C++ headers are usually `.hpp`, and C's grammar reads most C++
+headers acceptably.
+
+**Rationale**: Published grammar packages fail to link as they stand (R1), and vendoring puts
+every C file and query in one place, built one way. `highlights.scm` queries are vendored beside
+each grammar. Where a grammar's query inherits another's (TypeScript and TSX take JavaScript's),
+the vendored file is the concatenation, so each language needs exactly one query.
+
+## R3. Drawing coloured code in SwiftUI rows
+
+**Decision**: Keep the row-per-line lazy stack every view already uses. Each row is one `Text`
+built from an `AttributedString` whose runs carry a foreground colour from `CodeInk`. A
+`CodeDocument` (`@Observable`, one per shown text) owns the split lines and asks the `Colourer`
+actor for spans **by window**: 200 lines around what is on screen. It publishes each window as
+it arrives. A row with no spans yet draws plain.
+
+**Rationale**:
+- It keeps `FileLines`' behaviours as they are: wrapping, the gutter, scroll-to-line, keepsPlace
+  and `textSelection`.
+- Windows turn thousands of rows into a few async requests.
+- A row reads only its own line's spans, so a window arriving redraws only the rows it covers.
+
+**Alternatives considered**:
+- `NSTextView`/`UITextView` with Neon: two platform views, and it loses the shared SwiftUI rows.
+- Colouring the whole file before showing it breaks FR-017.
+
+## R4. Nine roles and one palette
+
+**Decision**: Capture names from every `highlights.scm` map, by their first component with a few
+exceptions, to nine roles: `keyword`, `string`, `comment`, `number` (numbers, booleans,
+constants), `type`, `function`, `property` (attributes and properties), `punctuation` (and
+operators), and `plain`. Anything unmapped is `plain`. `CodeInk` gives each role a light and a
+dark colour, derived from `Paper`'s warm ink:
+
+- Comments: a muted warm grey, italic.
+- Keywords: a deep ink blue, semibold.
+- Strings: a dark olive green.
+- Numbers: a plum.
+- Types: a teal.
+- Functions: a slate blue.
+- Properties: brown.
+- Punctuation: the secondary ink.
+
+There is **no red, orange or pink role**; StateTint keeps those for failure. The exact hex values
+are settled at the look gate (Phase A).
+
+**Rationale**: Nine roles give the structure FR-001 asks for without the noise of a 30-colour
+theme. A test computes the WCAG contrast of every role against `Paper.ground` and `Paper.well` in
+both appearances and fails below 4.5:1 (SC-007).
+
+## R5. Line and word diffs
+
+**Decision**: Both come from the Swift standard library, and no diff library is added.
+
+- **Lines**: `newLines.difference(from: oldLines)` (Myers) over `[Substring]` gives removals and
+  insertions. They are walked in order into `DiffRow`s marked context, removed or added. In each
+  change block (a run of removals then insertions between two context lines), removed line *i*
+  pairs with added line *i* when both exist.
+- **Words**: each paired line is tokenised into identifier runs, whitespace runs and single
+  punctuation characters. Diffing the token arrays the same way gives character ranges, marked on
+  each side. When less than a third of the tokens are shared, the lines aren't pairs, so no word
+  marks are drawn (a rewrite, not an edit).
+- **Whole file**: the daemon's `DiffLine`s (035) are already a line diff. Word marks are added to
+  them by the same pairing, app-side.
+
+**Rationale**: `CollectionDifference` is fast enough at edit sizes (hundreds of lines), is on
+both platforms, and needs no dependency. It matches the spec's "word marks, not moves".
+
+## R6. Limits (FR-018)
+
+**Decision**: One `Limits` type holds:
+
+| Limit | Value | Why |
+|---|---|---|
+| Colour a text of at most | 512 KB | The files pane reads the first 128 KB already (035/022); 512 KB covers pages and diffs with room. |
+| Colour no text with a line longer than | 4,000 characters | R1: a single 294 KB line took 734 ms even for one screen, because a screen range can't split a line. Minified and generated files are what hit this. |
+| Word-mark a line of at most | 1,000 characters | Token diff cost is quadratic in the worst case. |
+| Word-mark a change block of at most | 200 paired lines | Beyond that it is a rewrite. |
+| Fold unchanged runs longer than | 8 lines, keeping 3 either side | The same shape as `git diff -U3`. |
+
+A file past a colour limit shows plain, with one line saying "Shown without colour: too large"
+or "…: a line is too long". 035's `drawLimit` (2,000 changed lines) stays as it is.
+
+## R7. Text that is still being written
+
+**Decision**: When a `CodeDocument` gets new text for the same file, it finds the common prefix
+and suffix, builds one `InputEdit`, calls `tree.edit(_:)`, and reparses with the old tree. Only
+the windows the change touched are invalidated; the rest keep their spans. The reader's place is
+kept by the existing `keepsPlace` and `ScrollViewReader` logic, which this does not touch.
+
+**Rationale**: FR-007. A full reparse of 5,000 lines is 13–83 ms. Incremental reparse is
+typically a few ms for an append, which is what an agent writing a file mostly does.
+
+## R8. First use of a language
+
+**Decision**: Each language's query is compiled on first use, off the main actor, and cached for
+the life of the app. The Swift query took 93–215 ms to compile under load (R1); others took
+under 65 ms. The text shows plain meanwhile (FR-017). There is no warm-up at launch: most
+sessions never open most languages.
+
+## R9. What stays the same
+
+Some things don't change:
+- The daemon's protocol, `ChangedFileDetail`, and `DiffLine`'s wire shape.
+- 035's draw limit.
+- `LivePage`'s typing surface; its fenced blocks are coloured by `MarkdownText`.
+- How the files pane reads files: the first 128 KB and the probe.
+
+`agentsd` does not link `CodeText`.
