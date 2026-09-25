@@ -71,13 +71,28 @@ public actor AppService {
     /// Where an outcome goes: the wire spelling, and the agent's own sentence. Both
     /// still strings here — the daemon owns which words it knows, because it is the
     /// daemon that has to refuse one it does not.
-    public typealias OutcomeSink = @Sendable (String, String) async -> Outcome
+    public typealias OutcomeSink = @Sendable (String, String, BlockWords) async -> Outcome
 
     /// Where the one call goes: the outcome's wire spelling, the sentence, the chips,
     /// which may be none, and the conversation's new title. One sink rather than the
     /// two above in turn, because the daemon refuses the whole call or lands the whole
     /// call, and two sinks could do half of each.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String) async -> Outcome
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String, BlockWords) async -> Outcome
+
+    /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
+    /// on, as written, and when to check again. Empty for every other outcome — and
+    /// refused here if it is not, so the agent hears it before the call goes further.
+    public struct BlockWords: Sendable, Equatable {
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
+
+        public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
+        }
+
+        public static let none = BlockWords()
+    }
 
     /// One of the four calls that act on other agents (028), as the agent made it.
     /// Nothing is decided here beyond whether the words are there at all: the daemon
@@ -107,7 +122,7 @@ public actor AppService {
 
     public init(transport: any LineTransport,
                 managesAgents: Bool = true,
-                finishTurn: @escaping FinishSink = { _, _, _, _ in
+                finishTurn: @escaping FinishSink = { _, _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
                 sink: @escaping Sink,
@@ -115,7 +130,7 @@ public actor AppService {
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
                 },
-                reportOutcome: @escaping OutcomeSink = { _, _ in
+                reportOutcome: @escaping OutcomeSink = { _, _, _ in
                     .refused("This app cannot record an outcome.")
                 },
                 agents: @escaping AgentsSink = { _ in
@@ -207,7 +222,12 @@ public actor AppService {
                 }
                 let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
                                                    orFirstOf: arguments?["next_prompts"])
-                return .success(Self.reply(await finishSink(raw, message, prompts, title)))
+                let words: BlockWords
+                switch Self.blockWords(raw, arguments) {
+                case .success(let read): words = read
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                }
+                return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
             }
 
             if name.hasSuffix(Self.toolName) {
@@ -270,7 +290,10 @@ public actor AppService {
                 guard !message.isEmpty else {
                     return .success(Self.reply(Self.noWords, isError: true))
                 }
-                return .success(Self.reply(await outcomeSink(raw, message)))
+                switch Self.blockWords(raw, arguments) {
+                case .success(let words): return .success(Self.reply(await outcomeSink(raw, message, words)))
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                }
             }
 
             return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
@@ -319,8 +342,41 @@ public actor AppService {
     /// door. Said once here so the one call and the older name cannot drift.
     static let unknownOutcome = """
         Nothing was recorded: outcome has to be one of done, nothing_to_do, \
-        needs_answer, partly_done or stuck.
+        needs_answer, partly_done, stuck or blocked.
         """
+
+    /// The two block arguments, read, with contract §1's two local refusals: neither
+    /// goes with any outcome but `blocked`, and the minutes are a whole number in range.
+    /// Which agents exist, and whether waiting on them is allowed, is the daemon's.
+    static func blockWords(_ outcome: String, _ arguments: JSONValue?)
+        -> Result<BlockWords, AgentCallProblem> {
+        let names = arguments?["waiting_on"]?.arrayValue?.compactMap(\.stringValue)
+        let minutesValue = arguments?["check_again_in_minutes"]
+        let written = (names?.isEmpty == false) || (minutesValue != nil && minutesValue != .null)
+        guard outcome == WorkOutcome.blocked.rawValue else {
+            return written
+                ? .failure("Nothing was recorded: waiting_on and check_again_in_minutes only go with blocked.")
+                : .success(.none)
+        }
+        var minutes: Int?
+        if let minutesValue, minutesValue != .null {
+            // A whole number, however the runtime spelled it: some send "25".
+            let number: Int? = switch minutesValue {
+            case .int(let whole): whole
+            case .double(let value): value == value.rounded() ? Int(exactly: value) : nil
+            case .string(let text): Int(text.trimmingCharacters(in: .whitespaces))
+            default: nil
+            }
+            guard let number, Block.checkAgainMinutes.contains(number) else {
+                return .failure(AgentCallProblem(stringLiteral: """
+                    Nothing was recorded: check_again_in_minutes has to be a whole number \
+                    from \(Block.checkAgainMinutes.lowerBound) to \(Block.checkAgainMinutes.upperBound).
+                    """))
+            }
+            minutes = number
+        }
+        return .success(BlockWords(waitingOn: names, checkAgainInMinutes: minutes))
+    }
     static let noWords = """
         Nothing was recorded: say in a sentence how it went. An outcome with no words \
         is no more use than the turn simply ending.
@@ -373,6 +429,16 @@ public actor AppService {
               needs_answer    You cannot go further until the person answers something.
               partly_done     You did some of it. The rest needs a decision that is not yours.
               stuck           You could not do it, and you know why.
+              blocked         You are waiting on something other than the person:
+                              agents you started, another agent's change, a CI run.
+
+            For blocked, name the agents in waiting_on and you will be resumed, with \
+            how each one ended, once they have all finished; for something the app \
+            can't see, say what it is and give check_again_in_minutes. It is not for a \
+            question to the person (that is needs_answer) or a dead end (that is stuck). \
+            Your turn ends and costs nothing while you wait — and anything you started \
+            in the background stops with it, so never block on a command of your own: \
+            wait for that in this turn.
 
             The message is one or two sentences in your own words, and it is what the \
             person reads on the row before they open anything — so write it for \
@@ -403,7 +469,7 @@ public actor AppService {
                 "outcome": [
                     "type": "string",
                     "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck"]),
+                                    "partly_done", "stuck", "blocked"]),
                     "description": "The one that is true.",
                 ],
                 "message": [
@@ -418,6 +484,24 @@ public actor AppService {
                     "description": """
                         A few words naming what this conversation is doing now. \
                         Replaces the name on its row.
+                        """,
+                ],
+                "waiting_on": [
+                    "type": "array",
+                    "items": ["type": "string"],
+                    "description": """
+                        Only with blocked. The agents in this project you are waiting on, \
+                        by id (as start_agent or list_my_agents gave it) or by exact \
+                        title. You will be resumed once every one has finished.
+                        """,
+                ],
+                "check_again_in_minutes": [
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440,
+                    "description": """
+                        Only with blocked. When to be resumed anyway, to check on \
+                        something the app can't see, like a CI run or a review.
                         """,
                 ],
                 // One, since 031. The list this replaced is still read by the
@@ -741,7 +825,7 @@ public actor AppService {
                 "outcome": [
                     "type": "string",
                     "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck"]),
+                                    "partly_done", "stuck", "blocked"]),
                     "description": "The one that is true.",
                 ],
                 "message": [
@@ -749,6 +833,24 @@ public actor AppService {
                     "description": """
                         One or two sentences, for somebody who has not read the \
                         conversation. For needs_answer, the question itself.
+                        """,
+                ],
+                "waiting_on": [
+                    "type": "array",
+                    "items": ["type": "string"],
+                    "description": """
+                        Only with blocked. The agents in this project you are waiting on, \
+                        by id (as start_agent or list_my_agents gave it) or by exact \
+                        title. You will be resumed once every one has finished.
+                        """,
+                ],
+                "check_again_in_minutes": [
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440,
+                    "description": """
+                        Only with blocked. When to be resumed anyway, to check on \
+                        something the app can't see, like a CI run or a review.
                         """,
                 ],
             ],

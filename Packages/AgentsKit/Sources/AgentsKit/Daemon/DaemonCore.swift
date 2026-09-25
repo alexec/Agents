@@ -532,6 +532,18 @@ public actor DaemonCore {
         case .starting, .waitingOnUser, .running, .archived:
             break
         }
+        // Anything blocked on this agent (039). Closing is one write per blocked agent;
+        // the resume it may clear is queued in that same moment and sent behind this
+        // call, so this agent's own ending is not held up by another's runtime starting.
+        if let how = waitEnding(for: agent, next: next, event: event,
+                                reasonThisEventSet: reasonThisEventSet) {
+            let at = now()
+            for blocked in closeWaits(on: agentID, how: how) {
+                guard let promptID = queueResume(blocked, now: at) else { continue }
+                Task { await self.sendResume(blocked, promptID: promptID) }
+            }
+        }
+
         // Every way a need begins or ends is a state change or passes through one, and
         // this is the one place every state change passes through. Cheap, and it says
         // nothing unless something changed (021, FR-002).

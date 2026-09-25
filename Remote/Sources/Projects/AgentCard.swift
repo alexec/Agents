@@ -63,6 +63,15 @@ struct AgentCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // Blocked (039): what it waits on and when it looks again, in the
+                    // Mac row's words. Carry on is in the card's menu and the chat, not
+                    // here: the whole card is the one control (see `AgentRow`).
+                    ForEach(model.blockLines(agent), id: \.self) { line in
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -73,6 +82,15 @@ struct AgentCard: View {
             .paperRow()
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if model.isBlocked(agent) {
+                Button {
+                    Task { await model.carryOn(agent.id) }
+                } label: {
+                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                }
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -88,8 +106,8 @@ struct AgentCard: View {
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
-        return [agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
-            .compactMap { $0 }
+        return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
+            .compactMap { $0 } + model.blockLines(agent))
             .joined(separator: ", ")
     }
 }

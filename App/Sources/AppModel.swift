@@ -274,6 +274,8 @@ final class AppModel {
 
     /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
 
     // MARK: Workflows
 
@@ -989,6 +991,16 @@ final class AppModel {
             try await self.client.call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
+        }
+    }
+
+    /// End a block by hand (039): the prompt Carry on sends, as the person, to an agent
+    /// that need not be the one selected. A person's prompt is what clears a block, so
+    /// this is an ordinary prompt and nothing else.
+    func carryOn(_ id: UUID) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+                                       DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
         }
     }
 

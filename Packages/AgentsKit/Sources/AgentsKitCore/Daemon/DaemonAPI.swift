@@ -358,7 +358,12 @@ public enum DaemonAPI {
             name = try c.decode(String.self, forKey: .name)
             exists = try c.decode(Bool.self, forKey: .exists)
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
-            counts = try c.decode([AgentGroup: Int].self, forKey: .counts)
+            // Read as plain names, so a group this build does not know (039's `blocked`,
+            // seen by an older phone) is dropped rather than failing the whole project.
+            let named = try c.decode([String: Int].self, forKey: .counts)
+            counts = Dictionary(uniqueKeysWithValues: named.compactMap { key, value in
+                AgentGroup(rawValue: key).map { ($0, value) }
+            })
             costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
             unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
         }
@@ -588,11 +593,18 @@ public enum DaemonAPI {
         public var token: String
         public var outcome: String
         public var message: String
+        /// Only with `blocked` (039): the agents it waits on, as it wrote them — ids or
+        /// titles, resolved by the daemon. Optional, so an older helper still relays.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
-        public init(token: String, outcome: String, message: String) {
+        public init(token: String, outcome: String, message: String,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 
@@ -623,14 +635,20 @@ public enum DaemonAPI {
         /// relays a call without it, and that call still lands — with the title left
         /// as it was.
         public var title: String?
+        /// Only with `blocked` (039). See `ReportOutcomeRequest`.
+        public var waitingOn: [String]?
+        public var checkAgainInMinutes: Int?
 
         public init(token: String, outcome: String, message: String,
-                    prompts: [SuggestedPrompt], title: String? = nil) {
+                    prompts: [SuggestedPrompt], title: String? = nil,
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
             self.title = title
+            self.waitingOn = waitingOn
+            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 

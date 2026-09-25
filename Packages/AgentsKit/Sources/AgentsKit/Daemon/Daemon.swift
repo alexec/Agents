@@ -78,6 +78,8 @@ public final class Daemon: @unchecked Sendable {
         // a prompt, and both of those belong in front of a window that can watch them
         // rather than behind a socket nobody can reach yet.
         await core.pickUpAfterRestart(recovered)
+        // After the pick-ups are known, so a wait on a chat coming back stays open (039).
+        await core.resumeBlocksAfterRestart()
         // Last of all, once the agents that are coming back are back. A daemon
         // restarting under resumed agents is holding work from its first moment, and
         // without this it would not take the assertion until one of them next changed

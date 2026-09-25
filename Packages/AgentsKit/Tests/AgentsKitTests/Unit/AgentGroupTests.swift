@@ -34,23 +34,28 @@ struct AgentGroupTests {
         #expect(Self.group(.archived) == .archived)
     }
 
+    /// Every group but Blocked is reachable from a state alone. Blocked needs a report,
+    /// because it is a thing an agent says rather than a state it is in (039).
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
         let reached = Set(AgentState.allCases.map { Self.group($0) })
-        #expect(reached == Set(AgentGroup.allCases))
-        #expect(AgentGroup.allCases.count == 5)
+        #expect(reached == Set(AgentGroup.allCases).subtracting([.blocked]))
+        #expect(Self.group(.finished, .blocked) == .blocked)
+        #expect(AgentGroup.allCases.count == 6)
         #expect(AgentState.allCases.count == 6)
     }
 
-    @Test("the four live groups are in the order the panel draws them")
+    @Test("the live groups are in the order the panel draws them")
     func liveOrder() {
-        #expect(AgentGroup.live == [.needsAttention, .running, .finished, .stopped])
+        #expect(AgentGroup.live == [.needsAttention, .blocked, .running, .finished, .stopped])
         #expect(!AgentGroup.live.contains(.archived))
     }
 
     /// FR-022 of 019 and FR-023 of 020, stated as a test so it cannot be lost quietly.
+    /// One heading added since, on purpose: Blocked (039).
     @Test func noHeadingWasAddedRenamedOrRemoved() {
-        #expect(AgentGroup.live.map(\.title) == ["Needs attention", "Working", "Complete", "Stopped"])
+        #expect(AgentGroup.live.map(\.title)
+            == ["Needs attention", "Blocked", "Working", "Complete", "Stopped"])
         #expect(AgentGroup.archived.title == "Archived")
     }
 
@@ -105,9 +110,62 @@ struct AgentGroupTests {
         for outcome in WorkOutcome.allCases where outcome.needsAPerson {
             #expect(Self.group(.finished, outcome) == .needsAttention)
         }
-        for outcome in WorkOutcome.allCases where !outcome.needsAPerson {
+        for outcome in WorkOutcome.allCases where !outcome.needsAPerson && outcome != .blocked {
             #expect(Self.group(.finished, outcome) == .finished)
         }
+    }
+
+    // MARK: Blocked (039)
+
+    private static func blocked(cleared: Bool) -> WorkReport {
+        WorkReport(outcome: .blocked, message: "waiting on the helpers", at: Date(),
+                   block: Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper")],
+                                clearedAt: cleared ? Date() : nil,
+                                clearedBy: cleared ? .waits : nil))
+    }
+
+    /// Settled and waiting on something that is not a person: its own group, not
+    /// Needs attention and not Complete.
+    @Test func aFinishedAgentWithAnOpenBlockIsBlocked() {
+        for asked in [false, true] {
+            #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: false),
+                               outcomeAsked: asked) == .blocked)
+        }
+        // A blocked report that named nothing and gave no time is still blocked.
+        #expect(Self.group(.finished, .blocked) == .blocked)
+    }
+
+    /// A block that cleared is not waiting on anything. The agent is being resumed or was
+    /// dropped, and neither is Blocked.
+    @Test func aClearedBlockIsNotBlocked() {
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: true),
+                           outcomeAsked: false) == .finished)
+    }
+
+    /// Asking the person to look outranks waiting on anything else.
+    @Test func eyesOutrankABlock() {
+        #expect(AgentGroup(for: .finished, wantsEyes: true, report: Self.blocked(cleared: false),
+                           outcomeAsked: false) == .needsAttention)
+    }
+
+    /// Stopped and archived outrank blocked, as they outrank every report (FR-012). A
+    /// running agent with a blocked report is the resumed turn, which is working.
+    @Test func stoppedArchivedAndRunningIgnoreABlock() {
+        let report = Self.blocked(cleared: false)
+        #expect(AgentGroup(for: .stopped, wantsEyes: false, report: report, outcomeAsked: false) == .stopped)
+        #expect(AgentGroup(for: .archived, wantsEyes: false, report: report, outcomeAsked: false) == .archived)
+        #expect(AgentGroup(for: .running, wantsEyes: false, report: report, outcomeAsked: false) == .running)
+    }
+
+    /// An older phone must not lose a whole project over a group it has never heard of.
+    @Test func countsWithAGroupThisBuildDoesNotKnowStillDecode() throws {
+        let json = #"""
+            {"project":{"folder":"file:///tmp/p/","addedAt":0},"name":"p","exists":true,
+             "lastActivityAt":0,"counts":{"running":2,"someday":1}}
+            """#
+        let decoder = JSONDecoder()
+        let summary = try decoder.decode(DaemonAPI.ProjectSummary.self, from: Data(json.utf8))
+        #expect(summary.counts == [.running: 2])
     }
 
     /// How a turn *ended* outranks what the agent said about the work. An agent

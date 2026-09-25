@@ -46,13 +46,23 @@ struct StatusShapeTests {
         #expect(StatusShape(state: .stopped, outcome: .stuck, isComingBack: false) == .stopped)
     }
 
+    /// Waiting on something that is not a person (039): its own shape, and no colour.
+    @Test("A turn that ended blocked is blocked, and wants nobody")
+    func blocked() {
+        let shape = StatusShape(state: .finished, outcome: .blocked, isComingBack: false)
+        #expect(shape == .blocked)
+        #expect(!shape.wantsAPerson)
+        #expect(StatusShape(state: .stopped, outcome: .blocked, isComingBack: false) == .stopped)
+        #expect(StatusShape(state: .running, outcome: .blocked, isComingBack: false) == .working)
+    }
+
     @Test("Every state lands on exactly one of the four")
     func total() {
         let shapes = Set(AgentState.allCases.map {
             StatusShape(state: $0, outcome: nil, isComingBack: false)
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
-        #expect(Set([StatusShape.needsYou, .done, .stopped].compactMap(\.symbol)).count == 3)
+        #expect(Set([StatusShape.needsYou, .blocked, .done, .stopped].compactMap(\.symbol)).count == 4)
     }
 }
 
