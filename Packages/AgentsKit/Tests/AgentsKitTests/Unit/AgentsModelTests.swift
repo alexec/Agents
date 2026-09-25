@@ -138,6 +138,18 @@ struct AgentsModelTests {
         #expect(model.agents(in: URL(filePath: "/tmp/work/./api"), group: .running).count == 1)
     }
 
+    /// Working in a worktree, filed under the project it was started from (030).
+    @Test func anAgentInAWorktreeIsFoundUnderItsProject() throws {
+        let model = AgentsModel()
+        let root = folder.appending(path: ".agents/worktrees/fix-login")
+        var working = agent(cwd: root)
+        working.worktree = AgentWorktree(name: "fix-login", root: root, branch: "agents/fix-login",
+                                         project: folder, base: "main", madeByApp: true)
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(working))
+        #expect(model.agents(in: folder, group: .running).map(\.id) == [working.id])
+        #expect(model.agents(in: root, group: .running).isEmpty)
+    }
+
     @Test func usageLandsOnTheAgentItIsAbout() throws {
         let model = AgentsModel()
         let id = UUID()

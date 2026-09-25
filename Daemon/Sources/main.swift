@@ -66,11 +66,12 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                     fallback: "Noted.")
     } agents: { call in
         switch call {
-        case .start(let prompt, let runtime, let model, let permissionMode):
+        case .start(let prompt, let runtime, let model, let permissionMode, let worktree):
             return await relay(DaemonAPI.Method.agentsStartHelper,
                                DaemonAPI.StartHelperRequest(token: token, prompt: prompt,
                                                             runtime: runtime, model: model,
-                                                            permissionMode: permissionMode),
+                                                            permissionMode: permissionMode,
+                                                            worktree: worktree),
                                fallback: "Started.")
         case .stop(let agentID):
             return await relay(DaemonAPI.Method.agentsStopHelper,

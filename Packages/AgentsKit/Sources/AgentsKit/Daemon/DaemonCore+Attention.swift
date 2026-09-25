@@ -88,7 +88,7 @@ extension DaemonCore {
         // An archived project is one the person has said they are done with: nothing
         // in it wants anybody, however its agents ended (2026-09-21, found on the walk).
         let archived = Set(projectRecords().values.filter(\.isArchived).map(\.folder))
-        func inALiveProject(_ agent: Agent) -> Bool { !archived.contains(Project.standardize(agent.cwd)) }
+        func inALiveProject(_ agent: Agent) -> Bool { !archived.contains(agent.projectFolder) }
         for (id, pending) in pendingPermissions {
             guard let agent = agents[pending.agentID], inALiveProject(agent) else { continue }
             found.append(need(.permission(id), for: agent, kind: .permission,
@@ -118,9 +118,9 @@ extension DaemonCore {
     private func need(_ id: NeedID, for agent: Agent, kind: Need.Kind, wanted: String, now: Date) -> Need {
         let raisedAt = needRaisedAt[id] ?? now
         needRaisedAt[id] = raisedAt
-        return Need(id: id, agentID: agent.id, folder: Project.standardize(agent.cwd), kind: kind,
+        return Need(id: id, agentID: agent.id, folder: agent.projectFolder, kind: kind,
                     raisedAt: raisedAt,
-                    headline: Headline(h1: agent.cwd.lastPathComponent,
+                    headline: Headline(h1: agent.projectFolder.lastPathComponent,
                                        h2: agent.title ?? "",
                                        h3: wanted).truncating())
     }

@@ -223,7 +223,10 @@ struct PromptBar: View {
                 // Both of these are settled once the agent exists, so they are
                 // labels rather than controls. They still sit on raised paper: the
                 // transcript scrolls under this row.
-                Label(agent.cwd.lastPathComponent, systemImage: "folder")
+                // In a worktree, the worktree is the place worth naming: its folder
+                // is the project's name again, or a subfolder of it (030).
+                Label(agent.worktree?.name ?? agent.cwd.lastPathComponent,
+                      systemImage: agent.worktree == nil ? "folder" : "arrow.triangle.branch")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -259,6 +262,10 @@ struct PromptBar: View {
                 // which is not something a prompt on this page should be able to do.
                 .disabled(folderIsFixed)
                 .help(folderHelp)
+
+                if model.draftWorktrees.isRepository {
+                    worktreeChooser
+                }
 
                 Spacer(minLength: 8)
 
@@ -881,9 +888,67 @@ struct PromptBar: View {
         if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             model.draftRuntimeID = model.availableRuntimes.first?.id
         }
-        if model.draftCwd == nil { model.draftCwd = model.agents.first?.cwd }
+        if model.draftCwd == nil { model.draftCwd = model.agents.first?.projectFolder }
         if model.draftCwd != nil, model.draftRuntimeID != nil, model.draftOptions.isEmpty {
             Task { await model.loadDraftOptions() }
+        }
+        if model.draftCwd != nil { Task { await model.loadDraftWorktrees() } }
+    }
+
+    // MARK: Where in the project (030)
+
+    /// Project folder, a new worktree, or one already there. Only on a repository;
+    /// only before the agent exists, since where an agent works is settled at its start.
+    private var worktreeChooser: some View {
+        let listed = model.draftWorktrees
+        return SelectCapsule(name: "Worktree", title: worktreeTitle) { dismiss in
+            SelectChoice(title: "Project folder",
+                         description: "Work alongside anything else here",
+                         isChosen: model.draftWorktree == nil) {
+                model.chooseWorktree(nil)
+                dismiss()
+            }
+            SelectChoice(title: "New worktree",
+                         description: listed.canMakeNew ? "A new branch from the last commit here"
+                                                        : listed.whyNot,
+                         isChosen: model.draftWorktree == .new) {
+                model.chooseWorktree(.new)
+                dismiss()
+            }
+            .disabled(!listed.canMakeNew)
+            let others = listed.worktrees.filter { !$0.isProjectFolder }
+            if !others.isEmpty {
+                Divider().padding(.vertical, 4)
+                ForEach(others) { worktree in
+                    SelectChoice(title: worktree.name,
+                                 description: worktreeDescription(worktree),
+                                 isChosen: model.draftWorktree == .existing(worktree.root)) {
+                        model.chooseWorktree(.existing(worktree.root))
+                        dismiss()
+                    }
+                    .disabled(!worktree.exists)
+                }
+            }
+        }
+    }
+
+    /// Its branch and who is in it, so a worktree someone is already working in is
+    /// chosen knowing that.
+    private func worktreeDescription(_ worktree: DaemonAPI.WorktreeSummary) -> String {
+        guard worktree.exists else { return "Missing" }
+        let branch = worktree.branch ?? "detached"
+        switch worktree.agents.count {
+        case 0: return branch
+        case 1: return "\(branch) · 1 agent working"
+        case let count: return "\(branch) · \(count) agents working"
+        }
+    }
+
+    private var worktreeTitle: String {
+        switch model.draftWorktree {
+        case nil: "Project folder"
+        case .new: "New worktree"
+        case .existing(let root): root.lastPathComponent
         }
     }
 

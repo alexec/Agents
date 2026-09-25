@@ -17,7 +17,7 @@ extension DaemonCore {
     /// Every project, named, stamped and counted.
     public func allProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
-        let agentsByFolder = Dictionary(grouping: agents.values) { Project.standardize($0.cwd) }
+        let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
 
         // The union: every folder an agent is in, and every folder we kept a record for.
         var folders = Set(agentsByFolder.keys)
@@ -147,7 +147,7 @@ extension DaemonCore {
                                message: "\(standardized.path) is not a project.")
         }
         let live = agents.values
-            .filter { Project.standardize($0.cwd) == standardized && $0.state.holdsRuntime }
+            .filter { $0.projectFolder == standardized && $0.state.holdsRuntime }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
         if !live.isEmpty {
             let names = live.map { $0.title ?? "an agent" }

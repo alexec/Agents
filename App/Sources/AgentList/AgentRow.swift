@@ -57,6 +57,11 @@ struct AgentRow: View {
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
+                    // Working in a worktree (030): named, because with two agents in
+                    // one project the worktree is how you tell whose changes are whose.
+                    if let worktree = agent.worktree {
+                        WorktreeBadge(worktree: worktree, isGone: !worktreeIsThere(worktree))
+                    }
                 }
 
                 // The agent's own account of its last turn, and nothing else. This line
@@ -94,6 +99,10 @@ struct AgentRow: View {
         }
     }
 
+    private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
+        FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+    }
+
     /// Whether the daemon is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }
 
@@ -101,7 +110,7 @@ struct AgentRow: View {
     /// the file has since gone, so the mark never disappears with it.
     private var startedByWorkflowName: String? {
         guard let id = agent.startedByWorkflow else { return nil }
-        return model.workflows(in: agent.cwd).first { $0.workflow.workflowID == id }?.workflow.name ?? id
+        return model.workflows(in: agent.projectFolder).first { $0.workflow.workflowID == id }?.workflow.name ?? id
     }
 }
 
@@ -166,5 +175,32 @@ struct StatusIcon: View {
         case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
         }
+    }
+}
+
+/// Which worktree an agent works in: a branch glyph and the worktree's name, quiet
+/// enough to sit after a title (030).
+struct WorktreeBadge: View {
+    let worktree: AgentWorktree
+    var isGone = false
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "arrow.triangle.branch")
+            Text(worktree.name)
+                .lineLimit(1)
+                .strikethrough(isGone)
+        }
+        .appText(.fine)
+        .foregroundStyle(.tertiary)
+        .help(help)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isGone ? "in worktree \(worktree.name), which is gone" : "in worktree \(worktree.name)")
+    }
+
+    private var help: String {
+        let path = worktree.root.path(percentEncoded: false)
+        let branch = worktree.branch ?? "detached"
+        return isGone ? "\(branch) — \(path), which is not there any more" : "\(branch) — \(path)"
     }
 }

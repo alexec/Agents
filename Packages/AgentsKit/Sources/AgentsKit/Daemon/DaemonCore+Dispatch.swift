@@ -245,6 +245,18 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await archiveHelper(request))])
 
+            case DaemonAPI.Method.worktreesList:
+                let request = try require(params, as: DaemonAPI.WorktreesListRequest.self)
+                return .success(try JSONValue.encoding(await listWorktrees(for: request.folder)))
+
+            case DaemonAPI.Method.worktreesCheck:
+                let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
+                return .success(try JSONValue.encoding(try await checkWorktreeRemoval(request)))
+
+            case DaemonAPI.Method.worktreesRemove:
+                let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
+                return .success(try JSONValue.encoding(try await removeWorktree(request)))
+
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)
                 return .success(["note": .string(try listHelpers(request))])

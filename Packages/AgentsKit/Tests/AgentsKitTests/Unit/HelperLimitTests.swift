@@ -14,6 +14,16 @@ struct HelperLimitTests {
         return agent
     }
 
+    /// A helper working in a worktree still takes one of its project's places (030).
+    @Test func aHelperInAWorktreeCountsInItsProject() {
+        let root = project.appending(path: ".agents/worktrees/x")
+        var inWorktree = helper(.running, in: root)
+        inWorktree.worktree = AgentWorktree(name: "x", root: root, branch: "agents/x",
+                                            project: project, base: "main", madeByApp: true)
+        #expect(HelperLimit.placesInUse(in: project, agents: [inWorktree]) == 1)
+        #expect(HelperLimit.placesInUse(in: root, agents: [inWorktree]) == 0)
+    }
+
     @Test func threeIsTheLimit() {
         #expect(HelperLimit.perProject == 3)
     }

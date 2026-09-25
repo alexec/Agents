@@ -130,6 +130,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// starter's run can end long before this agent does, and a depth read from it then
     /// would be zero — the loop the chain limit exists to stop, begun again.
     public var chainDepth: Int?
+    /// The worktree this agent was started in, if it was (030). Its project is the
+    /// worktree's project, not its `cwd`.
+    public var worktree: AgentWorktree?
     /// The `requestID` of the start that made this agent, when the caller sent one
     /// (029). Written on the first save, never changed. It is how a start retried after
     /// its reply was lost finds the agent the first attempt made, including across a
@@ -146,6 +149,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var unknownFields: [String: JSONValue]
 
     /// Everywhere this agent may read and write: its folder, and any it was given.
+    /// The project this agent belongs to, as projects compare folders. Its `cwd` is
+    /// where it works; in a worktree those are two different folders (030).
+    public var projectFolder: URL { Project.standardize(worktree?.project ?? cwd) }
+
     public var folderScope: FolderScope { FolderScope(folders: [cwd] + additionalDirectories) }
 
     /// Only `byUser` exists in this feature: nothing archives itself.
@@ -238,6 +245,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
+        // New in 030, and optional: every agent before it works in its project folder.
+        worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
         startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
@@ -298,6 +307,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
         try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
+        try c.encodeIfPresent(worktree, forKey: .worktree)
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
@@ -319,6 +329,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, startRequestID
+        case worktree
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
@@ -359,6 +370,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 startedByRun: UUID? = nil,
                 startedByAgent: UUID? = nil,
                 chainDepth: Int? = nil,
+                worktree: AgentWorktree? = nil,
                 startRequestID: UUID? = nil,
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
@@ -393,6 +405,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.startedByRun = startedByRun
         self.startedByAgent = startedByAgent
         self.chainDepth = chainDepth
+        self.worktree = worktree
         self.startRequestID = startRequestID
         self.restartPickUps = restartPickUps
         self.report = report

@@ -148,11 +148,17 @@ struct ProjectAgentsView: View {
                 // Under the agents: what will happen, after what is happening. See
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
+
+                // Worktrees the app made here, which outlive the agents in them (030).
+                WorktreesSection(folder: folder)
             }
             .chatColumn()
             .padding(.bottom, 28)
         }
         .animation(.default, value: model.agents.map(\.state))
+        // Who is working in which worktree changes when an agent is archived or
+        // brought back, so the list is asked for again then. Not polled.
+        .onChange(of: archived.count) { Task { await model.loadDraftWorktrees() } }
     }
 
     private var hasSessions: Bool {
@@ -245,7 +251,7 @@ struct SectionHeading: View {
 }
 
 /// What the cards under it have in common, and how many there are.
-private struct GroupHeading: View {
+struct GroupHeading: View {
     let title: String
     let count: Int
 

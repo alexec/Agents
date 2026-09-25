@@ -343,7 +343,7 @@ extension DaemonCore {
         // The project is the agent's own folder. There is deliberately no parameter for
         // naming a different one: the token is what makes a call belong to an agent, and
         // that is what scopes this.
-        let project = Project.standardize(agent.cwd)
+        let project = agent.projectFolder
 
         switch request.action {
         case .list:
