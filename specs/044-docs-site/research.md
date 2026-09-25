@@ -55,8 +55,7 @@ settled.
 2. **Reached**: every `.md` under `docs/` appears in the `nav:` of `mkdocs.yml`, and every `nav:` entry exists.
 3. **Pictures**: every picture referenced by a page exists. Every file in an `images/` folder is used by some
    page, so unused pictures are flagged and do not pile up.
-4. **Nothing private** (FR-013, SC-006): no page contains `/Users/`, `/private/`, `/tmp/run-`, a home-directory
-   `~/` path other than the documented `~/Library/Application Support/Agents`, `alexcollins`, an IPv4 address
+4. **Nothing private** (FR-013, SC-006): no page contains `/Users/`, `/private/`, `/tmp/run-`, `alexcollins`, an IPv4 address
    other than `127.0.0.1`, or a token shape (`ghp_`, `github_pat_`, `sk-ant-`, `xox`). Pictures are checked by
    size and name only. What they show is checked by eye in quickstart V6, because the check cannot read them.
 

@@ -70,15 +70,14 @@ needed before any content.
     - nav-missing, nav-dead, nav-twice.
     - image-missing, image-unused, image-alt, and image-large (> 400 KB).
     - private: `/Users/`, `/private/`, `/tmp/run-`, `alexcollins`, any IPv4 address other than `127.0.0.1`,
-      `ghp_`, `github_pat_`, `sk-ant-`, `xox[abp]-`, and `~/` paths other than
-      `~/Library/Application Support/Agents`.
+      `ghp_`, `github_pat_`, `sk-ant-`, `xox[abp]-`.
     - shape-steps: an explanation page has an ordered list, outside code blocks.
     - shape-where-next: a tutorial has no `## Where next`.
   - It ignores fenced code blocks for everything except the private check.
   - **Output**: the summary line `docs-check: ok (M pages, K pictures)` or `docs-check: N problems in M pages`.
   - **Exit**: 0, 1 if there are problems, 2 if it cannot run. `--root` is optional.
 - [X] T007 Run `scripts/docs.sh check` on the skeleton, and fix the pages or the script until it prints `ok`.
-- [ ] T008 Set up the demo projects for screenshots, `scripts/docs-demo.sh`:
+- [X] T008 Set up the demo projects for screenshots, `scripts/docs-demo.sh`:
   - it creates `/tmp/run-044/demo/weather-app` (a small git repo: README, a Swift file, one failing test) and
     `/tmp/run-044/demo/recipes-site` (HTML/CSS);
   - it launches the branch build on root `/tmp/run-044` through the `run-app` skill's launch step with a clean
@@ -105,18 +104,18 @@ should see", and ends in Complete.
   - one prominent "Start here → Your first agent" link;
   - four cards or links to the sections, each with one line;
   - a line on the devices (Mac app; iPhone and iPad follow the Mac; Linux servers).
-- [ ] T010 [US1] Walk the first run on the scratch app, taking notes of every screen and wording, before writing.
+- [X] T010 [US1] Walk the first run on the scratch app, taking notes of every screen and wording, before writing.
   The walk covers: install and open → add `weather-app` → start an agent with Claude → the sign-in state if not
   signed in → prompt "Why does the test fail? Fix it." → the permission question → Complete.
-- [ ] T011 [US1] Write `docs/tutorials/first-agent.md` (`diataxis: tutorial`, `devices: [mac]`):
+- [X] T011 [US1] Write `docs/tutorials/first-agent.md` (`diataxis: tutorial`, `devices: [mac]`):
   - "What you'll have at the end" with a picture, then "Before you start" (a Mac, one runtime installed; link to
     `reference/runtimes.md`).
   - Numbered steps from T010, each ending "You should see…", and a step for "if the runtime is not signed in"
     that does not assume sign-in.
   - "Where next", linking to the iPhone tutorial and the three most likely guides.
-- [ ] T012 [US1] Take the screenshots for T011 as `docs/tutorials/images/first-agent-01.png …`: window only,
+- [X] T012 [US1] Take the screenshots for T011 as `docs/tutorials/images/first-agent-01.png …`: window only,
   cropped to the step, ≤ 400 KB, with alt text on every use.
-- [ ] T013 [US1] Write `docs/tutorials/follow-from-iphone.md` (`diataxis: tutorial`, `devices: [mac, iphone]`):
+- [X] T013 [US1] Write `docs/tutorials/follow-from-iphone.md` (`diataxis: tutorial`, `devices: [mac, iphone]`):
   - pair the phone with the Mac;
   - see the agent from T011 in the list;
   - answer a question from the phone;

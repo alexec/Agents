@@ -59,6 +59,7 @@ nav:
   - Tutorials:
       - tutorials/index.md
       - tutorials/first-agent.md
+      - tutorials/follow-from-iphone.md
   - How-to guides:
       - how-to/index.md
   - Reference:

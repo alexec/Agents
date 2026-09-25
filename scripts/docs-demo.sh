@@ -19,7 +19,8 @@ build=""
 [ "${1:-}" = "--no-build" ] && build="--no-build"
 
 cd "$root"
-eval "$("$S/launch.sh" --slug 044 $build)"
+launched=$("$S/launch.sh" --slug 044 $build) || exit 1
+eval "$launched"
 
 # weather-app: a small Swift package with one failing test, for "Your first agent".
 w="$demo/weather-app"

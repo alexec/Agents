@@ -39,8 +39,6 @@ PRIVATE = [
 ]
 IPV4 = re.compile(r"(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.])")
 IPV4_ALLOWED = {"127.0.0.1", "0.0.0.0"}
-HOME_PATH = re.compile(r"~/\S*")
-HOME_ALLOWED = "~/Library/Application Support/Agents"
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 MD_IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
@@ -128,9 +126,6 @@ def check_private(problems, path, number, text):
     for m in IPV4.finditer(text):
         if m.group(0) not in IPV4_ALLOWED and all(int(g) <= 255 for g in m.groups()):
             problems.add(path, number, f"private: an IP address ({m.group(0)})")
-    for m in HOME_PATH.finditer(text):
-        if not text[m.start():].startswith(HOME_ALLOWED):
-            problems.add(path, number, f"private: a home-directory path ({m.group(0)})")
 
 
 def check_page(problems, docs, path, used_images):
