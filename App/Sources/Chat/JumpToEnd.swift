@@ -23,6 +23,7 @@ struct JumpToEnd: View {
             }
             .padding(.horizontal, hasNewBelow ? 12 : 9)
             .padding(.vertical, 7)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .appText(.fine)
