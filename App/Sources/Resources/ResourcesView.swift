@@ -14,6 +14,11 @@ struct ResourcesView: View {
     @Environment(AppModel.self) private var model
 
     private var snapshot: DaemonAPI.LeaseSnapshot { model.leases ?? .empty }
+    /// Groups whose free rows are all showing. A Mac with Xcode has twenty-odd
+    /// simulators, and a page that lists every free one pushes the browsers below the
+    /// fold for no reason: what anyone comes here to see is what is held.
+    @State private var unfolded: Set<ResourceKind> = []
+    private static let freeShown = 4
 
     /// The page's groups, always in this order. A group with nothing in it is not
     /// drawn: a Mac without Xcode has no simulators, and names only exist while leased.
@@ -36,11 +41,22 @@ struct ResourcesView: View {
                             Text(group.title.uppercased())
                                 .appText(.fine).fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
+                            let (shown, folded) = fold(group.rows)
                             VStack(spacing: 0) {
-                                ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, state in
+                                ForEach(Array(shown.enumerated()), id: \.element.id) { index, state in
                                     if index > 0 { Divider().padding(.leading, 32) }
                                     ResourceRow(state: state, at: snapshot.at)
                                         .id(state.name)
+                                }
+                                if folded > 0, let kind = group.rows.first?.kind {
+                                    Divider().padding(.leading, 32)
+                                    Button("Show \(folded) more free") { unfolded.insert(kind) }
+                                        .buttonStyle(.plain)
+                                        .appText(.fine)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
                             .padding(.vertical, 4)
@@ -56,6 +72,19 @@ struct ResourcesView: View {
         }
         .navigationTitle("Resources")
         .task { await model.refreshLeases() }
+    }
+
+    /// Every held or awaited row, and the first few free ones unless the group has been
+    /// unfolded. The rest are counted, not hidden without a word.
+    private func fold(_ rows: [DaemonAPI.ResourceState]) -> (shown: [DaemonAPI.ResourceState], folded: Int) {
+        guard let kind = rows.first?.kind, !unfolded.contains(kind) else { return (rows, 0) }
+        var freeSoFar = 0
+        let shown = rows.filter { state in
+            if state.lease != nil || !state.line.isEmpty || state.name == model.resourcesFocus { return true }
+            freeSoFar += 1
+            return freeSoFar <= Self.freeShown
+        }
+        return (shown, rows.count - shown.count)
     }
 
     /// To the resource a chat's capsule named, once.

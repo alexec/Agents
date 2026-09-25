@@ -471,9 +471,14 @@ extension DaemonCore {
             rows.append(row(name, kind: entry.kind, display: entry.displayName, gone: gone))
         }
         let order: [ResourceKind: Int] = [.screen: 0, .simulator: 1, .browser: 2, .named: 3]
+        // By kind, then as Finder sorts names: "iPhone 9" before "iPhone 17".
         rows.sort {
-            (order[$0.kind] ?? 9, $0.displayName.lowercased(), $0.name.key)
-                < (order[$1.kind] ?? 9, $1.displayName.lowercased(), $1.name.key)
+            let (a, b) = (order[$0.kind] ?? 9, order[$1.kind] ?? 9)
+            if a != b { return a < b }
+            switch $0.displayName.localizedStandardCompare($1.displayName) {
+            case .orderedSame: return $0.name < $1.name
+            case let result: return result == .orderedAscending
+            }
         }
         return DaemonAPI.LeaseSnapshot(resources: rows, at: at)
     }

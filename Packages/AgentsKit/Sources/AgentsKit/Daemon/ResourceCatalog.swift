@@ -114,7 +114,13 @@ public actor ResourceCatalog: ResourceFinding {
                                      aliases: [device.udid, display])
             }
         }
-        .sorted { $0.displayName == $1.displayName ? $0.name < $1.name : $0.displayName < $1.displayName }
+        // As Finder sorts: "iPad" before "Twin", and "iPhone 9" before "iPhone 17".
+        .sorted {
+            switch $0.displayName.localizedStandardCompare($1.displayName) {
+            case .orderedSame: return $0.name < $1.name
+            case let order: return order == .orderedAscending
+            }
+        }
     }
 
     /// "com.apple.CoreSimulator.SimRuntime.iOS-26-0" → "iOS 26.0".
@@ -140,7 +146,7 @@ public actor ResourceCatalog: ResourceFinding {
             let display = app.deletingPathExtension().lastPathComponent
             return FoundResource(name: name, kind: .browser, displayName: display, aliases: [display])
         }
-        .sorted { $0.displayName < $1.displayName }
+        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 }
 
