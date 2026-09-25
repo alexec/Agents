@@ -1,0 +1,21 @@
+# A small shop's till, for the colour samples (041).
+name: till
+version: 1.4.0
+private: true
+float: 150.00
+mask: 0xFF
+currencies:
+  - GBP
+  - EUR
+hours:
+  monday: [9, 17]
+  sunday: null
+motto: "Mind the step"
+notes: |
+  Opens at nine.
+  Closes at five.
+anchors:
+  base: &base
+    tax: 0.2
+  shop:
+    <<: *base

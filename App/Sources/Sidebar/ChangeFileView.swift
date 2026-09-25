@@ -1,4 +1,5 @@
 import AgentsKit
+import CodeText
 import SwiftUI
 
 /// One file in the Changes pane: every edit the agent made to it, in order (035).
@@ -27,6 +28,12 @@ struct ChangeFileView: View {
     /// The whole file as it stands, asked for the first time Whole file is chosen.
     @State private var whole: [DiffLine]?
     @State private var wholeProblem: String?
+    /// Whole file as diff rows, worked out once when it arrives rather than on every pass
+    /// of `body`: a long file is thousands of rows and word marks (041).
+    @State private var wholeRows: WholeRows?
+    /// The change Next and Previous last went to, and where to scroll for it (041 FR-012).
+    @State private var stop: Int?
+    @State private var scrollTarget: Int?
 
     /// More changed lines than this and the edits wait to be asked for.
     static let drawLimit = 2_000
@@ -87,6 +94,7 @@ struct ChangeFileView: View {
         do {
             whole = try await model.changeDetail(for: agent.id, path: selection.path, whole: true).whole
             wholeProblem = whole == nil ? "The whole file can't be shown." : nil
+            wholeRows = whole.map { WholeRows($0, path: selection.path) }
         } catch {
             if whole == nil { wholeProblem = "The whole file could not be read." }
         }
@@ -125,14 +133,22 @@ struct ChangeFileView: View {
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView([.vertical, .horizontal]) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(whole.enumerated()), id: \.offset) { _, line in
-                            WholeLine(line: line)
+            } else if let wholeRows {
+                ScrollViewReader { reader in
+                    ScrollView([.vertical, .horizontal]) {
+                        // Changes first, the rest folded: a long file with two changed
+                        // lines is those two lines and their neighbours (041 US3).
+                        CodeRows(rows: wholeRows.rows, language: wholeRows.language,
+                                 oldText: wholeRows.oldText, newText: wholeRows.newText,
+                                 numbered: true, lazy: true)
+                            .padding(.vertical, 8)
+                    }
+                    .onChange(of: scrollTarget) {
+                        guard let scrollTarget else { return }
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            reader.scrollTo(scrollTarget, anchor: .top)
                         }
                     }
-                    .padding(.vertical, 8)
                 }
                 .textSelection(.enabled)
             }
@@ -164,6 +180,36 @@ struct ChangeFileView: View {
         }
     }
 
+    /// Previous and Next change, in Whole file (041 FR-012). Folds only ever hide
+    /// unchanged lines, so a change is never inside one and is always there to go to.
+    private func stepButtons(_ stops: [Int]) -> some View {
+        let current = stop.flatMap { stops.firstIndex(of: $0) }
+        return HStack(spacing: 2) {
+            Button {
+                go(to: current.map { stops[max($0 - 1, 0)] } ?? stops[0])
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .help("Previous change")
+            .disabled(current == nil || current == 0)
+            Button {
+                go(to: current.map { stops[min($0 + 1, stops.count - 1)] } ?? stops[0])
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .help("Next change")
+            .disabled(current == stops.count - 1)
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private func go(to row: Int) {
+        stop = row
+        // Set to nil first, so going to the same change twice still scrolls.
+        scrollTarget = nil
+        DispatchQueue.main.async { scrollTarget = row }
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
             Button {
@@ -192,6 +238,9 @@ struct ChangeFileView: View {
                 }
             }
             Spacer(minLength: 8)
+            if view == .whole, let stops = wholeRows?.stops, !stops.isEmpty {
+                stepButtons(stops)
+            }
             if file?.state != .deleted {
                 Button("Open in Files") { openInFiles() }
                     .buttonStyle(.borderless)
@@ -298,34 +347,27 @@ struct ChangeFileView: View {
     }
 }
 
-/// One line of Whole file: its number, its mark, its text.
-private struct WholeLine: View {
-    let line: DiffLine
+/// Whole file as diff rows, with the two texts they are coloured from and where each
+/// change starts (041 US3).
+private struct WholeRows {
+    let rows: [DiffRow]
+    let oldText: String
+    let newText: String
+    let stops: [Int]
+    let language: CodeLanguage?
 
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            // A space, not nothing, where a removed line has no number: an empty text
-            // is shorter than a line and opened a gap under every removed one.
-            Text(line.newLine.map(String.init) ?? " ")
-                .frame(width: 40, alignment: .trailing)
-                .foregroundStyle(.quaternary)
-            Text(mark)
-                .foregroundStyle(.tertiary)
-            Text(line.text.isEmpty ? " " : line.text)
-                .foregroundStyle(line.kind == .removed ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
-                .strikethrough(line.kind == .removed)
-                .fontWeight(line.kind == .added ? .semibold : .regular)
-        }
-        .appText(.code)
-        .fixedSize()
-        .padding(.horizontal, 8)
-    }
-
-    private var mark: String {
-        switch line.kind {
-        case .added: return "+"
-        case .removed: return "-"
-        case .context: return " "
-        }
+    init(_ lines: [DiffLine], path: String) {
+        rows = LineDiff.rows(whole: lines.map { line in
+            let kind: DiffRow.Kind = switch line.kind {
+            case .context: .context
+            case .added: .added
+            case .removed: .removed
+            }
+            return (kind: kind, text: line.text, newLine: line.newLine)
+        })
+        oldText = rows.filter { $0.kind != .added }.map(\.text).joined(separator: "\n")
+        newText = rows.filter { $0.kind != .removed }.map(\.text).joined(separator: "\n")
+        stops = LineDiff.changeStops(rows)
+        language = CodeLanguage.detect(path: path, firstLine: nil)
     }
 }

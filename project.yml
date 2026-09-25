@@ -45,6 +45,11 @@ packages:
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     from: 1.2.0
+  # Code coloured and diffed (041). The two apps link this; agentsd does not, for the
+  # same reason it has no SwiftTerm: the daemon moves text and reads none of it, and
+  # the grammars are seventeen megabytes it has no use for.
+  CodeText:
+    path: Packages/CodeText
 targets:
   Agents:
     type: application
@@ -67,6 +72,7 @@ targets:
     dependencies:
       - package: AgentsKit
       - package: SwiftTerm
+      - package: CodeText
       # The helper goes in the bundle, so there is one thing to build, one thing to
       # sign, and nothing for anyone to install.
       - target: agentsd
@@ -125,6 +131,7 @@ targets:
       # `LocalProcess` half is macOS-only, so no process or PTY reaches the phone, and
       # the shell it draws is the one the Mac's daemon holds.
       - package: SwiftTerm
+      - package: CodeText
       # The notification service extension: the banner's words are assembled on the
       # device, from a sealed push (021 T068).
       - target: RemoteNotify
