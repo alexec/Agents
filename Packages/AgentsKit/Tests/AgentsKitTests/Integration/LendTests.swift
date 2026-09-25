@@ -20,13 +20,14 @@ struct LendTests {
         let folder: URL
     }
 
-    private func setUp(server: Bool = true, ownSignIn: Bool = false) async throws -> Setup {
+    private func setUp(server: Bool = true, ownSignIn: Bool = false,
+                       script: FakeACPAgent.Script = .init()) async throws -> Setup {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("lend-\(UUID().uuidString)")
         let locations = StoreLocations(root: root)
         try locations.createDirectories()
         let folder = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let launcher = FakeLauncher()
+        let launcher = FakeLauncher(script: script)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
         await core.loadFromDisk()
@@ -165,5 +166,35 @@ struct LendTests {
             guard let data = try? Data(contentsOf: file) else { continue }
             #expect(!String(decoding: data, as: UTF8.self).contains("LENDTEST"), "\(file.lastPathComponent)")
         }
+    }
+
+    /// What claude-agent-acp 0.81.2 answered a made-up token with (walk/spike.md T009).
+    static let refusal = JSONRPCError(
+        code: -32603, message: "Internal error: Failed to authenticate. API Error: 401 OAuth access token is invalid.",
+        data: ["errorKind": "authentication_failed"])
+
+    @Test func aRefusedTokenStopsTheAgentSayingSoAndNotStoppedAnswering() async throws {
+        let setup = try await setUp(script: .init(promptError: Self.refusal))
+        let window = UUID(), requestID = UUID()
+        await offer(setup, on: window)
+        _ = await lend(setup, Self.token, on: window)
+        guard case .success(let made) = await start(setup, on: window, requestID: requestID),
+              let id = made.stringValue.flatMap(UUID.init(uuidString:)) else { Issue.record("start"); return }
+        var notes: [String] = []
+        for _ in 0..<50 {
+            notes = try await setup.core.transcript(.init(agentID: id, before: nil, limit: 500)).entries.compactMap {
+                if case .runtimeNote(let text) = $0.kind { return text } else { return nil }
+            }
+            if notes.contains(where: { $0.contains("refused") }) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(notes.contains("Claude refused the token in Settings. Replace it in Settings ▸ Servers."))
+        #expect(!notes.contains { $0.contains("stopped answering") })
+    }
+
+    @Test func onlyAnAuthenticationFailureCounts() {
+        #expect(DaemonCore.isAuthenticationFailure(Self.refusal))
+        #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32000, message: "Authentication required")))
+        #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32603, message: "Internal error: overloaded")))
     }
 }

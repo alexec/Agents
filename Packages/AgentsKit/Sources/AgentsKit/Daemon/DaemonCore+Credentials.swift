@@ -99,6 +99,22 @@ extension DaemonCore {
         return [:]
     }
 
+    /// A turn that failed because the provider refused the sign-in (043, R7). What the
+    /// adapter says, as recorded in walk/spike.md: `-32603` with
+    /// `data.errorKind == "authentication_failed"`, for a subscription token and an API key
+    /// alike. Only on a server; the Mac's own sign-in is 037's business.
+    func credentialRefusal(agentID: UUID, error: any Error) -> DaemonAPI.CredentialRefused? {
+        guard !exitsWhenIdle, let agent = agents[agentID], Self.lendableRuntimes.contains(agent.runtimeID),
+              let error = error as? JSONRPCError, Self.isAuthenticationFailure(error) else { return nil }
+        let lent = lentCredentials.values.contains { $0[agent.runtimeID] != nil }
+        return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: lent)
+    }
+
+    static func isAuthenticationFailure(_ error: JSONRPCError) -> Bool {
+        if case .object(let data)? = error.data, data["errorKind"] == .string("authentication_failed") { return true }
+        return error.message.contains("Failed to authenticate")
+    }
+
     static func wanted(_ runtimeID: String, offered: Bool) -> JSONRPCError {
         let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
         return JSONRPCError(code: DaemonAPI.Failure.credentialWanted,

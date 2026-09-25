@@ -252,6 +252,9 @@ public enum DaemonAPI {
         public static let agentChanged = "agent/changed"
         public static let agentEntry = "agent/entry"
         public static let agentPermission = "agent/permission"
+        /// A server's runtime refused the credential it was started with, or found none
+        /// (043, FR-016). `CredentialRefused`.
+        public static let credentialRefused = "credentials/refused"
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
         public static let agentUsage = "agent/usage"
@@ -2076,6 +2079,20 @@ public extension DaemonAPI {
             self.runtime = runtime
             self.kind = secret.kind
             self.secret = secret.reveal()
+        }
+    }
+
+    /// `credentials/refused` (043): which agent stopped, and whether it was the token this
+    /// window lent (`lent`) or the server's own sign-in that was refused.
+    struct CredentialRefused: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var runtime: String
+        public var lent: Bool
+
+        public init(agentID: UUID, runtime: String, lent: Bool) {
+            self.agentID = agentID
+            self.runtime = runtime
+            self.lent = lent
         }
     }
 

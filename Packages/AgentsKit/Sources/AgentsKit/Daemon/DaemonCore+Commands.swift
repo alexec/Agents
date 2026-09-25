@@ -1079,7 +1079,15 @@ extension DaemonCore {
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
-        await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
+        if let refused = credentialRefusal(agentID: agentID, error: error) {
+            // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
+            await record(.runtimeNote(refused.lent
+                ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
+                : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
+            broadcast(DaemonAPI.Notification.credentialRefused, refused)
+        } else {
+            await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
+        }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
         await move(agentID, on: .processDied)
         await releaseRuntime(for: agentID)

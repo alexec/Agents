@@ -42,4 +42,13 @@ extension AppModel {
         tokenAsk = nil
         ask.answer.resume(returning: saved)
     }
+
+    /// A server spent money: a model answered, so whatever sign-in it was lent worked.
+    /// The only runtime lent anything is Claude (D3), and only where it may be (043, FR-011).
+    func noteServerSpent(_ id: HostID) {
+        guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false),
+              let record = credentials.record("claude"),
+              (record.lastWorked ?? .distantPast) < Date().addingTimeInterval(-60) else { return }
+        credentials.markWorked("claude")
+    }
 }
