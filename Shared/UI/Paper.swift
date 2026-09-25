@@ -206,7 +206,12 @@ struct PaperProminentButtonStyle: ButtonStyle {
             // to attach and dictate — is the same size as they are.
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            .background(Paper.ink.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
+            // Inside `.paper`'s hairline rather than out to where it is drawn. The same
+            // outer size filled edge to edge reads a size larger than a button whose
+            // edge is a line, and send sat beside two of those looking wider than them.
+            .background(Paper.ink.opacity(configuration.isPressed ? 0.8 : 1),
+                        in: Capsule().inset(by: 1))
+            .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Capsule())
     }

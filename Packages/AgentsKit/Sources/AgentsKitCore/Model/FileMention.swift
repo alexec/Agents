@@ -59,6 +59,7 @@ extension FileMention {
                                                   includingPropertiesForKeys: [.isDirectoryKey],
                                                   options: [.skipsHiddenFiles, .skipsPackageDescendants])
             else { continue }
+            let resolved = Self.realPath(folder)
             var seen = 0
             for case let url as URL in walker {
                 seen += 1
@@ -74,15 +75,29 @@ extension FileMention {
                     }
                     continue
                 }
-                let relative = url.path.hasPrefix(folder.path)
-                    ? String(url.path.dropFirst(folder.path.count + 1))
-                    : url.path
+                // The walker hands back resolved paths, so a folder reached through a
+                // link (`/tmp`, `/var`) is matched by its resolved form too; otherwise
+                // the whole path is shown where the part under the folder belongs.
+                let relative = [folder.path, resolved.path]
+                    .first { url.path.hasPrefix($0 + "/") }
+                    .map { String(url.path.dropFirst($0.count + 1)) }
+                    ?? url.path
                 guard needle.isEmpty || relative.lowercased().contains(needle) else { continue }
                 found.append(FileMention(url: url, relativePath: relative))
                 if found.count >= limit { return ranked(found, term: needle) }
             }
         }
         return ranked(found, term: needle)
+    }
+
+    /// The folder as the walker will report it. Not `resolvingSymlinksInPath`, which
+    /// deliberately turns `/private/var` back into `/var` — the opposite of what the
+    /// walker does.
+    private static func realPath(_ folder: URL) -> URL {
+        guard let resolved = folder.withUnsafeFileSystemRepresentation({ $0.flatMap { realpath($0, nil) } })
+        else { return folder }
+        defer { free(resolved) }
+        return URL(filePath: String(cString: resolved))
     }
 
     /// What starts with the term comes before what merely contains it, and a match on

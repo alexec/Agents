@@ -22,8 +22,14 @@ struct ChatView: View {
             if let agent {
                 ZStack(alignment: .bottom) {
                     Transcript(agent: agent, bottomInset: formHeight)
+                        // Over the chat rather than in the toolbar, whose trailing end
+                        // is above the sidebar whenever the sidebar is open. The
+                        // transcript scrolls on under it, as it does under the prompt.
+                        .safeAreaInset(edge: .top, spacing: 0) { actions(for: agent) }
                     form
                 }
+                // Back to the project the way Safari goes back a page.
+                .swipeBack { model.selection = nil }
             } else {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
@@ -37,25 +43,43 @@ struct ChatView: View {
         }
         .animation(.snappy(duration: 0.28), value: model.selection)
         .navigationTitle(agent?.title ?? "New agent")
-        // One click, and back to the project. The context menu on the card has the same
-        // word; this is for when you are already reading the thing you are putting away.
-        .toolbar {
-            // Beside Archive, and unlike it the page stays: someone who stops a chat
-            // that has gone the wrong way wants to keep reading it and say what next.
-            // ⌘. lives on the button, so it exists exactly when the button does.
-            if let agent, model.canStop(agent) {
-                ToolbarItem(placement: .automatic) {
+        .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
+        .environment(\.chatActions, chatActions)
+    }
+
+    /// What the shared chat rows mean on a Mac (033).
+    private var chatActions: ChatActions {
+        ChatActions(
+            // The editor the Mac opens that file with, which is the one the user chose.
+            open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
+            terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
+    }
+
+    /// What can be done to the chat as a whole, at the right-hand edge of its column.
+    @ViewBuilder
+    private func actions(for agent: Agent) -> some View {
+        if model.canStop(agent) || agent.state != .archived {
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                // Beside Archive, and unlike it the page stays: someone who stops a chat
+                // that has gone the wrong way wants to keep reading it and say what next.
+                // ⌘. lives on the button, so it exists exactly when the button does.
+                if model.canStop(agent) {
                     Button {
                         Task { await model.stop(agent.id) }
                     } label: {
                         Label("Stop", systemImage: "stop.circle")
                     }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
                     .keyboardShortcut(".", modifiers: .command)
                     .help("Stop this agent and stay on the chat")
                 }
-            }
-            if let agent, agent.state != .archived {
-                ToolbarItem(placement: .automatic) {
+                // One click, and back to the project. The context menu on the card has
+                // the same word; this is for when you are already reading the thing you
+                // are putting away.
+                if agent.state != .archived {
                     Button {
                         Task {
                             await model.archive(agent.id)
@@ -64,11 +88,14 @@ struct ChatView: View {
                     } label: {
                         Label("Archive", systemImage: "archivebox")
                     }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
                     .help("Archive this chat and go back to the project")
                 }
             }
+            .chatColumn()
+            .padding(.vertical, 8)
         }
-        .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
     }
 
     private var form: some View {

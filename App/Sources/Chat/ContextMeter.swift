@@ -57,7 +57,7 @@ struct ContextMeter: View {
         }
         let left = headroom.money(in: ceiling.currency)
         return agent.isAtCostLimit(under: limits)
-            ? "This agent has reached its cost limit"
+            ? PromptWords.atItsCostLimit
             : "What this agent has cost so far — \(left) left of its limit"
     }
 

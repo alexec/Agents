@@ -1,6 +1,7 @@
 import AgentsKitCore
 import PhotosUI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// What goes with the first prompt: a picture from the library or a file from Files
@@ -19,13 +20,20 @@ struct AttachButton: View {
         Menu {
             Button { choosingPhotos = true } label: { Label("Photo Library", systemImage: "photo") }
             Button { choosingFiles = true } label: { Label("Files", systemImage: "folder") }
+            // A copied screenshot is the picture most often meant. There is no paste
+            // into a text field for pictures on a phone, so it is offered here (033).
+            if UIPasteboard.general.hasImages {
+                Button { pastePicture() } label: { Label("Paste Picture", systemImage: "doc.on.clipboard") }
+            }
         } label: {
             Image(systemName: "paperclip")
-                // Decorative: a glyph in a button, not text.
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 34, height: 34)
+                .appText(.reading).fontWeight(.semibold)
+                .frame(width: 22, height: 22)
         }
-        .glassEffect(.regular.interactive(), in: .circle)
+        // The Mac's paper circle, the size of dictate and send beside it (033).
+        .menuStyle(.button)
+        .buttonStyle(.paper)
+        .buttonBorderShape(.circle)
         .accessibilityLabel("Attach")
         .photosPicker(isPresented: $choosingPhotos, selection: $photos, matching: .images)
         .fileImporter(isPresented: $choosingFiles, allowedContentTypes: [.item],
@@ -38,6 +46,14 @@ struct AttachButton: View {
             photos = []
             Task { for item in picked { await take(item) } }
         }
+    }
+
+    private func pastePicture() {
+        guard let image = UIPasteboard.general.image, let data = image.pngData() else {
+            refusal = "There is no picture to paste."
+            return
+        }
+        add(PhoneAttachment.picture(data, name: "Pasted picture"))
     }
 
     private func take(_ item: PhotosPickerItem) async {

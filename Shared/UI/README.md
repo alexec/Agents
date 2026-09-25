@@ -20,3 +20,20 @@ linking a UI framework.
 
 Before this directory the two apps shared no view code at all, which is exactly how
 `MarkdownText` and `BlocksView` came to disagree about font sizes.
+
+## `Chat/` (033)
+
+The chat itself, drawn by both apps: the transcript rows and the way the pane follows a
+conversation (`ChatTranscript`), the diff, plan and block views, the command and mention
+lists, the option capsules, dictation, and the pieces of the prompt area — the header
+row, the cost-limit banner, the notes where there are no controls, and `PromptWords`
+for every sentence the prompt area says.
+
+What differs by app comes in through `ChatActions` (opening a touched file, a command's
+output, taking a queued prompt back), or through `#if os(...)` inside the shared file
+where the difference is the platform's (a picture's image type, a link's style, a
+thumb-sized target). Each app's prompt field and `MarkdownText` stay its own.
+
+`ConsistencyTests` fails if either app declares its own copy of one of these types again,
+or writes a chat sentence in both apps rather than once here.
+

@@ -86,8 +86,8 @@ final class RemoteModel {
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
-    /// What the reader will allow, as the Mac has it. The phone shows limits and
-    /// never sets them, so there is no setter beside this.
+    /// What the reader will allow, as the Mac has it. The phone shows limits and does
+    /// not set them; it can only let one agent go on past its own (033).
     var costState: DaemonAPI.CostState? { work.costState }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     var hasMoreBefore: Bool { work.hasMoreBefore }
@@ -115,6 +115,10 @@ final class RemoteModel {
     private static let entryHeight: CGFloat = 80
     /// Screens' worth to hold: enough to scroll a couple before going back for more.
     private static let screensHeld: CGFloat = 3
+
+    /// Somebody asked for the end of the conversation: a prompt went. A counter, so two
+    /// asks in a row both land (033, the Mac's own rule).
+    private(set) var scrollToEndToken = 0
 
     /// Told by the conversation, which is the only thing that knows how tall it is.
     func measure(transcriptHeight height: CGFloat) {
@@ -966,7 +970,7 @@ final class RemoteModel {
         }
     }
 
-    /// Say something to an agent that already exists.
+    /// Say something to an agent that already exists, with whatever goes with it.
     ///
     /// Answers whether it went, so the prompt bar can keep what was typed when it did
     /// not. A prompt that could not be delivered and was cleared from the field anyway
@@ -974,21 +978,120 @@ final class RemoteModel {
     ///
     /// An agent mid-turn is not refused — the daemon queues it and gets to it after
     /// this turn. That is the daemon's rule and it is deliberately not second-guessed
-    /// from here.
-    func send(_ what: String, to agentID: UUID) async -> Bool {
+    /// from here. What is attached is checked first, by the same rules as a start from
+    /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
+    func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that was not sent."
             return false
         }
+        let capabilities = promptCapabilities(for: work.agent(agentID)?.runtimeID)
+        if let refused = attachments.lazy.compactMap({ PhoneAttachment.refusal(for: $0, from: capabilities) }).first {
+            problem = refused
+            return false
+        }
+        if let tooMuch = PhoneAttachment.totalRefusal(attachments) {
+            problem = tooMuch
+            return false
+        }
         do {
             try await client.call(DaemonAPI.Method.agentsPrompt,
-                                  DaemonAPI.PromptRequest(agentID: agentID, text: what))
+                                  DaemonAPI.PromptRequest(agentID: agentID, text: what,
+                                                          attachments: attachments))
             return true
         } catch {
             problem = "That did not reach your Mac. What you typed is still there."
             return false
         }
     }
+
+    /// Back to the end of the conversation, as the Mac does when a prompt goes.
+    func scrollToEnd() { scrollToEndToken += 1 }
+
+    // MARK: The agent's own controls (033)
+
+    /// What an option control should read. The same bookkeeping as the Mac's, in the
+    /// kit, so a choice made here shows at once and settles the same way.
+    func chosenOption(_ optionID: String, for agent: Agent, advertised: ConfigOption) -> JSONValue? {
+        work.chosenOption(optionID, for: agent, advertised: advertised)
+    }
+
+    /// Change one of a running agent's options, from the phone. Not `async`, so the
+    /// choice is on the control as the menu closes.
+    func setOption(agentID: UUID, optionID: String, value: JSONValue) {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        let sequence = work.beginOption(agentID: agentID, optionID: optionID, value: value)
+        Task {
+            do {
+                try await client.call(DaemonAPI.Method.agentsSetOption,
+                                      DaemonAPI.SetOptionRequest(agentID: agentID, optionID: optionID, value: value))
+            } catch {
+                problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+            }
+            work.settleOption(agentID: agentID, optionID: optionID, sequence: sequence)
+        }
+    }
+
+    /// What the controls row shows for an agent that exists. Its options came with it,
+    /// so there is nothing to load.
+    func controlsState(for agent: Agent) -> PromptControlsState {
+        PromptControlsState.resolve(agentOptions: agent.advertisedOptions,
+                                    draftOptions: [],
+                                    hasFolder: true,
+                                    hasRuntime: true,
+                                    runtimeName: PromptWords.runtimeName(agent.runtimeID),
+                                    isLoading: false,
+                                    failure: nil)
+    }
+
+    /// Let this one agent carry on past its limit: one more step of its ceiling, the
+    /// same step the Mac takes. No other agent is changed.
+    func letThisAgentGoOn(_ agent: Agent) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            let changed = try await client.call(
+                DaemonAPI.Method.agentsSetCeiling,
+                DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits)),
+                returning: Agent.self)
+            work.upsert(changed)
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// Files under the agent's folders for what follows an `@`, found on the Mac.
+    /// Empty when the Mac is not answering: an empty list is not a problem to show.
+    func mentions(_ term: String, for agentID: UUID) async -> [FileMention] {
+        guard !isStale, !term.isEmpty else { return [] }
+        let found = try? await client.call(DaemonAPI.Method.filesMention,
+                                           DaemonAPI.FileMentionRequest(agentID: agentID, term: term),
+                                           returning: [DaemonAPI.FileMentionDTO].self)
+        return (found ?? []).map(\.mention)
+    }
+
+    /// Take something back off the queue before it goes (033). The same call the Mac
+    /// makes; the row goes on both when the daemon says the agent changed.
+    func unqueue(_ prompt: QueuedPrompt, from agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be taken back."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsUnqueue,
+                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// What a command an agent ran has printed, as far as this phone heard it.
+    func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }

@@ -26,7 +26,7 @@ struct SelectCapsule<Content: View>: View {
             // The capsule is the button, not the words in it: padding put on outside
             // a plain button is paper that takes no clicks.
             .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.vertical, TouchTarget.capsuleVertical)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -46,6 +46,9 @@ struct SelectCapsule<Content: View>: View {
             }
             .padding(6)
             .paperPopover()
+            // A popover on a phone too, not a sheet: choosing a model is a glance,
+            // and a sheet over the conversation is a trip away from it (033).
+            .presentationCompactAdaptation(.popover)
         }
     }
 }
@@ -72,7 +75,7 @@ struct BooleanCapsule: View {
                 Text(name)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.vertical, TouchTarget.capsuleVertical)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -111,11 +114,23 @@ struct SelectChoice: View {
             }
             .contentShape(Rectangle())
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, TouchTarget.rowVertical)
             .background(isHovered ? AnyShapeStyle(Paper.wash) : AnyShapeStyle(.clear),
                         in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
     }
+}
+
+/// The same controls under a thumb as under a pointer, taller where a thumb has to hit
+/// them (033). The look is the Mac's; only the target grows.
+enum TouchTarget {
+    #if os(iOS)
+    static let capsuleVertical: CGFloat = 8
+    static let rowVertical: CGFloat = 10
+    #else
+    static let capsuleVertical: CGFloat = 4
+    static let rowVertical: CGFloat = 5
+    #endif
 }
