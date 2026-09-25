@@ -231,6 +231,9 @@ public actor DaemonCore {
     var eventWaitTimer: Task<Void, Never>?
     /// Drops the oldest events once an hour.
     var eventPruner: Task<Void, Never>?
+    /// Events raised before the workflows were read, held for their new-style triggers
+    /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
+    var deferredEventsForWorkflows: [Event] = []
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit
@@ -332,7 +335,7 @@ public actor DaemonCore {
     ///
     /// So `move` always emits. Whether the emission can be acted on now, or has to
     /// wait a moment, is the workflow layer's business and not the funnel's (FR-014).
-    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int)] = []
+    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int, cause: EventPosition?)] = []
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -661,10 +664,11 @@ public actor DaemonCore {
             let depth = workflowChainDepth(causedBy: agentID)
             // The event first (042): it is what a waiting agent hears, and what the
             // log keeps. Workflows still fire from the line below until US3 moves them.
-            raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason, depth: depth)
+            let cause = raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
+                                         depth: depth)
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
-                             agentID: agentID, depth: depth)
+                             agentID: agentID, depth: depth, causingEvent: cause)
         // An agent that has started has neither finished nor stopped, so it fires
         // nothing. Named rather than folded in with `.running`, because it is not
         // running — it is about to be.
@@ -845,8 +849,8 @@ public actor DaemonCore {
 
         case .elicitationRequested(let request):
             await holdElicitation(request, agentID: agentID)
-            raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
-            workflowsRespond(to: .askedForm, agentID: agentID)
+            let cause = raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
+            workflowsRespond(to: .askedForm, agentID: agentID, causingEvent: cause)
 
         case .elicitationWithdrawn(let requestID):
             await withdrawElicitation(requestID, agentID: agentID)
@@ -882,8 +886,8 @@ public actor DaemonCore {
                       DaemonAPI.PermissionNotification(agentID: agentID, request: request))
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
-            raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
-            workflowsRespond(to: .askedPermission, agentID: agentID)
+            let cause = raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
+            workflowsRespond(to: .askedPermission, agentID: agentID, causingEvent: cause)
             reconsider()
 
         case .processExited:

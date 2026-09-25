@@ -42,34 +42,34 @@ extension DaemonCore {
     // MARK: Agents (042 contracts/catalogue.md)
 
     /// An event about one agent, in its project, with its id and title.
+    @discardableResult
     func raiseAgentEvent(_ name: String, _ agentID: UUID, sentence: String,
-                         details extra: [String: String] = [:], depth: Int? = nil) {
-        guard let agent = agents[agentID] else { return }
-        raise(EventDraft(name: name, at: now(), scope: .project(folder: agent.projectFolder),
+                         details extra: [String: String] = [:], depth: Int? = nil) -> EventPosition? {
+        guard let agent = agents[agentID] else { return nil }
+        return raise(EventDraft(name: name, at: now(), scope: .project(folder: agent.projectFolder),
                          sentence: "\(LeaseWords.agentName(agent.title)) \(sentence)",
                          details: agentDetails(agent).merging(extra) { $1 },
-                         chainDepth: depth ?? workflowChainDepth(causedBy: agentID)))
+                         chainDepth: depth ?? workflowChainDepth(causedBy: agentID))).position
     }
 
     /// `agent.finished`, `agent.stopped` or `agent.failed`. Stopped is somebody or
     /// something choosing to stop it; failed is everything that ended it that nobody
     /// chose. The old `agent-stopped` trigger answers to both (FR-022).
-    func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int) {
-        guard let agent = agents[agentID] else { return }
+    @discardableResult
+    func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int) -> EventPosition? {
+        guard let agent = agents[agentID] else { return nil }
         if next == .finished {
             let outcome = agent.report?.outcome
-            raiseAgentEvent("agent.finished", agentID,
-                            sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",
-                            details: outcome.map { ["outcome": $0.rawValue] } ?? [:], depth: depth)
-            return
+            return raiseAgentEvent("agent.finished", agentID,
+                                   sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",
+                                   details: outcome.map { ["outcome": $0.rawValue] } ?? [:], depth: depth)
         }
         let words = reason?.summary?.lowercased() ?? "stopped"
         if Self.isChosenStop(reason) {
-            raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": words], depth: depth)
-        } else {
-            raiseAgentEvent("agent.failed", agentID, sentence: "ended in an error: \(words).",
-                            details: ["reason": words], depth: depth)
+            return raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": words], depth: depth)
         }
+        return raiseAgentEvent("agent.failed", agentID, sentence: "ended in an error: \(words).",
+                               details: ["reason": words], depth: depth)
     }
 
     static func isChosenStop(_ reason: EndedReason?) -> Bool {
@@ -81,8 +81,42 @@ extension DaemonCore {
 
     // MARK: Workflows
 
-    /// Fire every workflow whose trigger this event matches. Filled in with US3.
-    func fireWorkflows(for event: Event) {}
+    /// Fire every workflow with a new-style trigger this event matches (042 FR-021).
+    ///
+    /// Today's nine trigger names keep firing from where they always have — the
+    /// lifecycle funnel, 038's pull-request sweep, the run that finished — and are not
+    /// matched here, so nothing fires twice (research R7, as built). A project event
+    /// reaches that project's workflows; a Mac event reaches every project's. A workflow
+    /// is never fired by news of itself, which with the chain-depth limit is what stops
+    /// `workflow.refused` feeding on its own refusals.
+    func fireWorkflows(for event: Event) {
+        guard workflowsAreStarted else {
+            deferredEventsForWorkflows.append(event)
+            return
+        }
+        let folders: [URL]
+        switch event.scope {
+        case .mac: folders = Array(workflows.keys)
+        case .project(let folder): folders = [folder]
+        }
+        let records = workflowStore.load()
+        // The agent the event is about, or the one that published it (FR-023).
+        let triggeringAgent = event.details["agent"].flatMap(UUID.init(uuidString:)) ?? event.publisher?.agentID
+        for folder in folders {
+            for workflow in (workflows[folder] ?? [:]).values.sorted(by: { $0.workflowID < $1.workflowID }) {
+                guard workflow.problem == nil,
+                      records.state(folder: folder, workflowID: workflow.workflowID)?.isArchived != true,
+                      !(event.subject == .workflow && event.details["workflow"] == workflow.workflowID),
+                      let trigger = workflow.triggers.first(where: { $0.matches(event) }) else { continue }
+                // Detached, as `workflowsRespond` does: `raise` is called from inside
+                // the actor, and firing awaits things that call back into it.
+                Task { [weak self] in
+                    await self?.fire(workflow, on: trigger, triggeringAgentID: triggeringAgent,
+                                     depth: event.chainDepth, causingEvent: event.position)
+                }
+            }
+        }
+    }
 
     // MARK: Reading
 

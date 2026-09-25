@@ -32,8 +32,12 @@ extension DaemonCore {
         let waiting = deferredLifecycleEvents
         deferredLifecycleEvents.removeAll()
         for held in waiting {
-            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth)
+            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth, causingEvent: held.cause)
         }
+        // And the events whose new-style triggers could not be matched yet (042).
+        let events = deferredEventsForWorkflows
+        deferredEventsForWorkflows.removeAll()
+        for event in events { fireWorkflows(for: event) }
     }
 
     /// Take a project's workflows on: read them once, and watch for more.
@@ -196,7 +200,9 @@ extension DaemonCore {
             overLimit: overLimit,
             nextFireAt: archived || overLimit != nil ? nil : workflow.nextDue(after: Date()),
             lastOutcome: state?.lastOutcome,
-            isRunning: isRunning(workflow))
+            isRunning: isRunning(workflow),
+            causingEvent: state?.lastCausingEvent,
+            causingEventName: state?.lastCausingEvent.flatMap { eventLog.event(at: $0) }.map(Self.eventLabel))
     }
 
     /// Whether any run of it is in flight: its own, or one for any of its pull requests
@@ -395,14 +401,15 @@ extension DaemonCore {
     @discardableResult
     func fire(_ workflow: Workflow, on trigger: WorkflowTrigger,
               triggeringAgentID: UUID? = nil, depth: Int = 0,
-              at now: Date = Date(), pullRequest: PullRequestFire? = nil) async -> WorkflowRefusal? {
+              at now: Date = Date(), pullRequest: PullRequestFire? = nil,
+              causingEvent: EventPosition? = nil) async -> WorkflowRefusal? {
         let key = runKey(for: workflow, pullRequest: pullRequest?.pull.number)
         var triggeringAgentID = triggeringAgentID
         if let pullRequest {
             // Its own checks first, in R9's order: somewhere to work, babysitting not
             // stopped, nothing uncommitted, nobody else working there.
             if let refusal = await pullRequestRefusal(for: workflow, pullRequest) {
-                record(.refused(refusal, at: now, repeats: 1), for: workflow)
+                record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
                 notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
                 return refusal
             }
@@ -429,7 +436,7 @@ extension DaemonCore {
             dayLimitReached: isDayLimitReached(),
             folderExists: Self.isDirectory(workflow.folder),
             triggeringAgentIsUsable: triggeringAgentIsUsable) {
-            record(.refused(refusal, at: now, repeats: 1), for: workflow)
+            record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             if let pullRequest {
                 notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
             }
@@ -455,7 +462,7 @@ extension DaemonCore {
             run.agentID = agentID
             workflowRuns[key] = run
             persistWorkflowRuns()
-            record(.ran(agentID: agentID, at: now), for: workflow)
+            record(.ran(agentID: agentID, at: now), for: workflow, causingEvent: causingEvent, depth: depth)
             if let pullRequest {
                 notePullRequestRan(agentID: agentID, at: now, workflow: workflow, pullRequest)
             }
@@ -469,7 +476,7 @@ extension DaemonCore {
             persistWorkflowRuns()
             let refusal = WorkflowRefusal.settingRefused(setting: refused.setting,
                                                          detail: refused.detail)
-            record(.refused(refusal, at: now, repeats: 1), for: workflow)
+            record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             if let pullRequest {
                 notePullRequestOutcome(.refused(refusal, at: now, repeats: 1), workflow: workflow, pullRequest)
             }
@@ -478,7 +485,7 @@ extension DaemonCore {
             workflowRuns.removeValue(forKey: key)
             persistWorkflowRuns()
             let message = (error as? JSONRPCError)?.message ?? error.localizedDescription
-            record(.refused(.unreadable(message), at: now, repeats: 1), for: workflow)
+            record(.refused(.unreadable(message), at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             if let pullRequest {
                 notePullRequestOutcome(.refused(.unreadable(message), at: now, repeats: 1),
                                        workflow: workflow, pullRequest)
@@ -700,11 +707,41 @@ extension DaemonCore {
 
     /// Write down what a fire produced, then tell the windows. That order is why a
     /// daemon killed mid-fire still leaves something true behind.
-    func record(_ outcome: WorkflowOutcome, for workflow: Workflow) {
+    func record(_ outcome: WorkflowOutcome, for workflow: Workflow,
+                causingEvent: EventPosition? = nil, depth: Int = 0) {
         var records = workflowStore.load()
-        records.record(outcome, folder: workflow.folder, workflowID: workflow.workflowID)
+        records.record(outcome, folder: workflow.folder, workflowID: workflow.workflowID,
+                       causingEvent: causingEvent)
         workflowStore.save(records)
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
+        // On the log (042): what the fire came to, on the event that caused it, and as
+        // an event of its own, one step deeper in the chain.
+        switch outcome {
+        case .ran(let agentID, _):
+            if let causingEvent {
+                addConsequence(.fired(workflowID: workflow.workflowID, folder: workflow.folder, agentID: agentID),
+                               to: causingEvent)
+            }
+            raise(EventDraft(name: "workflow.ran", at: now(), scope: .project(folder: workflow.folder),
+                             sentence: "Workflow \(workflow.name) started \(LeaseWords.agentName(agents[agentID]?.title)).",
+                             details: ["workflow": workflow.workflowID, "agent": agentID.uuidString,
+                                       "agent_title": agents[agentID]?.title ?? "Untitled"],
+                             chainDepth: depth + 1))
+        case .refused(let refusal, _, _):
+            if let causingEvent {
+                addConsequence(.refused(workflowID: workflow.workflowID, folder: workflow.folder, reason: refusal),
+                               to: causingEvent)
+            }
+            raise(EventDraft(name: "workflow.refused", at: now(), scope: .project(folder: workflow.folder),
+                             sentence: "Workflow \(workflow.name) did not run: \(refusal.message).",
+                             details: ["workflow": workflow.workflowID, "reason": refusal.message],
+                             chainDepth: depth + 1))
+        }
+    }
+
+    /// An event as the workflow row says it: "pull_request.merged #41".
+    static func eventLabel(_ event: Event) -> String {
+        EventPattern.matching(event).label
     }
 
     // MARK: What an agent doing something sets off
@@ -753,7 +790,8 @@ extension DaemonCore {
     }
 
     /// Called from the one funnel every agent state change goes through.
-    func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil) {
+    func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil,
+                          causingEvent: EventPosition? = nil) {
         guard let agent = agents[agentID] else { return }
         // Before anything is read off `workflows`, because at this point that
         // dictionary is empty and the guard below would swallow the event without
@@ -762,7 +800,7 @@ extension DaemonCore {
         guard workflowsAreStarted else {
             deferredLifecycleEvents.append(
                 (event: event, agentID: agentID,
-                 depth: depth ?? workflowChainDepth(causedBy: agentID)))
+                 depth: depth ?? workflowChainDepth(causedBy: agentID), cause: causingEvent))
             return
         }
         let folder = agent.projectFolder
@@ -785,7 +823,7 @@ extension DaemonCore {
             // already uses for a turn.
             Task { [weak self] in
                 await self?.fire(workflow, on: trigger,
-                                 triggeringAgentID: agentID, depth: depth)
+                                 triggeringAgentID: agentID, depth: depth, causingEvent: causingEvent)
             }
         }
     }
@@ -803,6 +841,13 @@ extension DaemonCore {
         }
 
         let folder = Project.standardize(run.folder)
+        // On the log (042), a step deeper than the run, as the old trigger fires.
+        raise(EventDraft(name: "workflow.completed", at: now(), scope: .project(folder: folder),
+                         sentence: "Workflow \(workflow(run.workflowID, in: run.folder)?.name ?? run.workflowID) finished.",
+                         details: ["workflow": run.workflowID]
+                            .merging(run.agentID.map { ["agent": $0.uuidString,
+                                                         "agent_title": agents[$0]?.title ?? "Untitled"] } ?? [:]) { $1 },
+                         chainDepth: run.depth + 1))
         guard let byID = workflows[folder] else { return }
         let records = workflowStore.load()
         for other in byID.values where other.respondsToCompletion(of: run.workflowID)

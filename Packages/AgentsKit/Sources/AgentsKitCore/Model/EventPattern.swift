@@ -115,7 +115,7 @@ public struct EventPattern: Codable, Hashable, Sendable {
         if let subject = wholeSubject {
             meaning = "Anything about \(subject == .pullRequest ? "my pull requests" : "\(subject.rawValue)s")"
         } else if EventCatalogue.isCustom(name) {
-            meaning = "When an agent here publishes \(name)"
+            meaning = "An agent here publishes \(name)"
         } else {
             meaning = EventCatalogue.kind(named: name).map { String($0.meaning.dropLast()) } ?? name
         }

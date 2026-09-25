@@ -22,6 +22,8 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     public var lastFiredAt: Date?
     /// The only evidence a refused fire leaves.
     public var lastOutcome: WorkflowOutcome?
+    /// The event that caused `lastOutcome`, when an event did (042 FR-030).
+    public var lastCausingEvent: EventPosition?
 
     public var key: String { folder.path + "/" + workflowID }
 
@@ -36,6 +38,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         standingAgentIDs = try c.decodeIfPresent([Int: UUID].self, forKey: .standingAgentIDs) ?? [:]
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
+        lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
     }
 
     public init(folder: URL, workflowID: String, isArchived: Bool = false,
@@ -148,9 +151,11 @@ extension WorkflowRecords {
 
     /// Record what a fire produced, counting a repeat of the same refusal rather than
     /// listing it again. This is what keeps a fortnight away to one line.
-    mutating func record(_ outcome: WorkflowOutcome, folder: URL, workflowID: String) {
+    mutating func record(_ outcome: WorkflowOutcome, folder: URL, workflowID: String,
+                         causingEvent: EventPosition? = nil) {
         update(folder: folder, workflowID: workflowID) { state in
             state.lastOutcome = outcome.following(state.lastOutcome)
+            state.lastCausingEvent = causingEvent
             if case .ran = outcome { state.lastFiredAt = outcome.at }
         }
     }

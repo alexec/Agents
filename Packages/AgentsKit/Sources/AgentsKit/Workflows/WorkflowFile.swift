@@ -203,6 +203,30 @@ public enum WorkflowFile {
             }
             return WorkflowTrigger.pullRequestTriggers.first { $0.name == name }!
         default:
+            // An event (042): a catalogue name, a subject with .*, or custom.<name>,
+            // narrowed by details written under it. A name the catalogue knows with a
+            // detail it does not carry is a mistake worth saying, as a pull-request
+            // trigger given settings is; a dotted name it does not know is from a later
+            // version, and is kept whole like any other.
+            if name.contains(".") {
+                var filters: [String: String] = [:]
+                for (key, value) in keys {
+                    guard let text = value.scalar else {
+                        throw YAMLNode.Failure("The \"\(key)\" under \"\(name)\" should be one value")
+                    }
+                    filters[key] = text
+                }
+                switch EventPattern.parse(name, filters: filters) {
+                case .success(let pattern):
+                    return .event(pattern)
+                case .failure(.badFilter(let kind, let key, let valid)):
+                    throw YAMLNode.Failure(valid.isEmpty
+                        ? "\"\(kind)\" takes no settings, not \(key)"
+                        : "\"\(kind)\" takes \(valid.joined(separator: ", ")), not \(key)")
+                case .failure:
+                    break
+                }
+            }
             // Kept whole, with whatever it came with. This is the case that lets the
             // format grow without anything already on disk changing shape.
             return .unrecognised(name: name, keys: keys.mapValues(\.jsonValue))
