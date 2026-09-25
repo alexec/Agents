@@ -40,21 +40,21 @@ struct ElicitationView: View {
                         Button("Open") {
                             if let link = URL(string: url) { NSWorkspace.shared.open(link) }
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.paperProminent)
                         Button("Done") {
                             Task { await model.answerElicitation(request, action: .accept) }
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                         Button("Gave up") {
                             Task { await model.answerElicitation(request, action: .decline) }
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                     }
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+            .paperRaised(in: RoundedRectangle(cornerRadius: 16))
         }
         // Floats above the prompt bar, in its column.
         .chatColumn()
@@ -116,7 +116,7 @@ struct ElicitationView: View {
             Button("No thanks") {
                 Task { await model.answerElicitation(request, action: .decline) }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             // Always offered, on every page but the last. Clicking an option turns
             // the page by itself, so here Next is mostly the way past a question
             // that a click cannot answer: a boolean left alone, an optional box left
@@ -126,13 +126,13 @@ struct ElicitationView: View {
             // Whether the answer will do is Submit's business, not this button's.
             if page < last {
                 Button("Next") { step = page + 1 }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
             }
             if page == last {
                 Button("Submit") {
                     Task { await model.answerElicitation(request, action: .accept, content: values) }
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.paperProminent)
                 .disabled(!schema.problems(with: values).isEmpty)
             }
         }
@@ -178,7 +178,7 @@ struct ElicitationView: View {
 
     private func turn(to page: Int, _ symbol: String, _ label: String, enabled: Bool) -> some View {
         Button { step = page } label: { Image(systemName: symbol) }
-            .buttonStyle(.glass)
+            .buttonStyle(.paper)
             .disabled(!enabled)
             .accessibilityLabel(label)
     }
@@ -249,10 +249,10 @@ struct ElicitationView: View {
                         chosen: Bool, choose: @escaping () -> Void) -> some View {
         if chosen {
             Button(action: choose) { optionLabel(title, description) }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.paperProminent)
         } else {
             Button(action: choose) { optionLabel(title, description) }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
         }
     }
 
@@ -320,10 +320,10 @@ struct ElicitationView: View {
                               prominent: Bool, choose: @escaping () -> Void) -> some View {
         if prominent {
             Button(action: choose) { answerLabel(title, description) }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.paperProminent)
         } else {
             Button(action: choose) { answerLabel(title, description) }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
         }
     }
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A select, drawn as a glass capsule.
+/// A select, drawn as a raised paper capsule.
 ///
 /// It reads as the chosen value, open or closed, because that is what you want to see
 /// at a glance and a control that changes its own label is a control that moves. The
@@ -29,7 +29,7 @@ struct SelectCapsule<Content: View>: View {
         .fixedSize()
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .paperRaised(in: .capsule)
         .help(name)
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
@@ -42,6 +42,7 @@ struct SelectCapsule<Content: View>: View {
                 choices { isOpen = false }
             }
             .padding(6)
+            .paperPopover()
         }
     }
 }
@@ -73,7 +74,7 @@ struct BooleanCapsule: View {
         .fixedSize()
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .paperRaised(in: .capsule)
         .help(name)
         .accessibilityValue(isOn ? "on" : "off")
     }
@@ -107,7 +108,7 @@ struct SelectChoice: View {
             .contentShape(Rectangle())
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+            .background(isHovered ? AnyShapeStyle(Paper.wash) : AnyShapeStyle(.clear),
                         in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)

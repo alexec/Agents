@@ -49,7 +49,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
                     DaemonAPI.SuggestPromptsRequest(token: token, prompts: prompts),
-                    fallback: "Shown above the prompt.")
+                    fallback: "Shown in the person's empty prompt.")
     } showFile: { file in
         await relay(DaemonAPI.Method.agentsShowFile,
                     DaemonAPI.ShowFileRequest(token: token, file: file),

@@ -41,7 +41,7 @@ struct SessionListView: View {
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.paper)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -95,7 +95,7 @@ struct SessionListView: View {
                         dismiss()
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.paper)
             }
             Button {
                 deleting = session

@@ -75,6 +75,7 @@ struct ContentView: View {
                     .transition(.move(edge: .trailing))
             }
         }
+        .paperGround()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 SidebarToggle(windowWidth: width)
@@ -97,12 +98,14 @@ struct ContentView: View {
                 // path.
                 if model.showsSpending {
                     SpendingView()
+                        .paperGround()
                 } else {
                     // `pages` is read here, in the body, so that opening a workflow
                     // invalidates it. See the note on `pages`.
                     let path = pages
                     NavigationStack(path: Binding(get: { path }, set: { show($0.last) })) {
                         ProjectAgentsView(selection: $model.selection)
+                            .paperGround()
                             .navigationDestination(for: Page.self) { page in
                                 switch page {
                                 case .agent:
@@ -112,6 +115,7 @@ struct ContentView: View {
                                 // be nothing for either to show.
                                 case .workflow(let id):
                                     WorkflowPage(workflowID: id)
+                                        .paperGround()
                                 }
                             }
                     }

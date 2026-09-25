@@ -36,7 +36,7 @@ struct AttachmentStrip: View {
                     .appText(.supporting)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .glassEffect(.regular, in: .capsule)
+                    .paperRaised(in: .capsule)
                     .help(attachment.displayName)
                 }
             }
@@ -78,7 +78,7 @@ struct MentionList: View {
                         .padding(.vertical, 5)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                        .background(index == selected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                        .background(index == selected ? AnyShapeStyle(Paper.wash) : AnyShapeStyle(.clear),
                                     in: RoundedRectangle(cornerRadius: 7))
                         .id(index)
                         .onTapGesture { choose(mention) }
@@ -89,6 +89,6 @@ struct MentionList: View {
             .frame(maxHeight: 220)
             .onChange(of: selected) { scroller.scrollTo(selected, anchor: .center) }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
+        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
     }
 }

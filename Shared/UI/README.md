@@ -6,7 +6,8 @@ apps.
 
 What belongs here: the definitions both apps must agree on and that need SwiftUI to
 say — a colour, a font step, a view modifier. `StateTint`, `TypeScale` and
-`ChatColumn` are the three that started it. `TypeScale` was `ChatTypeScale` and held
+`ChatColumn` are the three that started it; `Paper` is the fourth, and owns every
+surface colour — ground, raised, well, rule — so no view picks a background of its own. `TypeScale` was `ChatTypeScale` and held
 only the transcript; it holds both apps entire now, and every `.font(` outside it is a
 marked decorative glyph.
 

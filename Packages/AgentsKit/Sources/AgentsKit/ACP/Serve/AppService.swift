@@ -204,7 +204,8 @@ public actor AppService {
                 guard let title = Agent.cleanedTitle(arguments?["title"]?.stringValue ?? "") else {
                     return .success(Self.reply(Self.noTitle, isError: true))
                 }
-                let prompts = SuggestedPrompt.list(in: arguments?["next_prompts"])
+                let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
+                                                   orFirstOf: arguments?["next_prompts"])
                 return .success(Self.reply(await finishSink(raw, message, prompts, title)))
             }
 
@@ -382,13 +383,13 @@ public actor AppService {
             replaces the last one. Keep it short and specific, and do not repeat the \
             outcome in it.
 
-            With it, offer two to four things the person might want to say next, shown \
-            as buttons above their prompt. Take them from the work you just did: what \
-            you did not do, a check worth running, a decision you had to guess at, the \
-            obvious next step. Write each one as a prompt the person would send you, in \
-            the second person ("Run the tests and fix what fails"). Leave them out only \
-            if there is genuinely nothing worth asking next. Say nothing in your reply \
-            about having called this.
+            With it, offer the one thing the person is most likely to want to say next, \
+            which waits in their empty prompt for them to take. Take it from the work \
+            you just did: what you did not do, a check worth running, a decision you \
+            had to guess at, the obvious next step. Write it as a prompt the person \
+            would send you, in the second person ("Run the tests and fix what fails"). \
+            Leave it out only if there is genuinely nothing worth asking next. Say \
+            nothing in your reply about having called this.
 
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
@@ -417,24 +418,22 @@ public actor AppService {
                         Replaces the name on its row.
                         """,
                 ],
-                "next_prompts": [
-                    "type": "array",
-                    "minItems": .int(0),
-                    "maxItems": .int(SuggestedPrompt.limit),
+                // One, since 031. The list this replaced is still read by the
+                // handler, for a conversation told about it before, but no longer
+                // offered: a fresh agent shown both would send both.
+                "next_prompt": [
+                    "type": "object",
                     "description": """
-                        Two to four things the person might say next, best first. \
-                        Leave out if there is nothing worth asking.
+                        The one thing the person is most likely to say next. Leave out \
+                        if there is nothing worth asking.
                         """,
-                    "items": [
-                        "type": "object",
-                        "properties": [
-                            "label": ["type": "string",
-                                      "description": "Two to five words for the button, e.g. \"Run the tests\"."],
-                            "prompt": ["type": "string",
-                                       "description": "The prompt itself, addressed to you, which goes into their prompt box when they tap it."],
-                        ],
-                        "required": .array(["label", "prompt"]),
+                    "properties": [
+                        "label": ["type": "string",
+                                  "description": "Two to five words naming it, e.g. \"Run the tests\"."],
+                        "prompt": ["type": "string",
+                                   "description": "The prompt itself, addressed to you, which goes into their prompt box when they take it."],
                     ],
+                    "required": .array(["label", "prompt"]),
                 ],
             ],
             "required": .array(["outcome", "message", "title"]),
@@ -446,7 +445,10 @@ public actor AppService {
     // and resumed after it calls these and has to find them. Listed, because some
     // runtimes check a name against the list before calling it; described as the
     // older names, because a fresh agent reading the whole list should be pointed at
-    // the one tool rather than left to pick. Their schemas and rules are untouched.
+    // the one tool rather than left to pick. Their schemas and rules are untouched,
+    // but for the ceiling on the list below: since 031 only the first is kept, and a
+    // conversation told "up to four" must not be refused by a runtime checking the
+    // count against the schema before it calls.
     //
     // Removing them is deleting these two entries, their two branches in `handle`,
     // their two sinks in the helper, and their two predicates in `PermissionRequest`.
@@ -459,7 +461,7 @@ public actor AppService {
         "description": """
             The older name for the suggestions half of finish_turn. Use finish_turn \
             instead: it takes the same prompts and the outcome together. This still \
-            works, and shows the prompts as buttons above the person's prompt.
+            works, and shows the first prompt in the person's empty prompt.
             """,
         "inputSchema": [
             "type": "object",
@@ -467,8 +469,7 @@ public actor AppService {
                 "prompts": [
                     "type": "array",
                     "minItems": .int(1),
-                    "maxItems": .int(SuggestedPrompt.limit),
-                    "description": "The suggestions, best first.",
+                    "description": "The suggestions, best first. Only the first is shown.",
                     "items": [
                         "type": "object",
                         "properties": [

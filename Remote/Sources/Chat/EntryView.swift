@@ -39,7 +39,7 @@ private struct EntryRow: View {
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                     .appText(.reading)
                     .padding(12)
-                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                    .paperWell(in: RoundedRectangle(cornerRadius: 12))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 

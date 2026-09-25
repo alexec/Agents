@@ -47,6 +47,8 @@ struct ProjectListView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(Paper.sidebar)
         // Carried over from the agent list this replaced: four agents running is four
         // numbers to add up in your head, which is the sort of thing you only do after
         // the bill. Pinned rather than scrolled with the projects: it is about all of
@@ -88,7 +90,7 @@ struct ProjectListView: View {
             guard case .success(let folder) = result else { return }
             Task { await model.addProject(folder) }
         }
-        .sheet(isPresented: $isCloning) { CloneSheet() }
+        .sheet(isPresented: $isCloning) { CloneSheet().paperSheet() }
     }
 
     @ViewBuilder
@@ -243,7 +245,7 @@ private struct SpendingRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(.bar)
+        .background(Paper.sidebar)
         .help(today == nil
               ? "What all of the work has cost"
               : "What every agent has cost today. Opens Spending.")
@@ -301,7 +303,7 @@ private struct WakefulnessRow: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
+            .background(Paper.sidebar)
             .help(help(state))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(help(state))

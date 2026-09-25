@@ -131,7 +131,7 @@ private struct FileLines: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .paperWell(in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

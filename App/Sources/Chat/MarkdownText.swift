@@ -106,7 +106,7 @@ struct MarkdownText: View {
                         .textSelection(.enabled)
                         .padding(10)
                 }
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                .paperWell(in: RoundedRectangle(cornerRadius: 8))
             }
 
         case .image(let source, let alt):

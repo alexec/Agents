@@ -4,10 +4,15 @@ import SwiftUI
 struct AgentsApp: App {
     @State private var model = AppModel()
 
+    /// Light, dark or the Mac's own, from Settings. Applied to the whole app from here,
+    /// once at launch and on every change, so no window decides for itself.
+    @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(model)
+                .onChange(of: appearance, initial: true) { Appearance.apply(appearance) }
         }
         .defaultSize(width: 1_100, height: 720)
         .commands {
@@ -29,9 +34,11 @@ struct AgentsApp: App {
         // this app a person types.
         Settings {
             TabView {
+                Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
                 Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
                 Tab("Devices", systemImage: "iphone") { DevicesPane() }
             }
+            .paperGround()
             .environment(model)
         }
     }

@@ -22,7 +22,7 @@ struct SidebarView: View {
             content
                 .frame(width: frame.width)
         }
-        .background(.background)
+        .background(Paper.ground)
     }
 
     @ViewBuilder

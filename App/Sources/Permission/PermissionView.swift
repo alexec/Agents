@@ -22,10 +22,10 @@ struct PermissionView: View {
                     ForEach(request.options) { option in
                         if option.kind.allows {
                             Button(option.name) { answer(option) }
-                                .buttonStyle(.glassProminent)
+                                .buttonStyle(.paperProminent)
                         } else {
                             Button(option.name) { answer(option) }
-                                .buttonStyle(.glass)
+                                .buttonStyle(.paper)
                         }
                     }
                     Spacer(minLength: 0)
@@ -33,7 +33,7 @@ struct PermissionView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+            .paperRaised(in: RoundedRectangle(cornerRadius: 16))
         }
         // Floats above the prompt bar, in its column.
         .chatColumn()

@@ -20,7 +20,7 @@ struct ProjectAgentsView: View {
     /// this window already holds every one of them.
     @State private var archivedShown = Self.pageSize
     static let pageSize = 10
-    static let cardSpacing: CGFloat = 10
+    static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -176,7 +176,7 @@ struct ProjectAgentsView: View {
                 }
                 if archived.count > archivedShown {
                     Button("Show more") { archivedShown += Self.pageSize }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.paper)
                 }
             }
             // A link, not a button: putting the archive away again is an aside, and
@@ -196,8 +196,8 @@ struct ProjectAgentsView: View {
 
 /// One agent, as a card you can go into.
 ///
-/// It is a real control — the whole card opens that conversation — which is what
-/// earns it interactive glass rather than a decorated background.
+/// It is a real control — the whole card opens that conversation — which is why it
+/// is a paper row that answers the pointer rather than a line of text.
 private struct AgentCard<Content: View>: View {
     let id: UUID
     @Binding var selection: UUID?
@@ -212,7 +212,7 @@ private struct AgentCard<Content: View>: View {
                 .padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(RoundedRectangle(cornerRadius: 14))
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
+                .paperRow()
         }
         .buttonStyle(.plain)
     }
