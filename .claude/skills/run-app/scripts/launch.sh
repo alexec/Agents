@@ -10,13 +10,15 @@ APP="$REPO/build/DD/Build/Products/Debug/Agents.app"
 SLUG=""
 BUILD=1
 FRONT=0
+EXTRA_ENV=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-build) BUILD=0 ;;
     --front)    FRONT=1 ;;          # bring the window to the front; steals focus
     --slug)     SLUG="$2"; shift ;;
-    *) echo "usage: launch.sh [--slug NAME] [--no-build] [--front]" >&2; exit 2 ;;
+    --env)      EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the app, e.g. AGENTS_SSH=…
+    *) echo "usage: launch.sh [--slug NAME] [--no-build] [--front] [--env KEY=VALUE]…" >&2; exit 2 ;;
   esac
   shift
 done
@@ -51,6 +53,7 @@ mkdir -p "$ROOT"
 OPEN_FLAGS=(-n)
 [ "$FRONT" = 1 ] || OPEN_FLAGS+=(-g)   # -g: launch behind whatever the user is doing
 env -i HOME="$HOME" USER="$USER" PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin" \
+  ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} \
   open "${OPEN_FLAGS[@]}" "$APP" --args --root "$ROOT"
 
 # The window starts the daemon; the daemon writes the lock and then listens.

@@ -26,6 +26,13 @@ struct AgentRow: View {
     private var agent: Agent { model.agents.first { $0.id == given.id } ?? given }
 
     var body: some View {
+        rowContent
+            // Last known, not current: its server is not answering (037).
+            .opacity(model.hosts.isOffline(agent.host) ? 0.55 : 1)
+    }
+
+    @ViewBuilder
+    private var rowContent: some View {
         HStack(alignment: .top, spacing: 12) {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,

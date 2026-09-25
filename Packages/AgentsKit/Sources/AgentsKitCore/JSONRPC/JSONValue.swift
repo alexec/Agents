@@ -99,7 +99,7 @@ public enum JSONValue: Codable, Hashable, Sendable {
         case let string as String:
             self = .string(string)
         case let number as NSNumber:
-            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+            if Self.isBoolean(number) {
                 self = .bool(number.boolValue)
             } else if number is NSDecimalNumber {
                 self = .double(number.doubleValue)
@@ -138,4 +138,17 @@ extension JSONValue: ExpressibleByDictionaryLiteral, ExpressibleByArrayLiteral {
         self = .object(Dictionary(uniqueKeysWithValues: elements))
     }
     public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
+}
+
+extension JSONValue {
+    /// Whether `JSONSerialization` meant true or false rather than 1 or 0. The Mac asks
+    /// CoreFoundation; the Linux build of `agentsd` has no CFBoolean to ask, and its
+    /// Foundation marks a boolean with the Objective-C type code `c` instead (037).
+    static func isBoolean(_ number: NSNumber) -> Bool {
+        #if canImport(Darwin)
+        CFGetTypeID(number) == CFBooleanGetTypeID()
+        #else
+        number.objCType.pointee == CChar(UInt8(ascii: "c"))
+        #endif
+    }
 }

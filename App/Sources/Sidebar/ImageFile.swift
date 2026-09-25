@@ -19,6 +19,9 @@ struct ImageFile: View {
     /// would not: an agent regenerating a chart writes to the same name.
     let probe: FileProbe
     let description: String
+    /// The server the file is on, when it is not this Mac (037). Its picture is drawn
+    /// from the bytes the server sent, and there is nowhere here to open it.
+    var server: String? = nil
 
     @State private var image: NSImage?
     @State private var failed = false
@@ -41,13 +44,13 @@ struct ImageFile: View {
                         .padding(10)
                 }
             } else if failed {
-                OpenElsewhere(url: url, description: description)
+                OpenElsewhere(url: url, description: description, server: server)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: probe) {
-            let loaded = NSImage(contentsOf: url)
+            let loaded = server == nil ? NSImage(contentsOf: url) : NSImage(data: probe.prefix)
             image = loaded
             failed = loaded == nil
         }

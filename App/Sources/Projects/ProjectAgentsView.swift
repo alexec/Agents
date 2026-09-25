@@ -70,6 +70,12 @@ struct ProjectAgentsView: View {
             Text(summary?.name ?? "Project")
                 .appText(.title).fontWeight(.semibold)
                 .lineLimit(1)
+            // Which machine, when it is not this one (037).
+            if let summary, summary.host != .mac {
+                Text("on \(model.hosts.label(summary.host))")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             if let summary, !summary.exists {
                 Label("This folder is not there any more", systemImage: "exclamationmark.triangle")
                     .appText(.supporting)
@@ -135,7 +141,7 @@ struct ProjectAgentsView: View {
                     }
                 }
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    let agents = model.agents(in: folder, group: group)
+                    let agents = model.agents(in: model.selectedProjectKey, group: group)
                     if !agents.isEmpty {
                         GroupHeading(title: group.title, count: agents.count)
                         ForEach(agents) { agent in
@@ -174,7 +180,7 @@ struct ProjectAgentsView: View {
     }
 
     private var hasSessions: Bool {
-        AgentGroup.allCases.contains { !model.agents(in: folder, group: $0).isEmpty }
+        AgentGroup.allCases.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
     }
 
     /// Every agent's state on this page, archived ones included.
@@ -183,7 +189,7 @@ struct ProjectAgentsView: View {
     }
 
     private var archived: [Agent] {
-        model.agents(in: folder, group: .archived)
+        model.agents(in: model.selectedProjectKey, group: .archived)
     }
 
     /// Out of the way until it is wanted, because looking at what you archived is a

@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "${FAKE_SSH_UNAME:-Linux aarch64}"

@@ -45,7 +45,7 @@ extension DaemonCore {
                                message: "That is not a Git URL this app can clone. Paste an HTTPS or SSH address.")
         }
         let destination = Project.standardize(cloneParent).appending(path: remote.folderName)
-        let shown = (destination.path as NSString).abbreviatingWithTildeInPath
+        let shown = abbreviatingHome(destination.path)
 
         // Checked and reserved with no await in between, so two clones to one folder
         // cannot both get past here.

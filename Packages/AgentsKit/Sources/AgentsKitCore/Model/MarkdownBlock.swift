@@ -1,3 +1,6 @@
+// Drawing only, and built on Apple Foundation's CommonMark parser, which the Linux
+// build of agentsd does not have and does not need (037).
+#if canImport(Darwin)
 import Foundation
 
 /// A piece of a markdown document, once it has been read.
@@ -347,3 +350,4 @@ private extension Array where Element == AttributedString {
         return self + Array(repeating: AttributedString(), count: count - self.count)
     }
 }
+#endif

@@ -1,4 +1,10 @@
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Foundation
 
 /// One shell, in one agent's folder, owned by the daemon.

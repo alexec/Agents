@@ -1,4 +1,6 @@
+#if canImport(CoreServices)
 import CoreServices
+#endif
 import Foundation
 
 /// Tells you when something under a folder changed.
@@ -7,6 +9,7 @@ import Foundation
 /// this pane wants: a build that writes four thousand files produces a manageable
 /// number of directory-level events rather than four thousand file-level ones. The pane
 /// re-reads the directory it is showing and the file it has open, and ignores the rest.
+#if canImport(CoreServices)
 public final class FolderWatch: @unchecked Sendable {
     /// How long FSEvents may gather changes before telling us. Long enough to collapse
     /// a burst, short enough to stay inside SC-002's two seconds with room to spare.
@@ -101,3 +104,4 @@ public final class FolderWatch: @unchecked Sendable {
         }
     }
 }
+#endif

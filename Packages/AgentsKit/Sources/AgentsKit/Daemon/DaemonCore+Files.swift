@@ -31,6 +31,51 @@ extension DaemonCore {
         }
     }
 
+    /// Any folder this account can read, by absolute path (037). Only ever asked by a
+    /// window choosing a server folder as a project, before there is an agent to scope
+    /// a listing to. The daemon runs as the person, so it shows exactly what they could
+    /// `ls` themselves, and no more.
+    public func browse(_ request: DaemonAPI.FilesBrowseRequest) throws -> DirectoryListing {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+        var path = request.path ?? "~"
+        if path == "~" { path = home } else if path.hasPrefix("~/") { path = home + path.dropFirst(1) }
+        guard path.hasPrefix("/") else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Give an absolute path, or one starting ~.")
+        }
+        let url = URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL
+        do {
+            return try DirectoryReader.read(url)
+        } catch DirectoryReader.Failure.notADirectory {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That is a file.")
+        } catch DirectoryReader.Failure.notReadable {
+            throw Self.notReadable(url)
+        } catch {
+            throw Self.gone(url)
+        }
+    }
+
+    /// Keep a file attached on another machine where this agent can read it (037):
+    /// `<its folder>/.agents/attachments/<uuid>-<name>`, private to the account. The
+    /// name is reduced to its last component so it can never climb out of there.
+    public func writeAttachment(_ request: DaemonAPI.FilesWriteRequest) throws -> DaemonAPI.FilesWriteResponse {
+        guard let agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard request.data.count <= DaemonAPI.attachmentLimit else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That file is too big to send.")
+        }
+        let name = URL(filePath: request.name).lastPathComponent
+        guard !name.isEmpty, name != ".", name != ".." else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That file has no name.")
+        }
+        let folder = agent.cwd.appendingPathComponent(".agents/attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let file = folder.appendingPathComponent("\(UUID().uuidString.prefix(8))-\(name)")
+        try request.data.write(to: file, options: .atomic)
+        return DaemonAPI.FilesWriteResponse(path: file.path(percentEncoded: false))
+    }
+
     public func readFile(_ request: DaemonAPI.FilesReadRequest) throws -> FileReading {
         let (url, _) = try resolveInScope(agentID: request.agentID, path: request.path)
         do {

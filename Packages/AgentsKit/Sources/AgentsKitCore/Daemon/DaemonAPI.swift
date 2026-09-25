@@ -202,6 +202,17 @@ public enum DaemonAPI {
         public static let elicitationsAnswer = "elicitations/answer"
         public static let permissionsAnswer = "permissions/answer"
         public static let ping = "daemon/ping"
+        /// How busy a daemon is, so a server is updated only between turns and removed
+        /// only after saying how many agents that stops (037).
+        public static let daemonStatus = "daemon/status"
+        /// Go now, rather than when idle. A server's daemon never leaves for being idle.
+        public static let daemonQuit = "daemon/quit"
+        /// The folders at a path, before there is any project or agent to scope it to:
+        /// what the window browses to choose a server folder as a project (037).
+        public static let filesBrowse = "files/browse"
+        /// A file attached on one machine, for an agent on another (037): written into
+        /// the agent's folder so it can read it, and the path handed back.
+        public static let filesWrite = "files/write"
 
         // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
         // which is 003's and belongs to the agent. Different owner, different
@@ -389,9 +400,17 @@ public enum DaemonAPI {
         /// the ordinary case; non-zero means `costToDate` is a floor rather than the
         /// whole.** Like `counts`, recomputed on every call and never stored.
         public var unmeasuredAgents: Int
+        /// Which machine the project is on, stamped by the window that heard of it and
+        /// never sent (037). Not in `CodingKeys`.
+        public var host: HostID = .mac
 
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
+        public var key: ProjectKey { ProjectKey(host: host, folder: project.folder) }
+
+        enum CodingKeys: String, CodingKey {
+            case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
+        }
 
         /// Whether anything in this project wants the user.
         /// From the daemon's counts, so with the same blind spot: an agent waiting to be
@@ -597,13 +616,19 @@ public enum DaemonAPI {
         /// that ended without saying how it went, and only the person's clears what
         /// the agent last said about the turn before.
         public var from: PromptOrigin
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
 
         public init(agentID: UUID, text: String, attachments: [Attachment] = [],
-                    from: PromptOrigin = .person) {
+                    from: PromptOrigin = .person, sendID: UUID? = nil) {
             self.agentID = agentID
             self.text = text
             self.attachments = attachments
             self.from = from
+            self.sendID = sendID
         }
 
         /// An older app sends only the text, so attachments are optional on the way in.
@@ -615,6 +640,7 @@ public enum DaemonAPI {
             text = try c.decode(String.self, forKey: .text)
             attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
             from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
+            sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
         }
 
         public var blocks: [ContentBlock] {
@@ -962,9 +988,15 @@ public enum DaemonAPI {
     public struct AnswerRequest: Codable, Sendable {
         public var permissionID: UUID
         public var optionID: String
-        public init(permissionID: UUID, optionID: String) {
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
+        public init(permissionID: UUID, optionID: String, sendID: UUID? = nil) {
             self.permissionID = permissionID
             self.optionID = optionID
+            self.sendID = sendID
         }
     }
 
@@ -1092,15 +1124,22 @@ public enum DaemonAPI {
         public var requestID: UUID
         public var action: Action
         public var content: [String: JSONValue]
+        /// Made by the window once per send, and sent again unchanged if the first try's
+        /// reply was lost with the connection. A daemon that has seen it already does
+        /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
+        /// older window, which is today's behaviour.
+        public var sendID: UUID?
 
         public enum Action: String, Codable, Sendable {
             case accept, decline, cancel
         }
 
-        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:]) {
+        public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:],
+                    sendID: UUID? = nil) {
             self.requestID = requestID
             self.action = action
             self.content = content
+            self.sendID = sendID
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1108,6 +1147,7 @@ public enum DaemonAPI {
             requestID = try c.decode(UUID.self, forKey: .requestID)
             action = try c.decodeIfPresent(Action.self, forKey: .action) ?? .cancel
             content = try c.decodeIfPresent([String: JSONValue].self, forKey: .content) ?? [:]
+            sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
         }
     }
 
@@ -1299,6 +1339,8 @@ public enum DaemonAPI {
         public static let noSuchDevice = -32020
         /// A need id that is not outstanding — met, or never existed (021).
         public static let noSuchNeed = -32021
+        /// A daemon asked to quit while a turn is in flight (037).
+        public static let busy = -32040
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -1935,4 +1977,58 @@ public enum DaemonAPI {
             self.alert = alert
         }
     }
+}
+
+public extension DaemonAPI {
+    /// `daemon/status` (037).
+    struct DaemonStatus: Codable, Hashable, Sendable {
+        /// Agents starting, running or waiting on the person: an update waits for zero.
+        public var turnsInFlight: Int
+        /// Agents holding a runtime: what removing the server would stop.
+        public var agentsLive: Int
+
+        public init(turnsInFlight: Int, agentsLive: Int) {
+            self.turnsInFlight = turnsInFlight
+            self.agentsLive = agentsLive
+        }
+    }
+
+    /// `daemon/quit` (037).
+    struct QuitRequest: Codable, Hashable, Sendable {
+        /// Stop every live agent first. Without it, a turn in flight refuses the quit.
+        public var stopAgents: Bool
+
+        public init(stopAgents: Bool) { self.stopAgents = stopAgents }
+    }
+}
+
+public extension DaemonAPI {
+    /// `files/browse` (037). An absolute path, or one starting `~`, which is the
+    /// daemon's own home. Nil is the home.
+    struct FilesBrowseRequest: Codable, Hashable, Sendable {
+        public var path: String?
+        public init(path: String? = nil) { self.path = path }
+    }
+}
+
+public extension DaemonAPI {
+    /// `files/write` (037). `data` travels as base64 in the JSON.
+    struct FilesWriteRequest: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var name: String
+        public var data: Data
+        public init(agentID: UUID, name: String, data: Data) {
+            self.agentID = agentID
+            self.name = name
+            self.data = data
+        }
+    }
+
+    struct FilesWriteResponse: Codable, Hashable, Sendable {
+        public var path: String
+        public init(path: String) { self.path = path }
+    }
+
+    /// The most `files/write` takes, and the most the window sends.
+    static let attachmentLimit = 25 * 1024 * 1024
 }

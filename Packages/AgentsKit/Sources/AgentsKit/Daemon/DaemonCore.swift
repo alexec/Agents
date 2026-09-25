@@ -325,6 +325,15 @@ public actor DaemonCore {
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
     var connectionCount = 0
+    /// False on a server, where the daemon is started with `--serve` and stays up with
+    /// no Mac connected, so scheduled workflows keep firing (037). A server has no
+    /// battery to spare and no window that could start it again on its own.
+    var exitsWhenIdle = true
+    /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
+    var quitRequested = false
+    /// The last few hundred sends that carried a `sendID`, and what each came to (037).
+    var recentSends: [UUID: Task<JSONValue, any Error>] = [:]
+    var recentSendOrder: [UUID] = []
 
     /// The daemon's one way out to the windows, settable once the socket exists and
     /// readable from any thread.

@@ -46,7 +46,8 @@ struct CostSettingsView: View {
                 Text("When the day reaches this, nothing new starts and no prompt is sent — "
                      + "including a workflow firing on a schedule. Whatever is working "
                      + "finishes its turn and holds. What you typed stays where it is and "
-                     + "goes when the day rolls over.")
+                     + "goes when the day rolls over."
+                     + (model.hosts.isEmpty ? "" : " Each server keeps to this limit on its own."))
             }
             .paperListRow()
 

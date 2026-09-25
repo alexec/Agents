@@ -38,6 +38,7 @@ struct AgentsApp: App {
                 Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
                 Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
                 Tab("Devices", systemImage: "iphone") { DevicesPane() }
+                Tab("Servers", systemImage: "server.rack") { ServersSettingsView() }
             }
             .paperGround()
             .environment(model)

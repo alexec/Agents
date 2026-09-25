@@ -57,6 +57,14 @@ targets:
     sources:
       - path: App/Sources
       - path: App/Resources
+        excludes:
+          - servers
+      # The Linux agentsd a server is given (037), built by
+      # scripts/build-linux-agentsd.sh. A folder, so it lands as Resources/servers/ and
+      # not loose; optional, because it is a build output and not in git.
+      - path: App/Resources/servers
+        type: folder
+        optional: true
       # Compiled into the Remote as well. The two apps shared no view code before
       # this, which is how they came to draw the same state in three colours and the
       # same block kind at two sizes; the definitions both must agree on live here.
