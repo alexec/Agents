@@ -2,6 +2,9 @@
 
 A Mac app, rebuilt one feature at a time against a written spec.
 
+Using the app? The docs are at https://alexec.github.io/Agents/ (source in `docs/`;
+preview with `scripts/docs.sh serve`). This README is for building and working on it.
+
 The window is a list of the projects you work in — a project is a folder, named by that
 folder — with that project's agents beside it in three groups: what needs you, what is
 working, what is done. Each project also has a lead: one agent whose job is the project
@@ -176,5 +179,8 @@ Spec Kit, one feature at a time. Each feature is a folder under `specs/`:
 3. `/speckit-plan` — how it will be built.
 4. `/speckit-tasks` — the ordered list.
 5. `/speckit-implement` — the work, against those tasks.
+
+Every spec has a Docs section listing the pages on the docs site it adds or changes, and
+`scripts/docs.sh check` runs on every push, so the docs move with the code.
 
 The rules the specs are held to are in `.specify/memory/constitution.md`.

@@ -117,6 +117,17 @@
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
 
+## Docs *(mandatory)*
+
+<!--
+  Which pages on the docs site (docs/) this feature adds or changes, so they are written
+  with the feature rather than after it. One line per page. If the person using the app
+  will see no difference, write "None" and why.
+-->
+
+- `docs/how-to/<task>.md` — add: <what it covers>
+- `docs/reference/<thing>.md` — change: <which entries>
+
 ## Assumptions
 
 <!--
