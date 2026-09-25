@@ -56,10 +56,10 @@ public struct EventLog: Codable, Hashable, Sendable {
         return .new(event)
     }
 
-    /// Put a repeat back, as read from the store: a count and a time.
-    public mutating func applyRepeat(of position: EventPosition, at: Date) {
+    /// Put a repeat back, as read from the store: how many times, and the last time.
+    public mutating func applyRepeat(of position: EventPosition, at: Date, count: Int) {
         guard let index = index(of: position) else { return }
-        events[index].count += 1
+        events[index].count = count
         events[index].lastAt = at
     }
 

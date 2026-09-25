@@ -128,6 +128,12 @@ public struct StoreLocations: Sendable {
     /// Every resource lease on the Mac and every line waiting for one (036). One file
     /// for the root, like the limits: a lease is the Mac's, not a project's.
     public var leases: URL { root.appendingPathComponent("leases.json") }
+    /// What happened (042): one event, consequence or repeat per line, appended, and
+    /// rewritten only when the oldest are dropped.
+    public var events: URL { root.appendingPathComponent("events.jsonl") }
+    /// The little the event sources remember between runs (042): the next position,
+    /// branch tips, pull requests as last seen, publish counts, cost crossings.
+    public var eventState: URL { root.appendingPathComponent("events-state.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather
     /// than starting the day again from zero.

@@ -39,7 +39,7 @@ the end of Phase 3. Story 1 is still the MVP: it is the first story that is usef
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge `main` into `042-events-and-waiting` in this worktree, so the branch sits on today's `main` (041, 038, 039 and 040 are all merged there). Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge's output. Conflicts should only be in `specs/`.
+- [X] T001 Merge `main` into `042-events-and-waiting` in this worktree, so the branch sits on today's `main` (041, 038, 039 and 040 are all merged there). Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge's output. Conflicts should only be in `specs/`.
 - [ ] T002 Record the baseline: run `swift test` in `Pkg/` once, and write down in `specs/042-events-and-waiting/walk/README.md` which tests fail before any change. The suite is flaky under load, so a later failure belongs to this lane only if it is new, and only after six runs on both commits.
 
 ---
@@ -49,7 +49,7 @@ the end of Phase 3. Story 1 is still the MVP: it is the first story that is usef
 This phase adds the pure core, the catalogue, the store and the wire shapes. Nothing behaves
 differently yet.
 
-- [ ] T003 [P] Create `Pkg/Sources/AgentsKitCore/Model/Event.swift`. All types are `Codable, Hashable, Sendable`.
+- [X] T003 [P] Create `Pkg/Sources/AgentsKitCore/Model/Event.swift`. All types are `Codable, Hashable, Sendable`.
   - `typealias EventPosition = Int64`.
   - `enum EventScope { case mac; case project(URL) }`. `project` stores `Project.standardize(folder)`.
   - `struct EventPublisher { agentID: UUID, title: String }`.
@@ -58,7 +58,7 @@ differently yet.
   - `struct EventDraft`: the same fields minus `position`, `count`, `lastAt` and `consequences`. It is what sources hand to `raise`.
   - Enforce the data-model validation verbatim: the name matches `^[a-z][a-z_]*\.[a-z][a-z0-9_]*$`; `details` has "at most 10 keys, and each value is at most 200 characters"; `message` is "at most 500 characters".
   - Add `var subject: EventSubject`, read from the name's prefix.
-- [ ] T004 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`.
+- [X] T004 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`.
   - `enum EventSubject: String, CaseIterable { agent, workflow, pullRequest = "pull_request", branch, lease, mac, person, cost, server, custom }`, each with its glyph (● ⟳ ⑂ ⎇ ⌘ ✦ per wireframes §5) and its filter capsule (Agents, Workflows, Pull requests, Branches, This Mac, Custom), per `contracts/catalogue.md` §Subjects.
   - `enum EventScopeKind { mac, project, either }`.
   - `struct EventKind { name, subject, scope: EventScopeKind, details: [String], meaning: String, aliases: [String] }`.
@@ -66,7 +66,7 @@ differently yet.
   - `static func kind(named:) -> EventKind?`.
   - `static func isCustom(_ name: String) -> Bool`, true for `custom.<name>` where `<name>` is "lowercase letters, digits and `_`, up to 40 characters".
   - `static func describe() -> String`: the one text block that `list` and `manage_workflows` both return. It has one line per kind (name, then details, then meaning), then the `custom.<name>` family, then a line saying `subject.*` matches a whole subject.
-- [ ] T005 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventPattern.swift`: `struct EventPattern: Codable, Hashable, Sendable { name: String, filters: [String: String] }`.
+- [X] T005 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventPattern.swift`: `struct EventPattern: Codable, Hashable, Sendable { name: String, filters: [String: String] }`.
   - `static func parse(_ name: String, filters: [String: String]) -> Result<EventPattern, EventPatternProblem>` accepts a catalogue name, `subject.*` for a subject in `EventSubject`, or `custom.<name>`. `EventPatternProblem.message` is the sentence the agent reads:
     - an unknown name gives "`\"x\" is not an event. Did you mean y? Events you can wait on: …`";
     - an unknown subject in `x.*` is refused the same way;
@@ -74,7 +74,7 @@ differently yet.
     - For `x.*`, a filter key must be carried by at least one kind in the subject. Filters on `custom.*` are free-form.
   - `func matches(_ event: Event) -> Bool`: the name is equal, or the prefix matches for `subject.*`, and every filter equals `event.details[key]`, compared as strings (a number filter `41` matches `"41"`).
   - `var summary: String`: the kind's meaning narrowed by the filters, e.g. "When pull request #41 is merged".
-- [ ] T006 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventCatalogueTests.swift` and `EventPatternTests.swift`, failing first. Cover:
+- [X] T006 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventCatalogueTests.swift` and `EventPatternTests.swift`, failing first. Cover:
   - the 30 names are unique and all valid;
   - every one of today's nine trigger names except `schedule` is an alias of at least one kind, and `agent-stopped` is an alias of exactly `agent.stopped` and `agent.failed`;
   - `describe()` names every kind;
@@ -82,13 +82,13 @@ differently yet.
   - `{number: 41}` matches 41 and not 42;
   - `custom.build_green` matches only itself;
   - the refusals list the valid choices (quickstart §1).
-- [ ] T007 Create `Pkg/Sources/AgentsKitCore/Model/EventLog.swift`: `struct EventLog` with the events in position order, plus `head: EventPosition`.
+- [X] T007 Create `Pkg/Sources/AgentsKitCore/Model/EventLog.swift`: `struct EventLog` with the events in position order, plus `head: EventPosition`.
   - `mutating func append(_ draft: EventDraft, position: EventPosition, now: Date) -> Appended`, where `Appended` is `.new(Event)` or `.repeated(Event)`. It folds the draft into the last event when that event has the same name, the same scope and equal details, and `now - (lastAt ?? at) < 60 s`. Folding sets `count += 1` and `lastAt = now` and keeps the first position (FR-031, R14).
   - `mutating func addConsequence(_:to:)`.
   - `mutating func prune(now:)` keeps events newer than 7 days, then at most 10,000, dropping the oldest first (FR-032).
   - `func query(before: EventPosition?, limit: Int, scopes: Set<EventScope>?, subjects: Set<EventSubject>?) -> (events: [Event], hasMore: Bool)`, newest first, with `limit ≤ 200`.
   - `func matches(after: EventPosition, _ patterns: [EventPattern], scopes: Set<EventScope>) -> [Event]`, oldest first, used for "wait from" (R6).
-- [ ] T008 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventLogTests.swift`, failing first. Cover:
+- [X] T008 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventLogTests.swift`, failing first. Cover:
   - positions only go up;
   - folding within 60 s gives `count` 2, and 61 s later gives a new row;
   - details that differ do not fold;
@@ -98,13 +98,13 @@ differently yet.
   - `matches(after:)` excludes the event at the `from` position itself;
   - a log encoded and decoded is equal.
   Make it pass with T007.
-- [ ] T009 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventWait.swift`.
+- [X] T009 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventWait.swift`.
   - `struct EventWait { id: UUID, patterns: [EventPattern], from: EventPosition, deadline: Date?, since: Date, ending: EventWaitEnding?, resumePromptID: UUID? }`.
   - `enum EventWaitEnding { matched(position: EventPosition, extraMatches: Int); timedOut; cancelled(by: Canceller); couldNotWake(reason: String) }`, where `Canceller` is `agent, person, prompt, stopped, archived`.
   - `var isOpen: Bool { ending == nil }`.
   - The deadline range is 1–1440 minutes.
-- [ ] T010 In `Pkg/Sources/AgentsKitCore/Model/Agent.swift`, add `public var eventWait: EventWait?`. Encode it with `encodeIfPresent`, decode it with `decodeIfPresent`, add it to `CodingKeys`, and add it to the memberwise init with a default of `nil`. An older phone ignores the unknown key. Add a round-trip case to the existing agent coding test (`Pkg/Tests/AgentsKitTests/Unit/AgentCodingTests.swift`, or whichever file tests `Agent` coding today).
-- [ ] T011 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventWords.swift`, holding every sentence from `contracts/event-tools.md`, so tests can pin them:
+- [X] T010 In `Pkg/Sources/AgentsKitCore/Model/Agent.swift`, add `public var eventWait: EventWait?`. Encode it with `encodeIfPresent`, decode it with `decodeIfPresent`, add it to `CodingKeys`, and add it to the memberwise init with a default of `nil`. An older phone ignores the unknown key. Add a round-trip case to the existing agent coding test (`Pkg/Tests/AgentsKitTests/Unit/AgentCodingTests.swift`, or whichever file tests `Agent` coding today).
+- [X] T011 [P] Create `Pkg/Sources/AgentsKitCore/Model/EventWords.swift`, holding every sentence from `contracts/event-tools.md`, so tests can pin them:
   - `matched(event, waited: Int?)`, `stillWaiting(patterns, filters, since, until)`, `replaced(previous)`, `timedOut(patterns, at)`;
   - `wake(event, extraMatches)`, which is the prompt block in the contract;
   - `cancelledByPrompt(patterns)`, the line put before the person's text;
@@ -113,20 +113,20 @@ differently yet.
   - `hint(patterns)`, which is "Sending will cancel the wait on pull_request.merged.";
   - `recentLine(event)` and `recentFooter(head)`.
   Times are `HH:mm` in the Mac's time zone, as `LeaseWords` formats them.
-- [ ] T012 [P] In `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, add:
+- [X] T012 [P] In `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, add:
   - Methods `eventsWait = "events/wait"`, `eventsCancel = "events/cancel"`, `eventsPublish = "events/publish"`, `eventsList = "events/list"`, `eventsCancelWait = "events/cancelWait"` and `eventsRaise = "events/raise"`.
   - Requests `EventWaitRequest { token, action: String?, events: [String]?, where: [String: String]?, from: Int64?, untilMinutes: Int?, limit: Int? }`, `EventTokenRequest { token }`, `EventPublishRequest { token, name, message: String?, details: [String: String]? }`, `EventsListRequest { before: Int64?, limit: Int, scope: EventScope?, subjects: [EventSubject]? }` and `CancelWaitRequest { agentID: UUID }`.
   - `EventsPage { events: [Event], waiting: [WaitingAgent], hasMore: Bool }`, `WaitingAgent { agentID, title, folder, status: WaitStatus, cancellable: Bool }` and `EventsChange { event: Event?, waiting: [WaitingAgent] }`.
   - `Notification.eventsChanged = "events/changed"`.
   - `Failure.eventRefused = -32050` and `Failure.noWait = -32051`, each with a doc comment in the file's voice (R16).
-- [ ] T013 [P] Create `Pkg/Sources/AgentsKit/Store/EventStore.swift`.
+- [X] T013 [P] Create `Pkg/Sources/AgentsKit/Store/EventStore.swift`.
   - `events.jsonl` under `locations.root` holds the three line shapes from data-model §Files: `{"event":…}`, `{"consequence":…,"position":N}` and `{"repeat":N,"at":…}`.
   - `load() -> EventLog` folds lines in order and drops a torn last line.
   - `append(_ line:)` writes through a `FileHandle` kept open, one `write` per line.
   - `rewrite(_ log:)` writes to a temporary file and renames it over the old one.
   - Beside it, `events-state.json` (`EventState { nextPosition, branchTips, pullRequestsSeen, publishes, costCrossings }`) is written whole and atomically, like `LeaseStore`.
   - A file that cannot be read is moved aside as `.unreadable`, a line goes to `DaemonLog`, and the log starts empty.
-- [ ] T014 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventStoreTests.swift`. Cover:
+- [X] T014 [P] Create `Pkg/Tests/AgentsKitTests/Unit/EventStoreTests.swift`. Cover:
   - round trip;
   - a torn last line;
   - consequences and repeats folding into their event;
@@ -164,12 +164,12 @@ consequences link to their agents.
   - `func eventsPage(_ request: EventsListRequest) -> EventsPage`;
   - an hourly prune task.
 - [ ] T017 [US2] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Dispatch.swift`, add the `events/list` case, and `events/raise` under `#if DEBUG`. The raise method is refused unless the store root is not the real one (compare with `StoreLocations.default`), and it can attach a consequence given in the request for the look gate. Allow `events/list` over the bridge the way `leases/snapshot` is allowed (find the phone's allowed-method list by grepping for `leasesSnapshot` in `Bridge/` and `Pkg/Sources/AgentsKit/Daemon/DaemonServer.swift`).
-- [ ] T018 [P] [US2] Create `Pkg/Sources/AgentsKitCore/Model/WaitStatus.swift`: `struct WaitStatus: Codable, Hashable, Sendable { line: String, mark: String, cancellable: Bool }` and `static func status(for agent: Agent, names: (UUID) -> String) -> WaitStatus?`.
+- [X] T018 [P] [US2] Create `Pkg/Sources/AgentsKitCore/Model/WaitStatus.swift`: `struct WaitStatus: Codable, Hashable, Sendable { line: String, mark: String, cancellable: Bool }` and `static func status(for agent: Agent, names: (UUID) -> String) -> WaitStatus?`.
   - An open `eventWait` gives `◷ Waiting for {pattern} · #44 · since HH:mm · until HH:mm` and the mark `◷ Waiting for pull_request.merged #44`, with `cancellable: true`.
   - An open 039 `Block` with agent waits gives `◷ Waiting for "Fix login" to finish` in both the line and the mark, with `cancellable: false`.
   - An `agent.finished` wait filtered to those same agents gives identical text (FR-012, R4).
   - Otherwise it returns `nil`.
-- [ ] T019 [P] [US2] Create `Pkg/Tests/AgentsKitTests/Unit/WaitStatusTests.swift`. Cover:
+- [X] T019 [P] [US2] Create `Pkg/Tests/AgentsKitTests/Unit/WaitStatusTests.swift`. Cover:
   - the line and the mark for an event wait with and without a deadline;
   - a block on one agent and on two agents;
   - the block-versus-`agent.finished` equality;
