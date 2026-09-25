@@ -330,13 +330,13 @@ each fire shows as a consequence on its event.
   - The first refresh after start only seeds the list, except for a merged or closed pull request that was in the stored list.
   - Save `pullRequestsSeen`.
   - Add tests with the fake `GitHubCLI` in `Pkg/Tests/AgentsKitTests/Integration/PullRequestEventTests.swift`: every transition, merged versus closed, a failed follow-up, and 038's babysitter still firing exactly once.
-- [ ] T051 [US3] `branch.moved`, in a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+EventSources.swift` (R9):
+- [X] T051 [US3] `branch.moved`, in a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+EventSources.swift` (R9):
   - Start the project's `FolderWatch` for every project, not only ones with workflows, and add a callback for paths under `.git/refs/`, `.git/packed-refs`, `.git/HEAD` and `.git/worktrees/*/HEAD`, debounced by 1 s.
   - Run `git rev-parse` for the default branch and the branch of each live agent's worktree, off the actor. Compare with `eventState.branchTips` and raise one event per change, with `branch`, `from` and `to`.
   - At start, store the tips and raise nothing, apart from a tip that moved while the daemon was down, which carries the time it was noticed.
   - Add tests with a temporary git repository in `Pkg/Tests/AgentsKitTests/Integration/BranchEventTests.swift`.
 - [X] T052 [US3] Workflow row link: in `App/Sources/Projects/WorkflowRow.swift`, the latest-outcome line reads "Ran 06:55 on pull_request.merged #41 ›" when `causingEvent` is set. The event part links to that row on the Events page, and the run link still goes to the agent (FR-030, wireframes §3).
-- [ ] T053 [US3] Run `swift test --filter 'Workflow|PullRequest|EventWorkflow|BranchEvent|WorkflowTriggerEvent'`. Every existing workflow and 038 suite must pass without edits (SC-006).
+- [X] T053 [US3] Run `swift test --filter 'Workflow|PullRequest|EventWorkflow|BranchEvent|WorkflowTriggerEvent'`. Every existing workflow and 038 suite must pass without edits (SC-006).
 
 **Checkpoint**: Workflows and waits read one catalogue through one route. Old files are
 unchanged, and pull requests and branches raise events.

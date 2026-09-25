@@ -234,6 +234,10 @@ public actor DaemonCore {
     /// Events raised before the workflows were read, held for their new-style triggers
     /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
     var deferredEventsForWorkflows: [Event] = []
+    /// Each project's `.git`, watched for branch tips moving (042 R9).
+    var branchWatchers: [URL: FolderWatch] = [:]
+    /// The one pending look at each project's branch tips, so a rebase is one look.
+    var branchChecks: [URL: Task<Void, Never>] = [:]
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit

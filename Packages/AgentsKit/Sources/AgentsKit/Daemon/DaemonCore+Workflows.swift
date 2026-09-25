@@ -58,6 +58,7 @@ extension DaemonCore {
         guard Self.isDirectory(standardized) else { return }
         loadWorkflows(in: standardized)
         watchWorkflows(in: standardized)
+        watchBranches(in: standardized)
         let held = workflows[standardized]?.values ?? [:].values
         guard !held.isEmpty else { return }
         // Read once for the lot rather than once each: this is a file read, and a
@@ -90,6 +91,7 @@ extension DaemonCore {
     func stopWatchingAllWorkflows() {
         for (_, watch) in workflowWatchers { watch.stop() }
         workflowWatchers.removeAll()
+        stopWatchingAllBranches()
     }
 
     /// Let a project's workflows go: an archived project's do not fire.
