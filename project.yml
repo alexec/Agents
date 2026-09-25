@@ -112,6 +112,7 @@ targets:
     supportedDestinations: [iOS]
     sources:
       - path: Remote/Sources
+      - path: Remote/Resources
       # The same files the Mac compiles. See the note on the Agents target.
       - path: Shared/UI
       # Listed, not owned. See the note on the Agents target's entitlements.
@@ -164,7 +165,9 @@ targets:
         SDKROOT: iphoneos
         SUPPORTED_PLATFORMS: iphoneos iphonesimulator
         TARGETED_DEVICE_FAMILY: "1,2"
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Not the Mac's set: that mark stands on nothing, and iOS fills nothing with
+        # black. This one is the crowd on its own dark ground, square, for iOS to round.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
 
