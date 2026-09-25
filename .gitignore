@@ -11,3 +11,6 @@ Agents.xcodeproj/
 
 # Another session's worktree lives here. Not ours to commit.
 .claude/worktrees/
+
+# Built by scripts/build-linux-agentsd.sh (037). Build outputs, 58 MB each.
+App/Resources/servers/

@@ -219,7 +219,7 @@ public final class PTY: @unchecked Sendable {
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = read(self.master, &buffer, buffer.count)
             if count <= 0 {
-                let avail = agents_output_queued(self.master)
+                _ = agents_output_queued(self.master)
                 FileHandle.standardError.write(Data("PTYDEBUG eof pid=\(self.pid) count=\(count) slave=\(self.slave) totalRead=\(self.debugTotal) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
             } else {
                 self.debugTotal += count
