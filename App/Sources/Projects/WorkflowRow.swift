@@ -172,9 +172,18 @@ struct WorkflowRow: View {
     }
 
     private var nextText: String? {
-        guard !summary.isArchived, summary.overLimit == nil,
-              let next = summary.nextFireAt else { return nil }
-        return "Next \(next.formatted(.relative(presentation: .named)))"
+        guard !summary.isArchived, summary.overLimit == nil else { return nil }
+        if let next = summary.nextFireAt {
+            return "Next \(next.formatted(.relative(presentation: .named)))"
+        }
+        // A pull-request trigger has no next time. What it has is how many pull requests
+        // it is looking after: checked out here and not stopped (038).
+        if workflow.respondsToPullRequests,
+           let list = model.pullRequestLists[Project.standardize(workflow.folder)] {
+            let watched = list.pullRequests.filter { $0.worktree != nil && !$0.babysitting.isStopped }.count
+            return watched == 1 ? "Watching 1 pull request" : "Watching \(watched) pull requests"
+        }
+        return nil
     }
 
     /// Whether anything is drawn after the next-fire time.
