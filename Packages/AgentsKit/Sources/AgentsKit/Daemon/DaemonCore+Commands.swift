@@ -300,6 +300,10 @@ extension DaemonCore {
         }
         agents[agent.id] = agent
         live[agent.id] = session
+        // Where its changes will be measured from (035), asked for beside the start
+        // rather than inside it: a start waits for nothing it does not need, and git
+        // answers in milliseconds where a runtime takes seconds to make its first edit.
+        Task { [self] in await takeStartingPoint(for: agent.id, in: cwd) }
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindAppToken(appToken, to: agent.id)

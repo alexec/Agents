@@ -124,6 +124,10 @@ public actor DaemonCore {
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
     /// and a daemon that restarts has nothing to apologise for (022 FR-016).
     var artifactEdits: [UUID: [ArtifactEdit]] = [:]
+    /// Each agent's reported edits, folded from its transcript the first time the
+    /// Changes pane asks and caught up on every ask after (035). Not persisted: the
+    /// transcript is the record, and folding it again costs one read.
+    var reportedChanges: [UUID: HeldChanges] = [:]
     /// One folder watch per watched root, shared by every connection watching under
     /// it, and who is watching what (034). Nothing here outlives its connection.
     var fileWatches: [URL: FolderWatch] = [:]
@@ -486,7 +490,7 @@ public actor DaemonCore {
     /// promised order, and an older copy landing last is a record that says an agent
     /// is running when it finished, or still has words queued that already went — both
     /// of which the next daemon acts on.
-    private func saveQuietly(_ agent: Agent) {
+    func saveQuietly(_ agent: Agent) {
         let previous = saveTail
         saveTail = Task { [store] in
             await previous?.value

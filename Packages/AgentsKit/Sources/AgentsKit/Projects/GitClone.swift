@@ -12,6 +12,9 @@ public final class GitProcess: @unchecked Sendable {
         public var status: Int32
         public var output: String
         public var errors: String
+        /// What it printed, as bytes: for output measured in bytes, as `cat-file
+        /// --batch`'s is (035).
+        public var data = Data()
         public var succeeded: Bool { status == 0 }
     }
 
@@ -20,6 +23,9 @@ public final class GitProcess: @unchecked Sendable {
     }
 
     private let process = Process()
+    /// What is written to its stdin, for the one command that reads a list there
+    /// (`cat-file --batch`, 035). Nil is an empty stdin, as it always was.
+    private let input: Data?
 
     /// Where git is on the person's PATH, or nil when it is not installed.
     public static func executable() -> URL? {
@@ -30,7 +36,11 @@ public final class GitProcess: @unchecked Sendable {
         return nil
     }
 
-    public init(_ arguments: [String], in folder: URL? = nil) throws {
+    /// `extra` is laid over the environment last: how a caller that must only read
+    /// says so (035's `GIT_OPTIONAL_LOCKS=0`).
+    public init(_ arguments: [String], in folder: URL? = nil,
+                environment extra: [String: String] = [:], input: Data? = nil) throws {
+        self.input = input
         guard let git = Self.executable() else { throw LaunchError.notInstalled }
         process.executableURL = git
         process.arguments = arguments
@@ -40,8 +50,9 @@ public final class GitProcess: @unchecked Sendable {
         // `GIT_SSH_COMMAND` is left alone because it would override their own
         // `core.sshCommand`.
         environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment.merge(extra) { _, new in new }
         process.environment = environment
-        process.standardInput = FileHandle.nullDevice
+        process.standardInput = input == nil ? FileHandle.nullDevice : Pipe()
     }
 
     /// Run to the end. Both pipes are drained while it runs, so a chatty git cannot
@@ -57,6 +68,14 @@ public final class GitProcess: @unchecked Sendable {
         drained.group.enter()
         process.terminationHandler = { _ in drained.group.leave() }
         try process.run()
+        if let input, let stdin = process.standardInput as? Pipe {
+            // Written off this thread and closed, so a list longer than the pipe's
+            // buffer cannot stall git and this caller waiting on each other.
+            DispatchQueue.global().async {
+                try? stdin.fileHandleForWriting.write(contentsOf: input)
+                try? stdin.fileHandleForWriting.close()
+            }
+        }
         let process = self.process
         return await withCheckedContinuation { continuation in
             drained.group.enter()
@@ -73,7 +92,8 @@ public final class GitProcess: @unchecked Sendable {
                 continuation.resume(returning: Outcome(
                     status: process.terminationStatus,
                     output: String(decoding: drained.output, as: UTF8.self),
-                    errors: String(decoding: drained.errors, as: UTF8.self)))
+                    errors: String(decoding: drained.errors, as: UTF8.self),
+                    data: drained.output))
             }
         }
     }

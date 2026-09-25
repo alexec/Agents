@@ -228,6 +228,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))
 
+            case DaemonAPI.Method.changesList:
+                let request = try require(params, as: DaemonAPI.ChangesListRequest.self)
+                return .success(try JSONValue.encoding(try await changesList(request)))
+
+            case DaemonAPI.Method.changesFile:
+                let request = try require(params, as: DaemonAPI.ChangesFileRequest.self)
+                return .success(try JSONValue.encoding(try await changesFile(request)))
+
             case DaemonAPI.Method.agentsSetOption:
                 let request = try require(params, as: DaemonAPI.SetOptionRequest.self)
                 return .success(try JSONValue.encoding(try await setOption(request)))
