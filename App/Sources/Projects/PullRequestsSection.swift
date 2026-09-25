@@ -31,6 +31,12 @@ struct PullRequestsSection: View {
             } else if let problem = list.problem {
                 problemLine(problem)
             }
+            if let refused = model.babysitterRefusals[list.folder] {
+                Text(refused)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 2)
+            }
         }
     }
 
@@ -52,12 +58,19 @@ struct PullRequestsSection: View {
             .help("Refresh")
             .accessibilityLabel("Refresh pull requests")
             Spacer()
-            // Wired in US4. With a problem there is nothing to babysit, so no button.
+            // With a problem there is nothing to babysit, so no button.
             if list.showsRows {
-                Button(list.babysitterWorkflowID == nil ? "Babysit my pull requests" : "Show babysitter") {}
+                if let id = list.babysitterWorkflowID {
+                    Button("Show babysitter") { model.openWorkflow = list.folder.path + "/" + id }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                } else {
+                    Button("Babysit my pull requests") {
+                        Task { await model.addBabysitter(in: list.folder) }
+                    }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                    .disabled(true)
+                }
             }
         }
         .padding(.top, 22)

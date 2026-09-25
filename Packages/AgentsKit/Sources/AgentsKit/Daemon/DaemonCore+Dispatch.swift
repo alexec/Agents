@@ -346,6 +346,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
                 return .success(try JSONValue.encoding(try await resumePullRequest(request.number, in: request.folder)))
 
+            case DaemonAPI.Method.pullRequestsAddBabysitter:
+                let request = try require(params, as: DaemonAPI.PullRequestsRequest.self)
+                return .success(try JSONValue.encoding(try addBabysitter(in: request.folder)))
+
             case DaemonAPI.Method.pullRequestsCheckout:
                 let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
                 return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))

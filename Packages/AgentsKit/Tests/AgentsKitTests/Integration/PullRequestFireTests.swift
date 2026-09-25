@@ -247,4 +247,61 @@ struct PullRequestFireTests {
         #expect(await eventually("a run after Resume") { await !box.core.allAgents().isEmpty })
         #expect(resumed.pullRequests.first { $0.number == 412 }?.babysitting.isStopped == false)
     }
+
+    // MARK: The starter (US4)
+
+    @Test func babysitMyPullRequestsWritesALiveWorkflow() async throws {
+        // A runtime offering the mode the starter asks for, as Claude does.
+        var script = FakeACPAgent.Script()
+        script.configOptions = [
+            ConfigOption(id: "permission_mode", name: "Mode", category: "mode", type: "select",
+                         currentValue: .string("default"),
+                         options: ["default", "acceptEdits"].map { ConfigChoice(value: .string($0), name: $0) })
+        ]
+        let box = try await PullRequestSandbox.make(script: script)
+        let summary = try await box.core.addBabysitter(in: box.project)
+        #expect(summary.workflowID == "babysit-pull-requests")
+        #expect(summary.workflow.problem == nil)
+        #expect(summary.workflow.triggers == WorkflowTrigger.pullRequestTriggers)
+        #expect(summary.workflow.mode == .new)
+        #expect(summary.workflow.settings.permissionMode == "acceptEdits")
+        // The note about acceptEdits is in the front matter, not in the prompt.
+        #expect(summary.workflow.prompt.hasPrefix("Read what changed."))
+        #expect(!summary.workflow.prompt.contains("acceptEdits"))
+        #expect(await box.core.pullRequestList(for: box.project)?.babysitterWorkflowID == "babysit-pull-requests")
+
+        // And it fires on the next refresh.
+        _ = await box.core.refreshPullRequestsNow(in: box.project)
+        #expect(await eventually("a run from the starter") { await !box.core.allAgents().isEmpty })
+    }
+
+    @Test func aSecondOneIsNotAdded() async throws {
+        let box = try await PullRequestSandbox.make()
+        _ = try await box.core.addBabysitter(in: box.project)
+        do {
+            _ = try await box.core.addBabysitter(in: box.project)
+            Issue.record("expected babysitterExists")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.babysitterExists)
+            #expect(error.data?["workflowID"]?.stringValue == "babysit-pull-requests")
+        }
+    }
+
+    @Test func aProjectAtItsCeilingIsToldSoInTheRowsWords() async throws {
+        let every = """
+            ---
+            on:
+              - agent-finished
+            ---
+            Hello.
+            """
+        let box = try await PullRequestSandbox.make(workflows: ["one": every, "two": every, "three": every])
+        do {
+            _ = try await box.core.addBabysitter(in: box.project)
+            Issue.record("expected the ceiling")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.workflowLimitReached)
+            #expect(error.message == "This project already runs its 3 workflows. Archive another in this project to let it run.")
+        }
+    }
 }

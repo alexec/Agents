@@ -411,6 +411,28 @@ final class AppModel {
         }
     }
 
+    /// Why Babysit my pull requests was refused, by folder, until it is tried again.
+    private(set) var babysitterRefusals: [URL: String] = [:]
+
+    /// Babysit my pull requests: write the starter workflow (FR-026). A ceiling is said
+    /// under the button rather than in an alert (wireframe G).
+    func addBabysitter(in folder: URL) async {
+        let folder = Project.standardize(folder)
+        babysitterRefusals[folder] = nil
+        do {
+            let summary = try await client.call(DaemonAPI.Method.pullRequestsAddBabysitter,
+                                                DaemonAPI.PullRequestsRequest(folder: folder),
+                                                returning: WorkflowSummary.self)
+            work.upsert(summary)
+            if var list = pullRequestLists[folder] {
+                list.babysitterWorkflowID = summary.workflowID
+                pullRequestLists[folder] = list
+            }
+        } catch {
+            babysitterRefusals[folder] = describe(error)
+        }
+    }
+
     /// Resume: start babysitting a stopped pull request again (FR-024).
     func resume(_ number: Int, in folder: URL) async {
         let folder = Project.standardize(folder)
