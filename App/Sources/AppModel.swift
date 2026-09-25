@@ -198,6 +198,9 @@ final class AppModel {
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
     private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var draftWorktreesGeneration = 0
+    /// The branch each project folder is on, for the chat's folder chip. Missing until
+    /// asked, and for a folder in no repository.
+    private(set) var projectFolderBranches: [URL: String] = [:]
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -271,6 +274,8 @@ final class AppModel {
 
     /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
 
     // MARK: Workflows
 
@@ -837,6 +842,17 @@ final class AppModel {
         draftWorktrees = answer
     }
 
+    /// Ask which branch an agent's project folder is on. Asked when its chat opens and
+    /// when its turn ends, since someone may have checked out another branch meanwhile.
+    func loadProjectFolderBranch(of agent: Agent) async {
+        guard agent.worktree == nil else { return }
+        let folder = agent.projectFolder
+        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                            returning: DaemonAPI.WorktreesListResponse.self)
+        projectFolderBranches[folder] = answer?.projectFolderBranch
+    }
+
     /// A session has to exist before its options do, so choosing a folder and a
     /// runtime starts one. It is kept and used by the start that follows.
     func loadDraftOptions() async {
@@ -975,6 +991,16 @@ final class AppModel {
             try await self.client.call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: selection, text: text,
                                                                attachments: attachments))
+        }
+    }
+
+    /// End a block by hand (039): the prompt Carry on sends, as the person, to an agent
+    /// that need not be the one selected. A person's prompt is what clears a block, so
+    /// this is an ordinary prompt and nothing else.
+    func carryOn(_ id: UUID) async {
+        await attempt {
+            try await self.client.call(DaemonAPI.Method.agentsPrompt,
+                                       DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
         }
     }
 

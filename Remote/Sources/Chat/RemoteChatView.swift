@@ -87,6 +87,18 @@ struct RemoteChatView: View {
             // on screen, because someone who stops a chat that has gone the wrong way
             // wants to keep reading it and say what next. Archive goes back to the
             // project, because the thing being read has been put away.
+            // Blocked (039): the card's Carry on, where the chat's own controls are.
+            if let agent, model.isBlocked(agent) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await model.carryOn(agent.id) }
+                    } label: {
+                        Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                    }
+                    .disabled(model.isStale)
+                    .accessibilityHint("Tells it the block has cleared, and lets it carry on")
+                }
+            }
             if let agent, model.canStop(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

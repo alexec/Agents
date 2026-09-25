@@ -45,7 +45,11 @@ struct PromptBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if isShowingEverything {
-                PromptHeader(agent: agent) { ContextMeter(agent: agent) }
+                PromptHeader(agent: agent,
+                             projectFolderBranch: model.projectFolderBranches[agent.projectFolder]) {
+                    ContextMeter(agent: agent)
+                }
+                .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
                 CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()

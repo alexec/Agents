@@ -182,6 +182,13 @@ public final class DaemonServer: @unchecked Sendable {
     /// matters; and a write that cannot finish in `sendWait` fails, the connection is
     /// closed, and the client reconnects and asks for everything again — which a
     /// window already does whenever its connection goes.
+    ///
+    /// Encoded once and the same line written to each. A shell's output is a
+    /// notification per chunk, and with the Mac, the phone and the bridge listening it
+    /// was being turned into JSON once per listener. The encoding is on a serial queue
+    /// of its own, not the caller's, because the caller is the actor that owns every
+    /// agent; serial, and handing on in the order it was given, so each connection's
+    /// queue still receives what the daemon said in the order it said it.
     public func broadcast(_ method: String, _ params: JSONValue?) {
         broadcast(method, params, to: { _ in true })
     }
@@ -193,22 +200,34 @@ public final class DaemonServer: @unchecked Sendable {
     /// open. The rest of what the daemon says still goes to everyone. A phone on WiFi
     /// should not carry an unrelated agent's build output because a Mac window happens
     /// to have that shell open.
+    ///
+    /// Through the same encoding queue as everything else, so a connection that hears
+    /// some notifications this way and the rest the other way still hears them all in
+    /// the order the daemon said them.
     public func broadcast(_ method: String, _ params: JSONValue?,
-                          to wanted: @Sendable (ConnectionContext) -> Bool) {
-        for (connection, queue, context) in connections.allAddressed where wanted(context) {
-            queue.async {
-                do {
-                    try connection.notify(method, params)
-                } catch {
-                    // Closed, or stuck past the wait. Either way this connection has
-                    // missed something, and a client that carried on would be showing
-                    // a list that is no longer true. Half a line may also be on the
-                    // wire. Closing is what tells it to start again.
-                    Task { await connection.close() }
+                          to wanted: @escaping @Sendable (ConnectionContext) -> Bool) {
+        encoding.async { [connections] in
+            let targets = connections.allAddressed.filter { wanted($0.2) }
+            guard !targets.isEmpty,
+                  let line = try? JSONRPCCodec.encode(.notification(method: method, params: params))
+            else { return }
+            for (connection, queue, _) in targets {
+                queue.async {
+                    do {
+                        try connection.notify(line: line)
+                    } catch {
+                        // Closed, or stuck past the wait. Either way this connection has
+                        // missed something, and a client that carried on would be showing
+                        // a list that is no longer true. Half a line may also be on the
+                        // wire. Closing is what tells it to start again.
+                        Task { await connection.close() }
+                    }
                 }
             }
         }
     }
+
+    private let encoding = DispatchQueue(label: "com.alexecollins.agents.broadcast.encode")
 
     /// How long a write to one client may block before that client is given up on.
     /// Long enough for a window busy for a moment; a client that has read nothing for

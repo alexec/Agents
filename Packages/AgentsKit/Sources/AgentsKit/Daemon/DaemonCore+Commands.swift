@@ -712,7 +712,7 @@ extension DaemonCore {
         return agents[request.agentID] ?? agent
     }
 
-    private func reason(_ error: any Error) -> String {
+    func reason(_ error: any Error) -> String {
         (error as? JSONRPCError)?.message ?? error.localizedDescription
     }
 
@@ -960,6 +960,10 @@ extension DaemonCore {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
             return
         }
+        // Ended blocked, with everything it named already over (039): carried on here,
+        // after the runtime is let go, and never from inside `move`, where the release
+        // still to come would take the new turn's runtime with it.
+        await resumeIfCleared(agentID)
         await askForOutcomeIfSilent(agentID: agentID, reason: reason)
         await drainQueue(after: agentID)
     }
@@ -1164,6 +1168,17 @@ extension DaemonCore {
         // reject `.stoppedByUser` — so this is not what keeps the record right. It is
         // here so the code says what it means instead of leaning on a refusal to
         // undo a call it should not have made.
+        // A blocked agent (039). Its block is dropped first, so nothing clearing in the
+        // awaits below can resume it; and a finished one, which has no turn to cancel,
+        // is stopped on the one event that takes a finished agent to stopped.
+        let wasBlocked = agents[agentID]?.report?.isOpenBlock == true
+        dropBlock(agentID)
+        if wasBlocked, agents[agentID]?.state == .finished {
+            if case .agent(let starter) = cause {
+                await record(.runtimeNote("\(starterName(starter)) stopped this agent."), for: agentID)
+            }
+            await move(agentID, on: cause == .person ? .stoppedWaitingByUser : .stoppedWaitingByAgent)
+        }
         if agents[agentID]?.state.holdsRuntime == true {
             switch cause {
             case .person:
@@ -1201,6 +1216,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         stops[agentID, default: 0] += 1
+        // Archived is never resumed (FR-017): the block goes before anything is awaited.
+        dropBlock(agentID)
         if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
         switch cause {
         case .person:

@@ -70,4 +70,49 @@ struct FileMentionTests {
         guard case .failure(let error) = answer else { Issue.record("expected a refusal"); return }
         #expect(error.code == DaemonAPI.Failure.noSuchAgent)
     }
+
+    // MARK: What is left out
+
+    /// Build output and what the project ignores. An index record under `build/DD`
+    /// matched "PromptBar" before the source did, on the Mac and the phone alike.
+    @Test func buildOutputAndWhatGitIgnoresAreNotOffered() async throws {
+        let (locations, work, _) = try temporary()
+        let manager = FileManager.default
+        for folder in ["build/DD/Index", "DerivedData/x", "Generated", "Sources/out"] {
+            try manager.createDirectory(at: work.appendingPathComponent(folder), withIntermediateDirectories: true)
+        }
+        for file in ["build/DD/Index/Transcript.swift-1RMN", "DerivedData/x/Transcript.o",
+                     "Generated/TranscriptModel.swift", "Sources/out/TranscriptOut.swift",
+                     "Sources/Transcript.xcuserstate"] {
+            try Data("x".utf8).write(to: work.appendingPathComponent(file))
+        }
+        try Data("# ours\n/Generated/\n*.xcuserstate\nSources/out/\n!keep.txt\nweird/*/glob\n".utf8)
+            .write(to: work.appendingPathComponent(".gitignore"))
+        let core = try core(locations: locations)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "hello"))
+
+        let found = try await core.fileMentions(.init(agentID: id, term: "Transcript"))
+        #expect(found.map(\.relativePath) == ["Sources/Transcript.swift"])
+    }
+
+    @Test func onlyTheShapesOfGitignoreItCanHonourAreRead() {
+        typealias Rule = MentionIgnore.Rule
+        #expect(MentionIgnore.rule("build/") == Rule(kind: .name("build"), directoriesOnly: true))
+        #expect(MentionIgnore.rule("/DerivedData") == Rule(kind: .path("DerivedData"), directoriesOnly: false))
+        #expect(MentionIgnore.rule(".claude/worktrees/") == Rule(kind: .path(".claude/worktrees"), directoriesOnly: true))
+        #expect(MentionIgnore.rule("*.xcuserstate") == Rule(kind: .suffix(".xcuserstate"), directoriesOnly: false))
+        #expect(MentionIgnore.rule("# a comment") == nil)
+        #expect(MentionIgnore.rule("!keep.txt") == nil)
+        #expect(MentionIgnore.rule("weird/*/glob") == nil)
+        #expect(MentionIgnore.rule("*.o*") == nil)
+
+        let ignore = MentionIgnore(gitignore: "xcuserdata/\n/Top\n")
+        #expect(ignore.skips("a/b/xcuserdata", isDirectory: true))
+        // A rule for folders does not hide a file of the same name.
+        #expect(!ignore.skips("a/b/xcuserdata", isDirectory: false))
+        #expect(ignore.skips("Top", isDirectory: false))
+        #expect(!ignore.skips("nested/Top", isDirectory: false))
+        #expect(ignore.skips("App/build", isDirectory: true))
+        #expect(!ignore.skips("App/build.swift", isDirectory: false))
+    }
 }

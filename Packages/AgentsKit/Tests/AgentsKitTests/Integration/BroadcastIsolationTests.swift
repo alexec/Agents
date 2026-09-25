@@ -47,6 +47,66 @@ struct BroadcastIsolationTests {
         return false
     }
 
+    /// Every byte `fd` receives until `marker` appears or `deadline` passes.
+    private func received(_ fd: Int32, until marker: String, deadline: Date) -> Data {
+        var wait = timeval(tv_sec: 0, tv_usec: 200_000)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &wait, socklen_t(MemoryLayout<timeval>.size))
+        var received = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        let needle = Data(marker.utf8)
+        while Date() < deadline {
+            let n = buffer.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress, $0.count) }
+            if n > 0 {
+                received.append(contentsOf: buffer[0..<n])
+                if received.range(of: needle) != nil { return received }
+            } else if n == 0 {
+                break
+            }
+        }
+        return received
+    }
+
+    /// The line is encoded once and written to each client, and encoding off the
+    /// caller must not cost the order: every client gets the same bytes, in the order
+    /// they were said.
+    @Test func everyClientHearsTheSameLinesInOrder() async throws {
+        let path = "/tmp/ag-bcast-\(UUID().uuidString.prefix(8)).sock"
+        let server = DaemonServer(url: URL(fileURLWithPath: path)) { _, _, _ in .success(.null) }
+        try server.start()
+        defer { server.stop() }
+
+        let clients = (0..<3).map { _ in connect(path) }
+        defer { clients.forEach { close($0) } }
+        await eventually("all are connected") { server.connectionCount == 3 }
+
+        for i in 0..<500 { server.broadcast("test/chunk", ["n": .int(i)]) }
+        server.broadcast("test/end", nil)
+
+        let streams = await withTaskGroup(of: Data.self) { group in
+            for fd in clients {
+                group.addTask {
+                    await withCheckedContinuation { (done: CheckedContinuation<Data, Never>) in
+                        Thread { [self] in
+                            done.resume(returning: received(fd, until: "test/end",
+                                                            deadline: Date().addingTimeInterval(5)))
+                        }.start()
+                    }
+                }
+            }
+            return await group.reduce(into: []) { $0.append($1) }
+        }
+        #expect(streams.count == 3)
+        #expect(Set(streams).count == 1, "every client got the same bytes")
+        let numbers = String(decoding: streams[0], as: UTF8.self)
+            .split(separator: "\n")
+            .compactMap { try? JSONRPCCodec.decode(line: String($0)) }
+            .compactMap { message -> Int? in
+                guard case .notification("test/chunk", let params) = message else { return nil }
+                return params?["n"]?.intValue
+            }
+        #expect(numbers == Array(0..<500), "in the order they were said")
+    }
+
     @Test func aStalledClientDoesNotSilenceTheOthers() async throws {
         let path = "/tmp/ag-bcast-\(UUID().uuidString.prefix(8)).sock"
         let server = DaemonServer(url: URL(fileURLWithPath: path)) { _, _, _ in .success(.null) }

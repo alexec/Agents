@@ -451,6 +451,21 @@ final class RemoteModel {
 
     // MARK: The project's worktrees (030)
 
+    /// The branch each project folder is on, for the chat's folder chip, as the Mac
+    /// shows it. Missing until asked, and for a folder in no repository.
+    private(set) var projectFolderBranches: [URL: String] = [:]
+
+    /// Asked when a chat opens and when its turn ends, since someone may have checked
+    /// out another branch meanwhile. Never polled.
+    func loadProjectFolderBranch(of agent: Agent) async {
+        guard agent.worktree == nil else { return }
+        let folder = agent.projectFolder
+        let answer = try? await client.call(DaemonAPI.Method.worktreesList,
+                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                            returning: DaemonAPI.WorktreesListResponse.self)
+        projectFolderBranches[folder] = answer?.projectFolderBranch
+    }
+
     /// The app's worktrees for the project on screen, for its Worktrees section.
     private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var projectWorktreesFolder: URL?
@@ -538,6 +553,10 @@ final class RemoteModel {
 
     /// Whether the menu offers Stop: the same answer the Mac gives.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
+    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
+    /// End a block by hand (039), as the person. See the Mac's `carryOn`.
+    func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// The question the open conversation is blocked on, if it still is.
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }

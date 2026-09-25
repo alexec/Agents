@@ -7,6 +7,8 @@ import Foundation
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case needsAttention
+    /// Its turn ended waiting on something other than the person (039).
+    case blocked
     case running
     case finished
     case stopped
@@ -16,6 +18,7 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     public var title: String {
         switch self {
         case .needsAttention: return "Needs attention"
+        case .blocked: return "Blocked"
         case .running: return "Working"
         case .finished: return "Complete"
         case .stopped: return "Stopped"
@@ -23,9 +26,11 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// The four the panel always shows, in the order it shows them. `archived` is not
-    /// here because it is only drawn when the user asks for it.
-    public static let live: [AgentGroup] = [.needsAttention, .running, .finished, .stopped]
+    /// The ones the panel shows when they have anybody in them, in the order it shows
+    /// them. `archived` is not here because it is only drawn when the user asks for it.
+    /// Blocked sits under Needs attention and above Working: nearer the top than
+    /// Working, because it is waiting, but below the one group that wants you (039).
+    public static let live: [AgentGroup] = [.needsAttention, .blocked, .running, .finished, .stopped]
 
     /// One state in, exactly one group out.
     ///
@@ -81,6 +86,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// answers ends `finished` with the flag still up, which is the unaccounted ending
     /// 014 already draws (FR-017).
     ///
+    /// A blocked report (039) is the one report that is neither: nobody has to act,
+    /// and the work is not settled. It gets Blocked, under the same arms — settled, or
+    /// answering the app — and loses to anything that wants a person.
+    ///
     /// Still total over `(AgentState, Bool, WorkReport?, Bool)`, so an agent is in
     /// exactly one group and never in none.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool) {
@@ -92,12 +101,22 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .starting: self = .running
         case .waitingOnUser: self = .needsAttention
         // Answering the app's question: where it was, not Working. See above.
-        case .running where outcomeAsked: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished
+        case .running where outcomeAsked: self = Self.settled(wantsEyes || wantsAnswer, report)
         case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = (wantsEyes || wantsAnswer) ? .needsAttention : .finished
+        case .finished: self = Self.settled(wantsEyes || wantsAnswer, report)
         case .stopped: self = .stopped
         case .archived: self = .archived
         }
+    }
+
+    /// Where a settled agent goes: Needs attention if somebody has to act, Blocked if
+    /// it is waiting on something that is not a person (039), and Complete otherwise.
+    /// Wanting a person outranks being blocked — an agent that asked to be looked at is
+    /// asking you, whatever else it is waiting on.
+    private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?) -> AgentGroup {
+        if wantsAPerson { return .needsAttention }
+        if report?.isOpenBlock == true { return .blocked }
+        return .finished
     }
 }
 
@@ -120,7 +139,7 @@ extension AgentGroup: CodingKeyRepresentable {
 }
 
 public extension Agent {
-    /// Which of the five this agent falls in — the one way to ask.
+    /// Which group this agent falls in — the one way to ask.
     ///
     /// The argument is the one fact only a window holds: whether this agent asked the
     /// person to look at something and they have not. `false` is honest from anything

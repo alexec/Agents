@@ -108,7 +108,10 @@ extension DaemonCore {
         // Nothing to stop. Said, rather than refused: the agent asked for a thing
         // that is already true, and a stop that finds nothing running is not an error.
         let isComingBack = resuming.contains(target.id) || interrupted[target.id] != nil
-        guard target.state.holdsRuntime || isComingBack else {
+        // A blocked helper (039) has no turn going but has a resume coming, and
+        // stopping it is how that resume is called off.
+        let isBlocked = target.state == .finished && target.report?.isOpenBlock == true
+        guard target.state.holdsRuntime || isComingBack || isBlocked else {
             return "\u{201C}\(title)\u{201D} had already stopped; nothing changed."
         }
         try await stop(target.id, by: .agent(caller.id))
@@ -152,6 +155,8 @@ extension DaemonCore {
         case .starting: return "starting"
         case .running: return "working"
         case .waitingOnUser: return "waiting on the person"
+        case .finished where agent.report?.isOpenBlock == true:
+            return "blocked: " + (agent.report?.message ?? "")
         case .finished: return "finished" + said
         case .stopped:
             let why = agent.endedReason?.summary.map { " (\($0.lowercased()))" } ?? ""
