@@ -15,7 +15,11 @@ struct OptionMenu: View {
             BooleanCapsule(name: option.name, isOn: isOn) { chosen = .bool($0) }
         case .select(let groups):
             SelectCapsule(name: option.name, title: option.closedTitle(for: chosen)) { dismiss in
-                ForEach(groups) { group in
+                // By position, not by `group.id`: a group's id is its heading, and two
+                // without one — the workflow page's "Runtime default" ahead of the
+                // runtime's own flat list — would share it, and SwiftUI then draws the
+                // first group in place of the second.
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                     // A heading only where the runtime gave one. A flat list is the
                     // common case and looks exactly as it did before.
                     if let name = group.name, !name.isEmpty {
