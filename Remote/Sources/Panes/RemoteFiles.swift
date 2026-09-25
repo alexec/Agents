@@ -28,6 +28,10 @@ final class RemoteFiles {
     /// anywhere beside the page.
     private(set) var anyChange: [UUID: Int] = [:]
 
+    /// Counted up each time the Mac is back after being gone. A page with a draft the
+    /// Mac never received reads its file again and saves it (034 FR-009).
+    private(set) var reconnections = 0
+
     private var watched: Set<DaemonAPI.FilesWatchRequest> = []
 
     init(client: DaemonClient) {
@@ -70,6 +74,7 @@ final class RemoteFiles {
     /// A new connection: it watches nothing yet, and may be to a newer Mac.
     func reconnected() async {
         macLacksPanes = false
+        reconnections += 1
         for request in watched {
             _ = try? await asking { try await client.call(DaemonAPI.Method.filesWatch, request) }
         }

@@ -134,20 +134,20 @@ it first. The page opens and follows each step with no tap.
   - image → the disk, with the old cache
   - imagesChanged → `folderEvents` and `ImageStamps`
   - canEdit → true
-- [ ] T027 [US1] Build the Mac. Run the run-app skill on a scratch root and walk quickstart "The Mac page, unchanged after the move". Screenshot four steps, compare with `specs/022-live-artifacts/walk/`, and put the shots in `specs/034-ios-artifacts/walk/`.
-- [ ] T028 [US1] Create `Remote/Sources/Panes/PagePane.swift`:
+- [ ] T027 (deferred to the end, 2026-09-24: Alex chose "build on, walk later" while at the keyboard) [US1] Build the Mac. Run the run-app skill on a scratch root and walk quickstart "The Mac page, unchanged after the move". Screenshot four steps, compare with `specs/022-live-artifacts/walk/`, and put the shots in `specs/034-ios-artifacts/walk/`.
+- [X] T028 [US1] Create `Remote/Sources/Panes/PagePane.swift`:
   - It reads `pagePath` through `RemoteFiles.read` and watches its folder.
   - On `files/changed` naming the page's folder, it re-reads with the stamp and hands new text to `LivePage`.
   - Its `PageActions`: image through `files/read`, cached by path and stamp. `imagesChanged` is bumped when an image's folder is named.
   - A missing file shows an empty page with the file's name (US1 scenario 1).
   - "\<name\> is gone." keeps the last text, dimmed.
   - The stale banner is on top.
-- [ ] T029 [US1] Add attention to `Remote/Sources/RemoteModel.swift`:
+- [X] T029 [US1] Add attention to `Remote/Sources/RemoteModel.swift`:
   - `isTyping: Bool`, set by the prompt bar's focus (`Remote/Sources/Chat/PromptBar.swift`), and later by the passage editor and the terminal.
   - `openFileTheAgentWants()`, when the chat is in front and `!isTyping`, sets the agent's `PaneState`: `.page` with `pagePath` for `.md`, otherwise `.files` with `openFile` and `openLine`. When `macLacksPanes`, it keeps today's `fileOnScreen`.
   - Otherwise it sets `offeredFile`.
-- [ ] T030 [US1] In `Remote/Sources/Chat/RemoteChatView.swift`, add the "Wants you to see **name**" strip under the top bar, with Open and ✕, from `offeredFile`. Keep `.onChange(of: model.fileTheAgentWants)`, and re-check when `isTyping` becomes false.
-- [ ] T031 [US1] Build Remote. Build the Mac and walk once more with run-app, to show `show_file` still opens the Mac page.
+- [X] T030 [US1] In `Remote/Sources/Chat/RemoteChatView.swift`, add the "Wants you to see **name**" strip under the top bar, with Open and ✕, from `offeredFile`. Keep `.onChange(of: model.fileTheAgentWants)`, and re-check when `isTyping` becomes false.
+- [X] T031 [US1] Build Remote. Build the Mac and walk once more with run-app, to show `show_file` still opens the Mac page.
 
 **Checkpoint**: The page follows on both devices. Slice A's layout (Phase 2 plus this) is ready
 for Alex to see on an iPad and an iPhone. **Stop here and ask Alex to look before Phase 4**
@@ -163,7 +163,7 @@ to a dropped connection.
 **Independent Test**: Edit a paragraph on the phone, then check `cat` on the Mac and the Mac's
 page. Prompt "carry on", and the agent keeps the edit.
 
-- [ ] T032 [US2] Add `reconnected(_ fresh:)` to `PageFollower`. With a draft open, it runs `follow` against `fresh` with the same `PassageMerge` carry, and returns `.save`. `saved(problem:)` keeps the draft and sets `saveProblem` on failure. A later `follow` never clears a `saveProblem` while the draft differs from what is on disk.
+- [X] T032 [US2] Add `reconnected(_ fresh:)` to `PageFollower`. With a draft open, it runs `follow` against `fresh` with the same `PassageMerge` carry, and returns `.save`. `saved(problem:)` keeps the draft and sets `saveProblem` on failure. A later `follow` never clears a `saveProblem` while the draft differs from what is on disk.
 - [X] T033 [P] [US2] Extend `PageFollowerTests`:
   - an agent's write elsewhere while a passage is open leaves the draft and produces no scroll
   - a write to the same passage gives a collision, keeps mine and saves
@@ -173,9 +173,9 @@ page. Prompt "carry on", and the agent keeps the edit.
 - [X] T034 [US2] Move `App/Sources/Sidebar/PassageEditor.swift` to `Shared/UI/Page/PassageEditor.swift`:
   - macOS keeps the `NSTextView`. iOS gets a `UIViewRepresentable` `UITextView` with the same `draft` binding, `onCommit` after `pauseBeforeSaving` (1 s), `onClose` on end-editing, height fitting to its content, and the paper colours.
   - `LivePage` uses it on both platforms, and opens passages only when `PageActions.canEdit`.
-- [ ] T035 [US2] Add `writeArtifact(agentID:path:text:) async -> String?` to `Remote/Sources/RemoteModel.swift`, over `artifact/write`, with the Mac's wording for failures (copy `AppModel.writeArtifact`). `PagePane`'s `PageActions.save` calls it, and `canEdit = !model.isStale`. The editor reports focus to `isTyping`.
-- [ ] T036 [US2] Handle reconnect in `PagePane`. When `isStale` goes false with a draft open, re-watch, re-read, and call `follower.reconnected(fresh)`. While stale, the open editor is read-only with its draft selectable, and a failed save shows "Not saved: \<reason\>" under it.
-- [ ] T037 [US2] Build Remote. Run the suite. Show `ArtifactWriteTests` still passes with a device surface as the caller (add one case with a `FakeSurface` device connection).
+- [X] T035 [US2] Add `writeArtifact(agentID:path:text:) async -> String?` to `Remote/Sources/RemoteModel.swift`, over `artifact/write`, with the Mac's wording for failures (copy `AppModel.writeArtifact`). `PagePane`'s `PageActions.save` calls it, and `canEdit = !model.isStale`. The editor reports focus to `isTyping`.
+- [X] T036 [US2] Handle reconnect in `PagePane`. When `isStale` goes false with a draft open, re-watch, re-read, and call `follower.reconnected(fresh)`. While stale, the open editor is read-only with its draft selectable, and a failed save shows "Not saved: \<reason\>" under it.
+- [X] T037 [US2] Build Remote. Run the suite. Show `ArtifactWriteTests` still passes with a device surface as the caller (add one case with a `FakeSurface` device connection).
 
 ---
 

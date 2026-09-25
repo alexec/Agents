@@ -56,6 +56,9 @@ struct RemoteChatView: View {
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
+                // The agent asked to be looked at while something was being typed: said
+                // here, to be opened when the person chooses (034 FR-005).
+                if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -251,5 +254,40 @@ struct ContextMeter: View {
     private func label(_ usage: Usage) -> String {
         let tokens = "\(usage.used.formatted()) of \(usage.size.formatted()) tokens"
         return usage.isCloseToFull ? "Context nearly full — \(tokens)" : tokens
+    }
+}
+
+/// "Wants you to see plan.md", with Open and not now (034 FR-005).
+///
+/// The agent's request, kept on the chat rather than taking the screen: somebody typing
+/// is not somebody to interrupt, and the file will still be there when they are done.
+private struct OfferedFileStrip: View {
+    @Environment(RemoteModel.self) private var model
+    let file: ShownFile
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            (Text("Wants you to see ") + Text(file.name).fontWeight(.semibold))
+                .appText(.supporting)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Button("Open") { model.openOfferedFile() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            Button {
+                model.dismissOfferedFile()
+            } label: {
+                Label("Not now", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .paperWell(in: Rectangle())
     }
 }

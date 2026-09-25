@@ -35,6 +35,9 @@ struct PageActions {
     /// Whether typing is possible now. A phone whose Mac has gone quiet says no, and
     /// the page keeps what is typed but takes no more (034 FR-028).
     var canEdit: Bool
+    /// Told when a passage opens for typing and when it closes, so an agent asking to be
+    /// looked at waits rather than taking the screen (034 FR-005).
+    var typing: @MainActor (Bool) -> Void = { _ in }
 
     init(save: @escaping @MainActor (String, String) async -> String? = { _, _ in
              "Nothing here can save this page."

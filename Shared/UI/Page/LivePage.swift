@@ -118,9 +118,11 @@ struct LivePage: View {
                     guard let new, !page.isEditing else { return }
                     Task { await go(to: new, proxy: proxy) }
                 }
+                .onChange(of: page.isEditing) { _, now in actions.typing(now) }
                 .onDisappear {
                     typist?.cancel()
                     page.complete()
+                    if page.isEditing { actions.typing(false) }
                 }
                 .task(id: line) {
                     guard let line, let index = page.index(containing: line) else { return }
