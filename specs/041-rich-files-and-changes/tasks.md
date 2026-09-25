@@ -125,7 +125,7 @@ with `scripts/vendor-grammars.sh`. The other 15 come in T025.
   - string dark olive
   - number plum
   - type teal
-  - function slate blue
+  - function indigo (was slate blue; changed at T024)
   - property brown
   - punctuation `.secondary`
 

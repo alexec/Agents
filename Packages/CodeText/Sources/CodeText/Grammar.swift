@@ -1,27 +1,53 @@
 import Foundation
 import os
 import SwiftTreeSitter
+import TS_bash
+import TS_c
+import TS_cpp
+import TS_css
+import TS_dockerfile
+import TS_go
+import TS_html
+import TS_java
 import TS_javascript
 import TS_json
+import TS_make
 import TS_markdown
 import TS_python
+import TS_ruby
+import TS_rust
 import TS_swift
+import TS_toml
 import TS_tsx
 import TS_typescript
+import TS_yaml
 
 /// Each language's parser and highlight query (041 research R2, R8).
 enum Grammar {
-    /// The parser for a language, or nil for one whose grammar is not vendored yet.
+    /// The parser for a language. Optional so a language can be listed before its grammar is
+    /// vendored; all twenty are vendored now.
     static func language(for code: CodeLanguage) -> Language? {
         let pointer: OpaquePointer? = switch code {
         case .swift: tree_sitter_swift()
+        case .c: tree_sitter_c()
+        case .cpp: tree_sitter_cpp()
         case .python: tree_sitter_python()
         case .javascript: tree_sitter_javascript()
         case .typescript: tree_sitter_typescript()
         case .tsx: tree_sitter_tsx()
         case .json: tree_sitter_json()
+        case .go: tree_sitter_go()
+        case .rust: tree_sitter_rust()
+        case .java: tree_sitter_java()
+        case .ruby: tree_sitter_ruby()
+        case .bash: tree_sitter_bash()
+        case .yaml: tree_sitter_yaml()
+        case .toml: tree_sitter_toml()
+        case .html: tree_sitter_html()
+        case .css: tree_sitter_css()
         case .markdown: tree_sitter_markdown()
-        default: nil
+        case .dockerfile: tree_sitter_dockerfile()
+        case .make: tree_sitter_make()
         }
         return pointer.map { Language(language: $0) }
     }

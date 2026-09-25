@@ -7,10 +7,24 @@ import Testing
 struct ColourerTests {
     /// Each vendored language and its sample file.
     static let samples: [(CodeLanguage, String)] = [
-        (.swift, "sample.swift"), (.python, "sample.py"), (.javascript, "sample.js"),
-        (.typescript, "sample.ts"), (.tsx, "sample.tsx"), (.json, "sample.json"),
-        (.markdown, "sample.md"),
+        (.swift, "sample.swift"), (.c, "sample.c"), (.cpp, "sample.cpp"),
+        (.python, "sample.py"), (.javascript, "sample.js"), (.typescript, "sample.ts"),
+        (.tsx, "sample.tsx"), (.json, "sample.json"), (.go, "sample.go"),
+        (.rust, "sample.rs"), (.java, "sample.java"), (.ruby, "sample.rb"),
+        (.bash, "sample.sh"), (.yaml, "sample.yml"), (.toml, "sample.toml"),
+        (.html, "sample.html"), (.css, "sample.css"), (.markdown, "sample.md"),
+        (.dockerfile, "Dockerfile"), (.make, "Makefile"),
     ]
+
+    @Test func everyLanguageHasASample() {
+        #expect(Set(Self.samples.map(\.0)) == Set(CodeLanguage.allCases))
+    }
+
+    /// The sample's name says its language, the way a file in the pane is recognised.
+    @Test(arguments: samples)
+    func eachSampleIsRecognisedByItsName(language: CodeLanguage, file: String) {
+        #expect(CodeLanguage.detect(path: file, firstLine: nil) == language)
+    }
 
     static func sample(_ name: String) throws -> String {
         let url = try #require(Bundle.module.url(forResource: name, withExtension: nil,
@@ -104,8 +118,10 @@ struct ColourerTests {
         #expect(spans.contains { !$0.isEmpty })
     }
 
-    @Test func aLanguageWithoutAGrammarDoesNotParse() async {
-        #expect(await !Colourer.shared.parse(id: UUID(), text: "SELECT 1", language: .go))
+    @Test func everyLanguageHasAGrammar() {
+        for language in CodeLanguage.allCases {
+            #expect(Grammar.language(for: language) != nil, "\(language) has no grammar")
+        }
     }
 
     @Test func layingASpanOverOthersTrimsThem() {

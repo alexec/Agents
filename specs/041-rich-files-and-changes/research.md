@@ -157,7 +157,7 @@ dark colour, derived from `Paper`'s warm ink:
 - Strings: a dark olive green.
 - Numbers: a plum.
 - Types: a teal.
-- Functions: a slate blue.
+- Functions: an indigo (a slate blue at first; too close to the ink in light, changed at the T024 look gate).
 - Properties: brown.
 - Punctuation: the secondary ink.
 

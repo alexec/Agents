@@ -17,8 +17,10 @@ import PackageDescription
 // Said here rather than looked for on disk: a manifest cannot see files reliably, which is
 // how tree-sitter-python's own manifest comes to lose its scanner.
 let grammars: [(name: String, scanner: Bool)] = [
-    ("swift", true), ("python", true), ("javascript", true), ("typescript", true),
-    ("tsx", true), ("json", false), ("markdown", true),
+    ("swift", true), ("c", false), ("cpp", true), ("python", true), ("javascript", true),
+    ("typescript", true), ("tsx", true), ("json", false), ("go", false), ("rust", true),
+    ("java", false), ("ruby", true), ("bash", true), ("yaml", true), ("toml", true),
+    ("html", true), ("css", true), ("markdown", true), ("dockerfile", true), ("make", false),
 ]
 
 let grammarTargets: [Target] = grammars.map { grammar in

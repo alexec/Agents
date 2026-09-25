@@ -11,7 +11,7 @@
 ///     string        #4E6420   #A9C27A
 ///     number        #7A3E7A   #D5A3D5
 ///     type          #1F6A6A   #7CC4C0
-///     function      #3D5A80   #9DB5D9
+///     function      #5B4BB5   #B3A6F0
 ///     property      #6B5A2E   #C9B27E
 ///     punctuation   #5F5A52   #A8A196
 public enum InkValues {
@@ -21,7 +21,7 @@ public enum InkValues {
         .string: 0x4E6420,
         .number: 0x7A3E7A,
         .type: 0x1F6A6A,
-        .function: 0x3D5A80,
+        .function: 0x5B4BB5,
         .property: 0x6B5A2E,
         .punctuation: 0x5F5A52,
     ]
@@ -32,7 +32,7 @@ public enum InkValues {
         .string: 0xA9C27A,
         .number: 0xD5A3D5,
         .type: 0x7CC4C0,
-        .function: 0x9DB5D9,
+        .function: 0xB3A6F0,
         .property: 0xC9B27E,
         .punctuation: 0xA8A196,
     ]
