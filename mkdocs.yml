@@ -62,7 +62,28 @@ nav:
       - tutorials/follow-from-iphone.md
   - How-to guides:
       - how-to/index.md
+      - how-to/add-a-project.md
+      - how-to/start-in-a-worktree.md
+      - how-to/answer-a-question.md
+      - how-to/add-a-linux-server.md
+      - how-to/set-up-a-workflow.md
+      - how-to/watch-a-pull-request.md
+      - how-to/sign-a-runtime-in.md
+      - how-to/archive-park-stop.md
+      - how-to/attach-files.md
+      - how-to/read-an-agents-changes.md
   - Reference:
       - reference/index.md
+      - reference/statuses.md
+      - reference/runtimes.md
+      - reference/agent-tools.md
+      - reference/settings.md
+      - reference/workflows.md
+      - reference/keyboard-shortcuts.md
   - Explanation:
       - explanation/index.md
+      - explanation/window-and-daemon.md
+      - explanation/scoped-tools.md
+      - explanation/projects-hosts-worktrees.md
+      - explanation/leases.md
+      - explanation/phone-and-ipad.md
