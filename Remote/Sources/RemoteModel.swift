@@ -211,7 +211,7 @@ final class RemoteModel {
                                                  returning: DaemonAPI.OptionsResponse.self)
             guard generation == startGeneration else { discard(draft: response.draftID); return }
             startDraftID = response.draftID
-            showStart(response.options)
+            showStart(response.options, opening: true)
         } catch {
             guard generation == startGeneration else { return }
             startChoicesState = .failed(sentence(for: error))
@@ -220,7 +220,11 @@ final class RemoteModel {
 
     /// Draw what the runtime offers, keeping every choice already made that is still
     /// one of the choices.
-    private func showStart(_ options: [ConfigOption]) {
+    ///
+    /// On the first draw only, the mode opens on the one last chosen for this runtime
+    /// on any device, as the Mac's form does: a correction arriving behind a form drawn
+    /// from memory must not undo a mode chosen since.
+    private func showStart(_ options: [ConfigOption], opening: Bool = false) {
         startOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
         var kept: [String: JSONValue] = [:]
         for option in startOptions {
@@ -230,6 +234,10 @@ final class RemoteModel {
             } else if let current = option.currentValue {
                 kept[option.id] = current
             }
+        }
+        if opening, let runtimeID = startRuntimeID, let mode = ModeMemory.modeOption(in: startOptions),
+           let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
+            kept[mode.id] = value
         }
         startChosen = kept
         startChoicesState = .ready
@@ -531,6 +539,7 @@ final class RemoteModel {
         await refreshCostState()
         await refreshWorkflows()
         await refreshRuntimes()
+        await refreshModes()
         await settleUnsettledStart()
         await loadTranscript()
         settleSelection()
@@ -731,6 +740,15 @@ final class RemoteModel {
                                                   DaemonAPI.WorkflowsListRequest(),
                                                   returning: [WorkflowSummary].self) else { return }
         work.replaceWorkflows(listed)
+    }
+
+    /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
+    /// current afterwards. A Mac too old to know the method leaves the sheet opening
+    /// on each runtime's own current mode.
+    private func refreshModes() async {
+        guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
+                                                 returning: DaemonAPI.RememberedModes.self) else { return }
+        work.replaceRememberedModes(modes)
     }
 
     private func refreshRuntimes() async {

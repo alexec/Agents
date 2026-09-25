@@ -121,6 +121,17 @@ extension DaemonCore {
     /// start leaves nothing behind under the id, so trying again once the reason has
     /// gone starts it (029).
     public func start(_ request: DaemonAPI.StartRequest) async throws -> UUID {
+        let id = try await startOnce(request)
+        // The person's choice, so remembered for the next one on any device. Only
+        // here: an agent started by another agent was not the person choosing.
+        if let agent = agents[id] {
+            rememberMode(in: request.startOptions.values, runtimeID: agent.runtimeID,
+                         options: agent.advertisedOptions)
+        }
+        return id
+    }
+
+    private func startOnce(_ request: DaemonAPI.StartRequest) async throws -> UUID {
         guard let requestID = request.requestID else {
             return try await start(request, startedBy: nil)
         }
@@ -130,6 +141,28 @@ extension DaemonCore {
         startsByRequest[requestID] = starting
         defer { startsByRequest[requestID] = nil }
         return try await starting.value
+    }
+
+    // MARK: The mode each runtime was last started in (029)
+
+    public func rememberedModes() -> DaemonAPI.RememberedModes {
+        modeStore.remembered()
+    }
+
+    /// A window's memory from before the daemon kept one. Fills gaps only.
+    public func importModes(_ request: DaemonAPI.ModesImportRequest) -> DaemonAPI.RememberedModes {
+        if (try? modeStore.importing(request.modes)) == true { tellModes() }
+        return modeStore.remembered()
+    }
+
+    /// Remember the mode among these values, if one of them is this runtime's mode.
+    func rememberMode(in values: [String: JSONValue], runtimeID: String, options: [ConfigOption]) {
+        guard let mode = ModeMemory.modeOption(in: options), let value = values[mode.id] else { return }
+        if (try? modeStore.remember(value, for: runtimeID)) == true { tellModes() }
+    }
+
+    private func tellModes() {
+        broadcast(DaemonAPI.Notification.modesChanged, modeStore.remembered())
     }
 
     /// Let go of a draft that is not going to be started. Not there is not an error:
@@ -1164,6 +1197,8 @@ extension DaemonCore {
             }
             agent.startOptions.values[request.optionID] = request.value
             changed(agent)
+            rememberMode(in: [request.optionID: request.value], runtimeID: agent.runtimeID,
+                         options: agent.advertisedOptions)
             await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
             return []
         }
@@ -1172,6 +1207,10 @@ extension DaemonCore {
             agent.advertisedOptions = options
             agent.startOptions.values[request.optionID] = request.value
             changed(agent)
+            // Changing a conversation's mode says what you want next time too, as it
+            // always has on the Mac.
+            rememberMode(in: [request.optionID: request.value], runtimeID: agent.runtimeID,
+                         options: options)
         }
         await record(.optionChanged(id: request.optionID, value: request.value), for: request.agentID)
         return options

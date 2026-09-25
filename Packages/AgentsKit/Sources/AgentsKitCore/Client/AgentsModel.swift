@@ -95,6 +95,9 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// The mode last chosen for each runtime, as the Mac holds it (029). A copy, kept
+    /// current by `modes/changed`, so a start form can open on it without a round trip.
+    public private(set) var rememberedModes: DaemonAPI.RememberedModes = [:]
     /// Why the Mac is, or is not, being kept awake (024).
     ///
     /// Nil means *not yet heard from*, which is a different fact from *not holding* and
@@ -123,6 +126,7 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
+        case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
@@ -148,6 +152,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
@@ -224,6 +229,9 @@ public final class AgentsModel {
         case .costChanged(let state):
             costState = state
 
+        case .modesChanged(let modes):
+            rememberedModes = modes
+
         case .wakeChanged(let state):
             wakeState = state
 
@@ -295,6 +303,10 @@ public final class AgentsModel {
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceRememberedModes(_ modes: DaemonAPI.RememberedModes) { rememberedModes = modes }
+
+    /// The mode last chosen for this runtime, on any device (029).
+    public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
 
     /// What this agent has left before it stops, under the limits as they stand.

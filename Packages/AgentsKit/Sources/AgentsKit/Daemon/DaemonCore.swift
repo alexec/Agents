@@ -156,6 +156,8 @@ public actor DaemonCore {
     /// What each runtime last advertised, so a start form does not wait for a runtime
     /// to say what it said last time. Read from disk the first time it is wanted.
     lazy var optionCache = OptionCache(locations: locations)
+    /// The mode last chosen for each runtime (029).
+    lazy var modeStore = ModeStore(locations: locations, now: now)
     var rememberedOptions: [String: OptionCache.Entry]?
 
     // MARK: Money

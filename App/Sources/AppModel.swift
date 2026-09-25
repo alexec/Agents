@@ -635,9 +635,10 @@ final class AppModel {
         async let cost: Void = refreshCostState()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
+        async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, cloning, wake, transcript)
+                   elicitations, attention, resuming, cost, cloning, wake, modes, transcript)
     }
 
     func refreshElicitations() async {
@@ -1024,22 +1025,36 @@ final class AppModel {
 
     // MARK: The mode you keep choosing
 
-    /// What was last chosen for this runtime, if it is still readable.
-    ///
-    /// A stored value we cannot decode is treated as nothing remembered, and the key
-    /// is left where it is: a later version may understand it, and throwing away
-    /// something we merely do not recognise is not ours to do.
+    /// What was last chosen for this runtime, on this Mac or a phone. The daemon keeps
+    /// it now — it writes on a start and on a conversation's mode changing — and this
+    /// reads the copy `modes/changed` keeps current (029).
     func rememberedMode(for runtimeID: String) -> JSONValue? {
-        guard let data = UserDefaults.standard.data(forKey: ModeMemory.defaultsKey(runtimeID: runtimeID))
-        else { return nil }
-        return try? JSONDecoder().decode(JSONValue.self, from: data)
+        work.rememberedMode(for: runtimeID)
     }
 
-    /// Remember it, for chats after this one. Called for a draft and for a live agent
-    /// alike: changing the mode on a conversation says what you want next time too.
-    func rememberMode(_ value: JSONValue, for runtimeID: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        UserDefaults.standard.set(data, forKey: ModeMemory.defaultsKey(runtimeID: runtimeID))
+    /// The daemon's memory, after giving it whatever this window remembered from
+    /// before the daemon kept one. The daemon only fills gaps, so this is safe on
+    /// every connection and from every copy of the app; the keys are left in place.
+    /// A daemon too old to know the methods leaves the form opening on the runtime's
+    /// own current mode, which is what it did before anything was remembered.
+    func refreshModes() async {
+        let prefix = ModeMemory.defaultsKey(runtimeID: "")
+        var held: DaemonAPI.RememberedModes = [:]
+        for (key, stored) in UserDefaults.standard.dictionaryRepresentation() where key.hasPrefix(prefix) {
+            guard let data = stored as? Data,
+                  let mode = try? JSONDecoder().decode(JSONValue.self, from: data) else { continue }
+            held[String(key.dropFirst(prefix.count))] = mode
+        }
+        let modes: DaemonAPI.RememberedModes?
+        if held.isEmpty {
+            modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
+                                           returning: DaemonAPI.RememberedModes.self)
+        } else {
+            modes = try? await client.call(DaemonAPI.Method.modesImport,
+                                           DaemonAPI.ModesImportRequest(modes: held),
+                                           returning: DaemonAPI.RememberedModes.self)
+        }
+        if let modes { work.replaceRememberedModes(modes) }
     }
 
     // MARK: The user's shells

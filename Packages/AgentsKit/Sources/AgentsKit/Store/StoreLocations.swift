@@ -97,6 +97,9 @@ public struct StoreLocations: Sendable {
     /// What each runtime last advertised. A cache: safe to delete, and deleting it
     /// costs the next start form the wait it used to have every time.
     public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
+    /// The mode last chosen for each runtime, so every window and phone offers the
+    /// same one first (029).
+    public var modes: URL { root.appendingPathComponent("modes.json") }
     /// What the daemon has already told somebody about: which outstanding needs have
     /// been delivered, where each is showing, when the person was last alerted, and
     /// when each need was first raised.

@@ -25,6 +25,17 @@ struct DefaultRuntimeTests {
         #expect(model.defaultRuntimeID(available: ["codex", "claude"]) == "claude")
     }
 
+    /// The mode is the daemon's memory, kept current by `modes/changed` (029).
+    @Test func theRememberedModeFollowsTheMac() throws {
+        let model = AgentsModel()
+        model.replaceRememberedModes(["claude": "default"])
+        #expect(model.rememberedMode(for: "claude") == "default")
+        #expect(model.apply(DaemonAPI.Notification.modesChanged,
+                            try JSONValue.encoding(["claude": "plan"] as DaemonAPI.RememberedModes)))
+        #expect(model.rememberedMode(for: "claude") == "plan")
+        #expect(model.rememberedMode(for: "codex") == nil)
+    }
+
     @Test func aRecentRuntimeThatCannotStartIsPassedOver() {
         let model = AgentsModel()
         model.replaceAgents([agent("gemini", minutesAgo: 1), agent("codex", minutesAgo: 30)])
