@@ -41,6 +41,9 @@ public enum WorktreeChoice: Codable, Hashable, Sendable {
     case new
     /// A worktree of the same repository that is already there.
     case existing(URL)
+    /// Make a fresh worktree on a branch that is already there: a local one not
+    /// checked out anywhere, or one only a remote has, which git then tracks.
+    case branch(String)
 }
 
 /// What a new worktree is called (030, research R3).
@@ -66,6 +69,21 @@ public enum WorktreeName {
     ]
 
     public static func branch(for name: String) -> String { branchPrefix + name }
+
+    /// The folder a worktree on someone's branch goes in: the branch, less the app's
+    /// own prefix, with every `/` a `-`, so `feature/login` is `feature-login`.
+    public static func folder(forBranch branch: String) -> String {
+        let bare = branch.hasPrefix(branchPrefix) ? String(branch.dropFirst(branchPrefix.count)) : branch
+        var name = ""
+        for character in bare {
+            let kept = character.isASCII && (character.isLetter || character.isNumber || "-_.".contains(character))
+            let next: Character = kept ? character : "-"
+            if next == "-", name.hasSuffix("-") { continue }
+            name.append(next)
+        }
+        let trimmed = name.trimmingCharacters(in: CharacterSet(charactersIn: "-."))
+        return trimmed.isEmpty ? "branch" : trimmed
+    }
 
     public static func from(prompt: String, now: Date = Date()) -> String {
         let folded = prompt.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)

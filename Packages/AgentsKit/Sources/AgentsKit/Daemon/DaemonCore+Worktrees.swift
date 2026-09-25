@@ -26,7 +26,50 @@ extension DaemonCore {
             return try await makeWorktree(in: repository, project: project, prompt: prompt)
         case .existing(let root):
             return try await existingWorktree(root, in: repository, project: project)
+        case .branch(let name):
+            return try await makeWorktree(onBranch: name, in: repository, project: project)
         }
+    }
+
+    /// A new worktree in the app's folder on a branch already there, named for it.
+    /// Only a branch the chooser would offer: one checked out somewhere else is
+    /// refused by git anyway, and saying so first says which.
+    private func makeWorktree(onBranch wanted: String, in repository: GitWorktrees.Repository,
+                              project: URL) async throws -> (cwd: URL, worktree: AgentWorktree) {
+        let entries = (try? await GitWorktrees.list(in: project)) ?? []
+        if let holder = entries.first(where: { $0.branch == wanted }) {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: "\(wanted) is already checked out in \(holder.path.lastPathComponent). Choose that worktree instead.")
+        }
+        let branches = (try? await GitWorktrees.branches(in: project)) ?? []
+        guard let branch = branches.first(where: { $0.name == wanted }) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: "There is no branch called \(wanted) here.")
+        }
+        do {
+            try GitWorktrees.ensureExcluded(commonDir: repository.commonDir)
+        } catch let failure as GitWorktrees.Failure {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed, message: failure.message)
+        }
+
+        let folder = repository.worktreesFolder
+        var taken = reservedWorktreeNames(under: folder)
+        taken.formUnion(existingNames(in: folder))
+        let name = WorktreeName.next(after: WorktreeName.folder(forBranch: wanted), taken: taken)
+        reserveWorktreeName(name, under: folder)
+        defer { releaseWorktreeName(name, under: folder) }
+
+        let root = folder.appending(path: name, directoryHint: .isDirectory)
+        do {
+            try await GitWorktrees.add(existing: branch, path: root, in: project)
+        } catch let failure as GitWorktrees.Failure {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: "Could not make a worktree on \(wanted): \(failure.message)")
+        }
+        let made = Project.standardize(root)
+        let worktree = AgentWorktree(name: name, root: made, branch: wanted, project: project,
+                                     base: nil, madeByApp: true)
+        return (Self.workingFolder(in: made, prefix: repository.prefix), worktree)
     }
 
     private func makeWorktree(in repository: GitWorktrees.Repository, project: URL,
@@ -140,10 +183,16 @@ extension DaemonCore {
                 madeByApp: Self.isMadeByApp(root, branch: entry.branch, in: repository),
                 agents: own.sorted { $0.createdAt < $1.createdAt }.map(\.id))
         }
+        // A branch checked out anywhere cannot be checked out again; its worktree is
+        // already on the list.
+        let checkedOut = Set(entries.compactMap(\.branch))
+        let branches = hasCommit
+            ? ((try? await GitWorktrees.branches(in: project)) ?? []).filter { !checkedOut.contains($0.name) }
+            : []
         return DaemonAPI.WorktreesListResponse(
             isRepository: true, canMakeNew: hasCommit,
             whyNot: hasCommit ? nil : "There is no commit here yet to base a worktree on.",
-            worktrees: summaries)
+            worktrees: summaries, branches: branches)
     }
 
     // MARK: Cleaning up (US3)
@@ -178,7 +227,7 @@ extension DaemonCore {
                 try await GitWorktrees.prune(in: facts.project)
             }
             var removedBranch = false
-            if let branch = facts.branch {
+            if let branch = facts.branch, Self.isAppBranch(branch) {
                 try await GitWorktrees.deleteBranch(branch, force: facts.check.unmerged, in: facts.project)
                 removedBranch = true
             }
@@ -232,7 +281,8 @@ extension DaemonCore {
         let uncommitted = exists ? ((try? await GitWorktrees.statusCount(in: root)) ?? 0) : 0
         var unmerged = false
         var measuredAgainst: String?
-        if let branch = entry.branch {
+        // Someone's own branch stays when its worktree goes, so nothing on it is lost.
+        if let branch = entry.branch, Self.isAppBranch(branch) {
             // Measured against what it was made from, when an agent's record still
             // says; otherwise against what the project folder has checked out.
             let recorded = agents.values.first { $0.worktree.map { Self.canonicalPath($0.root) } == root.path }?.worktree?.base
@@ -258,11 +308,18 @@ extension DaemonCore {
         return isDirectory(inside) ? Project.standardize(inside) : root
     }
 
-    /// One of the app's own: under its worktrees folder and on one of its branches (R6).
+    /// One of the app's own: under its worktrees folder and on a branch (R6). The
+    /// branch may be the app's or one it was made on; only the app's goes with it
+    /// (`isAppBranch`). A detached one is not, since removing it could lose commits
+    /// no branch holds.
     static func isMadeByApp(_ root: URL, branch: String?, in repository: GitWorktrees.Repository) -> Bool {
         let folder = canonicalPath(repository.worktreesFolder) + "/"
-        return canonicalPath(root).hasPrefix(folder)
-            && (branch?.hasPrefix(WorktreeName.branchPrefix) ?? false)
+        return canonicalPath(root).hasPrefix(folder) && branch != nil
+    }
+
+    /// A branch the app made, and so the app's to delete.
+    static func isAppBranch(_ branch: String) -> Bool {
+        branch.hasPrefix(WorktreeName.branchPrefix)
     }
 
     /// What the agent's chat opens with, so where it is working is said before it does.

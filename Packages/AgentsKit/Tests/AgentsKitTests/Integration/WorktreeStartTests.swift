@@ -491,6 +491,110 @@ struct WorktreeStartTests {
         #expect(worktree == "new")
     }
 
+    // MARK: A new worktree on a branch already there
+
+    /// `feature/login` in the repository, not checked out, and `origin/review/pr-12`
+    /// with no local branch: the remote is the repository itself, fetched.
+    private func withBranches(_ repo: Repo) async throws {
+        _ = try await git(["branch", "feature/login"], in: repo.top)
+        _ = try await git(["remote", "add", "origin", repo.top.path], in: repo.top)
+        _ = try await git(["branch", "review/pr-12"], in: repo.top)
+        _ = try await git(["fetch", "-q", "origin"], in: repo.top)
+        _ = try await git(["branch", "-D", "review/pr-12"], in: repo.top)
+    }
+
+    @Test func branchesNotCheckedOutAreOffered() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        _ = try await addByHand(repo, "by-hand")
+        let core = try await makeCore(repo, FakeLauncher())
+        let listed = await core.listWorktrees(for: repo.project)
+        let names = listed.branches.map(\.name)
+        #expect(names.contains("feature/login"))
+        #expect(!names.contains("main"), "the project folder has it")
+        #expect(!names.contains("by-hand"), "a worktree has it")
+        #expect(!names.contains("HEAD"))
+        #expect(listed.branches.first { $0.name == "review/pr-12" }?.remote == "origin")
+        #expect(listed.branches.first { $0.name == "feature/login" }?.remote == nil)
+        #expect(names.filter { $0 == "feature/login" }.count == 1, "origin's copy is not listed twice")
+    }
+
+    @Test func anAgentCanStartInANewWorktreeOnALocalBranch() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "look at it",
+                                            worktree: .branch("feature/login")))
+
+        let agent = try #require(await core.agent(id))
+        let expected = Project.standardize(repo.top.appending(path: ".agents/worktrees/feature-login"))
+        #expect(agent.cwd == expected)
+        #expect(agent.worktree?.name == "feature-login")
+        #expect(agent.worktree?.branch == "feature/login")
+        #expect(agent.worktree?.madeByApp == true)
+        #expect(agent.projectFolder == repo.project)
+        #expect(try await git(["rev-parse", "--abbrev-ref", "HEAD"], in: expected) == "feature/login")
+        #expect(launcher.launches.map { Project.standardize($0.cwd) } == [expected])
+        #expect(!(await core.listWorktrees(for: repo.project)).branches.contains { $0.name == "feature/login" })
+    }
+
+    @Test func aRemoteOnlyBranchBecomesALocalOneThatTracksIt() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "review",
+                                            worktree: .branch("review/pr-12")))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        #expect(try await git(["rev-parse", "--abbrev-ref", "HEAD"], in: root) == "review/pr-12")
+        #expect(try await git(["rev-parse", "--abbrev-ref", "review/pr-12@{upstream}"], in: root) == "origin/review/pr-12")
+    }
+
+    @Test func aBranchCheckedOutElsewhereIsRefused() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        _ = try await addByHand(repo, "by-hand")
+        let error = await failure {
+            try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
+                                       worktree: .branch("by-hand")))
+        }
+        #expect(error?.code == DaemonAPI.Failure.worktreeFailed)
+        #expect(error?.message.contains("already checked out in by-hand") == true)
+        #expect(launcher.launchCount == 0)
+    }
+
+    /// Removing a worktree made on someone's branch leaves the branch, commits and all.
+    @Test func removingAWorktreeOnSomeonesBranchKeepsTheBranch() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "x",
+                                            worktree: .branch("feature/login")))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        try await core.archive(id)
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        try "more\n".write(to: root.appending(path: "NEW"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "NEW"], in: root)
+        _ = try await git(["commit", "-q", "-m", "work"], in: root)
+
+        let check = try await core.checkWorktreeRemoval(removal(repo, root))
+        #expect(!check.losesWork, "the commit stays on feature/login")
+        let removed = try await core.removeWorktree(removal(repo, root))
+        #expect(!removed.removedBranch)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(try await git(["log", "-1", "--format=%s", "feature/login"], in: repo.top) == "work")
+    }
+
+    @Test func aHelperCanBeSentOntoABranch() async throws {
+        let repo = try await repository()
+        try await withBranches(repo)
+        let core = try await makeCore(repo, FakeLauncher())
+        let lead = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "lead"))
+        let started = try await startHelper(core, caller: lead, prompt: "review", worktree: "feature/login")
+        #expect(await core.agent(started.agentID)?.worktree?.branch == "feature/login")
+    }
+
     /// An agent without a worktree starts where it always did.
     @Test func withoutAChoiceNothingChanges() async throws {
         let repo = try await repository()
