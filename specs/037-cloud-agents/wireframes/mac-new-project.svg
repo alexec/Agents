@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="540" viewBox="0 0 1120 540" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; } .rb { font-size:14px; font-weight:600; } .f { font-size:12px; }
+    .btn { fill:#fff; stroke:#c7c7cc; } .pri { fill:#0a84ff; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .menu { fill:#fbfbfd; stroke:#c7c7cc; }
+  </style>
+
+  <text x="20" y="28" class="h">A · NEW PROJECT MENU</text>
+  <text x="560" y="28" class="h">B · CHOOSE FOLDER ON DEVBOX</text>
+
+  <!-- A: menu -->
+  <rect x="20" y="44" width="36" height="22" rx="5" class="btn"/><text x="38" y="60" class="r t" text-anchor="middle">+</text>
+  <rect x="20.5" y="72.5" width="200" height="150" rx="8" class="menu"/>
+  <text x="36" y="98" class="r t">This Mac</text><text x="206" y="98" class="r s" text-anchor="end">›</text>
+  <rect x="24" y="110" width="192" height="26" rx="4" fill="#0a84ff"/>
+  <text x="36" y="128" class="r" fill="#fff">devbox</text><text x="206" y="128" class="r" fill="#fff" text-anchor="end">›</text>
+  <text x="36" y="158" class="r t">staging</text><text x="206" y="158" class="r s" text-anchor="end">›</text>
+  <line x1="28" y1="172" x2="212" y2="172" stroke="#e5e5ea"/>
+  <text x="36" y="198" class="r t">Add a server…</text>
+
+  <rect x="222.5" y="104.5" width="180" height="64" rx="8" class="menu"/>
+  <text x="238" y="130" class="r t">Choose Folder…</text>
+  <text x="238" y="158" class="r t">Clone Git URL…</text>
+
+  <text x="20" y="256" class="note">With no server: today's two items, then a divider and Add a server….</text>
+  <text x="20" y="274" class="note">With a server: one submenu per host, the same two items in each.</text>
+  <text x="20" y="292" class="note">An offline host's submenu is disabled, with “Offline” beside its name.</text>
+
+  <!-- clone variant -->
+  <text x="20" y="336" class="h">A′ · CLONE ON DEVBOX</text>
+  <rect x="20.5" y="348.5" width="400" height="150" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="40" y="378" class="rb t">Clone a Git repository</text>
+  <rect x="40" y="392" width="360" height="28" rx="6" fill="#fff" stroke="#0a84ff"/>
+  <text x="50" y="411" class="r t">https://github.com/octocat/Hello-World.git</text>
+  <text x="40" y="440" class="f s">Clones into ~/Hello-World <tspan class="t" font-weight="600">on devbox</tspan> and adds it as a project.</text>
+  <rect x="252" y="458" width="70" height="28" rx="6" class="btn"/><text x="287" y="477" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="330" y="458" width="70" height="28" rx="6" class="pri"/><text x="365" y="477" class="f" fill="#fff" text-anchor="middle">Clone</text>
+
+  <!-- B: remote folder sheet -->
+  <rect x="560.5" y="40.5" width="520" height="440" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="580" y="72" class="rb t">Choose a folder on devbox</text>
+  <rect x="580" y="88" width="480" height="28" rx="6" fill="#fff" stroke="#0a84ff"/>
+  <text x="590" y="107" class="r t">~/src/</text>
+  <rect x="580" y="126" width="480" height="276" rx="8" fill="#fff" stroke="#e5e5ea"/>
+  <text x="596" y="152" class="r s">‹  ~</text>
+  <line x1="580" y1="164" x2="1060" y2="164" stroke="#f2f2f7"/>
+  <text x="596" y="188" class="r t">agents-fork</text><text x="1044" y="188" class="f s" text-anchor="end">git · main</text>
+  <rect x="584" y="198" width="472" height="28" rx="4" fill="#dcdce1"/>
+  <text x="596" y="217" class="rb t">ml-pipeline</text><text x="1044" y="217" class="f s" text-anchor="end">git · feature/arrow</text>
+  <text x="596" y="248" class="r t">infra</text><text x="1044" y="248" class="f s" text-anchor="end">git · main</text>
+  <text x="596" y="278" class="r t">scratch</text>
+  <text x="596" y="308" class="r q">notes.txt</text>
+  <text x="580" y="424" class="f s">Type a path or click into a folder. Files are shown but can't be chosen.</text>
+  <rect x="860" y="440" width="70" height="28" rx="6" class="btn"/><text x="895" y="459" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="938" y="440" width="122" height="28" rx="6" class="pri"/><text x="999" y="459" class="f" fill="#fff" text-anchor="middle">Add as project</text>
+
+  <text x="560" y="504" class="note">The Mac's folder picker can't see devbox, so this sheet stands in for it. Double-click goes in;</text>
+  <text x="560" y="520" class="note">Add as project takes the selected folder, or the path field when nothing is selected.</text>
+</svg>

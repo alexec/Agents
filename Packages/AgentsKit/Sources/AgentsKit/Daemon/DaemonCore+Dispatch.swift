@@ -14,6 +14,22 @@ extension DaemonCore {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
 
+            case DaemonAPI.Method.filesWrite:
+                let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)
+                return .success(try JSONValue.encoding(try writeAttachment(request)))
+
+            case DaemonAPI.Method.filesBrowse:
+                let request = try decode(params, as: DaemonAPI.FilesBrowseRequest.self) ?? .init()
+                return .success(try JSONValue.encoding(try browse(request)))
+
+            case DaemonAPI.Method.daemonStatus:
+                return .success(try JSONValue.encoding(status()))
+
+            case DaemonAPI.Method.daemonQuit:
+                let request = try require(params, as: DaemonAPI.QuitRequest.self)
+                try await quit(request)
+                return .success([:])
+
             case DaemonAPI.Method.presenceReport:
                 let report = try require(params, as: DaemonAPI.PresenceReport.self)
                 try reportPresence(report, from: surface, connection: connection)
@@ -125,8 +141,10 @@ extension DaemonCore {
 
             case DaemonAPI.Method.elicitationsAnswer:
                 let request = try require(params, as: DaemonAPI.AnswerElicitationRequest.self)
-                try await answerElicitation(request)
-                return .success([:])
+                return .success(try await once(request.sendID) {
+                    try await self.answerElicitation(request)
+                    return [:]
+                })
 
             case DaemonAPI.Method.agentsList:
                 let request = try decode(params, as: DaemonAPI.ListRequest.self) ?? .init()
@@ -168,9 +186,11 @@ extension DaemonCore {
                 // person typing, and that picks a parked chat back up (040, FR-009).
                 // Workflows, the restart pick-up and the outcome question reach
                 // `prompt` directly and leave the chat parked.
-                if request.from == .person { unparkQuietly(request.agentID) }
-                try await prompt(request)
-                return .success([:])
+                return .success(try await once(request.sendID) {
+                    if request.from == .person { await self.unparkQuietly(request.agentID) }
+                    try await self.prompt(request)
+                    return [:]
+                })
 
             case DaemonAPI.Method.agentsUnqueue:
                 let request = try require(params, as: DaemonAPI.UnqueueRequest.self)
@@ -371,8 +391,10 @@ extension DaemonCore {
 
             case DaemonAPI.Method.permissionsAnswer:
                 let request = try require(params, as: DaemonAPI.AnswerRequest.self)
-                try await answerPermission(request)
-                return .success([:])
+                return .success(try await once(request.sendID) {
+                    try await self.answerPermission(request)
+                    return [:]
+                })
 
             case DaemonAPI.Method.shellAttach:
                 let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)

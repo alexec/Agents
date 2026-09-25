@@ -205,6 +205,29 @@ public final class AgentsModel {
         return true
     }
 
+    /// Apply one notification from one of several daemons (037). What it carries is
+    /// stamped with the host it came from before it is filed, so a window holding a
+    /// server's projects beside the Mac's never mistakes one for the other.
+    @discardableResult
+    public func apply(_ method: String, _ params: JSONValue?, from host: HostID) -> Bool {
+        guard let update = Self.read(method, params) else { return false }
+        apply(Self.stamp(update, host: host))
+        return true
+    }
+
+    nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
+        switch update {
+        case .agentChanged(var agent):
+            agent.host = host
+            return .agentChanged(agent)
+        case .projectChanged(var summary):
+            summary.host = host
+            return .projectChanged(summary)
+        default:
+            return update
+        }
+    }
+
     /// Apply one notification already read. See `read`.
     public func apply(_ update: Update) {
         switch update {
@@ -330,7 +353,7 @@ public final class AgentsModel {
     }
 
     public func upsert(_ summary: DaemonAPI.ProjectSummary) {
-        if let index = projects.firstIndex(where: { $0.folder == summary.folder }) {
+        if let index = projects.firstIndex(where: { $0.folder == summary.folder && $0.host == summary.host }) {
             projects[index] = summary
         } else {
             projects.append(summary)
@@ -344,6 +367,18 @@ public final class AgentsModel {
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
         projects = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    /// One host's agents, as it just listed them. Every other host's are left alone:
+    /// a server re-listing after a reconnect must not take the Mac's away (037).
+    public func replaceAgents(_ listed: [Agent], from host: HostID) {
+        let stamped = listed.map { var agent = $0; agent.host = host; return agent }
+        agents = (agents.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
+        let stamped = listed.map { var summary = $0; summary.host = host; return summary }
+        projects = (projects.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
@@ -566,6 +601,36 @@ public final class AgentsModel {
         projects.filter(\.project.isArchived)
     }
 
+    public func project(_ key: ProjectKey?) -> DaemonAPI.ProjectSummary? {
+        guard let key else { return nil }
+        return projects.first { $0.host == key.host && $0.folder == key.folder }
+    }
+
+    public func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
+        guard let key else { return [] }
+        return agents(in: key.folder, group: group).filter { $0.host == key.host }
+    }
+
+    public func counts(in key: ProjectKey?) -> [AgentGroup: Int] {
+        guard let key else { return [:] }
+        let wanted = Project.standardize(key.folder)
+        var counts: [AgentGroup: Int] = [:]
+        for agent in agents where agent.host == key.host && projectFolder(of: agent) == wanted {
+            counts[group(of: agent), default: 0] += 1
+        }
+        return counts
+    }
+
+    public func unreadCount(in key: ProjectKey?) -> Int {
+        guard let key else { return 0 }
+        let wanted = Project.standardize(key.folder)
+        return agents.filter {
+            $0.host == key.host && projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread
+        }.count
+    }
+
+    /// By folder alone, whichever host it is on: what the phone asks, which only ever
+    /// holds the Mac's (037 keeps servers off the phone in its first version).
     public func project(_ folder: URL?) -> DaemonAPI.ProjectSummary? {
         guard let folder else { return nil }
         return projects.first { $0.folder == folder }

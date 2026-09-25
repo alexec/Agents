@@ -1,3 +1,5 @@
+// Not on Linux: the server build of agentsd has no Network and no use for this (037).
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -150,3 +152,4 @@ public final class NWTransport: LineTransport, @unchecked Sendable {
         connection.cancel()
     }
 }
+#endif

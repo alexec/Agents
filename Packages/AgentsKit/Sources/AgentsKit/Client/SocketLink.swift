@@ -16,35 +16,7 @@ public struct SocketLink: DaemonLink {
     }
 
     public func transport() async throws -> any LineTransport {
-        FDTransport(socket: try connectSocket(path: locations.socket.path))
-    }
-
-    private func connectSocket(path: String) throws -> Int32 {
-        // The same 104 bytes `DaemonServer` refuses to exceed. Said here too, because
-        // a truncated path connects to nothing and reads as "no daemon is running".
-        guard path.utf8.count < 104 else { throw DaemonClient.ConnectError.socketPathTooLong(path) }
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw DaemonClient.ConnectError.couldNotConnect }
-        // The daemon notices the window has gone when this end closes. A child holding
-        // a copy of it — the helper this same client spawns, and every shell below it —
-        // would be a window that never leaves, and a daemon that never shuts down.
-        fcntl(fd, F_SETFD, FD_CLOEXEC)
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        _ = withUnsafeMutablePointer(to: &address.sun_path) { pointer in
-            path.withCString { source in
-                strncpy(UnsafeMutableRawPointer(pointer).assumingMemoryBound(to: CChar.self), source, 103)
-            }
-        }
-        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
-        let result = withUnsafePointer(to: &address) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, size) }
-        }
-        guard result == 0 else {
-            close(fd)
-            throw DaemonClient.ConnectError.couldNotConnect
-        }
-        return fd
+        FDTransport(socket: try connectUnixSocket(path: locations.socket.path))
     }
 
     /// Start the helper in a session of its own.
@@ -58,41 +30,16 @@ public struct SocketLink: DaemonLink {
         // if that file cannot be opened. On a first run the directory does not exist
         // yet, and the daemon that would have made it is the thing being started.
         try? locations.createDirectories()
-        var attributes: posix_spawnattr_t?
-        posix_spawnattr_init(&attributes)
-        defer { posix_spawnattr_destroy(&attributes) }
-        // CLOEXEC_DEFAULT so the helper starts with nothing of the app's but the three
-        // descriptors named below. It outlives the window on purpose; what it inherits
-        // would outlive it too.
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT))
-
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        defer { posix_spawn_file_actions_destroy(&actions) }
-        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_addopen(&actions, 1, locations.log.path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
-        posix_spawn_file_actions_adddup2(&actions, 1, 2)
-
-        var pid: pid_t = 0
-        let arguments: [String] = [helper.path]
-        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
-        argv.append(nil)
-        defer { for pointer in argv where pointer != nil { free(pointer) } }
-
         // Said rather than inherited. A window started with `--root` has the path in
         // its arguments and not in its environment, and the daemon it starts has to
         // end up in the same place or it is a different daemon.
-        var inherited = ProcessInfo.processInfo.environment
-        inherited[StoreLocations.rootVariable] = locations.root.path
-        var environment: [UnsafeMutablePointer<CChar>?] = inherited
-            .map { strdup("\($0.key)=\($0.value)") }
-        environment.append(nil)
-        defer { for pointer in environment where pointer != nil { free(pointer) } }
-
-        let status = posix_spawn(&pid, helper.path, &actions, &attributes, &argv, &environment)
-        guard status == 0 else {
-            let reason = String(cString: strerror(status))
-            throw DaemonClient.ConnectError.couldNotStartHelper("\(helper.path): \(reason)")
+        var environment = ProcessInfo.processInfo.environment
+        environment[StoreLocations.rootVariable] = locations.root.path
+        do {
+            try Spawn.detached(executable: helper, arguments: [], environment: environment,
+                               log: locations.log)
+        } catch let failed as Spawn.Failed {
+            throw DaemonClient.ConnectError.couldNotStartHelper(failed.description)
         }
     }
 
@@ -120,4 +67,34 @@ public extension DaemonClient {
     init(locations: StoreLocations = .default, helperURL: URL? = nil) {
         self.init(link: SocketLink(locations: locations, helperURL: helperURL))
     }
+}
+
+/// A connected Unix socket, close-on-exec, or `couldNotConnect`. The Mac's daemon socket
+/// and a server's forwarded one are reached the same way (037).
+public func connectUnixSocket(path: String) throws -> Int32 {
+    // The same 104 bytes `DaemonServer` refuses to exceed. Said here too, because
+    // a truncated path connects to nothing and reads as "no daemon is running".
+    guard path.utf8.count < 104 else { throw DaemonClient.ConnectError.socketPathTooLong(path) }
+    let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+    guard fd >= 0 else { throw DaemonClient.ConnectError.couldNotConnect }
+    // The daemon notices the window has gone when this end closes. A child holding
+    // a copy of it — the helper this same client spawns, and every shell below it —
+    // would be a window that never leaves, and a daemon that never shuts down.
+    fcntl(fd, F_SETFD, FD_CLOEXEC)
+    var address = sockaddr_un()
+    address.sun_family = sa_family_t(AF_UNIX)
+    _ = withUnsafeMutablePointer(to: &address.sun_path) { pointer in
+        path.withCString { source in
+            strncpy(UnsafeMutableRawPointer(pointer).assumingMemoryBound(to: CChar.self), source, 103)
+        }
+    }
+    let size = socklen_t(MemoryLayout<sockaddr_un>.size)
+    let result = withUnsafePointer(to: &address) { pointer in
+        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { POSIX.connect(fd, $0, size) }
+    }
+    guard result == 0 else {
+        close(fd)
+        throw DaemonClient.ConnectError.couldNotConnect
+    }
+    return fd
 }

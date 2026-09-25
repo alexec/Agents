@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; } .rb { font-size:14px; font-weight:600; } .f { font-size:12px; }
+    .m { font-size:12px; font-family: ui-monospace, Menlo, monospace; }
+    .btn { fill:#fff; stroke:#c7c7cc; } .pri { fill:#0a84ff; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .sheet { fill:#fff; stroke:#c7c7cc; }
+  </style>
+
+  <text x="20" y="28" class="h">A · NAME</text>
+  <text x="300" y="28" class="h">B · FIRST CONNECTION</text>
+  <text x="580" y="28" class="h">C · READY</text>
+  <text x="860" y="28" class="h">D · FAILED</text>
+
+  <!-- A -->
+  <rect x="20.5" y="40.5" width="260" height="250" rx="12" class="sheet"/>
+  <text x="40" y="72" class="rb t">Add a server</text>
+  <rect x="40" y="88" width="220" height="28" rx="6" fill="#fff" stroke="#0a84ff"/>
+  <text x="50" y="107" class="r t">devbox</text>
+  <text x="40" y="136" class="f s">An alias from ~/.ssh/config,</text>
+  <text x="40" y="152" class="f s">or user@host.</text>
+  <text x="40" y="186" class="f s">Agents uses your own ssh setup:</text>
+  <text x="40" y="202" class="f s">keys, agent, jump hosts.</text>
+  <rect x="112" y="244" width="70" height="28" rx="6" class="btn"/><text x="147" y="263" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="190" y="244" width="70" height="28" rx="6" class="pri"/><text x="225" y="263" class="f" fill="#fff" text-anchor="middle">Connect</text>
+
+  <!-- B -->
+  <rect x="300.5" y="40.5" width="260" height="250" rx="12" class="sheet"/>
+  <text x="320" y="72" class="rb t">Add devbox</text>
+  <circle cx="326" cy="98" r="5" fill="#c77700"/><text x="340" y="102" class="r t">Connect</text>
+  <rect x="320" y="114" width="220" height="100" rx="8" fill="#f5f5f7"/>
+  <text x="332" y="136" class="f t">First time connecting to devbox.</text>
+  <text x="332" y="152" class="f s">Its host key fingerprint is</text>
+  <text x="332" y="172" class="m t">SHA256:q7Lk4mJ2…</text>
+  <text x="332" y="188" class="m t">…Zr0pX9vB1aQe</text>
+  <text x="332" y="206" class="f s">Check it matches the server.</text>
+  <text x="340" y="236" class="r q">Check the system</text>
+  <rect x="332" y="252" width="70" height="28" rx="6" class="btn"/><text x="367" y="271" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="410" y="252" width="130" height="28" rx="6" class="pri"/><text x="475" y="271" class="f" fill="#fff" text-anchor="middle">Trust and continue</text>
+
+  <!-- C -->
+  <rect x="580.5" y="40.5" width="260" height="250" rx="12" class="sheet"/>
+  <text x="600" y="72" class="rb t">Add devbox</text>
+  <text x="600" y="102" class="r" fill="#34c759">✓</text><text x="620" y="102" class="r t">Connect</text>
+  <text x="600" y="126" class="r" fill="#34c759">✓</text><text x="620" y="126" class="r t">Check the system</text>
+  <text x="620" y="142" class="f s">Linux · ARM64</text>
+  <text x="600" y="166" class="r" fill="#34c759">✓</text><text x="620" y="166" class="r t">Set up</text>
+  <text x="600" y="190" class="r" fill="#34c759">✓</text><text x="620" y="190" class="r t">Find agent runtimes</text>
+  <text x="620" y="206" class="f s">Claude Code · Codex</text>
+  <rect x="744" y="252" width="76" height="28" rx="6" class="pri"/><text x="782" y="271" class="f" fill="#fff" text-anchor="middle">Done</text>
+
+  <!-- D -->
+  <rect x="860.5" y="40.5" width="240" height="250" rx="12" class="sheet"/>
+  <text x="880" y="72" class="rb t">Add devbx</text>
+  <text x="880" y="102" class="r" fill="#ff3b30">✕</text><text x="900" y="102" class="r t">Connect</text>
+  <text x="900" y="122" class="f" fill="#ff3b30">ssh can't find a host called</text>
+  <text x="900" y="138" class="f" fill="#ff3b30">“devbx”. Check the name or</text>
+  <text x="900" y="154" class="f" fill="#ff3b30">your ~/.ssh/config.</text>
+  <rect x="880" y="172" width="200" height="28" rx="6" fill="#fff" stroke="#0a84ff"/>
+  <text x="890" y="191" class="r t">devbx</text>
+  <rect x="932" y="252" width="70" height="28" rx="6" class="btn"/><text x="967" y="271" class="f t" text-anchor="middle">Cancel</text>
+  <rect x="1010" y="252" width="70" height="28" rx="6" class="pri"/><text x="1045" y="271" class="f" fill="#fff" text-anchor="middle">Try again</text>
+
+  <!-- C' no runtimes -->
+  <text x="580" y="328" class="h">C′ · READY, NO RUNTIME</text>
+  <rect x="580.5" y="340.5" width="260" height="200" rx="12" class="sheet"/>
+  <text x="600" y="372" class="rb t">Add devbox</text>
+  <text x="600" y="400" class="r" fill="#34c759">✓</text><text x="620" y="400" class="r t">Connect, check, set up</text>
+  <text x="600" y="424" class="r" fill="#c77700">!</text><text x="620" y="424" class="r t">Find agent runtimes</text>
+  <text x="620" y="442" class="f s">No agent runtime on devbox.</text>
+  <text x="620" y="458" class="f s">Install one there and log in,</text>
+  <text x="620" y="474" class="f s">then choose Check again.</text>
+  <rect x="600" y="498" width="150" height="28" rx="6" class="btn"/><text x="675" y="517" class="f t" text-anchor="middle">Open terminal on devbox</text>
+  <rect x="756" y="498" width="70" height="28" rx="6" class="btn"/><text x="791" y="517" class="f t" text-anchor="middle">Check again</text>
+
+  <text x="20" y="340" class="note">One sheet, four states. The steps tick down in place; nothing opens a second window.</text>
+  <text x="20" y="358" class="note">Cancel at any step leaves nothing on the server (FR-025).</text>
+  <text x="20" y="376" class="note">B appears only when ssh has no known key for the host. A changed key is state D</text>
+  <text x="20" y="394" class="note">with no Try again: “devbox's host key has changed since you last connected…”.</text>
+  <text x="20" y="412" class="note">The terminal in C′ is the project terminal, opened in the server's home folder.</text>
+</svg>

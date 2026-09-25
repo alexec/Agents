@@ -54,7 +54,7 @@ public final class RuntimeProcess: @unchecked Sendable {
 
     public func kill() {
         guard process.isRunning else { return }
-        Darwin.kill(process.processIdentifier, SIGKILL)
+        POSIX.kill(process.processIdentifier, SIGKILL)
     }
 
     /// Let go of the pipes. Called once the process is gone.

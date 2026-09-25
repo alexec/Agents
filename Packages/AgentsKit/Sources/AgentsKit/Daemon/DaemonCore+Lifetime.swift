@@ -45,7 +45,11 @@ extension DaemonCore {
     }
 
     public var shouldExit: Bool {
-        connectionCount == 0 && !isHoldingAgents
+        exitsWhenIdle && connectionCount == 0 && !isHoldingAgents
+    }
+
+    public func setExitsWhenIdle(_ exits: Bool) {
+        exitsWhenIdle = exits
     }
 
     /// Wait until there is nothing left to do and nobody watching.
@@ -60,6 +64,9 @@ extension DaemonCore {
             // The same tick that asks whether to exit also lets go of shells nobody
             // has touched for hours (FR-028).
             reapIdleShells()
+            // Asked to go (037). No grace: the grace is for a window reopening, and
+            // whoever asked has already said what they want.
+            if quitRequested { return }
             if shouldExit {
                 let start = idleSince ?? ContinuousClock.now
                 idleSince = start

@@ -2,7 +2,8 @@ import AgentsKitCore
 import Foundation
 import Observation
 
-/// The phone's end of `files/*` (034): an agent's folder as the Mac's daemon reads it.
+/// A client's end of `files/*` (034): an agent's folder as its daemon reads it. The
+/// phone's for the Mac's agents, and the Mac's for a server's (037).
 ///
 /// Nothing here reads a disk. Every listing and every file is asked of the Mac, inside
 /// the folders the agent was given, and the answer is what is shown; the phone keeps
@@ -12,35 +13,35 @@ import Observation
 /// watched is remembered here and asked for again every time the Mac comes back.
 @MainActor
 @Observable
-final class RemoteFiles {
+public final class RemoteFiles {
     private let client: DaemonClient
 
     /// The Mac answered a `files/*` request with "no such method": it predates the panes.
     /// The phone falls back to what it could do before, and says the Mac needs updating
     /// (FR-029). Cleared when a new connection is made, in case the Mac was updated.
-    private(set) var macLacksPanes = false
+    public private(set) var macLacksPanes = false
 
     /// Counted up for each folder named by `files/changed`, per agent. A pane observes
     /// the count for the folder it shows, or the file's parent, and reads again when it
     /// moves.
-    private(set) var changes: [String: Int] = [:]
+    public private(set) var changes: [String: Int] = [:]
     /// Everything changed for an agent, whatever the folder: for pictures, which may sit
     /// anywhere beside the page.
-    private(set) var anyChange: [UUID: Int] = [:]
+    public private(set) var anyChange: [UUID: Int] = [:]
 
     /// Counted up each time the Mac is back after being gone. A page with a draft the
     /// Mac never received reads its file again and saves it (034 FR-009).
-    private(set) var reconnections = 0
+    public private(set) var reconnections = 0
 
     private var watched: Set<DaemonAPI.FilesWatchRequest> = []
 
-    init(client: DaemonClient) {
+    public init(client: DaemonClient) {
         self.client = client
     }
 
     // MARK: Reading
 
-    func list(agentID: UUID, folder: URL) async throws -> DirectoryListing {
+    public func list(agentID: UUID, folder: URL) async throws -> DirectoryListing {
         try await asking {
             try await client.call(DaemonAPI.Method.filesList,
                                   DaemonAPI.FilesListRequest(agentID: agentID, folder: folder.path),
@@ -48,7 +49,7 @@ final class RemoteFiles {
         }
     }
 
-    func read(agentID: UUID, path: String, known: FileStamp? = nil) async throws -> FileReading {
+    public func read(agentID: UUID, path: String, known: FileStamp? = nil) async throws -> FileReading {
         try await asking {
             try await client.call(DaemonAPI.Method.filesRead,
                                   DaemonAPI.FilesReadRequest(agentID: agentID, path: path, knownStamp: known),
@@ -59,20 +60,20 @@ final class RemoteFiles {
     // MARK: Watching
 
     /// Hear about changes under this folder. Idempotent here and on the Mac.
-    func watch(agentID: UUID, folder: URL) async {
+    public func watch(agentID: UUID, folder: URL) async {
         let request = DaemonAPI.FilesWatchRequest(agentID: agentID, folder: folder.path)
         guard watched.insert(request).inserted else { return }
         _ = try? await asking { try await client.call(DaemonAPI.Method.filesWatch, request) }
     }
 
-    func unwatch(agentID: UUID, folder: URL) async {
+    public func unwatch(agentID: UUID, folder: URL) async {
         let request = DaemonAPI.FilesWatchRequest(agentID: agentID, folder: folder.path)
         guard watched.remove(request) != nil else { return }
         _ = try? await client.call(DaemonAPI.Method.filesUnwatch, request)
     }
 
     /// A new connection: it watches nothing yet, and may be to a newer Mac.
-    func reconnected() async {
+    public func reconnected() async {
         macLacksPanes = false
         reconnections += 1
         for request in watched {
@@ -84,7 +85,7 @@ final class RemoteFiles {
     }
 
     /// `files/changed`, from the notification switch.
-    func apply(_ change: DaemonAPI.FilesChangedNotification) {
+    public func apply(_ change: DaemonAPI.FilesChangedNotification) {
         anyChange[change.agentID, default: 0] += 1
         for folder in change.folders {
             changes[Self.key(change.agentID, Self.standard(folder)), default: 0] += 1
@@ -92,14 +93,14 @@ final class RemoteFiles {
     }
 
     /// How often this folder has changed. Read in a view to be redrawn when it does.
-    func changeCount(agentID: UUID, folder: URL) -> Int {
+    public func changeCount(agentID: UUID, folder: URL) -> Int {
         changes[Self.key(agentID, Self.standard(folder.path))] ?? 0
     }
 
     // MARK: Words
 
     /// What to say when a read failed, in the Mac's words where it gave some.
-    static func describe(_ error: any Error, name: String) -> String {
+    public static func describe(_ error: any Error, name: String) -> String {
         if let error = error as? JSONRPCError {
             if error.code == DaemonAPI.Failure.fileGone { return "\(name) is gone." }
             return error.message
@@ -107,7 +108,7 @@ final class RemoteFiles {
         return "\(name) could not be read. Your Mac may not be answering."
     }
 
-    static func isGone(_ error: any Error) -> Bool {
+    public static func isGone(_ error: any Error) -> Bool {
         (error as? JSONRPCError)?.code == DaemonAPI.Failure.fileGone
     }
 
