@@ -101,8 +101,14 @@ struct ProjectPageView: View {
         .markedStale(model.isStale)
         // Asked when the page opens and when its archive changes (who is working in a
         // worktree moves then), never polled.
-        .task(id: WorktreesAsk(project: model.selectedProject, archived: archived.count)) {
+        .task(id: WorktreesAsk(project: model.selectedProject, archived: archivedCount)) {
             if let folder = model.selectedProject { await model.loadProjectWorktrees(in: folder) }
+        }
+        // The archived page wanted, once it is open, and again when the count moves.
+        .task(id: ArchivedAsk(project: model.selectedProject, isOpen: showsArchived,
+                              shown: archivedShown, count: archivedCount)) {
+            guard showsArchived, let folder = model.selectedProject else { return }
+            await model.loadArchivedAgents(in: folder, limit: archivedShown)
         }
         .refreshable { await model.refreshEverything() }
     }
@@ -111,20 +117,26 @@ struct ProjectPageView: View {
         AgentGroup.allCases.allSatisfy { model.agents(group: $0).isEmpty }
     }
 
+    /// The archived agents fetched so far — none until the section is opened.
     private var archived: [Agent] { model.agents(group: .archived) }
 
+    /// How many there are, from the Mac's count rather than from what has been fetched.
+    private var archivedCount: Int {
+        max(model.selectedSummary?.counts[.archived] ?? 0, archived.count)
+    }
+
     /// Out of the way until it is wanted, ten at a time, as on the Mac, and behind the
-    /// same chevron. On a mobile connection there is a second reason: the rest is not
-    /// fetched until it is asked for.
+    /// same chevron. None of it is fetched until it is opened: archived agents outnumber
+    /// the live ones many times over and are almost never read.
     @ViewBuilder
     private var archivedSection: some View {
-        if !archived.isEmpty {
-            DisclosureHeading(title: "Archived", count: archived.count, isOpen: $showsArchived)
+        if archivedCount > 0 {
+            DisclosureHeading(title: "Archived", count: archivedCount, isOpen: $showsArchived)
             if showsArchived {
                 ForEach(archived.prefix(archivedShown)) { agent in
                     AgentCard(agent: agent)
                 }
-                if archived.count > archivedShown {
+                if archivedCount > archivedShown {
                     Button("Show more") { archivedShown += pageSize }
                         .appText(.reading)
                         .padding(.top, 4)
@@ -216,4 +228,12 @@ struct GroupHeading: View {
 private struct WorktreesAsk: Equatable {
     var project: URL?
     var archived: Int
+}
+
+/// When the Archived section fetches: opened, paged, or its count moved.
+private struct ArchivedAsk: Equatable {
+    var project: URL?
+    var isOpen: Bool
+    var shown: Int
+    var count: Int
 }

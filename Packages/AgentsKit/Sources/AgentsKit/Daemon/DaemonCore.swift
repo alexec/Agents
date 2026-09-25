@@ -716,6 +716,22 @@ public actor DaemonCore {
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
+    /// `agents/list`, narrowed the way the request asks.
+    public func listAgents(_ request: DaemonAPI.ListRequest) -> [Agent] {
+        let folder = request.folder.map(Project.standardize)
+        var listed = allAgents(includeArchived: request.includeArchived || request.archivedOnly)
+            .filter { agent in
+                (!request.archivedOnly || agent.state == .archived)
+                    && (folder == nil || agent.projectFolder == folder)
+                    && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
+            }
+        if let limit = request.limit { listed = Array(listed.prefix(max(0, limit))) }
+        if !request.archivedCommands {
+            for i in listed.indices where listed[i].state == .archived { listed[i].availableCommands = [] }
+        }
+        return listed
+    }
+
     public func agent(_ id: UUID) -> Agent? { agents[id] }
 
     public func runtimeStatuses() -> [RuntimeStatus] {

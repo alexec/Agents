@@ -975,16 +975,13 @@ struct DaemonSlashCommandTests {
         }
         try await core.archive(archived)
 
-        func list(_ request: DaemonAPI.ListRequest) async throws -> [UUID: [String]] {
-            guard case .success(let value) = await core.handle(method: DaemonAPI.Method.agentsList,
-                                                                params: try JSONValue.encoding(request))
-            else { throw CancellationError() }
-            let agents = try value.decode([Agent].self)
-            return Dictionary(uniqueKeysWithValues: agents.map { ($0.id, $0.availableCommands.map(\.name)) })
+        func commands(_ request: DaemonAPI.ListRequest) async -> [UUID: [String]] {
+            Dictionary(uniqueKeysWithValues: await core.listAgents(request).map {
+                ($0.id, $0.availableCommands.map(\.name))
+            })
         }
-        let mac = try await list(.init())
-        #expect(mac[archived] == ["review", "add-dir"])
-        let phone = try await list(.init(archivedCommands: false))
+        #expect(await commands(.init())[archived] == ["review", "add-dir"])
+        let phone = await commands(.init(archivedCommands: false))
         #expect(phone[kept] == ["review", "add-dir"])
         #expect(phone[archived] == [])
         #expect(await core.agent(archived)?.availableCommands.count == 2, "only the reply is trimmed")
