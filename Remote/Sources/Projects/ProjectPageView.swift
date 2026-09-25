@@ -45,6 +45,7 @@ struct ProjectPageView: View {
                                     set: { if !$0 { model.startingIn = nil } })) {
             if let project = model.startingIn {
                 StartAgentView(project: project)
+                    .paperSheet()
                     .presentationDetents([.large])
                     .presentationSizing(.form)
             }

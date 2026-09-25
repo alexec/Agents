@@ -17,6 +17,7 @@ struct ChoiceRows: View {
                 worktreeRow
             }
         }
+        .paperListRow()
         Section {
             switch model.startChoicesState {
             case .loading:
@@ -45,6 +46,7 @@ struct ChoiceRows: View {
                 Text("You can still start it with what \(runtimeName) chooses by itself.")
             }
         }
+        .paperListRow()
     }
 
     private var runtimeName: String {

@@ -84,7 +84,7 @@ private struct WorkflowRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         .accessibilityElement(children: .combine)
     }
 

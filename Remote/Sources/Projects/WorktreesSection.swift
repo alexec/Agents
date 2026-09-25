@@ -61,7 +61,7 @@ private struct WorktreeRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 14))
+        .paperRow()
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {

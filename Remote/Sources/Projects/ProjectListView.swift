@@ -21,7 +21,9 @@ struct ProjectListView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .paperGround()
+        // One shade deeper than the page, as the Mac's projects column is.
+        .background(Paper.sidebar)
+        .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Projects")
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         // Pinned under the projects, as on the Mac: it is about all of them, and the
@@ -131,7 +133,7 @@ private struct SpendingRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(Paper.ground)
+        .background(Paper.sidebar)
         .overlay(alignment: .top) { Rectangle().fill(Paper.rule).frame(height: 1) }
         .accessibilityHint("Opens Spending")
     }
