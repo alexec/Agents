@@ -80,6 +80,12 @@ struct AgentRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                // What it holds or waits for (036), so an idle agent still holding the
+                // simulator can be seen from the list.
+                if let leases = model.work.leaseStatus(of: agent.id) {
+                    LeaseMark(status: leases)
+                }
+
                 // Blocked (039): what it waits on, one line an agent, and when it will
                 // look again — so the row says what it is waiting for without opening
                 // it (SC-005). Carry on is here because the person often knows the block
