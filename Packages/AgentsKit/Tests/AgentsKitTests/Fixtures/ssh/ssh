@@ -75,7 +75,15 @@ if [ $master = 1 ]; then
         trap 'kill $relay 2>/dev/null; rm -f "$ctl" "$ctl.relay" "$local"; exit 0' TERM INT
         wait $relay
     else
-        while :; do sleep 1; done
+        # `wait` and not a foreground sleep: sh runs a trap only once the foreground
+        # command returns, which made every -O exit take up to a second.
+        # Its pid goes where a relay's would, so a master killed outright leaves
+        # nothing that the next master or FakeSSH.tearDown does not stop.
+        sleep 2147483647 &
+        sleeper=$!
+        echo $sleeper > "$ctl.relay"
+        trap 'kill $sleeper 2>/dev/null; rm -f "$ctl" "$ctl.relay"; exit 0' TERM INT
+        wait $sleeper
     fi
     exit 0
 fi

@@ -3,89 +3,91 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The one long-lived ssh connection per server (037), against the fake ssh.
-@Suite("The ssh master", .serialized)
-struct SSHMasterTests {
-    @Test func itIsReadyWhenTheMasterAnswersACheck() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
-        try await master.start(forwardingTo: nil)
-        #expect(await master.isRunning)
-        let check = try await fake.command().run(fake.command().controlArguments("check"))
-        #expect(check.status == 0)
-        await master.stop()
-    }
+extension FakeSSHSuites {
+    /// The one long-lived ssh connection per server (037), against the fake ssh.
+    @Suite("The ssh master")
+    struct SSHMasterTests {
+        @Test func itIsReadyWhenTheMasterAnswersACheck() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
+            try await master.start(forwardingTo: nil)
+            #expect(await master.isRunning)
+            let check = try await fake.command().run(fake.command().controlArguments("check"))
+            #expect(check.status == 0)
+            await master.stop()
+        }
 
-    @Test func theForwardReachesWhateverListensOnTheServer() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let remote = fake.home.appendingPathComponent("r.sock")
-        let listener = try EchoListener(path: remote.path)
-        defer { listener.close() }
-        let local = fake.hosts.appendingPathComponent("fk000001.sock")
-        let master = SSHMaster(command: fake.command(), socket: local)
-        try await master.start(forwardingTo: remote.path)
-        await eventually("the forward socket exists") { FileManager.default.fileExists(atPath: local.path) }
-        let reply = try EchoListener.roundTrip(path: local.path, line: "hello")
-        #expect(reply == "HELLO")
-        await master.stop()
-    }
+        @Test func theForwardReachesWhateverListensOnTheServer() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let remote = fake.home.appendingPathComponent("r.sock")
+            let listener = try EchoListener(path: remote.path)
+            defer { listener.close() }
+            let local = fake.hosts.appendingPathComponent("fk000001.sock")
+            let master = SSHMaster(command: fake.command(), socket: local)
+            try await master.start(forwardingTo: remote.path)
+            await eventually("the forward socket exists") { FileManager.default.fileExists(atPath: local.path) }
+            let reply = try EchoListener.roundTrip(path: local.path, line: "hello")
+            #expect(reply == "HELLO")
+            await master.stop()
+        }
 
-    @Test func stoppingRemovesBothSockets() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let local = fake.hosts.appendingPathComponent("fk000001.sock")
-        let master = SSHMaster(command: fake.command(), socket: local)
-        try await master.start(forwardingTo: fake.home.appendingPathComponent("nothing.sock").path)
-        await master.stop()
-        #expect(await master.isRunning == false)
-        #expect(!FileManager.default.fileExists(atPath: fake.hosts.appendingPathComponent("fk000001.ctl").path))
-        await eventually("the forward socket is gone") { !FileManager.default.fileExists(atPath: local.path) }
-    }
+        @Test func stoppingRemovesBothSockets() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let local = fake.hosts.appendingPathComponent("fk000001.sock")
+            let master = SSHMaster(command: fake.command(), socket: local)
+            try await master.start(forwardingTo: fake.home.appendingPathComponent("nothing.sock").path)
+            await master.stop()
+            #expect(await master.isRunning == false)
+            #expect(!FileManager.default.fileExists(atPath: fake.hosts.appendingPathComponent("fk000001.ctl").path))
+            await eventually("the forward socket is gone") { !FileManager.default.fileExists(atPath: local.path) }
+        }
 
-    @Test func aMasterThatDiesIsNoticedWithinASecond() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
-        let exited = Flag()
-        await master.setOnExit { await exited.set() }
-        try await master.start(forwardingTo: nil)
-        let pid = try #require(await master.pid)
-        kill(pid, SIGKILL)
-        await eventually("the exit was heard", within: .seconds(1)) { await exited.isSet }
-        #expect(await master.isRunning == false)
-    }
+        @Test func aMasterThatDiesIsNoticedWithinASecond() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
+            let exited = Flag()
+            await master.setOnExit { await exited.set() }
+            try await master.start(forwardingTo: nil)
+            let pid = try #require(await master.pid)
+            kill(pid, SIGKILL)
+            await eventually("the exit was heard", within: .seconds(1)) { await exited.isSet }
+            #expect(await master.isRunning == false)
+        }
 
-    @Test func staleFilesFromADeadMasterAreClearedFirst() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let ctl = fake.hosts.appendingPathComponent("fk000001.ctl")
-        try "999999".write(to: ctl, atomically: true, encoding: .utf8)
-        let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
-        try await master.start(forwardingTo: nil)
-        #expect(await master.isRunning)
-        await master.stop()
-    }
+        @Test func staleFilesFromADeadMasterAreClearedFirst() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let ctl = fake.hosts.appendingPathComponent("fk000001.ctl")
+            try "999999".write(to: ctl, atomically: true, encoding: .utf8)
+            let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))
+            try await master.start(forwardingTo: nil)
+            #expect(await master.isRunning)
+            await master.stop()
+        }
 
-    @Test func anUnreachableHostIsNamed() async throws {
-        let fake = try FakeSSH()
-        defer { fake.tearDown() }
-        let master = SSHMaster(command: fake.command(fail: "unknownHost"),
-                               socket: fake.hosts.appendingPathComponent("fk000001.sock"))
-        await #expect(throws: HostProblem.unknownHost) { try await master.start(forwardingTo: nil) }
-    }
+        @Test func anUnreachableHostIsNamed() async throws {
+            let fake = try FakeSSH()
+            defer { fake.tearDown() }
+            let master = SSHMaster(command: fake.command(fail: "unknownHost"),
+                                   socket: fake.hosts.appendingPathComponent("fk000001.sock"))
+            await #expect(throws: HostProblem.unknownHost) { try await master.start(forwardingTo: nil) }
+        }
 
-    @Test func aSocketPathTooLongIsRefusedBeforeSSHRuns() async throws {
-        let long = URL(filePath: "/tmp/" + String(repeating: "x", count: 110) + ".sock")
-        let master = SSHMaster(command: SSHCommand(name: "devbox", controlPath: URL(filePath: "/tmp/a.ctl")),
-                               socket: long)
-        await #expect(throws: DaemonClient.ConnectError.self) { try await master.start(forwardingTo: "/r") }
-    }
+        @Test func aSocketPathTooLongIsRefusedBeforeSSHRuns() async throws {
+            let long = URL(filePath: "/tmp/" + String(repeating: "x", count: 110) + ".sock")
+            let master = SSHMaster(command: SSHCommand(name: "devbox", controlPath: URL(filePath: "/tmp/a.ctl")),
+                                   socket: long)
+            await #expect(throws: DaemonClient.ConnectError.self) { try await master.start(forwardingTo: "/r") }
+        }
 
-    actor Flag {
-        var isSet = false
-        func set() { isSet = true }
+        actor Flag {
+            var isSet = false
+            func set() { isSet = true }
+        }
     }
 }
 
