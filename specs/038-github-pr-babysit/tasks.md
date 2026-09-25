@@ -299,9 +299,9 @@ prove.
 
 - [X] T050 [P] Build the iOS Remote scheme for the generic simulator only, and confirm it decodes the new trigger and refusal cases. Don't create or boot a simulator.
 - [X] T051 Build `agentsd`, then `Agents`. Run the full `swift test` six times on this branch and six on `main`, and compare pass counts before blaming any failure on this branch.
-- [ ] T052 With the run-app skill on a scratch root, screenshot wireframe states A, C, D and E (using `GH_CONFIG_DIR` pointed at an empty folder for A) and the stopped row. Compare them with `wireframes/mac-section-states.svg`, and record the differences in Notes.
-- [ ] T053 Ask Alex (question tool) to create or approve the throwaway sandbox repository. Only then run quickstart §3 live, then run the §4 audit (`gh api repos/<o>/<r>/events` and the branch reflog): no force-push, no other branch, no merge, close, approve or edit (SC-004). Record the results in this file's Notes and in research.md.
-- [ ] T054 Update memory: 038's status in the spec-queue entry and its MEMORY.md line.
+- [X] T052 With the run-app skill on a scratch root, screenshot wireframe states A, C, D and E (using `GH_CONFIG_DIR` pointed at an empty folder for A) and the stopped row. Compare them with `wireframes/mac-section-states.svg`, and record the differences in Notes.
+- [X] T053 Ask Alex (question tool) to create or approve the throwaway sandbox repository. Only then run quickstart §3 live, then run the §4 audit (`gh api repos/<o>/<r>/events` and the branch reflog): no force-push, no other branch, no merge, close, approve or edit (SC-004). Record the results in this file's Notes and in research.md.
+- [X] T054 Update memory: 038's status in the spec-queue entry and its MEMORY.md line.
 
 ---
 
@@ -386,4 +386,25 @@ prove.
   socket against the real gh instead: the starter written with the three triggers and acceptEdits,
   a second press refused with `babysitterExists`, Run now refused with `noPullRequest`, no agent
   started. The screenshots are still owed.
-- Live run and audit (T053):
+- Live run and audit (T053), 2026-09-25, Alex's go-ahead to create a private sandbox:
+  `alexec/agents-babysit-sandbox` (private; one check that fails while a file `FAIL` exists), PR #1
+  on `babysit-demo` adding `FAIL`. Scratch root, real gh, a real Claude agent; permission questions
+  answered by a watcher that allowed edits and commits and would refuse any `git push`/`gh` the
+  agent ran by itself (none were asked).
+  - The live run found a bug: the starter, written untracked into the project's `.agents`, made the
+    project folder look dirty, so every fire was refused (fixed in `8b12b4d`; the test sandbox had
+    hidden it by excluding `.agents`).
+  - After the fix: one fire on the failing check, in the project folder. The prompt named #1, the
+    check and its log. The agent ran `git rm FAIL && git commit`, pushed `1547836` with
+    push_pull_request, replied on the pull request with reply_on_pull_request (as alexec), and ended
+    blocked until CI confirmed. The check passed. The refresh a minute after the run saw it passing,
+    fired nothing, and kept the count at 1 (babysitting's own push does not reset it).
+  - Copilot's automatic review (a bot) arrived on the pull request and was correctly ignored.
+  - SC-004 audit (`gh api repos/alexec/agents-babysit-sandbox/events`): one push to
+    `refs/heads/babysit-demo`, `forced=false`; one issue comment; no merge, close, approve or edit.
+  - Not exercised live: review comments from another person with write access (there is no second
+    account) and stopping after three. Both are covered by the tests with fakes.
+  - Screenshot: `walk/05-live-babysat.png`: the Blocked babysitting agent, the pull request row
+    reading "project folder · Babysat 1 minute ago → · Removed the stray FAIL file…", Show
+    babysitter, and the workflow row.
+  - The sandbox repository and its PR are left in place for Alex to delete or reuse.
