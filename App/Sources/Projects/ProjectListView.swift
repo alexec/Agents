@@ -96,7 +96,7 @@ struct ProjectListView: View {
     @ViewBuilder
     private func menu(for summary: DaemonAPI.ProjectSummary) -> some View {
         Button("Archive") {
-            Task { await model.archiveProject(summary.folder) }
+            Task { await model.archiveProject(summary.key) }
         }
         Button("Show in Finder") {
             NSWorkspace.shared.activateFileViewerSelecting([summary.folder])
@@ -122,14 +122,14 @@ private struct ArchivedProjectRow: View {
             }
             Spacer()
             Button("Unarchive") {
-                Task { await model.unarchiveProject(summary.folder) }
+                Task { await model.unarchiveProject(summary.key) }
             }
             .buttonStyle(.link)
             .appText(.fine)
         }
         .contextMenu {
             Button("Unarchive") {
-                Task { await model.unarchiveProject(summary.folder) }
+                Task { await model.unarchiveProject(summary.key) }
             }
         }
     }

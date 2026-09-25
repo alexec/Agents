@@ -28,7 +28,7 @@ public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStrin
 ///
 /// Everything about reaching it — address, port, user, key, jump host — stays in their
 /// own ssh configuration. The window keeps the name and what it learned by asking.
-public struct Host: Codable, Hashable, Sendable, Identifiable {
+public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     public var id: HostID
     /// Exactly what was typed. Handed to `ssh` as the destination, after `--`.
     public var sshName: String
@@ -159,22 +159,22 @@ public enum HostProblem: Error, Hashable, Sendable {
 
 /// The servers, in the order they were added. This Mac is not among them.
 public struct HostList: Codable, Hashable, Sendable {
-    public private(set) var all: [Host] = []
+    public private(set) var all: [ServerHost] = []
 
     public struct Duplicate: Error, Equatable, Sendable {
         public var sshName: String
     }
 
-    public init(_ hosts: [Host] = []) { all = hosts }
+    public init(_ hosts: [ServerHost] = []) { all = hosts }
 
-    public mutating func add(_ host: Host) throws {
+    public mutating func add(_ host: ServerHost) throws {
         guard !all.contains(where: { $0.sshName == host.sshName }) else {
             throw Duplicate(sshName: host.sshName)
         }
         all.append(host)
     }
 
-    public mutating func update(_ host: Host) {
+    public mutating func update(_ host: ServerHost) {
         guard let index = all.firstIndex(where: { $0.id == host.id }) else { return }
         all[index] = host
     }
@@ -183,12 +183,12 @@ public struct HostList: Codable, Hashable, Sendable {
         all.removeAll { $0.id == id }
     }
 
-    public subscript(id: HostID) -> Host? {
+    public subscript(id: HostID) -> ServerHost? {
         all.first { $0.id == id }
     }
 
     public init(from decoder: any Decoder) throws {
-        all = try decoder.singleValueContainer().decode([Host].self)
+        all = try decoder.singleValueContainer().decode([ServerHost].self)
     }
 
     public func encode(to encoder: any Encoder) throws {

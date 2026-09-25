@@ -10,20 +10,20 @@ import Testing
 @Suite("A host and its name")
 struct HostTests {
     @Test func aNameIsWhatSSHIsGiven() throws {
-        let host = try Host(sshName: "devbox")
+        let host = try ServerHost(sshName: "devbox")
         #expect(host.sshName == "devbox")
         #expect(host.label == "devbox")
     }
 
     @Test func theLabelIsTheHostPartOfUserAtHost() throws {
-        #expect(try Host(sshName: "alex@devbox.lan:2222").label == "devbox.lan")
-        #expect(try Host(sshName: "alex@devbox.lan").label == "devbox.lan")
-        #expect(try Host(sshName: "gpu-01:2200").label == "gpu-01")
+        #expect(try ServerHost(sshName: "alex@devbox.lan:2222").label == "devbox.lan")
+        #expect(try ServerHost(sshName: "alex@devbox.lan").label == "devbox.lan")
+        #expect(try ServerHost(sshName: "gpu-01:2200").label == "gpu-01")
     }
 
     @Test(arguments: ["", "  ", "dev box", "-oProxyCommand=evil", "devbox\n", "\tdevbox"])
     func aNameThatCouldBeAnOptionOrIsNotOneWordIsRefused(_ name: String) {
-        #expect(throws: Host.InvalidName.self) { try Host(sshName: name) }
+        #expect(throws: ServerHost.InvalidName.self) { try ServerHost(sshName: name) }
     }
 
     @Test func anIDIsEightLowercaseLettersOrDigits() throws {
@@ -38,9 +38,9 @@ struct HostTests {
 
     @Test func twoHostsMayNotShareAName() throws {
         var hosts = HostList()
-        try hosts.add(Host(sshName: "devbox"))
-        #expect(throws: HostList.Duplicate.self) { try hosts.add(Host(sshName: "devbox")) }
-        try hosts.add(Host(sshName: "gpu-01"))
+        try hosts.add(ServerHost(sshName: "devbox"))
+        #expect(throws: HostList.Duplicate.self) { try hosts.add(ServerHost(sshName: "devbox")) }
+        try hosts.add(ServerHost(sshName: "gpu-01"))
         #expect(hosts.all.map(\.sshName) == ["devbox", "gpu-01"])
     }
 
@@ -50,7 +50,7 @@ struct HostTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let store = HostStore(file: folder.appendingPathComponent("hosts.json"))
         var hosts = HostList()
-        try hosts.add(Host(sshName: "devbox"))
+        try hosts.add(ServerHost(sshName: "devbox"))
         try store.save(hosts)
         let text = try String(contentsOf: folder.appendingPathComponent("hosts.json"), encoding: .utf8)
         #expect(!text.contains("\"mac\""))

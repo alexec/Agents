@@ -94,13 +94,13 @@ worktree. `Pkg/` stands for `Packages/AgentsKit/`, and `Tests/` for
   - `project(_ key:)`, `agents(in:group:)`, `counts(in:)` and `unreadCount(in:)` take `ProjectKey`;
   - records decoded without `host` are `.mac`.
 - [X] T026 Add `host: HostID` (client-assigned, default `.mac`, not encoded) to `DaemonAPI.ProjectSummary` and `Agent` in `Pkg/Sources/AgentsKitCore/Model/`. Change `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift` to key projects by `ProjectKey` and to add `apply(_:from:)`. Keep URL-taking shims that mean `.mac` until T028 has moved every caller, then delete them. **Done. URL-taking queries stay (the phone uses them, and they mean any host); keyed ones added beside them. T028 moves the Mac's callers.**
-- [ ] T027 Create `App/Sources/Hosts/HostSet.swift` (`@Observable @MainActor`): **In progress: the per-host sequence is `AgentsKit/Hosts/ServerConnection.swift` (master → probe → refuse / install / update-when-idle → forward → connect; offline on master loss), 7 tests in `Integration/ServerConnectionTests.swift`. The app-side `HostSet` wrapper is next.**
+- [X] T027 Create `App/Sources/Hosts/HostSet.swift` (`@Observable @MainActor`): **In progress: the per-host sequence is `AgentsKit/Hosts/ServerConnection.swift` (master → probe → refuse / install / update-when-idle → forward → connect; offline on master loss), 7 tests in `Integration/ServerConnectionTests.swift`. The app-side `HostSet` wrapper is next.** **Done: `App/Sources/Hosts/HostSet.swift` over `ServerConnection`; `UnreachableLink` so a server call never falls through to the Mac. The kit's `Host` became `ServerHost`, because Foundation has its own `Host`.**
   - hosts `[HostID: HostConnection]`, `.mac` first, the rest loaded from `HostStore`;
   - each `HostConnection` has its `DaemonClient`, link, `SSHMaster?` and `HostState` (data-model.md state diagram);
   - `client(for:)` throws `offline` fast when the host is not connected;
   - the reconnect loop moves here from `AppModel.reconnect()`, per host, with backoff 1→30 s, plus immediate retry on `NSWorkspace.didWakeNotification` and on `NWPathMonitor` becoming satisfied (R8);
   - `AGENTS_SSH` in the environment overrides the `ssh` path, which is used by the fake-host walk.
-- [ ] T028 Move `App/Sources/AppModel.swift` from its single `client` to `hostSet`:
+- [X] T028 Move `App/Sources/AppModel.swift` from its single `client` to `hostSet`: **Done: selection is host+folder (`select(_:)`, `selectedProjectKey`, stored `host|path`); agent calls go to the agent's host, draft and project calls to the selected project's host, and devices, cost, wake, presence and accounts stay on the Mac. The Mac's refreshes replace only the Mac's records; `refreshServer` lists a server's when it connects. Builds; the scratch smoke with no servers is part of T036.**
   - every `client.call` becomes `hostSet.client(for: <the project's or agent's host>)`;
   - whole-app reads (`cost/state`, `attention/pending`) are asked of every connected host and combined;
   - notifications from each host's `client.notifications()` go to `work.apply(_:from:)`;
