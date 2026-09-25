@@ -181,6 +181,8 @@ extension DaemonCore {
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
         if let prompts { agent.suggestedPrompts = prompts }
+        // Said in front of the person, so already seen: no banner for what they watched.
+        if isWatched(agentID) { agent.reportSeenAt = report.at }
         // In the same write as the report, so no window ever sees the new account of
         // the work under the old name for it.
         if let title {
