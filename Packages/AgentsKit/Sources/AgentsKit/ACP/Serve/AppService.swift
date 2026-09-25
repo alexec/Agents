@@ -436,7 +436,9 @@ public actor AppService {
             how each one ended, once they have all finished; for something the app \
             can't see, say what it is and give check_again_in_minutes. It is not for a \
             question to the person (that is needs_answer) or a dead end (that is stuck). \
-            Your turn ends and costs nothing while you wait.
+            Your turn ends and costs nothing while you wait — and anything you started \
+            in the background stops with it, so never block on a command of your own: \
+            wait for that in this turn.
 
             The message is one or two sentences in your own words, and it is what the \
             person reads on the row before they open anything — so write it for \

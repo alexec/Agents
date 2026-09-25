@@ -108,9 +108,10 @@ Built before the daemon logic, to settle the look first (memory: settle the UX b
 ## Phase 7: Polish and proof
 
 - [X] T031 [P] Update the `Agent.needsAPerson` and `AgentGroup` doc comments, and any count/notification doc that says "five outcomes", so the comments say what the code does.
-- [ ] T032 Run the full `swift test`, and compare it with T001's failures (run twice more if something new fails, per memory: the suite is flaky under load). Then build both schemes, one after the other, with `-skipPackagePluginValidation -skipMacroValidation`.
-- [ ] T033 Quickstart §3 steps 2–6 on a scratch daemon with the `run-app` skill, with screenshots of blocked, one of two finished, and resumed. Record what ran and what didn't.
-- [ ] T034 Commit on `039-blocked-status` with the attribution line. Don't merge into main until Alex says it's this lane's turn (memory: main checkout is only main).
+- [X] T032 Run the full `swift test`, and compare it with T001's failures (run twice more if something new fails, per memory: the suite is flaky under load). Then build both schemes, one after the other, with `-skipPackagePluginValidation -skipMacroValidation`.
+- [X] T033 Quickstart §3 steps 2–6 on a scratch daemon with the `run-app` skill, with screenshots of blocked, one of two finished, and resumed. Record what ran and what didn't.
+  - *T033 done 2026-09-24, real Claude agents on a scratch daemon, driven over the socket (Alex was at the keyboard, so no clicks):* a lead started two helpers and ended blocked on both ids. Both helpers ended blocked themselves, with a time to check again, on their own background `sleep`. `shots/e2e-three-blocked.png` shows all three under Blocked, with live wait names and Carry on. Carry on for both helpers was sent as the person over the socket, not by pressing the button. Both reported done, and the lead got exactly one prompt from the app naming each helper, its outcome and its message, then finished done. **Finding:** the helpers' background commands were killed when their turns ended (the runtime is let go), so the tool description now tells agents never to block on a command of their own. Not run live: the check-again firing (covered by `theTimeResumesItOnceOnTheHeartbeat`), refusals (`everyRefusalWritesNothingAndSaysWhy`, `aCircleIsRefused`) and the phone look (Alex's).
+- [X] T034 Commit on `039-blocked-status` with the attribution line. Don't merge into main until Alex says it's this lane's turn (memory: main checkout is only main).
 
 ---
 
