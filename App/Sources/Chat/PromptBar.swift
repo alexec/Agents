@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 /// it, which is why this is one view rather than a start form and a composer.
 struct PromptBar: View {
     @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
     /// Set on a project page, where the folder is the project and changing it would
@@ -66,6 +67,14 @@ struct PromptBar: View {
 
     /// Take the words. They land in the field rather than going: the agent wrote
     /// them, and sending them is still the user's move.
+    private func takeFocusIfAsked() {
+        guard requests.wantsPromptFocus, folderIsFixed else { return }
+        requests.wantsPromptFocus = false
+        // After the page has settled: from inside a chat, this bar is already there under
+        // the chat, and focus asked for before the chat has popped off it lands nowhere.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focused = true }
+    }
+
     private func takeSuggestion() {
         guard let suggestion else { return }
         text = suggestion.prompt
@@ -133,6 +142,10 @@ struct PromptBar: View {
             // and all — see `KeepsDrafts`. Words meant for one agent still never reach
             // the next: the bar only ever holds what belongs to where it is.
         }
+        // File ▸ New Session: the keyboard goes where the session starts, the project
+        // page's bar. The chat's own bar, on its way out, has no agent by then either,
+        // so it is told apart by being the one whose folder is not fixed.
+        .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.
         .onChange(of: model.offeredPrompt) {
@@ -679,14 +692,14 @@ struct PromptBar: View {
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
         }
     }
 
     @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter { !$0.isAboutPermission }) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
         }
     }
 
@@ -791,11 +804,11 @@ struct PromptBar: View {
     private var reachTitle: String {
         let folders = model.draftFolders.count
         let servers = model.draftServers.count
-        if folders == 0 && servers == 0 { return "Reach" }
+        if folders == 0 && servers == 0 { return "Reach: this folder" }
         var parts: [String] = []
         if folders > 0 { parts.append("\(folders + 1) folders") }
         if servers > 0 { parts.append("\(servers) MCP") }
-        return parts.joined(separator: " · ")
+        return "Reach: " + parts.joined(separator: " · ")
     }
 
     /// Said in the runtime list, so a runtime that cannot be used says why there.
@@ -845,23 +858,34 @@ struct PromptBar: View {
             }
             .disabled(!listed.canMakeNew)
             let others = listed.worktrees.filter { !$0.isProjectFolder }
-            if !others.isEmpty {
+            if !others.isEmpty || !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
-                ForEach(others) { worktree in
-                    SelectChoice(title: worktree.name,
-                                 description: worktreeDescription(worktree),
-                                 isChosen: model.draftWorktree == .existing(worktree.root)) {
-                        model.chooseWorktree(.existing(worktree.root))
-                        dismiss()
+                ScrollingChoices {
+                    ForEach(others) { worktree in
+                        SelectChoice(title: worktree.name,
+                                     description: worktreeDescription(worktree),
+                                     isChosen: model.draftWorktree == .existing(worktree.root)) {
+                            model.chooseWorktree(.existing(worktree.root))
+                            dismiss()
+                        }
+                        .disabled(!worktree.exists)
                     }
-                    .disabled(!worktree.exists)
-                }
-            }
-            if !listed.branches.isEmpty {
-                Divider().padding(.vertical, 4)
-                BranchChoices(branches: listed.branches, chosen: chosenBranch) { name in
-                    model.chooseWorktree(.branch(name))
-                    dismiss()
+                    if !listed.branches.isEmpty {
+                        if !others.isEmpty { Divider().padding(.vertical, 4) }
+                        Text("New worktree on a branch")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 4)
+                        ForEach(listed.branches) { branch in
+                            SelectChoice(title: branch.name,
+                                         description: branch.remote.map { "From \($0)" },
+                                         isChosen: chosenBranch == branch.name) {
+                                model.chooseWorktree(.branch(branch.name))
+                                dismiss()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -911,54 +935,22 @@ struct PromptBar: View {
     }
 }
 
-/// Branches a new worktree can be made on, in the Worktree chooser. A repository can
-/// have hundreds, so they scroll, and past a handful there is a field to find one.
-private struct BranchChoices: View {
-    let branches: [DaemonAPI.BranchSummary]
-    let chosen: String?
-    let choose: (String) -> Void
+/// The worktrees and branches in the Worktree chooser, which can outgrow the screen:
+/// a repository can have hundreds of branches, so past a height they scroll.
+private struct ScrollingChoices<Content: View>: View {
+    static var tallest: CGFloat { 320 }
 
-    @State private var filter = ""
+    @ViewBuilder let content: Content
 
-    private var shown: [DaemonAPI.BranchSummary] {
-        let words = filter.trimmingCharacters(in: .whitespaces)
-        guard !words.isEmpty else { return branches }
-        return branches.filter { $0.name.localizedCaseInsensitiveContains(words) }
-    }
+    @State private var contentHeight: CGFloat = 0
 
+    // A popover sizes to what is in it, and a scroll view has no size of its own,
+    // so it is given the height of its rows, up to the tallest it may be.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("New worktree on a branch")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 4)
-            if branches.count > 6 {
-                TextField("Find a branch", text: $filter)
-                    .textFieldStyle(.roundedBorder)
-                    .appText(.fine)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-            // A popover sizes to what is in it, and a scroll view has no size of its
-            // own, so a short list is laid out as it is and a long one given a height.
-            if branches.count > 6 {
-                ScrollView { rows }.frame(height: 220)
-            } else {
-                rows
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) { content }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-    }
-
-    private var rows: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(shown) { branch in
-                SelectChoice(title: branch.name,
-                             description: branch.remote.map { "From \($0)" },
-                             isChosen: chosen == branch.name) {
-                    choose(branch.name)
-                }
-            }
-        }
+        .frame(height: min(contentHeight, Self.tallest))
     }
 }

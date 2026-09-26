@@ -45,7 +45,7 @@ extension FakeSSHSuites {
             await eventually("the forward socket is gone") { !FileManager.default.fileExists(atPath: local.path) }
         }
 
-        @Test func aMasterThatDiesIsNoticedWithinASecond() async throws {
+        @Test(.flakyUnderLoad) func aMasterThatDiesIsNoticedWithinASecond() async throws {
             let fake = try FakeSSH()
             defer { fake.tearDown() }
             let master = SSHMaster(command: fake.command(), socket: fake.hosts.appendingPathComponent("fk000001.sock"))

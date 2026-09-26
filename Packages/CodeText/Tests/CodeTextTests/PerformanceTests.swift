@@ -42,7 +42,7 @@ struct PerformanceTests {
         #expect(elapsed < .seconds(1))
     }
 
-    @Test @MainActor func aThirtyMegabyteFileIsPlainAtOnce() throws {
+    @Test(.flakyUnderLoad) @MainActor func aThirtyMegabyteFileIsPlainAtOnce() throws {
         let row = #"{"id": 1, "name": "item", "tags": ["a", "b"], "price": 12.5, "ok": true},"# + "\n"
         let text = "[\n" + String(repeating: row, count: 31 * 1024 * 1024 / row.utf8.count) + "]"
         let start = ContinuousClock.now

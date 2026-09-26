@@ -17,6 +17,9 @@ public extension DaemonAPI.Method {
     /// Raise an event by hand. Debug builds on a scratch root only: how the events page
     /// is seen before anything real raises one.
     static let eventsRaise = "events/raise"
+    /// The window telling the daemon a server went offline or came back. The window
+    /// holds the servers' connections, so it is the only one that knows.
+    static let eventsServer = "events/server"
 }
 
 public extension DaemonAPI.Notification {
@@ -137,6 +140,17 @@ public extension DaemonAPI {
         public init(event: Event?, waiting: [WaitingAgent]) {
             self.event = event
             self.waiting = waiting
+        }
+    }
+
+    /// `events/server`: one server, by the name the person gave it, gone or back.
+    struct ServerReachabilityChange: Codable, Sendable, Hashable {
+        public var server: String
+        public var online: Bool
+
+        public init(server: String, online: Bool) {
+            self.server = server
+            self.online = online
         }
     }
 

@@ -292,7 +292,7 @@ struct ChangesTests {
     /// Two hundred changed files: the list under a second, a file under half a second.
     /// Measured, and printed, so the numbers can be written down; the bounds are the
     /// spec's, with room for a loaded machine.
-    @Test func twoHundredFilesAreQuickToList() async throws {
+    @Test(.flakyUnderLoad) func twoHundredFilesAreQuickToList() async throws {
         let (locations, work) = try temporary()
         try repository(at: work)
         var updates: [JSONValue] = []

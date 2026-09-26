@@ -132,6 +132,25 @@ extension DaemonCore {
         raise(draft)
     }
 
+    // MARK: server.* (037)
+
+    /// A server gone or back, as the window saw it: the window holds the servers'
+    /// connections, so it says, and the event goes through the one funnel like any other.
+    /// A phone has no connection to a server and cannot say.
+    @discardableResult
+    func raiseServerChange(_ change: DaemonAPI.ServerReachabilityChange, from surface: Surface? = nil) throws -> Event {
+        let server = change.server.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard surface?.deviceID == nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.eventRefused, message: "Only the Mac's window says how its servers are.")
+        }
+        guard !server.isEmpty else {
+            throw JSONRPCError(code: DaemonAPI.Failure.eventRefused, message: "A server change needs the server's name.")
+        }
+        return raise(EventDraft(name: change.online ? "server.online" : "server.offline", at: now(), scope: .mac,
+                                sentence: change.online ? "\(server) came back." : "\(server) went offline.",
+                                details: ["server": server]))
+    }
+
     // MARK: cost.limit_reached (R11)
 
     /// A spending limit was reached, said once a day for each limit (and each agent's

@@ -76,6 +76,8 @@ public struct ToolsetInstaller: Sendable {
         let id = toolset.id
         // Only the one the probe found, so a failure is that tool's own words.
         let fetch = facts.downloader == "wget" ? "wget -qO- \"$1\"" : "curl -fsSL \"$1\""
+        let npm = Toolset.npmCIArguments.joined(separator: " ")
+        let shim = toolset.shimLines.map { "'\($0)'" }.joined(separator: " ")
         return """
             set -e; umask 077; T="$HOME/\(Toolset.serverFolder(runtimeID: "claude"))"; P="$T/.part-\(id)"; \
             mkdir -p "$T"; chmod 700 "$HOME/.agents-server" "$HOME/.agents-server/tools" "$T" 2>/dev/null || true; \
@@ -85,13 +87,10 @@ public struct ToolsetInstaller: Sendable {
             fetch 'https://nodejs.org/dist/\(tarball)' > node.tar.xz || { tail -1 "$P/fetch.err" >&2; exit 21; }; \
             echo '\(sha)  node.tar.xz' | sha256sum -c - >/dev/null 2>&1 || exit 22; \
             mkdir node; tar -xJf node.tar.xz -C node --strip-components=1; rm -f node.tar.xz fetch.err; \
-            PATH="$P/node/bin:$PATH" npm ci --prefix "$P/lib" --ignore-scripts --omit=dev --no-audit --no-fund \
+            PATH="$P/node/bin:$PATH" npm \(npm) --prefix "$P/lib" \
             --cache "$P/.npm" >"$P/npm.log" 2>&1 || { tail -5 "$P/npm.log" >&2; exit 23; }; \
             rm -rf "$P/.npm" "$P/npm.log"; mkdir "$P/bin"; \
-            printf '%s\\n' '#!/bin/sh' \
-            '# Agents (043): not npx. Runs the Claude adapter this toolset was installed with.' \
-            'd=$(cd "$(dirname "$0")/.." && pwd -P)' \
-            'PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/\(toolset.manifest.entryPath)"' > "$P/bin/npx"; \
+            printf '%s\\n' \(shim) > "$P/bin/npx"; \
             chmod 700 "$P/bin/npx"; : > "$P/ok"; \
             rm -rf "$T/\(id)"; trap - EXIT; mv "$P" "$T/\(id)"
             """

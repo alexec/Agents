@@ -226,6 +226,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var causingEvent: EventPosition?
     public var causingEventName: String?
     public var isRunning: Bool
+    /// Set while the file is not the one the person approved: new since they last
+    /// looked, or changed. Nothing fires until they approve it.
+    public var awaitingApproval: WorkflowApproval?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -243,12 +246,15 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
         causingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .causingEvent)
         causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)
+        awaitingApproval = try c.decodeIfPresent(WorkflowApproval.self, forKey: .awaitingApproval)
     }
 
     public init(workflow: Workflow, isArchived: Bool = false,
                 overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
-                causingEvent: EventPosition? = nil, causingEventName: String? = nil) {
+                causingEvent: EventPosition? = nil, causingEventName: String? = nil,
+                awaitingApproval: WorkflowApproval? = nil) {
+        self.awaitingApproval = awaitingApproval
         self.causingEvent = causingEvent
         self.causingEventName = causingEventName
         self.workflow = workflow
@@ -268,11 +274,29 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         // Nothing put away is anybody's problem any more, including a file that cannot
         // be read: archiving it is how you say so.
         if isArchived { return false }
+        // Nothing runs until somebody has looked at it.
+        if awaitingApproval != nil { return true }
         // Nothing resolves this one on its own: it stays over the limit until somebody
         // archives or removes another.
         if overLimit != nil { return true }
         if workflow.problem?.needsAPerson == true { return true }
         if case .refused(let refusal, _, _) = lastOutcome { return refusal.needsAPerson }
         return false
+    }
+}
+
+/// What a workflow waiting for approval is waiting on (security review).
+///
+/// The digest is of the file as the daemon read it, and it is what Approve sends back,
+/// so what gets approved is exactly what the person was shown: a file changed between
+/// their looking and their clicking is still waiting afterwards.
+public struct WorkflowApproval: Codable, Hashable, Sendable {
+    public var digest: String
+    /// Never approved before, as opposed to changed since it was.
+    public var isNew: Bool
+
+    public init(digest: String, isNew: Bool) {
+        self.digest = digest
+        self.isNew = isNew
     }
 }

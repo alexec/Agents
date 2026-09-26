@@ -8,6 +8,8 @@ description: Why the app works the way it does.
 Why the app works the way it does: the ideas behind it and the trade-offs it makes.
 Nothing here needs doing; it is for understanding.
 
+- [Why Agents](why-agents.md): why you would run your coding agents here, alongside the
+  editor you already use, and when something else is better.
 - [The window and the daemon](window-and-daemon.md): why agents keep working when the
   window is closed, and what happens to them when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the

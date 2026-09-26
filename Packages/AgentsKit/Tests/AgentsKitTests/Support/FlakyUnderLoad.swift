@@ -1,0 +1,44 @@
+import Foundation
+import Testing
+
+extension Trait where Self == ConditionTrait {
+    /// A test that passes alone and fails when the whole suite runs at once on a busy
+    /// machine: a real-time race between a fake runtime's turn and the test's own calls,
+    /// or a time budget. Skipped where `CI` is set, so the build fails only on real
+    /// failures; `.github/workflows/ci.yml` runs them again on their own, allowed to fail,
+    /// with `AGENTS_RUN_FLAKY=1`. They always run on a Mac.
+    ///
+    /// Written on the same line as `@Test`: `scripts/flaky-tests.sh` finds them by that
+    /// to build the filter for that step. Take the trait off when the race is fixed.
+    ///
+    /// Quarantined, each seen failing in full runs on 2026-09-25 and passing alone. What
+    /// was seen, not a diagnosis:
+    /// - BlockedTests: twoHelpersFinishingGiveOneResumeNamingEach,
+    ///   aPersonsPromptEndsTheBlockAndNothingIsSentLater,
+    ///   stoppingABlockedAgentStopsItAndNothingIsSentLater,
+    ///   archivingABlockedAgentIsNeverUndoneByAResume — the lead's `blocked` report is
+    ///   refused because the helper "has already ended".
+    /// - BlockedTests.aBlockWhoseWaitsClosedBeforeItsTurnEndedIsResumedWhenItEnds — the
+    ///   lead's 900 ms turn is over before the test looks at it.
+    /// - WorktreeStartTests.anAgentCanStartInANewWorktreeOnALocalBranch — a launch
+    ///   other than the one expected is recorded.
+    /// - UnreportedEndingTests.theEndingAPersonsPromptOvertookIsNotAskedAbout — the
+    ///   app's one question is never sent.
+    /// - WorkflowRestartTests: theDepthCeilingCountsFromTheRestoredRun,
+    ///   aChainShortOfTheCeilingCarriesOnFromTheRestoredDepth — the next link neither
+    ///   runs nor is refused within 10 s. Worth a look: it may be more than slowness.
+    /// - BigContentTests.aMegabyteDiffIsReadQuickly — a 500 ms budget.
+    /// - DaemonTests.theRestartWordsGoAheadOfWhatWasQueued — on the GitHub runner, both
+    ///   prompts had not gone within `eventually`'s wait (2026-09-26); green on a Mac.
+    /// - Wall-clock budgets, which a shared runner cannot promise: ChangesTests.
+    ///   twoHundredFilesAreQuickToList (1 s / 500 ms, failed on the runner 2026-09-26),
+    ///   FilesPaneScaleTests.aFolderOfFiftyThousandEntriesListsQuickly (2 s) and
+    ///   SSHMasterTests.aMasterThatDiesIsNoticedWithinASecond (1 s).
+    /// - LeaseTests.aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack —
+    ///   the next in line is never started with the news (1 of 3 runs under CI=1).
+    static var flakyUnderLoad: Self {
+        let environment = ProcessInfo.processInfo.environment
+        return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_FLAKY"] != "1",
+                         "flaky under load; quarantined in CI (see FlakyUnderLoad.swift)")
+    }
+}

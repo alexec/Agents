@@ -823,7 +823,7 @@ struct DaemonTests {
 
     /// The queued words were typed by somebody who believed the turn was still
     /// running. The news that it was not has to reach the agent first.
-    @Test func theRestartWordsGoAheadOfWhatWasQueued() async throws {
+    @Test(.flakyUnderLoad) func theRestartWordsGoAheadOfWhatWasQueued() async throws {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running,

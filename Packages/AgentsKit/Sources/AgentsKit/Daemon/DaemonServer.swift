@@ -18,10 +18,15 @@ public final class DaemonServer: @unchecked Sendable {
     public struct ConnectionContext: Hashable, Sendable {
         public var id: UUID
         public var surface: Surface?
+        /// The process that connected, as the kernel said when it did. What ties an
+        /// agent's token to the helper its own runtime started, rather than to anything
+        /// that read the token off `ps`.
+        public var peer: Int32?
 
-        public init(id: UUID, surface: Surface?) {
+        public init(id: UUID, surface: Surface?, peer: Int32? = nil) {
             self.id = id
             self.surface = surface
+            self.peer = peer
         }
     }
 
@@ -33,6 +38,15 @@ public final class DaemonServer: @unchecked Sendable {
     /// sees a surface a caller merely claimed in some other request's parameters.
     final class ConnectionIdentity: @unchecked Sendable {
         let id = UUID()
+        let peer: Int32?
+        /// What this connection may ask for, decided once from who made it.
+        let role: ConnectionRole
+
+        init(peer: Int32?, role: ConnectionRole = .control) {
+            self.peer = peer
+            self.role = role
+        }
+
         private let lock = NSLock()
         private var _surface: Surface? = .mac
 
@@ -41,11 +55,12 @@ public final class DaemonServer: @unchecked Sendable {
             set { lock.lock(); defer { lock.unlock() }; _surface = newValue }
         }
 
-        var context: ConnectionContext { ConnectionContext(id: id, surface: surface) }
+        var context: ConnectionContext { ConnectionContext(id: id, surface: surface, peer: peer) }
     }
 
     private let url: URL
     private let handler: Handler
+    private let roles: RolePolicy
     /// Readable inside the module so a test can ask whether it would survive an exec.
     /// There is no other way to see the flag: it only shows itself in a child.
     private(set) var listenFD: Int32 = -1
@@ -59,9 +74,11 @@ public final class DaemonServer: @unchecked Sendable {
     public init(url: URL,
                 onConnectionCountChanged: @escaping @Sendable (Int) -> Void = { _ in },
                 onDisconnected: @escaping @Sendable (UUID) -> Void = { _ in },
+                roles: RolePolicy = .open,
                 handler: @escaping Handler) {
         self.url = url
         self.handler = handler
+        self.roles = roles
         self.onConnectionCountChanged = onConnectionCountChanged
         self.onDisconnected = onDisconnected
     }
@@ -72,8 +89,13 @@ public final class DaemonServer: @unchecked Sendable {
         let path = url.path
         guard path.utf8.count < 104 else { throw DaemonServerError.socketPathTooLong(path.utf8.count) }
 
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                 withIntermediateDirectories: true)
+        // The root is private to this account, whoever made it and wherever it is. A
+        // scratch root under /tmp was otherwise readable by every account on the Mac,
+        // transcripts and all.
+        let folder = url.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
         unlink(path)
 
         listenFD = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -99,6 +121,9 @@ public final class DaemonServer: @unchecked Sendable {
             close(listenFD)
             throw DaemonServerError.cannotBind(errno: errno)
         }
+        // Only this account may connect. Connecting takes write permission on the
+        // socket, and `bind` made it with whatever the umask left.
+        chmod(path, 0o600)
         guard listen(listenFD, 16) == 0 else {
             close(listenFD)
             throw DaemonServerError.cannotListen(errno: errno)
@@ -118,23 +143,37 @@ public final class DaemonServer: @unchecked Sendable {
                 // window connects, an agent starts a terminal, and the window's
                 // connection is held open by a shell that will never read it.
                 setCloseOnExec(fd)
+                // Said by the kernel, not the caller: another account is turned away
+                // before it can send a line, whatever the socket's mode has become.
+                guard PeerCredentials.uid(of: fd) == geteuid() else { close(fd); continue }
                 DaemonServer.limitSendWait(fd)
                 guard let self, !self.stopped.isSet else { close(fd); return }
-                self.accepted(fd)
+                self.accepted(fd, peer: PeerCredentials.pid(of: fd), role: self.roles.role(fd))
             }
         }
         thread.name = "AgentsKit.DaemonServer"
         thread.start()
     }
 
-    private func accepted(_ fd: Int32) {
+    private func accepted(_ fd: Int32, peer: Int32?, role: ConnectionRole) {
+        // Only what is not a window: a window connects all day, and a helper or a
+        // stranger is what anybody reading the log about the socket is looking for.
+        if role != .control {
+            DaemonLog.shared.write("socket: pid \(peer.map(String.init) ?? "?") connected as \(role.rawValue)")
+        }
         let transport = FDTransport(socket: fd)
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
-        let identity = ConnectionIdentity()
+        let identity = ConnectionIdentity(peer: peer, role: role)
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
+            // Refused by the server, before the daemon hears of it: a helper asking for
+            // what only a window may, or a shell asking for anything at all.
+            guard role.allows(method) else {
+                return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                             message: "\(method) is not open to this connection (\(role.rawValue))."))
+            }
             // A device saying which it is. The server sets the identity here, once,
             // and only then hands the request on — so what the daemon registers under
             // is what every later request on this connection will carry (021 T051).
@@ -207,11 +246,11 @@ public final class DaemonServer: @unchecked Sendable {
     public func broadcast(_ method: String, _ params: JSONValue?,
                           to wanted: @escaping @Sendable (ConnectionContext) -> Bool) {
         encoding.async { [connections] in
-            let targets = connections.allAddressed.filter { wanted($0.2) }
+            let targets = connections.allAddressed.filter { $0.3.hearsNotifications && wanted($0.2) }
             guard !targets.isEmpty,
                   let line = try? JSONRPCCodec.encode(.notification(method: method, params: params))
             else { return }
-            for (connection, queue, _) in targets {
+            for (connection, queue, _, _) in targets {
                 queue.async {
                     do {
                         try connection.notify(line: line)
@@ -276,11 +315,11 @@ final class ConnectionSet: @unchecked Sendable {
         identities.removeValue(forKey: ObjectIdentifier(connection))
     }
 
-    var allAddressed: [(JSONRPCConnection, DispatchQueue, DaemonServer.ConnectionContext)] {
+    var allAddressed: [(JSONRPCConnection, DispatchQueue, DaemonServer.ConnectionContext, ConnectionRole)] {
         lock.lock(); defer { lock.unlock() }
         return connections.compactMap { key, connection in
             guard let queue = queues[key], let identity = identities[key] else { return nil }
-            return (connection, queue, identity.context)
+            return (connection, queue, identity.context, identity.role)
         }
     }
 

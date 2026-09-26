@@ -24,6 +24,9 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     public var lastOutcome: WorkflowOutcome?
     /// The event that caused `lastOutcome`, when an event did (042 FR-030).
     public var lastCausingEvent: EventPosition?
+    /// SHA-256 of the file as the person last approved it. Kept here, outside the
+    /// project, because the file itself is something an agent can write.
+    public var approvedDigest: String?
 
     public var key: String { folder.path + "/" + workflowID }
 
@@ -39,6 +42,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
+        approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
     }
 
     public init(folder: URL, workflowID: String, isArchived: Bool = false,
@@ -69,13 +73,16 @@ struct WorkflowRecords: Codable, Sendable {
     /// would have been told about had gone, and the depth that stops a chain looping went
     /// with it. Written wherever `DaemonCore.workflowRuns` moves.
     var runs: [WorkflowRun] = []
+    /// When approval began. Every workflow file present then was approved as it stood,
+    /// so the upgrade stops nothing; any file new or changed after it waits.
+    var approvalsBegan: Date?
 
     /// How long a run is believed. A run in flight for a week is a run whose agent will
     /// not be finishing, and holding its workflow any longer only stops it firing.
     static let runHorizon: TimeInterval = 7 * 24 * 60 * 60
 
     enum CodingKeys: String, CodingKey {
-        case states, lastTickAt, runs
+        case states, lastTickAt, runs, approvalsBegan
     }
 }
 
@@ -95,6 +102,7 @@ extension WorkflowRecords {
         lastTickAt = try c.decodeIfPresent(Date.self, forKey: .lastTickAt)
         runs = (try c.decodeIfPresent([Lossy<WorkflowRun>].self, forKey: .runs) ?? [])
             .compactMap(\.value)
+        approvalsBegan = try c.decodeIfPresent(Date.self, forKey: .approvalsBegan)
     }
 }
 

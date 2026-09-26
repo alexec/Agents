@@ -436,4 +436,45 @@ struct WorkflowToolTests {
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.manageWorkflows)")) != nil)
         #expect(await core.autoAllowed(request(named: "Write")) == nil)
     }
+
+    /// The tool's description is what the agent tells the person, so it must say what
+    /// happens: the app answers for the tool without asking anyone, a write is live at
+    /// once, and the person's controls afterwards are the ones the page has.
+    @Test func theDescriptionSaysWritingAsksNobody() async throws {
+        let description = AppService.workflowTool["description"]?.stringValue ?? ""
+        #expect(!description.contains("removing one asks"))
+        #expect(!description.contains("if they decline"))
+        #expect(description.contains("Nothing here asks the person,"))
+
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        let asked = PermissionRequest(
+            agentID: agentID,
+            toolCall: ToolCall(title: AppTool.manageWorkflows, name: "mcp__agents__\(AppTool.manageWorkflows)"),
+            options: [PermissionOption(optionID: "allow", name: "Allow", kind: .allowAlways)])
+        #expect(await core.autoAllowed(asked) != nil)
+
+        let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+        #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "advisories", in: work).path))
+        #expect(answer.contains("It is live now"))
+        #expect(!answer.contains("pause"))
+        #expect(description.contains("does not run until they approve it"))
+    }
+
+    /// Once approval has begun, what an agent writes waits for the person, and the
+    /// agent is told so in words it can pass on rather than believing it will run.
+    @Test func aWorkflowAnAgentWritesWaitsForTheirOKAndTheAgentIsTold() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        await core.startWorkflows()
+
+        let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+
+        #expect(answer.contains("It will not run until they approve it on the project page"))
+        let summary = try #require(await core.allWorkflows(in: work).first)
+        #expect(summary.awaitingApproval?.isNew == true)
+        #expect(summary.needsAPerson)
+    }
 }
