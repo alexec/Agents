@@ -7,13 +7,14 @@ description: Every tool the app gives an agent, what it does, and whether you ar
 # Tools the app gives agents
 
 The app gives every agent it starts a set of tools of its own, alongside the runtime's
-tools. This page lists them all, in the order an agent sees them. Copilot conversations
-get none of them (see [Runtimes](runtimes.md)).
+tools, on every runtime (see [Runtimes](runtimes.md)). This page lists them all, in the
+order an agent sees them. Copilot takes them over a local http address the app serves
+only to that agent, and uses its own follow-up suggestions instead of the app's.
 
 The last column says whether you are asked before the tool runs. Where it says the app
 answers, the runtime's permission question is answered by the app and you do not see it.
 Where it says the runtime decides, you get the same permission card as for any other tool
-if the runtime asks; Claude and Cursor ask.
+if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool call.
 
 | Tool | What it does | Asks the person first? |
 | --- | --- | --- |

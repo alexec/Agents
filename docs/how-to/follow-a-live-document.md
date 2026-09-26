@@ -13,8 +13,8 @@ short plan while you watch.
 
 ## Before you start
 
-- An agent on Claude, Grok or Cursor. Copilot conversations do not get the app's tools,
-  including the one that opens a page. See [Runtimes](../reference/runtimes.md).
+- An agent on any runtime. Every runtime gets the app's `show_file` tool, which opens the
+  page; see [Runtimes](../reference/runtimes.md).
 - The document is an ordinary Markdown file inside the agent's project folder or worktree.
 
 ## Steps

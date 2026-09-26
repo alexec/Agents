@@ -37,8 +37,9 @@ agents in the project, set up a workflow, take a turn on a shared resource, and 
 pull request. Everything these tools do shows up in the window and on your phone. The
 [Reference](../reference/index.md) lists them all.
 
-Copilot is the exception today: its sessions have been seen without the app's tools, so a
-Copilot agent may not be able to use them.
+Every runtime gets them. Copilot takes no MCP server it would have to start itself, so the
+app runs its own tools for it and hands them to Copilot over a local http address that
+only that agent can use.
 
 ## What is kept
 

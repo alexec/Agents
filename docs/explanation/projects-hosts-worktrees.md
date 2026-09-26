@@ -20,6 +20,11 @@ folder cannot tell it, such as whether you have archived the project.
 A project's agents are listed beside it on its page, grouped by what needs you, what is
 working and what is done.
 
+An agent is filed under one project, but it need not stay inside that one folder. Work
+that spans two repositories is ordinary, so a new agent can be given more folders to reach,
+and MCP servers of its own, before it starts. It is still listed under the project it
+started in. See [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
+
 ## A project lives on one host
 
 A host is a machine where agents can do their work. Your Mac is one. A Linux server you
