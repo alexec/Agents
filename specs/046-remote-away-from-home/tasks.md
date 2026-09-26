@@ -199,7 +199,7 @@ within a minute (spec US5).
 - [X] T053 [P] Update `docs/explanation/phone-and-ipad.md` ("Two ways to reach you", "The connection today": the relayed link, pairing at home, what works away, why it is slower), `docs/tutorials/follow-from-iphone.md` (a closing step with the Away mark), and `docs/reference/statuses.md` (the phone's link states). Then run `python3 scripts/docs-check.py`
 - [ ] T054 [P] Look in the CloudKit Console (DEVELOPMENT, private DB, `relay-*` zones) during a walk and record in `walk/README.md` that only ids, numbers, dates and ciphertext are there (SC-005). **Alex's sign-in.**
 - [X] T055 Merge current `main` in again, then build both schemes and the bridge, and run the Linux gate build. Run the full suite three times and compare with T002's baseline. Update the memory entry
-- [ ] T056 Tell Alex the real bridge (8790) must be restarted onto this build for the relay to work day to day (live-bridge memory), and do it only when he says so
+- [X] T056 Tell Alex the real bridge (8790) must be restarted onto this build for the relay to work day to day (live-bridge memory), and do it only when he says so
 
 ---
 
