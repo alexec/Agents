@@ -35,6 +35,20 @@ between turns.
 ### Session 2026-09-25
 
 - Q: What happens to edits the agent already made in the old folder that are not committed? → A: They are left behind, as in 030. The new worktree starts from the old folder's last commit, and nothing uncommitted comes with it (FR-009, FR-010).
+- Q: Should the agent's tools copy Claude's `EnterWorktree`/`ExitWorktree`? → A: Yes, their shape: enter by name (new) or path (existing), and exit with keep or remove, refusing to remove unsaved work unless told to discard it. With enter and exit there is no separate move tool (FR-001 to FR-001c).
+- Q: When may an agent move without being told to? → A: On its own judgement, when the work turns into a change that needs its own branch, or when asked. Claude's own tool is only for when someone says "worktree", but the point of this feature is that the agent is often the first to know. (Taken as the default, since the feature is about the agent moving itself; not separately confirmed.)
+
+### What Claude's own tools do (checked 2026-09-25)
+
+| | Claude Code's `EnterWorktree` / `ExitWorktree` | This feature's `enter_worktree` / `exit_worktree` |
+|---|---|---|
+| Enter | `name` makes a new worktree, `path` enters an existing one. A new one cannot be made while already in one. | The same two ways in, and a new one can also be made from inside a worktree (from its checked-out commit). |
+| Where, and from what | `.claude/worktrees/<name>`, branched from `origin/<default branch>` by default | `.agents/worktrees/<name>`, branched from the commit the current folder has checked out (030) |
+| When it takes effect | At once, inside the running session | When the turn ends, by restarting the runtime there |
+| Exit | `keep` or `remove`. Remove refuses when files are uncommitted or commits are unmerged, unless `discard_changes`. It never removes a worktree entered by path. | The same, except that "never removes" means worktrees the app did not make (030 FR-021), and a worktree another agent is still in is never removed |
+| Remembered | Only for this session. Exit forgets worktrees from earlier sessions. | By the app, across restarts and resumes |
+| Who knows | The runtime only. The app never finds out. | The app, and everything that follows the agent's folder |
+| When to use | Only when the person, CLAUDE.md or memory says "worktree" | On the agent's own judgement, or when asked |
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -112,7 +126,9 @@ Check that it moved, that no turn started, and that the next prompt is answered 
 ### User Story 4 - One way to move (Priority: P2)
 
 A runtime's own tool for moving into a worktree is taken away from agents the app runs, so the
-only move there is the app's. Today that is Claude's `EnterWorktree` and `ExitWorktree`.
+only move there is the app's. Today that is Claude's `EnterWorktree` and `ExitWorktree`. The app's
+`enter_worktree` and `exit_worktree` take their place, with the same shape, so a Claude agent is
+not asked to learn anything new.
 
 **Why this priority**: As long as Claude's own tool is there, an agent can still drift into a
 folder the app cannot see, and US2's promises do not hold for it.
@@ -122,7 +138,7 @@ not have that tool, and uses the app's move instead.
 
 **Acceptance Scenarios**:
 
-1. **Given** a Claude agent, **When** it lists its tools, **Then** `EnterWorktree` and `ExitWorktree` are not there, and the app's move is.
+1. **Given** a Claude agent, **When** it lists its tools, **Then** `EnterWorktree` and `ExitWorktree` are not there, and the app's `enter_worktree` and `exit_worktree` are.
 2. **Given** a runtime gains its own worktree-moving tool later, **When** the app's tool check runs (015), **Then** the new tool is reported so that it can be removed too.
 
 ---
@@ -135,7 +151,8 @@ not have that tool, and uses the app's move instead.
 - **The runtime will not start again in the new folder.** The worktree is kept (nothing in it yet is lost). The agent shows that it could not start, in the new folder, like any failed resume (025). It does not go back to the old folder by itself.
 - **The project is not a git repository.** The agent is told that a move needs a git repository. The person's page offers no move.
 - **The agent is already in a worktree.** It can move to a new worktree. The new one is made from what its current folder has checked out, not the project folder, so its commits come along.
-- **The old folder was a worktree the app made, and the agent was the last one in it.** The move leaves that worktree where it is. Cleaning it up stays with 030's project-page removal.
+- **The old folder was a worktree the app made, and the agent was the last one in it.** Entering another worktree leaves it where it is. Only `exit_worktree` with `remove` takes it away. Otherwise cleaning it up stays with 030's project-page removal and archive cleanup.
+- **`exit_worktree` with `remove` is refused.** Nothing moves. The agent is told why and can call it again with `keep`, or with `discard_changes` once the person agrees.
 - **Moving to an existing worktree another agent is working in.** Allowed, as in 030 US2, and the choice says who is there.
 - **The folder the agent had open was a subfolder of the repository.** It lands in the same subfolder of the worktree (030's rule).
 - **Additional folders the agent was given.** These stay as they were. Only its working folder changes.
@@ -149,8 +166,11 @@ not have that tool, and uses the app's move instead.
 
 **Asking**
 
-- **FR-001**: Agents MUST have a tool from the app to ask for a move: to a new worktree, to an existing worktree of the same repository by name, or back to the project folder. A new worktree MAY be given a name. Otherwise it is named from the agent's title by 030's naming rules (FR-006 to FR-008), falling back to `agent-` plus a short date and time.
-- **FR-002**: The tool MUST answer at once, before anything moves: either that the move will happen when the turn ends, or why it cannot (not a git repository, not a worktree of this repository, a name it cannot use).
+- **FR-001**: Agents MUST have two tools from the app, shaped like Claude Code's own: `enter_worktree` and `exit_worktree`. There is no separate move tool.
+- **FR-001a**: `enter_worktree` MUST take either a `name`, which makes a new worktree, or a `path` to an existing worktree of the same repository, but not both. With neither, the new worktree is named from the agent's title by 030's naming rules (FR-006 to FR-008), falling back to `agent-` plus a short date and time. It MUST work from the project folder and from inside a worktree.
+- **FR-001b**: `exit_worktree` MUST take `action`, which is `keep` or `remove`, and MAY take `discard_changes`. It moves the agent back to the project folder. With `keep`, the worktree stays as it is. With `remove`, the worktree goes after the move, on 030's terms (FR-020, FR-021). The removal MUST be refused, with the reason, when the app did not make the worktree or another agent that is not archived is working in it. When files are uncommitted or commits are unmerged, the removal MUST be refused and the tool MUST list them, unless `discard_changes` is set. Called when the agent is not in a worktree, it MUST say so and do nothing.
+- **FR-001c**: Both tools' descriptions MUST tell the agent it may use them on its own judgement, when the work turns into a change that needs its own branch, or when asked.
+- **FR-002**: Both tools MUST answer at once, before anything moves: either that the move will happen when the turn ends, or why it cannot (not a git repository, not a worktree of this repository, a name it cannot use, a removal that would lose work).
 - **FR-003**: The person MUST be able to ask for the same moves from the agent's page on the Mac, using 030's Worktree choice. While a turn is running, the choice MUST say that it waits for the turn to end, and a waiting move MUST be possible to take back.
 - **FR-004**: Only one move MAY be waiting at a time. A later request replaces it.
 
@@ -181,7 +201,7 @@ not have that tool, and uses the app's move instead.
 ### Key Entities
 
 - **Agent**: Its working folder can now change during its life. Gains at most one waiting move, and a history of moves shown in its chat.
-- **Waiting move**: Where the agent will go (new worktree with an optional name, an existing worktree, or the project folder), who asked (the agent or the person), and when.
+- **Waiting move**: Where the agent will go (new worktree with an optional name, an existing worktree, or the project folder), whether the worktree it leaves is to be removed (and whether changes may be discarded), who asked (the agent or the person), and when.
 - **Worktree**: As in 030. One made by a move is recorded as made by the app, the same as one made at start.
 
 ## Success Criteria *(mandatory)*

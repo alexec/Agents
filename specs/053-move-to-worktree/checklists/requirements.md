@@ -32,5 +32,5 @@
 ## Notes
 
 - The one open question (uncommitted edits in the old folder) was answered on 2026-09-25: they stay behind.
-- Tool names `EnterWorktree`/`ExitWorktree` are named because the feature is about removing them; like 030's runtime table, they say what, not how.
+- Tool names (`EnterWorktree`/`ExitWorktree` and the app's `enter_worktree`/`exit_worktree`) are named because the feature removes the first and copies their shape; like 030's runtime table, they say what, not how.
 - Builds on 030 (worktrees), 025 (resume), 015 (tool scoping); shares its carry-on path with 052.
