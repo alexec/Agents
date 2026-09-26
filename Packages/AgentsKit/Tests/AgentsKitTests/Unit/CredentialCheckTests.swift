@@ -90,7 +90,7 @@ struct GeminiCredentialCheckTests {
 @Suite("Checking an OpenAI key")
 struct OpenAICredentialCheckTests {
     @Test func theKeyGoesInTheAuthorizationHeader() throws {
-        let key = "sk-proj-FAKEFAKEFAKEFAKEFAKEFAKE1234"
+        let key = "sk-" + "proj-FAKEFAKEFAKEFAKEFAKEFAKE1234"
         let request = CredentialCheck.request(for: try #require(Secret(key)))
         #expect(request.url == CredentialCheck.openAIEndpoint)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")

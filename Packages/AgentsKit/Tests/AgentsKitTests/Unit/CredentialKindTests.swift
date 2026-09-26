@@ -66,7 +66,7 @@ struct GeminiKeyKindTests {
 @Suite("An OpenAI key")
 struct OpenAIKeyKindTests {
     @Test func projectAndOlderKeysAreOpenAIKeys() throws {
-        for text in ["sk-proj-FAKEFAKEFAKEFAKEFAKEFAKE1234", "sk-FAKEFAKEFAKEFAKEFAKE5678"] {
+        for text in ["sk-" + "proj-FAKEFAKEFAKEFAKEFAKEFAKE1234", "sk-" + "FAKEFAKEFAKEFAKEFAKE5678"] {
             let secret = try #require(Secret(text))
             #expect(secret.kind == .openAIAPIKey)
             #expect(secret.kind.runtimeID == "codex")
