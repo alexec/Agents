@@ -24,7 +24,12 @@ struct RuntimeMoveLiveTests {
 
     @Test(arguments: RuntimeCatalog.builtIn)
     func aRuntimeRemembersItsConversationInAnotherFolder(runtime: Runtime) async throws {
-        guard case .available(let path, _) = RuntimeDiscovery().locate(runtime) else {
+        // Codex, Gemini and Antigravity are only ever the app's own copies, in the real
+        // app's tools folder. Only launched from there; nothing is written to it.
+        var discovery = RuntimeDiscovery()
+        discovery.macToolsHome = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/Agents/tools").path
+        guard case .available(let path, _) = discovery.locate(runtime) else {
             print("== \(runtime.id): not installed, not measured")
             return
         }

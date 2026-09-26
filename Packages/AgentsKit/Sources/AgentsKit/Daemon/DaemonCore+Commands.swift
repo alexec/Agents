@@ -402,7 +402,8 @@ extension DaemonCore {
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
+                                                      mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents,
+                                                                                         movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))],
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
@@ -799,7 +800,8 @@ extension DaemonCore {
         let token = mintAppToken()
         // Picked back up as what it was: an agent another agent started still has no
         // tools for starting agents (028).
-        let servers = agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil)]
+        let servers = agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil,
+                                                    movesItself: RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID))]
         bindAppToken(token, to: agent.id)
 
         // The same scoping a new conversation gets, so an agent picked back up is not

@@ -73,4 +73,18 @@ struct MoveToolParsingTests {
         let listed = AppService.tools(managesAgents: false).compactMap { $0["name"]?.stringValue }
         #expect(listed.contains(AppTool.enterWorktree) && listed.contains(AppTool.exitWorktree))
     }
+
+    /// Not for an agent on a runtime that would forget its conversation in another folder.
+    @Test func neitherIsListedWhenTheRuntimeCannotMove() {
+        let listed = AppService.tools(managesAgents: true, movesItself: false).compactMap { $0["name"]?.stringValue }
+        #expect(!listed.contains(AppTool.enterWorktree) && !listed.contains(AppTool.exitWorktree))
+        #expect(listed.contains(AppTool.finishTurn))
+    }
+
+    /// Measured, 2026-09-26: these carried their conversation into another folder; Grok did not.
+    @Test func theRuntimesThatMayMoveAreTheOnesMeasured() {
+        #expect(RuntimeCatalog.carriesConversationAcrossFolders == ["claude", "copilot", "cursor", "codex"])
+        #expect(!RuntimeCatalog.canMoveFolders(runtimeID: "grok"))
+        #expect(RuntimeCatalog.whyCannotMoveFolders(runtimeID: "grok").hasPrefix("Grok can't carry"))
+    }
 }

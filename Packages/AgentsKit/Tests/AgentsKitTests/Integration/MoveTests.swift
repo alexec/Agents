@@ -59,8 +59,8 @@ struct MoveTests {
 
     /// An agent in the project folder, its first turn over.
     private func idleAgent(_ core: DaemonCore, _ repo: Repo, in folder: URL? = nil,
-                           prompt: String = "Fix the login redirect") async throws -> UUID {
-        let id = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: folder ?? repo.project,
+                           prompt: String = "Fix the login redirect", runtime: String = "claude") async throws -> UUID {
+        let id = try await core.start(DaemonAPI.StartRequest(runtimeID: runtime, cwd: folder ?? repo.project,
                                                              prompt: prompt))
         await settled(core, id)
         await quiet(core, id)
@@ -111,6 +111,19 @@ struct MoveTests {
             if case .userMessage(let text, _, let from) = $0.kind, from == .app { return text }
             return nil
         }
+    }
+
+    /// Every argument the app's tool server was started with, across every session made
+    /// or picked up, so a later runtime (the question about a silent turn) is counted too.
+    private func serverArguments(_ launcher: FakeLauncher) async -> [String] {
+        var all: [String] = []
+        for runtime in launcher.allAgents {
+            for params in [await runtime.newSessionParams, await runtime.continuedSessionParams] {
+                let servers = params?["mcpServers"]?.arrayValue ?? []
+                all += servers.compactMap { $0["args"]?.arrayValue?.compactMap(\.stringValue) }.flatMap { $0 }
+            }
+        }
+        return all
     }
 
     private func worktreesMade(_ repo: Repo) -> [String] {
@@ -693,5 +706,34 @@ struct MoveTests {
         try await core.archive(id)
         let error = await failure { try await personMove(core, id, .newWorktree(name: nil)) }
         #expect(error?.message.contains("archived") == true)
+    }
+
+    // MARK: Runtimes that would forget (053, Alex 2026-09-26)
+
+    /// Grok files its sessions by folder and answers "Path not found" when asked for one
+    /// from another, so it would carry on having forgotten everything: it is not moved,
+    /// whoever asks, and is not offered the tools.
+    @Test func anAgentOnARuntimeThatWouldForgetIsNotMoved() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let id = try await idleAgent(core, repo, runtime: "grok")
+
+        let error = await failure { try await personMove(core, id, .newWorktree(name: nil)) }
+
+        #expect(error?.message.contains("can't carry its conversation into another folder") == true)
+        #expect(await core.agent(id)?.cwd == repo.project)
+        #expect(worktreesMade(repo).isEmpty)
+        let args = await serverArguments(launcher)
+        #expect(args.contains(DaemonCore.noMoveToolsFlag))
+    }
+
+    @Test func anAgentOnARuntimeThatCarriesItsConversationIsOfferedTheTools() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        _ = try await idleAgent(core, repo, runtime: "claude")
+        let args = await serverArguments(launcher)
+        #expect(!args.contains(DaemonCore.noMoveToolsFlag))
     }
 }

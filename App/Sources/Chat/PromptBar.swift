@@ -901,6 +901,13 @@ struct PromptBar: View {
     private func agentPlace(_ agent: Agent) -> AnyView? {
         guard agent.host == .mac, agent.state != .archived,
               let listed = model.agentWorktrees[agent.projectFolder], listed.isRepository else { return nil }
+        // Shown but not opened on a runtime that would forget its conversation in another
+        // folder (053), with the reason where the pointer finds it.
+        guard RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID) else {
+            return AnyView(SelectCapsule(name: "Worktree", title: placeTitle(agent, listed)) { _ in EmptyView() }
+                .disabled(true)
+                .help(RuntimeCatalog.whyCannotMoveFolders(runtimeID: agent.runtimeID)))
+        }
         let here = agent.worktree?.root.resolvingSymlinksInPath().path
         let waiting = agent.pendingMove
         return AnyView(VStack(alignment: .leading, spacing: 4) {

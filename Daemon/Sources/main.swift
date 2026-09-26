@@ -14,6 +14,9 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
     // or archiving agents (028). The daemon says so here, when it hands the runtime
     // this server; it refuses the calls as well, so this only keeps the menu honest.
     let managesAgents = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noAgentToolsFlag)
+    // Nor, on a runtime that forgets its conversation in another folder, the tools for
+    // moving itself (053).
+    let movesItself = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noMoveToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
     // Every tool does the same thing with what it is given: hand it to the daemon
@@ -40,6 +43,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
 
     let service = AppService(transport: FDTransport(readFD: 0, writeFD: 1),
                              managesAgents: managesAgents,
+                             movesItself: movesItself,
                              finishTurn: { outcome, message, prompts, title, words in
         await relay(DaemonAPI.Method.agentsFinishTurn,
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,

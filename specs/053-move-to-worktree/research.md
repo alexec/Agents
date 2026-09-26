@@ -63,7 +63,14 @@ So Grok and Cursor may answer `session/resume` or `session/load` in a new folder
 | Copilot | yes | yes |
 | Cursor | yes | yes (the hash was not the folder, or its load looks further) |
 | Grok | **no**: `session/load` answers `-32603 Path not found` (`FS_NOT_FOUND`) | — |
-| Codex, Gemini | not installed on this Mac, not measured | |
+| Codex | yes (measured 2026-09-26 on the app's own copy) | yes |
+| Gemini, Antigravity | not measured: each needs a credential the daemon lends at launch, which the bare test does not have | |
+
+**Decision (Alex, 2026-09-26)**: runtimes that do not carry their conversation are left out of
+moving altogether: `RuntimeCatalog.carriesConversationAcrossFolders` lists the ones measured to
+(Claude, Copilot, Cursor, Codex). The rest get no move tools (`--no-move-tools`), the daemon
+refuses to move them, and the page shows the Worktree choice disabled with the reason. So
+Handover (R5) is not needed for moves; 052 still needs its own.
 
 So Grok alone loses its conversation on a move. Through today's fallback it carries on in a new
 session with the briefing again, and has forgotten everything it was told. `runtime-tools.sh grok`

@@ -38,6 +38,8 @@ between turns.
 - Q: Should the agent's tools copy Claude's `EnterWorktree`/`ExitWorktree`? → A: Yes, their shape: enter by name (new) or path (existing), and exit with keep or remove, refusing to remove unsaved work unless told to discard it. With enter and exit there is no separate move tool (FR-001 to FR-001c).
 - Q: When may an agent move without being told to? → A: On its own judgement, when the work turns into a change that needs its own branch, or when asked. Claude's own tool is only for when someone says "worktree", but the point of this feature is that the agent is often the first to know. (Taken as the default, since the feature is about the agent moving itself; not separately confirmed.)
 
+- Q: What about a runtime that loses its conversation when started again in another folder (Grok, measured 2026-09-25)? → A: It is left out (Alex, 2026-09-26). Its agents are not offered the move tools, the daemon refuses to move them whoever asks, and on their page the Worktree choice is shown disabled with the reason (FR-020 to FR-022).
+
 ### What Claude's own tools do (checked 2026-09-25)
 
 | | Claude Code's `EnterWorktree` / `ExitWorktree` | This feature's `enter_worktree` / `exit_worktree` |
@@ -192,6 +194,12 @@ not have that tool, and uses the app's move instead.
 - **FR-015**: Resume and restart (025) MUST use the new folder. If it is gone, 030 FR-017 applies: the agent does not fall back to the folder it came from.
 - **FR-016**: Archive cleanup and the project page's worktree list MUST treat a moved-into worktree exactly like one the agent was started in (030 FR-018 to FR-021).
 - **FR-017**: Other clients (the phone and iPad Remote) MUST show the agent's new folder and the move's chat line. Moving an agent from the phone is out of scope here.
+
+**Runtimes that would forget**
+
+- **FR-020**: The app MUST know, per runtime, whether it picks its own conversation back up when started again in another folder, from a live measurement (research R3). A runtime not yet measured MUST count as not.
+- **FR-021**: An agent on a runtime that does not MUST NOT be offered `enter_worktree` or `exit_worktree`, and a move of it MUST be refused, whoever asks, with a sentence saying why.
+- **FR-022**: On such an agent's page the Worktree choice MUST be shown, naming where it works, but disabled, with the reason where the pointer finds it. Starting such an agent in a worktree (030) is unchanged.
 
 **One way to move**
 

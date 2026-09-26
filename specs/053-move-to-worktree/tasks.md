@@ -310,16 +310,16 @@ Commit, archive, and the worktree is removed.
   Because the mover has already left, it no longer blocks the removal. Catch its refusal into
   the note. Make T025 pass.
 
-These three are **conditional on T003**. Mark them "not needed" there if every runtime kept its
+**Not needed (Alex, 2026-09-26)**: runtimes that lose their conversation are left out of moving instead (spec FR-020 to FR-022), so T027–T029 are closed without a Handover. These three were **conditional on T003**. Mark them "not needed" there if every runtime kept its
 session:
-- [ ] T027 [US2] Write `Pkg/Tests/AgentsKitTests/Unit/HandoverTests.swift`:
+- [X] T027 [US2] Write `Pkg/Tests/AgentsKitTests/Unit/HandoverTests.swift`:
   - A transcript of user messages, agent messages and tool calls becomes one text block: the
     person's words, the agent's replies, and one line per tool call with its target.
   - It's shortened from the oldest end to a character budget, and says that it was shortened.
   - An empty transcript gives nil.
-- [ ] T028 [US2] Create `Pkg/Sources/AgentsKit/ACP/Serve/Handover.swift` (research R5). Keep its
+- [X] T028 [US2] Create `Pkg/Sources/AgentsKit/ACP/Serve/Handover.swift` (research R5). Keep its
   interface independent of moves, so 052 can call it. Make T027 pass.
-- [ ] T029 [US2] In `DaemonCore+Commands.swift` `connect`, in the branch where `continueSession`
+- [X] T029 [US2] In `DaemonCore+Commands.swift` `connect`, in the branch where `continueSession`
   failed for an agent that had a session, queue the handover as a preface on the next prompt
   (beside the briefing). Extend the note: "… Carrying on in a new one, given the conversation so
   far."

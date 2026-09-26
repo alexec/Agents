@@ -177,10 +177,14 @@ public actor AppService {
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
+    /// Whether the two move tools are offered. False for an agent on a runtime that cannot
+    /// carry its conversation into another folder (053), said with `--no-move-tools`.
+    private let movesItself: Bool
     private let box = ServiceBox()
 
     public init(transport: any LineTransport,
                 managesAgents: Bool = true,
+                movesItself: Bool = true,
                 finishTurn: @escaping FinishSink = { _, _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
@@ -219,6 +223,7 @@ public actor AppService {
         self.pullRequestsSink = pullRequests
         self.movesSink = moves
         self.managesAgents = managesAgents
+        self.movesItself = movesItself
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -256,7 +261,7 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            return .success(["tools": .array(Self.tools(managesAgents: managesAgents))])
+            return .success(["tools": .array(Self.tools(managesAgents: managesAgents, movesItself: movesItself))])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -352,6 +357,12 @@ public actor AppService {
             }
 
             if let call = Self.moveCall(named: name, arguments) {
+                guard movesItself else {
+                    return .success(Self.reply("""
+                        Nothing was moved: this runtime cannot carry its conversation into \
+                        another folder, so you stay where you are.
+                        """, isError: true))
+                }
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await movesSink(call)))
@@ -515,7 +526,7 @@ public actor AppService {
     }
 
     /// Every tool this server offers, in the order they are listed.
-    static func tools(managesAgents: Bool) -> [JSONValue] {
+    static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
         // The one that ends a turn first, the two that act mid-turn, and the two
         // older names last, described as such (023).
         // The four agent tools after the workflow tool, and only for an agent that
@@ -533,7 +544,8 @@ public actor AppService {
         // The three event tools, for every agent (042).
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
         // The two for moving itself, for every agent (053).
-        let moveTools = [Self.enterWorktreeTool, Self.exitWorktreeTool]
+        // Not for a runtime that would forget the conversation on the way.
+        let moveTools = movesItself ? [Self.enterWorktreeTool, Self.exitWorktreeTool] : []
         return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool] + agentTools + leaseTools
             + eventTools + moveTools + pullRequestTools + [Self.tool, Self.reportOutcomeTool]
     }

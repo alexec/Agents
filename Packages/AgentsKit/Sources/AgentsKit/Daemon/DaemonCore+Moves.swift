@@ -56,6 +56,12 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "\(agent.title ?? "That agent") is archived, so it cannot be moved.")
         }
+        // Refused whoever asks: a runtime that cannot pick its conversation back up in
+        // another folder would carry on there having forgotten it (053 research R3).
+        guard RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: RuntimeCatalog.whyCannotMoveFolders(runtimeID: agent.runtimeID))
+        }
         let project = agent.projectFolder
         guard let repository = await GitWorktrees.repository(of: project) else {
             throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
