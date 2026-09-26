@@ -32,6 +32,9 @@ struct ChatTranscript: View {
     var clearFocus: () -> Void = {}
     /// How tall the visible part is. The phone sizes its first page to it.
     var onHeight: ((CGFloat) -> Void)? = nil
+    /// Told whether the pane is following the end. The model lets the oldest entries
+    /// go only while it is, so nothing leaves from above somebody reading back.
+    var onFollowing: (Bool) -> Void = { _ in }
 
     @State private var expandedRuns: Set<UUID> = []
     /// Set once the pane is sitting at the foot of the conversation. Until then the
@@ -195,6 +198,9 @@ struct ChatTranscript: View {
                 clearFocus()
             }
             .onChange(of: scrollToEndToken) { goToEnd(scroller) }
+            .onChange(of: isFollowing) { _, now in onFollowing(now) }
+            // Nobody is reading a chat that is not on screen, so it may be trimmed again.
+            .onDisappear { onFollowing(true) }
             // The floor rose: a question or a permission card appeared above the
             // prompt bar, and the transcript's bottom margin grew with it. The
             // geometry does not count that as the end moving — content size and

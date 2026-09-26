@@ -21,11 +21,12 @@ struct FilesPane: View {
     @State private var fileProblem: String?
     @State private var watch: FolderWatch?
     @State private var touched = TouchedPaths()
-    /// How much of the page `touched` has folded, and which page: entries past
-    /// `touchedThrough` are new and are folded in, and a page that was replaced or
-    /// grown at the front is folded again from the top.
-    @State private var touchedThrough = 0
-    @State private var touchedPageStart = 0
+    /// Which stretch of whose conversation `touched` has folded, by position in the
+    /// whole transcript. Entries outside it — new at the end, or an earlier page in
+    /// front — are folded in; anything else is folded again from the top.
+    @State private var touchedAgent: UUID?
+    @State private var touchedFrom = 0
+    @State private var touchedTo = 0
     /// Which re-listing is the current one, so a slower earlier read landing after a
     /// later one does not put the older listing on screen.
     @State private var listingRequest = 0
@@ -409,20 +410,29 @@ struct FilesPane: View {
 
     /// Folded from the transcript the window is holding.
     ///
-    /// Entries that arrived since the last fold are folded in; a page replaced, or
-    /// grown at the front by an earlier page, is folded again from the top. Folding
-    /// the whole page for every chunk resolved every path the agent had touched
-    /// against the disk again, several times a second, while the agent talked.
+    /// Only what is new to the fold is folded in: entries arriving at the end, and an
+    /// earlier page put in front. Folding the whole page for every chunk resolved every
+    /// path the agent had touched against the disk again, several times a second, while
+    /// the agent talked. And a page trimmed at the front keeps its marks: the model
+    /// lets the oldest entries of a long conversation go, and the agent still touched
+    /// what they say it touched.
     private func refreshTouched() {
         let entries = model.entries
-        let pageStart = model.work.firstEntryIndex
-        if pageStart == touchedPageStart, entries.count >= touchedThrough {
-            for entry in entries[touchedThrough...] { touched.absorb(entry) }
+        let from = model.work.firstEntryIndex
+        let to = from + entries.count
+        if touchedAgent == model.work.watching, from <= touchedTo {
+            let front = min(max(touchedFrom - from, 0), entries.count)
+            let back = min(max(touchedTo - from, front), entries.count)
+            for entry in entries[..<front] { touched.absorb(entry) }
+            for entry in entries[back...] { touched.absorb(entry) }
+            touchedFrom = min(touchedFrom, from)
+            touchedTo = max(touchedTo, to)
         } else {
             touched = TouchedPaths(entries: entries)
+            touchedAgent = model.work.watching
+            touchedFrom = from
+            touchedTo = to
         }
-        touchedThrough = entries.count
-        touchedPageStart = pageStart
     }
 }
 

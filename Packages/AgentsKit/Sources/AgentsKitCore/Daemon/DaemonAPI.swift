@@ -61,6 +61,12 @@ public enum DaemonAPI {
         /// (021 T051). A stand-in until pairing verifies it against the device store —
         /// Phase 7 makes the bridge refuse an unpaired device at accept.
         public static let surfaceIdentify = "surface/identify"
+        /// The bridge saying the connection it just opened carries a device, not itself
+        /// (security review, Phase 3). From then on the connection has the device's
+        /// rights, never a window's, and there is no way back. With an id the device is
+        /// fixed; without one, the first id the device names is the only one it may use.
+        /// Said by the bridge, before a single line of the device's is carried.
+        public static let connectionBindDevice = "connection/bindDevice"
         /// A connection saying it carries mail: that it hears `mailbox/post` and takes
         /// what it hears to the devices' mailboxes. Said once, by the bridge, right after
         /// it connects (025).
@@ -1987,6 +1993,17 @@ public enum DaemonAPI {
             self.id = id
             self.name = name
             self.kind = kind
+        }
+    }
+
+    /// `connection/bindDevice`: which device a bridge connection carries, when the
+    /// bridge knows. The relay knows from the key that opened the frame; the LAN link
+    /// learns it from the device until it has a key of its own to know it by.
+    public struct DeviceBinding: Codable, Sendable {
+        public var id: UUID?
+
+        public init(id: UUID?) {
+            self.id = id
         }
     }
 

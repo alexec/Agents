@@ -10,6 +10,7 @@ import SwiftUI
 struct SessionsColumn: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    @Environment(SidebarFrame.self) private var frame
     @Binding var selection: UUID?
 
     @AppStorage("showsArchivedAgents") private var showsArchived = false
@@ -68,7 +69,6 @@ struct SessionsColumn: View {
             Task { await model.archive(id) }
             selection = nil
         }
-        .searchable(text: $query, placement: .toolbar, prompt: "Search sessions")
         // The window's title is this column's: whatever the right-hand side is reading.
         .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
@@ -82,6 +82,21 @@ struct SessionsColumn: View {
                 }
                 .help("Start a new session in this project (⌘N)")
                 .disabled(model.selectedProjectSummary == nil)
+            }
+            // A search field of our own rather than `.searchable`, which pins its field
+            // to the window's far right edge whatever the order: the chat's sidebar
+            // toggle belongs to the right of the search, beside the sidebar it opens.
+            ToolbarSpacer(.fixed)
+            ToolbarItem {
+                SessionSearchField(text: $query)
+                    .frame(width: 240)
+            }
+            // Only while a chat is showing: a workflow or project page has no sidebar.
+            if model.selection != nil, model.openWorkflow == nil {
+                ToolbarSpacer(.fixed)
+                ToolbarItem {
+                    SidebarToggle(windowWidth: frame.windowWidth)
+                }
             }
         }
     }
@@ -123,6 +138,35 @@ struct SessionsColumn: View {
     private var hasAny: Bool {
         AgentGroup.allCases.contains {
             !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
+        }
+    }
+}
+
+/// The Mac's own search field, as the toolbar's search item draws it.
+private struct SessionSearchField: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = "Search sessions"
+        field.sendsSearchStringImmediately = true
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        if field.stringValue != text { field.stringValue = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func controlTextDidChange(_ note: Notification) {
+            guard let field = note.object as? NSSearchField else { return }
+            text.wrappedValue = field.stringValue
         }
     }
 }

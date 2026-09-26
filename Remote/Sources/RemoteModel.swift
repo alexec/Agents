@@ -107,6 +107,12 @@ final class RemoteModel {
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         away = link as? AwayLink
+        // The oldest of a long conversation go from the page as it runs on; what they
+        // say the agent touched is kept with the rest of the history read for Files.
+        work.onTrimmed = { [weak self] dropped in
+            guard let self, let agentID = work.watching else { return }
+            for entry in dropped { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
+        }
         guard let away else { return }
         self.link = away.chooser.link
         away.onTrouble { [weak self] trouble in
@@ -671,7 +677,6 @@ final class RemoteModel {
         touchedHistoryAsked.insert(agentID)
         var before: Int? = selection == agentID ? work.firstEntryIndex : nil
         if before == 0 { return }
-        var touched = TouchedPaths()
         while true {
             guard let page = try? await client.call(
                 DaemonAPI.Method.agentsTranscript,
@@ -681,11 +686,12 @@ final class RemoteModel {
                 touchedHistoryAsked.remove(agentID)
                 break
             }
-            for entry in page.entries { touched.absorb(entry) }
+            // Added to what is there rather than replacing it: entries trimmed off the
+            // page while this was reading are already in it, and came after these.
+            for entry in page.entries { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
             guard page.hasMoreBefore else { break }
             before = page.firstIndex
         }
-        touchedEarlier[agentID] = touched
     }
 
     /// Something is being typed on this device: the prompt, a passage on a page, the
