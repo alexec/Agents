@@ -35,5 +35,5 @@
   is a runtime integration, and the name trap it exists to rule out can only be stated in those
   terms. Everything about how the app does it (Swift types, checks, config plumbing) is left to
   planning.
-- D1 (vendor script vs the app's own pinned copy) and D2 (Mac only vs servers) are defaults
-  for Alex to confirm in `/speckit-clarify`.
+- Clarified 2026-09-25: D1 (the app's own pinned copy, not the vendor's script), D2 (servers
+  too) and D7 (a server credential of one provider and its key) were settled by Alex.
