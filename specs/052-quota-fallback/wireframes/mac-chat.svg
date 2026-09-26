@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .title { font-size:22px; font-weight:600; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .fb { font-size:12px; font-weight:600; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .out { fill:#c93400; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="1119" height="759" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
+  <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
+
+  <!-- session list -->
+  <rect x="0.5" y="40" width="300" height="719" fill="#fafafa" stroke="#e5e5ea"/>
+  <text x="20" y="72" class="h">AGENTS</text>
+  <rect x="12" y="84" width="276" height="62" rx="8" fill="#dcdce1"/>
+  <text x="24" y="104" class="rb t">Fix login</text>
+  <text x="276" y="104" class="f s" text-anchor="end">Codex</text>
+  <text x="24" y="122" class="f s">Working · 4 min</text>
+  <text x="24" y="138" class="f s">⇄ Carried on from Claude at 02:03</text>
+  <text x="24" y="170" class="rb t">Docs pass</text>
+  <text x="276" y="170" class="f s" text-anchor="end">Codex</text>
+  <text x="24" y="188" class="f s">Finished · 02:19</text>
+  <text x="24" y="204" class="f s">⇄ Carried on from Copilot at 02:14</text>
+  <text x="24" y="236" class="rb t">Spec 051</text>
+  <text x="276" y="236" class="f s" text-anchor="end">Claude</text>
+  <text x="24" y="254" class="f s">Finished · yesterday</text>
+  <text x="20" y="300" class="note">The row's runtime is the one it is on now.</text>
+  <text x="20" y="316" class="note">A “⇄ Carried on” line sits under the report</text>
+  <text x="20" y="332" class="note">line until the chat's next prompt from you.</text>
+
+  <!-- chat -->
+  <text x="330" y="78" class="title t">Fix login</text>
+  <text x="330" y="100" class="f s">~/Agents · worktree fix-login · 41% context · Codex</text>
+
+  <rect x="610" y="124" width="480" height="44" rx="12" fill="#f2f2f7"/>
+  <text x="626" y="151" class="r t">Carry on with the redirect fix, then run the tests.</text>
+
+  <text x="330" y="200" class="r t">I'll change the callback to keep the <tspan font-family="Menlo, monospace">next</tspan> parameter, then run the suite.</text>
+  <rect x="330" y="214" width="420" height="30" rx="6" fill="#fafafa" stroke="#e5e5ea"/>
+  <text x="344" y="234" class="f s">✎ Edited LoginCallback.swift  +6 −2</text>
+
+  <!-- switch note -->
+  <rect x="330" y="268" width="760" height="112" rx="10" fill="#fff8f4" stroke="#f1d3c2"/>
+  <text x="348" y="294" class="rb t">⇄ Claude's allowance ran out, until 07:00. Carried on with Codex.</text>
+  <text x="348" y="316" class="f s">GPT-5 Codex · high, from your “Strongest” level · Agent mode, the closest to Accept edits that is no looser</text>
+  <text x="348" y="336" class="f s">Given the whole conversation so far, and your last message again. Not carried: 2 “always allow” answers,</text>
+  <text x="348" y="352" class="f s">so Codex may ask again.</text>
+  <text x="348" y="372" class="f t" text-decoration="underline">Change what it carried on with…</text>
+  <text x="590" y="372" class="f t" text-decoration="underline">Pool</text>
+  <text x="330" y="398" class="note">One note per switch (FR-013, FR-015a). It is a runtime note, not a bubble. “Change…” opens the sheet in §3 with</text>
+  <text x="330" y="414" class="note">nothing re-sent; its changes apply from the next turn (FR-029). “Pool” opens the Pool page at this switch.</text>
+
+  <text x="330" y="450" class="r t">Picking up from where Claude left off: the callback edit is in place. Running the tests now.</text>
+  <rect x="330" y="464" width="420" height="30" rx="6" fill="#fafafa" stroke="#e5e5ea"/>
+  <text x="344" y="484" class="f s">▸ swift test --filter Login   running…</text>
+
+  <!-- prompt bar with runtime menu open -->
+  <rect x="330" y="664" width="760" height="76" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <text x="348" y="692" class="r q">Message Fix login…</text>
+  <rect x="344" y="704" width="82" height="24" rx="6" fill="#f2f2f7"/><text x="385" y="720" class="f t" text-anchor="middle">Codex ▾</text>
+  <rect x="434" y="704" width="140" height="24" rx="6" fill="#f2f2f7"/><text x="504" y="720" class="f t" text-anchor="middle">GPT-5 Codex · high</text>
+  <rect x="582" y="704" width="64" height="24" rx="6" fill="#f2f2f7"/><text x="614" y="720" class="f t" text-anchor="middle">Agent</text>
+
+  <!-- menu -->
+  <rect x="344" y="494" width="300" height="202" rx="8" fill="#fff" stroke="#c7c7cc"/>
+  <text x="360" y="518" class="r t">✓ Carry on when Codex runs out</text>
+  <text x="360" y="548" class="fb s">CONTINUE WITH</text>
+  <text x="360" y="574" class="r t">Claude</text><text x="628" y="574" class="f out" text-anchor="end">out until 07:00</text>
+  <text x="360" y="600" class="r t">Copilot</text><text x="628" y="600" class="f out" text-anchor="end">out, retrying 03:14</text>
+  <text x="360" y="626" class="r q">Cursor</text><text x="628" y="626" class="f s" text-anchor="end">not signed in</text>
+  <line x1="352" y1="640" x2="636" y2="640" stroke="#e5e5ea"/>
+  <text x="360" y="664" class="r t">Grok…</text><text x="628" y="664" class="f s" text-anchor="end">not in the pool</text>
+  <text x="360" y="686" class="f s">Runtimes that are out can still be picked.</text>
+  <text x="660" y="560" class="note">The runtime control in the prompt bar opens this menu.</text>
+  <text x="660" y="576" class="note">Picking one opens the sheet (§3). While a turn is running,</text>
+  <text x="660" y="592" class="note">the sheet says to stop it first (US5-AS2). The tick at</text>
+  <text x="660" y="608" class="note">the top turns switching off for this chat only (FR-003).</text>
+</svg>
