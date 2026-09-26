@@ -31,6 +31,9 @@ RUNTIMES = {
     "copilot": ["copilot", "--acp"],
     # Not "agent", which is what Cursor calls itself and what Grok installs.
     "cursor": ["cursor-agent", "acp"],
+    # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
+    # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
+    "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
 }
 
 CLIENT = {
@@ -93,6 +96,18 @@ POLICIES = {
         "args": [],
         "env": {},
     },
+    # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
+    "codex": {
+        "removed": ["spawn_agent", "send_input", "wait", "close_agent"],
+        "kept": ["request_user_input"],
+        "residue": [],
+        "meta": None,
+        "args": [],
+        "env": {},
+        "inline_env": {"CODEX_CONFIG": json.dumps({"features": {
+            "multi_agent": False, "memories": False, "apps": False, "goals": False,
+            "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
+    },
 }
 
 POLICIES["claude"]["meta"]["claudeCode"]["options"]["disallowedTools"] = POLICIES["claude"]["removed"]
@@ -126,6 +141,7 @@ def ask(name, command, policy, scoped):
             handle.write(contents)
             handle.close()
             environment[variable] = handle.name
+        environment.update(policy.get("inline_env", {}))
     work = tempfile.mkdtemp(prefix="agents-tools-")
     try:
         process = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

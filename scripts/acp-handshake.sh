@@ -17,6 +17,9 @@ RUNTIMES = {
     "copilot": ["copilot", "--acp"],
     # Not "agent", which is what Cursor calls itself and what Grok installs.
     "cursor": ["cursor-agent", "acp"],
+    # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
+    # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
+    "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
 }
 
 # What the app advertises today. Kept beside ACP.ClientCapabilities.app on purpose:

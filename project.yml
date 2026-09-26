@@ -66,9 +66,10 @@ targets:
       - path: App/Resources/servers
         type: folder
         optional: true
-      # What a server downloads to run Claude (043): Node's checksums and the adapter's
-      # npm lock, pinned by scripts/update-claude-toolset.sh. A folder, so the three files
-      # keep their names under Resources/toolsets/claude/.
+      # What this Mac (048) and a server (043) download to run a runtime the app installs:
+      # Node's checksums and the package's npm lock, one folder per runtime, pinned by
+      # scripts/update-toolset.sh. A folder, so the files keep their names under
+      # Resources/toolsets/<runtime>/.
       - path: App/Resources/toolsets
         type: folder
       # Compiled into the Remote as well. The two apps shared no view code before
