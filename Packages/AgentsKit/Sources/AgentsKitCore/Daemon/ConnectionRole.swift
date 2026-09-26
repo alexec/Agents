@@ -14,6 +14,11 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// The `agentsd mcp` helper a runtime starts for its agent: that agent's tools,
     /// each call carrying the agent's token.
     case agent
+    /// A phone or iPad, carried by the bridge on the LAN link or the relay: what the
+    /// Remote does, and nothing that reaches past the agents — no credentials, no
+    /// signing in or out, no folders outside a project, no quitting the daemon. A
+    /// connection becomes one only by the bridge saying so, and never stops being one.
+    case device
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
@@ -38,6 +43,68 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.eventsPublish,
     ]).union(strangerMethods)
 
+    /// What the Remote calls, and only that. Anything not here is refused to a device,
+    /// so a method added later stays the Mac's until somebody decides the phone needs
+    /// it. Left out on purpose: `credentials/*`, `runtimes/authenticate`, `logout`,
+    /// `install` and `setProvider`, `files/browse` and `files/write`, `daemon/quit`,
+    /// `hosts/*`, `devices/list` and `forget`, `relay/register`, `mailbox/carry`,
+    /// `workflows/approve`, `projects/add` and `clone`, `sessions/*`, and every agent
+    /// tool.
+    public static let deviceMethods: Set<String> = Set<String>([
+        DaemonAPI.Method.projectsList,
+        DaemonAPI.Method.agentsList,
+        DaemonAPI.Method.agentsTranscript,
+        DaemonAPI.Method.agentsStart,
+        DaemonAPI.Method.agentsPrompt,
+        DaemonAPI.Method.agentsUnqueue,
+        DaemonAPI.Method.agentsStop,
+        DaemonAPI.Method.agentsArchive,
+        DaemonAPI.Method.agentsUnarchive,
+        DaemonAPI.Method.agentsPark,
+        DaemonAPI.Method.agentsUnpark,
+        DaemonAPI.Method.agentsResuming,
+        DaemonAPI.Method.agentsOptions,
+        DaemonAPI.Method.agentsSetOption,
+        DaemonAPI.Method.agentsSetCeiling,
+        DaemonAPI.Method.agentsDiscardDraft,
+        DaemonAPI.Method.optionsRemembered,
+        DaemonAPI.Method.modesRemembered,
+        DaemonAPI.Method.runtimesList,
+        DaemonAPI.Method.runtimesAccounts,
+        DaemonAPI.Method.permissionsPending,
+        DaemonAPI.Method.permissionsAnswer,
+        DaemonAPI.Method.elicitationsPending,
+        DaemonAPI.Method.elicitationsAnswer,
+        DaemonAPI.Method.attentionPending,
+        DaemonAPI.Method.presenceReport,
+        DaemonAPI.Method.surfaceIdentify,
+        DaemonAPI.Method.devicesAnnounce,
+        DaemonAPI.Method.eventsList,
+        DaemonAPI.Method.leasesSnapshot,
+        DaemonAPI.Method.costState,
+        DaemonAPI.Method.worktreesList,
+        DaemonAPI.Method.worktreesCheck,
+        DaemonAPI.Method.worktreesRemove,
+        DaemonAPI.Method.workflowsList,
+        DaemonAPI.Method.workflowsRun,
+        DaemonAPI.Method.workflowsArchive,
+        DaemonAPI.Method.workflowsSettings,
+        DaemonAPI.Method.filesMention,
+        DaemonAPI.Method.filesList,
+        DaemonAPI.Method.filesRead,
+        DaemonAPI.Method.filesWatch,
+        DaemonAPI.Method.filesUnwatch,
+        DaemonAPI.Method.changesList,
+        DaemonAPI.Method.changesFile,
+        DaemonAPI.Method.artifactWrite,
+        DaemonAPI.Method.shellAttach,
+        DaemonAPI.Method.shellDetach,
+        DaemonAPI.Method.shellInput,
+        DaemonAPI.Method.shellResize,
+        DaemonAPI.Method.shellSignal,
+        DaemonAPI.Method.shellRestart,
+    ]).union(strangerMethods)
+
     /// Enough to find out a daemon is answering, which a client does before anything.
     public static let strangerMethods: Set<String> = [
         DaemonAPI.Method.ping,
@@ -48,12 +115,13 @@ public enum ConnectionRole: String, Sendable, Hashable {
         switch self {
         case .control: true
         case .agent: Self.agentMethods.contains(method)
+        case .device: Self.deviceMethods.contains(method)
         case .stranger: Self.strangerMethods.contains(method)
         }
     }
 
-    /// Only a window hears what the daemon says. A helper only ever waits on its own
-    /// replies, and a stranger must not read every agent's transcript and terminal
-    /// going by.
-    public var hearsNotifications: Bool { self == .control }
+    /// A window and a device hear what the daemon says: the phone's lists are kept
+    /// true by it. A helper only ever waits on its own replies, and a stranger must not
+    /// read every agent's transcript and terminal going by.
+    public var hearsNotifications: Bool { self == .control || self == .device }
 }

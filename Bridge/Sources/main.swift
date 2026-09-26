@@ -104,7 +104,10 @@ final class Relay {
 
     private func openTheDaemon() async {
         do {
-            let transport = try await SocketLink().transport()
+            // A device's connection, not a window's: the daemon hears nothing from the
+            // device until it has agreed. Which device it is, the device says once;
+            // until this link has keys of its own, that is the best there is.
+            let transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: nil)
             // The device can go while the daemon is being reached.
             guard !stopped else { transport.close(); return }
             daemon = transport
