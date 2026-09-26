@@ -75,6 +75,7 @@ public actor ServerConnection {
     private let wants: @Sendable (String) async -> Bool
     private let offer: @Sendable () async -> DaemonAPI.CredentialsOffer?
     private let lender: DaemonClient.CredentialLender?
+    private let relay: @Sendable () async -> RelayGrant?
     private var onState: (@Sendable (State) async -> Void)?
     private var onClaude: (@Sendable (Claude) async -> Void)?
     private var onToolset: (@Sendable (String, Claude) async -> Void)?
@@ -99,7 +100,9 @@ public actor ServerConnection {
                 toolsets: (@Sendable () -> [Toolset])? = nil,
                 wants: (@Sendable (String) async -> Bool)? = nil,
                 offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
-                lender: DaemonClient.CredentialLender? = nil) {
+                lender: DaemonClient.CredentialLender? = nil,
+                relay: @escaping @Sendable () async -> RelayGrant? = { nil }) {
+        self.relay = relay
         self.offer = offer
         self.lender = lender
         self.hostID = hostID
@@ -203,6 +206,7 @@ public actor ServerConnection {
         try await client.connect(timeout: .seconds(20))
         try? await installer.removeBinaries(except: wanted.sha256)
         await offerCredentials()
+        await offerRelay(home: probed.home)
 
         for toolset in toolsets() { await settle(toolset, probed) }
 
@@ -220,6 +224,46 @@ public actor ServerConnection {
         await client.setCredentialLender(lender)
         guard let offer = await offer() else { return }
         _ = try? await client.call(DaemonAPI.Method.credentialsOffer, offer)
+    }
+
+    /// What a window relays to its servers (047): a runtime's sign-in, served on this Mac at
+    /// `localPort`, with the CA certificate to trust and the stand-in the runtime starts with.
+    public struct RelayGrant: Sendable {
+        public var runtime: String
+        public var localPort: UInt16
+        public var caCertificate: String
+        public var standIn: String
+
+        public init(runtime: String, localPort: UInt16, caCertificate: String, standIn: String) {
+            self.runtime = runtime
+            self.localPort = localPort
+            self.caCertificate = caCertificate
+            self.standIn = standIn
+        }
+    }
+
+    /// The server end of the relay's forward, in the server's own folder.
+    static func relaySocket(home: String, runtime: String) -> String {
+        "\(home)/.agents-server/relay-\(runtime).sock"
+    }
+
+    /// On every connect: when this window relays a sign-in, forward a socket on the server
+    /// back to it and tell the server's daemon, which opens its gate. Never throws: without
+    /// a relay the server still works, and says what sign-in it needs instead.
+    public func offerRelay(home: String) async {
+        guard let grant = await relay() else { return }
+        let socket = Self.relaySocket(home: home, runtime: grant.runtime)
+        // A socket a previous master left in place would make the forward fail.
+        _ = try? await master.command.run(master.command.runArguments("rm -f '\(socket)'"))
+        let forwarded = try? await master.command.run(
+            master.command.remoteForwardArguments(remote: socket, local: "127.0.0.1:\(grant.localPort)"))
+        guard forwarded?.status == 0 else {
+            DaemonLog.shared.write("relay: forwarding \(socket) failed: \(forwarded?.stderr ?? "no answer")")
+            return
+        }
+        _ = try? await client.call(DaemonAPI.Method.relayOffer,
+                                   DaemonAPI.RelayOffer(runtime: grant.runtime, socketPath: socket,
+                                                        caCertificate: grant.caCertificate, standIn: grant.standIn))
     }
 
     /// Lend a credential on this connection. Only after the daemon asked for it.

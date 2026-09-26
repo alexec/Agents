@@ -41,6 +41,8 @@ final class HostSet {
     @ObservationIgnored private var retrying: [HostID: Task<Void, Never>] = [:]
     @ObservationIgnored private let store: HostStore
     @ObservationIgnored private let locations: StoreLocations
+    /// The sign-ins this Mac relays to servers (047).
+    @ObservationIgnored lazy var relays = SignInRelays(locations: locations)
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var quitObserver: (any NSObjectProtocol)?
@@ -219,7 +221,8 @@ final class HostSet {
                            wantsClaude: @escaping @Sendable () async -> Bool,
                            wants: (@Sendable (String) async -> Bool)? = nil,
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
-                           lender: DaemonClient.CredentialLender? = nil) -> ServerConnection {
+                           lender: DaemonClient.CredentialLender? = nil,
+                           relay: @escaping @Sendable () async -> ServerConnection.RelayGrant? = { nil }) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
@@ -228,7 +231,7 @@ final class HostSet {
                          wantsClaude: wantsClaude,
                          toolsets: { ServerBinaries.toolsets },
                          wants: wants ?? { runtimeID in runtimeID == RuntimeCatalog.claude.id ? await wantsClaude() : false },
-                         offer: offer, lender: lender)
+                         offer: offer, lender: lender, relay: relay)
     }
 
     /// A new connection for a host, asking this set what to offer and who lends (043).
@@ -236,7 +239,17 @@ final class HostSet {
         let id = host.id
         return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id), wants: wants(id),
                                offer: { [weak self] in await MainActor.run { self?.offerFor(id) } },
-                               lender: lenderFor(id))
+                               lender: lenderFor(id),
+                               relay: relayFor(id))
+    }
+
+    /// What this window relays to a server (047): nothing to one marked "own sign-in only".
+    func relayFor(_ id: HostID) -> @Sendable () async -> ServerConnection.RelayGrant? {
+        let relays = self.relays
+        return { [weak self] in
+            let ownOnly = await MainActor.run { self?.host(id)?.ownSignInOnly ?? true }
+            return ownOnly ? nil : await relays.grant()
+        }
     }
 
     /// Say again what this window may lend a server: a credential was just added (043).

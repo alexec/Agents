@@ -11,6 +11,7 @@ public protocol RuntimeInstalling: Sendable {
     func install(_ runtime: Runtime, progress: @escaping @Sendable (String) -> Void) async -> RuntimeAvailability
 }
 
+#if canImport(Security)
 /// Installs the runtimes in `RuntimeCatalog` on this Mac, each its own way: Claude and
 /// Codex from the app's pinned toolsets, the rest with the vendor's own script or npm.
 ///
@@ -145,3 +146,4 @@ public struct RuntimeInstaller: RuntimeInstalling {
             .first { discovery.fileExists($0) }
     }
 }
+#endif
