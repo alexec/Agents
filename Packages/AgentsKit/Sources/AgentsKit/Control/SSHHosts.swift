@@ -103,6 +103,10 @@ actor SSHHosts {
             updated.version = facts.installedVersion ?? Self.version
         }
         try await plane?.methods.enroll(updated)
+        // Said again now it is on record: a client that listed hosts between the forward
+        // coming up and this would otherwise not know of it until something else moved.
+        await plane?.router.broadcastControl(DaemonAPI.Notification.controlHostChanged,
+                                             ControlRouter.describe(updated.id, .online))
         return updated
     }
 

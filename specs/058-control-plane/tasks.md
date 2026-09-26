@@ -152,20 +152,20 @@ or on Alex's paired devices.
 
 **Independent test**: add the devbox, start a turn there, and see its project from a second client.
 
-- [ ] T039 [US3] Move `SSHMaster`, `ServerInstaller` and `ToolsetInstaller` into use by `Control/Sources/HostInstall.swift` for `hosts/install`, `hosts/update` and `hosts/checkAgain` (R9):
+- [x] T039 (`SSHHosts`, in the kit; the binaries are found in the app bundle the control plane is in) [US3] Move `SSHMaster`, `ServerInstaller` and `ToolsetInstaller` into use by `Control/Sources/HostInstall.swift` for `hosts/install`, `hosts/update` and `hosts/checkAgain` (R9):
   - `needsTrust {fingerprint}`, then a second call with `trust`.
   - Progress goes out as `control/installProgress {name, step, of, detail}`.
   - Binaries come from the control plane's bundle `Resources/servers`.
-- [ ] T040 [US3] Write `Control/Sources/SSHHost.swift` (FR-012): a `HostSession` whose channels are separate socket connections over the `ssh -M -L` forward.
+- [x] T040 (`SSHUplink`) [US3] Write `Control/Sources/SSHHost.swift` (FR-012): a `HostSession` whose channels are separate socket connections over the `ssh -M -L` forward.
   - `device` channels are bound with `connection/bindDevice`.
   - Channel 0 is a `control` connection that carries `mailbox/carry`.
   - `HostRecord.reach` is `ssh(…)`.
-- [ ] T041 [US3] `hosts/remove {host, purge?}` revokes the key and closes the uplink at once. It never stops or deletes the host's agents (FR-014).
-- [ ] T042 [US3] Point `App/Sources/Hosts/AddServerFlow.swift` and `AddServerSheet.swift` at `hosts/install` when `ControlConfig` exists. Render the progress notifications and the trust step. Today's path stays when it doesn't.
+- [x] T041 [US3] `hosts/remove {host, purge?}` revokes the key and closes the uplink at once. It never stops or deletes the host's agents (FR-014).
+- [x] T042 (Settings ▸ Control plane ▸ Hosts ▸ Add a Server; the window keeps a client per control-plane host) [US3] Point `App/Sources/Hosts/AddServerFlow.swift` and `AddServerSheet.swift` at `hosts/install` when `ControlConfig` exists. Render the progress notifications and the trust step. Today's path stays when it doesn't.
 - [ ] T043 [US3] Spike S1 (R8) in `Packages/AgentsKit/Sources/ControlUplinkLinux/` (a Linux-only target): `swift-crypto` + `swift-nio-ssl` TLS-PSK against the Network.framework listener, statically linked with musl. Measure the binary growth. Write the result in `specs/058-control-plane/research.md` R8.
   - If S1 fails, ask Alex whether "Mac, with Linux hosts" is acceptable.
 - [ ] T044 [US3] If S1 passes: `agentsd --control` on Linux dials out using the S1 dialer. `hosts/install` then enrols dial-out by default, and ssh-reached remains the fallback.
-- [ ] T045 [US3] Walk with test-servers: add the devbox and start a turn there. Drop the container's network and bring it back, and check the agent kept working and the host reconnected. Remove the host, and check it disappears from every client while its agents stay. Record in `specs/058-control-plane/walks/us3.md`.
+- [x] T045 (walks/us3.md; network drop/return not walked) [US3] Walk with test-servers: add the devbox and start a turn there. Drop the container's network and bring it back, and check the agent kept working and the host reconnected. Remove the host, and check it disappears from every client while its agents stay. Record in `specs/058-control-plane/walks/us3.md`.
 
 ---
 

@@ -1381,8 +1381,12 @@ final class AppModel {
             }
             await refreshServer(id)
         }
+        // A host removed from the control plane leaves the window too: its projects and
+        // agents are no longer anybody's to show here (FR-014; they carry on where they are).
         for id in controlHosts.keys where !others.contains(where: { $0.id == id }) {
             await controlHosts.removeValue(forKey: id)?.disconnect()
+            work.replaceProjects([], from: id)
+            work.replaceAgents([], from: id)
         }
     }
 
