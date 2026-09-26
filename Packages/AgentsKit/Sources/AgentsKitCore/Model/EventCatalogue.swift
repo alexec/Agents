@@ -120,6 +120,8 @@ public enum EventCatalogue {
                   "An agent in this project was stopped before finishing.", aliases: ["agent-stopped"]),
         EventKind("agent.failed", .project, ["agent", "reason"],
                   "An agent in this project ended in an error.", aliases: ["agent-stopped"]),
+        EventKind("agent.retired", .project, ["agent", "because"],
+                  "An archived agent was retired and its conversation deleted."),
         EventKind("workflow.ran", .project, ["workflow", "agent"], "A workflow in this project started an agent."),
         EventKind("workflow.completed", .project, ["workflow", "agent"],
                   "A workflow's run in this project finished.", aliases: ["workflow-completed"]),

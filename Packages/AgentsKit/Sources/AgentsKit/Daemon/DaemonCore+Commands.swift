@@ -1359,6 +1359,11 @@ extension DaemonCore {
             await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
+        // Whole for the ten minutes after, as if just read: the window that archived it
+        // is usually still showing it. The sweep slims it after that (051).
+        lastWhole[agentID] = now()
+        dropLiveState(for: agentID)
+        checkSoonAfterArchiving()
     }
 
     /// The line an agent that archived itself leaves in its transcript.
@@ -1393,6 +1398,8 @@ extension DaemonCore {
         guard agents[agentID] != nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        // Its lists back before it is live again (051): a live agent is never slim.
+        await makeWhole(agentID)
         await move(agentID, on: .unarchivedByUser)
     }
 
@@ -1481,6 +1488,13 @@ extension DaemonCore {
     }
 
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {
-        try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
+        // Deleted with the rest of it (051): say so rather than show an empty page.
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        // Somebody is reading it: whole while they do (051).
+        if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
+        return try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
     }
 }

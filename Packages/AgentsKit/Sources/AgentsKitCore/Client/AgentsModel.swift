@@ -122,6 +122,11 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// How long archived agents are kept and what the archive holds (051). Nil against a
+    /// daemon from before 051, which leaves the settings section out.
+    public private(set) var retentionState: DaemonAPI.RetentionState?
+    /// What is left of retired agents this client has asked about, by id (051).
+    public private(set) var tombstones: [UUID: Tombstone] = [:]
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
@@ -211,6 +216,8 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case costChanged(DaemonAPI.CostState)
+        case retentionChanged(DaemonAPI.RetentionState)
+        case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
@@ -240,6 +247,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
+        case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
+        case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
@@ -346,6 +355,16 @@ public final class AgentsModel {
 
         case .costChanged(let state):
             costState = state
+
+        case .retentionChanged(let state):
+            retentionState = state
+
+        case .agentRemoved(let notification):
+            // Retired (051). Out of every list; a chat that was showing it finds no
+            // agent and shows what is left of it instead.
+            agents.removeAll { $0.id == notification.agentID }
+            permissions.removeAll { $0.agentID == notification.agentID }
+            elicitations.removeAll { $0.agentID == notification.agentID }
 
         case .leasesChanged(let snapshot):
             leases = snapshot
@@ -468,6 +487,11 @@ public final class AgentsModel {
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
+    /// Tombstones as `agents/retired` answered, kept for the retired page (051).
+    public func takeTombstones(_ found: [Tombstone]) {
+        for tombstone in found { tombstones[tombstone.id] = tombstone }
+    }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
 
     /// A page of events from `events/list`, asked for with `filter`. The first page
@@ -689,8 +713,11 @@ public final class AgentsModel {
     /// view so the Mac's row and the phone's card cannot word it differently.
     public func startedByAgentLabel(_ agent: Agent) -> String? {
         guard let starter = agent.startedByAgent else { return nil }
-        let title = self.agent(starter)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "Started by " + (title.flatMap { $0.isEmpty ? nil : "\u{201C}\($0)\u{201D}" } ?? "another agent")
+        // A starter that has been retired is named from what is left of it (051).
+        let retired = self.agent(starter) == nil ? tombstones[starter] : nil
+        let title = (self.agent(starter)?.title ?? retired?.title)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = title.flatMap { $0.isEmpty ? nil : "\u{201C}\($0)\u{201D}" } ?? "another agent"
+        return "Started by " + name + (retired != nil ? " (retired)" : "")
     }
 
     /// The symbol that mark is drawn with.

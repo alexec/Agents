@@ -64,6 +64,16 @@ struct AgentCard: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // When it will be retired, or why it is kept, in the Mac row's
+                    // words (051). The phone has no settings, so the cap goes unnamed.
+                    if agent.state == .archived,
+                       let note = RetirementWords.rowNote(agent.retirement, now: Date(),
+                                                          cap: model.work.retentionState?.settings.cap) {
+                        Text(note)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     // What it holds or waits for, in the Mac row's words (036).
                     if let leases = model.work.leaseStatus(of: agent.id) {
                         LeaseMark(status: leases)

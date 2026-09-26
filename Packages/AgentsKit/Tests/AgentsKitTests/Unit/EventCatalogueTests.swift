@@ -5,9 +5,10 @@ import Testing
 /// The one list of what can happen (042 FR-003, FR-022, FR-024).
 @Suite("The event catalogue")
 struct EventCatalogueTests {
-    @Test func thereAreThirtyUniqueWellFormedNames() {
+    @Test func thereAreThirtyOneUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
-        #expect(names.count == 30)
+        // 30 from 042, and 051's agent.retired.
+        #expect(names.count == 31)
         #expect(Set(names).count == names.count)
         for name in names { #expect(EventDraft.isWellFormed(name), "\(name)") }
         for kind in EventCatalogue.all { #expect(EventSubject(name: kind.name) != nil, "\(kind.name)") }
