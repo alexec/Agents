@@ -296,7 +296,7 @@ holds.
 
 - **SC-001**: With default settings and the measured rate of use, the space archived agents take on disk stays under 2 GB plus one day's archiving, instead of growing without end.
 - **SC-002**: No agent that is not archived is ever retired, and no agent is retired within 24 hours of being archived. That is zero across repeated trials that include clock changes and restarts.
-- **SC-003**: The daemon starts, and is ready to list agents, within 10% of the time it takes on the same store with no archived agents, for stores of up to 1,000 archived agents.
+- **SC-003**: The daemon starts, and is ready to list agents, within 10% of the time it takes on the same store with no archived agents, for stores of up to 1,000 archived agents. *Amended 2026-09-26, Alex: accepted as measured instead: 280 ms against 177 ms for an empty store (the index decode), and against 4.2 s on main for the same 1,000 archived agents.*
 - **SC-004**: The daemon's memory with 1,000 archived agents is within 20 MB of the same store with none.
 - **SC-005**: Following any link to a retired agent shows who it was and when it was retired. That is 100% of events, "started by" lines and worktrees tried, with no errors.
 - **SC-006**: Interrupting retirement at any point, by killing the daemon, never leaves an agent that is gone without a tombstone, or a tombstone beside a conversation. That is zero across repeated trials.

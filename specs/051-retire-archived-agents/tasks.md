@@ -362,15 +362,15 @@ state on archive.
 
 - [X] T057 Run quickstart §2 in full on `/tmp/run-051` against a scratch daemon, and record each bullet's result in `walk/README.md`.
 - [X] T058 Run quickstart §4, the kill test, ten times, and record each outcome (SC-006).
-- [ ] T059 Run quickstart §5 with the run-app skill on `/tmp/run-051`, and screenshot each Mac item into `walk/`.
+- [X] T059 Run quickstart §5 with the run-app skill on `/tmp/run-051`, and screenshot each Mac item into `walk/`.
 - [X] T060 [P] Write the docs:
   - A new section in `docs/how-to/archive-park-stop.md`: "How long archived agents are kept", covering the time, the cap, Forever, the notes, Retire now and what a retired agent leaves.
   - The two settings in `docs/reference/settings.md`.
   - `agent.retired` in `docs/reference/events.md`.
   - Then run `python3 scripts/docs-check.py`.
 - [X] T061 Merge `main` again, rebuild both schemes one after the other, and run the full suite six times on the branch and six on `main`. Record the differences in `walk/README.md`. Only new failures are this lane's.
-- [ ] T062 Ask Alex with AskUserQuestion to look at the row notes, the retired line and the retired page on his iPhone and iPad. Install Remote from this branch on one device at a time, after saying it replaces his Remote. Batch the question as quickstart §5 says.
-- [ ] T063 Before merging, stop and ask Alex. Merging turns retirement on for the real store: at the first start, every archived agent gets `archivedAt` = that start (FR-008), so nothing goes for 30 days by age. The 2 GB cap **does** apply after the first day, and the real store has 791 MB archived, so nothing is retired at once. Say both facts in the question.
+- [X] T062 Ask Alex with AskUserQuestion to look at the row notes, the retired line and the retired page on his iPhone and iPad. Install Remote from this branch on one device at a time, after saying it replaces his Remote. Batch the question as quickstart §5 says.
+- [X] T063 Before merging, stop and ask Alex. Merging turns retirement on for the real store: at the first start, every archived agent gets `archivedAt` = that start (FR-008), so nothing goes for 30 days by age. The 2 GB cap **does** apply after the first day, and the real store has 791 MB archived, so nothing is retired at once. Say both facts in the question.
 
 ---
 

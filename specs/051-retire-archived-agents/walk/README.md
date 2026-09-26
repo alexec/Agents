@@ -155,3 +155,13 @@ restart. There are 2,288 tests on the branch against 2,218 on main. Failures per
   together three times on each side pass every time, in 2.03–2.14 s on the branch and
   2.12–2.13 s on main, so start-up is not slower. The branch's extra 70 tests (real git
   worktrees, real restarts) add load to a suite already known to flake under it.
+
+## Closing (T059, T062, T063), 2026-09-26
+
+- **T059**: the Mac's surfaces were walked at the look gate (screenshots in `look/`). Retire Now…
+  lives in a context menu, which no accessibility action opens without a click, and Alex was at
+  the keyboard. Its daemon side was walked over the socket (T057) and is covered by tests.
+- **T062**: Alex chose to look at the phone and iPad after shipping, not on a branch build.
+- **T063**: asked before merging. The real store had 285 archived agents, 874 MB. The first start
+  stamps them all as archived at that moment, so nothing goes by age for 30 days, and 874 MB is
+  under the 2 GB cap. Alex: merge and ship. SC-003 accepted as measured.
