@@ -60,7 +60,7 @@ runtime-id branches outside the catalogs (the `Lever` comment's rule).
 gates. The project's working rules stand in for it and this plan keeps them:
 
 - **Settle the UX before depth**: there is almost no new UI. The only new surfaces are a
-  Gemini row in Settings ▸ Runtime credentials and the "fetching Gemini" line. Both are
+  Gemini row in Settings ▸ Runtime credentials and the "Gemini is still being installed" line. Both are
   copies of existing ones, so the look gate is one screenshot pass, early (Phase 3).
 - **The policy is total over the catalog** (`ToolPolicyCatalog` test): Gemini's policy lands
   in the same commit as its catalog entry.

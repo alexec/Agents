@@ -98,7 +98,7 @@ Nothing fatal.
   over ACP (it is expected to open a browser from the agent process, as it does in a
   terminal); what `gemini-api-key` does with no key in the environment (expected: a refusal
   naming `GEMINI_API_KEY`). If `oauth-personal` cannot complete over ACP, the sheet falls back
-  to the Copilot pattern: hand over `npx -y @google/gemini-cli@<pin>` with **Open Terminal**
+  to the Copilot pattern: hand over the installed Gemini's command (its Node and entry, as the installer placed them) with **Open Terminal**
   and **Copy**, where the person signs in once and Gemini keeps it.
 - **Servers (D4)**: a Gemini API key, lent as `GEMINI_API_KEY` for that run, the same as 043's
   `ANTHROPIC_API_KEY`. `GOOGLE_API_KEY` is taken out of the environment when a key is lent so
