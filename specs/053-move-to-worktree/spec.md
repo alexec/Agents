@@ -215,6 +215,14 @@ not have that tool, and uses the app's move instead.
 - **SC-005**: A move is done, from the end of the turn to the agent working again, within the time a normal resume (025) takes, plus the time to make the worktree.
 - **SC-006**: No agent the app runs has a runtime-owned way to move into a worktree.
 
+## Docs *(mandatory)*
+
+- `docs/how-to/start-in-a-worktree.md`: change it to add "Move an agent that is already working"
+  (the capsule on the agent's page, and that the move waits for the turn to end).
+- `docs/explanation/projects-hosts-worktrees.md`: change it to say that an agent's folder can
+  change during its life, and what follows it.
+- `docs/reference/agent-tools.md`: add `enter_worktree` and `exit_worktree`.
+
 ## Assumptions
 
 - **Built on 030.** Worktree naming, folders, branches, the "made by the app" record, cleanup and the Worktree choice all come from 030 and are not specified again here.
