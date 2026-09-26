@@ -132,6 +132,12 @@ public final class AgentsModel {
     public private(set) var recentEvents: [Event] = []
     /// Whether the daemon has older events than `recentEvents` reaches.
     public private(set) var moreEvents = false
+    /// What `recentEvents` is narrowed to. Set by whoever asks for a page, before it
+    /// asks, so a page that comes back for a filter since left is dropped.
+    public var eventsFilter = EventFilter()
+    /// The time of the newest event heard of, whatever the filter, for the sidebar's
+    /// "Last 07:40".
+    public private(set) var lastEventAt: Date?
     /// Every agent waiting on something, for the Waiting now strip.
     public private(set) var waitingAgents: [DaemonAPI.WaitingAgent] = []
     /// Whether a page of events has arrived at all, so an empty list can say "nothing
@@ -464,9 +470,13 @@ public final class AgentsModel {
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) { leases = snapshot }
 
-    /// A page of events from `events/list`. The first page replaces what was there;
-    /// a page from further back (`appending`) goes on the end.
-    public func takeEvents(_ page: DaemonAPI.EventsPage, appending: Bool = false) {
+    /// A page of events from `events/list`, asked for with `filter`. The first page
+    /// replaces what was there; a page from further back (`appending`) goes on the end.
+    /// A page for a filter other than the current one is too late, and dropped.
+    public func takeEvents(_ page: DaemonAPI.EventsPage, for filter: EventFilter = EventFilter(),
+                           appending: Bool = false) {
+        guard filter == eventsFilter else { return }
+        noteEventAt(page.events.first?.latest)
         if appending {
             let known = Set(recentEvents.map(\.position))
             recentEvents += page.events.filter { !known.contains($0.position) }
@@ -480,6 +490,8 @@ public final class AgentsModel {
 
     /// One event, new or changed, put in by its position so the list stays newest first.
     func takeEvent(_ event: Event) {
+        noteEventAt(event.latest)
+        guard eventsFilter.matches(event) else { return }
         if let index = recentEvents.firstIndex(where: { $0.position == event.position }) {
             recentEvents[index] = event
         } else if let index = recentEvents.firstIndex(where: { $0.position < event.position }) {
@@ -487,14 +499,20 @@ public final class AgentsModel {
         } else if !moreEvents || recentEvents.isEmpty {
             recentEvents.append(event)
         }
-        if recentEvents.count > Self.eventsKept { recentEvents.removeLast(recentEvents.count - Self.eventsKept) }
+        if recentEvents.count > Self.eventsKept {
+            recentEvents.removeLast(recentEvents.count - Self.eventsKept)
+            // What went is still the daemon's, and paging back brings it in.
+            moreEvents = true
+        }
+    }
+
+    private func noteEventAt(_ date: Date?) {
+        guard let date else { return }
+        if lastEventAt.map({ date > $0 }) ?? true { lastEventAt = date }
     }
 
     /// How many live events a window keeps before the oldest go; paging back brings them in.
     static let eventsKept = 1_000
-
-    /// The time of the newest event, for the sidebar's "Last 07:40".
-    public var lastEventAt: Date? { recentEvents.first?.latest }
 
     /// What an agent is waiting on, in the words its row, card and capsule use.
     public func waitStatus(of agent: Agent) -> WaitStatus? {
