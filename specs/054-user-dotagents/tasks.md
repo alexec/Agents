@@ -160,18 +160,18 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Tests for User Story 6
 
-- [ ] T021 [P] [US6] In `Tests/Unit/PersonalMCPTests.swift`, test parsing per data-model.md `PersonalMCPServer`:
+- [X] T021 [P] [US6] In `Tests/Unit/PersonalMCPTests.swift`, test parsing per data-model.md `PersonalMCPServer`:
   - stdio "when `command` is present; else `type` (`http` default, or `sse`)";
   - an entry "with neither `command` nor `url`", or a file that is not JSON, is a problem `{message, line?}`;
   - a problem's message never contains a value from the file (a sentinel string in `env`, `headers`, `args` and `url`);
   - a missing file means no servers and no problem.
-- [ ] T022 [P] [US6] In `Tests/Unit/SessionServersTests.swift`, test R10 with a stubbed handshake:
+- [X] T022 [P] [US6] In `Tests/Unit/SessionServersTests.swift`, test R10 with a stubbed handshake:
   - the order is app's own → chosen → personal → Grok plugin servers;
   - of two servers with one name, the first is kept and the later one is dropped as `nameTaken` (FR-020);
   - an sse server is dropped for a handshake with `sse: false` (`transportNotAdvertised`, FR-019), and an http server for one without http;
   - a problem file drops only the personal servers;
   - for a runtime with `takesStdioServers == false`, every stdio server comes back as `.http` with an `Authorization` header, and the rest are unchanged.
-- [ ] T023 [P] [US6] In `Tests/Integration/PersonalMCPIntegrationTests.swift`, test with `FakeACPAgent` on a temporary root with `AGENTS_PERSONAL_HOME`. `FakeACPAgent` records `session/new`/`session/load` params.
+- [X] T023 [P] [US6] In `Tests/Integration/PersonalMCPIntegrationTests.swift`, test with `FakeACPAgent` on a temporary root with `AGENTS_PERSONAL_HOME`. `FakeACPAgent` records `session/new`/`session/load` params.
   - A new agent's `session/new` carries the personal server.
   - Edit `mcp.json`, stop the agent and pick it up again: the `session/load` carries the edit.
   - `Agent.mcpServers` in the store never contains a personal server.
@@ -181,13 +181,13 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Implementation for User Story 6
 
-- [ ] T024 [US6] Create `Src/Projects/PersonalDotAgents+MCP.swift`: `personalServers(home:) -> Result<[MCPServer], MCPFileProblem>`, read fresh on every call, with no cache (R10). Keep an `mcpStamp(home:)` (modification date + size) for drafts.
-- [ ] T025 [US6] Create `Src/Daemon/DaemonCore+SessionServers.swift`: `sessionServers(runtimeID:chosen:token:managesAgents:cwd:capabilities:)` per R10 steps 1 to 4. Log each drop by name and reason only. Bridge swapping calls `MCPBridge.route(for:token:cwd:)`, which comes in T029; until then, leave stdio as it is.
-- [ ] T026 [US6] In `Src/Daemon/DaemonCore+Commands.swift`, replace the two hand-built `mcpServers + [appServer(...)]` lists with `sessionServers(...)`: `freshSession` (about line 405, using the handshake it has just received) and the pick-up path (about line 802). Store the `mcpStamp` on the draft, and treat a mismatch as unusable in `startAgent`'s draft check (about line 243). The workflow start path in `DaemonCore+Workflows.swift` goes through `freshSession` and needs nothing extra.
+- [X] T024 [US6] Create `Src/Projects/PersonalDotAgents+MCP.swift`: `personalServers(home:) -> Result<[MCPServer], MCPFileProblem>`, read fresh on every call, with no cache (R10). Keep an `mcpStamp(home:)` (modification date + size) for drafts.
+- [X] T025 [US6] Create `Src/Daemon/DaemonCore+SessionServers.swift`: `sessionServers(runtimeID:chosen:token:managesAgents:cwd:capabilities:)` per R10 steps 1 to 4. Log each drop by name and reason only. Bridge swapping calls `MCPBridge.route(for:token:cwd:)`, which comes in T029; until then, leave stdio as it is.
+- [X] T026 [US6] In `Src/Daemon/DaemonCore+Commands.swift`, replace the two hand-built `mcpServers + [appServer(...)]` lists with `sessionServers(...)`: `freshSession` (about line 405, using the handshake it has just received) and the pick-up path (about line 802). Store the `mcpStamp` on the draft, and treat a mismatch as unusable in `startAgent`'s draft check (about line 243). The workflow start path in `DaemonCore+Workflows.swift` goes through `freshSession` and needs nothing extra.
 
 ### The bridge, built
 
-- [ ] T027 [P] [US6] In `Tests/MCPBridgeTests.swift`, test against a fixture stdio server `Tests/Fixtures/mcp/echo-server.py` (echoes `tools/call` arguments; sleeps when asked) every row of contracts/mcp-bridge.md's HTTP table, using `URLSession` against the listener:
+- [X] T027 [P] [US6] In `Tests/MCPBridgeTests.swift`, test against a fixture stdio server `Tests/Fixtures/mcp/echo-server.py` (echoes `tools/call` arguments; sleeps when asked) every row of contracts/mcp-bridge.md's HTTP table, using `URLSession` against the listener:
   - 200 with a matching `id`, and 202 for a notification;
   - the same 404 for an unknown route, a wrong bearer and an ended route;
   - 405 on GET, 411 on a chunked body, 413 over 16 MiB;
@@ -196,7 +196,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - a server that exits fails waiting calls, and the next POST starts it again;
   - a server-sent notification is dropped and a server-sent request is answered -32601;
   - no command, arg, env or body appears in `daemon.log`.
-- [ ] T028 [US6] Build `Src/MCP/MCPBridge.swift` out from the spike to contracts/mcp-bridge.md:
+- [X] T028 [US6] Build `Src/MCP/MCPBridge.swift` out from the spike to contracts/mcp-bridge.md:
   - an actor with lazy `NWListener` start and keep-alive HTTP/1.1 parsing (`Content-Length` bodies only);
   - routes keyed by route id, each holding a key, an app token, the server, the folder and a process;
   - the process starts on first POST, with a stdout reader that matches ids;
@@ -204,7 +204,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - `endRoutes(for token:)` and `stopAll()`.
 
   Wrap it in `#if canImport(Network)` so the Linux gate still builds.
-- [ ] T029 [US6] Wire the bridge in:
+- [X] T029 [US6] Wire the bridge in:
   - `sessionServers` swaps stdio servers for `bridge.route(...)` when the rule says `takesStdioServers == false`;
   - `dropAppTokens` in `Src/Daemon/DaemonCore+AppTools.swift` calls `bridge.endRoutes(for:)`;
   - a let-go draft ends its routes;

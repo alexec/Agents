@@ -21,7 +21,9 @@ extension DaemonCore {
                                    mcpServers: request.mcpServers)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
-                                mcpServers: request.mcpServers, pending: pending,
+                                mcpServers: request.mcpServers,
+                                personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
+                                pending: pending,
                                 connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
@@ -241,6 +243,7 @@ extension DaemonCore {
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
                                      && $0.mcpServers == request.mcpServers
+                                     && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
         if let usable {
             // The session may still be being made: a form shown from memory is quicker
@@ -359,6 +362,7 @@ extension DaemonCore {
     /// so the runtime is ended when it arrives rather than left running unowned.
     func endDraft(_ draft: Draft) async {
         guard let made = try? await draft.pending.value else { return }
+        endBridgeRoutes(for: made.appToken)
         await made.session.end(gracePeriod: .seconds(2))
     }
 
@@ -403,8 +407,9 @@ extension DaemonCore {
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
-            let servers = await bridged(mcpServers + [appServer(token: token, managesAgents: managesAgents)],
-                                        runtimeID: runtimeID, token: token, cwd: cwd)
+            let servers = await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
+                                               managesAgents: managesAgents, cwd: cwd,
+                                               capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: servers,
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
@@ -796,7 +801,7 @@ extension DaemonCore {
     }
 
     private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
-        _ = try await session.initialize()
+        let handshake = try await session.initialize()
         // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
         reconcileHome()
 
@@ -806,8 +811,9 @@ extension DaemonCore {
         // Picked back up as what it was: an agent another agent started still has no
         // tools for starting agents (028).
         bindAppToken(token, to: agent.id)
-        let servers = await bridged(agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil)],
-                                    runtimeID: agent.runtimeID, token: token, cwd: agent.cwd)
+        let servers = await sessionServers(runtimeID: agent.runtimeID, chosen: agent.mcpServers, token: token,
+                                           managesAgents: agent.startedByAgent == nil, cwd: agent.cwd,
+                                           capabilities: handshake.agentCapabilities?.mcpCapabilities)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).

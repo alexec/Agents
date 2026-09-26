@@ -24,6 +24,7 @@ final class MCPBridge: @unchecked Sendable {
     private let queue = DispatchQueue(label: "mcp-bridge")
     private var listener: NWListener?
     private var port: UInt16 = 0
+    private var starting: Task<UInt16, any Error>?
     private var routes: [String: Route] = [:]
     private let log: @Sendable (String) -> Void
 
@@ -75,7 +76,7 @@ final class MCPBridge: @unchecked Sendable {
         }
         for route in ended {
             route.process?.end(reason: "The agent's session has ended.")
-            log("bridge: route \(route.id.prefix(6)) for \(route.name) ended")
+            log("bridge: route \(route.id.prefix(6)) for \(route.name) ended (session over)")
         }
     }
 
@@ -96,6 +97,7 @@ final class MCPBridge: @unchecked Sendable {
             listener?.cancel()
             listener = nil
             port = 0
+            starting = nil
             return all
         }
         for route in all { route.process?.end(reason: "The app is stopping.") }
@@ -103,8 +105,23 @@ final class MCPBridge: @unchecked Sendable {
 
     // MARK: Listening
 
+    /// The port, once one start has made the listener: two sessions made at once share it.
     private func start() async throws -> UInt16 {
-        if let port = lock.withLock({ listener != nil && port != 0 ? port : nil }) { return port }
+        let task = lock.withLock { () -> Task<UInt16, any Error> in
+            if let starting { return starting }
+            let task = Task { try await self.listen() }
+            starting = task
+            return task
+        }
+        do {
+            return try await task.value
+        } catch {
+            lock.withLock { starting = nil }
+            throw error
+        }
+    }
+
+    private func listen() async throws -> UInt16 {
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         let listener = try NWListener(using: parameters)
@@ -132,25 +149,71 @@ final class MCPBridge: @unchecked Sendable {
         return ready
     }
 
+    /// The largest request body taken (contracts/mcp-bridge.md).
+    static let bodyLimit = 16 << 20
+
     private func receive(_ connection: NWConnection, buffer: Data) {
+        // What is already here may be a whole request: a client that sent two back to
+        // back on a kept-alive connection.
+        if !buffer.isEmpty, handle(connection, buffer: buffer, done: false) { return }
         connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, done, error in
             guard let self else { return }
             var buffer = buffer
             if let data { buffer.append(data) }
-            switch HTTPRequest.parse(buffer) {
-            case .complete(let request):
-                Task {
-                    let (status, body) = await self.answer(request)
-                    self.reply(connection, status: status, body: body)
-                    // Keep-alive: the same connection carries the next request.
-                    self.receive(connection, buffer: Data())
-                }
-            case .incomplete where !done && error == nil:
-                self.receive(connection, buffer: buffer)
-            default:
-                connection.cancel()
+            if self.handle(connection, buffer: buffer, done: done || error != nil) { return }
+            self.receive(connection, buffer: buffer)
+        }
+    }
+
+    /// Answer the request at the front of `buffer`, if it is all here. False when more is
+    /// needed and the connection can still send it.
+    private func handle(_ connection: NWConnection, buffer: Data, done: Bool) -> Bool {
+        // Refused from the head alone: nothing about a body this bridge will not take is
+        // worth waiting for.
+        if let head = Self.head(of: buffer) {
+            if head.chunked {
+                reply(connection, status: "411 Length Required", body: Data(), close: true)
+                return true
+            }
+            if head.length > Self.bodyLimit {
+                reply(connection, status: "413 Content Too Large", body: Data(), close: true)
+                return true
             }
         }
+        switch HTTPRequest.parse(buffer) {
+        case .complete(let request):
+            let used = (Self.head(of: buffer)?.size ?? buffer.count) + request.body.count
+            let rest = used < buffer.count ? Data(buffer[(buffer.startIndex + used)...]) : Data()
+            Task {
+                let (status, body) = await self.answer(request)
+                self.reply(connection, status: status, body: body)
+                // Keep-alive: the same connection carries the next request.
+                self.receive(connection, buffer: rest)
+            }
+            return true
+        case .incomplete where !done:
+            return false
+        default:
+            connection.cancel()
+            return true
+        }
+    }
+
+    /// The request head's length (through the blank line), its `Content-Length`, and
+    /// whether the body is chunked. Nil until the head has all arrived.
+    static func head(of buffer: Data) -> (size: Int, length: Int, chunked: Bool)? {
+        guard let end = buffer.range(of: Data("\r\n\r\n".utf8)),
+              let text = String(data: buffer[..<end.lowerBound], encoding: .utf8) else { return nil }
+        var length = 0
+        var chunked = false
+        for line in text.components(separatedBy: "\r\n").dropFirst() {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let name = line[..<colon].lowercased()
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            if name == "content-length" { length = Int(value) ?? 0 }
+            if name == "transfer-encoding", value.lowercased().contains("chunked") { chunked = true }
+        }
+        return (buffer.distance(from: buffer.startIndex, to: end.upperBound), length, chunked)
     }
 
     private func answer(_ request: HTTPRequest) async -> (String, Data) {
@@ -173,6 +236,7 @@ final class MCPBridge: @unchecked Sendable {
             return ("200 OK", reply)
         case "DELETE":
             endRoute(route)
+            log("bridge: route \(route.id.prefix(6)) for \(route.name) ended (closed by the runtime)")
             return ("200 OK", Data())
         default:
             return ("405 Method Not Allowed", Data())
@@ -184,11 +248,14 @@ final class MCPBridge: @unchecked Sendable {
         route.process?.end(reason: "The route was closed.")
     }
 
-    private func reply(_ connection: NWConnection, status: String, body: Data) {
+    private func reply(_ connection: NWConnection, status: String, body: Data, close: Bool = false) {
         var head = "HTTP/1.1 \(status)\r\nContent-Length: \(body.count)\r\n"
         if !body.isEmpty { head += "Content-Type: application/json\r\n" }
+        if close { head += "Connection: close\r\n" }
         head += "\r\n"
-        connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in })
+        connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in
+            if close { connection.cancel() }
+        })
     }
 
     static func random(_ bytes: Int) -> String {
@@ -211,6 +278,7 @@ final class RouteProcess: @unchecked Sendable {
     private var partial = Data()
     private var dropped = 0
     private var ended = false
+    private var endReason = "The server stopped."
     private let name: String
     private let log: @Sendable (String) -> Void
 
@@ -225,7 +293,10 @@ final class RouteProcess: @unchecked Sendable {
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         output.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            self?.read(handle.availableData)
+            let data = handle.availableData
+            // Empty is the end of the pipe, which is otherwise reported again and again.
+            if data.isEmpty { handle.readabilityHandler = nil }
+            self?.read(data)
         }
         process.terminationHandler = { [weak self] _ in
             self?.end(reason: "The server stopped.")
@@ -252,17 +323,26 @@ final class RouteProcess: @unchecked Sendable {
             write(body)
             return nil
         }
-        if lock.withLock({ ended }) {
-            return Self.error(id: message["id"], code: -32000, message: "The server stopped.")
-        }
+        let original = message["id"]
         return await withCheckedContinuation { done in
-            lock.withLock { waiting[id] = done }
-            write(body)
+            // Checked and registered together, so a server that stops in between still
+            // answers this call.
+            let stopped = lock.withLock { () -> String? in
+                if ended { return endReason }
+                waiting[id] = done
+                return nil
+            }
+            if let stopped {
+                done.resume(returning: Self.error(id: original, code: -32000, message: stopped))
+            } else {
+                write(body)
+            }
         }
     }
 
     func end(reason: String) {
         let pending = lock.withLock { () -> [String: CheckedContinuation<Data?, Never>] in
+            if !ended { endReason = reason }
             ended = true
             let pending = waiting
             waiting.removeAll()

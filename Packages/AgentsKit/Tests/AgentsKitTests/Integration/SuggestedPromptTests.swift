@@ -80,7 +80,9 @@ struct SuggestedPromptTests {
 
         let names = servers(in: await launcher.lastAgent?.newSessionParams)
             .compactMap { $0["name"]?.stringValue }
-        #expect(names == ["theirs", "agents"])
+        // The app's own first, so a server of the person's by the same name never
+        // takes its place (054, FR-020).
+        #expect(names == ["agents", "theirs"])
     }
 
     /// A draft session was made before the user chose a server, so it cannot be the
@@ -98,7 +100,7 @@ struct SuggestedPromptTests {
         #expect(launcher.launchCount == 2)
         let names = servers(in: await launcher.lastAgent?.newSessionParams)
             .compactMap { $0["name"]?.stringValue }
-        #expect(names == ["theirs", "agents"])
+        #expect(names == ["agents", "theirs"])
     }
 
     @Test func aDraftMadeWithTheSameServersIsUsedAsItIs() async throws {
