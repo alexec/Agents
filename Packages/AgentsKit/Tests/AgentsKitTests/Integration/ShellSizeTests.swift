@@ -112,7 +112,7 @@ struct ShellSizeTests {
         await eventually("the phone heard the shell") { await heard.output(to: phone, from: id) > 0 }
 
         // The phone lets it go: the shell carries on, and the phone hears no more.
-        await core.detachShell(id, connection: phone)
+        await core.detachShell(DaemonAPI.ShellRequest(agentID: id), connection: phone)
         try await Task.sleep(for: .milliseconds(200))
         await heard.clear()
         try await core.writeToShell(.init(agentID: id, bytes: Data("echo after\n".utf8)))

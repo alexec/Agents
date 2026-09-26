@@ -66,6 +66,9 @@ struct PromptHeader<Meter: View>: View {
     /// What the wait capsule does when pressed, and its ✕. See `WaitCapsule`.
     var openWait: (() -> Void)? = nil
     var cancelWait: (() -> Void)? = nil
+    /// What stands where the place is named, when an app can move the agent from here:
+    /// the Mac's Worktree choice (053). Nil names the place as a label, as the phone does.
+    var place: AnyView? = nil
     @ViewBuilder let meter: () -> Meter
 
     var body: some View {
@@ -86,15 +89,19 @@ struct PromptHeader<Meter: View>: View {
             // its folder is the project's name again, or a subfolder of it (030). In the
             // project folder it is whatever is checked out there, which is not always
             // main. Only a folder in no repository is named as a folder.
-            Label(branch ?? agent.cwd.lastPathComponent,
-                  systemImage: branch == nil ? "folder" : "arrow.triangle.branch")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .paperRaised(in: Capsule())
-                .help(agent.cwd.path(percentEncoded: false))
+            if let place {
+                place
+            } else {
+                Label(branch ?? agent.cwd.lastPathComponent,
+                      systemImage: branch == nil ? "folder" : "arrow.triangle.branch")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .paperRaised(in: Capsule())
+                    .help(agent.cwd.path(percentEncoded: false))
+            }
             Spacer(minLength: 8)
             meter()
                 .padding(.horizontal, 10)

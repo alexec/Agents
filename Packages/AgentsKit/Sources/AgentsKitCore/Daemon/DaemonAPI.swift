@@ -210,6 +210,12 @@ public enum DaemonAPI {
         public static let worktreesCheck = "worktrees/check"
         /// Remove a worktree the app made, and its branch when that is safe.
         public static let worktreesRemove = "worktrees/remove"
+        /// The person moving an agent into a worktree or back to its project folder, or
+        /// taking back a move still waiting for the turn to end (053).
+        public static let agentsMove = "agents/move"
+        /// What the MCP helper relays when an agent calls `enter_worktree` or
+        /// `exit_worktree` (053). The caller is the token.
+        public static let agentsMoveSelf = "agents/moveSelf"
         /// A GitHub project's pull requests, from the daemon's cache (038). Never runs
         /// `gh`; `null` when the project is not on GitHub.
         public static let pullRequestsList = "pullRequests/list"
@@ -272,6 +278,11 @@ public enum DaemonAPI {
         public static let shellResize = "shell/resize"
         public static let shellSignal = "shell/signal"
         public static let shellRestart = "shell/restart"
+        /// The shells an agent has, by number, so a window that opens finds the tabs it
+        /// left rather than only the first (055).
+        public static let shellList = "shell/list"
+        /// End one shell for good and forget it: the tab was closed (055).
+        public static let shellClose = "shell/close"
 
         // What the reader will allow to be spent. All three are window calls: none is
         // advertised to `AppService`, added to the MCP tool surface, or named in any
@@ -305,6 +316,10 @@ public enum DaemonAPI {
         /// Carries the `RuntimeStatus`; a window may just ask `runtimes/list` again.
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
+        /// An agent's runtime refused it for want of a sign-in, somewhere the window did
+        /// not ask: a turn, a queued prompt, a pick-up after a restart. `SignInNeeded`.
+        /// The window answers it with the sign-in sheet rather than an error.
+        public static let signInNeeded = "runtime/signInNeeded"
         public static let agentUsage = "agent/usage"
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
@@ -1286,13 +1301,20 @@ public enum DaemonAPI {
 
     // MARK: Shells
 
+    // An agent may have several shells (055), told apart by `shell`: a small number,
+    // unique for the agent while the shell is held. Zero is the one every agent had
+    // before there could be more, and what a message without the field means, so a
+    // phone or a server that has never heard of the field is talking about that one.
+
     public struct ShellAttachRequest: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         public var rows: Int
         public var cols: Int
 
-        public init(agentID: UUID, rows: Int = 24, cols: Int = 80) {
+        public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80) {
             self.agentID = agentID
+            self.shell = shell
             self.rows = rows
             self.cols = cols
         }
@@ -1300,9 +1322,33 @@ public enum DaemonAPI {
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
             rows = try c.decodeIfPresent(Int.self, forKey: .rows) ?? 24
             cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
         }
+    }
+
+    /// One of an agent's shells, for detaching and closing.
+    public struct ShellRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var shell: Int
+
+        public init(agentID: UUID, shell: Int = 0) {
+            self.agentID = agentID
+            self.shell = shell
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+        }
+    }
+
+    /// The shells the daemon holds for an agent, in the order they were opened.
+    public struct ShellListResponse: Codable, Sendable {
+        public var shells: [Int]
+        public init(shells: [Int]) { self.shells = shells }
     }
 
     /// What a window gets on attach: the state, and the bytes to replay.
@@ -1315,17 +1361,21 @@ public enum DaemonAPI {
         public var scrollback: Data
         public var dropped: Int
         public var startedAt: Date
+        /// Where the shell was started. Nil from an older daemon (053).
+        public var folder: URL?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
+            self.folder = folder
         }
     }
 
     public struct ShellInputRequest: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         /// What the user typed, as bytes. Never a `String`: a keystroke is not always a
         /// character, and an escape sequence is not text.
         public var bytes: Data
@@ -1335,43 +1385,81 @@ public enum DaemonAPI {
         public var rows: Int?
         public var cols: Int?
 
-        public init(agentID: UUID, bytes: Data, rows: Int? = nil, cols: Int? = nil) {
+        public init(agentID: UUID, shell: Int = 0, bytes: Data, rows: Int? = nil, cols: Int? = nil) {
             self.agentID = agentID
+            self.shell = shell
             self.bytes = bytes
             self.rows = rows
             self.cols = cols
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+            bytes = try c.decode(Data.self, forKey: .bytes)
+            rows = try c.decodeIfPresent(Int.self, forKey: .rows)
+            cols = try c.decodeIfPresent(Int.self, forKey: .cols)
         }
     }
 
     public struct ShellResizeRequest: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         public var rows: Int
         public var cols: Int
 
-        public init(agentID: UUID, rows: Int, cols: Int) {
+        public init(agentID: UUID, shell: Int = 0, rows: Int, cols: Int) {
             self.agentID = agentID
+            self.shell = shell
             self.rows = rows
             self.cols = cols
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+            rows = try c.decode(Int.self, forKey: .rows)
+            cols = try c.decode(Int.self, forKey: .cols)
         }
     }
 
     public struct ShellSignalRequest: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         public var signal: Int32
 
-        public init(agentID: UUID, signal: Int32) {
+        public init(agentID: UUID, shell: Int = 0, signal: Int32) {
             self.agentID = agentID
+            self.shell = shell
             self.signal = signal
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+            signal = try c.decode(Int32.self, forKey: .signal)
         }
     }
 
     public struct ShellOutputNotification: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         public var bytes: Data
 
-        public init(agentID: UUID, bytes: Data) {
+        public init(agentID: UUID, shell: Int = 0, bytes: Data) {
             self.agentID = agentID
+            self.shell = shell
             self.bytes = bytes
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+            bytes = try c.decode(Data.self, forKey: .bytes)
         }
 
         /// Read straight off the value that came in, without the round trip.
@@ -1390,17 +1478,27 @@ public enum DaemonAPI {
                   let encoded = params["bytes"]?.stringValue,
                   let bytes = Data(base64Encoded: encoded) else { return nil }
             self.agentID = agentID
+            self.shell = params["shell"]?.intValue ?? 0
             self.bytes = bytes
         }
     }
 
     public struct ShellStateNotification: Codable, Sendable {
         public var agentID: UUID
+        public var shell: Int
         public var state: ShellState
 
-        public init(agentID: UUID, state: ShellState) {
+        public init(agentID: UUID, shell: Int = 0, state: ShellState) {
             self.agentID = agentID
+            self.shell = shell
             self.state = state
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
+            state = try c.decode(ShellState.self, forKey: .state)
         }
     }
 
@@ -2019,6 +2117,59 @@ public enum DaemonAPI {
         }
     }
 
+    /// An agent moving itself (053): what it passed to `enter_worktree` or `exit_worktree`.
+    public struct MoveSelfRequest: Codable, Sendable {
+        public var token: String
+        public var target: MoveTarget
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(token: String, target: MoveTarget, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.token = token
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+    }
+
+    /// The person moving an agent (053). No target takes back the move that is waiting.
+    public struct MoveRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var target: MoveTarget?
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(agentID: UUID, target: MoveTarget?, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.agentID = agentID
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            target = try c.decodeIfPresent(MoveTarget.self, forKey: .target)
+            removeLeft = try c.decodeIfPresent(Bool.self, forKey: .removeLeft) ?? false
+            discardChanges = try c.decodeIfPresent(Bool.self, forKey: .discardChanges) ?? false
+        }
+    }
+
+    /// What a move request came to: made now, waiting for the turn to end, or nothing to
+    /// do. The message is what the agent's tool returns and what a window may show.
+    public struct MoveAnswer: Codable, Sendable {
+        public enum When: String, Codable, Sendable { case now, afterTurn, nothing }
+        public var when: When
+        public var message: String
+        public var agent: Agent?
+
+        public init(when: When, message: String, agent: Agent? = nil) {
+            self.when = when
+            self.message = message
+            self.agent = agent
+        }
+    }
+
     /// What removing a worktree would lose, said before anything is removed.
     public struct RemovalCheck: Codable, Hashable, Sendable {
         /// Agents still working in it. Any at all and it is not removed.
@@ -2339,6 +2490,17 @@ public extension DaemonAPI {
             self.agentID = agentID
             self.runtime = runtime
             self.lent = lent
+        }
+    }
+
+    /// `runtime/signInNeeded`: which runtime wants signing in, and the agent it stopped.
+    struct SignInNeeded: Codable, Hashable, Sendable {
+        public var runtimeID: String
+        public var agentID: UUID?
+
+        public init(runtimeID: String, agentID: UUID?) {
+            self.runtimeID = runtimeID
+            self.agentID = agentID
         }
     }
 

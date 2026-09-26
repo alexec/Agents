@@ -147,7 +147,7 @@ private struct PoolEntryRow: View {
                 .padding(.top, 2)
             Circle()
                 .fill(row.unusable != nil ? AnyShapeStyle(.clear)
-                      : isOut ? StateTint.failure.style(or: .red) : StateTint.vouched.style(or: .green))
+                      : isOut ? StateTint.failure.style(or: .primary) : StateTint.vouched.style(or: .primary))
                 .overlay(Circle().stroke(.tertiary, lineWidth: row.unusable != nil ? 1 : 0))
                 .frame(width: 9, height: 9)
                 .padding(.top, 5)
@@ -160,7 +160,7 @@ private struct PoolEntryRow: View {
                 }
                 HStack(spacing: 0) {
                     Text(row.line(now: at))
-                        .foregroundStyle(isOut ? StateTint.failure.style(or: .red) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
                     if row.chats > 0 {
                         Text(" · \(row.chats) chat\(row.chats == 1 ? "" : "s") on it")
                             .foregroundStyle(.secondary)
@@ -196,7 +196,7 @@ struct PaymentCapsule: View {
     var body: some View {
         Text(PoolWords.payment(payment, spent: spent))
             .appText(.fine)
-            .foregroundStyle(onAKey ? StateTint.attention.style(or: .orange) : AnyShapeStyle(.secondary))
+            .foregroundStyle(onAKey ? StateTint.attention.style(or: .primary) : AnyShapeStyle(.secondary))
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .paperRaised(in: Capsule())
@@ -247,7 +247,7 @@ struct PoolSidebarRow: View {
             Spacer()
             if model.poolStatus?.anyOut == true {
                 Circle()
-                    .fill(StateTint.failure.style(or: .red))
+                    .fill(StateTint.failure.style(or: .primary))
                     .frame(width: 8, height: 8)
                     .accessibilityLabel("A runtime is out")
             }

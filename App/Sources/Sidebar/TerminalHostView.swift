@@ -11,6 +11,15 @@ import SwiftUI
 /// out to it.
 struct TerminalHostView: NSViewRepresentable {
     let client: ShellClient
+    /// Set once when the user brings this tab forward or opens it, and cleared through
+    /// `focused` once the keyboard is here. Every tab's view stays in the window, so
+    /// without it typing would go on into a shell nobody can see (055). A request
+    /// rather than "is on top", so a pane built while hidden takes nothing from the
+    /// prompt.
+    var wantsFocus = false
+    var focused: () -> Void = {}
+    /// Whether this is the tab on top. One behind lets go of the keyboard.
+    var isFront = true
     /// Told the size whenever the view is laid out, so the pty can be resized and a
     /// full-screen program reflows (FR-021).
     let onSize: (Int, Int) -> Void
@@ -41,6 +50,15 @@ struct TerminalHostView: NSViewRepresentable {
     func updateNSView(_ view: TerminalView, context: Context) {
         context.coordinator.client = client
         Self.paint(view)
+        if wantsFocus {
+            // After this layout pass: a view made in this update has no window yet.
+            DispatchQueue.main.async { [weak view, focused] in
+                if let view, let window = view.window { window.makeFirstResponder(view) }
+                focused()
+            }
+        } else if !isFront, let window = view.window, window.firstResponder === view {
+            window.makeFirstResponder(nil)
+        }
     }
 
     /// On paper, like the page around it. Only the ground, the ink, the caret and the

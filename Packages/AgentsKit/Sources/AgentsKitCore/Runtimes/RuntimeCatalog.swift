@@ -97,6 +97,26 @@ public enum RuntimeCatalog {
 
     public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini, antigravity]
 
+    /// The runtimes that pick their own conversation back up when started again in a
+    /// different folder, which is what moving an agent into a worktree mid-work asks of
+    /// them (053). Measured, not assumed, by `RuntimeMoveLiveTests` through each ACP
+    /// adapter (research R3, 2026-09-26): Claude, Copilot, Cursor and Codex did; Grok
+    /// answers "Path not found", because it files sessions by folder. Gemini and
+    /// Antigravity are left out until measured. A runtime not here is never offered the
+    /// move tools, and cannot be moved, so nobody loses a conversation to a move.
+    public static let carriesConversationAcrossFolders: Set<String> = ["claude", "copilot", "cursor", "codex"]
+
+    /// Whether an agent on this runtime can be moved to another folder (053).
+    public static func canMoveFolders(runtimeID: String) -> Bool {
+        carriesConversationAcrossFolders.contains(runtimeID)
+    }
+
+    /// Why it cannot, in the words the page and the daemon use.
+    public static func whyCannotMoveFolders(runtimeID: String) -> String {
+        let name = runtime(id: runtimeID)?.name ?? runtimeID
+        return "\(name) can't carry its conversation into another folder, so this agent stays where it is. Start a new one in a worktree instead."
+    }
+
     public static func runtime(id: String) -> Runtime? {
         builtIn.first { $0.id == id }
     }

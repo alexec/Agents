@@ -490,6 +490,14 @@ extension DaemonCore {
                 return .success(["note": .string(started.note),
                                  "agentID": .string(started.agentID.uuidString)])
 
+            case DaemonAPI.Method.agentsMoveSelf:
+                let request = try require(params, as: DaemonAPI.MoveSelfRequest.self)
+                return .success(["note": .string(try await moveSelf(request).message)])
+
+            case DaemonAPI.Method.agentsMove:
+                let request = try require(params, as: DaemonAPI.MoveRequest.self)
+                return .success(try JSONValue.encoding(try await move(request)))
+
             case DaemonAPI.Method.agentsStopHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
@@ -558,8 +566,17 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(try attachShell(request, from: surface, connection: connection)))
 
             case DaemonAPI.Method.shellDetach:
+                let request = try require(params, as: DaemonAPI.ShellRequest.self)
+                detachShell(request, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.shellList:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                detachShell(request.agentID, connection: connection)
+                return .success(try JSONValue.encoding(listShells(request.agentID)))
+
+            case DaemonAPI.Method.shellClose:
+                let request = try require(params, as: DaemonAPI.ShellRequest.self)
+                closeShell(request)
                 return .success([:])
 
             case DaemonAPI.Method.shellInput:

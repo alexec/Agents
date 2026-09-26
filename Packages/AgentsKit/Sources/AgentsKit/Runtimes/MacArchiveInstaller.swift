@@ -1,3 +1,6 @@
+// The Mac's own archive installer (049), like `MacToolsetInstaller`: a Linux server's
+// agentsd has no CryptoKit or `ditto` and installs through `ToolsetInstaller`.
+#if canImport(Security)
 import AgentsKitCore
 import Foundation
 
@@ -177,3 +180,4 @@ enum ArchiveDownload {
                         didFinishDownloadingTo location: URL) {}
     }
 }
+#endif

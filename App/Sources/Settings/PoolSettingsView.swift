@@ -65,7 +65,7 @@ struct PoolSettingsView: View {
                     Text("Free or prepaid credit only. Never suggested.").appText(.fine).foregroundStyle(.secondary)
                 }
                 if let refusal {
-                    Text(refusal).appText(.fine).foregroundStyle(StateTint.failure.style(or: .red))
+                    Text(refusal).appText(.fine).foregroundStyle(StateTint.failure.style(or: .primary))
                 }
             } header: {
                 Text("The pool, in the order to try")

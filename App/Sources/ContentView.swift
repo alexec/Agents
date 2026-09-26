@@ -168,5 +168,13 @@ struct ContentView: View {
         } message: {
             Text(model.problem ?? "")
         }
+        // An agent that needs its runtime signed in gets the sign-in, not an error.
+        .sheet(isPresented: Binding(get: { model.signInRuntimeID != nil },
+                                    set: { if !$0 { model.putAwaySignIn() } })) {
+            if let runtimeID = model.signInRuntimeID {
+                RuntimeAccountView(runtimeID: runtimeID)
+                    .paperSheet()
+            }
+        }
     }
 }

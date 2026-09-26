@@ -44,6 +44,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.eventsWait,
         DaemonAPI.Method.eventsCancel,
         DaemonAPI.Method.eventsPublish,
+        DaemonAPI.Method.agentsMoveSelf,
     ]).union(strangerMethods)
 
     /// What the Remote calls, and only that. Anything not here is refused to a device,
@@ -61,6 +62,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsPrompt,
         DaemonAPI.Method.agentsUnqueue,
         DaemonAPI.Method.agentsStop,
+        DaemonAPI.Method.agentsMove,
         DaemonAPI.Method.agentsArchive,
         DaemonAPI.Method.agentsUnarchive,
         DaemonAPI.Method.agentsPark,

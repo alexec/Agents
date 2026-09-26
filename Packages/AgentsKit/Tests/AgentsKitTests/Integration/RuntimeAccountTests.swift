@@ -72,6 +72,84 @@ struct RuntimeAccountTests {
         #expect(account.state == .ready)
     }
 
+    /// A sign-in that lapses mid-conversation is the runtime asking for a sign-in, not
+    /// the runtime falling over, and the window is told so it can offer one.
+    @Test func aTurnRefusedForWantOfASignInAsksTheWindowForOne() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.promptError = .authRequired("Invalid API key · Please run /login")
+        let core = try core(FakeLauncher(script: script), locations: locations)
+        let heard = Heard()
+        await core.setBroadcaster { method, params in
+            guard method == DaemonAPI.Notification.signInNeeded,
+                  let needed = try? params?.decode(DaemonAPI.SignInNeeded.self) else { return }
+            heard.add("\(needed.runtimeID) \(needed.agentID?.uuidString ?? "none")")
+        }
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+
+        #expect(await core.agent(id)?.endedReason == .signInRefused, "not \"The runtime crashed\"")
+        #expect(await core.account(for: "claude").state == .needsSignIn)
+        #expect(heard.text == "claude \(id.uuidString)")
+        let notes = try await core.transcript(.init(agentID: id, before: nil, limit: 500)).entries.compactMap {
+            if case .runtimeNote(let text) = $0.kind { return text } else { return nil }
+        }
+        #expect(notes.contains("Claude needs signing in: Invalid API key · Please run /login"))
+        #expect(!notes.contains { $0.contains("stopped answering") })
+    }
+
+    /// A handshake is not a sign-in. The window warms a session for its draft the moment
+    /// a refusal lands, and that must not put the runtime back to ready under the sheet.
+    @Test func onlyATurnThatWorksTakesBackARefusal() async throws {
+        let (locations, work) = try temporary()
+        var lapses = FakeACPAgent.Script()
+        lapses.promptError = .authRequired("not signed in")
+        let gate = TurnGate()
+        var held = FakeACPAgent.Script()
+        held.gate = gate
+        let core = try core(FakeLauncher(script: .init(), then: [lapses, held]), locations: locations)
+
+        let refused = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(refused)?.endedReason != nil }
+        #expect(await core.account(for: "claude").state == .needsSignIn)
+
+        let next = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn is under way") { await core.agent(next)?.state == .running }
+        #expect(await core.account(for: "claude").state == .needsSignIn, "a handshake proved nothing")
+
+        gate.open()
+        await eventually("the turn worked") { await core.account(for: "claude").state == .ready }
+        #expect(await core.account(for: "claude").state == .ready)
+    }
+
+    /// Picking an agent back up that its runtime now refuses gives the window the same
+    /// refusal a new agent gets, with the runtime named, rather than the protocol's
+    /// error — and does not give up on its conversation for a new one.
+    @Test func pickingUpAnAgentWhoseSignInLapsedAsksForASignIn() async throws {
+        let (locations, work) = try temporary()
+        var lapses = FakeACPAgent.Script()
+        lapses.promptError = .authRequired("not signed in")
+        var refuses = FakeACPAgent.Script()
+        refuses.sessionGoneError = .authRequired("not signed in")
+        refuses.newSessionError = .authRequired("not signed in")
+        let core = try core(FakeLauncher(script: .init(), then: [lapses, refuses]), locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        let conversation = await core.agent(id)?.runtimeSessionID
+
+        do {
+            try await core.prompt(.init(agentID: id, text: "again"))
+            Issue.record("expected a refusal")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.needsSignIn, "got \(error.code): \(error.message)")
+            #expect(error.data?["runtimeID"]?.stringValue == "claude")
+        }
+        #expect(await core.agent(id)?.runtimeSessionID == conversation)
+        #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["again"], "the words wait for the sign-in")
+    }
+
     @Test func aMethodThatNeedsATerminalHandsBackTheCommandRatherThanRunningIt() async throws {
         let (locations, _) = try temporary()
         var script = FakeACPAgent.Script()

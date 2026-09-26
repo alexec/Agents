@@ -46,6 +46,12 @@ final class AppModel {
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
     private(set) var problem: String?
+    /// A runtime of this Mac's that refused for want of a sign-in: the window answers
+    /// with its sign-in sheet rather than an error nobody can act on.
+    var signInRuntimeID: String?
+    /// Sheets put away without signing in, so that the agents a restart picks back up
+    /// do not each raise it again. Forgotten when the runtime says it is signed in.
+    private var signInsPutAway: Set<String> = []
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Projects column until it becomes a project or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
@@ -349,6 +355,12 @@ final class AppModel {
     /// The branch each project folder is on, for the chat's folder chip. Missing until
     /// asked, and for a folder in no repository.
     private(set) var projectFolderBranches: [URL: String] = [:]
+    /// Each open agent's project's worktrees, for the Worktree choice on its page (053).
+    /// Asked when the page opens and after each move, never polled.
+    private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
+    /// Why the last move asked for an agent was refused, shown under its choice until
+    /// the next one. A move that fails later, when it is made, says so in the chat.
+    private(set) var moveProblems: [UUID: String] = [:]
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -400,10 +412,16 @@ final class AppModel {
     private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }
     private var listening: Task<Void, Never>?
 
-    /// The panes listening for shell output, one per agent in this window. Shell
-    /// notifications are broadcast to every window, so each one keeps only the agents
-    /// it is actually showing and ignores the rest.
-    @ObservationIgnored private var shellClients: [UUID: ShellClient] = [:]
+    /// The panes listening for shell output, one per shell in this window: an agent
+    /// has one per terminal tab (055). Shell notifications are broadcast to every
+    /// window, so each one keeps only the shells it is actually showing and ignores
+    /// the rest.
+    @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
+
+    struct ShellKey: Hashable {
+        var agentID: UUID
+        var shell: Int
+    }
 
     /// What each agent had already spent when this window first laid eyes on it.
     ///
@@ -1107,11 +1125,11 @@ final class AppModel {
             // the general path would re-encode every byte of it here on the main
             // actor before decoding it again. See `ShellOutputNotification`.
             guard let params, let notification = DaemonAPI.ShellOutputNotification(params: params) else { return }
-            shellClients[notification.agentID]?.received(notification.bytes)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.bytes)
 
         case DaemonAPI.Notification.shellStateChanged:
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
-            shellClients[notification.agentID]?.received(notification.state)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.state)
 
         case DaemonAPI.Notification.draftOptions:
             guard let notification = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -1123,6 +1141,14 @@ final class AppModel {
         case DaemonAPI.Notification.runtimeAccountChanged:
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
+            if account.state == .ready { signInsPutAway.remove(account.runtimeID) }
+
+        case DaemonAPI.Notification.signInNeeded:
+            // A turn, a queued prompt or a pick-up refused with nobody waiting on the
+            // call, so this is the only place the window hears it.
+            guard let needed = try? params?.decode(DaemonAPI.SignInNeeded.self),
+                  !signInsPutAway.contains(needed.runtimeID), signInRuntimeID == nil else { return }
+            signInRuntimeID = needed.runtimeID
 
         case DaemonAPI.Notification.pullRequestsChanged:
             // The Mac's own, like the shells (038 FR-010).
@@ -1590,6 +1616,32 @@ final class AppModel {
         draftWorktrees = answer
     }
 
+    /// What the open agent's project has, for the Worktree choice on its page (053).
+    func loadAgentWorktrees(of agent: Agent) async {
+        let folder = agent.projectFolder
+        let answer = (try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
+                                                                DaemonAPI.WorktreesListRequest(folder: folder),
+                                                                returning: DaemonAPI.WorktreesListResponse.self))
+            ?? .notARepository
+        agentWorktrees[folder] = answer
+    }
+
+    /// Move an agent, or with no target take back the move that is waiting (053). Made
+    /// at once when it is between turns; otherwise when its turn ends.
+    func move(_ agent: Agent, to target: MoveTarget?) async {
+        moveProblems[agent.id] = nil
+        do {
+            _ = try await client(forAgent: agent.id).call(DaemonAPI.Method.agentsMove,
+                                                          DaemonAPI.MoveRequest(agentID: agent.id, target: target),
+                                                          returning: DaemonAPI.MoveAnswer.self)
+        } catch let error as JSONRPCError {
+            moveProblems[agent.id] = error.message
+        } catch {
+            moveProblems[agent.id] = "Could not move: \(error.localizedDescription)"
+        }
+        await loadAgentWorktrees(of: agent)
+    }
+
     /// Ask which branch an agent's project folder is on. Asked when its chat opens and
     /// when its turn ends, since someone may have checked out another branch meanwhile.
     func loadProjectFolderBranch(of agent: Agent) async {
@@ -1724,7 +1776,7 @@ final class AppModel {
             // in a row should not mean coming back twice.
             return true
         } catch {
-            problem = describe(error)
+            fail(error, on: selectedProjectHost)
             return false
         }
     }
@@ -1756,7 +1808,7 @@ final class AppModel {
     /// that need not be the one selected. A person's prompt is what clears a block, so
     /// this is an ordinary prompt and nothing else.
     func carryOn(_ id: UUID) async {
-        await attempt {
+        await attempt(on: work.agent(id)?.host ?? .mac) {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
         }
@@ -1900,13 +1952,31 @@ final class AppModel {
 
     // MARK: The user's shells
 
-    /// The pane's end of one agent's shell, made once per agent per window.
-    func shellClient(for agentID: UUID) -> ShellClient {
-        if let existing = shellClients[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, client: client(forAgent: agentID),
+    /// The pane's end of one of an agent's shells, made once per shell per window.
+    func shellClient(for agentID: UUID, shell: Int = 0) -> ShellClient {
+        let key = ShellKey(agentID: agentID, shell: shell)
+        if let existing = shellClients[key] { return existing }
+        let fresh = ShellClient(agentID: agentID, shell: shell, client: client(forAgent: agentID),
                                 describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
-        shellClients[agentID] = fresh
+        shellClients[key] = fresh
         return fresh
+    }
+
+    /// The shells the daemon holds for an agent, so the pane opens with the tabs it
+    /// had (055). Nil from a daemon too old to hold more than one — a server not yet
+    /// updated — and the pane then offers only the one.
+    func shellNumbers(for agentID: UUID) async -> [Int]? {
+        let response = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.shellList, DaemonAPI.AgentRequest(agentID: agentID),
+            returning: DaemonAPI.ShellListResponse.self)
+        return response?.shells
+    }
+
+    /// The user closed a terminal tab: the shell ends, and this window forgets it.
+    func closeShell(agentID: UUID, shell: Int) async {
+        let client = shellClient(for: agentID, shell: shell)
+        shellClients[ShellKey(agentID: agentID, shell: shell)] = nil
+        await client.close()
     }
 
     /// What the person typed on a live page, sent to the daemon to put on disk (022).
@@ -2023,7 +2093,7 @@ final class AppModel {
             await refreshAgents()
             selection = id
         } catch {
-            problem = describe(error)
+            fail(error, on: selectedProjectHost)
         }
     }
 
@@ -2134,7 +2204,7 @@ final class AppModel {
         }
     }
 
-    private func attempt(_ work: () async throws -> Void) async -> Bool {
+    private func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
         do {
             try await work()
             return true
@@ -2145,9 +2215,30 @@ final class AppModel {
                 await connect()
                 if isConnected, (try? await work()) != nil { return true }
             }
-            problem = describe(error)
+            fail(error, on: host)
             return false
         }
+    }
+
+    /// A failure put in front of the person. A runtime of this Mac's that needs signing
+    /// in gets its sign-in sheet; everything else is said in words. A server's runtime
+    /// is signed in on the server, which this sheet cannot do, so it stays words.
+    private func fail(_ error: any Error, on host: HostID) {
+        if host == .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.needsSignIn,
+           let runtimeID = error.data?["runtimeID"]?.stringValue {
+            signInRuntimeID = runtimeID
+            return
+        }
+        problem = describe(error)
+    }
+
+    /// The sign-in sheet, put away. Signed in or not, it does not come back for this
+    /// runtime by itself until the runtime has been signed in once more.
+    func putAwaySignIn() {
+        if let runtimeID = signInRuntimeID, accounts[runtimeID]?.state != .ready {
+            signInsPutAway.insert(runtimeID)
+        }
+        signInRuntimeID = nil
     }
 
     /// What a person can read. The daemon's errors are already written for someone
