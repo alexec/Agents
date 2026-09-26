@@ -20,6 +20,37 @@ public struct Toolset: Hashable, Sendable {
     public var id: String
     /// The three files, as they are sent to a server.
     public var folder: URL
+    /// Node for this Mac (048), from `mac-node.json` beside the manifest. Kept out of the
+    /// manifest on purpose: the manifest's bytes are the toolset's id, and a Mac pin
+    /// added there would make every server install the same toolset again.
+    public var macNode: MacNode?
+
+    /// Node's version and the SHA-256 of its two macOS tarballs.
+    public struct MacNode: Codable, Hashable, Sendable {
+        public var version: String
+        /// Keyed by nodejs.org's own names: `arm64`, `x64`.
+        public var sha256: [String: String]
+
+        public init(version: String, sha256: [String: String]) {
+            self.version = version
+            self.sha256 = sha256
+        }
+
+        /// This Mac's architecture, in nodejs.org's words.
+        public static var hostArchitecture: String {
+            #if arch(arm64)
+            "arm64"
+            #else
+            "x64"
+            #endif
+        }
+
+        /// Where Node's tarball for `architecture` is published, relative to `/dist/`.
+        /// Gzip rather than xz: macOS's tar reads either, and nodejs.org ships both.
+        public func tarball(for architecture: String) -> String {
+            "\(version)/node-\(version)-darwin-\(architecture).tar.gz"
+        }
+    }
 
     public struct Manifest: Codable, Hashable, Sendable {
         public var runtimeID: String
@@ -60,11 +91,29 @@ public struct Toolset: Hashable, Sendable {
     public static let manifestFile = "manifest.json"
     public static let packageFile = "package.json"
     public static let lockFile = "package-lock.json"
+    public static let macNodeFile = "mac-node.json"
 
-    public init(manifest: Manifest, id: String, folder: URL) {
+    public init(manifest: Manifest, id: String, folder: URL, macNode: MacNode? = nil) {
         self.manifest = manifest
         self.id = id
         self.folder = folder
+        self.macNode = macNode
+    }
+
+    // MARK: Shared by the server's install script and the Mac's installer
+
+    /// What `npm ci` is given besides `--prefix` and `--cache`: the lock and nothing else,
+    /// no install scripts, and nothing said to a server about audits or funding.
+    public static let npmCIArguments = ["ci", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"]
+
+    /// The `bin/npx` a toolset is started through: not npx, but the pinned adapter run by
+    /// the toolset's own Node. One line per element, none containing a single quote, so
+    /// the server's script can hand them to `printf` quoted.
+    public var shimLines: [String] {
+        ["#!/bin/sh",
+         "# Agents (043): not npx. Runs the Claude adapter this toolset was installed with.",
+         #"d=$(cd "$(dirname "$0")/.." && pwd -P)"#,
+         #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""#]
     }
 
     /// Where a server keeps one runtime's toolsets, relative to its home.
@@ -78,7 +127,10 @@ public struct Toolset: Hashable, Sendable {
         let manifestData = try Data(contentsOf: folder.appendingPathComponent(manifestFile))
         let lockData = try Data(contentsOf: folder.appendingPathComponent(lockFile))
         let manifest = try JSONDecoder().decode(Manifest.self, from: manifestData)
-        return Toolset(manifest: manifest, id: id(manifest: manifestData, lock: lockData), folder: folder)
+        let macNode = (try? Data(contentsOf: folder.appendingPathComponent(macNodeFile)))
+            .flatMap { try? JSONDecoder().decode(MacNode.self, from: $0) }
+        return Toolset(manifest: manifest, id: id(manifest: manifestData, lock: lockData), folder: folder,
+                       macNode: macNode)
     }
 
     public static func id(manifest: Data, lock: Data) -> String {

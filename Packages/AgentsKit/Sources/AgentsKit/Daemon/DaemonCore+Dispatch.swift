@@ -116,6 +116,10 @@ extension DaemonCore {
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
+            case DaemonAPI.Method.runtimesInstall:
+                let request = try require(params, as: DaemonAPI.RuntimeRequest.self)
+                return .success(try JSONValue.encoding(try installRuntime(request.runtimeID, from: surface)))
+
             case DaemonAPI.Method.runtimesAccounts:
                 return .success(try JSONValue.encoding(allAccounts()))
 

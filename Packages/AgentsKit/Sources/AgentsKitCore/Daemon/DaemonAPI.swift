@@ -6,6 +6,10 @@ import Foundation
 public enum DaemonAPI {
     public enum Method {
         public static let runtimesList = "runtimes/list"
+        /// Install a missing runtime on this Mac (048). `RuntimeRequest` → `RuntimeStatus`,
+        /// answered at once; progress and the result follow on `runtime/changed`. The
+        /// Mac's daemon only, and only for the app itself: it runs a vendor's script.
+        public static let runtimesInstall = "runtimes/install"
         public static let runtimesAccounts = "runtimes/accounts"
         public static let runtimeAuthenticate = "runtimes/authenticate"
         public static let runtimeLogOut = "runtimes/logout"
@@ -255,6 +259,8 @@ public enum DaemonAPI {
         /// A server's runtime refused the credential it was started with, or found none
         /// (043, FR-016). `CredentialRefused`.
         public static let credentialRefused = "credentials/refused"
+        /// A runtime's status moved: installed, installing, or an install failed (048).
+        /// Carries the `RuntimeStatus`; a window may just ask `runtimes/list` again.
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
         public static let agentUsage = "agent/usage"

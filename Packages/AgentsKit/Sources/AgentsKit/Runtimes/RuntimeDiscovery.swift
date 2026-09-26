@@ -7,6 +7,10 @@ public struct RuntimeDiscovery: Sendable {
     /// On a server (`--serve`), the home whose `.agents-server/tools/` holds the toolsets
     /// the app installed (043). Nil on the Mac, which never looks there.
     public var serverHome: String?
+    /// On the Mac, the daemon's own `tools/` folder, where the app installs the Claude
+    /// toolset for somebody with no Node (048). Consulted after the person's own PATH, so
+    /// anyone who already has `npx` goes on using it.
+    public var macToolsHome: String?
 
     public init(searchPaths: [String]? = nil,
                 fileExists: (@Sendable (String) -> Bool)? = nil) {
@@ -40,7 +44,20 @@ public struct RuntimeDiscovery: Sendable {
                 return .available(path: candidate, supportsResume: false)
             }
         }
+        if let shim = appToolset(for: runtime) {
+            return .available(path: shim, supportsResume: false)
+        }
         return .missing(lookedIn: searchPaths)
+    }
+
+    /// The Mac's own copy of a toolset, when it is whole: `current/ok` and an executable
+    /// shim, the same test as a server's.
+    public func appToolset(for runtime: Runtime) -> String? {
+        guard let macToolsHome else { return nil }
+        let current = "\(macToolsHome)/\(runtime.id)/current"
+        let shim = "\(current)/bin/\(runtime.executable)"
+        guard FileManager.default.fileExists(atPath: "\(current)/ok"), fileExists(shim) else { return nil }
+        return shim
     }
 
     public func statuses(for runtimes: [Runtime] = RuntimeCatalog.builtIn) -> [RuntimeStatus] {
