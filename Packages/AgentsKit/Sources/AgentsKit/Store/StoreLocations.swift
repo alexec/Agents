@@ -77,6 +77,9 @@ public struct StoreLocations: Sendable {
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// What the app installs for this daemon (048): `tools/<runtime>/<id>/`, with
+    /// `current` pointing at the one in use. Per root, so a scratch copy installs its own.
+    public var tools: URL { root.appendingPathComponent("tools", isDirectory: true) }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
     /// Every project we have been told about. One file, because the only things in it
     /// are the two a project's folder cannot tell us: that it is archived, and that it
@@ -97,6 +100,9 @@ public struct StoreLocations: Sendable {
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
     public var devices: URL { root.appendingPathComponent("devices.json") }
+    /// The public half of the Mac's relay key, as the bridge registered it (046). Beside
+    /// `devices.json` rather than in it, so that file keeps the shape older builds read.
+    public var relay: URL { root.appendingPathComponent("relay.json") }
     /// The servers the window reaches over ssh (037). Written by the window only; the
     /// daemon at this root never reads it.
     public var hosts: URL { root.appendingPathComponent("hosts.json") }

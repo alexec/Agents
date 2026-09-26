@@ -69,6 +69,12 @@ struct ContentView: View {
                                  set: { model.hosts.rebuiltAsk = $0 })) { host in
                 RebuiltServerSheet(host: host).paperSheet()
             }
+            // Agents missing at start-up, offered once each (048). Closed any way at
+            // all, what was missing counts as offered.
+            .sheet(isPresented: $model.isOfferingInstall,
+                   onDismiss: { model.rememberInstallOffer() }) {
+                InstallAgentsSheet().paperSheet()
+            }
     }
 
     /// What the right-hand column shows: a page about all the work, a workflow, the

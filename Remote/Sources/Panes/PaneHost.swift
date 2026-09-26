@@ -130,7 +130,10 @@ struct PaneView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.macLacksPanes {
+        if model.isAway {
+            // Away, none of the three open: they stream too much for iCloud (046, look B).
+            NeedsSameNetworkView()
+        } else if model.macLacksPanes {
             VStack(spacing: 0) {
                 Text("Update Agents on your Mac to read files and use the terminal here.")
                     .appText(.fine)

@@ -21,16 +21,23 @@ runtimes, and shows up on the Mac as if you had started it there.
 That is why the Mac needs to be awake and reachable for the phone to be of use, and why
 nothing is lost if your phone runs out of battery.
 
-## Two ways to reach you
+## Three ways to reach you
 
-There are two separate paths from the Mac to your devices.
+There are three separate paths from the Mac to your devices.
 
 The first is a direct connection on your local network. A small helper on the Mac, the
 bridge, offers the daemon to devices on the same network. The phone and iPad find the Mac
-by themselves, without you typing an address. Everything you see and do in the iPhone and
-iPad apps goes over this connection.
+by themselves, without you typing an address. At home, everything you see and do in the
+iPhone and iPad apps goes over this connection, and it is instant.
 
-The second is notifications. When an agent needs you and you are not at the Mac, the Mac
+The second is the relay, for when your device is somewhere else. The same requests and
+updates go through your own iCloud account instead, each one sealed so that only your Mac
+and that one device can read it. Nothing passes through a server of ours. The device
+switches between the two by itself: leave the house and a line at the top says **Away —
+slower, through iCloud**; come back and it goes. The relay is slower, about two or three
+seconds for each answer, which is why a few things wait until you are home (see below).
+
+The third is notifications. When an agent needs you and you are not at the Mac, the Mac
 sends a short notice to your device through your own iCloud account. It is sealed so that
 only that one device can read it. If you are at the Mac, the Mac tells you itself and your
 devices stay quiet. If you are away, the device you used most recently is told, and the
@@ -64,24 +71,34 @@ Some things are only on the Mac:
 
 ## The connection today
 
-Be aware of how the direct connection works today.
+Be aware of how the connections work today.
 
 The bridge is not started by the app. You start it by hand on the Mac, and it runs until
-you stop it. While it is not running, your devices cannot reach the Mac, and notifications
-that were due wait on the Mac until it is.
+you stop it. While it is not running, your devices cannot reach the Mac from anywhere, and
+notifications that were due wait on the Mac until it is.
+
+**Pairing happens at home.** The first time a device connects on the Mac's network, the Mac
+hands it the key the relay is sealed with. After that, the device can reach the Mac from
+anywhere. A device that has never been on the Mac's network says **Open Agents once on your
+Mac's Wi-Fi**, and sends nothing through iCloud. The Mac and the device must be signed in to
+the same iCloud account.
+
+**Away, the everyday things work**: your projects and agents, reading a conversation and
+following it as it grows, sending prompts, answering questions and permissions, starting,
+stopping and archiving agents, changing an agent's mode or model, and the events list. The
+terminal, the live page, files and attaching pictures say **Needs the same network as your
+Mac**, because they send too much, too often, for iCloud. They open by themselves when you
+are back on the Mac's Wi‑Fi.
+
+**Forgetting a device.** In Settings ▸ Devices on the Mac, **Forget…** cuts a device off from
+the relay at once, and deletes what was waiting for it in iCloud. It pairs again the next
+time it is on the Mac's network.
 
 The direct connection has no pairing and no encryption. Any device on the same local
 network that finds the bridge can see and drive your agents. Run it only on a network you
-trust, such as your home network, and stop it when you do not need it.
-
-It also only works on the same network. When your phone is somewhere else, it says it
-cannot reach your Mac, and shows what it last knew, dimmed, without offering any action.
-Notifications still arrive, because they go through iCloud, but to answer one you need to
-be back on the Mac's network.
-
-Notifications are the part that is protected today. Each one is sealed to the device it is
-for before it leaves the Mac, and travels through your own iCloud account, not through a
-server of ours.
+trust, such as your home network, and stop it when you do not need it. The relay and
+notifications are the parts that are sealed: each message is sealed to the one device or
+Mac it is for before it leaves, and travels through your own iCloud account.
 
 ## Related
 
