@@ -64,8 +64,9 @@ actor FakeACPAgent {
         /// uses the file methods and none sends an elicitation form.
         var clientRequests: [(method: String, params: JSONValue)] = []
         /// Notifications under a method of the runtime's own invention, sent during the
-        /// turn. A real one is Cursor's `cursor/update_todos`. Nothing is expected back,
-        /// which is exactly why they used to vanish without trace.
+        /// turn. A real one is `_auth/status_update`. Nothing is expected back, which is
+        /// exactly why they used to vanish without trace. (Cursor's `cursor/*` methods
+        /// look like these and are requests: put those in `clientRequests`.)
         var extensionNotifications: [(method: String, params: JSONValue)] = []
         /// How long the handshake takes. Zero for almost every test; a real duration
         /// for the ones about what the daemon is doing while a runtime is still
@@ -281,6 +282,23 @@ actor FakeACPAgent {
     /// What the client answered one method with, for a test that cares.
     func answer(to method: String) -> Result<JSONValue, JSONRPCError>? {
         clientAnswers.first { $0.method == method }?.result
+    }
+
+    /// Every answer to one method, in order, for a test that sends it more than once.
+    func answers(to method: String) -> [Result<JSONValue, JSONRPCError>] {
+        clientAnswers.filter { $0.method == method }.map(\.result)
+    }
+
+    /// Make a request of the client outside a turn and say what came back, the way a
+    /// runtime calling a method of its own invention does.
+    func emitRequest(_ method: String, _ params: JSONValue = [:]) async -> Result<JSONValue, JSONRPCError> {
+        do {
+            return .success(try await connection.call(method, params))
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(.internalError("\(error)"))
+        }
     }
 
     static func chunk(_ text: String, messageID: String? = nil) -> JSONValue {

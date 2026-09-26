@@ -11,6 +11,9 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
     public var canLogOut: Bool
     public var providers: [ACP.ProviderInfo]
     public var currentProviderID: String?
+    /// Which kind of account the runtime says it is using, for a runtime that pushes
+    /// `_auth/status_update`. Nil for one that does not, or has not said yet.
+    public var signedInAs: AuthStatus?
     /// What this runtime will take in a prompt. A runtime fact, so the composer can
     /// refuse a picture before it is sent rather than after.
     public var promptCapabilities: ACP.PromptCapabilities
@@ -31,6 +34,7 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
                 canLogOut: Bool = false,
                 providers: [ACP.ProviderInfo] = [],
                 currentProviderID: String? = nil,
+                signedInAs: AuthStatus? = nil,
                 promptCapabilities: ACP.PromptCapabilities = .init(),
                 checkedAt: Date = Date()) {
         self.runtimeID = runtimeID
@@ -39,6 +43,7 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
         self.canLogOut = canLogOut
         self.providers = providers
         self.currentProviderID = currentProviderID
+        self.signedInAs = signedInAs
         self.promptCapabilities = promptCapabilities
         self.checkedAt = checkedAt
     }
