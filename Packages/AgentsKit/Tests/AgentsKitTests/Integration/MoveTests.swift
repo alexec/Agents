@@ -323,6 +323,27 @@ struct MoveTests {
         #expect(try await notes(core, id).contains { $0.hasPrefix("Will move to a new worktree like own-branch when this turn ends") })
     }
 
+    /// The name the answer gives is the name made, even when the agent retitles itself
+    /// later in the same turn.
+    @Test func theNameIsSettledWhenTheMoveIsAsked() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+        let title = try #require(await core.agent(id)?.title)
+        let expected = WorktreeName.from(prompt: title)
+
+        let answer = try await core.moveSelf(.init(token: token, target: .newWorktree(name: nil)))
+        #expect(answer.message.contains(expected))
+        var agent = try #require(await core.agent(id))
+        agent.title = "Something else entirely"
+        await core.changed(agent)
+        gate.open()
+
+        await eventually("moved") { await core.agent(id)?.worktree != nil }
+        #expect(await core.agent(id)?.worktree?.name == expected)
+    }
+
     @Test func theLastOfTwoAsksIsTheOneMade() async throws {
         let repo = try await repository()
         let (launcher, gate) = gatedLauncher()

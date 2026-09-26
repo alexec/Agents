@@ -119,6 +119,12 @@ extension DaemonCore {
             }
         }
 
+        // A new worktree's name is settled now, from the title the agent has now, so the
+        // name the tool's answer gives is the name made — not one from a title the agent
+        // changes later in the same turn. Only whether it is free waits for the move.
+        if case .newWorktree(nil) = target {
+            target = .newWorktree(name: moveName(nil, for: agent))
+        }
         var stored = move
         stored.target = target
         agent.pendingMove = stored
