@@ -59,10 +59,10 @@ struct AddCreditSheet: View {
                 if id == RuntimeCatalog.gemini.id, kind == nil { kind = .freeTier }
             }
             if let saved {
-                Text("Uses the \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) \(saved.mask), from Settings ▸ Agents.")
+                Text("Uses the \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) \(saved.mask), from Settings ▸ Agent Runtimes.")
                     .appText(.fine).foregroundStyle(.secondary)
             } else {
-                Text("No \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) is saved. Add one in Settings ▸ Agents first.")
+                Text("No \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) is saved. Add one in Settings ▸ Agent Runtimes first.")
                     .appText(.fine).foregroundStyle(StateTint.attention.style(or: .primary))
             }
 

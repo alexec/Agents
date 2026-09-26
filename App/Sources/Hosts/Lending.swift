@@ -16,7 +16,15 @@ extension AppModel {
     func credentialOffer(_ id: HostID) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
         let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
-        return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly)
+        // What this Mac would relay and cannot now, so the server can say why (056).
+        var notRelayed: [String: DaemonAPI.SignInWanted.Reason] = [:]
+        if !ownOnly {
+            for runtimeID in SignInRelays.relayed {
+                if let why = SignInRelays.whyNotRelayed(runtimeID) { notRelayed[runtimeID] = why }
+            }
+        }
+        return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly,
+                                          notRelayed: notRelayed.isEmpty ? nil : notRelayed)
     }
 
     /// A server's daemon wants a credential to start a runtime (043, R6). Lends the one in
@@ -67,12 +75,12 @@ extension AppModel {
         ask.answer.resume(returning: saved)
     }
 
-    /// A server spent money: a model answered, so whatever sign-in it was lent worked.
-    /// The only runtime lent anything is Claude (D3), and only where it may be (043, FR-011).
+    /// A server spent money: a model answered, so whatever sign-in it was lent worked
+    /// (043, FR-011). Gemini's key is the only one lent since 056.
     func noteServerSpent(_ id: HostID) {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false),
-              let record = credentials.record("claude"),
+              let record = credentials.record(RuntimeCatalog.gemini.id),
               (record.lastWorked ?? .distantPast) < Date().addingTimeInterval(-60) else { return }
-        credentials.markWorked("claude")
+        credentials.markWorked(RuntimeCatalog.gemini.id)
     }
 }

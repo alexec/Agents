@@ -78,7 +78,7 @@ public actor ServerConnection {
     private let wantsOther: @Sendable (String) async -> Bool
     private let offer: @Sendable () async -> DaemonAPI.CredentialsOffer?
     private let lender: DaemonClient.CredentialLender?
-    private let relay: @Sendable () async -> RelayGrant?
+    private let relay: @Sendable () async -> [RelayGrant]
     private var onState: (@Sendable (State) async -> Void)?
     private var onClaude: (@Sendable (Claude) async -> Void)?
     private var onToolset: (@Sendable (String, Claude) async -> Void)?
@@ -104,7 +104,7 @@ public actor ServerConnection {
                 wants: @escaping @Sendable (String) async -> Bool = { _ in false },
                 offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                 lender: DaemonClient.CredentialLender? = nil,
-                relay: @escaping @Sendable () async -> RelayGrant? = { nil }) {
+                relay: @escaping @Sendable () async -> [RelayGrant] = { [] }) {
         self.relay = relay
         self.offer = offer
         self.lender = lender
@@ -252,11 +252,14 @@ public actor ServerConnection {
         "\(home)/.agents-server/relay-\(runtime).sock"
     }
 
-    /// On every connect: when this window relays a sign-in, forward a socket on the server
-    /// back to it and tell the server's daemon, which opens its gate. Never throws: without
-    /// a relay the server still works, and says what sign-in it needs instead.
+    /// On every connect: for each sign-in this window relays (047 Codex, 056 Claude), forward
+    /// a socket on the server back to it and tell the server's daemon, which opens its gate.
+    /// Never throws: without a relay the server still works, and says what sign-in it needs.
     public func offerRelay(home: String) async {
-        guard let grant = await relay() else { return }
+        for grant in await relay() { await offerRelay(grant, home: home) }
+    }
+
+    private func offerRelay(_ grant: RelayGrant, home: String) async {
         let socket = Self.relaySocket(home: home, runtime: grant.runtime)
         // A socket a previous master left in place would make the forward fail.
         _ = try? await master.command.run(master.command.runArguments("rm -f '\(socket)'"))

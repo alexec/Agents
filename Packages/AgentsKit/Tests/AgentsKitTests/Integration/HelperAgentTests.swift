@@ -6,7 +6,7 @@ import Testing
 /// An agent starting, stopping, archiving and listing agents of its own (028).
 ///
 /// What this suite holds is the boundary: the new agent always lands in the caller's
-/// own project, a project never holds more than three agents started by agents however
+/// own project, a project never holds more than five agents started by agents however
 /// the requests arrive, an agent touches only the agents it started, and an agent
 /// another agent started has none of it. Every refusal is checked for its words as
 /// well as its effect, because the calling agent reads them.
@@ -111,7 +111,7 @@ struct HelperAgentTests {
         #expect(Project.standardize(helper.cwd) == work)
         #expect(helper.startedByAgent == lead)
         #expect(started.note.contains("(id \(started.agentID.uuidString))"))
-        #expect(started.note.contains("1 of 3 places in this project are now in use."))
+        #expect(started.note.contains("1 of 5 places in this project are now in use."))
     }
 
     @Test func itsChatOpensWithWhoStartedIt() async throws {
@@ -252,7 +252,7 @@ struct HelperAgentTests {
 
     // MARK: The limits (US2)
 
-    @Test func aFourthIsRefusedAndTheThreeAreNamed() async throws {
+    @Test func aSixthIsRefusedAndTheFiveAreNamed() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
@@ -261,13 +261,15 @@ struct HelperAgentTests {
         _ = try await start(core, first, "Alpha")
         _ = try await start(core, second, "Beta")
         _ = try await start(core, first, "Gamma")
+        _ = try await start(core, second, "Delta")
+        _ = try await start(core, first, "Epsilon")
 
-        let error = await refusal { _ = try await start(core, second, "Delta") }
+        let error = await refusal { _ = try await start(core, second, "Zeta") }
         let message = error?.message ?? ""
         #expect(error?.code == DaemonAPI.Failure.notYours)
-        #expect(message.hasPrefix("Nothing was started: this project already has 3 agents started by agents"))
-        for name in ["Alpha", "Beta", "Gamma"] { #expect(message.contains(name), "names \(name)") }
-        #expect(await core.allAgents().count == 5)
+        #expect(message.hasPrefix("Nothing was started: this project already has 5 agents started by agents"))
+        for name in ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"] { #expect(message.contains(name), "names \(name)") }
+        #expect(await core.allAgents().count == 7)
     }
 
     @Test func archivingOneGivesItsPlaceBack() async throws {
@@ -278,6 +280,8 @@ struct HelperAgentTests {
         let alpha = try await start(core, token, "Alpha")
         _ = try await start(core, token, "Beta")
         _ = try await start(core, token, "Gamma")
+        _ = try await start(core, token, "Delta")
+        _ = try await start(core, token, "Epsilon")
         // Settled for good: finished, asked how its work went (a fake agent never
         // says), and let go. Archiving before that ask lands would see the ask's
         // prompt pick the agent back up, which is not what this test is about.
@@ -288,9 +292,9 @@ struct HelperAgentTests {
         }
 
         try await core.archive(alpha)   // by the person
-        _ = try await start(core, token, "Delta")
+        _ = try await start(core, token, "Zeta")
 
-        #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 4)
+        #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 6)
     }
 
     @Test func anotherProjectsAgentsTakeNoPlaceHere() async throws {
@@ -299,15 +303,15 @@ struct HelperAgentTests {
         let there = try project(root, "web")
         let core = try await makeCore(locations, FakeLauncher())
         let (_, elsewhere) = try await caller(core, in: there)
-        for name in ["A", "B", "C"] { _ = try await start(core, elsewhere, name) }
+        for name in ["A", "B", "C", "D", "E"] { _ = try await start(core, elsewhere, name) }
         let (_, token) = try await caller(core, in: here)
 
         _ = try await start(core, token)
     }
 
     /// SC-002. The starts overlap for real: every handshake is held long enough for all
-    /// four calls to have been made before the first session exists.
-    @Test func fourAtOnceMakeExactlyThree() async throws {
+    /// six calls to have been made before the first session exists.
+    @Test func sixAtOnceMakeExactlyFive() async throws {
         for _ in 0..<10 {
             let (locations, root) = try temporary()
             let work = try project(root)
@@ -317,7 +321,7 @@ struct HelperAgentTests {
             let (_, token) = try await caller(core, in: work)
 
             let results = await withTaskGroup(of: Bool.self) { group in
-                for index in 0..<4 {
+                for index in 0..<6 {
                     group.addTask {
                         (try? await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Part \(index)")) }) != nil
                     }
@@ -325,8 +329,8 @@ struct HelperAgentTests {
                 return await group.reduce(into: [Bool]()) { $0.append($1) }
             }
 
-            #expect(results.filter { $0 }.count == 3)
-            #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 3)
+            #expect(results.filter { $0 }.count == 5)
+            #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 5)
             #expect(await core.reservedStarts[work, default: 0] == 0)
         }
     }
@@ -514,7 +518,7 @@ struct HelperAgentTests {
         #expect(archived.state == .archived)
         #expect(archived.archivedReason == .byAgent)
         #expect(archived.endedReason == .stoppedByAgent)
-        #expect(note.hasSuffix("0 of 3 places in this project are now in use."))
+        #expect(note.hasSuffix("0 of 5 places in this project are now in use."))
     }
 
     @Test func anArchivedOneIsSaidToBeArchived() async throws {
@@ -583,7 +587,7 @@ struct HelperAgentTests {
         let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
 
         let lines = list.split(separator: "\n").map(String.init)
-        #expect(lines.first == "2 of 3 places in this project are in use.")
+        #expect(lines.first == "2 of 5 places in this project are in use.")
         #expect(list.contains("- \(mine.uuidString): \u{201C}Alpha\u{201D} — finished"))
         #expect(!list.contains(theirs.uuidString))
     }
@@ -595,7 +599,7 @@ struct HelperAgentTests {
         let (_, token) = try await caller(core, in: work)
 
         #expect(try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
-                == "You have not started any agents that are still here. 0 of 3 places in this project are in use.")
+                == "You have not started any agents that are still here. 0 of 5 places in this project are in use.")
     }
 }
 

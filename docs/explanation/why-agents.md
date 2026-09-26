@@ -83,7 +83,7 @@ Each part can be used on its own:
   or on an event, such as an agent finishing or a check failing. It is a file beside your
   code, reviewed like code.
   See [Set up a workflow](../how-to/set-up-a-workflow.md).
-- **Agents that manage agents.** An agent can start up to three others, brief them, wait
+- **Agents that manage agents.** An agent can start up to five others, brief them, wait
   for them and stop them. Each can work in a [worktree](../how-to/start-in-a-worktree.md)
   of its own, so they never edit the same files.
   See [Tools the app gives agents](../reference/agent-tools.md).
@@ -138,10 +138,10 @@ Compare on the runtimes you already use, leases, events, workflows, the phone an
   closer to hand.
 - **You are not on a Mac.** Agents needs a Mac. Servers and phones hang off one.
 - **You want to download and go.** Today Agents is built from source in Xcode.
-- **You want to reach your agents from anywhere.** The phone and iPad reach the Mac on the
-  same network. Notifications reach you anywhere, but answering needs that connection.
-- **You use Copilot most.** Its conversations get none of the app's tools, so it cannot
-  wait, lease or report how its turn went.
+- **You want to reach your agents with the Mac asleep.** Away from home the phone and iPad
+  reach the Mac through your iCloud, so you can read and answer from anywhere, but only
+  while the Mac is awake with the bridge running (see [How the phone and iPad reach the
+  Mac](phone-and-ipad.md)). The terminal, files and live pages need the Mac's own network.
 - **Your machine should be off while the work happens.** A cloud agent does that; Agents
   does not.
 

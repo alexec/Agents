@@ -4,8 +4,8 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// Checking a credential when it is saved (043, R9), against a stand-in for Anthropic that
-/// records what it was sent and answers as told.
+/// Checking a credential when it is saved (043, R9), against a stand-in for the provider that
+/// records what it was sent and answers as told. Gemini's key is the only kind since 056.
 @Suite("Checking a credential", .serialized)
 struct CredentialCheckTests {
     final class Stub: URLProtocol, @unchecked Sendable {
@@ -38,26 +38,16 @@ struct CredentialCheckTests {
         return await CredentialCheck(session: URLSession(configuration: config)).check(secret)
     }
 
-    static let token = Secret("sk-ant-oat01-TESTTESTTEST-a3f9")!
-    static let key = Secret("sk-ant-api03-TESTTESTTEST-9x9z")!
+    static let token = Secret("AQ." + "Ab8RN6FAKECHECKTESTCHECKTEST-a3f9")!
 
-    @Test func aSubscriptionTokenGoesAsABearerWithTheOAuthBeta() async {
+    @Test func aWorkingKeyWorks() async {
         #expect(await check(Self.token) == .works)
-        #expect(Stub.seen?.value(forHTTPHeaderField: "Authorization") == "Bearer sk-ant-oat01-TESTTESTTEST-a3f9")
-        #expect(Stub.seen?.value(forHTTPHeaderField: "anthropic-beta") == "oauth-2025-04-20")
-        #expect(Stub.seen?.value(forHTTPHeaderField: "x-api-key") == nil)
+        #expect(Stub.seen?.url == CredentialCheck.geminiEndpoint)
     }
 
-    @Test func anAPIKeyGoesAsXAPIKey() async {
-        #expect(await check(Self.key) == .works)
-        #expect(Stub.seen?.value(forHTTPHeaderField: "x-api-key") == "sk-ant-api03-TESTTESTTEST-9x9z")
-        #expect(Stub.seen?.value(forHTTPHeaderField: "Authorization") == nil)
-    }
-
-    /// The body Anthropic sent on 2026-09-25 for a made-up token (walk/spike.md T010).
-    @Test func a401IsRefusedInAnthropicsOwnWords() async {
-        let body = #"{"type":"error","error":{"type":"authentication_error","message":"OAuth access token is invalid."},"request_id":null}"#
-        #expect(await check(Self.token, answer: (401, body)) == .refused("OAuth access token is invalid."))
+    @Test func a403IsRefusedInGooglesOwnWords() async {
+        let body = #"{"error":{"code":403,"message":"Method doesn't allow unregistered callers.","status":"PERMISSION_DENIED"}}"#
+        #expect(await check(Self.token, answer: (403, body)) == .refused("Method doesn't allow unregistered callers."))
     }
 
     @Test func anythingElseIsCannotCheck() async {

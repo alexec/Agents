@@ -4,14 +4,16 @@ import Testing
 @testable import AgentsKitCore
 
 /// Lending a server's daemon a credential, one connection at a time (043, contracts/daemon.md).
+/// Gemini's key is the only kind lent since 056; Claude signs in through the Mac's relay,
+/// and says so when it cannot (`signInWanted`).
 ///
 /// Against the real daemon core with the fake launcher, which records what each runtime it
 /// starts was lent. The window's side is `ServerCredentials` and `HostSet`; here the core is
 /// driven through `handle`, as the socket drives it.
 @Suite("Lending a credential to a server")
 struct LendTests {
-    static let token = "sk-ant-oat01-LENDTESTLENDTEST-a3f9"
-    static let otherToken = "sk-ant-oat01-SECONDMACSECOND-b4c0"
+    static let token = "AQ." + "Ab8RN6FAKE-LENDTESTLENDTEST-a3f9"
+    static let otherToken = "AQ." + "Ab8RN6FAKE-SECONDMACSECOND-b4c0"
 
     struct Setup {
         let core: DaemonCore
@@ -43,17 +45,18 @@ struct LendTests {
 
     private func offer(_ setup: Setup, on connection: UUID, ownSignInOnly: Bool = false) async {
         _ = await call(setup, DaemonAPI.Method.credentialsOffer,
-                       DaemonAPI.CredentialsOffer(runtimes: ["claude"], ownSignInOnly: ownSignInOnly), on: connection)
+                       DaemonAPI.CredentialsOffer(runtimes: ["gemini"], ownSignInOnly: ownSignInOnly), on: connection)
     }
 
     private func lend(_ setup: Setup, _ text: String, on connection: UUID) async -> Result<JSONValue, JSONRPCError> {
         await call(setup, DaemonAPI.Method.credentialsLend,
-                   DaemonAPI.CredentialsLend(runtime: "claude", secret: Secret(text)!), on: connection)
+                   DaemonAPI.CredentialsLend(runtime: "gemini", secret: Secret(text)!), on: connection)
     }
 
-    private func start(_ setup: Setup, on connection: UUID, requestID: UUID = UUID()) async -> Result<JSONValue, JSONRPCError> {
+    private func start(_ setup: Setup, on connection: UUID, requestID: UUID = UUID(),
+                       runtime: String = "gemini") async -> Result<JSONValue, JSONRPCError> {
         await call(setup, DaemonAPI.Method.agentsStart,
-                   DaemonAPI.StartRequest(runtimeID: "claude", cwd: setup.folder, prompt: "hello", requestID: requestID),
+                   DaemonAPI.StartRequest(runtimeID: runtime, cwd: setup.folder, prompt: "hello", requestID: requestID),
                    on: connection)
     }
 
@@ -63,29 +66,18 @@ struct LendTests {
         return try? data.decode(DaemonAPI.CredentialWanted.self)
     }
 
-    @Test func theMacsOwnDaemonTakesNoLend() async throws {
-        let setup = try await setUp(server: false)
-        let window = UUID()
-        await offer(setup, on: window)
-        guard case .failure(let error) = await lend(setup, Self.token, on: window) else {
-            Issue.record("a Mac daemon took a lend"); return
-        }
-        #expect(error.code == DaemonAPI.Failure.notAServer)
-        _ = await start(setup, on: window)
-        #expect(setup.launcher.lent.allSatisfy { $0.isEmpty })
-    }
 
     @Test func aStartWithNothingLentStartsNothingAndAsks() async throws {
         let setup = try await setUp()
         let window = UUID()
         await offer(setup, on: window)
         let answer = await start(setup, on: window)
-        #expect(wanted(answer) == DaemonAPI.CredentialWanted(runtime: "claude", offered: true))
+        #expect(wanted(answer) == DaemonAPI.CredentialWanted(runtime: "gemini", offered: true))
         #expect(setup.launcher.launchCount == 0)
         #expect(await setup.core.agents.isEmpty)
     }
 
-    @Test func afterALendTheSameStartStartsExactlyOneWithTheToken() async throws {
+    @Test func afterALendTheSameStartStartsExactlyOneWithTheKey() async throws {
         let setup = try await setUp()
         let window = UUID(), requestID = UUID()
         await offer(setup, on: window)
@@ -94,7 +86,7 @@ struct LendTests {
         guard case .success = await start(setup, on: window, requestID: requestID) else { Issue.record("start"); return }
         _ = await start(setup, on: window, requestID: requestID)
         #expect(setup.launcher.launchCount == 1)
-        #expect(setup.launcher.lent == [["CLAUDE_CODE_OAUTH_TOKEN": Self.token]])
+        #expect(setup.launcher.lent == [["GEMINI_API_KEY": Self.token]])
     }
 
     @Test func oneWindowsLendIsNeverAnothersStart() async throws {
@@ -106,7 +98,7 @@ struct LendTests {
         #expect(wanted(await start(setup, on: second))?.offered == true)
         _ = await lend(setup, Self.otherToken, on: second)
         _ = await start(setup, on: second)
-        #expect(setup.launcher.lent == [["CLAUDE_CODE_OAUTH_TOKEN": Self.otherToken]])
+        #expect(setup.launcher.lent == [["GEMINI_API_KEY": Self.otherToken]])
     }
 
     @Test func aClosedConnectionTakesItsLendWithIt() async throws {
@@ -119,7 +111,7 @@ struct LendTests {
         #expect(await setup.core.credentialOffers.isEmpty)
     }
 
-    @Test func ownSignInOnlyStartsWithNoTokenAndRefusesALend() async throws {
+    @Test func ownSignInOnlyStartsWithNoKeyAndRefusesALend() async throws {
         let setup = try await setUp(ownSignIn: true)
         let window = UUID()
         await offer(setup, on: window, ownSignInOnly: true)
@@ -137,23 +129,15 @@ struct LendTests {
         _ = await bare.core.handle(method: DaemonAPI.Method.credentialsOffer,
                                    params: try JSONValue.encoding(DaemonAPI.CredentialsOffer(runtimes: [], ownSignInOnly: false)),
                                    connection: window)
-        #expect(wanted(await start(bare, on: window)) == DaemonAPI.CredentialWanted(runtime: "claude", offered: false))
+        #expect(wanted(await start(bare, on: window)) == DaemonAPI.CredentialWanted(runtime: "gemini", offered: false))
 
         let signedIn = try await setUp(ownSignIn: true)
         guard case .success = await start(signedIn, on: window) else { Issue.record("start"); return }
         #expect(signedIn.launcher.lent == [[:]])
     }
 
-    @Test func theLentTokenReplacesAnyClaudeVariableTheServerHad() {
-        let before = ["PATH": "/usr/bin", "ANTHROPIC_API_KEY": "sk-ant-api03-servers-own", "CLAUDE_CODE_OAUTH_TOKEN": "old"]
-        let after = LentEnvironment.$value.withValue(["CLAUDE_CODE_OAUTH_TOKEN": Self.token]) {
-            LentEnvironment.applied(to: before)
-        }
-        #expect(after == ["PATH": "/usr/bin", "CLAUDE_CODE_OAUTH_TOKEN": Self.token])
-        #expect(LentEnvironment.applied(to: before) == before)
-    }
 
-    @Test func theTokenIsWrittenNowhereUnderTheRoot() async throws {
+    @Test func theKeyIsWrittenNowhereUnderTheRoot() async throws {
         let setup = try await setUp()
         let window = UUID(), requestID = UUID()
         await offer(setup, on: window)
@@ -168,12 +152,13 @@ struct LendTests {
         }
     }
 
-    /// What claude-agent-acp 0.81.2 answered a made-up token with (walk/spike.md T009).
+    /// What claude-agent-acp 0.81.2 answered a made-up token with (walk/spike.md T009); the
+    /// shape any runtime's refusal takes here.
     static let refusal = JSONRPCError(
         code: -32603, message: "Internal error: Failed to authenticate. API Error: 401 OAuth access token is invalid.",
         data: ["errorKind": "authentication_failed"])
 
-    @Test func aRefusedTokenStopsTheAgentSayingSoAndNotStoppedAnswering() async throws {
+    @Test func aRefusedKeyStopsTheAgentSayingSoAndNotStoppedAnswering() async throws {
         let setup = try await setUp(script: .init(promptError: Self.refusal))
         let window = UUID(), requestID = UUID()
         await offer(setup, on: window)
@@ -188,7 +173,7 @@ struct LendTests {
             if notes.contains(where: { $0.contains("refused") }) { break }
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(notes.contains("Claude refused the token in Settings. Replace it in Settings ▸ Servers."))
+        #expect(notes.contains("Gemini refused the key in Settings. Replace it in Settings ▸ Servers."))
         #expect(!notes.contains { $0.contains("stopped answering") })
         #expect(await setup.core.agent(id)?.endedReason == .signInRefused, "not \"The runtime crashed\"")
     }
@@ -197,6 +182,54 @@ struct LendTests {
         #expect(DaemonCore.isAuthenticationFailure(Self.refusal))
         #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32000, message: "Authentication required")))
         #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32603, message: "Internal error: overloaded")))
+    }
+
+    // MARK: Claude, relayed or not at all (056)
+
+    private func signInWanted(_ result: Result<JSONValue, JSONRPCError>) -> DaemonAPI.SignInWanted? {
+        guard case .failure(let error) = result, error.code == DaemonAPI.Failure.signInWanted,
+              let data = error.data else { return nil }
+        return try? data.decode(DaemonAPI.SignInWanted.self)
+    }
+
+    @Test func claudeWithNoRelayAndNoSignInOfItsOwnSaysTheMacIsNotSignedIn() async throws {
+        let setup = try await setUp(ownSignIn: false)
+        let window = UUID()
+        await offer(setup, on: window)
+        let answer = await start(setup, on: window, runtime: "claude")
+        #expect(signInWanted(answer) == DaemonAPI.SignInWanted(runtime: "claude", reason: .notSignedIn))
+        guard case .failure(let error) = answer else { return }
+        #expect(error.message == "Claude on this Mac isn’t signed in with a Claude account.")
+        #expect(setup.launcher.launchCount == 0)
+        #expect(wanted(answer) == nil, "never a token to paste")
+    }
+
+    @Test func claudeWithNoRelayUsesTheServersOwnSignIn() async throws {
+        let setup = try await setUp(ownSignIn: true)
+        let window = UUID()
+        await offer(setup, on: window)
+        guard case .success = await start(setup, on: window, runtime: "claude") else { Issue.record("start"); return }
+        #expect(setup.launcher.lent == [[:]])
+    }
+
+    @Test func ownSignInOnlyStartsClaudeWithNothingEvenWithoutASignIn() async throws {
+        let setup = try await setUp(ownSignIn: false)
+        let window = UUID()
+        await offer(setup, on: window, ownSignInOnly: true)
+        guard case .success = await start(setup, on: window, runtime: "claude") else { Issue.record("start"); return }
+        #expect(setup.launcher.lent == [[:]])
+    }
+
+    @Test func aMacThatCouldNotReadItsSignInSaysSo() async throws {
+        let setup = try await setUp(ownSignIn: false)
+        let window = UUID()
+        _ = await call(setup, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.CredentialsOffer(runtimes: [], ownSignInOnly: false, notRelayed: ["claude": .unreadable]),
+                       on: window)
+        let answer = await start(setup, on: window, runtime: "claude")
+        #expect(signInWanted(answer)?.reason == .unreadable)
+        guard case .failure(let error) = answer else { return }
+        #expect(error.message == "Agents couldn’t read Claude’s sign-in on this Mac.")
     }
 
     // MARK: Gemini's key on this Mac (046, D3)
@@ -227,7 +260,7 @@ struct LendTests {
         let window = UUID()
         guard case .success = await lendGemini(setup, on: window) else { Issue.record("refused"); return }
         guard case .success = await startGemini(setup, on: window) else { Issue.record("did not start"); return }
-        guard case .success = await start(setup, on: window) else { Issue.record("Claude did not start"); return }
+        guard case .success = await start(setup, on: window, runtime: "claude") else { Issue.record("Claude did not start"); return }
         // Paired by launch, since a background check may start a runtime of its own too.
         let pairs = zip(setup.launcher.launches.map(\.runtime), setup.launcher.lent)
         #expect(pairs.contains { $0.0 == "gemini" })

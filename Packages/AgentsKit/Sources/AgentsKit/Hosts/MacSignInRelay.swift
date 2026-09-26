@@ -4,23 +4,22 @@ import Foundation
 import Network
 import Security
 
-/// The Mac end of a sign-in relay (047, research R12): a runtime on a server signs in with
-/// this Mac's own sign-in, which never leaves the Mac.
+/// The Mac end of a sign-in relay (047, research R12; Claude's, 056): a runtime on a server
+/// signs in with this Mac's own sign-in, which never leaves the Mac.
 ///
 /// The server's runtime is given a stand-in sign-in with no secret in it and pointed at a
 /// gate on its own loopback (`RelayGate`), which pipes to a socket the window's ssh forwards
 /// back here. Here TLS is ended with a certificate the app made for itself, and every
 /// request goes on to the runtime's own service with the Mac's current token in place of
-/// the stand-in's. The token is read from the Mac's sign-in file for every request, so a
-/// renewal by the runtime on the Mac is picked up at once; and a 401 renews it here, once,
-/// by the same exchange the runtime itself makes, re-reading the file first so two renewals
-/// never race to spend one refresh token.
+/// the stand-in's. The token comes from a `MacSignInSource`, which picks up a renewal by the
+/// runtime on the Mac; a 401 asks the source to renew, once (Codex's by the same exchange
+/// Codex makes, Claude's by the Mac's own Claude), and the request is asked again.
 ///
 /// Logs say what was asked and how it was answered: a method, a path and a status. Never a
 /// header or a body.
 public final class MacSignInRelay: @unchecked Sendable {
     public let relay: SignInRelay
-    public let signIn: MacSignIn
+    public let signIn: any MacSignInSource
     public let certificates: RelayCertificates
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "sign-in-relay")
@@ -28,7 +27,7 @@ public final class MacSignInRelay: @unchecked Sendable {
     private let log: @Sendable (String) -> Void
     public private(set) var port: UInt16 = 0
 
-    public init(relay: SignInRelay, signIn: MacSignIn, certificates: RelayCertificates,
+    public init(relay: SignInRelay, signIn: any MacSignInSource, certificates: RelayCertificates,
                 log: @escaping @Sendable (String) -> Void = { _ in }) {
         self.relay = relay
         self.signIn = signIn
@@ -100,9 +99,45 @@ public final class MacSignInRelay: @unchecked Sendable {
     }
 
     /// Hop-by-hop headers, and the ones the relay sets itself.
-    static let dropped: Set<String> = ["host", "authorization", "chatgpt-account-id", "connection", "keep-alive",
+    static let dropped: Set<String> = ["host", "authorization", "x-api-key", "chatgpt-account-id", "connection", "keep-alive",
                                        "proxy-connection", "transfer-encoding", "content-length", "upgrade",
                                        "te", "trailer", "accept-encoding"]
+
+    /// The upstream URL for a request target, or nil unless the target is origin-form: a
+    /// path starting with one `/`, then an optional query, in characters a URL may carry
+    /// as they are. Built by parts, so the host is always `host` and nothing in the target
+    /// can become a user, a port or another host; and checked once built, all the same.
+    static func upstreamURL(host: String, target: String) -> URL? {
+        guard target.hasPrefix("/"), !target.hasPrefix("//") else { return nil }
+        let allowed = CharacterSet.urlPathAllowed.union(.urlQueryAllowed).union(CharacterSet(charactersIn: "%"))
+        guard target.unicodeScalars.allSatisfy(allowed.contains), hasWellFormedEscapes(target) else { return nil }
+        let parts = target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+        components.percentEncodedPath = String(parts[0])
+        if parts.count == 2 { components.percentEncodedQuery = String(parts[1]) }
+        guard let url = components.url, url.scheme == "https", url.host == host,
+              url.user == nil, url.password == nil, url.port == nil else { return nil }
+        return url
+    }
+
+    /// Every `%` followed by two hex digits.
+    private static func hasWellFormedEscapes(_ text: String) -> Bool {
+        let bytes = Array(text.utf8)
+        let hex = Set("0123456789abcdefABCDEF".utf8)
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == UInt8(ascii: "%") {
+                guard index + 2 < bytes.count,
+                      hex.contains(bytes[index + 1]), hex.contains(bytes[index + 2]) else { return false }
+                index += 3
+            } else {
+                index += 1
+            }
+        }
+        return true
+    }
 
     private func forward(_ request: HTTPRequest, on connection: NWConnection, renewed: Bool) async {
         // A WebSocket upgrade is refused plainly: the runtime falls back to HTTPS at once,
@@ -112,20 +147,20 @@ public final class MacSignInRelay: @unchecked Sendable {
             send(connection, head: "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
             return
         }
-        guard let token = try? signIn.current(),
-              let url = URL(string: "https://\(relay.upstreamHost)\(request.target)") else {
+        // The token goes only to the runtime's own service. A target that is not a plain
+        // path could name another host (`@evil.example/`), so it is refused before the
+        // sign-in is even read. The target is not logged: it is not one the relay knows.
+        guard let url = Self.upstreamURL(host: relay.upstreamHost, target: request.target) else {
+            log("relay: \(request.method) -> 400 (the request target is not a path)")
+            send(connection, head: "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
+            return
+        }
+        guard let token = try? signIn.current() else {
             log("relay: \(request.method) \(request.pathOnly) -> 502 (no sign-in on this Mac)")
             send(connection, head: "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
             return
         }
-        var upstream = URLRequest(url: url)
-        upstream.httpMethod = request.method
-        for header in request.headers where !Self.dropped.contains(header.name.lowercased()) {
-            upstream.addValue(header.value, forHTTPHeaderField: header.name)
-        }
-        upstream.setValue("Bearer \(token.access)", forHTTPHeaderField: "Authorization")
-        upstream.setValue(token.account, forHTTPHeaderField: "ChatGPT-Account-Id")
-        if !request.body.isEmpty { upstream.httpBody = request.body }
+        let upstream = Self.upstream(request, url: url, token: token)
 
         let streamer = Streamer()
         let task = session.dataTask(with: upstream)
@@ -166,6 +201,22 @@ public final class MacSignInRelay: @unchecked Sendable {
             connection.send(content: framed, completion: .contentProcessed { _ in })
         }
         send(connection, head: "0\r\n\r\n", close: true)
+    }
+
+    /// The request as it goes on to the service: everything the runtime sent but its own
+    /// sign-in (`Authorization`, `x-api-key`) and hop-by-hop headers, with this Mac's token
+    /// and the headers the sign-in carries (Codex's account id) in their place, sent to a
+    /// `url` that `upstreamURL` has already checked.
+    static func upstream(_ request: HTTPRequest, url: URL, token: MacSignInToken) -> URLRequest {
+        var upstream = URLRequest(url: url)
+        upstream.httpMethod = request.method
+        for header in request.headers where !dropped.contains(header.name.lowercased()) {
+            upstream.addValue(header.value, forHTTPHeaderField: header.name)
+        }
+        upstream.setValue("Bearer \(token.access)", forHTTPHeaderField: "Authorization")
+        for (name, value) in token.headers { upstream.setValue(value, forHTTPHeaderField: name) }
+        if !request.body.isEmpty { upstream.httpBody = request.body }
+        return upstream
     }
 
     private func send(_ connection: NWConnection, head: String, close: Bool) {
@@ -288,127 +339,6 @@ struct HTTPRequest: Sendable, Equatable {
             out.append(data[start..<stop])
             index = data.index(stop, offsetBy: 2)
         }
-    }
-}
-
-// MARK: The Mac's sign-in
-
-/// The Mac's own sign-in file for a runtime (Codex's `~/.codex/auth.json`), read for every
-/// request and renewed in place on a 401, exactly as the runtime itself would.
-public struct MacSignIn: Sendable {
-    public var file: URL
-    /// Where a refresh token is exchanged. A `file://` stand-in in tests.
-    public var tokenEndpoint: URL
-
-    public init(file: URL, tokenEndpoint: URL = URL(string: "https://auth.openai.com/oauth/token")!) {
-        self.file = file
-        self.tokenEndpoint = tokenEndpoint
-    }
-
-    public struct Token: Sendable, Equatable {
-        public var access: String
-        public var account: String
-    }
-
-    public enum Failure: Error { case notSignedIn, renewalRefused(Int) }
-
-    /// Whether this Mac is signed in the way the relay can lend: a ChatGPT sign-in.
-    public var isSignedIn: Bool { (try? current()) != nil }
-
-    public func current() throws -> Token {
-        let object = try Self.read(file)
-        guard object["auth_mode"] as? String == "chatgpt",
-              let tokens = object["tokens"] as? [String: Any],
-              let access = tokens["access_token"] as? String, let account = tokens["account_id"] as? String
-        else { throw Failure.notSignedIn }
-        return Token(access: access, account: account)
-    }
-
-    /// Renew after `stale` was refused. If the file already holds another token, somebody
-    /// (the runtime on this Mac) renewed it first: use that, and spend nothing.
-    public func renew(after stale: Token) async throws -> Token {
-        var object = try Self.read(file)
-        guard var tokens = object["tokens"] as? [String: Any],
-              let refresh = tokens["refresh_token"] as? String,
-              let access = tokens["access_token"] as? String else { throw Failure.notSignedIn }
-        if access != stale.access { return try current() }
-        let clientID = Self.claims(access)["client_id"] as? String ?? ""
-        var request = URLRequest(url: tokenEndpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "client_id": clientID, "grant_type": "refresh_token", "refresh_token": refresh,
-            "scope": "openid profile email"])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 200
-        guard status == 200, let answer = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let newAccess = answer["access_token"] as? String else { throw Failure.renewalRefused(status) }
-        tokens["access_token"] = newAccess
-        if let id = answer["id_token"] as? String { tokens["id_token"] = id }
-        if let newRefresh = answer["refresh_token"] as? String { tokens["refresh_token"] = newRefresh }
-        object["tokens"] = tokens
-        object["last_refresh"] = RelayClock.stamp(Date())
-        let out = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted])
-        try out.write(to: file, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
-        return try current()
-    }
-
-    /// A sign-in file the runtime on a server can start with, holding nothing secret: the
-    /// account id and plan (not secrets), tokens whose signature is `standin`, and no
-    /// refresh token. The relay swaps in the real token on the way out.
-    public func standIn(now: Date = Date()) throws -> String {
-        let object = try Self.read(file)
-        guard object["auth_mode"] as? String == "chatgpt", let tokens = object["tokens"] as? [String: Any],
-              let id = tokens["id_token"] as? String, let account = tokens["account_id"] as? String
-        else { throw Failure.notSignedIn }
-        let auth = Self.claims(id)["https://api.openai.com/auth"] as? [String: Any] ?? [:]
-        let kept = auth.filter { ["chatgpt_account_id", "chatgpt_plan_type", "chatgpt_user_id", "user_id"].contains($0.key) }
-        let far = Int(now.timeIntervalSince1970) + 30 * 86_400
-        let issued = Int(now.timeIntervalSince1970)
-        let idClaims: [String: Any] = ["iss": "agents-relay-standin", "aud": "agents-relay-standin", "exp": far,
-                                       "iat": issued, "email": "relay@agents.invalid",
-                                       "https://api.openai.com/auth": kept]
-        let accessClaims: [String: Any] = ["exp": far, "iat": issued, "https://api.openai.com/auth": kept]
-        let standIn: [String: Any] = [
-            "auth_mode": "chatgpt", "OPENAI_API_KEY": NSNull(),
-            "tokens": ["id_token": try Self.unsigned(idClaims), "access_token": try Self.unsigned(accessClaims),
-                       "refresh_token": "agents-relay-standin", "account_id": account],
-            "last_refresh": RelayClock.stamp(now)]
-        return String(decoding: try JSONSerialization.data(withJSONObject: standIn, options: [.sortedKeys]), as: UTF8.self)
-    }
-
-    static func read(_ file: URL) throws -> [String: Any] {
-        guard let object = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-        else { throw Failure.notSignedIn }
-        return object
-    }
-
-    static func claims(_ jwt: String) -> [String: Any] {
-        let parts = jwt.split(separator: ".")
-        guard parts.count >= 2 else { return [:] }
-        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        while payload.count % 4 != 0 { payload += "=" }
-        guard let data = Data(base64Encoded: payload),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return object
-    }
-
-    static func unsigned(_ claims: [String: Any]) throws -> String {
-        func segment(_ object: [String: Any]) throws -> String {
-            try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]).base64EncodedString()
-                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: "=", with: "")
-        }
-        return try segment(["alg": "none", "typ": "JWT"]) + "." + segment(claims) + ".standin"
-    }
-}
-
-enum RelayClock {
-    /// `2026-09-26T05:30:31.291Z`, the shape the runtime writes its own `last_refresh` in.
-    static func stamp(_ date: Date) -> String {
-        date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: true)
-            .dateSeparator(.dash).timeSeparator(.colon).timeZone(separator: .omitted))
     }
 }
 

@@ -34,6 +34,8 @@ signing in** beside it, and you can sign it in from there.
      code to enter on OpenAI's page instead, and **API Key** uses an OpenAI API key.
      Antigravity offers a personal or a business Google account, and opens Google's
      sign-in in your browser.
+   - Claude Code signs in in Terminal: run `claude`, type `/login`, and follow what it
+     asks. Then open the sheet again; it says which account, such as **Claude Max**.
    - Some hand you a command to run instead, and the sheet says, for example, **Copilot
      signs in from a terminal. Run this:** with the command under it. Click **Open
      Terminal** (it also copies the command), paste it and follow what it asks. **Copy**
@@ -82,8 +84,10 @@ off**, beside a provider the runtime does not need, stops it being offered.
 2. Confirm with **Sign out**. The dialog says first whether anything is running on it, for
    example **This stops 2 agents mid-conversation.**
 
-iPhone and iPad cannot sign runtimes in: sign in on the Mac. For a runtime on a Linux
-server, sign in on the server itself; see [Add a Linux server](add-a-linux-server.md).
+iPhone and iPad cannot sign runtimes in: sign in on the Mac. Signing Claude or Codex in on
+this Mac also signs them in on your Linux servers: their requests go through this Mac. For
+any other runtime on a server, sign in on the server itself; see
+[Add a Linux server](add-a-linux-server.md).
 
 ## If it doesn't work
 

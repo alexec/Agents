@@ -18,9 +18,11 @@ how every agent in the app works.
 ## Before you start
 
 - A Mac with Xcode installed.
-- One coding agent installed and signed in on this Mac. This tutorial uses **Claude
-  Code**. Codex, Gemini, Antigravity, Grok, Copilot and Cursor work too; see [Runtimes](../reference/runtimes.md) for
-  what each needs.
+- One coding agent signed in on this Mac. This tutorial uses **Claude Code**, signed in
+  with `claude` and `/login` in Terminal. The app talks to Claude through a small adapter:
+  it runs it with your own Node if you have one, and otherwise installs its own copy in
+  step 1. Codex, Gemini, Antigravity, Grok, Copilot and Cursor work too; see
+  [Runtimes](../reference/runtimes.md) for what each needs.
 
 ## 1. Build and open Agents
 
@@ -37,7 +39,15 @@ open Agents.xcodeproj
 In Xcode, choose the **Agents** scheme with **My Mac** as the destination, and choose
 **Product ▸ Run**. The first build takes a few minutes.
 
-You should see the Agents window open, saying **No projects yet**.
+The first time it opens, a sheet called **Install your agents** lists every runtime the
+app knows and whether it is on this Mac. If Claude's row says **Not on this Mac**, click
+**Install** on it and wait for it to finish. You need none of the others for this
+tutorial. Click **Done** (or **Not now**); the sheet comes back only for a runtime it has
+not offered before, and the same rows are in **Settings ▸ Agent Runtimes**.
+
+You should see the Agents window, saying **No projects yet**. If it says **No agent
+runtime found** instead, nothing it can run is installed: install Claude from the row
+under it, or from **Settings ▸ Agent Runtimes**.
 
 ## 2. Make a project to work on
 
@@ -97,8 +107,9 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **+** at the top of the list, choose **Add a folder**, and
-pick `weather-app` in your `Demo` folder.
+In the Agents window, click **Add a folder** in the empty project list (once you have
+projects, it is **+** at the top of the list, then **Choose Folder…**), and pick
+`weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and its page beside it with
 **New session** at the top.
@@ -107,9 +118,11 @@ You should see `weather-app` in the list on the left, and its page beside it wit
 
 ## 4. Start the agent
 
-The runtime is on the right, above the prompt. It should say **Claude**. If it says
-**Needs signing in**, click it, choose **Sign in, sign out, providers…**, and follow what
-it asks. Then come back here.
+The runtime is on the right, above the prompt. It should say **Claude**. If you have not
+signed Claude Code in on this Mac yet, do it now in Terminal: run `claude`, type `/login`,
+and follow what it asks. To check, click **Claude** above the prompt and choose **Sign in,
+sign out, providers…**: the sheet names the account you are signed in with. Then come back
+here.
 
 Click in the prompt, where it says **Say what's next**, type:
 

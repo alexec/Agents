@@ -133,8 +133,8 @@ struct AddServerSheet: View {
         }
     }
 
-    /// Install Claude, once the server is ready (043, contracts/ui.md § 4). With no token
-    /// in Settings nothing was installed, and the sheet says when it will be.
+    /// Install Claude, once the server is ready (043, contracts/ui.md § 4). With this Mac not
+    /// signed in to Claude nothing was installed (056), and the sheet says so.
     @ViewBuilder
     private func claudeStep(_ flow: AddServerFlow) -> some View {
         switch flow.claude {
@@ -153,7 +153,7 @@ struct AddServerSheet: View {
                 Button("Try again") { Task { await flow.installClaude() } }.controlSize(.small)
             }
         case .notInstalled, .unknown:
-            Text("Claude will be installed the first time you start it here.")
+            Text("Claude will be installed here once Claude on this Mac is signed in.")
                 .appText(.fine).foregroundStyle(.secondary)
         }
     }

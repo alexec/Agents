@@ -1,5 +1,6 @@
 #if canImport(Security)
 import Foundation
+import Security
 import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
@@ -15,22 +16,23 @@ struct CredentialStoreTests {
         let store = CredentialStore(file: folder.appendingPathComponent("credentials.json"),
                                     service: "agents.test.\(UUID().uuidString)")
         defer {
+            try? store.remove("gemini")
             try? store.remove("claude")
             try? FileManager.default.removeItem(at: folder)
         }
         try body(store)
     }
 
-    static let token = Secret("sk-ant-oat01-TESTSECRETTESTSECRET-a3f9")!
-    static let key = Secret("sk-ant-api03-TESTSECRETTESTSECRET-9x9z")!
+    static let token = Secret("AQ." + "Ab8RN6FAKESTORETESTSECRET-a3f9")!
+    static let key = Secret("AIza" + "SyFAKESTORETESTSECRETSECOND9x9z")!
 
     @Test func aSavedSecretComesBackAndItsRecordIsOnlyTheMask() throws {
         try withStore { store in
-            try store.save(Self.token, for: "claude")
-            #expect(store.secret(for: "claude") == Self.token)
-            let record = try #require(store.record(for: "claude"))
-            #expect(record.kind == .oauthToken)
-            #expect(record.mask == "sk-ant-oat…a3f9")
+            try store.save(Self.token, for: "gemini")
+            #expect(store.secret(for: "gemini") == Self.token)
+            let record = try #require(store.record(for: "gemini"))
+            #expect(record.kind == .geminiAPIKey)
+            #expect(record.mask == "key …a3f9")
             let text = try String(contentsOf: store.file, encoding: .utf8)
             #expect(!text.contains("TESTSECRET"))
         }
@@ -38,10 +40,10 @@ struct CredentialStoreTests {
 
     @Test func replacingKeepsOnlyTheNewOne() throws {
         try withStore { store in
-            try store.save(Self.token, for: "claude")
-            try store.save(Self.key, for: "claude")
-            #expect(store.secret(for: "claude") == Self.key)
-            #expect(store.record(for: "claude")?.kind == .apiKey)
+            try store.save(Self.token, for: "gemini")
+            try store.save(Self.key, for: "gemini")
+            #expect(store.secret(for: "gemini") == Self.key)
+            #expect(store.record(for: "gemini")?.lastFour == "9x9z")
         }
     }
 
@@ -61,21 +63,45 @@ struct CredentialStoreTests {
 
     @Test func removingLeavesNeitherSecretNorRecord() throws {
         try withStore { store in
-            try store.save(Self.token, for: "claude")
-            try store.remove("claude")
-            #expect(store.secret(for: "claude") == nil)
-            #expect(store.record(for: "claude") == nil)
+            try store.save(Self.token, for: "gemini")
+            try store.remove("gemini")
+            #expect(store.secret(for: "gemini") == nil)
+            #expect(store.record(for: "gemini") == nil)
         }
     }
 
     @Test func workedAndRefusedAreRemembered() throws {
         try withStore { store in
-            try store.save(Self.token, for: "claude", at: Date(timeIntervalSince1970: 0))
-            try store.markWorked("claude", at: Date(timeIntervalSince1970: 100))
-            try store.markRefused("claude", at: Date(timeIntervalSince1970: 200))
-            let record = try #require(store.record(for: "claude"))
+            try store.save(Self.token, for: "gemini", at: Date(timeIntervalSince1970: 0))
+            try store.markWorked("gemini", at: Date(timeIntervalSince1970: 100))
+            try store.markRefused("gemini", at: Date(timeIntervalSince1970: 200))
+            let record = try #require(store.record(for: "gemini"))
             #expect(record.lastWorked == Date(timeIntervalSince1970: 100))
             #expect(record.lastRefused == Date(timeIntervalSince1970: 200))
+        }
+    }
+
+    /// A Claude token saved before 056 is forgotten, record and Keychain item both; a
+    /// Gemini key beside it stays (FR-010).
+    @Test func aClaudeTokenFromBefore056IsForgottenAndGeminisKept() throws {
+        try withStore { store in
+            try store.save(Self.token, for: "gemini")
+            let item: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: store.service,
+                kSecAttrAccount as String: "claude", kSecValueData as String: Data("sk-ant-oat01-OLDTOKEN".utf8)]
+            #expect(SecItemAdd(item as CFDictionary, nil) == errSecSuccess)
+            var all = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: store.file)) as? [String: Any])
+            all["claude"] = ["kind": "oauthToken", "lastFour": "KEN0", "addedAt": "2026-09-20T10:00:00Z"]
+            try JSONSerialization.data(withJSONObject: all).write(to: store.file)
+
+            #expect(store.forgetKindsNoLongerTaken() == ["claude"])
+            let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                        kSecAttrService as String: store.service, kSecAttrAccount as String: "claude"]
+            #expect(SecItemCopyMatching(query as CFDictionary, nil) == errSecItemNotFound)
+            let text = try String(contentsOf: store.file, encoding: .utf8)
+            #expect(!text.contains("claude"))
+            #expect(store.secret(for: "gemini") == Self.token)
+            #expect(store.forgetKindsNoLongerTaken().isEmpty, "once")
         }
     }
 

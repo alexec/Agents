@@ -20,6 +20,10 @@ public enum LentEnvironment {
         var result = environment
         let lentKinds = CredentialKind.allCases.filter { value.keys.contains($0.environmentVariable) }
         for name in lentKinds.flatMap(\.clearedVariables) { result[name] = nil }
+        // A relayed sign-in (047, 056) always names the CA it trusts; any other sign-in the
+        // login environment holds for that runtime goes, so the relay's is the one used.
+        let relays = ToolPolicyCatalog.builtIn.compactMap(\.relay).filter { value.keys.contains($0.certificateVariable) }
+        for name in relays.flatMap(\.clearedVariables) { result[name] = nil }
         result.merge(value) { _, lent in lent }
         return result
     }
@@ -32,11 +36,12 @@ enum ServerSignIn {
     static var home: String { ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory() }
 
     static func exists(runtimeID: String) -> Bool {
-        let variables = CredentialKind.variables(for: runtimeID)
-        guard !variables.isEmpty else { return true }
-        // Claude's own login leaves a file as well as, or instead of, a variable.
-        if runtimeID == RuntimeCatalog.claude.id,
-           FileManager.default.fileExists(atPath: "\(home)/.claude/.credentials.json") {
+        let relay = ToolPolicyCatalog.policy(for: runtimeID).relay
+        let variables = Set(CredentialKind.variables(for: runtimeID) + (relay?.ownSignInVariables ?? []))
+        guard !variables.isEmpty || relay?.ownSignInFile != nil else { return true }
+        // Claude's own login leaves a file as well as, or instead of, a variable (056: the
+        // policy says where).
+        if let file = relay?.ownSignInFile, FileManager.default.fileExists(atPath: "\(home)/\(file)") {
             return true
         }
         let env = LoginShellPath.environment()
@@ -108,35 +113,49 @@ extension DaemonCore {
         if relayGates[offer.socketPath] == nil {
             relayGates[offer.socketPath] = try RelayGate(target: offer.socketPath)
         }
-        relayOffers[connection] = offer
+        relayOffers[connection, default: [:]][offer.runtime] = offer
         DaemonLog.shared.write("relay offered for \(offer.runtime) on port \(relayGates[offer.socketPath]?.port ?? 0)")
     }
 
-    /// The environment a runtime starts with when its sign-in is relayed: a home of the
-    /// app's own holding the stand-in and a config pointing the runtime's sign-in traffic at
-    /// the gate, and the certificate to trust for it. Nil when no relay is offered for it.
+    /// The offer relaying `runtimeID`'s sign-in: the asking connection's, else any other's.
+    func relayOffer(for runtimeID: String) -> DaemonAPI.RelayOffer? {
+        RequestConnection.current.flatMap { relayOffers[$0]?[runtimeID] }
+            ?? relayOffers.values.lazy.compactMap { $0[runtimeID] }.first
+    }
+
+    /// The environment a runtime starts with when its sign-in is relayed, and the certificate
+    /// to trust for it: for Codex a home of the app's own holding the stand-in and a config
+    /// pointing its sign-in traffic at the gate; for Claude (056) variables only. Nil when no
+    /// relay is offered for it.
     func relayEnvironment(for runtimeID: String) -> [String: String]? {
-        let connection = RequestConnection.current
-        let offer = connection.flatMap { relayOffers[$0] }.flatMap { $0.runtime == runtimeID ? $0 : nil }
-            ?? relayOffers.values.first { $0.runtime == runtimeID }
-        guard let offer, let gate = relayGates[offer.socketPath],
+        guard let offer = relayOffer(for: runtimeID), let gate = relayGates[offer.socketPath],
               let relay = ToolPolicyCatalog.policy(for: runtimeID).relay else { return nil }
-        let home = locations.root.appendingPathComponent("runtimes/\(runtimeID)-relay-home", isDirectory: true)
         let certificate = locations.root.appendingPathComponent("runtimes/\(runtimeID)-relay-ca.pem")
         do {
-            try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
-            try relay.config(gatePort: gate.port)
-                .write(to: home.appendingPathComponent(relay.configFile), atomically: true, encoding: .utf8)
-            try offer.standIn.write(to: home.appendingPathComponent(relay.signInFile), atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600],
-                                                  ofItemAtPath: home.appendingPathComponent(relay.signInFile).path)
+            try FileManager.default.createDirectory(at: certificate.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
             try offer.caCertificate.write(to: certificate, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: certificate.path)
+            switch relay.pointing {
+            case .home(let homeVariable, let configFile, let signInFile, _):
+                let home = locations.root.appendingPathComponent("runtimes/\(runtimeID)-relay-home", isDirectory: true)
+                try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true,
+                                                        attributes: [.posixPermissions: 0o700])
+                try (relay.config(gatePort: gate.port) ?? "")
+                    .write(to: home.appendingPathComponent(configFile), atomically: true, encoding: .utf8)
+                try offer.standIn.write(to: home.appendingPathComponent(signInFile), atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                                      ofItemAtPath: home.appendingPathComponent(signInFile).path)
+                return [homeVariable: home.path, relay.certificateVariable: certificate.path]
+            case .environment:
+                var environment = relay.environment(gatePort: gate.port, standIn: offer.standIn)
+                environment[relay.certificateVariable] = certificate.path
+                return environment
+            }
         } catch {
-            DaemonLog.shared.write("could not write \(runtimeID)'s relay home: \(error)")
+            DaemonLog.shared.write("could not write \(runtimeID)'s relay files: \(error)")
             return nil
         }
-        return [relay.homeVariable: home.path, relay.certificateVariable: certificate.path]
     }
 
     /// The environment to start `runtimeID` with, for the request under way (043, R6).
@@ -151,6 +170,13 @@ extension DaemonCore {
         if !(RequestConnection.current.flatMap { credentialOffers[$0] }?.ownSignInOnly ?? false),
            let relayed = relayEnvironment(for: runtimeID) {
             return relayed
+        }
+        // A runtime whose sign-in only the Mac relays (056: Claude; 047: Codex), with no relay
+        // offered: the server's own sign-in, or say why the Mac's could not be used.
+        if ToolPolicyCatalog.policy(for: runtimeID).relay != nil, !Self.lendableRuntimes.contains(runtimeID) {
+            if RequestConnection.current.flatMap({ credentialOffers[$0] })?.ownSignInOnly == true { return [:] }
+            if hasOwnSignIn(runtimeID) { return [:] }
+            throw Self.signInWanted(runtimeID, reason: notRelayedReason(for: runtimeID))
         }
         guard Self.lendableRuntimes.contains(runtimeID) else { return [:] }
         let connection = RequestConnection.current
@@ -193,8 +219,13 @@ extension DaemonCore {
     /// `data.errorKind == "authentication_failed"`, for a subscription token and an API key
     /// alike. Only on a server; the Mac's own sign-in is 037's business.
     func credentialRefusal(agentID: UUID, error: any Error) -> DaemonAPI.CredentialRefused? {
-        guard onServer, let agent = agents[agentID], Self.lendableRuntimes.contains(agent.runtimeID),
-              let error = error as? JSONRPCError, Self.isAuthenticationFailure(error) else { return nil }
+        guard onServer, let agent = agents[agentID], let error = error as? JSONRPCError,
+              Self.isAuthenticationFailure(error) else { return nil }
+        // This Mac's own sign-in, relayed and refused even after the relay re-read it (056).
+        if ToolPolicyCatalog.policy(for: agent.runtimeID).relay != nil, relayOffer(for: agent.runtimeID) != nil {
+            return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: false, relayed: true)
+        }
+        guard Self.lendableRuntimes.contains(agent.runtimeID) else { return nil }
         let lent = lentCredentials.values.contains { $0[agent.runtimeID] != nil }
         return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: lent)
     }
@@ -204,6 +235,24 @@ extension DaemonCore {
         // Google's words for a Gemini key it does not know (046, contracts/credentials.md).
         return error.message.contains("Failed to authenticate") || error.message.contains("API key not valid")
             || error.message.contains("API_KEY_INVALID")
+    }
+
+    /// Why the window could not relay `runtimeID`'s sign-in: what the asking connection
+    /// said, else any window's, else not signed in.
+    func notRelayedReason(for runtimeID: String) -> DaemonAPI.SignInWanted.Reason {
+        RequestConnection.current.flatMap { credentialOffers[$0]?.notRelayed?[runtimeID] }
+            ?? credentialOffers.values.lazy.compactMap { $0.notRelayed?[runtimeID] }.first
+            ?? .notSignedIn
+    }
+
+    static func signInWanted(_ runtimeID: String, reason: DaemonAPI.SignInWanted.Reason) -> JSONRPCError {
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        let message = switch reason {
+        case .notSignedIn: "\(name) on this Mac isn’t signed in with a \(name) account."
+        case .unreadable: "Agents couldn’t read \(name)’s sign-in on this Mac."
+        }
+        return JSONRPCError(code: DaemonAPI.Failure.signInWanted, message: message,
+                            data: (try? JSONValue.encoding(DaemonAPI.SignInWanted(runtime: runtimeID, reason: reason))) ?? nil)
     }
 
     static func wanted(_ runtimeID: String, offered: Bool) -> JSONRPCError {

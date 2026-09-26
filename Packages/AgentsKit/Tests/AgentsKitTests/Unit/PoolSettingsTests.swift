@@ -31,9 +31,9 @@ struct PoolSettingsTests {
         #expect(throws: PoolSettings.Invalid.keyAsAnAllowance(runtimeID: "gemini")) { try pool.validate() }
     }
 
-    /// Only a key this Mac lends can run an entry: Gemini's. Claude's tokens are for servers
-    /// (and going, 056), and Codex's OpenAI key is gone (047).
-    @Test(arguments: [("claude", CredentialKind.oauthToken.rawValue), ("claude", CredentialKind.apiKey.rawValue),
+    /// Only a key this Mac lends can run an entry: Gemini's. Claude's tokens are gone (056),
+    /// and Codex's OpenAI key (047).
+    @Test(arguments: [("claude", "oauthToken"), ("claude", "apiKey"),
                       ("codex", "openAIAPIKey"), ("codex", CredentialKind.geminiAPIKey.rawValue)])
     func aKeyThisMacDoesNotLendIsRefused(runtimeID: String, credential: String) {
         let pool = PoolSettings(entries: [PoolEntry(runtimeID: runtimeID, payment: .prepaid(amount: nil, expires: nil),
