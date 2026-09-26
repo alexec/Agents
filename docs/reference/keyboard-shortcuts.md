@@ -28,7 +28,7 @@ ones every Mac app has.
 | None | **File ▸ Add Server…** | Adds a Linux server. |
 | Shift-Command-R | **File ▸ Show in Finder** | Shows the agent's or project's folder in Finder. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
-| Shift-Command-Return | **Session ▸ Carry On** | Tells a blocked agent its wait is over. |
+| Shift-Command-Return | **Session ▸ Carry On** | Tells a **Blocked** agent its block has gone, or a **Waiting** one that its wait is over early. |
 | Control-Command-P | **Session ▸ Park** or **Unpark** | Puts the chat down to come back to later, or puts it back where it was. |
 | Option-Command-Delete | **Session ▸ Archive** or **Bring Back** | Archives the agent, or brings an archived one back. |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |
