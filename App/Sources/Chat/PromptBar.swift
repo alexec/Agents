@@ -860,7 +860,8 @@ struct PromptBar: View {
             let others = listed.worktrees.filter { !$0.isProjectFolder }
             if !others.isEmpty {
                 Divider().padding(.vertical, 4)
-                ForEach(others) { worktree in
+                FindableChoices(heading: nil, prompt: "Find a worktree", items: others,
+                                words: { "\($0.name) \($0.branch ?? "")" }) { worktree in
                     SelectChoice(title: worktree.name,
                                  description: worktreeDescription(worktree),
                                  isChosen: model.draftWorktree == .existing(worktree.root)) {
@@ -872,9 +873,14 @@ struct PromptBar: View {
             }
             if !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
-                BranchChoices(branches: listed.branches, chosen: chosenBranch) { name in
-                    model.chooseWorktree(.branch(name))
-                    dismiss()
+                FindableChoices(heading: "New worktree on a branch", prompt: "Find a branch",
+                                items: listed.branches, words: \.name) { branch in
+                    SelectChoice(title: branch.name,
+                                 description: branch.remote.map { "From \($0)" },
+                                 isChosen: chosenBranch == branch.name) {
+                        model.chooseWorktree(.branch(branch.name))
+                        dismiss()
+                    }
                 }
             }
         }
@@ -924,30 +930,39 @@ struct PromptBar: View {
     }
 }
 
-/// Branches a new worktree can be made on, in the Worktree chooser. A repository can
-/// have hundreds, so they scroll, and past a handful there is a field to find one.
-private struct BranchChoices: View {
-    let branches: [DaemonAPI.BranchSummary]
-    let chosen: String?
-    let choose: (String) -> Void
+/// A list in the Worktree chooser that can outgrow the screen: past four it shows the
+/// first four, which are the most recent, and a field to find the rest. What the field
+/// finds scrolls, since a repository can have hundreds of branches.
+private struct FindableChoices<Item: Identifiable, Row: View>: View {
+    static var shownAtFirst: Int { 4 }
+
+    let heading: String?
+    let prompt: String
+    let items: [Item]
+    let words: (Item) -> String
+    @ViewBuilder let row: (Item) -> Row
 
     @State private var filter = ""
 
-    private var shown: [DaemonAPI.BranchSummary] {
-        let words = filter.trimmingCharacters(in: .whitespaces)
-        guard !words.isEmpty else { return branches }
-        return branches.filter { $0.name.localizedCaseInsensitiveContains(words) }
+    private var isLong: Bool { items.count > Self.shownAtFirst }
+
+    private var shown: [Item] {
+        let typed = filter.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty else { return Array(items.prefix(Self.shownAtFirst)) }
+        return items.filter { words($0).localizedCaseInsensitiveContains(typed) }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("New worktree on a branch")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 4)
-            if branches.count > 6 {
-                TextField("Find a branch", text: $filter)
+            if let heading {
+                Text(heading)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+            }
+            if isLong {
+                TextField(prompt, text: $filter)
                     .textFieldStyle(.roundedBorder)
                     .appText(.fine)
                     .padding(.horizontal, 8)
@@ -955,23 +970,30 @@ private struct BranchChoices: View {
             }
             // A popover sizes to what is in it, and a scroll view has no size of its
             // own, so a short list is laid out as it is and a long one given a height.
-            if branches.count > 6 {
+            if shown.count > 6 {
                 ScrollView { rows }.frame(height: 220)
             } else {
                 rows
+            }
+            if isLong, filter.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text("\(items.count - Self.shownAtFirst) more")
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 2)
+            } else if isLong, shown.isEmpty {
+                Text("None match")
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 2)
             }
         }
     }
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(shown) { branch in
-                SelectChoice(title: branch.name,
-                             description: branch.remote.map { "From \($0)" },
-                             isChosen: chosen == branch.name) {
-                    choose(branch.name)
-                }
-            }
+            ForEach(shown) { row($0) }
         }
     }
 }
