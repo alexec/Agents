@@ -77,6 +77,5 @@ struct AppearanceSettingsView: View {
             .paperListRow()
         }
         .paperForm()
-        .frame(width: 460)
     }
 }

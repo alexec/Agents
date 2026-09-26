@@ -6,12 +6,11 @@ import SwiftUI
 /// gets each thing. Read-only: Edit opens the file in the person's editor and Reveal in
 /// Finder opens the folder; the app lays the folder out and reports on it.
 ///
-/// One snapshot from the daemon feeds every page, asked for when the tab appears and
-/// whenever the app comes back to the front, which is when an edit made elsewhere shows.
+/// Its pages are chosen in the Settings rail (055), which also holds the one snapshot from
+/// the daemon that feeds every page, since the rail shows their counts.
 struct SharedSettingsView: View {
-    @Environment(AppModel.self) private var model
-    @State private var snapshot: DaemonAPI.SharedSnapshot?
-    @State private var page: SharedPage = .overview
+    let snapshot: DaemonAPI.SharedSnapshot?
+    @Binding var page: SharedPage
 
     var body: some View {
         Group {
@@ -21,23 +20,13 @@ struct SharedSettingsView: View {
                 } else if snapshot.isEmpty {
                     SharedEmptyState(home: snapshot.home)
                 } else {
-                    HStack(spacing: 0) {
-                        SharedSidebar(snapshot: snapshot, page: $page)
-                        Divider()
-                        pageView(snapshot)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    }
+                    pageView(snapshot)
                 }
             } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView()
             }
         }
-        .frame(width: 1_000, height: 640)
-        .background(Paper.ground)
-        .task { await refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await refresh() }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -50,10 +39,6 @@ struct SharedSettingsView: View {
         case .plugins: SharedPluginsPage(snapshot: snapshot)
         case .other: SharedOtherFilesPage(snapshot: snapshot)
         }
-    }
-
-    private func refresh() async {
-        if let fresh = await model.sharedSnapshot() { snapshot = fresh }
     }
 }
 
@@ -89,65 +74,6 @@ extension DaemonAPI.SharedSnapshot {
 
     func warns(_ page: DaemonAPI.Look.Page) -> Bool {
         needsALook.contains { $0.page == page && ($0.kind == .clash || $0.kind == .problem || $0.kind == .leftOut) }
-    }
-}
-
-// MARK: - Sidebar
-
-private struct SharedSidebar: View {
-    let snapshot: DaemonAPI.SharedSnapshot
-    @Binding var page: SharedPage
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            item("Overview", .overview, count: nil, warns: false)
-            Text("In ~/.agents")
-                .appText(.fine).textCase(.uppercase).foregroundStyle(.secondary)
-                .padding(.top, 14).padding(.bottom, 2).padding(.leading, 10)
-            item("Instructions", .instructions, count: snapshot.instructions?.exists == true ? 1 : 0,
-                 warns: snapshot.warns(.instructions))
-            item("Skills", .skills, count: snapshot.skills.count, warns: snapshot.warns(.skills))
-            item("MCP servers", .mcp, count: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil,
-                 warns: snapshot.warns(.mcp))
-            item("Plugins", .plugins, count: snapshot.plugins.count, warns: snapshot.warns(.plugins))
-            item("Other files", .other, count: snapshot.otherFiles.count, warns: false)
-            Spacer()
-            Text("Your own set, for every project. A project’s own .agents folder is on its project page.")
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(10)
-        }
-        .padding(12)
-        .frame(width: 220)
-        .frame(maxHeight: .infinity)
-        .background(Paper.sidebar)
-    }
-
-    private func item(_ title: String, _ target: SharedPage, count: Int?, warns: Bool) -> some View {
-        let chosen = page == target
-        return Button {
-            page = target
-        } label: {
-            HStack(spacing: 6) {
-                Text(title)
-                Spacer()
-                if warns {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(chosen ? .white : SharedInk.attention)
-                }
-                if let count { Text("\(count)").monospacedDigit() }
-            }
-            .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(chosen ? SharedInk.reach : .clear, in: RoundedRectangle(cornerRadius: 7))
-            .contentShape(RoundedRectangle(cornerRadius: 7))
-        }
-        .buttonStyle(.plain)
-        // A button is already one element: `children: .ignore` would swap it for one
-        // that cannot be pressed. No Text inside carries a label of its own (memory).
-        .accessibilityLabel(title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : ""))
-        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }
 }
 
