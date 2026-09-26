@@ -74,6 +74,14 @@ public enum DaemonAPI {
         /// same device and gets its record back, and the same id with a **different**
         /// key is refused `notSupported` — a key never changes under an identity.
         public static let devicesAnnounce = "devices/announce"
+        /// The Mac's window forgetting a paired device (046, R11): its record goes, and the
+        /// bridge stops carrying anything for it through the relay. Refused `notAllowed` on
+        /// a device's own connection.
+        public static let devicesForget = "devices/forget"
+        /// The bridge handing the daemon the public half of the Mac's relay key, so a device
+        /// announcing on the direct link is given it (046, R4). Said once per connection,
+        /// right after `mailbox/carry`.
+        public static let relayRegister = "relay/register"
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
@@ -1343,6 +1351,9 @@ public enum DaemonAPI {
         public static let wrongProtocolVersion = -32008
         /// The runtime never said it could do the thing that was asked of it.
         public static let notSupported = -32009
+        /// Something only the Mac's own window may do, asked on a device's connection:
+        /// forgetting a device (046).
+        public static let notAllowed = -32060
         /// A destructive call that nobody confirmed.
         public static let notConfirmed = -32010
         /// A folder that is not a project, on archive or unarchive.
@@ -1965,14 +1976,62 @@ public enum DaemonAPI {
         }
     }
 
-    /// `device/changed`: the whole record.
+    /// `device/changed`: the whole record, or that it was forgotten (046). A build from
+    /// before 046 finds no `device` in a removal and decodes nothing, which is ignoring it.
     public struct DeviceNotification: Codable, Sendable, Hashable {
         public var id: UUID
-        public var device: Device
+        public var device: Device?
+        public var removed: Bool?
 
         public init(_ device: Device) {
             self.id = device.id
             self.device = device
+        }
+
+        public init(removed id: UUID) {
+            self.id = id
+            self.removed = true
+        }
+    }
+
+    /// `devices/forget`.
+    public struct DeviceForget: Codable, Sendable {
+        public var id: UUID
+        public init(id: UUID) { self.id = id }
+    }
+
+    /// `relay/register`: the public half of the Mac's relay key, X9.63.
+    public struct RelayRegistration: Codable, Sendable {
+        public var publicKey: Data
+        public init(publicKey: Data) { self.publicKey = publicKey }
+    }
+
+    /// What `devices/announce` answers: the device's record, as it always was, with the
+    /// Mac's relay key beside its fields when a bridge has registered one (046). The one
+    /// object is both, so a phone from before 046 decodes the record and keeps `macKey`
+    /// among the fields it does not know.
+    public struct AnnounceReply: Codable, Sendable, Hashable {
+        public var device: Device
+        public var macKey: Data?
+
+        public init(device: Device, macKey: Data?) {
+            self.device = device
+            self.macKey = macKey
+        }
+
+        private enum CodingKeys: String, CodingKey { case macKey }
+
+        public init(from decoder: any Decoder) throws {
+            var device = try Device(from: decoder)
+            device.unknownFields.removeValue(forKey: CodingKeys.macKey.stringValue)
+            self.device = device
+            macKey = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Data.self, forKey: .macKey)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            try device.encode(to: encoder)
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encodeIfPresent(macKey, forKey: .macKey)
         }
     }
 

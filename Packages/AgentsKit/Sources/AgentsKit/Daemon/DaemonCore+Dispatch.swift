@@ -71,7 +71,18 @@ extension DaemonCore {
 
             case DaemonAPI.Method.devicesAnnounce:
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
-                return .success(try JSONValue.encoding(try announce(announcement)))
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.AnnounceReply(device: try announce(announcement), macKey: relayKey())))
+
+            case DaemonAPI.Method.devicesForget:
+                let request = try require(params, as: DaemonAPI.DeviceForget.self)
+                try forgetDevice(request.id, from: surface)
+                return .success([:])
+
+            case DaemonAPI.Method.relayRegister:
+                let registration = try require(params, as: DaemonAPI.RelayRegistration.self)
+                try registerRelayKey(registration.publicKey)
+                return .success([:])
 
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)

@@ -3,10 +3,11 @@ import SwiftUI
 
 /// The devices that may be told when an agent needs somebody.
 ///
-/// A list, not a control: a device pairs by opening Agents on this network, and there
-/// is nothing to approve or revoke here (Alex, 2026-09-21). What the pane is for is
-/// FR-023 — a device that has not let its own system show notifications says so here,
-/// because otherwise it would appear to work and be chosen for silence.
+/// A device pairs by opening Agents on this network, and there is nothing to approve
+/// here (Alex, 2026-09-21). The pane says, per FR-023, when a device has not let its own
+/// system show notifications, because otherwise it would appear to work and be chosen
+/// for silence. Since 046 a paired device can reach this Mac from anywhere, so each one
+/// can be forgotten: it stops being carried for until it is next on the same network.
 struct DevicesPane: View {
     @Environment(AppModel.self) private var model
 
@@ -19,7 +20,7 @@ struct DevicesPane: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(model.devices) { device in
-                    DeviceLine(device: device)
+                    DeviceLine(device: device) { forgetting = device }
                 }
             } header: {
                 Text("Devices")
@@ -31,11 +32,24 @@ struct DevicesPane: View {
         }
         .paperForm()
         .task { await model.refreshDevices() }
+        .confirmationDialog(forgetting.map { "Forget \($0.name)?" } ?? "",
+                            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
+                            titleVisibility: .visible, presenting: forgetting) { device in
+            Button("Forget", role: .destructive) {
+                Task { await model.forgetDevice(device.id) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("It will stop reaching this Mac from away until it is next on the same network.")
+        }
     }
+
+    @State private var forgetting: Device?
 }
 
 private struct DeviceLine: View {
     let device: Device
+    let forget: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -49,6 +63,8 @@ private struct DeviceLine: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button("Forget…", action: forget)
+                .buttonStyle(.borderless)
         }
     }
 

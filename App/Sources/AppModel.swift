@@ -443,8 +443,20 @@ final class AppModel {
 
     private func deviceChanged(_ change: DaemonAPI.DeviceNotification) {
         devices.removeAll { $0.id == change.id }
-        devices.append(change.device)
+        guard change.removed != true, let device = change.device else { return }
+        devices.append(device)
         devices.sort { $0.announcedAt < $1.announcedAt }
+    }
+
+    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac from away
+    /// until it is next on the same network, where it pairs again by itself.
+    func forgetDevice(_ id: UUID) async {
+        do {
+            try await client.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
+            devices.removeAll { $0.id == id }
+        } catch {
+            problem = describe(error)
+        }
     }
 
     func refreshWorkflows() async {

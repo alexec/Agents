@@ -97,6 +97,9 @@ public struct StoreLocations: Sendable {
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
     public var devices: URL { root.appendingPathComponent("devices.json") }
+    /// The public half of the Mac's relay key, as the bridge registered it (046). Beside
+    /// `devices.json` rather than in it, so that file keeps the shape older builds read.
+    public var relay: URL { root.appendingPathComponent("relay.json") }
     /// The servers the window reaches over ssh (037). Written by the window only; the
     /// daemon at this root never reads it.
     public var hosts: URL { root.appendingPathComponent("hosts.json") }
