@@ -612,7 +612,10 @@ struct PromptBar: View {
     private var controlsState: PromptControlsState {
         PromptControlsState.resolve(
             agentOptions: agent.map(\.advertisedOptions),
-            draftOptions: model.draftOptions,
+            // An agent's own, never the new-chat form's: those may be another
+            // runtime's, and a choice made on one would be sent to this agent. The
+            // phone has always passed none here.
+            draftOptions: agent == nil ? model.draftOptions : [],
             // Both are settled facts about an agent that exists, which is why
             // `whereAndWhat` draws them as labels rather than controls.
             hasFolder: agent != nil || model.draftCwd != nil,
