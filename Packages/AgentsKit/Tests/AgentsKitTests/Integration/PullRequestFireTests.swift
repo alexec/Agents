@@ -94,6 +94,9 @@ struct PullRequestFireTests {
         let box = try await sandbox()
         try "x".write(to: box.project.appending(path: ".agents/note.md"), atomically: true, encoding: .utf8)
         #expect(try await GitWorktrees.workInProgressCount(in: box.project) == 0)
+        // Nor is the dotagents layout the project was given when it was added.
+        DotAgents.apply(to: box.project)
+        #expect(try await GitWorktrees.workInProgressCount(in: box.project) == 0)
         try "y".write(to: box.project.appending(path: "real-change.txt"), atomically: true, encoding: .utf8)
         #expect(try await GitWorktrees.workInProgressCount(in: box.project) == 1)
     }

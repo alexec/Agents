@@ -112,7 +112,8 @@ extension DaemonCore {
 
     // MARK: Writing
 
-    /// Add a folder as a project before anything has run in it.
+    /// Add a folder as a project before anything has run in it, laid out the dotagents
+    /// way (`DotAgents`).
     ///
     /// Idempotent: adding a folder that is already a project returns it unchanged, so
     /// two windows racing settle on the same thing rather than one of them failing.
@@ -126,6 +127,8 @@ extension DaemonCore {
         if records[standardized] == nil {
             records[standardized] = Project(folder: standardized)
             saveProjectRecords(records)
+            // Laid out once, when it is first added; the person owns it from then on.
+            DotAgents.apply(to: standardized)
         }
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
