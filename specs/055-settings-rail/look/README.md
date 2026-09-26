@@ -1,6 +1,6 @@
 # 055 · Wireframes: Settings on one rail
 
-**Waiting for Alex to look.** This is the look gate for moving Settings from tabs across the
+**Approved by Alex, 2026-09-26: C/D, Shared's pages in the rail.** This is the look gate for moving Settings from tabs across the
 top to a rail down the left.
 
 Today Settings is six tabs (Appearance, Agents, Shared, Spending, Devices, Servers). Two things
@@ -67,12 +67,12 @@ detail under 200 pt, too narrow to read SKILL.md; the window would have to grow 
 
 ## What the frames decide, and what they leave open
 
-- **Proposed: C/D over H.** Shared's pages go into the rail. That changes the chrome of 054's
+- **Decided: C/D over H.** Shared's pages go into the rail. That changes the chrome of 054's
   approved frames A–H but none of their content.
 - **Proposed: one fixed size, 1000 × 640.** Open: whether the window may also be resized
   larger, with only the detail (on Shared) or nothing (on form panes) taking the extra space.
-- **Proposed: actions move to the title bar** (F, G). This is optional and separable. Without it,
-  they stay at the foot of their cards as today.
+- **Not done: actions move to the title bar** (F, G). Left unanswered, so the first build keeps
+  them at the foot of their cards as today.
 - **Open: remember the last pane** across launches, as System Settings does. ⌘, opens there.
 - **Not in these frames:** a search field at the top of the rail. Six panes don't need one yet.
 - **Mac only.** The Remote has no Settings.

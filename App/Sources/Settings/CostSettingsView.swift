@@ -63,7 +63,6 @@ struct CostSettingsView: View {
             if !stoppedByALimit.isEmpty { stopped }
         }
         .paperForm()
-        .frame(width: 460)
         .task { await model.refreshCostState() }
     }
 
