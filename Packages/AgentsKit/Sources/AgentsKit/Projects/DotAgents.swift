@@ -7,12 +7,23 @@ import Foundation
 ///     AGENTS.md                the router every agent reads first
 ///     .agents/skills/          task-specific Agent Skills
 ///     .agents/personas/        perspectives an agent can adopt
+///     .agents/plugins/         plugins, one folder each
 ///     CLAUDE.md       -> AGENTS.md
 ///     .claude/skills  -> ../.agents/skills
+///     .claude/plugins -> ../.agents/plugins
 ///
 /// Links only where a known agent needs one. Codex, Grok, Cursor and Copilot read
 /// `AGENTS.md` and `.agents/skills` themselves — each one's shipped binary names both —
 /// so Claude, which reads neither, is the only runtime that gets links.
+///
+/// Plugins are the exception to "each reads it itself". Antigravity reads
+/// `.agents/plugins/` and Grok reads `.claude/plugins/`, so the link is for Grok: Claude
+/// has no project plugin folder at all. What reaches Claude and Grok in the app is the
+/// list `sessionMeta` hands them on every session, which needs no folder of theirs.
+/// Codex, Cursor, Copilot and Gemini load plugins only from their own home folders or
+/// from a marketplace, so nothing here reaches them yet. A plugin that carries
+/// `.claude-plugin/plugin.json` is read by all of Claude, Grok, Codex, Cursor and
+/// Copilot; Antigravity wants a `plugin.json` at the plugin's root as well.
 ///
 /// Nothing the person wrote is lost or overwritten. A `CLAUDE.md` with no `AGENTS.md`
 /// beside it is moved to `AGENTS.md` and linked back, so `.agents` is where it lives and
@@ -24,7 +35,25 @@ import Foundation
 public enum DotAgents {
     public static let router = "AGENTS.md"
     public static let folder = ".agents"
-    public static let resourceFolders = ["skills", "personas"]
+    public static let plugins = "plugins"
+
+    /// Which layout a project has. A project laid out by an older one is given only the
+    /// steps added since, so what the person deleted from the first is not put back.
+    public static let version = 2
+
+    /// A folder in `.agents`, and the layout that first had it.
+    struct Resource {
+        var name: String
+        var since: Int
+    }
+
+    static let resources = [
+        Resource(name: "skills", since: 1),
+        Resource(name: "personas", since: 1),
+        Resource(name: plugins, since: 2),
+    ]
+
+    public static var resourceFolders: [String] { resources.map(\.name) }
 
     /// A link from a file a known agent reads to the file in `.agents` that holds it.
     struct Link {
@@ -32,17 +61,20 @@ public enum DotAgents {
         var path: String
         /// Relative to the link's own folder, so the project can move and keep working.
         var destination: String
+        var since: Int
     }
 
     static let links = [
-        Link(path: "CLAUDE.md", destination: "AGENTS.md"),
-        Link(path: ".claude/skills", destination: "../.agents/skills"),
+        Link(path: "CLAUDE.md", destination: "AGENTS.md", since: 1),
+        Link(path: ".claude/skills", destination: "../.agents/skills", since: 1),
+        Link(path: ".claude/plugins", destination: "../.agents/plugins", since: 2),
     ]
 
     /// What `apply` adds outside `.agents`, as `git status` names it before it is committed.
     public static var untrackedLayout: [String] { [router] + links.map(\.path) }
 
-    public static func apply(to project: URL) {
+    /// Lay the project out, or bring one laid out by layout `from` up to this one.
+    public static func apply(to project: URL, from: Int = 0) {
         let fileManager = FileManager.default
         // The home folder's `.claude` is Claude's own, for every project: its skills
         // are not this folder's to move, and nothing above it is a project either.
@@ -51,7 +83,7 @@ public enum DotAgents {
         guard path != "/", !(home + "/").hasPrefix(path.hasSuffix("/") ? path : path + "/") else {
             return
         }
-        for name in resourceFolders {
+        for name in resources.filter({ $0.since > from }).map(\.name) {
             attempt("create \(folder)/\(name)") {
                 try fileManager.createDirectory(
                     at: project.appending(path: "\(folder)/\(name)", directoryHint: .isDirectory),
@@ -60,7 +92,7 @@ public enum DotAgents {
         }
         let routerURL = project.appending(path: router)
         let claudeFile = project.appending(path: "CLAUDE.md")
-        if !exists(routerURL) {
+        if from == 0, !exists(routerURL) {
             attempt("write \(router)") {
                 if isPlainFile(claudeFile) {
                     try fileManager.moveItem(at: claudeFile, to: routerURL)
@@ -69,7 +101,7 @@ public enum DotAgents {
                 }
             }
         }
-        for link in links {
+        for link in links where link.since > from {
             attempt("link \(link.path)") { try place(link, in: project) }
         }
     }
@@ -111,6 +143,7 @@ public enum DotAgents {
         }
         routes.append("- **For a task a skill covers:** USE the skill in `.agents/skills/`.")
         routes.append("- **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.")
+        routes.append("- **For a plugin this project carries:** LOOK in `.agents/plugins/`.")
         return """
             # AGENTS.md
 
@@ -119,6 +152,42 @@ public enum DotAgents {
             \(routes.joined(separator: "\n"))
 
             """
+    }
+
+    /// The plugins an agent working in `cwd` is handed: every folder in the project's
+    /// `.agents/plugins`, by absolute path, which is what Claude and Grok both ask for.
+    /// An agent in one of the app's worktrees gets its project's, because the layout is
+    /// untracked and is not in the worktree's checkout.
+    public static func pluginFolders(for cwd: URL) -> [URL] {
+        var path = cwd.standardizedFileURL.resolvingSymlinksInPath().path
+        if let range = path.range(of: "/\(WorktreeName.folder)/") {
+            path = String(path[..<range.lowerBound])
+        }
+        let plugins = URL(filePath: path, directoryHint: .isDirectory).appending(path: "\(folder)/\(Self.plugins)")
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: plugins.path)) ?? []
+        return entries.sorted()
+            .filter { !$0.hasPrefix(".") }
+            .map { plugins.appending(path: $0, directoryHint: .isDirectory) }
+            .filter { isDirectory($0.resolvingSymlinksInPath()) }
+    }
+
+    /// What rides in a session's `_meta` so the runtime loads the project's plugins, for
+    /// the two that take them that way; nil for every other runtime, and for no plugins.
+    ///
+    /// Claude takes them as the Agent SDK's `plugins` option, which its ACP adapter reads
+    /// from `claudeCode.options`; Grok takes absolute folders in `pluginDirs` on
+    /// `session/new` and `session/load`, and trusts them because the client named them.
+    public static func sessionMeta(runtimeID: String, plugins: [URL]) -> JSONValue? {
+        guard !plugins.isEmpty else { return nil }
+        switch runtimeID {
+        case "claude":
+            let entries = plugins.map { JSONValue.object(["type": .string("local"), "path": .string($0.path)]) }
+            return .object(["claudeCode": .object(["options": .object(["plugins": .array(entries)])])])
+        case "grok":
+            return .object(["pluginDirs": .array(plugins.map { .string($0.path) })])
+        default:
+            return nil
+        }
     }
 
     private static func attempt(_ what: String, _ body: () throws -> Void) {

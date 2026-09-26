@@ -405,7 +405,7 @@ extension DaemonCore {
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
-                                                      meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
+                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
@@ -806,7 +806,7 @@ extension DaemonCore {
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
-        let meta = ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd)
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
