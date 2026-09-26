@@ -126,9 +126,22 @@ public enum PersonalDotAgents {
                                                         withIntermediateDirectories: true)
             }
         }
-        for rule in rules where installed.contains(rule.runtimeID) {
+        let present = rules.filter { installed.contains($0.runtimeID) }
+        // What the person already has moves in first, so the links below point at it.
+        for rule in present where rule.adopts {
             if let skillsFolder = rule.skillsFolder {
+                adoptSkills(home: home, from: skillsFolder, record: &record)
+            }
+        }
+        adoptInstructions(home: home, from: present, record: &record)
+        writeRouterIfMissing(home: home)
+        for rule in present {
+            if let skillsFolder = rule.skillsFolder {
+                sweep(home: home, skillsFolder: skillsFolder, record: &record)
                 linkSkills(home: home, into: skillsFolder, record: &record)
+            }
+            if let instructionsFile = rule.instructionsFile {
+                placeLink(home: home, at: instructionsFile, to: "\(folder)/\(router)", record: &record)
             }
         }
     }
@@ -146,28 +159,134 @@ public enum PersonalDotAgents {
         // Somebody linked the whole folder somewhere: that is theirs, and links placed
         // inside it would land wherever it points.
         if (try? fileManager.destinationOfSymbolicLink(atPath: target.path)) != nil { return }
-        let depth = skillsFolder.split(separator: "/").count
         for skill in sharedSkills(home: home) {
             let relative = "\(skillsFolder)/\(skill)"
             let url = target.appending(path: skill)
-            let destination = String(repeating: "../", count: depth) + "\(folder)/\(skills)/\(skill)"
             if isManaged(url) || managedNames.contains(skill) {
                 DaemonLog.shared.write("personal layout: left \(relative) alone, a name another tool manages")
                 continue
             }
-            if let existing = try? fileManager.destinationOfSymbolicLink(atPath: url.path) {
-                if resolves(existing, from: url, to: home.appending(path: "\(folder)/\(skills)/\(skill)")) {
-                    record.links[relative] = record.links[relative] ?? existing
+            placeLink(home: home, at: relative, to: "\(folder)/\(skills)/\(skill)", record: &record)
+        }
+    }
+
+    /// One link at `path` to `shared` (both relative to the home), by data-model's table.
+    /// A real file or folder there is the person's, and a clash: left alone.
+    static func placeLink(home: URL, at path: String, to shared: String, record: inout Record) {
+        let fileManager = FileManager.default
+        let url = home.appending(path: path)
+        if let existing = try? fileManager.destinationOfSymbolicLink(atPath: url.path) {
+            if resolves(existing, from: url, to: home.appending(path: shared)) {
+                record.links[path] = record.links[path] ?? existing
+            }
+            return
+        }
+        if DotAgents.exists(url) { return }
+        if record.links[path] != nil { return }  // placed once, removed by the person (FR-009)
+        let depth = path.split(separator: "/").count - 1
+        let destination = String(repeating: "../", count: depth) + shared
+        attempt("link \(path)") {
+            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: destination)
+            record.links[path] = destination
+        }
+    }
+
+    // MARK: - Adopting what is already there (US3)
+
+    /// Each real skill folder in a runtime's own skills folder moves to `~/.agents/skills`
+    /// when that name is free there; the link step then links it back (FR-005). A taken
+    /// name leaves both where they are. A failed move leaves the original in place, since
+    /// a move on one disk is a rename.
+    static func adoptSkills(home: URL, from skillsFolder: String, record: inout Record) {
+        let fileManager = FileManager.default
+        let source = home.appending(path: skillsFolder, directoryHint: .isDirectory)
+        if (try? fileManager.destinationOfSymbolicLink(atPath: source.path)) != nil { return }
+        let shared = home.appending(path: "\(folder)/\(skills)", directoryHint: .isDirectory)
+        let entries = (try? fileManager.contentsOfDirectory(atPath: source.path)) ?? []
+        for name in entries.sorted() where !name.hasPrefix(".") && !managedNames.contains(name) {
+            let url = source.appending(path: name)
+            guard (try? fileManager.destinationOfSymbolicLink(atPath: url.path)) == nil,
+                  DotAgents.isDirectory(url), !isManaged(url),
+                  !DotAgents.exists(shared.appending(path: name)) else { continue }
+            attempt("move \(skillsFolder)/\(name) into \(folder)/\(skills)") {
+                try fileManager.moveItem(at: url, to: shared.appending(path: name))
+                // A real folder where our link once was: the person put it back, so the
+                // link that replaces it is wanted.
+                record.links.removeValue(forKey: "\(skillsFolder)/\(name)")
+                DaemonLog.shared.write("personal layout: moved \(skillsFolder)/\(name) into \(folder)/\(skills)")
+            }
+        }
+    }
+
+    /// The order a real instructions file is looked for when `~/.agents/AGENTS.md` is
+    /// missing; only the first found moves (FR-006, research R3).
+    static let adoptionOrder = ["claude", "codex", "copilot", "grok"]
+
+    static func adoptInstructions(home: URL, from present: [Rule], record: inout Record) {
+        let fileManager = FileManager.default
+        let shared = home.appending(path: "\(folder)/\(router)")
+        guard !DotAgents.exists(shared) else { return }
+        for id in adoptionOrder {
+            guard let file = present.first(where: { $0.runtimeID == id })?.instructionsFile else { continue }
+            let url = home.appending(path: file)
+            guard (try? fileManager.destinationOfSymbolicLink(atPath: url.path)) == nil,
+                  DotAgents.isPlainFile(url) else { continue }
+            attempt("move \(file) to \(folder)/\(router)") {
+                try fileManager.createDirectory(at: shared.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fileManager.moveItem(at: url, to: shared)
+                record.links.removeValue(forKey: file)
+                DaemonLog.shared.write("personal layout: moved \(file) to \(folder)/\(router)")
+            }
+            return
+        }
+    }
+
+    /// With no instructions anywhere, a short `~/.agents/AGENTS.md` that says what it is
+    /// for, so the links have something to point at (US2 scenario 3).
+    static func writeRouterIfMissing(home: URL) {
+        let url = home.appending(path: "\(folder)/\(router)")
+        guard !DotAgents.exists(url) else { return }
+        attempt("write \(folder)/\(router)") {
+            try routerContents.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    static let routerContents = """
+        # Personal instructions
+
+        How you like to work, written once for every agent the Agents app starts: each reads
+        this file, on every runtime that has a place for personal instructions, in every project.
+        A project's own AGENTS.md is read as well, and says more about that project.
+
+        """
+
+    // MARK: - Out of the way (US4)
+
+    /// Links into `~/.agents/skills` that now point at nothing are removed, whoever made
+    /// them, and no other link is (FR-008, R7). A record entry goes with its skill, so the
+    /// same skill added again is linked again.
+    static func sweep(home: URL, skillsFolder: String, record: inout Record) {
+        let fileManager = FileManager.default
+        let folderURL = home.appending(path: skillsFolder, directoryHint: .isDirectory)
+        let shared = home.appending(path: "\(folder)/\(skills)").standardizedFileURL.path + "/"
+        if (try? fileManager.destinationOfSymbolicLink(atPath: folderURL.path)) == nil {
+            let entries = (try? fileManager.contentsOfDirectory(atPath: folderURL.path)) ?? []
+            for name in entries {
+                let url = folderURL.appending(path: name)
+                guard let destination = try? fileManager.destinationOfSymbolicLink(atPath: url.path) else { continue }
+                let resolved = (destination.hasPrefix("/") ? URL(filePath: destination)
+                                : folderURL.appending(path: destination)).standardizedFileURL
+                guard resolved.path.hasPrefix(shared), !fileManager.fileExists(atPath: resolved.path) else { continue }
+                attempt("remove the dangling link \(skillsFolder)/\(name)") {
+                    try fileManager.removeItem(at: url)
                 }
-                continue
             }
-            if DotAgents.exists(url) { continue }  // a real folder of the person's: a clash, left alone
-            if record.links[relative] != nil { continue }  // placed once, removed by the person
-            attempt("link \(relative)") {
-                try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
-                try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: destination)
-                record.links[relative] = destination
-            }
+        }
+        let present = Set(sharedSkills(home: home))
+        for path in record.links.keys where path.hasPrefix(skillsFolder + "/") {
+            let name = String(path.dropFirst(skillsFolder.count + 1))
+            if !present.contains(name) { record.links.removeValue(forKey: path) }
         }
     }
 

@@ -84,7 +84,7 @@ struct PersonalDotAgentsTests {
         reconcile(home, record: &record)
 
         #expect(link(home, ".claude/skills/mirrored") == nil)
-        #expect(record.links.isEmpty)
+        #expect(record.links[".claude/skills/mirrored"] == nil)
     }
 
     // US1 scenario 4
@@ -101,7 +101,7 @@ struct PersonalDotAgentsTests {
         for folder in [".codex", ".grok", ".cursor", ".copilot"] {
             #expect(!DotAgents.exists(home.appending(path: "\(folder)/skills/grill-me")))
         }
-        #expect(record.links.keys.allSatisfy { $0.hasPrefix(".claude/") })
+        #expect(record.links.keys.filter { $0.contains("/skills/") }.allSatisfy { $0.hasPrefix(".claude/") })
     }
 
     @Test func aRuntimeThatIsNotInstalledGetsNothing() throws {
@@ -112,7 +112,7 @@ struct PersonalDotAgentsTests {
         reconcile(home, installed: ["codex"], record: &record)
 
         #expect(!DotAgents.exists(home.appending(path: ".claude")))
-        #expect(record.links.isEmpty)
+        #expect(record.links.keys.allSatisfy { !$0.hasPrefix(".claude/") })
     }
 
     // spec, Edge Cases
@@ -196,6 +196,234 @@ struct PersonalDotAgentsTests {
         let took = (0..<3).map { _ in clock.measure { reconcile(home, record: &record) } }.min()!
 
         #expect(took < .milliseconds(50))
+    }
+
+    // MARK: - US2: instructions
+
+    private func read(_ home: URL, _ path: String) throws -> String {
+        try String(contentsOf: home.appending(path: path), encoding: .utf8)
+    }
+
+    // US2 scenarios 1 and 2, FR-003, FR-013
+    @Test func everyRuntimeWithAnInstructionsFileIsLinkedToAgentsMD() throws {
+        let home = try home()
+        try write(home, ".agents/AGENTS.md", "OSPREY-3\n")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/CLAUDE.md") == "../.agents/AGENTS.md")
+        #expect(link(home, ".codex/AGENTS.md") == "../.agents/AGENTS.md")
+        #expect(link(home, ".grok/AGENTS.md") == "../.agents/AGENTS.md")
+        #expect(link(home, ".copilot/copilot-instructions.md") == "../.agents/AGENTS.md")
+        #expect(try read(home, ".copilot/copilot-instructions.md") == "OSPREY-3\n")
+        #expect(!DotAgents.exists(home.appending(path: ".cursor")))
+        #expect(record.links[".codex/AGENTS.md"] == "../.agents/AGENTS.md")
+    }
+
+    // US2 scenario 3
+    @Test func withNoInstructionsAnywhereAShortAgentsMDIsWritten() throws {
+        let home = try home()
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        let written = try read(home, ".agents/AGENTS.md")
+        #expect(written.contains("every agent"))
+        #expect(written.count < 600)
+        #expect(link(home, ".claude/CLAUDE.md") == "../.agents/AGENTS.md")
+    }
+
+    @Test func instructionsGoOnlyToInstalledRuntimes() throws {
+        let home = try home()
+        try write(home, ".agents/AGENTS.md", "mine")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, installed: ["codex"], record: &record)
+
+        #expect(link(home, ".codex/AGENTS.md") == "../.agents/AGENTS.md")
+        #expect(!DotAgents.exists(home.appending(path: ".claude")))
+        #expect(!DotAgents.exists(home.appending(path: ".copilot")))
+    }
+
+    // MARK: - US3: what is already there moves in
+
+    /// What a folder holds, byte for byte.
+    private func contents(_ folder: URL) throws -> [String: Data] {
+        var result: [String: Data] = [:]
+        let enumerator = fileManager.enumerator(atPath: folder.path)
+        while let path = enumerator?.nextObject() as? String {
+            let url = folder.appending(path: path)
+            if !DotAgents.isDirectory(url) { result[path] = try Data(contentsOf: url) }
+        }
+        return result
+    }
+
+    // US3 scenario 1, FR-005
+    @Test func aRealClaudeSkillMovesInAndIsLinkedBack() throws {
+        let home = try home()
+        try write(home, ".claude/skills/mine/SKILL.md", "---\nname: mine\n---\nbody")
+        try write(home, ".claude/skills/mine/scripts/run.sh", "#!/bin/sh\necho hi\n")
+        let before = try contents(home.appending(path: ".claude/skills/mine"))
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/skills/mine") == "../../.agents/skills/mine")
+        #expect(try contents(home.appending(path: ".agents/skills/mine")) == before)
+        #expect(try contents(home.appending(path: ".claude/skills/mine")) == before)  // through the link
+    }
+
+    // US3 scenario 2
+    @Test func aClaudeSkillWhoseNameIsTakenStaysWhereItIs() throws {
+        let home = try home()
+        try write(home, ".claude/skills/review/SKILL.md", "Claude's")
+        try write(home, ".agents/skills/review/SKILL.md", "shared")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/skills/review") == nil)
+        #expect(try read(home, ".claude/skills/review/SKILL.md") == "Claude's")
+        #expect(try read(home, ".agents/skills/review/SKILL.md") == "shared")
+    }
+
+    @Test func managedAndHiddenClaudeFoldersAreNotAdopted() throws {
+        let home = try home()
+        try write(home, ".claude/skills/synced/house/SKILL.md", "synced")
+        try write(home, ".claude/skills/mirrored/.bucket-1", "")
+        try write(home, ".claude/skills/.cache/x", "")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        for name in ["synced", "mirrored", ".cache"] {
+            #expect(DotAgents.isDirectory(home.appending(path: ".claude/skills/\(name)")))
+            #expect(link(home, ".claude/skills/\(name)") == nil)
+            #expect(!DotAgents.exists(home.appending(path: ".agents/skills/\(name)")))
+        }
+    }
+
+    // US3 scenario 3, FR-006
+    @Test func aRealClaudeMDMovesInAndIsLinkedBack() throws {
+        let home = try home()
+        try write(home, ".claude/CLAUDE.md", "KITE-1\n")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(try read(home, ".agents/AGENTS.md") == "KITE-1\n")
+        #expect(link(home, ".claude/CLAUDE.md") == "../.agents/AGENTS.md")
+        #expect(link(home, ".codex/AGENTS.md") == "../.agents/AGENTS.md")
+    }
+
+    // US3 scenario 4
+    @Test func aRealClaudeMDBesideARealAgentsMDStaysWhereItIs() throws {
+        let home = try home()
+        try write(home, ".claude/CLAUDE.md", "Claude's")
+        try write(home, ".agents/AGENTS.md", "shared")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/CLAUDE.md") == nil)
+        #expect(try read(home, ".claude/CLAUDE.md") == "Claude's")
+        #expect(try read(home, ".agents/AGENTS.md") == "shared")
+    }
+
+    // FR-006: only the first found moves, in the order Claude, Codex, Copilot, Grok
+    @Test func onlyTheFirstRealInstructionsFileMoves() throws {
+        let home = try home()
+        try write(home, ".codex/AGENTS.md", "codex's")
+        try write(home, ".grok/AGENTS.md", "grok's")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        #expect(try read(home, ".agents/AGENTS.md") == "codex's")
+        #expect(link(home, ".codex/AGENTS.md") == "../.agents/AGENTS.md")
+        #expect(link(home, ".grok/AGENTS.md") == nil)
+        #expect(try read(home, ".grok/AGENTS.md") == "grok's")
+    }
+
+    // MARK: - US4: out of the way
+
+    // US4 scenario 2, FR-009
+    @Test func aLinkThePersonDeletedIsNotPutBack() throws {
+        let home = try home()
+        try skill(home, "grill-me")
+        try write(home, ".agents/AGENTS.md", "mine")
+        var record = PersonalDotAgents.Record(home: home.path)
+        reconcile(home, record: &record)
+        try fileManager.removeItem(at: home.appending(path: ".claude/skills/grill-me"))
+        try fileManager.removeItem(at: home.appending(path: ".codex/AGENTS.md"))
+
+        reconcile(home, record: &record)
+
+        #expect(!DotAgents.exists(home.appending(path: ".claude/skills/grill-me")))
+        #expect(!DotAgents.exists(home.appending(path: ".codex/AGENTS.md")))
+    }
+
+    // US4 scenario 3, FR-008
+    @Test func aRemovedSkillsDanglingLinksGoAndNoOthers() throws {
+        let home = try home()
+        try skill(home, "grill-me")
+        try skill(home, "review")
+        var record = PersonalDotAgents.Record(home: home.path)
+        reconcile(home, record: &record)
+        // The installer's own absolute link, a link of the person's to elsewhere that
+        // points at nothing, and a skill that goes.
+        let skills = home.appending(path: ".claude/skills")
+        try skill(home, "installed")
+        try fileManager.createSymbolicLink(atPath: skills.appending(path: "installed").path,
+                                           withDestinationPath: home.appending(path: ".agents/skills/installed").path)
+        try fileManager.createSymbolicLink(atPath: skills.appending(path: "elsewhere").path,
+                                           withDestinationPath: "/nowhere/at/all")
+        try fileManager.removeItem(at: home.appending(path: ".agents/skills/grill-me"))
+        try fileManager.removeItem(at: home.appending(path: ".agents/skills/installed"))
+
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/skills/grill-me") == nil)
+        #expect(link(home, ".claude/skills/installed") == nil)
+        #expect(link(home, ".claude/skills/elsewhere") == "/nowhere/at/all")
+        #expect(link(home, ".claude/skills/review") == "../../.agents/skills/review")
+        #expect(record.links[".claude/skills/grill-me"] == nil)
+    }
+
+    // The record entry goes with the skill, so the same skill added again is linked again.
+    @Test func aSkillAddedAgainIsLinkedAgain() throws {
+        let home = try home()
+        try skill(home, "grill-me")
+        var record = PersonalDotAgents.Record(home: home.path)
+        reconcile(home, record: &record)
+        try fileManager.removeItem(at: home.appending(path: ".agents/skills/grill-me"))
+        reconcile(home, record: &record)
+
+        try skill(home, "grill-me")
+        reconcile(home, record: &record)
+
+        #expect(link(home, ".claude/skills/grill-me") == "../../.agents/skills/grill-me")
+    }
+
+    // US4 scenario 4 with everything at once: adopted, linked, clashing, managed.
+    @Test func aBusyHomeReconciledTwiceChangesNothingTheSecondTime() throws {
+        let home = try home()
+        try skill(home, "grill-me")
+        try write(home, ".claude/skills/mine/SKILL.md", "mine")
+        try write(home, ".claude/skills/review/SKILL.md", "Claude's")
+        try skill(home, "review")
+        try write(home, ".claude/skills/synced/.bucket-1", "")
+        try write(home, ".claude/CLAUDE.md", "KITE-1")
+        var record = PersonalDotAgents.Record(home: home.path)
+        reconcile(home, record: &record)
+        let before = try snapshot(home)
+        let recorded = record
+
+        reconcile(home, record: &record)
+
+        #expect(try snapshot(home) == before)
+        #expect(record == recorded)
     }
 
     /// Every entry under a folder, with what a link points at or a file holds, and each
