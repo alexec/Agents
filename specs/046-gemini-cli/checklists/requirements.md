@@ -31,6 +31,7 @@
 
 ## Notes
 
-- Names that are the product's surface (npx, ACP, `~/.gemini/settings.json`, Keychain) are kept because the person sees or owns them, as in 043; how the app wires them is left to the plan.
+- Names that are the product's surface (ACP, `~/.gemini/settings.json`, Keychain) are kept because the person sees or owns them, as in 043; how the app wires them is left to the plan.
 - Gemini's ACP flag, package, tool names and question path are deliberately not stated: the plan's research measures them against a real Gemini CLI (not installed on this Mac).
-- D1 and D2 settled by Alex on 2026-09-25; D3–D6 are defaults for him to confirm or overturn.
+- D1 and D2 settled by Alex on 2026-09-25 (D1 revised the same day: installed by the start-up installer, not npx); D3–D6 are defaults for him to confirm or overturn.
+- Depends on the start-up installer (another lane, not yet specified): it owns download, checksum, update and progress on the Mac; this spec only adds Gemini to its list and says what an agent shows before Gemini is ready.

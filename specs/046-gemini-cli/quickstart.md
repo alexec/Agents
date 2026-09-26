@@ -1,6 +1,7 @@
 # Quickstart: proving Gemini works
 
-Prerequisites: Node ≥ 20 on the Mac; a Gemini API key (AI Studio) for the live steps, kept in
+Prerequisites: until the start-up installer lands, a Gemini toolset placed by hand
+(`scripts/update-gemini-toolset.sh --install-here <dir>`); a Gemini API key (AI Studio) for the live steps, kept in
 the scratch root's environment only, never in the real app's.
 
 ## 1. Handshake (no key)

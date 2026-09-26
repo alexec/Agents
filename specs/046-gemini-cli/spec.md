@@ -17,7 +17,7 @@ app's lists, on the phone, in workflows or in leases.
 
 Gemini CLI speaks the same agent protocol (ACP) as the four runtimes the app already has. It
 was the first agent to speak it. So Gemini can be added as another runtime, not built as a
-special case. The work is in the parts that differ between runtimes: how it is fetched, how it
+special case. The work is in the parts that differ between runtimes: how it is installed, how it
 signs in, which of its own tools overlap with the app's, how it asks questions, and how it gets
 onto a server.
 
@@ -29,9 +29,13 @@ nothing for the person to install beyond what Claude already needs.
 Alex settled the first two on 2026-09-25. The rest are defaults so that the spec is complete,
 and each is marked *(default Dn)* where it is used.
 
-- **D1. Started through npx, like Claude.** The app starts Gemini from its npm package in ACP
-  mode, using the person's Node. The first start fetches it, and later starts reuse what npm
-  cached. Nothing to install beyond Node. *(Settled by Alex.)*
+- **D1. Installed by the app's start-up installer.** Gemini CLI, pinned, with a pinned Node to
+  run it, is one of the programs the app's start-up installer fetches, checks and keeps up to
+  date. That installer is its own feature, planned in another lane (the one Codex, 047, also
+  depends on). This spec does not define how it downloads, verifies, updates or reports
+  progress. It only requires that Gemini is covered, and that nothing else is needed: no Node,
+  no npm, no npx, no `gemini` on the PATH. The app never uses or replaces a `gemini` the person
+  installed themselves. *(Settled by Alex, 2026-09-25: first npx, then moved to the installer.)*
 - **D2. On the Mac and on servers.** Servers get Gemini the way 043 gives them Claude: a
   pinned toolset installed on demand, and a credential from the Mac's Settings lent to each
   run and never written to the server's disk. *(Settled by Alex.)*
@@ -42,9 +46,10 @@ and each is marked *(default Dn)* where it is used.
   AI Studio. A Google account sign-in (a browser sign-in whose tokens live in the Mac's
   `~/.gemini`) is not copied to servers in this version. *Alternative: lend the Mac's Google
   account sign-in too.*
-- **D5. Not pinned on the Mac, pinned on servers.** As with Claude, npx on the Mac fetches
-  whatever version the app names (or the latest, if the plan finds pinning brittle). Servers
-  get the exact version and checksums in the app's toolset manifest.
+- **D5. Pinned, and moved on by the installer.** Each app version names one Gemini version,
+  the same on the Mac and on servers. Moving it on is the start-up installer's job, under its
+  rules. The one rule Gemini adds: a running Gemini agent keeps the build it started on until
+  it ends.
 - **D6. The person's own Gemini settings are left alone.** The app does not edit
   `~/.gemini/settings.json` or any other file of Gemini's in the person's home. Anything the app
   needs to set for its own agents (its tools, which of Gemini's tools are removed) is passed
@@ -54,24 +59,25 @@ and each is marked *(default Dn)* where it is used.
 
 ### User Story 1 - Start a Gemini agent on the Mac (Priority: P1)
 
-The person has Gemini CLI signed in on their Mac, or has never installed it at all but has
-Node. In the start form, **Gemini** is in the runtime list beside Claude, Grok, Copilot and
-Cursor. They choose it and type a prompt. The first time, the agent says it is fetching Gemini
-while npm downloads it, so a slow first start reads as progress and not as a hang. Then Gemini
+The person has Gemini CLI signed in on their Mac, or has never installed it at all. In the start form, **Gemini** is in the runtime list beside Claude, Grok, Copilot and
+Cursor. They choose it and type a prompt. If the start-up installer has not finished
+installing Gemini yet, the agent says so and starts as soon as it has, so a first start reads as
+progress and not as a hang. Then Gemini
 works like any other runtime: it replies as it thinks, calls tools, asks permission where it
 asks, shows the diffs of the files it changes, reports cost and usage as far as Gemini says
 them, can be stopped mid-turn, and can be resumed later with its history.
 
 **Why this priority**: It is the request. Without it the other stories have nothing to act on.
 
-**Independent Test**: On a Mac with Node and a signed-in Gemini CLI (or none installed), start a
+**Independent Test**: On a Mac with a signed-in Gemini (or none installed, and nothing else installed either), start a
 Gemini agent in a project and ask it to create a file and run `ls`. The reply streams in, the
 tool calls show, the file appears in the changes, and a later resume continues the conversation.
 
 **Acceptance Scenarios**:
 
 1. **Given** the start form, **When** the person opens the runtime list, **Then** Gemini is listed with the other runtimes, and a new conversation can be started with it *(default D1)*.
-2. **Given** a Mac where Gemini CLI has never been fetched, **When** the person starts a Gemini agent, **Then** the agent shows that Gemini is being fetched, and the first reply follows without the person doing anything else.
+2. **Given** a Mac where the start-up installer has not yet installed Gemini, **When** the person starts a Gemini agent, **Then** the agent shows that Gemini is still being installed, and the first reply follows once it is, without the person doing anything else.
+7. **Given** a running Gemini agent, **When** the installer moves Gemini to a newer build, **Then** that agent is not interrupted and keeps its build until it ends *(default D5)*.
 3. **Given** a running Gemini agent, **When** it edits files, runs commands or asks permission, **Then** each shows in the conversation the way the same act from another runtime does, and a permission ask can be answered on the Mac or phone.
 4. **Given** a Gemini agent mid-turn, **When** the person stops it, **Then** the turn ends and the agent can be given a new prompt.
 5. **Given** a stopped or parked Gemini agent, **When** the person resumes it, **Then** it continues the same conversation with its history, if Gemini supports loading a conversation; if not, the app says that resume starts afresh and does not claim otherwise.
@@ -165,8 +171,8 @@ project it is offered when it is installed there or can be installed there (User
 
 ### Edge Cases
 
-- **No Node on the Mac.** Choosing Gemini says Node is needed to run it, with where to get it, and does not try to start. Claude says the same today; the two share the check.
-- **Offline on the first start.** npx cannot fetch Gemini. The agent says it could not download Gemini, and why, rather than "stopped answering". A later start tries again.
+- **Gemini not installed yet.** A download that fails, a download that does not match, or being offline when the app starts are the installer's to handle. Gemini's part is to say, when an agent is started, which of these happened, and never to show "stopped answering" instead.
+- **A `gemini` of the person's own.** One on the PATH, from npm or Homebrew, is neither used nor changed. Their terminal keeps running theirs.
 - **A Gemini release changes its ACP flag or drops it.** The agent says Gemini did not start in a mode the app can talk to, and names the version. It does not hang. The plan's research records the flag measured, and a check script can re-measure it.
 - **Quota or rate limit.** Gemini refuses the turn because of a quota or rate limit (common on the free tier). The turn ends with that reason in a sentence, not as a crash, and the agent can be prompted again later.
 - **Free-tier model fallback.** Gemini switches to a smaller model in the middle of a session when the larger one's quota runs out. The model shown for the agent follows what Gemini reports, if it reports it. The app never claims a model that is not being used.
@@ -183,8 +189,9 @@ project it is offered when it is installed there or can be installed there (User
 **Starting Gemini on the Mac**
 
 - **FR-001**: The app MUST list Gemini among the runtimes it can start, everywhere a runtime is chosen: the Mac's start form and runtime menu, the phone and iPad start forms, workflow steps, and `start_agent`.
-- **FR-002**: The app MUST start Gemini from its npm package through the person's Node, in Gemini's ACP mode, with no other install needed *(default D1)*.
-- **FR-003**: While Gemini is being fetched on a first start, the agent MUST show that it is fetching and not appear stuck; a failed fetch MUST end with a sentence naming why.
+- **FR-002**: The pinned Gemini CLI, and the Node it runs on, MUST be among the programs the app's start-up installer installs on the Mac. Gemini MUST need nothing installed beforehand (no Node, npm or `gemini`), and the app MUST NOT use, change or remove a Gemini the person installed themselves *(default D1)*.
+- **FR-003**: A Gemini agent started before the installer has Gemini ready MUST say it is waiting for the install and start when it is ready; one started after the install failed MUST say why, in the installer's words.
+- **FR-003a**: A running Gemini agent MUST keep the build it started on when the installer moves Gemini to a newer one *(default D5)*.
 - **FR-004**: A Gemini agent MUST show replies, tool calls, permission asks, file changes, stop and resume the way the app shows them for other runtimes, limited only by what Gemini reports over ACP.
 - **FR-005**: Usage and cost MUST be shown where Gemini reports them, and left out (not shown as zero) where it does not.
 - **FR-006**: What Gemini can do in the app (pictures, sign-in, sign-out, resume, model choice) MUST follow what it says about itself when it starts, not a list kept by the app.
@@ -211,21 +218,21 @@ project it is offered when it is installed there or can be installed there (User
 
 **Failures**
 
-- **FR-018**: No Node, a failed fetch, a changed ACP mode, a quota or rate limit, and a refused key MUST each end with a sentence naming the cause, never an endless wait or "stopped answering".
+- **FR-018**: Gemini not installed, a changed ACP mode, a quota or rate limit, and a refused key MUST each end with a sentence naming the cause, never an endless wait or "stopped answering".
 
 ### Key Entities
 
-- **Gemini runtime**: a fifth entry in the app's runtime list: its name, how it is started (npm package through Node, ACP mode), and what it says about itself when it starts.
+- **Gemini runtime**: a fifth entry in the app's runtime list: its name, how it is started (the installed Gemini CLI on its installed Node, ACP mode), and what it says about itself when it starts.
 - **Gemini tool policy**: which of Gemini's tools are removed for the app's agents, which remain as residue and why, and how its questions reach the person.
 - **Gemini credential**: a Gemini API key, for servers only, kept in the Mac's Keychain, masked when shown, with when it was added and when it last worked (043's runtime credential, gaining a second kind).
-- **Gemini toolset**: Node and the pinned Gemini CLI package for a server, with versions and checksums, installed beside Claude's and replaced as a whole (043's installed tools).
+- **Gemini toolset**: the pinned Gemini CLI package and a Node to run it, with versions and checksums. On the Mac it is an entry in the start-up installer's list. On a server it is one of 043's installed tools, beside Claude's, replaced as a whole.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: On a Mac with Node and a signed-in Gemini, a person who has never used Gemini in the app gets a Gemini agent's first reply within 2 minutes of choosing it, including the first fetch, having run no command.
-- **SC-002**: A later Gemini start, with the fetch cached, takes no more than 5 seconds longer to its first reply than a Claude start on the same Mac.
+- **SC-001**: On a Mac with a signed-in Gemini and nothing else installed, once the start-up installer has finished, a person who has never used Gemini in the app gets a Gemini agent's first reply within 30 seconds of choosing it, having run no command.
+- **SC-002**: A Gemini start takes no more than 5 seconds longer to its first reply than a Claude start on the same Mac.
 - **SC-003**: Every failure in the edge cases above shows as a sentence naming its cause; none shows as an endless wait or as "stopped answering".
 - **SC-004**: After a day of Gemini agents in the app, the person's `~/.gemini` settings are byte for byte what they were before.
 - **SC-005**: From a bare Linux server, a person with a Gemini key in Settings gets a Gemini agent's first reply within 5 minutes, having run no command on the server; afterwards a search of the server's disk and the Mac's logs finds the key in neither.
@@ -241,7 +248,8 @@ project it is offered when it is installed there or can be installed there (User
 ## Assumptions
 
 - Gemini CLI's ACP mode, the exact flag that starts it, its package name, its tool names, and whether it can ask a question or sign out over ACP are measured in the plan's research against a real Gemini CLI, not taken from this spec. Gemini is not installed on this Mac today.
-- Gemini CLI is published on npm and runs on the Node versions that Claude's adapter already needs, so the Mac's Node check and 043's server Node serve both.
+- Gemini CLI is published on npm as JavaScript and needs Node 20 or later (measured: 0.61.0), so its installer entry carries a pinned Node beside it, on the Mac as on servers.
+- **Depends on the start-up installer**, a separate feature being planned in another lane. That feature owns downloading, checking, updating, progress and failure reporting for the app's runtime programs on the Mac. This spec adds Gemini to its list, can be planned and built alongside it (everything but the Mac install), but cannot ship on the Mac before it.
 - Gemini accepts an API key through its environment, so a server can be signed in by lending the key per run as 043 does for Claude.
 - Builds on 043 (runtime credentials, server toolsets, "own sign-in only"), which is merged. This spec extends 043's D3 "Claude first" to Gemini, but not yet to Grok, Copilot or Cursor.
 - Codex and other runtimes remain out of scope.

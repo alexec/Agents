@@ -12,22 +12,27 @@ Gemini's.
 
 ## R1. Package, command and flag
 
-- **Decision**: `npx -y @google/gemini-cli@<pin> --acp`, id `gemini`, name `Gemini`.
+- **Decision (revised 2026-09-25)**: the start-up installer (another lane) installs
+  `@google/gemini-cli@0.61.0` and a pinned Node on the Mac; the app starts
+  `<installed node> <installed package>/bundle/gemini.js --acp`. id `gemini`, name `Gemini`.
+  Alex first chose npx, then moved Gemini to the installer, as he did for Codex (047). The
+  measurements below were taken through npx and hold for the installed package: same bundle,
+  same flag.
 - **Measured**: the package's only bin is `gemini` (`bundle/gemini.js`); `engines.node` is
   `>=20`; unpacked size 98 MB (95 MB on disk once fetched, ~100 MB with its three
   dependencies `@github`, `@lydell`, `node-pty`). `--help` lists `--acp` ("Starts the agent in
   ACP mode") and `--experimental-acp` ("deprecated, use --acp instead").
-- **First fetch**: `npx -y @google/gemini-cli@0.61.0 --help` from an empty `_npx` entry took
-  **5.7 s** wall clock on this Mac and network. SC-001's 2 minutes has plenty of room; the
-  "fetching" line (FR-003) matters on slow links, not here.
-- **Pin on the Mac too (D5 adjusted)**: the spec left Mac pinning open. `@latest` would make
-  every Gemini release a silent change to the ACP surface the app depends on (R3–R6 are all
-  version-specific), and the deprecation of `--experimental-acp` shows the surface moves. So
-  the recipe names an exact version, the same one servers get, and
-  `scripts/update-gemini-toolset.sh` moves both together. npx caches per exact spec, so a
-  pinned start is also the fastest one after the first.
-- **Alternatives**: `@latest` (rejected, above); `--experimental-acp` (rejected, deprecated);
-  a global `npm i -g` (rejected by Alex's D1).
+- **Fetch cost**: `npx -y @google/gemini-cli@0.61.0 --help` from an empty cache took **5.7 s**
+  on this Mac and network, so the installer's Gemini entry is a small one beside Node's.
+- **Pinned (D5)**: one version per app version, the same on the Mac and servers, moved by
+  `scripts/update-gemini-toolset.sh`. The ACP surface moves between releases (R3–R6 are
+  version-specific; `--experimental-acp` is already deprecated).
+- **One manifest for both places**: `App/Resources/toolsets/gemini/manifest.json` (043's
+  format) carries Node's checksums for `darwin-arm64` and `darwin-x64` as well as the two Linux
+  ones, so the installer and 043's server install read the same pin. Proposed to the installer
+  lane as its entry format; if it chooses another, the Gemini entry is written in that.
+- **Alternatives**: npx through the person's Node (Alex's first answer, replaced); `@latest`
+  (rejected, above); `--experimental-acp` (deprecated); a `gemini` on the PATH (never used, R11).
 
 ## R2. Handshake: what Gemini says about itself
 

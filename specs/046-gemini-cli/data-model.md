@@ -9,8 +9,11 @@ kind and one toolset.
 |---|---|
 | `id` | `gemini` |
 | `name` | `Gemini` |
-| `executable` | `npx` |
-| `arguments` | `["-y", "@google/gemini-cli@0.61.0", "--acp"]` |
+| `executable` | the installer's Node for Gemini's entry (resolved at start, not stored) |
+| `arguments` | `["<installed package>/bundle/gemini.js", "--acp"]` |
+
+The recipe names the installer entry (`gemini`) and the entry script; the paths come from the
+installer when an agent starts and are kept by that agent until it ends (FR-003a).
 
 `builtIn` becomes `[claude, grok, copilot, cursor, gemini]`. The version string is the same
 one as `toolsets/gemini/manifest.json` `packageVersion`; a unit test says so.
@@ -62,7 +65,8 @@ shape change. Settings lists one row per runtime that has a bundled toolset.
 
 ```json
 { "runtimeID": "gemini",
-  "node": { "version": "v24.21.0", "sha256": { "x86_64": "…", "aarch64": "…" } },
+  "node": { "version": "v24.21.0", "sha256": { "x86_64": "…", "aarch64": "…",
+                                                 "darwin-arm64": "…", "darwin-x64": "…" } },
   "package": "@google/gemini-cli", "packageVersion": "0.61.0",
   "entry": "bundle/gemini.js", "minFreeBytes": 419430400 }
 ```
@@ -76,3 +80,15 @@ The server's runtime recipe is `node <toolset>/node_modules/@google/gemini-cli/b
 `tokenCount {input, output}` and `modelUsage [{model, tokenCount}]`. Mapped into the turn's
 existing usage (tokens, no cost). When `modelUsage` names one model and it differs from the
 session's current model id, the agent's shown model follows it.
+
+## Installed program (interface to the start-up installer, another lane)
+
+What this lane needs from the installer, per program id (`gemini`):
+
+| State | Carries | Gemini agent shows |
+|---|---|---|
+| `ready` | Node path, package folder, version | starts |
+| `installing` | progress, if the installer has it | "Gemini is still being installed" and starts when ready |
+| `failed` | the installer's sentence | that sentence; no start |
+
+Defined here as a protocol with a test double; implemented by the installer lane.

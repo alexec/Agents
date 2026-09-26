@@ -6,8 +6,10 @@
 
 ## Summary
 
-Add Gemini as a fifth entry in `RuntimeCatalog`, started as `npx -y
-@google/gemini-cli@0.61.0 --acp` (D1). The handshake measured on 2026-09-25 (research R2–R8)
+Add Gemini as a fifth entry in `RuntimeCatalog`, started as the installed Node running the
+installed `@google/gemini-cli@0.61.0` with `--acp`. The start-up installer, planned in another
+lane, puts both on the Mac (D1, revised 2026-09-25); this lane adds Gemini's entry to it and
+never installs anything on the Mac itself. The handshake measured on 2026-09-25 (research R2–R8)
 shows most of the work is already generic: sign-in refusal is ACP's `-32000`, resume,
 pictures, modes and models all come from the handshake, and there is no sign-out. What is
 new:
@@ -20,14 +22,16 @@ new:
 3. **Servers**: 043's Claude-only credential, lending and toolset code made per-runtime, then
    a Gemini toolset and a Gemini API key kind (R10).
 
-Pinned on the Mac as well as servers (R1 adjusts D5): one version, moved by one script.
+Pinned, the same version on the Mac and servers (D5), moved by one script. On the Mac the
+installer applies it.
 
 ## Technical Context
 
 **Language/Version**: Swift 6 (strict concurrency), as the rest of the app.
 
-**Primary Dependencies**: Gemini CLI 0.61.0 from npm (run, not linked); Node ≥ 20 on the Mac
-(already required by Claude); 043's server toolset machinery.
+**Primary Dependencies**: Gemini CLI 0.61.0 from npm (run, not linked) and a pinned Node ≥ 20,
+both installed on the Mac by **the start-up installer (another lane, not yet specified)**;
+043's server toolset machinery.
 
 **Storage**: `<root>/runtimes/gemini-policy.toml` (rebuilt each launch); the Gemini API key
 in the Mac's Keychain beside Claude's (043); `App/Resources/toolsets/gemini/`.
@@ -42,7 +46,7 @@ Remote only reads the runtime list.
 
 **Project Type**: desktop app with daemon, bridge and phone client.
 
-**Performance Goals**: SC-001 (first reply ≤ 2 min incl. fetch; measured fetch 5.7 s),
+**Performance Goals**: SC-001 (first reply ≤ 30 s once installed),
 SC-002 (cached start ≤ Claude + 5 s), SC-005 (bare server ≤ 5 min).
 
 **Constraints**: never write to `~/.gemini` (FR-013); key never on server disk (FR-016); no
@@ -123,7 +127,13 @@ folder doesn't stop a turn (R3), `oauth-personal` and `gemini-api-key` over `aut
 (R4), deny also hides the tool (R5), quota error shape (R9). Then `node-pty` on agents-bare
 (R10). Findings go into research.md as R-numbers' "Measured" lines.
 
-**Phase 1: Mac runtime (US1 + US3 together, the MVP).** Catalog entry, policy + policy file,
+**Phase 1: Mac runtime (US1 + US3 together, the MVP).** The runtime's command comes from the
+installer's answer to "where is Gemini, and is it ready": an interface this lane defines
+(`InstalledProgram` lookup: ready at path / installing / failed with a sentence) and the
+installer lane implements. Until it lands, a test double answers, and the live walk uses a
+toolset placed by hand with `scripts/update-gemini-toolset.sh --install-here <dir>`. The agent
+shows "Gemini is still being installed" and starts when the lookup says ready (FR-003); a
+running agent keeps the path it started with (FR-003a). Catalog entry, policy + policy file,
 `PromptResult` quota, briefing's residue/escalation lines follow from the table. Fake-runtime
 tests for the argument-named file and for quota usage; the catalog-totality test gains
 Gemini. A live test gated on `AGENTS_GEMINI=1`. Walk on a scratch root: start, edit, `ls`,
@@ -146,6 +156,10 @@ the spike's key: install, turn, then `leak-check.sh` for the key.
 shows is missing (e.g. the Terminal fallback for `oauth-personal`). Failure sentences for no
 Node (shared with Claude's), fetch offline, bad flag (version named), quota.
 
+**Ships on the Mac only with the installer.** Phases 2–3 (servers) and all of Phase 1 but the
+real install can merge first; the Gemini entry stays out of `RuntimeCatalog.builtIn` on the Mac
+until the installer can install it, so no one is offered a runtime that cannot start.
+
 **Phase 5: Everywhere a runtime is chosen, docs.** Phone/iPad start forms, workflow steps and
 `start_agent` read `RuntimeCatalog.builtIn`, so they should need nothing; verify each and fix
 any hard-coded list found. Four docs pages; `scripts/docs-check.py` passes.
@@ -155,4 +169,4 @@ any hard-coded list found. Four docs pages; `scripts/docs-check.py` passes.
 | Deviation | Why needed | Simpler alternative rejected because |
 |---|---|---|
 | `EnvironmentFile` gains an argument form | Gemini's only additive, per-process lever is `--policy <path>` | `GEMINI_CLI_SYSTEM_SETTINGS_PATH` would override the person's own settings key by key (R5) |
-| Pinned on the Mac, not `@latest` (D5 adjusted) | the ACP surface moves between releases (`--experimental-acp` deprecated) | `@latest` makes every Gemini release an untested change to the app |
+| Mac launch waits on another lane's installer | Alex's D1: the app installs runtime programs at start-up, one installer for all | a Gemini-only downloader would be thrown away when the installer lands |

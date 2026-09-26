@@ -3,8 +3,11 @@
 ## On the Mac
 
 ```text
-npx -y @google/gemini-cli@0.61.0 --acp --policy <root>/runtimes/gemini-policy.toml
+<installed node> <installed package>/bundle/gemini.js --acp --policy <root>/runtimes/gemini-policy.toml
 ```
+
+Both paths come from the start-up installer's `gemini` entry when the agent starts. Nothing is
+looked up on the PATH, so a person's own `gemini` is never used.
 
 - cwd: the agent's folder (or worktree), as for every runtime.
 - Environment: the login shell's (`LoginShellPath.environment()`), unchanged. Gemini's own
@@ -53,5 +56,6 @@ effect outside them. (Exact priority band confirmed in the spike against Gemini'
 |---|---|
 | `session/new` error `-32000` | **Needs signing in** + sheet (existing path) |
 | process exits before `initialize` answers, stderr names an unknown argument | "Gemini <version> did not start in a mode the app can talk to." |
-| npx exits non-zero before starting, stderr from npm | "Could not download Gemini: <npm's reason>." |
+| installer says `installing` | "Gemini is still being installed." (starts when ready) |
+| installer says `failed` | the installer's sentence |
 | prompt error / refusal carrying `RESOURCE_EXHAUSTED` or 429 | "Gemini's quota ran out: <Gemini's sentence>." (shape settled in the spike) |
