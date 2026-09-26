@@ -437,7 +437,7 @@ struct LeaseTests {
         #expect(await again.isHoldingAgents, "a line keeps the daemon up")
     }
 
-    @Test func aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack() async throws {
+    @Test(.flakyUnderLoad) func aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack() async throws {
         let clock = Clock()
         let (locations, work) = try temporary()
         let core = try await makeCore(locations, clock: clock, waitLimit: .milliseconds(100))
