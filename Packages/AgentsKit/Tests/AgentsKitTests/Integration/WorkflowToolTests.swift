@@ -436,4 +436,28 @@ struct WorkflowToolTests {
         #expect(await core.autoAllowed(request(named: "mcp__agents__\(AppTool.manageWorkflows)")) != nil)
         #expect(await core.autoAllowed(request(named: "Write")) == nil)
     }
+
+    /// The tool's description is what the agent tells the person, so it must say what
+    /// happens: the app answers for the tool without asking anyone, a write is live at
+    /// once, and the person's controls afterwards are the ones the page has.
+    @Test func theDescriptionSaysWritingAsksNobody() async throws {
+        let description = AppService.workflowTool["description"]?.stringValue ?? ""
+        #expect(!description.contains("removing one asks"))
+        #expect(!description.contains("if they decline"))
+        #expect(description.contains("Nothing here asks the person first."))
+
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        let asked = PermissionRequest(
+            agentID: agentID,
+            toolCall: ToolCall(title: AppTool.manageWorkflows, name: "mcp__agents__\(AppTool.manageWorkflows)"),
+            options: [PermissionOption(optionID: "allow", name: "Allow", kind: .allowAlways)])
+        #expect(await core.autoAllowed(asked) != nil)
+
+        let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+        #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "advisories", in: work).path))
+        #expect(answer.contains("It is live now"))
+        #expect(!answer.contains("pause"))
+    }
 }
