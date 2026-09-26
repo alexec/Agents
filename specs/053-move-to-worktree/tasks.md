@@ -415,14 +415,14 @@ of the turn, with Cancel.
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T042 [P] Docs, per the spec's Docs section:
+- [X] T042 [P] Docs, per the spec's Docs section:
   - `docs/how-to/start-in-a-worktree.md`: add "Move an agent that is already working".
   - `docs/explanation/projects-hosts-worktrees.md`: an agent's folder can change, and what
     follows it.
   - `docs/reference/agent-tools.md`: add `enter_worktree` and `exit_worktree`.
 
   Run `python3 scripts/docs-check.py`.
-- [ ] T043 [P] Check that the Remote builds, and that `Remote/Sources/Projects/AgentCard.swift`'s
+- [X] T043 [P] Check that the Remote builds, and that `Remote/Sources/Projects/AgentCard.swift`'s
   worktree badge and the chat's runtime notes show a moved agent from the record alone. There's
   no phone UI for moving. Build the Remote for the generic simulator only (memory: no throwaway
   simulators).
