@@ -362,6 +362,12 @@ public actor DaemonCore {
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
     /// battery to spare and no window that could start it again on its own.
     var exitsWhenIdle = true
+    /// What each connection said it could lend (043): names only.
+    var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
+    /// What each connection has lent, in memory only, dropped when it closes (043, R6).
+    var lentCredentials: [UUID: [String: Secret]] = [:]
+    /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
+    var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
     var quitRequested = false
     /// The last few hundred sends that carried a `sendID`, and what each came to (037).
@@ -1050,7 +1056,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
         let environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LoginShellPath.environment())
+            .environment(for: policy, onto: LentEnvironment.applied(to: LoginShellPath.environment()))
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                      arguments: runtime.arguments + policy.launchArguments,
                                      cwd: cwd,

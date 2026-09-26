@@ -74,6 +74,7 @@ struct AddServerSheet: View {
             step("Connect", .done)
             step("Check the system", .done, detail: flow.system)
             step("Set up", .done)
+            claudeStep(flow)
             if runtimes.isEmpty {
                 step("Find agent runtimes", .warning,
                      detail: "No agent runtime on \(flow.label). Install one there and log in, then choose Check again.")
@@ -113,7 +114,10 @@ struct AddServerSheet: View {
 
     @ViewBuilder
     private func checklist(_ flow: AddServerFlow, current: ServerConnection.Step) -> some View {
-        ForEach([ServerConnection.Step.connect, .checkSystem, .setUp, .findRuntimes], id: \.self) { step in
+        let steps: [ServerConnection.Step] = flow.installsClaude
+            ? [.connect, .checkSystem, .setUp, .installClaude, .findRuntimes]
+            : [.connect, .checkSystem, .setUp, .findRuntimes]
+        ForEach(steps, id: \.self) { step in
             let mark: Mark = flow.done.contains(step) ? .done : step == current ? .current : .waiting
             self.step(title(step), mark, detail: step == .checkSystem && mark == .done ? flow.system : nil)
         }
@@ -124,7 +128,33 @@ struct AddServerSheet: View {
         case .connect: "Connect"
         case .checkSystem: "Check the system"
         case .setUp: "Set up"
+        case .installClaude: "Install Claude"
         case .findRuntimes: "Find agent runtimes"
+        }
+    }
+
+    /// Install Claude, once the server is ready (043, contracts/ui.md § 4). With no token
+    /// in Settings nothing was installed, and the sheet says when it will be.
+    @ViewBuilder
+    private func claudeStep(_ flow: AddServerFlow) -> some View {
+        switch flow.claude {
+        case .ready:
+            step("Install Claude", .done, detail: "Installed by Agents")
+        case .own:
+            step("Install Claude", .done, detail: "\(flow.label) has its own; Agents uses it")
+        case .installing:
+            step("Install Claude", .current)
+        case .updateWaiting:
+            step("Install Claude", .warning, detail: "Waiting for a turn to end")
+        case .failed(let problem):
+            step("Install Claude", .failed, detail: problem.sentence(name: flow.trimmedName, label: flow.label))
+            HStack {
+                Spacer()
+                Button("Try again") { Task { await flow.installClaude() } }.controlSize(.small)
+            }
+        case .notInstalled, .unknown:
+            Text("Claude will be installed the first time you start it here.")
+                .appText(.fine).foregroundStyle(.secondary)
         }
     }
 

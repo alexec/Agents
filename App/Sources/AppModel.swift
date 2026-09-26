@@ -335,6 +335,10 @@ final class AppModel {
     private let client = DaemonClient()
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
+    /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
+    let credentials = ServerCredentials(locations: .default)
+    /// A server asked for a credential there is none of; the window asks the person (043).
+    var tokenAsk: TokenAsk?
     /// What a server with no connection answers through: nothing, at once.
     private static let unreachable = DaemonClient(link: UnreachableLink())
 
@@ -982,6 +986,17 @@ final class AppModel {
         hosts.onNotification = { [weak self] host, method, params in
             await self?.receivedFromServer(host, method, params)
         }
+        hosts.offerFor = { [weak self] id in self?.credentialOffer(id) }
+        hosts.lenderFor = { [weak self] id in
+            { [weak self] wanted in
+                guard let model = self else { return false }
+                return await model.answerCredentialWanted(wanted, on: id)
+            }
+        }
+        hosts.claudeWanted = { [weak self] id in
+            guard let self else { return false }
+            return self.credentials.record("claude") != nil && !(self.hosts.host(id)?.ownSignInOnly ?? false)
+        }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
         }
@@ -995,6 +1010,13 @@ final class AppModel {
         switch method {
         case DaemonAPI.Notification.costChanged:
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
+            noteServerSpent(host)
+            return
+        case DaemonAPI.Notification.credentialRefused:
+            // The token in Settings was refused: Settings turns red, and says why (043).
+            if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self), refused.lent {
+                credentials.markRefused(refused.runtime)
+            }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged:
@@ -1058,6 +1080,7 @@ final class AppModel {
         if let listed = try? await server.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
                                                returning: [DaemonAPI.ProjectSummary].self) {
             work.replaceProjects(listed, from: host)
+            hosts.noteProjects(host, listed: listed)
             settleProjectSelection()
         }
         let theirs = Set(work.agents.filter { $0.host == host }.map(\.id))

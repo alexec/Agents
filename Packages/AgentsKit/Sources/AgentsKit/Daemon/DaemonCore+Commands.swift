@@ -385,9 +385,14 @@ extension DaemonCore {
                                message: "\(runtime.name) is not installed, or is not where we looked.",
                                data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
         }
+        // Before anything starts, and outside the catch below: wanting a credential is not
+        // the runtime failing, and the window answers it by lending one (043).
+        let lent = try launchEnvironment(for: runtime.id)
         var launched: ACPSession?
         do {
-            let session = try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+            let session = try LentEnvironment.$value.withValue(lent) {
+                try launcher.launch(runtime: runtime, path: path, cwd: cwd)
+            }
             launched = session
             let handshake = try await session.initialize()
             // Recorded here rather than after the session is made, because the reason
@@ -750,8 +755,13 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.worktreeMissing,
                                message: "The worktree \(worktree.name) is gone, so this agent cannot be picked up where it was.")
         }
+        // Before anything is said or started: wanting a credential leaves the agent as it
+        // was, and the window lends one and asks again (043).
+        let lent = try launchEnvironment(for: runtime.id)
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
-        let session = try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        let session = try LentEnvironment.$value.withValue(lent) {
+            try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        }
         do {
             return try await connect(session, runtime: runtime, for: agent)
         } catch {
@@ -1083,9 +1093,18 @@ extension DaemonCore {
         // transport threw is for whoever is debugging the runtime, not for the
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
-        await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
+        let refused = credentialRefusal(agentID: agentID, error: error)
+        if let refused {
+            // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
+            await record(.runtimeNote(refused.lent
+                ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
+                : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
+            broadcast(DaemonAPI.Notification.credentialRefused, refused)
+        } else {
+            await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
+        }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        await move(agentID, on: .processDied)
+        await move(agentID, on: refused == nil ? .processDied : .turnEnded(.signInRefused))
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.

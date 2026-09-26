@@ -23,6 +23,17 @@ public actor DaemonClient {
     private let link: any DaemonLink
     private var connection: JSONRPCConnection?
 
+    /// What answers a server's `credentialWanted` (043): lends a credential on this
+    /// connection, asking the person first if there is none, and says whether it did.
+    /// When it did, the call that was refused is sent once more, as it was — a send's
+    /// `sendID` or a start's `requestID` makes that the same send, not a second one.
+    public typealias CredentialLender = @Sendable (DaemonAPI.CredentialWanted) async -> Bool
+    private var lender: CredentialLender?
+
+    public func setCredentialLender(_ lender: CredentialLender?) {
+        self.lender = lender
+    }
+
     public init(link: any DaemonLink) {
         self.link = link
     }
@@ -73,7 +84,14 @@ public actor DaemonClient {
     @discardableResult
     public func call(_ method: String, _ params: (some Encodable)? = Optional<String>.none) async throws -> JSONValue {
         let value = try params.map { try JSONValue.encoding($0) }
-        return try await connected().call(method, value)
+        do {
+            return try await connected().call(method, value)
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.credentialWanted {
+            guard let lender, let data = error.data,
+                  let wanted = try? data.decode(DaemonAPI.CredentialWanted.self),
+                  await lender(wanted) else { throw error }
+            return try await connected().call(method, value)
+        }
     }
 
     public func call<T: Decodable>(_ method: String, _ params: (some Encodable)? = Optional<String>.none,

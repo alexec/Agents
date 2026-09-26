@@ -25,6 +25,8 @@ actor FakeACPAgent {
         var permission: JSONValue?
         /// Answer `session/resume` and `session/load` with this error instead.
         var sessionGoneError: JSONRPCError?
+        /// What `session/prompt` fails with instead of taking a turn (043: a refused sign-in).
+        var promptError: JSONRPCError?
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
         /// What the runtime says on its way out, sent while answering `session/close`.
@@ -176,6 +178,7 @@ actor FakeACPAgent {
 
         case ACP.Method.prompt:
             promptContent = params?["prompt"]
+            if let error = script.promptError { return .failure(error) }
             return await runTurn()
 
         case ACP.Method.authenticate, ACP.Method.logout:

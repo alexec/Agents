@@ -38,6 +38,10 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// reason, so `init(stopReason:)` never produces it.
     case stoppedByAgent
 
+    /// The provider refused the sign-in the runtime was started with (043, FR-016): not
+    /// a crash, and not something another try fixes until the token is replaced.
+    case signInRefused
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -55,6 +59,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .costLimit: return "Reached its cost limit"
         case .unrecognised: return "Stopped for a reason we do not know"
         case .stoppedByAgent: return "Stopped by the agent that started it"
+        case .signInRefused: return "Its sign-in was refused"
         }
     }
 

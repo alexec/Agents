@@ -1,0 +1,3 @@
+#!/bin/sh
+# What `ldd --version` says first on the server (043). A Mac has no ldd.
+echo "${FAKE_SSH_LDD:-ldd (Debian GLIBC 2.36-9+deb12u14) 2.36}"

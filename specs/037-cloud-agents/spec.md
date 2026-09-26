@@ -232,7 +232,7 @@ project folders on the server are unchanged.
 - **Servers are Linux on x86-64 or ARM64** (Alex's choice). A Mac as a server, and other systems, are out of scope for this version.
 - **A project lives on one host** (Alex's choice). Local and server projects share one list; there is no mode that switches the whole window to a server.
 - **Key-based SSH only.** The app relies on the person's SSH agent and keys; a server that can only be reached with a typed password is out of scope, and the app says so.
-- **Agent runtimes are the person's to install and log in on the server.** The app finds what is installed and uses it, and does not copy the Mac's credentials or logins to the server. It may point to the server's terminal as the place to log in.
+- **Agent runtimes are the person's to install and log in on the server.** The app finds what is installed and uses it, and does not copy the Mac's credentials or logins to the server. It may point to the server's terminal as the place to log in. *Replaced for Claude by 043 (zero-setup servers): the app installs Claude's toolset on the server and lends a token from Settings; the other runtimes are still as here.*
 - **Git credentials on the server are the server's.** Cloning a private repository there uses whatever access the server has, not the Mac's.
 - **iPhone and iPad see only the Mac's projects in this version.** The remotes reach the Mac's daemon through the existing mailbox; reaching server projects from a phone (through the Mac, or directly) is a follow-up.
 - **A server is used by one person.** Several Macs belonging to the same person may connect; sharing a server's daemon between different people is out of scope.

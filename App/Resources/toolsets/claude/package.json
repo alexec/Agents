@@ -1,0 +1,5 @@
+{
+  "name": "agents-claude-toolset",
+  "private": true,
+  "dependencies": { "@agentclientprotocol/claude-agent-acp": "0.81.2" }
+}

@@ -207,6 +207,13 @@ public enum DaemonAPI {
         public static let daemonStatus = "daemon/status"
         /// Go now, rather than when idle. A server's daemon never leaves for being idle.
         public static let daemonQuit = "daemon/quit"
+        /// Which runtimes this window could lend a credential for, and whether this server
+        /// takes lends at all. Names only; sent on every connect to a server (043).
+        public static let credentialsOffer = "credentials/offer"
+        /// A credential for one runtime, for this connection only, sent only after the
+        /// daemon answered `credentialWanted`. Held in memory and dropped when the
+        /// connection closes; a daemon without `--serve` refuses it (043, D5).
+        public static let credentialsLend = "credentials/lend"
         /// The folders at a path, before there is any project or agent to scope it to:
         /// what the window browses to choose a server folder as a project (037).
         public static let filesBrowse = "files/browse"
@@ -245,6 +252,9 @@ public enum DaemonAPI {
         public static let agentChanged = "agent/changed"
         public static let agentEntry = "agent/entry"
         public static let agentPermission = "agent/permission"
+        /// A server's runtime refused the credential it was started with, or found none
+        /// (043, FR-016). `CredentialRefused`.
+        public static let credentialRefused = "credentials/refused"
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
         public static let agentUsage = "agent/usage"
@@ -1371,6 +1381,17 @@ public enum DaemonAPI {
         public static let noSuchNeed = -32021
         /// A daemon asked to quit while a turn is in flight (037).
         public static let busy = -32040
+        /// A server daemon had to start a runtime for this request and has no sign-in to
+        /// start it with. Nothing was started, so the same request (same `sendID`) can be
+        /// sent again after `credentials/lend` (043). `data`: `runtime`, `offered`.
+        public static let credentialWanted = -32036
+        /// The provider refused the credential a runtime was started with (043, FR-016).
+        public static let credentialRefused = -32037
+        /// `credentials/lend` to a daemon that is not a server's (043, D5).
+        public static let notAServer = -32038
+        /// `credentials/lend` for a runtime this connection did not offer, or on a
+        /// connection that said the server uses its own sign-in only (043, FR-014).
+        public static let notOffered = -32039
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -2029,6 +2050,63 @@ public extension DaemonAPI {
         public var stopAgents: Bool
 
         public init(stopAgents: Bool) { self.stopAgents = stopAgents }
+    }
+}
+
+public extension DaemonAPI {
+    /// `credentials/offer` (043).
+    struct CredentialsOffer: Codable, Hashable, Sendable {
+        public var runtimes: [String]
+        public var ownSignInOnly: Bool
+
+        public init(runtimes: [String], ownSignInOnly: Bool) {
+            self.runtimes = runtimes
+            self.ownSignInOnly = ownSignInOnly
+        }
+    }
+
+    /// `credentials/lend` (043). The one message that carries a credential's text. It is
+    /// never logged: the server prints only the method's name for it.
+    struct CredentialsLend: Codable, Hashable, Sendable, CustomStringConvertible, CustomReflectable {
+        public var runtime: String
+        public var kind: CredentialKind
+        public var secret: String
+
+        public var description: String { "CredentialsLend(\(runtime), \(kind.rawValue))" }
+        public var customMirror: Mirror { Mirror(self, children: ["runtime": runtime, "kind": kind]) }
+
+        public init(runtime: String, secret: Secret) {
+            self.runtime = runtime
+            self.kind = secret.kind
+            self.secret = secret.reveal()
+        }
+    }
+
+    /// `credentials/refused` (043): which agent stopped, and whether it was the token this
+    /// window lent (`lent`) or the server's own sign-in that was refused.
+    struct CredentialRefused: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var runtime: String
+        public var lent: Bool
+
+        public init(agentID: UUID, runtime: String, lent: Bool) {
+            self.agentID = agentID
+            self.runtime = runtime
+            self.lent = lent
+        }
+    }
+
+    /// The `data` of a `credentialWanted` failure (043).
+    struct CredentialWanted: Codable, Hashable, Sendable {
+        public var runtime: String
+        /// The connection offered a credential for this runtime: the window has one and
+        /// can lend it without asking. False means it has none to lend.
+        public var offered: Bool
+
+        public init(runtime: String, offered: Bool) {
+            self.runtime = runtime
+            self.offered = offered
+        }
     }
 }
 

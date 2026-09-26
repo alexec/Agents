@@ -1,0 +1,11 @@
+#!/bin/sh
+# The server's curl (043): serves https://nodejs.org/dist/<path> from $FAKE_TOOLS_MIRROR/<path>,
+# so installing Claude's toolset runs end to end with no network.
+#   FAKE_CURL_FAIL=resolve   as when the server has no internet
+url=""; for a in "$@"; do case "$a" in -*) ;; *) url="$a" ;; esac; done
+if [ "$FAKE_CURL_FAIL" = resolve ]; then
+    echo "curl: (6) Could not resolve host: ${url#https://}" | sed 's#/.*##' >&2; exit 6
+fi
+file="$FAKE_TOOLS_MIRROR/${url#https://nodejs.org/dist/}"
+[ -f "$file" ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
+exec cat "$file"

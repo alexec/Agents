@@ -8,6 +8,8 @@
 #   FAKE_SSH_UNAME        what `uname -sm` says on the server (default "Linux aarch64")
 #   FAKE_SSH_KNOWN_HOSTS  what `ssh -G` reports as userknownhostsfile
 #   FAKE_SSH_LOG          every argv is appended here, one per line
+#   FAKE_SSH_PATH         the server's PATH after bin/ (043), with a login shell that reads no profile, so that
+#                         this Mac's own npx and curl are not the server's
 
 here=$(cd "$(dirname "$0")" && pwd)
 [ -n "$FAKE_SSH_LOG" ] && printf '%s\n' "$*" >> "$FAKE_SSH_LOG"
@@ -95,4 +97,7 @@ if [ -n "$ctl" ] && ! alive; then
 fi
 [ -n "$FAKE_SSH_HOME" ] || { echo "fake ssh: FAKE_SSH_HOME is not set" >&2; exit 255; }
 cd "$FAKE_SSH_HOME" || exit 255
+if [ -n "$FAKE_SSH_PATH" ]; then
+    HOME="$FAKE_SSH_HOME" SHELL="$here/loginsh" PATH="$here/bin:$FAKE_SSH_PATH" exec /bin/sh -c "$*"
+fi
 HOME="$FAKE_SSH_HOME" PATH="$here/bin:$PATH" exec /bin/sh -c "$*"

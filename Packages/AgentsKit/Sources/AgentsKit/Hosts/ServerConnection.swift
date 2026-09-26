@@ -37,19 +37,43 @@ public actor ServerConnection {
     }
 
     public enum Step: String, Sendable, Equatable {
-        case connect, checkSystem, setUp, findRuntimes
+        case connect, checkSystem, setUp, installClaude, findRuntimes
+    }
+
+    /// Claude's toolset on this server (043). Apart from `state`, because none of it makes
+    /// the server unusable: a failed install leaves its files, terminal and other runtimes.
+    public enum Claude: Sendable, Equatable {
+        /// Not looked at yet, or the app carries no toolset.
+        case unknown
+        /// Nothing installed, and nothing asked for it yet (FR-002).
+        case notInstalled
+        case installing
+        /// The app's toolset, this id.
+        case ready(String)
+        /// The person's own install (037's npx on their PATH), used as it is (FR-005).
+        case own
+        case failed(HostProblem)
+        /// A newer toolset is installed beside the old; it takes over once no turn is in flight.
+        case updateWaiting
     }
 
     public nonisolated let hostID: HostID
     public nonisolated let client: DaemonClient
     public private(set) var state: State = .idle
     public private(set) var facts: ServerFacts?
+    public private(set) var claude: Claude = .unknown
 
     private nonisolated let master: SSHMaster
     private let installer: ServerInstaller
     private let binary: @Sendable (Architecture) async -> ServerBinary?
     private let installedBy: String
+    private let tools: ToolsetInstaller
+    private let toolset: @Sendable () -> Toolset?
+    private let wantsClaude: @Sendable () async -> Bool
+    private let offer: @Sendable () async -> DaemonAPI.CredentialsOffer?
+    private let lender: DaemonClient.CredentialLender?
     private var onState: (@Sendable (State) async -> Void)?
+    private var onClaude: (@Sendable (Claude) async -> Void)?
     private var wasConnected = false
     private var isConnecting = false
 
@@ -58,13 +82,26 @@ public actor ServerConnection {
     ///   - socket: the forward's local end, `<root>/hosts/<id>.sock`.
     ///   - binary: what to install on a server of this architecture; nil when the app
     ///     has none for it.
+    ///   - toolset: Claude's toolset, to install when `wantsClaude` says so (043); nil
+    ///     when the app carries none.
+    ///   - wantsClaude: whether to install Claude as the server connects: the window has a
+    ///     credential for it (FR-002). Otherwise it waits for `installClaude()`.
     public init(hostID: HostID, ssh: SSHCommand, socket: URL, installedBy: String,
-                binary: @escaping @Sendable (Architecture) async -> ServerBinary?) {
+                binary: @escaping @Sendable (Architecture) async -> ServerBinary?,
+                toolset: @escaping @Sendable () -> Toolset? = { nil },
+                wantsClaude: @escaping @Sendable () async -> Bool = { false },
+                offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
+                lender: DaemonClient.CredentialLender? = nil) {
+        self.offer = offer
+        self.lender = lender
         self.hostID = hostID
         let master = SSHMaster(command: ssh, socket: socket)
         let installer = ServerInstaller(ssh: ssh)
         self.master = master
         self.installer = installer
+        self.tools = ToolsetInstaller(ssh: ssh)
+        self.toolset = toolset
+        self.wantsClaude = wantsClaude
         self.binary = binary
         self.installedBy = installedBy
         self.client = DaemonClient(link: ServerLink(socket: socket, installer: installer) {
@@ -77,6 +114,10 @@ public actor ServerConnection {
 
     public func setOnState(_ handler: @escaping @Sendable (State) async -> Void) {
         onState = handler
+    }
+
+    public func setOnClaude(_ handler: @escaping @Sendable (Claude) async -> Void) {
+        onClaude = handler
     }
 
     public func connect() async {
@@ -148,11 +189,85 @@ public actor ServerConnection {
         try await master.start(forwardingTo: Self.daemonSocket(home: probed.home))
         try await client.connect(timeout: .seconds(20))
         try? await installer.removeBinaries(except: wanted.sha256)
+        await offerCredentials()
+
+        await settleClaude(probed)
 
         await move(.connecting(.findRuntimes))
         wasConnected = true
         await master.setOnExit { [weak self] in await self?.lost() }
         await move(.connected)
+    }
+
+    // MARK: Credentials (043)
+
+    /// Tell the server's daemon what this window could lend, on every connect: a lend
+    /// lasts only as long as the connection it was made on. Names only.
+    public func offerCredentials() async {
+        await client.setCredentialLender(lender)
+        guard let offer = await offer() else { return }
+        _ = try? await client.call(DaemonAPI.Method.credentialsOffer, offer)
+    }
+
+    /// Lend a credential on this connection. Only after the daemon asked for it.
+    public func lend(_ runtimeID: String, _ secret: Secret) async -> Bool {
+        (try? await client.call(DaemonAPI.Method.credentialsLend,
+                                DaemonAPI.CredentialsLend(runtime: runtimeID, secret: secret))) != nil
+    }
+
+    // MARK: Claude's toolset (043)
+
+    /// On connect: say how Claude stands, and install or update its toolset when the window
+    /// has a credential for it. Never throws: the server is usable either way.
+    private func settleClaude(_ probed: ServerFacts) async {
+        guard let toolset = toolset() else { return await moveClaude(.unknown) }
+        if probed.toolsetID == toolset.id {
+            // Old toolsets go only when nothing could still be running from one: an agent
+            // idle between turns keeps its process, and that process its files.
+            if await agentsLive() == 0 { try? await tools.removeOthers(except: toolset.id) }
+            return await moveClaude(.ready(toolset.id))
+        }
+        if probed.toolsetID == nil, probed.hasNpx { return await moveClaude(.own) }
+        let wanted = await wantsClaude()
+        guard probed.toolsetID != nil || wanted else { return await moveClaude(.notInstalled) }
+        await move(.connecting(.installClaude))
+        await install(toolset, on: probed)
+    }
+
+    /// Install Claude now: the person chose it on this server, or asked to try again.
+    /// Waits for the install, and says how it went in `claude`.
+    public func installClaude() async {
+        guard let toolset = toolset(), let facts, state == .connected || state == .updateWaiting else { return }
+        await install(toolset, on: facts)
+    }
+
+    private func install(_ toolset: Toolset, on facts: ServerFacts) async {
+        await moveClaude(.installing)
+        do {
+            // An update already downloaded and waiting for a turn to end is not fetched again.
+            if !(await tools.isInstalled(toolset.id)) {
+                try await tools.install(toolset, on: facts)
+            }
+            // Replacing one in use waits for its turns to end (FR-007): what is running
+            // keeps its files; the swap is tried again on the next connect.
+            if facts.toolsetID != nil, (try? await daemonIsBusy()) == true {
+                return await moveClaude(.updateWaiting)
+            }
+            try await tools.swap(to: toolset.id)
+            // A first install has nothing to tidy; an update's old toolset is removed on a
+            // later connect with no agent live (see `settleClaude`).
+            self.facts?.toolsetID = toolset.id
+            await moveClaude(.ready(toolset.id))
+        } catch let problem as HostProblem {
+            await moveClaude(.failed(problem))
+        } catch {
+            await moveClaude(.failed(.toolsetInstallFailed("\(error)")))
+        }
+    }
+
+    private func moveClaude(_ next: Claude) async {
+        claude = next
+        await onClaude?(next)
     }
 
     /// Whether the running daemon has a turn in flight. A daemon that is not answering

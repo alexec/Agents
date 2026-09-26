@@ -12,6 +12,17 @@ struct ServersSettingsView: View {
     var body: some View {
         Form {
             Section {
+                ForEach(ServerCredentials.runtimes, id: \.self) { runtimeID in
+                    CredentialRow(runtimeID: runtimeID,
+                                  name: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)
+                }
+            } header: {
+                Text("Signing in on servers")
+            } footer: {
+                Text("Used only by agents on servers; agents on this Mac use this Mac’s own sign-in. Kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
+            }
+            .paperListRow()
+            Section {
                 if model.hosts.isEmpty {
                     Text("No servers yet. Add one by the name you use with ssh.")
                         .foregroundStyle(.secondary)
@@ -66,7 +77,14 @@ private struct ServerLine: View {
                     .appText(.fine).foregroundStyle(.secondary)
             }
             Text(subtitle).appText(.fine).foregroundStyle(.secondary)
+            Text(model.hosts.claudeLine(host.id, hasCredential: model.credentials.record("claude") != nil))
+                .appText(.fine).foregroundStyle(.secondary)
             if isChosen {
+                Toggle("Use this server’s own sign-in only", isOn: Binding(
+                    get: { model.hosts.host(host.id)?.ownSignInOnly ?? false },
+                    set: { model.hosts.setOwnSignInOnly(host.id, $0) }))
+                    .appText(.fine)
+                    .help("Nothing from Settings is ever sent to this server. For a server you share.")
                 HStack {
                     Spacer()
                     Button("Check again", action: checkAgain)

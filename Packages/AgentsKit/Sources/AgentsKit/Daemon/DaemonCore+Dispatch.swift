@@ -9,10 +9,29 @@ extension DaemonCore {
     /// somebody, and the one thing a caller must not be able to say is who it is.
     public func handle(method: String, params: JSONValue?,
                        from surface: Surface? = nil, connection: UUID? = nil) async -> Result<JSONValue, JSONRPCError> {
+        // Who asked travels with the work, so a runtime started deep inside it is started
+        // with what that connection lent (043).
+        await RequestConnection.$current.withValue(connection) {
+            await dispatch(method: method, params: params, from: surface, connection: connection)
+        }
+    }
+
+    private func dispatch(method: String, params: JSONValue?,
+                          from surface: Surface?, connection: UUID?) async -> Result<JSONValue, JSONRPCError> {
         do {
             switch method {
             case DaemonAPI.Method.ping:
                 return .success(["ok": true])
+
+            case DaemonAPI.Method.credentialsOffer:
+                let request = try require(params, as: DaemonAPI.CredentialsOffer.self)
+                offerCredentials(request, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.credentialsLend:
+                let request = try require(params, as: DaemonAPI.CredentialsLend.self)
+                try lendCredential(request, connection: connection)
+                return .success([:])
 
             case DaemonAPI.Method.filesWrite:
                 let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)

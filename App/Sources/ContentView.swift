@@ -92,6 +92,13 @@ struct ContentView: View {
             NavigationSplitView(columnVisibility: $columns) {
                 ProjectListView(selection: $model.sidebarItem)
                     .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+                    // A server asked for a credential there is none of (043).
+                    .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+                    // A known server with a new key: rebuilt, or not what it says (043).
+                    .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
+                                         set: { model.hosts.rebuiltAsk = $0 })) { host in
+                        RebuiltServerSheet(host: host).paperSheet()
+                    }
             } detail: {
                 // Spending is a page here rather than a window of its own, so closing
                 // it is picking a project again and the window keeps its place. It
