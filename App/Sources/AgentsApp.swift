@@ -13,22 +13,19 @@ struct AgentsApp: App {
     @State private var requests = WindowRequests()
     @State private var frame = SidebarFrame()
 
-    init() {
-        // No tabs: the only way left to a second window, and a second window would be a
-        // mirror of the first, because what is selected lives on the one model.
-        NSWindow.allowsAutomaticWindowTabbing = false
-    }
-
     var body: some Scene {
         // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
         // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a
-        // `Window` scene, because the window state a `WindowGroup` saved restores no
-        // window into one, and the app then opens with nothing on screen.
+        // `Window` scene, for the same reason as the note below: the window saved by
+        // this group would restore into nothing.
         WindowGroup {
-            ContentView()
+            // Exactly `ContentView().environment(model).onChange(…)` and nothing more.
+            // SwiftUI names the saved window after this whole type, modifiers and all,
+            // so one more modifier here renames it: the window saved last time matches
+            // no scene, and the app opens with none. What the window needs besides the
+            // model goes in through `ContentView`'s own properties instead.
+            ContentView(requests: requests, frame: frame)
                 .environment(model)
-                .environment(requests)
-                .environment(frame)
                 .onChange(of: appearance, initial: true) { Appearance.apply(appearance) }
         }
         .defaultSize(width: 1_100, height: 720)

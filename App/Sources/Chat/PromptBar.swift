@@ -68,10 +68,11 @@ struct PromptBar: View {
     /// Take the words. They land in the field rather than going: the agent wrote
     /// them, and sending them is still the user's move.
     private func takeFocusIfAsked() {
-        guard requests.wantsPromptFocus, agent == nil else { return }
+        guard requests.wantsPromptFocus, folderIsFixed else { return }
         requests.wantsPromptFocus = false
-        // After the page has settled: focus asked for mid-push lands nowhere.
-        DispatchQueue.main.async { focused = true }
+        // After the page has settled: from inside a chat, this bar is already there under
+        // the chat, and focus asked for before the chat has popped off it lands nowhere.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focused = true }
     }
 
     private func takeSuggestion() {
@@ -141,8 +142,9 @@ struct PromptBar: View {
             // and all — see `KeepsDrafts`. Words meant for one agent still never reach
             // the next: the bar only ever holds what belongs to where it is.
         }
-        // File ▸ New Session: the keyboard goes where the session starts, which is a
-        // bar with no agent yet. The chat's own bar, on its way out, leaves it alone.
+        // File ▸ New Session: the keyboard goes where the session starts, the project
+        // page's bar. The chat's own bar, on its way out, has no agent by then either,
+        // so it is told apart by being the one whose folder is not fixed.
         .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.

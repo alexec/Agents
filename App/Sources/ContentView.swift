@@ -3,8 +3,10 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    /// The app's, so the menu bar can open and switch it too.
-    @Environment(SidebarFrame.self) private var frame
+    /// The app's, so the menu bar can reach them too. Passed in rather than set on the
+    /// scene's content: see the note in `AgentsApp`.
+    let requests: WindowRequests
+    let frame: SidebarFrame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
     /// Which columns are showing. The projects stay put: moving between them is the
@@ -119,7 +121,14 @@ struct ContentView: View {
                     // `pages` is read here, in the body, so that opening a workflow
                     // invalidates it. See the note on `pages`.
                     let path = pages
-                    NavigationStack(path: Binding(get: { path }, set: { show($0.last) })) {
+                    // Written back only while this stack's project is still the one
+                    // picked: the stack being replaced (see `.id` below) pops itself on
+                    // the way out, and that pop would close the chat just opened.
+                    let key = model.selectedProjectKey
+                    NavigationStack(path: Binding(get: { path }, set: { pages in
+                        guard model.selectedProjectKey == key else { return }
+                        show(pages.last)
+                    })) {
                         ProjectAgentsView(selection: $model.selection)
                             .paperGround()
                             .navigationDestination(for: Page.self) { page in
@@ -135,13 +144,23 @@ struct ContentView: View {
                                 }
                             }
                     }
+                    // One stack per project. Opening a chat in another project (Go ▸
+                    // Next Needing Attention, a banner, Resources) changes the project and
+                    // the chat at once; a stack kept across that shows the new project's
+                    // page and never pushes the chat. A fresh one starts on the path.
+                    .id(model.selectedProjectKey)
                 }
             }
         }
         .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
+        .environment(frame)
+        .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
         .task { await model.stayConnected() }
+        // No tabs: the only way left to a second window, and a second window would be a
+        // mirror of the first, because what is selected lives on the one model.
+        .onAppear { NSWindow.allowsAutomaticWindowTabbing = false }
         // An agent asking to be looked at is the one thing that opens this column by
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
