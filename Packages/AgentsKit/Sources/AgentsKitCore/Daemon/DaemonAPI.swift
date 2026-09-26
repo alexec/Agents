@@ -296,6 +296,11 @@ public enum DaemonAPI {
         public static let poolMarkAvailable = "pool/markAvailable"
         /// Stop a chat waiting for an allowance (052, US4).
         public static let poolStopWaiting = "pool/stopWaiting"
+        /// Carry a chat on with another runtime by hand, or change what an automatic
+        /// switch carried on with (052, US5). A preview unless `confirmed`.
+        public static let agentsContinueWith = "agents/continueWith"
+        /// A chat's own "carry on when this runs out" (052, FR-003).
+        public static let agentsSetSwitching = "agents/setSwitching"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -1034,6 +1039,63 @@ public enum DaemonAPI {
         public init(entryID: UUID) { self.entryID = entryID }
     }
 
+    /// `agents/continueWith` (US5). Name the runtime by its pool entry, or by id for one
+    /// outside the pool; or `adjust` the settings the chat is on after an automatic switch.
+    public struct ContinueWithRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var entryID: UUID?
+        public var runtimeID: String?
+        public var adjust: Bool
+        public var choices: [String: JSONValue]
+        public var confirmed: Bool
+
+        public init(agentID: UUID, entryID: UUID? = nil, runtimeID: String? = nil, adjust: Bool = false,
+                    choices: [String: JSONValue] = [:], confirmed: Bool = false) {
+            self.agentID = agentID
+            self.entryID = entryID
+            self.runtimeID = runtimeID
+            self.adjust = adjust
+            self.choices = choices
+            self.confirmed = confirmed
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            entryID = try c.decodeIfPresent(UUID.self, forKey: .entryID)
+            runtimeID = try c.decodeIfPresent(String.self, forKey: .runtimeID)
+            adjust = try c.decodeIfPresent(Bool.self, forKey: .adjust) ?? false
+            choices = try c.decodeIfPresent([String: JSONValue].self, forKey: .choices) ?? [:]
+            confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+        }
+    }
+
+    /// What `agents/continueWith` answers: the plan, and the options it was made against,
+    /// which fill the sheet's menus. Empty options when the runtime has never said what it
+    /// offers in this folder: the sheet says so. `agent` is set once it is applied.
+    public struct ContinueWithResult: Codable, Sendable {
+        public var runtimeID: String
+        public var plan: CarryPlan
+        public var options: [ConfigOption]
+        public var agent: Agent?
+
+        public init(runtimeID: String, plan: CarryPlan, options: [ConfigOption], agent: Agent? = nil) {
+            self.runtimeID = runtimeID
+            self.plan = plan
+            self.options = options
+            self.agent = agent
+        }
+    }
+
+    public struct SetSwitchingRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var isOn: Bool
+        public init(agentID: UUID, isOn: Bool) {
+            self.agentID = agentID
+            self.isOn = isOn
+        }
+    }
+
     public struct PoolStopWaiting: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
@@ -1577,6 +1639,8 @@ public enum DaemonAPI {
         public static let noSuchNeed = -32021
         /// A daemon asked to quit while a turn is in flight (037).
         public static let busy = -32040
+        /// A chat asked to move to another runtime while its turn is running (052, US5).
+        public static let stopTheTurnFirst = -32046
         /// A server daemon had to start a runtime for this request and has no sign-in to
         /// start it with. Nothing was started, so the same request (same `sendID`) can be
         /// sent again after `credentials/lend` (043). `data`: `runtime`, `offered`.

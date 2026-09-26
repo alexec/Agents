@@ -412,6 +412,15 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.PoolMarkAvailable.self)
                 return .success(try JSONValue.encoding(await markPoolEntryAvailable(request.entryID)))
 
+            case DaemonAPI.Method.agentsContinueWith:
+                let request = try require(params, as: DaemonAPI.ContinueWithRequest.self)
+                return .success(try JSONValue.encoding(try await continueWith(request)))
+
+            case DaemonAPI.Method.agentsSetSwitching:
+                let request = try require(params, as: DaemonAPI.SetSwitchingRequest.self)
+                await setSwitching(agentID: request.agentID, off: !request.isOn)
+                return .success(try JSONValue.encoding(agents[request.agentID]))
+
             case DaemonAPI.Method.poolStopWaiting:
                 let request = try require(params, as: DaemonAPI.PoolStopWaiting.self)
                 await stopWaitingForAllowance(request.agentID)

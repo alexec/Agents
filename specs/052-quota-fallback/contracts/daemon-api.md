@@ -42,12 +42,16 @@ fills the grid's menus.
 
 Two steps, on the same pattern as `retention/set`'s `confirmed`:
 
-- **Preview:** params `{ agentID, entryID }` → `CarryPlan`. Nothing changes.
+- **Preview:** params `{ agentID, entryID | runtimeID, choices? }` →
+  `{ runtimeID, plan: CarryPlan, options: [ConfigOption] }`. The options are what the runtime
+  last offered in this folder, which fill the sheet's menus; they are empty if it has never run
+  here. Nothing changes, and nothing is started.
 - **Apply:** params `{ agentID, entryID, choices: { optionID: JSONValue }, remember: { levelID? , newLevelName? }? , confirmed: true }` → `Agent`.
 
 Apply rejects in these cases:
 
-- `-32010` "Stop the turn first" while a turn is running (US5-AS2);
+- `-32046` "Stop the turn first" while a turn is running (US5-AS2). It is not -32010, which
+  already means two other things;
 - a mode looser than the chat's current mode (FR-027);
 - a choice value the runtime does not offer.
 

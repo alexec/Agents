@@ -96,6 +96,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.poolState,
         DaemonAPI.Method.poolMarkAvailable,
         DaemonAPI.Method.poolStopWaiting,
+        DaemonAPI.Method.agentsContinueWith,
+        DaemonAPI.Method.agentsSetSwitching,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,

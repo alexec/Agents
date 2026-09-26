@@ -233,6 +233,44 @@ extension DaemonCore {
         }
         tried.insert(AllowanceState.credentialKey(for: entry))
         carryTried[agentID] = tried
+        let why = switch pending.reason {
+        case .overage: "it started using paid extra usage"
+        case .creditUsedUp: "its credit was used up"
+        case .rateLimitPersisted: "it stayed rate limited"
+        case .everyoneOutResumed: "every runtime was out, and this one is back"
+        default: "its allowance ran out"
+        }
+        do {
+            return try await switchRuntime(agentID, to: entry, reason: pending.reason, why: why, resend: pending.resend)
+        } catch {
+            await record(.runtimeNote("Could not carry on with \(PoolWords.runtimeName(entry.runtimeID)): \(reason(error))"),
+                         for: agentID)
+            return false
+        }
+    }
+
+    /// Move a chat to another runtime: the pool's switch and the person's alike (T040,
+    /// US5). The new session is made first, so nothing is lost if it cannot start, and
+    /// the person's `choices` are checked against what it really offers before anything
+    /// about the chat changes. Then the old runtime is let go, the record takes the new
+    /// runtime, and the handoff is either sent with the refused words (`resend`) or kept
+    /// for the next prompt. True when a turn was started.
+    func switchRuntime(_ agentID: UUID, to entry: PoolEntry, reason switchReason: SwitchRecord.Reason, why: String,
+                       choices: [String: JSONValue] = [:], resend: Bool) async throws -> Bool {
+        guard var agent = agents[agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        let current = poolEntry(for: agent)
+        let at = now()
+        let made = try await freshSession(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers,
+                                          managesAgents: agent.startedByAgent == nil)
+        let options = await made.session.options
+        if let refusal = SettingsCarry.refusal(of: choices, options: options, currentMode: currentMode(of: agent),
+                                               runtimeName: PoolWords.runtimeName(entry.runtimeID)) {
+            await made.session.end(gracePeriod: .seconds(1))
+            throw JSONRPCError(code: -32602, message: refusal)
+        }
+
         // What the old runtime was asking can no longer be answered there (T040).
         await closeQuestionsOfAGoneRuntime(agentID)
         // Its plan window was the old runtime's: left, it would mark the new one out
@@ -240,53 +278,40 @@ extension DaemonCore {
         latestRateLimit[agentID] = nil
         await releaseRuntime(for: agentID)
 
-        let fromName = PoolWords.runtimeName(current.runtimeID)
-        let why = switch pending.reason {
-        case .overage: "it started using paid extra usage"
-        case .creditUsedUp: "its credit was used up"
-        case .rateLimitPersisted: "it stayed rate limited"
-        default: "its allowance ran out"
-        }
         let page = try? await store.transcript(for: agentID, before: nil, limit: 10_000)
         let size = agent.usage?.size ?? 0
         let budget = size > 0 ? min(Handoff.defaultBudget, size * 2) : Handoff.defaultBudget
-        let handoff = Handoff.document(entries: page?.entries ?? [], fromRuntime: fromName, why: why, budget: budget)
+        let handoff = Handoff.document(entries: page?.entries ?? [], fromRuntime: PoolWords.runtimeName(current.runtimeID),
+                                       why: why, budget: budget)
 
-        let made: MadeSession
-        do {
-            made = try await freshSession(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers,
-                                          managesAgents: agent.startedByAgent == nil)
-        } catch {
-            await record(.runtimeNote("Could not carry on with \(PoolWords.runtimeName(entry.runtimeID)): \(reason(error))"),
-                         for: agentID)
-            return false
-        }
-        let options = await made.session.options
-        let carry = SettingsCarry.plan(
+        let carry = SettingsCarry.choosing(choices, over: SettingsCarry.plan(
             from: .init(runtimeID: agent.runtimeID, options: agent.advertisedOptions, values: agent.startOptions.values),
             to: .init(runtimeID: entry.runtimeID, options: options),
             levels: pool.levels, entryModel: entry.fallbackModel,
             extraArguments: agent.startOptions.extraArguments,
             queuedCommands: agent.queuedPrompts.compactMap { prompt in
                 prompt.text.hasPrefix("/") ? String(prompt.text.split(separator: " ").first ?? "") : nil
-            })
+            }))
 
         let record = SwitchRecord(at: at, agentID: agentID,
                                   from: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID,
                                               model: SettingsCarry.model(in: agent.advertisedOptions).flatMap { agent.startOptions.values[$0.id] ?? $0.currentValue }),
-                                  to: .init(entryID: entry.id, runtimeID: entry.runtimeID,
+                                  to: .init(entryID: pool.entry(entry.id) == nil ? nil : entry.id, runtimeID: entry.runtimeID,
                                             model: carry.values["model"], mode: carry.values["mode"]),
-                                  reason: pending.reason, carried: carry.rows, dropped: carry.dropped,
+                                  reason: switchReason, carried: carry.rows, dropped: carry.dropped,
                                   shortened: handoff.leftOut, billing: entry.payment,
-                                  fromReturnsAt: allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
+                                  fromReturnsAt: switchReason == .byHand ? nil
+                                      : allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
 
         agent = agents[agentID] ?? agent
         agent.runtimeID = entry.runtimeID
         agent.runtimeSessionID = made.sessionID
-        agent.poolEntryID = entry.id
+        agent.poolEntryID = pool.entry(entry.id) == nil ? nil : entry.id
         agent.startOptions = StartOptions(values: carry.values, extraArguments: [])
         agent.advertisedOptions = options
         agent.availableCommands = await made.session.commands
+        remember(OptionCache.Entry(options: options, commands: agent.availableCommands),
+                 for: OptionCache.key(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers))
         agents[agentID] = agent
         try? await store.save(agent)
         live[agentID] = made.session
@@ -302,13 +327,13 @@ extension DaemonCore {
         do { try poolStore.append(record) } catch { DaemonLog.shared.write("switch not written: \(error)") }
         raise(EventDraft(name: "agent.runtime_switched", at: at, scope: .project(folder: agent.projectFolder),
                          sentence: "\(LeaseWords.agentName(agent.title)) carried on with \(PoolWords.runtimeName(entry.runtimeID)).",
-                         details: ["from": current.runtimeID, "to": entry.runtimeID, "reason": pending.reason.rawValue]
+                         details: ["from": current.runtimeID, "to": entry.runtimeID, "reason": switchReason.rawValue]
                             .merging(agentDetails(agent)) { $1 }))
         broadcastPool()
 
         let block = Self.handoffBlock(handoff.markdown, agentID: agentID,
                                       embedded: await made.session.initializeResult?.accepts.embeddedContext == true)
-        if pending.resend, let prompt = lastPrompts[agentID] {
+        if resend, let prompt = lastPrompts[agentID] {
             await beginTurn(agentID: agentID, text: prompt.text, blocks: [block] + prompt.blocks, from: prompt.from,
                             session: made.session, preface: prompt.preface, recorded: false)
             lastPrompts[agentID] = prompt
@@ -316,6 +341,101 @@ extension DaemonCore {
         }
         pendingHandoff[agentID] = handoff.markdown
         return false
+    }
+
+    /// The chat's mode now: what it set, else what its runtime says it is on.
+    func currentMode(of agent: Agent) -> JSONValue? {
+        guard let option = ModeMemory.modeOption(in: agent.advertisedOptions) else { return nil }
+        return agent.startOptions.values[option.id] ?? option.currentValue
+    }
+
+    // MARK: Continue with (US5)
+
+    /// `agents/continueWith`: a preview unless confirmed, then the move by hand with
+    /// nothing sent until the next prompt; or, with `adjust`, the settings of the runtime
+    /// the chat is already on after an automatic switch, from the next turn (FR-029).
+    public func continueWith(_ request: DaemonAPI.ContinueWithRequest) async throws -> DaemonAPI.ContinueWithResult {
+        guard let agent = agents[request.agentID], agent.state != .archived else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        if request.adjust { return try await adjustCarry(agent, request) }
+
+        let entry: PoolEntry
+        if let id = request.entryID, let found = pool.entry(id) {
+            entry = found
+        } else if let runtimeID = request.runtimeID, RuntimeCatalog.runtime(id: runtimeID) != nil {
+            entry = pool.entries.first { $0.runtimeID == runtimeID && !$0.isKeyed }
+                ?? PoolEntry(runtimeID: runtimeID, payment: .allowance(label: nil))
+        } else {
+            throw JSONRPCError(code: -32602, message: "Say which runtime to continue with.")
+        }
+        guard entry.runtimeID != agent.runtimeID || entry.id != agent.poolEntryID else {
+            throw JSONRPCError(code: -32602, message: "This chat is already on \(PoolWords.runtimeName(entry.runtimeID)).")
+        }
+        if let why = unusable(entry) {
+            throw JSONRPCError(code: -32602, message: "\(PoolWords.runtimeName(entry.runtimeID)) cannot be used: \(why).")
+        }
+
+        guard request.confirmed else {
+            // What it last offered in this folder: enough to show the plan without
+            // starting it. A runtime never run here shows nothing to choose yet.
+            let options = rememberedOptions(for: OptionCache.key(runtimeID: entry.runtimeID, cwd: agent.cwd,
+                                                                 mcpServers: agent.mcpServers))?.options
+                ?? rememberedOptions(.init(runtimeID: entry.runtimeID, cwd: agent.cwd))
+            let plan = SettingsCarry.plan(
+                from: .init(runtimeID: agent.runtimeID, options: agent.advertisedOptions, values: agent.startOptions.values),
+                to: .init(runtimeID: entry.runtimeID, options: options),
+                levels: pool.levels, entryModel: entry.fallbackModel,
+                extraArguments: agent.startOptions.extraArguments)
+            return .init(runtimeID: entry.runtimeID, plan: SettingsCarry.choosing(request.choices, over: plan), options: options)
+        }
+        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
+        }
+        dropAllowanceWait(agent.id)
+        _ = try await switchRuntime(agent.id, to: entry, reason: .byHand, why: "you asked to continue with it",
+                                    choices: request.choices, resend: false)
+        let moved = agents[agent.id]
+        return .init(runtimeID: entry.runtimeID,
+                     plan: CarryPlan(values: moved?.startOptions.values ?? [:]),
+                     options: moved?.advertisedOptions ?? [], agent: moved)
+    }
+
+    /// After an automatic switch: the same runtime, other settings, from the next turn.
+    /// No new session, and nothing sent again (FR-029).
+    private func adjustCarry(_ agent: Agent, _ request: DaemonAPI.ContinueWithRequest) async throws -> DaemonAPI.ContinueWithResult {
+        let options = agent.advertisedOptions
+        var plan = CarryPlan(values: agent.startOptions.values, rows: options.filter(\.isRenderable).map { option in
+            let now = agent.startOptions.values[option.id] ?? option.currentValue
+            return CarriedSetting(optionID: option.id, name: option.name, from: now, to: now, source: .sameValue)
+        })
+        plan = SettingsCarry.choosing(request.choices, over: plan)
+        guard request.confirmed else { return .init(runtimeID: agent.runtimeID, plan: plan, options: options) }
+        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
+        }
+        // The limit is the mode the chat had before it moved, which the switch record keeps.
+        let before = poolStore.switches(since: .distantPast).last { $0.agentID == agent.id }
+        let limit = before?.carried.first { $0.optionID == ModeMemory.modeOption(in: options)?.id }?.from
+            ?? currentMode(of: agent)
+        if let refusal = SettingsCarry.refusal(of: request.choices, options: options, currentMode: limit,
+                                               runtimeName: PoolWords.runtimeName(agent.runtimeID)) {
+            throw JSONRPCError(code: -32602, message: refusal)
+        }
+        var changed = agent
+        for (id, value) in request.choices { changed.startOptions.values[id] = value }
+        agents[agent.id] = changed
+        try? await store.save(changed)
+        self.changed(changed)
+        if let session = live[agent.id] { await session.apply(changed.startOptions) }
+        let record = SwitchRecord(at: now(), agentID: agent.id,
+                                  from: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID),
+                                  to: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID,
+                                            model: changed.startOptions.values["model"], mode: changed.startOptions.values["mode"]),
+                                  reason: .byHand, carried: plan.rows.filter { request.choices[$0.optionID] != nil },
+                                  billing: poolEntry(for: agent).payment)
+        await self.record(.settingsChanged(record), for: agent.id)
+        return .init(runtimeID: agent.runtimeID, plan: plan, options: options, agent: changed)
     }
 
     // MARK: Everyone out (US4)

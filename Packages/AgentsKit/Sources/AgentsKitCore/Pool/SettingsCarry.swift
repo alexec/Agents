@@ -2,7 +2,7 @@ import Foundation
 
 /// What a chat's settings become on another runtime, and where each came from (052,
 /// FR-015; the Continue with sheet's four columns).
-public struct CarryPlan: Hashable, Sendable {
+public struct CarryPlan: Codable, Hashable, Sendable {
     /// The values to set on the new runtime, keyed by its option id.
     public var values: [String: JSONValue]
     /// One per option the new runtime offers, in its order: now, next and where from.
@@ -75,6 +75,42 @@ public enum SettingsCarry {
         if alwaysAllowCount > 0 { plan.dropped.append(.alwaysAllow(count: alwaysAllowCount)) }
         plan.dropped += queuedCommands.map(Dropped.queuedSlashCommand)
         return plan
+    }
+
+    // MARK: The person's choices (US5)
+
+    /// Why these choices cannot be kept, or nil when they can: a value the runtime does
+    /// not offer, or a mode looser than the chat's own (FR-027). `currentMode` is the chat's
+    /// mode as it is now, before any move.
+    public static func refusal(of choices: [String: JSONValue], options: [ConfigOption],
+                               currentMode: JSONValue?, runtimeName: String) -> String? {
+        let modeID = ModeMemory.modeOption(in: options)?.id
+        for (id, value) in choices.sorted(by: { $0.key < $1.key }) {
+            guard let option = options.first(where: { $0.id == id }) else {
+                return "\(runtimeName) has no setting called \(id)."
+            }
+            guard offers(option, value) else {
+                return "\(runtimeName) does not offer \(value.stringValue ?? "that") for \(option.name)."
+            }
+            if id == modeID, let wanted = value.stringValue, let limit = currentMode?.stringValue,
+               !ModeLooseness.isNoLooser(wanted, than: limit) {
+                return "\(option.name) cannot be looser than the chat's own, \(limit)."
+            }
+        }
+        return nil
+    }
+
+    /// The plan with the person's choices put over it, each marked as theirs.
+    public static func choosing(_ choices: [String: JSONValue], over plan: CarryPlan) -> CarryPlan {
+        var chosen = plan
+        for (id, value) in choices {
+            chosen.values[id] = value
+            if let index = chosen.rows.firstIndex(where: { $0.optionID == id }) {
+                chosen.rows[index].to = value
+                chosen.rows[index].source = .person
+            }
+        }
+        return chosen
     }
 
     /// The new runtime's loosest mode that is no looser than the chat's; the strictest it

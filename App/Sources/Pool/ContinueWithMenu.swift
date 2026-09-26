@@ -20,7 +20,11 @@ struct ContinueWithMenu: View {
     var body: some View {
         SelectCapsule(name: "Runtime", title: PoolWords.runtimeName(agent.runtimeID)) { dismiss in
             SelectChoice(title: "Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out",
-                         description: nil, isChosen: true) { dismiss() }
+                         description: agent.switchingOff ? "Off for this chat: it stops when it runs out" : nil,
+                         isChosen: !agent.switchingOff) {
+                dismiss()
+                Task { await model.setSwitching(agent.id, isOn: agent.switchingOff) }
+            }
             Divider().padding(.vertical, 4)
             Text("CONTINUE WITH").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
@@ -55,6 +59,8 @@ struct ContinueWithMenu: View {
 /// A chat the person is moving by hand, and where to (US5).
 struct ContinueWith: Identifiable, Hashable {
     let agentID: UUID
-    let entry: PoolEntry
-    var id: String { "\(agentID)-\(entry.id)" }
+    var entry: PoolEntry
+    /// Changing what an automatic switch carried on with, on the runtime it is on (FR-029).
+    var adjust = false
+    var id: String { "\(agentID)-\(entry.id)-\(adjust)" }
 }

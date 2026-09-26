@@ -66,7 +66,8 @@ struct ContentView: View {
                 ContinueWithSheet(request: ContinueWith(
                     agentID: record.agentID,
                     entry: PoolEntry(id: record.to.entryID ?? UUID(), runtimeID: record.to.runtimeID,
-                                     payment: record.billing))).paperSheet()
+                                     payment: record.billing),
+                    adjust: true)).paperSheet()
             }
             // A known server with a new key: rebuilt, or not what it says (043).
             .sheet(item: Binding(get: { model.hosts.rebuiltAsk },

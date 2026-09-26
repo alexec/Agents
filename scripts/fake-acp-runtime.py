@@ -83,6 +83,21 @@ def prompt(request_id, params):
     reply(request_id, {"stopReason": "end_turn"})
 
 
+# A model and a mode, as real runtimes offer them, so a walk has settings to carry.
+chosen = {}
+
+
+def options():
+    def select(id_, name, category, values, current):
+        return {"id": id_, "name": name, "category": category, "type": "select",
+                "currentValue": chosen.get(id_, current),
+                "options": [{"value": v, "name": v} for v in values]}
+    return [
+        select("model", "Model", "model", [f"{NAME}-fast", f"{NAME}-smart"], f"{NAME}-smart"),
+        select("mode", "Mode", "mode", ["default", "acceptEdits", "bypassPermissions"], "default"),
+    ]
+
+
 def main():
     for line in sys.stdin:
         line = line.strip()
@@ -101,7 +116,10 @@ def main():
                                "agentCapabilities": {"loadSession": False,
                                                      "promptCapabilities": {"embeddedContext": True}}})
         elif method == "session/new":
-            reply(request_id, {"sessionId": f"{NAME}-{uuid.uuid4()}"})
+            reply(request_id, {"sessionId": f"{NAME}-{uuid.uuid4()}", "configOptions": options()})
+        elif method == "session/set_config_option":
+            chosen[params.get("configId", "")] = params.get("value")
+            reply(request_id, {"configOptions": options()})
         elif method == "session/prompt":
             prompt(request_id, params)
         else:

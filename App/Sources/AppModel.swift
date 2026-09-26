@@ -829,6 +829,47 @@ final class AppModel {
         }
     }
 
+    /// What moving a chat would carry, or what an automatic switch carried (052, US5).
+    /// Nothing changes.
+    func previewContinue(_ request: ContinueWith, choices: [String: JSONValue] = [:])
+        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
+        await continueWith(request, choices: choices, confirmed: false)
+    }
+
+    /// Move the chat, or change what it carried on with. The daemon's sentence when it
+    /// will not.
+    func applyContinue(_ request: ContinueWith, choices: [String: JSONValue]) async -> String? {
+        switch await continueWith(request, choices: choices, confirmed: true) {
+        case .success: return nil
+        case .failure(let error): return error.message
+        }
+    }
+
+    private func continueWith(_ request: ContinueWith, choices: [String: JSONValue], confirmed: Bool)
+        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
+        let call = DaemonAPI.ContinueWithRequest(
+            agentID: request.agentID,
+            entryID: request.adjust ? nil : request.entry.id,
+            runtimeID: request.adjust ? nil : request.entry.runtimeID,
+            adjust: request.adjust, choices: choices, confirmed: confirmed)
+        do {
+            let result = try await client.call(DaemonAPI.Method.agentsContinueWith, call,
+                                               returning: DaemonAPI.ContinueWithResult.self)
+            return .success(result)
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(JSONRPCError(code: -32603, message: "\(error)"))
+        }
+    }
+
+    /// A chat's own "carry on when this runs out" (052, FR-003).
+    func setSwitching(_ agentID: UUID, isOn: Bool) async {
+        _ = try? await client.call(DaemonAPI.Method.agentsSetSwitching,
+                                   DaemonAPI.SetSwitchingRequest(agentID: agentID, isOn: isOn),
+                                   returning: Agent?.self)
+    }
+
     /// A chat stops waiting for an allowance (052, US4).
     func stopWaiting(_ agentID: UUID) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,

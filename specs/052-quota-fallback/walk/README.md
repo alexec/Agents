@@ -181,3 +181,36 @@ Found and fixed:
 - Stop waiting;
 - no known return, in which case it stops and schedules nothing;
 - a restart that keeps the wait and still carries on.
+
+## US5: Continue with, by hand (T058–T061), 2026-09-26
+
+The run was on the scratch root `/tmp/run-052-us5`, and was driven through the window with the AX
+helper while nobody was at the keyboard (idle over 250 s, unlocked). The stand-ins now offer a
+model (`<name>-fast`, `<name>-smart`) and a mode (default, acceptEdits, bypassPermissions), so
+there are settings to carry. Copilot had run once in the folder, so what it offers there was
+remembered.
+
+1. The prompt bar's runtime control (`1-menu.png`) shows the per-chat tick, "Carry on when Grok
+   runs out", then CONTINUE WITH Copilot.
+2. Copilot opens the sheet (`2-sheet.png`), matching wireframes §3. The title carries a runtime
+   picker and the pool state ("Available"). The rows are Model (grok-smart → copilot-smart,
+   "Copilot's default") and Mode (default → default, "the same as now"). Under them is Won't
+   carry over. Remember is shown but switched off until the grid (US6).
+3. Picking copilot-fast marks the row "chosen by you" (`3-chosen.png`). **Continue on Copilot**
+   moved the chat: it is on Copilot with `model: copilot-fast`, `mode: default`. The note reads
+   "Continued with Copilot. Model: copilot-fast, chosen by you · Mode: default, the same as
+   before. Copilot is given the conversation so far with your next message." The prompt bar
+   shows Copilot and copilot-fast (`4-moved.png`). Nothing was sent.
+4. The note's **Change what it carried on with…** opens the sheet in adjust mode
+   (`5-adjust.png`): "From its next turn. Nothing is started again and nothing is sent again."
+   Its button stays off until something is changed.
+5. The next prompt, "Now make the change.", reached Copilot with the handoff: "copilot here. I
+   was handed the conversation so far (548 characters). You said: Now make the change."
+   (`us5/transcript.json`).
+
+Found and fixed: what a runtime offers in a folder was remembered only by the new-session form.
+So a runtime that had run there as a chat left nothing for the preview. Starting a chat, and
+moving one, now remember it too.
+
+Not seen on screen: the mode menu with its looser values left out, and "Stop the turn first"
+with its Stop button. `ContinueWithTests` covers both refusals.

@@ -266,6 +266,10 @@ extension DaemonCore {
             appToken = made.appToken
         }
 
+        // What it offers in this folder, for Continue with's preview, which starts
+        // nothing (052, US5), and for the next form.
+        remember(OptionCache.Entry(options: await session.options, commands: await session.commands),
+                 for: OptionCache.key(runtimeID: request.runtimeID, cwd: cwd, mcpServers: request.mcpServers))
         var agent = Agent(runtimeID: request.runtimeID,
                           cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
@@ -901,6 +905,10 @@ extension DaemonCore {
         if let newSessionID { updated.runtimeSessionID = newSessionID }
         if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         if !commands.isEmpty { updated.availableCommands = commands }
+        // What it offers in this folder, for the next form, and for Continue with's
+        // preview, which starts nothing (052, US5).
+        remember(OptionCache.Entry(options: refreshed, commands: commands),
+                 for: OptionCache.key(runtimeID: updated.runtimeID, cwd: updated.cwd, mcpServers: updated.mcpServers))
         changed(updated)
         await session.apply(updated.startOptions)
         live[agent.id] = session

@@ -349,7 +349,7 @@
 
 **Independent Test**: Spec US5 test and AS1–AS5; quickstart §8 steps 2, 3 and 5.
 
-- [ ] T058 [P] [US5] Write `Pkg/Tests/AgentsKitTests/Integration/ContinueWithTests.swift` for `agents/continueWith`, following `contracts/daemon-api.md`. Cover:
+- [X] T058 [P] [US5] Write `Pkg/Tests/AgentsKitTests/Integration/ContinueWithTests.swift` for `agents/continueWith`, following `contracts/daemon-api.md`. Cover:
   - the preview returns a `CarryPlan` and changes nothing;
   - apply sets exactly the chosen values, sends nothing until the next prompt, and then sends the handoff with that prompt;
   - `-32010` while a turn is running;
@@ -358,14 +358,18 @@
   - `adjust: true` after an automatic switch writes `.settingsChanged`, applies from the next turn, and makes no new session;
   - it is open to paired devices;
   - `agents/setSwitching` toggles `switchingOff`.
-- [ ] T059 [US5] Implement `agents/continueWith` (preview, apply, adjust) and `agents/setSwitching` in `DaemonCore+Pool.swift` and `DaemonAPI.swift`, reusing T040's switch with the reason `.byHand` and nothing re-sent. This makes T058 pass.
-- [ ] T060 [US5] Make `App/Sources/Chat/ContinueWithSheet.swift` and the prompt-bar menu from T030 live:
+
+  *Done 2026-09-26.* "Stop the turn first" is -32046, not -32010, which already has two
+  meanings. The preview returns `ContinueWithResult {runtimeID, plan, options, agent?}`: the
+  options fill the sheet's menus. Remember is left for US6.
+- [X] T059 [US5] Implement `agents/continueWith` (preview, apply, adjust) and `agents/setSwitching` in `DaemonCore+Pool.swift` and `DaemonAPI.swift`, reusing T040's switch with the reason `.byHand` and nothing re-sent. This makes T058 pass.
+- [X] T060 [US5] Make `App/Sources/Chat/ContinueWithSheet.swift` and the prompt-bar menu from T030 live:
   - the runtime menu refills the right-hand column from the preview;
   - the menus hold only the values the runtime offers, with modes capped;
   - while a turn is running, the sheet shows *Stop the turn first* and a Stop button;
   - the note's **Change what it carried on with…** opens it in adjust mode;
   - the per-chat tick calls `agents/setSwitching`.
-- [ ] T061 [US5] Walk the sheet in the scratch window with the AX helper, following quickstart §8 step 5. Take screenshots against wireframes §3, into `specs/052-quota-fallback/walk/us5/`.
+- [X] T061 [US5] Walk the sheet in the scratch window with the AX helper, following quickstart §8 step 5. Take screenshots against wireframes §3, into `specs/052-quota-fallback/walk/us5/`.
 
 ---
 
