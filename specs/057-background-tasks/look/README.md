@@ -1,7 +1,7 @@
 # 057 · Wireframes: background tasks and subagents
 
-**Look gate, waiting for Alex.** Nothing is built yet: no capability is advertised and no code has
-changed.
+**Approved by Alex, 2026-09-26: frame A (the list over the prompt) with subagents opted in and
+their steps in a Background sidebar pane (frame C); frame E on the phone.** Frame D is not taken.
 
 The goal is for a person to see the shells and subagents an agent has running in the background as
 a list, each shell with a Stop button, instead of reading about them in prose.
