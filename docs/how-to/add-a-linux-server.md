@@ -20,6 +20,11 @@ closed. You follow them from the Mac as you would any other project.
   example, for Claude Code: install it on the server, run `claude` there once and sign
   in. See [Reference](../reference/index.md) for what each runtime needs.
 
+- If you built Agents yourself, build the server's helper once before building the app:
+  `./scripts/build-linux-agentsd.sh`. It needs the swift.org toolchain and Static Linux
+  SDK that match Xcode's Swift. Without it, adding a server says its system is not
+  supported.
+
 Nothing needs installing on the server by hand beyond the runtime. Agents copies its own
 helper into `~/.agents-server` and opens no network port on the server: everything goes
 over ssh.

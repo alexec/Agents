@@ -12,8 +12,10 @@ Agents.xcodeproj/
 # Another session's worktree lives here. Not ours to commit.
 .claude/worktrees/
 
-# Built by scripts/build-linux-agentsd.sh (037). Build outputs, 58 MB each.
-App/Resources/servers/
+# Built by scripts/build-linux-agentsd.sh (037). Build outputs, 58 MB each. The
+# README is kept so a fresh clone has the folder the app build copies.
+App/Resources/servers/*
+!App/Resources/servers/README.md
 
 # Built by scripts/docs.sh (044). The docs site; published from CI, never committed.
 site/
