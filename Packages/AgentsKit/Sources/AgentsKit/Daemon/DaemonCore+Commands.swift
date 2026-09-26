@@ -403,7 +403,7 @@ extension DaemonCore {
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
-                                                      meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
+                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
@@ -804,7 +804,7 @@ extension DaemonCore {
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
-        let meta = ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd)
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
@@ -976,7 +976,14 @@ extension DaemonCore {
             }
         }
         var reason: EndedReason
-        if let known = result.reason {
+        if let failure = result.runtimeError {
+            // It said in words that the turn failed and then ended it normally (049).
+            // Its words are in the conversation already; this says what they mean, and
+            // keeps the row from reading as done.
+            let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+            await record(.runtimeNote("\(runtimeName) could not do this turn: \(failure.sentence)"), for: agentID)
+            reason = .runtimeError
+        } else if let known = result.reason {
             reason = known
         } else {
             // Written down as given. The ending line says only that the reason is

@@ -93,7 +93,9 @@ struct RuntimeInstallRow: View {
             Text(reason).appText(.supporting).tinted(.failure)
                 .fixedSize(horizontal: false, vertical: true)
         case .missing:
-            Text("Not on this Mac").appText(.supporting).foregroundStyle(.secondary)
+            Text(Self.downloadNote(for: status.runtime.id).map { "Not on this Mac · \($0)" } ?? "Not on this Mac")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .lineLimit(1)
         case .needsSignIn, .failed:
             Text(status.unavailableReason ?? "Can’t be used")
                 .appText(.supporting).foregroundStyle(.secondary)
@@ -136,6 +138,21 @@ struct RuntimeInstallRow: View {
     private func install() {
         Task { await model.installRuntime(status.id) }
     }
+
+    /// "112 MB from Google", said before **Install** for a runtime the app downloads from
+    /// its vendor as one archive (049), so a large download is not a surprise. From the
+    /// manifest the app carries; nil for everything else.
+    static func downloadNote(for runtimeID: String) -> String? {
+        guard let archive = bundledArchives[runtimeID],
+              let platform = archive.manifest.platforms[ArchiveToolset.macPlatform],
+              platform.knownBroken == nil else { return nil }
+        let vendor = platform.url.host()?.hasSuffix("google.com") == true ? "Google" : (platform.url.host() ?? "")
+        return "\(ArchiveToolset.megabytes(platform.size)) from \(vendor)"
+    }
+
+    private static let bundledArchives: [String: ArchiveToolset] = Bundle.main
+        .url(forResource: "toolsets", withExtension: nil)
+        .map(ArchiveToolset.loadAll(from:)) ?? [:]
 }
 
 /// An agent's state as the icon beside its name: the same 18-point well and glyph size

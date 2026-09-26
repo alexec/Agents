@@ -18,6 +18,9 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// When it was given the dotagents layout. Once: after that the files are the
     /// person's, and one they deleted is not put back.
     public var laidOutAt: Date?
+    /// Which layout it was given (`DotAgents.version`). Nil with `laidOutAt` set is the
+    /// first, from before the layout had a version.
+    public var layoutVersion: Int?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -60,11 +63,12 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     private static let standardized = Mutex<[String: URL]>([:])
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
-                laidOutAt: Date? = nil, unknownFields: [String: JSONValue] = [:]) {
+                laidOutAt: Date? = nil, layoutVersion: Int? = nil, unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
         self.laidOutAt = laidOutAt
+        self.layoutVersion = layoutVersion
         self.unknownFields = unknownFields
     }
 
@@ -74,6 +78,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
         laidOutAt = try c.decodeIfPresent(Date.self, forKey: .laidOutAt)
+        layoutVersion = try c.decodeIfPresent(Int.self, forKey: .layoutVersion)
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -89,6 +94,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
         try c.encode(addedAt, forKey: .addedAt)
         try c.encodeIfPresent(laidOutAt, forKey: .laidOutAt)
+        try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -98,7 +104,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion
     }
 
     struct AnyKey: CodingKey {

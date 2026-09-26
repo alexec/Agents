@@ -42,6 +42,11 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// a crash, and not something another try fixes until the token is replaced.
     case signInRefused
 
+    /// The runtime said in words that the turn failed, and then ended it as if it had
+    /// finished (049: Antigravity's "Agent execution error: …"). What it said is in the
+    /// conversation; this keeps the row from reading as done.
+    case runtimeError
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -60,6 +65,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .unrecognised: return "Stopped for a reason we do not know"
         case .stoppedByAgent: return "Stopped by the agent that started it"
         case .signInRefused: return "Its sign-in was refused"
+        case .runtimeError: return "The runtime reported an error"
         }
     }
 

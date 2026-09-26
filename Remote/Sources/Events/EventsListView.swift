@@ -14,8 +14,12 @@ struct EventsListView: View {
     @State private var scope: EventScope?
     @State private var picked: Event?
 
+    private var filter: EventFilter { EventFilter(scope: scope) }
+
+    /// The Mac sends pages already narrowed; narrowing here too keeps the list right in
+    /// the moment between the menu changing and its page arriving.
     private var events: [Event] {
-        model.work.recentEvents.filter { scope == nil || $0.scope == scope }
+        model.work.recentEvents.filter(filter.matches)
     }
 
     var body: some View {
@@ -63,7 +67,8 @@ struct EventsListView: View {
                 }
             }
         }
-        .refreshable { await model.refreshEvents() }
+        .refreshable { await model.refreshEvents(filter) }
+        .task(id: filter) { await model.refreshEvents(filter) }
         .sheet(item: $picked) { event in
             EventSheet(event: event, scopeName: scopeName(event.scope))
         }

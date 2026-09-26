@@ -60,6 +60,19 @@ With a key saved, Agents installs Gemini on a server as it connects, and each se
 entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent the same way
 as Claude's token and is never written on the server.
 
+### Codex: your ChatGPT sign-in, or a key
+
+If Codex on this Mac is signed in with ChatGPT, Codex on a server uses that sign-in with
+nothing to set up. Agents installs Codex on the server as it connects, and the server's
+Codex requests go back through this Mac, which adds your sign-in and sends them on to
+OpenAI. No token of yours is written on the server, and other accounts on the server cannot
+use it. This works only while the Mac is connected to the server.
+
+For Codex on a server when this Mac has no ChatGPT sign-in, paste an OpenAI API key
+(get one at platform.openai.com/api-keys) under **Codex** in **Runtime credentials** in
+**Settings ▸ Servers**. It says **Works** once OpenAI has checked it, and is lent the same
+way as Claude's token. Codex on this Mac always uses ChatGPT, not the key.
+
 ### Add the server
 
 1. In the Mac app, click **+** (**New project**) at the top of the **Projects** list and
@@ -99,7 +112,7 @@ as Claude's token and is never written on the server.
 
 If Claude is already signed in on the server and you would rather Agents did not lend it
 your token, open **Settings ▸ Servers**, find the server, and turn on **Use this server's
-own sign-in only**.
+own sign-in only**. That also stops Codex from using this Mac's ChatGPT sign-in there.
 
 ### When the server is offline
 

@@ -88,6 +88,20 @@ public struct DeviceKey: Sendable {
         }
     }
 
+    /// The secret this key and `peer` share for the direct link (security review,
+    /// Phase 3): the phone's key with the Mac's, or the Mac's with the phone's, come to
+    /// the same 32 bytes, and nobody else's do. Nothing about it is stored — both halves
+    /// already hold what it is made from — so forgetting a device ends it too.
+    public func linkKey(with peer: Data, device: UUID) throws -> SymmetricKey {
+        let other = try P256.KeyAgreement.PublicKey(x963Representation: peer)
+        let shared: SharedSecret
+        switch holder {
+        case .enclave(let key): shared = try key.sharedSecretFromKeyAgreement(with: other)
+        case .software(let key): shared = try key.sharedSecretFromKeyAgreement(with: other)
+        }
+        return LinkKey.derive(shared, device: device)
+    }
+
     /// Keep a public key someone else gave this device, beside its own: the Mac's relay
     /// key, learnt at pairing (046). `nil` forgets it.
     public static func keepPublicKey(_ key: Data?, account: String, accessGroup: String? = nil) throws {

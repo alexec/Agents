@@ -25,10 +25,14 @@ public enum DeviceBinder {
 
     /// `transport` as a device's: returns once the daemon has agreed, with a transport
     /// whose lines carry on from where the binding left off.
-    public static func bind(_ transport: any LineTransport, device: UUID?) async throws -> any LineTransport {
+    ///
+    /// `pairing` is a phone on the pairing code, allowed only to announce itself.
+    public static func bind(_ transport: any LineTransport, device: UUID?,
+                            pairing: Bool = false) async throws -> any LineTransport {
         let bound = BoundTransport(inner: transport)
         let request = JSONRPCMessage.request(id: .string(requestID), method: DaemonAPI.Method.connectionBindDevice,
-                                             params: try JSONValue.encoding(DaemonAPI.DeviceBinding(id: device)))
+                                             params: try JSONValue.encoding(DaemonAPI.DeviceBinding(id: device,
+                                                                                                   pairing: pairing)))
         try transport.write(line: try JSONRPCCodec.encode(request))
         try await bound.waitForBinding()
         return bound

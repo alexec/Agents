@@ -8,8 +8,9 @@ description: The coding agents the app can start, what it runs for each, and wha
 
 A runtime is the coding agent that does the work in a conversation. This page lists the
 ones the app knows how to start. Most you install and sign in to yourself, and the app
-finds them on your Mac, or on a server when the project is on a server. Gemini is only ever
-the app's own copy: **Install** on its row in **Settings ▸ Agents** puts it in place.
+finds them on your Mac, or on a server when the project is on a server. Codex and Gemini
+are only ever the app's own copies: **Install** on their rows in **Settings ▸ Agents** puts
+them in place.
 
 What a runtime can do in the app is decided by what it says about itself when it starts,
 not by its name. The columns for pictures and signing in are what each runtime said when
@@ -23,6 +24,7 @@ newer version.
 | **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | None | Its conversations get none of the app's tools, including the one it uses to say how a turn went, so its turns end without a report. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
 | **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agents** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agents** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that project's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker are switched off. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. |
+| **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agents** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agent tools (`spawn_agent` and five others) cannot be turned off. |
 
 In every column:
 

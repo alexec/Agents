@@ -187,6 +187,39 @@ extension FakeSSHSuites {
                                     toolset: { toolset }, wantsClaude: { wantsClaude })
         }
 
+        /// 047: another runtime's toolset, wanted, installs beside Claude's under its own
+        /// folder with its own shim, while Claude, not wanted, waits.
+        @Test func anotherRuntimesToolsetInstallsInItsOwnFolderWhenWanted() async throws {
+            let setup = try await Self.setUp()
+            defer { Task { await Self.tearDown(setup) } }
+            let agentsd = try #require(ServerLinkTests.agentsd)
+            let claude = setup.tools.toolset
+            let codex = try setup.tools.other(runtimeID: "codex", package: "@agentclientprotocol/codex-acp",
+                                              in: setup.fake.folder)
+            let server = ServerConnection(hostID: HostID(rawValue: "fk000002"), ssh: setup.ssh,
+                                          socket: setup.fake.hosts.appendingPathComponent("fk000002.sock"),
+                                          installedBy: "test",
+                                          binary: { _ in
+                                              ServerBinary(file: agentsd,
+                                                           sha256: (try? await ServerInstaller.sha256(of: agentsd)) ?? "",
+                                                           version: "0.1.0+1")
+                                          },
+                                          toolset: { claude }, wantsClaude: { false },
+                                          otherToolsets: { [codex] }, wants: { $0 == "codex" })
+            await server.connect()
+            let states = await server.toolsetStates
+            let facts = await server.facts
+            await server.disconnect()
+            #expect(states["codex"] == .ready(codex.id))
+            #expect(states["claude"] == .notInstalled)
+            #expect(facts?.toolsetID(for: "codex") == codex.id)
+            let folder = setup.fake.home.appendingPathComponent(".agents-server/tools/codex")
+            #expect(FileManager.default.isExecutableFile(atPath: folder.appendingPathComponent("current/bin/codex-acp").path))
+            #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent(
+                "current/lib/node_modules/@agentclientprotocol/codex-acp/dist/index.js").path))
+            #expect(!FileManager.default.fileExists(atPath: setup.claude.appendingPathComponent("current").path))
+        }
+
         @Test func withACredentialInSettingsClaudeIsInstalledAsTheServerConnects() async throws {
             let setup = try await Self.setUp()
             defer { Task { await Self.tearDown(setup) } }

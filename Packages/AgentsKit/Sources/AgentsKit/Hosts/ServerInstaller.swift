@@ -49,7 +49,8 @@ public struct ServerInstaller: Sendable {
         ${SHELL:-/bin/sh} -lc 'command -v npx >/dev/null 2>&1 && echo npx:yes || echo npx:no; \
         [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none; \
         [ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] && echo signin.gemini:env || echo signin.gemini:none' 2>/dev/null </dev/null; \
-        [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none
+        [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none; \
+        [ -f "$HOME/.codex/auth.json" ] && echo signin.codex:file || echo signin.codex:none
         """
 
     public func probe() async throws -> ServerFacts {
@@ -95,7 +96,9 @@ public struct ServerInstaller: Sendable {
                 let runtime = String(key.dropFirst("toolset.".count))
                 facts.toolsetIDs[runtime] = value == "none" || value.isEmpty ? nil : value
             case _ where key.hasPrefix("signin."):
-                if value == "env" { facts.ownSignIns.insert(String(key.dropFirst("signin.".count))) }
+                // Codex's own is a sign-in saved in its home (047): a key in the login
+                // environment does not sign its adapter in by itself.
+                if value == "env" || value == "file" { facts.ownSignIns.insert(String(key.dropFirst("signin.".count))) }
             case "npx": facts.hasNpx = value == "yes"
             case "signin": if value == "env" || value == "file" { facts.hasOwnClaudeSignIn = true }
             default: continue

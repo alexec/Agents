@@ -77,11 +77,12 @@ The bridge is not started by the app. You start it by hand on the Mac, and it ru
 you stop it. While it is not running, your devices cannot reach the Mac from anywhere, and
 notifications that were due wait on the Mac until it is.
 
-**Pairing happens at home.** The first time a device connects on the Mac's network, the Mac
-hands it the key the relay is sealed with. After that, the device can reach the Mac from
-anywhere. A device that has never been on the Mac's network says **Open Agents once on your
-Mac's Wi-Fi**, and sends nothing through iCloud. The Mac and the device must be signed in to
-the same iCloud account.
+**Pairing is a code you scan.** In Settings ▸ Devices on the Mac, **Pair a Device…** shows a
+code for five minutes. Scanning it with Agents on the device, on the Mac's Wi‑Fi, pairs it:
+the code carries the Mac's key and a secret that works once. After that, the device can
+reach the Mac at home and from anywhere, and nothing else on the network can. A device that
+has not paired says **Pair with your Mac**, and sends nothing, on the network or through
+iCloud. The Mac and the device must be signed in to the same iCloud account for the relay.
 
 **Away, the everyday things work**: your projects and agents, reading a conversation and
 following it as it grows, sending prompts, answering questions and permissions, starting,
@@ -90,15 +91,16 @@ terminal, the live page, files and attaching pictures say **Needs the same netwo
 Mac**, because they send too much, too often, for iCloud. They open by themselves when you
 are back on the Mac's Wi‑Fi.
 
-**Forgetting a device.** In Settings ▸ Devices on the Mac, **Forget…** cuts a device off from
-the relay at once, and deletes what was waiting for it in iCloud. It pairs again the next
-time it is on the Mac's network.
+**Forgetting a device.** In Settings ▸ Devices on the Mac, **Forget…** cuts a device off at
+once, at home and away, closes anything it has open, and deletes what was waiting for it in
+iCloud. To use it again, pair it again with a new code.
 
-The direct connection has no pairing and no encryption. Any device on the same local
-network that finds the bridge can see and drive your agents. Run it only on a network you
-trust, such as your home network, and stop it when you do not need it. The relay and
-notifications are the parts that are sealed: each message is sealed to the one device or
-Mac it is for before it leaves, and travels through your own iCloud account.
+**Everything is encrypted, and locked to paired devices.** On the Mac's network the device
+and the Mac talk over TLS with a key only the two of them can make, so a device that has not
+paired cannot connect at all. Through iCloud, each message is sealed to the one device or
+Mac it is for before it leaves. A paired device can do what the phone app does, and no
+more: it cannot sign runtimes in or out, lend credentials, browse the Mac's folders, change
+settings or quit the Mac's agents.
 
 ## Related
 

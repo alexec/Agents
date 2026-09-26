@@ -230,7 +230,22 @@ public enum ToolPolicyCatalog {
             ]),
         ])),
         escalationTool: "request_user_input",
-        preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"])
+        preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"],
+        // A server never offers ChatGPT: its sign-in is the Mac's, and never lent (FR-020).
+        serverEnvironment: ["NO_BROWSER": "1"],
+        // A lent key alone is not a sign-in (the adapter answers -32000), and the api-key
+        // sign-in writes the key into Codex's home unless that home's config keeps sign-ins
+        // in memory. Measured on agents-bare, research T008.
+        lentKeyHome: LentKeyHome(whenLent: "CODEX_API_KEY", variable: "CODEX_HOME", folder: "codex-home",
+                                 configFile: "config.toml",
+                                 config: "cli_auth_credentials_store = \"ephemeral\"\n",
+                                 environment: ["DEFAULT_AUTH_REQUEST": #"{"methodId":"api-key"}"#]),
+        // The Mac's ChatGPT sign-in, relayed (research R12). Codex insists on HTTPS for it,
+        // keeps only the origin for its model calls, and trusts CODEX_CA_CERTIFICATE.
+        relay: SignInRelay(homeVariable: "CODEX_HOME", certificateVariable: "CODEX_CA_CERTIFICATE",
+                           configFile: "config.toml", signInFile: "auth.json",
+                           configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n",
+                           macSignIn: ".codex/auth.json", upstreamHost: "chatgpt.com"))
 
     /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
     ///
@@ -293,6 +308,37 @@ public enum ToolPolicyCatalog {
         "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
 
+    /// Antigravity: a deny list in `_meta.agy.disabledTools` on `session/new`, and again on
+    /// `session/load` and `session/resume`, which is exactly the lever the server documents
+    /// for an ACP client ("Clients pass the filter under `_meta.agy`"). Measured against
+    /// `agy_acp_server` 1.2.1 on 2026-09-25 (049 research R7).
+    ///
+    /// Its built-in tools are `list_directory`, `search_directory`, `find_file`,
+    /// `view_file`, `create_file`, `edit_file`, `run_command`, `ask_question`,
+    /// `start_subagent`, `generate_image`, `search_web`, `read_url_content` and `finish`.
+    /// Only `start_subagent` duplicates the app. `ask_question` is the escalation tool: the
+    /// server raises it as `session/request_permission` whose options are the answers, and
+    /// allows it without a "Run ask_question?" prompt of its own.
+    ///
+    /// The `/plan` command writes "an implementation plan artifact" into the server's own
+    /// folder under `GEMINI_HOME`. It is a command the person types, not a tool the model
+    /// can call, so it is neither removed nor residue.
+    ///
+    /// A Google account, personal first, is the only way in (049 D3); the key methods the
+    /// server also offers are hidden (`RuntimeLaunchCatalog.hiddenAuthMethods`).
+    public static let antigravity = ToolPolicy(
+        runtimeID: RuntimeCatalog.antigravity.id,
+        removed: [
+            RemovedTool(name: "start_subagent", category: .agents),
+        ],
+        kept: [
+            KeptTool(name: "ask_question",
+                     because: "It is the escalation path: the server raises it as a permission request whose options are the answers, which the daemon holds and the phone can answer."),
+        ],
+        lever: .sessionMetaDenyList(path: ["agy", "disabledTools"]),
+        escalationTool: "ask_question",
+        preferredAuthMethods: ["oauth-personal", "oauth-business"])
+
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity]
 }

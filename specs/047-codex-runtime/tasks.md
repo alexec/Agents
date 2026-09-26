@@ -52,7 +52,7 @@ rebuild it from T003.
   - R6: `request_user_input` arrives as `elicitation/create` in the `agent` mode.
   - R7: whether token counts arrive, and in what shape a limit refusal arrives.
   - R8: whether a call to an app tool (`finish_turn`) raises `session/request_permission` in `agent` mode, and, if it does, whether an `mcp_servers` approval key in `CODEX_CONFIG` stops it.
-- [ ] T008 On agents-bare (test-servers skill, 127.0.0.1:2223): install the toolset with `npm ci` from the lock, set `CODEX_API_KEY` and `NO_BROWSER=1`, and record in research R9:
+- [X] T008 On agents-bare (test-servers skill, 127.0.0.1:2223): install the toolset with `npm ci` from the lock, set `CODEX_API_KEY` and `NO_BROWSER=1`, and record in research R9:
   - whether `session/new` succeeds without `authenticate`, and if not, whether `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}` fixes it;
   - the auth methods offered, which must not include `chat-gpt`;
   - the error shape for a deliberately wrong key.
@@ -179,7 +179,7 @@ place, and a Codex agent then works like any runtime.
   - `ServerSignIn.exists(runtimeID:)` asks a per-runtime check (Claude: `~/.claude/.credentials.json` or its variables);
   - `lendCredential` refuses a kind whose `runtimeID` ≠ `lend.runtime`;
   - `isAuthenticationFailure` gains a per-runtime shape (Claude's `errorKind` stays).
-- [ ] T042 Make `ToolsetInstaller`'s scripts, and `isInstalled`/`swap`/`removeOthers`, use `toolset.manifest.runtimeID` for `serverFolder` and the shim from T010. Rename `ServerFacts.canInstallClaude` to `canInstall(_ toolset:)`, and make `ServerConnection`'s Claude state, `wantsClaude` and `installClaude` step per toolset. In `Daemon-side/Hosts/ToolsetInstaller.swift`, `Core/Hosts/Host.swift` and `Daemon-side/Hosts/ServerConnection.swift`.
+- [X] T042 Make `ToolsetInstaller`'s scripts, and `isInstalled`/`swap`/`removeOthers`, use `toolset.manifest.runtimeID` for `serverFolder` and the shim from T010. Rename `ServerFacts.canInstallClaude` to `canInstall(_ toolset:)`, and make `ServerConnection`'s Claude state, `wantsClaude` and `installClaude` step per toolset. In `Daemon-side/Hosts/ToolsetInstaller.swift`, `Core/Hosts/Host.swift` and `Daemon-side/Hosts/ServerConnection.swift`.
 - [ ] T043 App side:
   - `ServerCredentials.runtimes` comes from the bundled toolsets;
   - `HostSet.claudeToolset` becomes `toolsets`;
@@ -206,7 +206,7 @@ place, and a Codex agent then works like any runtime.
   Tests in `Tests/Unit/CredentialKindTests.swift` (masked descriptions only; `sk-ant-oat…` is still Claude's).
 - [ ] T046 [US4] Add the OpenAI key check to `Daemon-side/Credentials/CredentialCheck.swift`: `GET https://api.openai.com/v1/models` with `Authorization: Bearer`. 200 is Works, 401 is refused, anything else is could-not-check. Tests in `Tests/Unit/CredentialCheckTests.swift`, with a stubbed session.
 - [ ] T047 [US4] Keep a Keychain record `codex` beside Claude's. Settings ▸ Runtime credentials shows a Codex row, with the kind, where to get one, the billing note from contracts/credentials.md, a paste field, and the key masked as `sk-…` plus its last 4 characters. In `App/Sources/Settings/ServerCredentials.swift`. **Look gate**: one screenshot to Alex.
-- [ ] T048 [US4] Server launch environment for Codex: set `NO_BROWSER=1` whenever the daemon runs with `--serve`, and set `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}` with a lent key only if T008 showed it is needed. Put these in the policy or launch path in `Daemon-side/Daemon/DaemonCore.swift`, without a runtime-id branch: a `serverEnvironment` field on the Codex policy. Test with `FakeLauncher` in `Tests/Integration/LendTests.swift`: the Mac launch has no `NO_BROWSER`, and the server launch does.
+- [X] T048 [US4] Server launch environment for Codex: set `NO_BROWSER=1` whenever the daemon runs with `--serve`, and set `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}` with a lent key only if T008 showed it is needed. Put these in the policy or launch path in `Daemon-side/Daemon/DaemonCore.swift`, without a runtime-id branch: a `serverEnvironment` field on the Codex policy. Test with `FakeLauncher` in `Tests/Integration/LendTests.swift`: the Mac launch has no `NO_BROWSER`, and the server launch does.
 - [ ] T049 [US4] Offer Codex in a server project's runtime list when it is installable there. The set-up checklist must show the Codex toolset install, and a server marked "own sign-in only" must be sent no key (`ServerSignIn.exists("codex")`: `~/.codex/auth.json`, or `CODEX_API_KEY`/`OPENAI_API_KEY` in the login environment). Verify through `App/Sources/Hosts/` and fix any gaps.
 - [ ] T050 [US4] Extend `Tests/Live/BareServerLiveTests.swift` (`AGENTS_BARE=1 AGENTS_CODEX_KEY=…`):
   - install Codex's toolset on agents-bare and run a turn;
@@ -217,7 +217,7 @@ place, and a Codex agent then works like any runtime.
 
 ## Phase 10: Polish & cross-cutting
 
-- [ ] T051 [P] Everywhere a runtime is chosen: check the phone and iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Codex from `RuntimeCatalog.builtIn`, and fix any hard-coded list. Build Remote for the generic simulator only.
+- [X] T051 [P] Everywhere a runtime is chosen: check the phone and iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Codex from `RuntimeCatalog.builtIn`, and fix any hard-coded list. Build Remote for the generic simulator only.
 - [ ] T052 [P] Docs. `scripts/docs-check.py` must pass.
   - `docs/reference/runtimes.md`: the count, and a Codex row: installed from the set-up page, the app's copy only, pictures, ChatGPT or API-key sign-in, questions as cards, the three modes, context use but no cost, plan limits, residue.
   - `docs/how-to/sign-a-runtime-in.md`: signing in with ChatGPT, device code or API key.
@@ -261,3 +261,16 @@ place, and a Codex agent then works like any runtime.
 - **US2**: signed out: **Needs signing in**, the sheet with ChatGPT first, sign in, then a turn (quickstart §3 steps 1–2).
 - **US3**: the tool list, `finish_turn`, a lease, and a question card (quickstart §3 steps 4–6).
 - **US4**: bare box, key lent, `uname -a`, no leak, no `auth.json` (quickstart §5).
+
+## Status 2026-09-25 (server half, in progress)
+
+- Done: T008 (spike on agents-bare), T042 (every toolset per runtime on a server: probe,
+  facts, ToolsetInstaller, ServerConnection, HostSet), T048 (NO_BROWSER on servers, and an
+  ephemeral CODEX_HOME plus DEFAULT_AUTH_REQUEST whenever a key is lent), T051 (no hard-coded
+  runtime lists), part of T052 (runtimes, sign-in and scoped-tools pages).
+- Waiting on 046 (Alex, 2026-09-25): T040, T041, T043 and T045–T047, meaning per-runtime
+  `CredentialKind`, lending and Settings rows. 046's branch has built them. Codex's
+  `openAIAPIKey` is added as one more kind once they reach main. Then T049, T050 and the
+  add-a-linux-server and settings docs.
+- Not wanted by Alex: a real server turn. The OpenAI key given has no credit, so the turn
+  ends "Quota exceeded", and everything before the model's reply is proven.

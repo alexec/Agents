@@ -88,6 +88,15 @@ public enum DaemonAPI {
         /// bridge stops carrying anything for it through the relay. Refused `notAllowed` on
         /// a device's own connection.
         public static let devicesForget = "devices/forget"
+        /// The Mac's window asking for a pairing code to show as a QR code: the Mac's key,
+        /// a one-time secret and this Mac's name, good for five minutes or one device,
+        /// whichever comes first (security review, Phase 3). Asking again replaces it.
+        public static let devicesStartPairing = "devices/startPairing"
+        /// The window's pairing sheet closing before anybody scanned it.
+        public static let devicesStopPairing = "devices/stopPairing"
+        /// The bridge asking for the code's secret, so its listener can take it. A window's
+        /// connection only, which the bridge's is; a device's never.
+        public static let pairingCurrent = "pairing/current"
         /// The bridge handing the daemon the public half of the Mac's relay key, so a device
         /// announcing on the direct link is given it (046, R4). Said once per connection,
         /// right after `mailbox/carry`.
@@ -230,6 +239,10 @@ public enum DaemonAPI {
         /// Which runtimes this window could lend a credential for, and whether this server
         /// takes lends at all. Names only; sent on every connect to a server (043).
         public static let credentialsOffer = "credentials/offer"
+        /// That this window relays a runtime's sign-in from the Mac (047): where the relay's
+        /// socket was forwarded to on the server, the certificate it answers with, and the
+        /// stand-in sign-in the runtime is given. Nothing secret; sent on every connect.
+        public static let relayOffer = "relay/offer"
         /// A credential for one runtime, for this connection only, sent only after the
         /// daemon answered `credentialWanted`. Held in memory and dropped when the
         /// connection closes; a daemon without `--serve` refuses it (043, D5).
@@ -304,6 +317,9 @@ public enum DaemonAPI {
         public static let attentionChanged = "attention/changed"
         /// A device announced or was heard from: the whole record (021).
         public static let deviceChanged = "device/changed"
+        /// A pairing code began, was used or ran out. Carries nothing: whoever needs the
+        /// secret asks `pairing/current` on a connection allowed to.
+        public static let pairingChanged = "pairing/changed"
         /// Something for a device's mailbox: a `MailboxItem`, sealed. The daemon has no
         /// CloudKit and must not; the bridge hears this and posts it. Every connection
         /// hears it, and that is safe: a need id, a device id and ciphertext name
@@ -1996,14 +2012,76 @@ public enum DaemonAPI {
         }
     }
 
-    /// `connection/bindDevice`: which device a bridge connection carries, when the
-    /// bridge knows. The relay knows from the key that opened the frame; the LAN link
-    /// learns it from the device until it has a key of its own to know it by.
+    /// `connection/bindDevice`: which device a bridge connection carries. The relay knows
+    /// from the key that opened the frame, the direct link from the key its TLS was
+    /// locked with. `pairing` is a connection locked with a pairing code instead: nobody
+    /// yet, allowed only to announce itself.
     public struct DeviceBinding: Codable, Sendable {
         public var id: UUID?
+        public var pairing: Bool?
 
-        public init(id: UUID?) {
+        public init(id: UUID?, pairing: Bool = false) {
             self.id = id
+            self.pairing = pairing ? true : nil
+        }
+    }
+
+    /// What the Mac shows as a QR code, and what the phone reads from it.
+    public struct PairingCode: Codable, Sendable, Hashable {
+        /// The Mac's relay key, X9.63. The phone keeps this one and no other.
+        public var macKey: Data
+        /// Thirty-two random bytes, good once.
+        public var secret: Data
+        /// This Mac's name, as the bridge advertises it on Bonjour.
+        public var name: String
+        public var expires: Date
+
+        public init(macKey: Data, secret: Data, name: String, expires: Date) {
+            self.macKey = macKey
+            self.secret = secret
+            self.name = name
+            self.expires = expires
+        }
+
+        /// The text in the QR code: `agents-pair:1:<key>:<secret>:<name>`, the key and the
+        /// secret in base64url and the name percent-encoded.
+        public var text: String {
+            let name = name.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+            return "agents-pair:1:\(Self.base64url(macKey)):\(Self.base64url(secret)):\(name)"
+        }
+
+        /// A code read back from a QR code's text, without its expiry: the phone does not
+        /// know it and does not need to, the Mac refuses a code it has let go.
+        public init?(text: String) {
+            let parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 5, parts[0] == "agents-pair", parts[1] == "1",
+                  let key = Self.data(base64url: parts[2]), key.count == 65, key.first == 0x04,
+                  let secret = Self.data(base64url: parts[3]), secret.count == 32,
+                  let name = parts[4].removingPercentEncoding
+            else { return nil }
+            self.init(macKey: key, secret: secret, name: name, expires: .distantFuture)
+        }
+
+        static func base64url(_ data: Data) -> String {
+            data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        }
+
+        static func data(base64url text: String) -> Data? {
+            var base = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            while base.count % 4 != 0 { base += "=" }
+            return Data(base64Encoded: base)
+        }
+    }
+
+    /// `pairing/current`: the secret the bridge's listener should take, if any.
+    public struct PairingSecret: Codable, Sendable, Hashable {
+        public var secret: Data?
+        public var expires: Date?
+
+        public init(secret: Data?, expires: Date?) {
+            self.secret = secret
+            self.expires = expires
         }
     }
 
@@ -2167,6 +2245,24 @@ public extension DaemonAPI {
         public init(runtimes: [String], ownSignInOnly: Bool) {
             self.runtimes = runtimes
             self.ownSignInOnly = ownSignInOnly
+        }
+    }
+
+    /// `relay/offer` (047): the Mac lends a runtime its own sign-in through a relay, without
+    /// the sign-in ever reaching the server. `socketPath` is the server end of the window's
+    /// reverse forward to the relay (made owner-only by sshd); `caCertificate` is the PEM the
+    /// runtime is told to trust for it; `standIn` is a sign-in file with no secret in it.
+    struct RelayOffer: Codable, Hashable, Sendable {
+        public var runtime: String
+        public var socketPath: String
+        public var caCertificate: String
+        public var standIn: String
+
+        public init(runtime: String, socketPath: String, caCertificate: String, standIn: String) {
+            self.runtime = runtime
+            self.socketPath = socketPath
+            self.caCertificate = caCertificate
+            self.standIn = standIn
         }
     }
 
