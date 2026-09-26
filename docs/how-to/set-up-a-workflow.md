@@ -57,18 +57,30 @@ an agent finishes.
      runtime's own; `plan` is Claude's read-only mode. Leave them out to use the
      runtime's defaults.
 2. Open the project's page and find the workflow under **Workflows**. Its line says what
-   it does, such as *When an agent finishes, in a new agent*, and **Waiting for its
-   trigger**.
+   it does, such as *When an agent finishes, in a new agent*. A workflow an agent wrote,
+   or one you wrote in another editor, shows a raised hand and **New — waiting for your
+   OK**: it does not run until you approve it.
 
-   On iPhone and iPad the same list is on the project's page.
-3. Click the workflow to open its page. Check the settings it will start the agent with
-   (**Runtime**, **Permission mode**, **Model**, **Effort**) and change any you want there.
+   On iPhone and iPad the same list is on the project's page, and a waiting workflow says
+   **waiting for your OK on the Mac**. You approve it on the Mac.
+3. Click the workflow to open its page. Check what it will do and the settings it will
+   start the agent with (**Runtime**, **Permission mode**, **Model**, **Effort**), change
+   any you want there, then click **Approve**. You can also click **Approve** on the row.
 4. To try it without waiting, click **Run now**. On iPhone and iPad, **Run now** is on
    the workflow's page too.
 
    A new agent starts, named after the workflow, and appears on the project's page. The
    workflow's page lists it under **Recent runs**, with **Open the agent it started**.
 5. From now on, each time an agent in the project finishes, the workflow starts a reviewer.
+
+**When the file changes**
+
+A workflow runs only as you approved it. If its file changes afterwards, whether an
+agent edited it, you pulled a change or edited it outside Agents, its row says
+**Changed since you approved it — waiting for your OK** and it does not run until you
+approve it again. Changes you make on the workflow's page in Agents count as approved,
+unless the workflow was already waiting. Workflows that existed before this version
+were approved as they stood.
 
 **Turn it off**
 
@@ -88,6 +100,10 @@ A workflow that did not run says why on its row and its page, for example:
   stop at once.
 - **Missed — the app was closed**: the time came while Agents was not running on the
   Mac, or the Mac was off.
+- **Did not run — it is waiting for your OK**: the file is new or has changed since you
+  approved it. Open it, read it, and click **Approve**.
+- **… changed after you looked at it, so it was not approved**: the file changed between
+  your opening it and clicking **Approve**. Look at it again and approve what you see.
 - **Not yet supported**: the file names a trigger or `agent` value this version does not
   know. Check the spelling.
 - A line naming a problem with the file itself, such as **The metadata does not say what

@@ -23,6 +23,8 @@ extension DaemonCore {
         // the held events are replayed, so nothing they fire collides with a run that is
         // already over.
         pruneWorkflowRuns()
+        // After adoption, so every file already here is what gets approved as it stands.
+        beginWorkflowApprovalsIfNeeded()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it
@@ -196,15 +198,18 @@ extension DaemonCore {
         let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
         let archived = state?.isArchived ?? false
         let overLimit = archived ? nil : limitReached(by: workflow, records: records)
+        // A file waiting for the person has no next run: nothing fires until they approve.
+        let waiting = archived ? nil : awaitingApproval(workflow, state: state, records: records)
         return WorkflowSummary(
             workflow: workflow,
             isArchived: archived,
             overLimit: overLimit,
-            nextFireAt: archived || overLimit != nil ? nil : workflow.nextDue(after: Date()),
+            nextFireAt: archived || overLimit != nil || waiting != nil ? nil : workflow.nextDue(after: Date()),
             lastOutcome: state?.lastOutcome,
             isRunning: isRunning(workflow),
             causingEvent: state?.lastCausingEvent,
-            causingEventName: state?.lastCausingEvent.flatMap { eventLog.event(at: $0) }.map(Self.eventLabel))
+            causingEventName: state?.lastCausingEvent.flatMap { eventLog.event(at: $0) }.map(Self.eventLabel),
+            awaitingApproval: waiting)
     }
 
     /// Whether any run of it is in flight: its own, or one for any of its pull requests
@@ -428,6 +433,14 @@ extension DaemonCore {
         if workflow.mode == .triggering, let triggeringAgentID {
             triggeringAgentIsUsable = agents[triggeringAgentID]?.state != .archived
                 && agents[triggeringAgentID] != nil
+        }
+
+        // Behind archiving, which is the person's own decision and says more; ahead of
+        // everything else, because nothing else matters about a file nobody has seen.
+        if !(state?.isArchived ?? false), awaitingApproval(workflow, state: state, records: records) != nil {
+            let refusal = WorkflowRefusal.awaitingApproval
+            record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
+            return refusal
         }
 
         if let refusal = workflow.refusalIfBlocked(
@@ -955,11 +968,24 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable, message: refusal.message)
         }
 
+        // A save through the app is the person's own change, so it is approved as it is
+        // written — but only if what it changed was approved already. Changing one
+        // setting on a file an agent wrote must not approve the rest of it unseen.
+        let before = workflowStore.load()
+        let wasApproved = awaitingApproval(existing, state: before.state(folder: existing.folder,
+                                                                         workflowID: existing.workflowID),
+                                           records: before) == nil
+
         do {
             try Data(edited.utf8).write(to: url, options: .atomic)
         } catch {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
+        }
+        if wasApproved {
+            var records = workflowStore.load()
+            approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
+            workflowStore.save(records)
         }
 
         // Synchronously, and not through the watcher. The watcher is debounced by

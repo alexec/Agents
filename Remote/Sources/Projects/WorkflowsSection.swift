@@ -64,12 +64,16 @@ private struct WorkflowRow: View {
                     Label("Restore", systemImage: "arrow.uturn.backward")
                 }
             } else {
-                Button {
-                    Task { await model.runWorkflow(summary) }
-                } label: {
-                    Label("Run now", systemImage: "play")
+                // Approving is the Mac's, for now; running a file nobody has approved
+                // would only be refused.
+                if summary.awaitingApproval == nil {
+                    Button {
+                        Task { await model.runWorkflow(summary) }
+                    } label: {
+                        Label("Run now", systemImage: "play")
+                    }
+                    .disabled(summary.isRunning)
                 }
-                .disabled(summary.isRunning)
                 Button {
                     Task { await model.setWorkflowArchived(summary, true) }
                 } label: {
@@ -121,6 +125,10 @@ private struct WorkflowRow: View {
     /// `WorkflowOutcome.summary`'s, which is where the Mac reads them, so a refusal
     /// is worded the same on both screens.
     private var happening: String? {
+        // Nothing else about it matters until somebody has read it, on the Mac.
+        if let waiting = summary.awaitingApproval {
+            return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK on the Mac"
+        }
         var parts: [String] = []
         if summary.isRunning {
             parts.append("Running now")
@@ -154,6 +162,7 @@ private struct StatusMark: View {
 
     private var symbol: String {
         if summary.isArchived { return "archivebox" }
+        if summary.awaitingApproval != nil { return "hand.raised" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         if summary.nextFireAt != nil { return "clock" }
         return "circle.dotted"
