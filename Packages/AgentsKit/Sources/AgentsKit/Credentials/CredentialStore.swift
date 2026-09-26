@@ -59,6 +59,25 @@ public struct CredentialStore: Sendable {
 
     public func record(for runtimeID: String) -> Record? { records()[runtimeID] }
 
+    /// A record of a kind this version no longer takes (056: Claude's token; 047: Codex's
+    /// OpenAI key) is forgotten, and its secret deleted from the Keychain: nothing will lend
+    /// it again, so nothing should keep it. Every other runtime's is left as it is. Returns
+    /// the runtimes forgotten.
+    @discardableResult
+    public func forgetKindsNoLongerTaken() -> [String] {
+        guard let data = try? Data(contentsOf: file),
+              let entries = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+        let kept = records()
+        let dropped = entries.keys.filter { kept[$0] == nil }.sorted()
+        guard !dropped.isEmpty else { return [] }
+        for runtimeID in dropped { try? deleteSecret(for: runtimeID) }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try? encoder.encode(kept).write(to: file, options: .atomic)
+        return dropped
+    }
+
     // MARK: Secrets
 
     /// Keep a secret for a runtime, replacing any before it.

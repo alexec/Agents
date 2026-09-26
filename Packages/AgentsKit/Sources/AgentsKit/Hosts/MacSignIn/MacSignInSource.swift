@@ -8,10 +8,16 @@ public protocol MacSignInSource: Sendable {
     /// Signed in the way this relay lends (a ChatGPT sign-in for Codex; a Claude account's,
     /// with inference, for Claude).
     var isSignedIn: Bool { get }
+    /// Why it cannot be lent right now, or nil when it can.
+    var whyNot: MacSignInFailure? { get }
     func current() throws -> MacSignInToken
     /// A token other than `stale`, which was refused; or `renewalRefused`. Never `stale`.
     func renew(after stale: MacSignInToken) async throws -> MacSignInToken
     func standIn() throws -> String
+}
+
+public extension MacSignInSource {
+    var whyNot: MacSignInFailure? { isSignedIn ? nil : .notSignedIn }
 }
 
 /// What the relay puts on a request: the access token, as `Authorization: Bearer`, and any

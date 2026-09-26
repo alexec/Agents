@@ -3,7 +3,7 @@ import AgentsKitCore
 import Foundation
 
 /// Asking the provider whether a credential works, when it is saved (043, FR-011, R9):
-/// Anthropic for Claude's, Google for Gemini's (046), OpenAI for Codex's (047).
+/// Google for Gemini's key (046), the only kind Settings still takes (056).
 ///
 /// The window's, not a daemon's: the daemons have no network code. One free call, the
 /// list of models, answered 200 for a credential that works and 401 for one that does not.
@@ -16,7 +16,6 @@ public struct CredentialCheck: Sendable {
         case cannotCheck(String)
     }
 
-    public static let endpoint = URL(string: "https://api.anthropic.com/v1/models?limit=1")!
     /// Google's list of models: free, and 200 for a key that works. The key goes in a
     /// header, never the URL, so no proxy log can keep it.
     public static let geminiEndpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")!
@@ -33,7 +32,6 @@ public struct CredentialCheck: Sendable {
         let request = Self.request(for: secret, timeout: timeout)
         let provider = switch secret.kind {
         case .geminiAPIKey: "Google"
-        case .oauthToken, .apiKey: "Anthropic"
         }
         do {
             let (data, response) = try await session.data(for: request)
@@ -52,16 +50,6 @@ public struct CredentialCheck: Sendable {
 
     static func request(for secret: Secret, timeout: TimeInterval = 10) -> URLRequest {
         switch secret.kind {
-        case .apiKey, .oauthToken:
-            var request = URLRequest(url: endpoint, timeoutInterval: timeout)
-            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-            if secret.kind == .apiKey {
-                request.setValue(secret.reveal(), forHTTPHeaderField: "x-api-key")
-            } else {
-                request.setValue("Bearer \(secret.reveal())", forHTTPHeaderField: "Authorization")
-                request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-            }
-            return request
         case .geminiAPIKey:
             var request = URLRequest(url: geminiEndpoint, timeoutInterval: timeout)
             request.setValue(secret.reveal(), forHTTPHeaderField: "x-goog-api-key")
@@ -73,8 +61,7 @@ public struct CredentialCheck: Sendable {
         String(decoding: data, as: UTF8.self).contains("API_KEY_INVALID")
     }
 
-    /// The `error.message` of the provider's error body, which is a sentence. Anthropic,
-    /// Google and OpenAI all put it there.
+    /// The `error.message` of the provider's error body, which is a sentence.
     static func message(_ data: Data) -> String? {
         struct Body: Decodable { struct E: Decodable { var message: String }; var error: E }
         return (try? JSONDecoder().decode(Body.self, from: data))?.error.message

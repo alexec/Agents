@@ -2,29 +2,19 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// Telling a pasted Claude credential's kind, and never printing it (043, D1).
+/// A pasted credential: Gemini's key is the only kind (056), and never prints (043, D1).
 @Suite("A runtime credential")
 struct CredentialKindTests {
-    @Test func aSubscriptionTokenAndAnAPIKeyAreToldApartByPrefix() throws {
-        let token = try #require(Secret("sk-ant-oat01-abcdefghijkl-a3f9"))
-        #expect(token.kind == .oauthToken)
-        #expect(token.kind.environmentVariable == "CLAUDE_CODE_OAUTH_TOKEN")
-        let key = try #require(Secret("  sk-ant-api03-abcdefghijkl-9x9z\n"))
-        #expect(key.kind == .apiKey)
-        #expect(key.kind.environmentVariable == "ANTHROPIC_API_KEY")
-        #expect(key.reveal() == "sk-ant-api03-abcdefghijkl-9x9z")
-    }
-
     @Test(arguments: ["", "hello", "sk-ant-", "sk-ant-oat", "sk-ant-xyz-abcdefghijkl", "sk-12", "ghp_abcdefghijk"])
     func anythingElseIsRefused(_ text: String) {
         #expect(Secret(text) == nil)
     }
 
     @Test func itOnlyEverPrintsAsItsMask() throws {
-        let secret = try #require(Secret("sk-ant-oat01-SECRETSECRET-a3f9"))
-        #expect(secret.mask == "sk-ant-oat…a3f9")
-        #expect("\(secret)" == "sk-ant-oat…a3f9")
-        #expect(String(describing: secret) == "sk-ant-oat…a3f9")
+        let secret = try #require(Secret("AQ." + "Ab8RN6SECRETSECRET-a3f9"))
+        #expect(secret.mask == "key …a3f9")
+        #expect("\(secret)" == "key …a3f9")
+        #expect(String(describing: secret) == "key …a3f9")
         #expect(!String(reflecting: secret).contains("SECRET"))
         #expect(!"\([secret])".contains("SECRET"))
         var dumped = ""
@@ -54,10 +44,7 @@ struct GeminiKeyKindTests {
         #expect(Secret("ghp_something-long-enough") == nil)
     }
 
-    @Test func claudesKindsAreUnchanged() {
-        #expect(CredentialKind.kinds(for: "claude") == [.oauthToken, .apiKey])
-        #expect(!CredentialKind.oauthToken.isLentOnTheMac && !CredentialKind.apiKey.isLentOnTheMac)
-        #expect(CredentialKind.allVariables == ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"])
+    @Test func geminisVariables() {
         #expect(CredentialKind.variables(for: "gemini") == ["GEMINI_API_KEY", "GOOGLE_API_KEY"])
     }
 }
@@ -71,8 +58,11 @@ struct NoOpenAIKeyTests {
         #expect(CredentialKind.kinds(for: "codex").isEmpty)
     }
 
-    @Test func claudesKeysStayClaudes() throws {
-        #expect(try #require(Secret("sk-ant-api03-abcdefghijkl-9x9z")).kind == .apiKey)
-        #expect(try #require(Secret("sk-ant-oat01-abcdefghijkl-a3f9")).kind == .oauthToken)
+    /// Claude takes no token either (056): a server's Claude signs in through the Mac's
+    /// own Claude sign-in, so a pasted token or key is nobody's.
+    @Test func aClaudeTokenOrKeyIsNobodysNow() {
+        #expect(Secret("sk-ant-api03-abcdefghijkl-9x9z") == nil)
+        #expect(Secret("sk-ant-oat01-abcdefghijkl-a3f9") == nil)
+        #expect(CredentialKind.kinds(for: "claude").isEmpty)
     }
 }

@@ -1185,7 +1185,7 @@ final class AppModel {
             noteServerSpent(host)
             return
         case DaemonAPI.Notification.credentialRefused:
-            // The token in Settings was refused: Settings turns red, and says why (043).
+            // The key in Settings was refused: Settings turns red, and says why (043).
             if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self), refused.lent {
                 credentials.markRefused(refused.runtime)
             }
@@ -2158,7 +2158,7 @@ final class AppModel {
                 try await work(client(for: host))
                 return true
             } catch let refused as JSONRPCError {
-                problem = describe(refused)
+                fail(refused, on: host)
                 return false
             } catch {
                 guard ContinuousClock.now < deadline else {
@@ -2193,6 +2193,14 @@ final class AppModel {
         if host == .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.needsSignIn,
            let runtimeID = error.data?["runtimeID"]?.stringValue {
             signInRuntimeID = runtimeID
+            return
+        }
+        // A server's Claude signs in through this Mac's own sign-in (056): with none to
+        // relay, the sheet that signs it in on this Mac, and a sentence saying so.
+        if host != .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.signInWanted,
+           let wanted = try? error.data?.decode(DaemonAPI.SignInWanted.self) {
+            problem = error.message + " Sign it in on this Mac, or use \(hosts.label(host))’s own sign-in in Settings ▸ Servers."
+            signInRuntimeID = wanted.runtime
             return
         }
         problem = describe(error)

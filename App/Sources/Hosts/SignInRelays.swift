@@ -35,16 +35,35 @@ final class SignInRelays: @unchecked Sendable {
         case .file(let path):
             made = CodexFileSignIn(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path))
         case .keychain(let service):
-            made = ClaudeKeychainSignIn(service: service)
+            made = ClaudeKeychainSignIn(service: testService ?? service)
         }
         sources[runtimeID] = made
         return made
+    }
+
+    /// A walk's stand-in for the Keychain item Claude keeps (056), so "this Mac is not signed
+    /// in" can be shown on a scratch root without signing anyone out. Debug builds only.
+    private static var testService: String? {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["AGENTS_TEST_CLAUDE_KEYCHAIN_SERVICE"]
+        #else
+        nil
+        #endif
     }
 
     /// Whether this Mac can relay `runtimeID`'s sign-in right now: it is signed in the way
     /// the relay lends (a ChatGPT sign-in for Codex, a Claude account's for Claude).
     static func canRelay(_ runtimeID: String) -> Bool {
         signIn(for: runtimeID)?.isSignedIn ?? false
+    }
+
+    /// Why this Mac cannot relay `runtimeID`'s sign-in right now, or nil when it can (056).
+    static func whyNotRelayed(_ runtimeID: String) -> DaemonAPI.SignInWanted.Reason? {
+        switch signIn(for: runtimeID)?.whyNot {
+        case nil: nil
+        case .unreadable?: .unreadable
+        case .some: .notSignedIn
+        }
     }
 
     /// What a server is offered: every sign-in this Mac is signed in to lend.

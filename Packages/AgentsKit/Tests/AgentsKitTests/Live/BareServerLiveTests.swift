@@ -20,7 +20,6 @@ struct BareServerLiveTests {
     static let repo = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
-    static let madeUp = Secret("sk-ant-oat01-BARELIVEMADEUP-0000")!
 
     /// The person's ssh, told to trust whatever key the box has and write it nowhere.
     func ssh(in folder: URL) throws -> SSHCommand {
@@ -35,7 +34,10 @@ struct BareServerLiveTests {
                           controlPath: folder.appendingPathComponent("b.ctl"))
     }
 
-    @Test func aBareServerGetsClaudeLendsOnDemandAndSaysARefusalIsOne() async throws {
+    /// 056: with no relay (none is offered here) and no sign-in of its own, a bare server's
+    /// Claude is installed and then says this Mac is not signed in, rather than asking for a
+    /// token. The relayed path is walked in specs/056-claude-sign-in-relay/walk/US1.md.
+    @Test func aBareServerGetsClaudeAndWithNoRelaySaysTheMacIsNotSignedIn() async throws {
         let folder = URL(filePath: "/tmp/bare-\(UUID().uuidString.prefix(6))", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -45,45 +47,28 @@ struct BareServerLiveTests {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let toolset = try Toolset.load(from: Self.repo.appendingPathComponent("App/Resources/toolsets/claude"))
 
-        let box = LentBox()
         let server = ServerConnection(
             hostID: HostID(rawValue: "bare0001"), ssh: ssh, socket: folder.appendingPathComponent("b.sock"),
             installedBy: "BareServerLiveTests",
             binary: { _ in ServerBinary(file: binary, sha256: sha, version: "0.1.0+1") },
             toolset: { toolset }, wantsClaude: { true },
-            offer: { DaemonAPI.CredentialsOffer(runtimes: ["claude"], ownSignInOnly: false) },
-            lender: { wanted in await box.lend(wanted) })
-        await box.set(server)
+            offer: { DaemonAPI.CredentialsOffer(runtimes: [], ownSignInOnly: false) })
 
-        let began = ContinuousClock.now
         await server.connect()
-        let installed = ContinuousClock.now - began
         #expect(await server.state == .connected)
-        #expect(await server.claude == .ready(toolset.id), "installed in \(installed)")
+        #expect(await server.claude == .ready(toolset.id))
 
         _ = try await server.client.call(DaemonAPI.Method.projectsAdd,
                                          DaemonAPI.ProjectRequest(folder: URL(filePath: "/home/agents/src/hello")))
-        let made = try await server.client.call(
-            DaemonAPI.Method.agentsStart,
-            DaemonAPI.StartRequest(runtimeID: "claude", cwd: URL(filePath: "/home/agents/src/hello"),
-                                   prompt: "Reply with the single word pong.", requestID: UUID()))
-        #expect(await box.asked == 1, "asked once, lent once, started once")
-        let agentID = try #require(made.stringValue.flatMap(UUID.init(uuidString:)))
-
-        var notes: [String] = []
-        for _ in 0..<120 {
-            let page = try await server.client.call(DaemonAPI.Method.agentsTranscript,
-                                                    DaemonAPI.TranscriptRequest(agentID: agentID, limit: 200),
-                                                    returning: TranscriptPage.self)
-            notes = page.entries.compactMap { if case .runtimeNote(let t) = $0.kind { t } else { nil } }
-            if notes.contains(where: { $0.contains("refused") || $0.contains("stopped answering") }) { break }
-            try await Task.sleep(for: .milliseconds(500))
+        do {
+            _ = try await server.client.call(
+                DaemonAPI.Method.agentsStart,
+                DaemonAPI.StartRequest(runtimeID: "claude", cwd: URL(filePath: "/home/agents/src/hello"),
+                                       prompt: "Reply with the single word pong.", requestID: UUID()))
+            Issue.record("started with nothing to sign in with")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.signInWanted)
         }
-        #expect(notes.contains("Claude refused the token in Settings. Replace it in Settings ▸ Servers."), "\(notes)")
-
-        // Nowhere on the server's disk (FR-012).
-        let grep = try await ssh.run(ssh.runArguments("grep -rlF BARELIVEMADEUP \"$HOME\" /tmp 2>/dev/null; true"))
-        #expect(grep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "\(grep.stdout)")
         await server.disconnect()
     }
 }
@@ -157,16 +142,5 @@ private actor GeminiLentBox {
     func lend(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
         asked += 1
         return await server?.lend(wanted.runtime, BareServerLiveTests.madeUpGemini) ?? false
-    }
-}
-
-/// Lends the made-up token on the connection that asked, and counts the asking.
-private actor LentBox {
-    private var server: ServerConnection?
-    private(set) var asked = 0
-    func set(_ server: ServerConnection) { self.server = server }
-    func lend(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
-        asked += 1
-        return await server?.lend(wanted.runtime, BareServerLiveTests.madeUp) ?? false
     }
 }

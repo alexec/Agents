@@ -29,6 +29,8 @@ final class ServerCredentials {
     init(locations: StoreLocations, checker: CredentialCheck = CredentialCheck()) {
         store = CredentialStore(locations: locations)
         self.checker = checker
+        // A Claude token from before 056 (or 047's OpenAI key) is lent to nothing now.
+        store.forgetKindsNoLongerTaken()
         records = store.records()
     }
 

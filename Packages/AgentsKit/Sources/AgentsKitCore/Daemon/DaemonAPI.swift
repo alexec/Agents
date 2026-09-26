@@ -1565,6 +1565,10 @@ public enum DaemonAPI {
         /// `credentials/lend` for a runtime this connection did not offer, or on a
         /// connection that said the server uses its own sign-in only (043, FR-014).
         public static let notOffered = -32039
+        /// A server daemon had to start a runtime whose sign-in the Mac relays (056: Claude),
+        /// and there was no relay, the server is not "own sign-in only", and it has no
+        /// sign-in of its own. Nothing was started. `data`: `SignInWanted`.
+        public static let signInWanted = -32070
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -2421,10 +2425,31 @@ public extension DaemonAPI {
     struct CredentialsOffer: Codable, Hashable, Sendable {
         public var runtimes: [String]
         public var ownSignInOnly: Bool
+        /// Runtimes whose sign-in this window would relay but cannot now, and why (056), so
+        /// a server can say "not signed in" or "couldn't read it". Absent from older windows.
+        public var notRelayed: [String: SignInWanted.Reason]?
 
-        public init(runtimes: [String], ownSignInOnly: Bool) {
+        public init(runtimes: [String], ownSignInOnly: Bool, notRelayed: [String: SignInWanted.Reason]? = nil) {
             self.runtimes = runtimes
             self.ownSignInOnly = ownSignInOnly
+            self.notRelayed = notRelayed
+        }
+    }
+
+    /// The `data` of a `signInWanted` failure (056, contracts/relay.md).
+    struct SignInWanted: Codable, Hashable, Sendable {
+        public enum Reason: String, Codable, Hashable, Sendable {
+            /// No sign-in on the Mac the relay can lend: none, or not a Claude account's.
+            case notSignedIn
+            /// There is one, and the Mac could not read it.
+            case unreadable
+        }
+        public var runtime: String
+        public var reason: Reason
+
+        public init(runtime: String, reason: Reason) {
+            self.runtime = runtime
+            self.reason = reason
         }
     }
 

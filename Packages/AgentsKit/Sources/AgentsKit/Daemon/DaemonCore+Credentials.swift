@@ -171,6 +171,13 @@ extension DaemonCore {
            let relayed = relayEnvironment(for: runtimeID) {
             return relayed
         }
+        // A runtime whose sign-in only the Mac relays (056: Claude; 047: Codex), with no relay
+        // offered: the server's own sign-in, or say why the Mac's could not be used.
+        if ToolPolicyCatalog.policy(for: runtimeID).relay != nil, !Self.lendableRuntimes.contains(runtimeID) {
+            if RequestConnection.current.flatMap({ credentialOffers[$0] })?.ownSignInOnly == true { return [:] }
+            if hasOwnSignIn(runtimeID) { return [:] }
+            throw Self.signInWanted(runtimeID, reason: notRelayedReason(for: runtimeID))
+        }
         guard Self.lendableRuntimes.contains(runtimeID) else { return [:] }
         let connection = RequestConnection.current
         let offer = connection.flatMap { credentialOffers[$0] }
@@ -223,6 +230,24 @@ extension DaemonCore {
         // Google's words for a Gemini key it does not know (046, contracts/credentials.md).
         return error.message.contains("Failed to authenticate") || error.message.contains("API key not valid")
             || error.message.contains("API_KEY_INVALID")
+    }
+
+    /// Why the window could not relay `runtimeID`'s sign-in: what the asking connection
+    /// said, else any window's, else not signed in.
+    func notRelayedReason(for runtimeID: String) -> DaemonAPI.SignInWanted.Reason {
+        RequestConnection.current.flatMap { credentialOffers[$0]?.notRelayed?[runtimeID] }
+            ?? credentialOffers.values.lazy.compactMap { $0.notRelayed?[runtimeID] }.first
+            ?? .notSignedIn
+    }
+
+    static func signInWanted(_ runtimeID: String, reason: DaemonAPI.SignInWanted.Reason) -> JSONRPCError {
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        let message = switch reason {
+        case .notSignedIn: "\(name) on this Mac isn’t signed in with a \(name) account."
+        case .unreadable: "Agents couldn’t read \(name)’s sign-in on this Mac."
+        }
+        return JSONRPCError(code: DaemonAPI.Failure.signInWanted, message: message,
+                            data: (try? JSONValue.encoding(DaemonAPI.SignInWanted(runtime: runtimeID, reason: reason))) ?? nil)
     }
 
     static func wanted(_ runtimeID: String, offered: Bool) -> JSONRPCError {
