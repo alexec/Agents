@@ -360,7 +360,7 @@ state on archive.
 
 ## Phase 11: Polish and proof
 
-- [ ] T057 Run quickstart §2 in full on `/tmp/run-051` against a scratch daemon, and record each bullet's result in `walk/README.md`.
+- [X] T057 Run quickstart §2 in full on `/tmp/run-051` against a scratch daemon, and record each bullet's result in `walk/README.md`.
 - [ ] T058 Run quickstart §4, the kill test, ten times, and record each outcome (SC-006).
 - [ ] T059 Run quickstart §5 with the run-app skill on `/tmp/run-051`, and screenshot each Mac item into `walk/`.
 - [X] T060 [P] Write the docs:

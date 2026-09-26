@@ -90,3 +90,24 @@ Each daemon was started five times, timed from launch to an answer, and measured
   slower (280 against 177 ms, by ping), which is decoding the index's 1,000 slim records. Against
   main the same store starts 14 times faster and holds a sixth of the memory. Whether 100 ms is
   acceptable, or the index should be decoded lazily, is for Alex (raised at T063).
+
+## Quickstart §2 over the socket (T057), 2026-09-26
+
+On scratch roots, with the branch's `agentsd`:
+
+- **Preview, then confirm**: 3 agents archived 10 days ago. `retention/set` to 7 days, unconfirmed,
+  answered `applied: false` with 3 agents and 147 KB, and changed nothing. Confirmed, it
+  retired the 3 (`retiredCount: 3`), and the 2-day agent stayed archived.
+- **Retire now**: unconfirmed, it answered 1 agent and 49 KB. Confirmed, it retired the agent,
+  and the tombstone says `person`. On a live agent it refused with `-32051`, "Only an archived
+  agent can be retired."
+- **A retired id**: `agents/unarchive` answered `-32050`, "“Seeded archived agent 1” was retired
+  on 25 September, 10 days after it was archived."
+- **Forever, no limit**: applied at once, since it retires nothing.
+- **Cap and holds**: `RetirementTests` covers them. The holds use real git repositories and
+  worktrees: an uncommitted file, then committed but unmerged, then merged, plus a shared
+  worktree, a worktree the person made, a running workflow and a watching window. The quickstart's
+  600 MB cap seeding was not repeated by hand.
+
+The first try at Retire now answered "Method not found": that daemon copy was built before US7.
+Rebuilt and rerun above.
