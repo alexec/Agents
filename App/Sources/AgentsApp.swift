@@ -38,16 +38,9 @@ struct AgentsApp: App {
         // that one is read-only by construction, and a limit is the one number in
         // this app a person types.
         Settings {
-            TabView {
-                Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
-                Tab("Agents", systemImage: "cpu") { AgentsSettingsView() }
-                Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
-                Tab("Pool", systemImage: "arrow.triangle.swap") { PoolSettingsView() }
-                Tab("Devices", systemImage: "iphone") { DevicesPane() }
-                Tab("Servers", systemImage: "server.rack") { ServersSettingsView() }
-            }
-            .paperGround()
-            .environment(model)
+            SettingsWindow()
+                .paperGround()
+                .environment(model)
         }
     }
 }

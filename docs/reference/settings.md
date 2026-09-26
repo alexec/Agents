@@ -9,8 +9,8 @@ description: Every control in Agents ▸ Settings on the Mac, and the system set
 This page lists every control in the Mac's Settings window, **Agents ▸ Settings…**, pane
 by pane, and the system settings the app on iPhone and iPad depends on.
 
-The Mac's Settings window has four panes: **Appearance**, **Spending**, **Devices** and
-**Servers**. Agents on iPhone and iPad has no Settings screen of its own; it follows the
+The Mac's Settings window has six panes: **Appearance**, **Agents**, **Shared**,
+**Spending**, **Devices** and **Servers**. Agents on iPhone and iPad has no Settings screen of its own; it follows the
 Mac it is paired with.
 
 | Device | Pane | Control | What it does |
@@ -19,6 +19,8 @@ Mac it is paired with.
 | Mac | Agents | **Archived agents** | How many archived agents there are and how much space they take, and how long they are kept. When they are over the space they may take and nothing more can be retired yet, it says so and why. |
 | Mac | Agents | **Keep archived agents**: **7 days**, **14 days**, **30 days**, **90 days**, **Forever** | How long an archived agent is kept before it is retired: its conversation is deleted and a short record of who it was is kept. The default is **30 days**. If a change would retire agents at once, you are asked first, with how many and how much space it frees. Each server keeps to the same setting. |
 | Mac | Agents | **Up to**: **1 GB**, **2 GB**, **5 GB**, **10 GB**, **No limit** | The most space archived agents may take. Over it, the ones archived longest ago are retired first. The default is **2 GB**. **Forever** with **No limit** keeps archived agents for good. |
+| Mac | Shared | **Overview** | What every agent gets from `~/.agents`: a grid of instructions, skills, MCP servers and plugins by runtime, with a count or a tick where it gets them, **n of m** where some are left out, **—** where it has no way to take them and **?** where it is not checked yet. **Needs a look** lists each clash, anything left out and any runtime with no way in, and opens its page. **Reveal in Finder** opens `~/.agents`. |
+| Mac | Shared | **Instructions**, **Skills**, **MCP servers**, **Plugins**, **Other files** | One page each, read-only: what is there, and how each runtime gets it. **Skills** shows a skill's `SKILL.md`; **MCP servers** shows your servers, the app's own and those only in one runtime's own config, with env and header names but never their values, and says so when `mcp.json` cannot be read; **Plugins** shows what each contains. **Edit** opens the file in your editor. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md). |
 | Mac | Spending | **Per agent**, with an amount, a currency, **Set** and **No limit** | The most one agent may spend across its whole life, not one turn. An agent that reaches it finishes the turn it is in and takes no further prompt, so it may end a little over. If agents have already spent this much, the pane says so as you set it. |
 | Mac | Spending | **Per day**, with an amount, a currency, **Set** and **No limit** | The most everything may spend in one local day, in every project. When the day reaches it, nothing new starts and no prompt is sent, including a workflow on a schedule. Whatever is working finishes its turn and holds. What you typed waits until the day rolls over. Each server keeps to this limit on its own. |
 | Mac | Spending | **Today** | What today has cost so far, and how much is left under **Per day**. Shows **Nothing yet** before anything is spent. |

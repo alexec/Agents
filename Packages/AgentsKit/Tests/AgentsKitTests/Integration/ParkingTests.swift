@@ -37,7 +37,7 @@ struct ParkingTests {
     }
 
     private func finished(_ work: URL, report: WorkReport? = nil) -> Agent {
-        Agent(runtimeID: "copilot", cwd: work, title: "seed", state: .finished,
+        Agent(runtimeID: "cursor", cwd: work, title: "seed", state: .finished,
               endedReason: .endTurn, report: report)
     }
 
@@ -252,7 +252,7 @@ struct ParkingTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try await core(locations, launcher: launcher)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await call(core, DaemonAPI.Method.agentsPark, id)
         let marked = try #require(await core.agent(id))
@@ -274,7 +274,7 @@ struct ParkingTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try await core(locations, launcher: launcher)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await call(core, DaemonAPI.Method.agentsPark, id)
         _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
@@ -290,7 +290,7 @@ struct ParkingTests {
     @Test func aStoppedTurnParksToo() async throws {
         let (locations, work) = try temporary()
         let core = try await core(locations, launcher: midTurn())
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await call(core, DaemonAPI.Method.agentsPark, id)
         try await core.stop(id)
@@ -304,7 +304,7 @@ struct ParkingTests {
     @Test func unparkingBeforeTheTurnEndsWithdrawsTheMark() async throws {
         let (locations, work) = try temporary()
         let core = try await core(locations, launcher: midTurn())
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await call(core, DaemonAPI.Method.agentsPark, id)
         try await call(core, DaemonAPI.Method.agentsUnpark, id)
@@ -318,7 +318,7 @@ struct ParkingTests {
     @Test func thePersonsPromptMidTurnWithdrawsTheMark() async throws {
         let (locations, work) = try temporary()
         let core = try await core(locations, launcher: midTurn())
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await call(core, DaemonAPI.Method.agentsPark, id)
         _ = await core.handle(method: DaemonAPI.Method.agentsPrompt,

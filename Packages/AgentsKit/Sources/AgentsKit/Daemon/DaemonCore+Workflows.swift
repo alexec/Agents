@@ -651,7 +651,8 @@ extension DaemonCore {
                                    managesAgents: managesAgents)
         }
         let draft = Draft(runtimeID: runtime.id, cwd: folder,
-                          mcpServers: [], pending: pending, managesAgents: managesAgents)
+                          mcpServers: [], personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
+                          pending: pending, managesAgents: managesAgents)
         drafts[draftID] = draft
 
         let made: DaemonCore.MadeSession

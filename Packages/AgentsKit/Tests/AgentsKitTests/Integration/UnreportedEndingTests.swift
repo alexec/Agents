@@ -62,7 +62,7 @@ struct UnreportedEndingTests {
     @Test func aTurnThatSaidNothingIsAskedExactlyOnce() async throws {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         try await settle(core, id)
@@ -83,7 +83,7 @@ struct UnreportedEndingTests {
         let asked = TurnGate()
         let launcher = FakeLauncher(script: .init(), then: [.init(), Self.held(asked)])
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         let token = await eventuallySome("the asked turn has a token of its own") {
@@ -109,7 +109,7 @@ struct UnreportedEndingTests {
     @Test func theQuestionNamesTheOneTool() async throws {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         try await settle(core, id)
@@ -124,7 +124,7 @@ struct UnreportedEndingTests {
     @Test func theQuestionIsNeverAskedASecondTime() async throws {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         try await settle(core, id)
@@ -148,7 +148,7 @@ struct UnreportedEndingTests {
         let asked = TurnGate()
         let launcher = FakeLauncher(script: .init(), then: [.init(), Self.held(asked)])
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         // The flag goes up before the prompt is enqueued, and the turn that prompt
         // causes mints a token of its own — a resumed session is a new process, so the
@@ -189,7 +189,7 @@ struct UnreportedEndingTests {
         var script = FakeACPAgent.Script()
         script.turnDelay = .milliseconds(300)
         let core = try core(FakeLauncher(script: script), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         let asked = try #require(await core.agent(id))
@@ -209,7 +209,7 @@ struct UnreportedEndingTests {
         let (locations, work) = try temporary()
         let first = TurnGate()
         let core = try core(FakeLauncher(script: .init(), then: [Self.held(first)]), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         // Queued while the first turn is still in flight, so it is waiting when that
         // turn ends and the gate is shut.
@@ -235,7 +235,7 @@ struct UnreportedEndingTests {
             var script = FakeACPAgent.Script()
             script.stopReason = stop
             let core = try core(FakeLauncher(script: script), locations: locations)
-            let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+            let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
             try await settle(core, id)
             try await Task.sleep(for: .milliseconds(150))
@@ -253,7 +253,7 @@ struct UnreportedEndingTests {
     @Test func anArchivedAgentIsNotAsked() async throws {
         let (locations, work) = try temporary()
         let core = try core(FakeLauncher(script: Self.held(TurnGate())), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("it is working") { await core.agent(id)?.state == .running }
         try await core.archive(id)
@@ -272,7 +272,7 @@ struct UnreportedEndingTests {
         script.stopReason = "max_tokens"
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let token = await eventuallySome("the runtime was handed its token") {
             let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
@@ -298,7 +298,7 @@ struct UnreportedEndingTests {
         var script = FakeACPAgent.Script()
         script.usage = ["inputTokens": 10, "outputTokens": 5]
         let core = try core(FakeLauncher(script: script), locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the question was asked") { await core.agent(id)?.outcomeAsked == true }
         try await settle(core, id)

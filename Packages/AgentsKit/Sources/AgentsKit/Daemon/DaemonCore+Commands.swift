@@ -21,7 +21,9 @@ extension DaemonCore {
                                    mcpServers: request.mcpServers)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
-                                mcpServers: request.mcpServers, pending: pending,
+                                mcpServers: request.mcpServers,
+                                personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
+                                pending: pending,
                                 connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
@@ -241,6 +243,7 @@ extension DaemonCore {
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
                                      && $0.mcpServers == request.mcpServers
+                                     && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
                                      && $0.managesAgents == (starter == nil) ? $0 : nil }
         if let usable {
             // The session may still be being made: a form shown from memory is quicker
@@ -359,6 +362,7 @@ extension DaemonCore {
     /// so the runtime is ended when it arrives rather than left running unowned.
     func endDraft(_ draft: Draft) async {
         guard let made = try? await draft.pending.value else { return }
+        endBridgeRoutes(for: made.appToken)
         await made.session.end(gracePeriod: .seconds(2))
     }
 
@@ -383,6 +387,9 @@ extension DaemonCore {
         // Before the runtime reads the folder, so a project from before the layout
         // existed has it by the first turn.
         layOutOnce(cwd)
+        // And the person's own `~/.agents`, so a skill added since the last start is here (054).
+        reconcileHome()
+        await syncCodexPlugins(before: runtimeID)
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
@@ -401,9 +408,11 @@ extension DaemonCore {
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
+            let servers = await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
+                                               managesAgents: managesAgents, cwd: cwd,
+                                               capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents,
-                                                                                         movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))],
+                                                      mcpServers: servers,
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
@@ -799,6 +808,8 @@ extension DaemonCore {
         // was, and the window lends one and asks again (043).
         let lent = try launchEnvironment(for: runtime.id)
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
+        // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
+        await syncCodexPlugins(before: agent.runtimeID)
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         }
@@ -822,16 +833,19 @@ extension DaemonCore {
     }
 
     private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
-        _ = try await session.initialize()
+        let handshake = try await session.initialize()
+        // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
+        reconcileHome()
 
         // A new process is a new MCP server, so a new token. The old one stopped
         // working when the last process died.
         let token = mintAppToken()
         // Picked back up as what it was: an agent another agent started still has no
         // tools for starting agents (028).
-        let servers = agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil,
-                                                    movesItself: RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID))]
         bindAppToken(token, to: agent.id)
+        let servers = await sessionServers(runtimeID: agent.runtimeID, chosen: agent.mcpServers, token: token,
+                                           managesAgents: agent.startedByAgent == nil, cwd: agent.cwd,
+                                           capabilities: handshake.agentCapabilities?.mcpCapabilities)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).

@@ -21,7 +21,7 @@ newer version.
 | --- | --- | --- | --- | --- | --- |
 | **Claude** | `npx -y @agentclientprotocol/claude-agent-acp` | Yes | No. Sign in with Claude Code itself, outside the app. | All | `claude` has no mode the app can talk to, so the app runs this adapter through your Node instead. Its questions reach you as a card you can answer on the Mac or phone. It asks your permission before using some of the app's tools. |
 | **Grok** | `grok agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. |
-| **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | None | Its conversations get none of the app's tools, including the one it uses to say how a turn went, so its turns end without a report. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
+| **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | All | It takes no MCP server it would have to start itself, so the app runs those, its own tools included, and hands each to Copilot over a local http address only that agent can use. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
 | **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agents** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agents** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that project's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker are switched off. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. |
 | **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agents** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agent tools (`spawn_agent` and five others) cannot be turned off. |
@@ -40,6 +40,21 @@ In every column:
   server. Claude and Gemini are the exceptions: with a Claude token, or a Gemini key, in
   Settings, Agents installs that runtime on the server itself and signs it in with it. See
   [Add a Linux server](../how-to/add-a-linux-server.md).
+
+## What each gets from `~/.agents`
+
+Your own skills, instructions, MCP servers and plugins in `~/.agents` reach each runtime the
+way it can take them. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
+
+| Runtime | Skills | Instructions | MCP servers from `mcp.json` | Plugins |
+| --- | --- | --- | --- | --- |
+| **Claude** | a link in `~/.claude/skills` | `~/.claude/CLAUDE.md`, a link | sent at start | handed at start |
+| **Codex** | reads `~/.agents/skills` | `~/.codex/AGENTS.md`, a link | sent at start, except sse servers; its own server of the same name wins | added to Codex by the app, and again when the plugin changes |
+| **Grok** | reads `~/.agents/skills` | `~/.grok/AGENTS.md`, a link | sent at start | handed at start, with its servers sent as MCP servers |
+| **Cursor** | reads `~/.agents/skills` | none: User Rules are in Cursor's settings | sent at start; its own of the same name runs too | no way in |
+| **Copilot** | reads `~/.agents/skills` | `~/.copilot/copilot-instructions.md`, a link | through the app's local bridge for servers it would start; its own of the same name wins | no way in over the app |
+| **Gemini** | not checked yet | not checked yet | sent at start | a link in `~/.gemini/extensions` |
+| **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
 
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that

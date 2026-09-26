@@ -21,7 +21,7 @@ struct PoolPage: View {
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 16)
-                    Button("Edit the pool in Settings ›") { openSettings() }
+                    Button("Edit the pool in Settings ›") { model.settingsPaneAsked = .pool; openSettings() }
                         .buttonStyle(.link)
                         .appText(.fine)
                 }
@@ -56,7 +56,7 @@ struct PoolPage: View {
             Text("Add the runtimes you are happy to carry on with, in the order to try, and a chat whose "
                  + "allowance runs out moves to the next one by itself.")
                 .appText(.supporting).foregroundStyle(.secondary)
-            Button("Set up the pool in Settings ›") { openSettings() }
+            Button("Set up the pool in Settings ›") { model.settingsPaneAsked = .pool; openSettings() }
                 .buttonStyle(.link)
         }
         .padding(16)

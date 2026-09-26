@@ -1,0 +1,3 @@
+Do not use any tools. Answer in exactly two lines.
+Line 1: SKILLS: the names of every Agent Skill available to you, comma-separated (or NONE).
+Line 2: WORDS: every probe word (like XYZ-1) in the instructions or context you were given, each followed by how many separate times it appears there, e.g. XYZ-1 x2 (or NONE).

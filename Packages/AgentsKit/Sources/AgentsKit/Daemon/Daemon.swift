@@ -73,6 +73,10 @@ public final class Daemon: @unchecked Sendable {
         #if canImport(Security)
         (core.installer as? RuntimeInstaller)?.tidy()
         #endif
+        // The person's `~/.agents`, laid out before anything is picked up (054).
+        await core.reconcileHome()
+        // Off the start: it runs Codex's own command, which takes a moment (054, R12).
+        Task { await core.syncCodexPlugins() }
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")

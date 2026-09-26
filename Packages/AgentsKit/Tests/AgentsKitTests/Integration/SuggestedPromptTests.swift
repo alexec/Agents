@@ -56,7 +56,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
 
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let attached = servers(in: await launcher.lastAgent?.newSessionParams)
         #expect(attached.count == 1)
@@ -75,12 +75,14 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
         let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
 
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go",
                                        mcpServers: [theirs]))
 
         let names = servers(in: await launcher.lastAgent?.newSessionParams)
             .compactMap { $0["name"]?.stringValue }
-        #expect(names == ["theirs", "agents"])
+        // The app's own first, so a server of the person's by the same name never
+        // takes its place (054, FR-020).
+        #expect(names == ["agents", "theirs"])
     }
 
     /// A draft session was made before the user chose a server, so it cannot be the
@@ -91,14 +93,14 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
         let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
 
-        let draft = try await core.options(.init(runtimeID: "copilot", cwd: work))
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+        let draft = try await core.options(.init(runtimeID: "cursor", cwd: work))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go",
                                        draftID: draft.draftID, mcpServers: [theirs]))
 
         #expect(launcher.launchCount == 2)
         let names = servers(in: await launcher.lastAgent?.newSessionParams)
             .compactMap { $0["name"]?.stringValue }
-        #expect(names == ["theirs", "agents"])
+        #expect(names == ["agents", "theirs"])
     }
 
     @Test func aDraftMadeWithTheSameServersIsUsedAsItIs() async throws {
@@ -107,8 +109,8 @@ struct SuggestedPromptTests {
         let core = try core(launcher, locations: locations)
         let theirs = MCPServer(name: "theirs", transport: .http(url: "https://example.com", headers: [:]))
 
-        let draft = try await core.options(.init(runtimeID: "copilot", cwd: work, mcpServers: [theirs]))
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go",
+        let draft = try await core.options(.init(runtimeID: "cursor", cwd: work, mcpServers: [theirs]))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go",
                                        draftID: draft.draftID, mcpServers: [theirs]))
 
         #expect(launcher.launchCount == 1)
@@ -156,7 +158,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let note = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher), prompts: [
             SuggestedPrompt(label: "Run the tests", prompt: "Run the tests and fix what fails"),
@@ -173,7 +175,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await #expect(throws: JSONRPCError.self) {
             _ = try await core.suggestPrompts(.init(token: "not-a-token", prompts: [
@@ -188,7 +190,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let stale = await mintedToken(core, launcher)
 
         // It works while the runtime is there, and not after.
@@ -209,7 +211,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         _ = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher),
                                                 prompts: (1...9).map {
@@ -228,7 +230,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
 
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         await eventually("the prompt reached the runtime") {
             await launcher.allAgents.first?.promptContent != nil
         }
@@ -238,7 +240,7 @@ struct SuggestedPromptTests {
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
         #expect(sent.count == 2)
         #expect(sent.first?["text"]?.stringValue == "do the thing")
-        #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.copilot))
+        #expect(sent.last?["text"]?.stringValue == Briefing.text(for: ToolPolicyCatalog.cursor))
     }
 
     /// Asked once. The runtime keeps it in its own history and replays that history
@@ -249,13 +251,13 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         try await settle(core, id)
         try await core.prompt(.init(agentID: id, text: "and the next thing"))
         try await settle(core, id)
 
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)],
+        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)],
                          ["and the next thing"]])
     }
 
@@ -306,7 +308,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher(script: gone, then: [.init()])
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         try await settle(core, id)
         try await core.prompt(.init(agentID: id, text: "carry on"))
         try await settle(core, id)
@@ -314,8 +316,8 @@ struct SuggestedPromptTests {
         // Two prompts, and the ask on both: the second runtime is a conversation
         // starting again, however much of it the app still has on its own record.
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)],
-                         ["carry on", Briefing.text(for: ToolPolicyCatalog.copilot)]])
+        #expect(sent == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)],
+                         ["carry on", Briefing.text(for: ToolPolicyCatalog.cursor)]])
     }
 
     /// The other way a conversation comes back, and the one the two tests above leave
@@ -327,9 +329,9 @@ struct SuggestedPromptTests {
         let first = FakeLauncher()
         let core = try core(first, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         try await settle(core, id)
-        #expect(await prompts(first) == [["do the thing", Briefing.text(for: ToolPolicyCatalog.copilot)]])
+        #expect(await prompts(first) == [["do the thing", Briefing.text(for: ToolPolicyCatalog.cursor)]])
 
         // Wait for the record on disk, not the one in memory. `settle` watches the
         // daemon's own copy, and the file is written a moment behind it — the same gap
@@ -419,7 +421,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do the thing"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         await eventually("the prompt is on the record") {
             let page = try? await core.transcript(.init(agentID: id))
             return page?.entries.contains { if case .userMessage = $0.kind { return true } else { return false } } == true
@@ -438,7 +440,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await suggest(core, launcher, "Run the tests")
         #expect(await core.agent(id)?.suggestedPrompts.isEmpty == false)
@@ -458,7 +460,7 @@ struct SuggestedPromptTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         try await suggest(core, launcher, "Run the tests")
         // The file, not the daemon's memory: every save after the first goes on a
         // detached task, so the record in hand is right well before the record on disk
@@ -494,7 +496,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         await eventually("our own tool's question was answered for us") {
             await launcher.lastAgent?.permissionOutcome != nil
         }
@@ -521,7 +523,7 @@ struct SuggestedPromptTests {
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
 
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         await eventually("the question reached the daemon") {
             await core.pendingPermissionRequests().count == 1
         }

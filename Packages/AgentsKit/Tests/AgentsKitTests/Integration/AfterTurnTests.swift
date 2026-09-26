@@ -75,7 +75,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await finish(core, launcher, "partly_done", afterwards: "park")
         #expect(reply.contains("will be parked"))
@@ -98,7 +98,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await finish(core, launcher, "done", afterwards: "archive")
         #expect(reply.contains("will be archived"))
@@ -118,7 +118,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", afterwards: "archive")
         try await core.prompt(.init(agentID: id, text: "one more thing", from: .app))
@@ -136,7 +136,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", afterwards: "park")
         _ = await core.handle(method: DaemonAPI.Method.agentsPrompt,
@@ -151,7 +151,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", afterwards: "archive")
         try await core.stop(id)
@@ -169,7 +169,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", afterwards: "archive")
         try await finish(core, launcher, "done", afterwards: nil)
@@ -186,7 +186,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", afterwards: "archive")
         _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
@@ -204,7 +204,7 @@ struct AfterTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let error = await #expect(throws: JSONRPCError.self) {
             _ = try await core.finishTurn(.init(token: await mintedToken(launcher), outcome: outcome,

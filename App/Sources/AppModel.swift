@@ -800,6 +800,10 @@ final class AppModel {
     /// workflow can reach calls this.
     // MARK: Retiring archived agents (051)
 
+    /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
+    /// by the Settings window.
+    var settingsPaneAsked: SettingsPane?
+
     /// The pool and each credential's state (052).
     func refreshPoolStatus(days: Int? = nil) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
@@ -1415,6 +1419,17 @@ final class AppModel {
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
         }
+    }
+
+    /// What every agent shares, for Settings ▸ Shared (054). Nil when it could not be read;
+    /// the tab then keeps what it last had.
+    func sharedSnapshot() async -> DaemonAPI.SharedSnapshot? {
+        var snapshot: DaemonAPI.SharedSnapshot?
+        _ = await attempt {
+            snapshot = try await self.client.call(DaemonAPI.Method.personalShared, Optional<String>.none,
+                                                  returning: DaemonAPI.SharedSnapshot.self)
+        }
+        return snapshot
     }
 
     func refreshRuntimes() async {

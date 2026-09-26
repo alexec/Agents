@@ -146,6 +146,8 @@ actor FakeACPAgent {
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
             var capabilities = script.agentCapabilities
             capabilities["loadSession"] = .bool(script.supportsLoad)
+            // What every runtime the app starts says, unless a test says otherwise.
+            if capabilities["mcpCapabilities"] == nil { capabilities["mcpCapabilities"] = ["http": true, "sse": true] }
             capabilities["sessionCapabilities"] = .object(sessionCapabilities)
             return .success([
                 "protocolVersion": .int(script.protocolVersion),
