@@ -9,15 +9,33 @@ import SwiftUI
 /// phone is a feature of its own.
 struct ProjectListView: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Binding var selection: URL?
 
     var body: some View {
-        List(model.projects, selection: $selection) { summary in
-            NavigationLink(value: summary.folder) {
-                ProjectRow(summary: summary)
+        List(selection: $selection) {
+            ForEach(model.projects, id: \.folder) { summary in
+                NavigationLink(value: summary.folder) {
+                    ProjectRow(summary: summary)
+                }
+                .tag(summary.folder)
+                .paperListRow()
             }
-            .tag(summary.folder)
-            .paperListRow()
+            // Pages about all the work rather than one project, as on the Mac (042,
+            // 052): rows of the list under their own heading, with the Mac's icons,
+            // rather than bars pinned under it in a style of their own.
+            if !model.projects.isEmpty {
+                Section("Activity") {
+                    NavigationLink { EventsListView() } label: { EventsRow() }
+                        .paperListRow()
+                    NavigationLink { TotalsView() } label: { SpendingRow() }
+                        .paperListRow()
+                    if model.poolStatus?.rows.isEmpty == false {
+                        NavigationLink { PoolPageView() } label: { PoolRow() }
+                            .paperListRow()
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -25,23 +43,22 @@ struct ProjectListView: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Projects")
-        .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
-        // Pinned under the projects, as on the Mac: it is about all of them, and the
-        // foot of this column is where the money has always been.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Events above Spending, as on the Mac (042): about all of the projects,
-            // and read rather than acted on.
-            VStack(spacing: 0) {
-                EventsRow()
-                SpendingRow()
-                // The pool, when there is one (052): with the Mac's dot.
-                if model.poolStatus?.rows.isEmpty == false { PoolRow() }
-            }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if showsBanner { StaleBanner() }
         }
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }
         .refreshable { await model.refreshEverything() }
+    }
+
+    /// Said once on the screen. Beside the project on a wide iPad, the project page
+    /// carries the line; and with no projects yet, the waiting view in the middle says
+    /// the same thing in more words.
+    private var showsBanner: Bool {
+        if sizeClass == .regular { return false }
+        if model.projects.isEmpty, model.needsPairing || model.isStale { return false }
+        return true
     }
 }
 
@@ -107,43 +124,28 @@ struct ProjectRow: View {
     }
 }
 
-/// The way into Spending, and what today has cost on the way past — the Mac's row,
-/// drawn whether or not anything has been spent so it is always there to go in by.
+/// What today has cost, the Mac's row: drawn whether or not anything has been spent so
+/// Spending is always there to go in by.
 private struct SpendingRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        NavigationLink {
-            TotalsView()
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                Text(today == nil ? "Spending" : "Today")
-                Spacer()
-                VStack(alignment: .trailing, spacing: 1) {
-                    if let today {
-                        Text(today).monospacedDigit()
-                    }
-                    if let state = model.costState, let left = state.dayHeadroom,
-                       let daily = state.limits.daily {
-                        Text("\(left.money(in: daily.currency)) left")
-                            .appText(.fine)
-                    }
+        HStack(alignment: .firstTextBaseline) {
+            Label(today == nil ? "Spending" : "Today", systemImage: "dollarsign.circle")
+            Spacer()
+            VStack(alignment: .trailing, spacing: 1) {
+                if let today {
+                    Text(today).monospacedDigit()
                 }
-                Image(systemName: "chevron.right")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                if let state = model.costState, let left = state.dayHeadroom,
+                   let daily = state.limits.daily {
+                    Text("\(left.money(in: daily.currency)) left")
+                }
             }
-            .appText(.supporting)
+            .appText(.fine)
             .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
                                 .style(or: .secondary))
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
-        .overlay(alignment: .top) { Rectangle().fill(Paper.rule).frame(height: 1) }
         .accessibilityHint("Opens Spending")
     }
 
