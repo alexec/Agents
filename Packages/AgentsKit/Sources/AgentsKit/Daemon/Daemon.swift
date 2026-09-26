@@ -82,6 +82,7 @@ public final class Daemon: @unchecked Sendable {
         // A host of a control plane is kept running by launchd, not by a window being
         // there, so it never leaves for being idle (058, R5).
         await core.setExitsWhenIdle(!serve && control == nil)
+        await core.setHostsForControlPlane(control != nil && !serve)
         await core.holdWorkflowEventsUntilStarted()
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).

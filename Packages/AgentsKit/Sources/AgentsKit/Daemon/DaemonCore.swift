@@ -452,6 +452,13 @@ public actor DaemonCore {
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
     /// battery to spare and no window that could start it again on its own.
     var exitsWhenIdle = true
+    /// A Mac's daemon kept running for a control plane (058). It never leaves for being
+    /// idle, as a server's does not, but it is still the Mac's: keys are lent as on a
+    /// Mac and its own sign-ins are the person's.
+    var hostsForControlPlane = false
+    /// Whether this is a server's daemon (037, 043): one that stays up with nobody
+    /// connected, and was not asked to stay up by a control plane.
+    var onServer: Bool { !exitsWhenIdle && !hostsForControlPlane }
     /// What each connection said it could lend (043): names only.
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).

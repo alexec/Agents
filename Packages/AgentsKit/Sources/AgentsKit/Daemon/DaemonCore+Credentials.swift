@@ -52,7 +52,7 @@ extension DaemonCore {
     func offerCredentials(_ offer: DaemonAPI.CredentialsOffer, connection: UUID?) {
         // On this Mac an offer is the window saying what it still holds: a key taken out
         // of Settings stops being lent to agents started from now on.
-        if exitsWhenIdle {
+        if !onServer {
             for runtime in macLent.keys where !offer.runtimes.contains(runtime) { macLent[runtime] = nil }
             return
         }
@@ -63,12 +63,12 @@ extension DaemonCore {
 
     func lendCredential(_ lend: DaemonAPI.CredentialsLend, connection: UUID?) throws {
         // This Mac's own agents are lent only what has no other way in (046, D3).
-        if exitsWhenIdle, let secret = Secret(lend.secret), secret.kind == lend.kind,
+        if !onServer, let secret = Secret(lend.secret), secret.kind == lend.kind,
            secret.kind.isLentOnTheMac, secret.kind.runtimeID == lend.runtime {
             macLent[lend.runtime] = secret
             return
         }
-        guard !exitsWhenIdle else {
+        guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is lent to them.")
         }
@@ -100,7 +100,7 @@ extension DaemonCore {
     /// (once per forwarded socket) and keep the offer for as long as the connection lasts.
     /// Only on a server; the Mac's own agents use the Mac's sign-in directly.
     func offerRelay(_ offer: DaemonAPI.RelayOffer, connection: UUID?) throws {
-        guard !exitsWhenIdle else {
+        guard onServer else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is relayed to them.")
         }
@@ -145,7 +145,7 @@ extension DaemonCore {
     /// credential it has not lent yet, or when nothing was lent and the server has no
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
-        if exitsWhenIdle { return try macLaunchEnvironment(for: runtimeID) }
+        if !onServer { return try macLaunchEnvironment(for: runtimeID) }
         // A sign-in relayed from the Mac comes first on a server (047): the person's own
         // plan, with nothing of theirs on the server. "Own sign-in only" still means own.
         if !(RequestConnection.current.flatMap { credentialOffers[$0] }?.ownSignInOnly ?? false),
@@ -193,7 +193,7 @@ extension DaemonCore {
     /// `data.errorKind == "authentication_failed"`, for a subscription token and an API key
     /// alike. Only on a server; the Mac's own sign-in is 037's business.
     func credentialRefusal(agentID: UUID, error: any Error) -> DaemonAPI.CredentialRefused? {
-        guard !exitsWhenIdle, let agent = agents[agentID], Self.lendableRuntimes.contains(agent.runtimeID),
+        guard onServer, let agent = agents[agentID], Self.lendableRuntimes.contains(agent.runtimeID),
               let error = error as? JSONRPCError, Self.isAuthenticationFailure(error) else { return nil }
         let lent = lentCredentials.values.contains { $0[agent.runtimeID] != nil }
         return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: lent)

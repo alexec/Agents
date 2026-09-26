@@ -56,6 +56,10 @@ extension DaemonCore {
         exitsWhenIdle = exits
     }
 
+    func setHostsForControlPlane(_ hosts: Bool) {
+        hostsForControlPlane = hosts
+    }
+
     /// Wait until there is nothing left to do and nobody watching.
     ///
     /// The grace period is there so that quitting the app and opening it again does not
