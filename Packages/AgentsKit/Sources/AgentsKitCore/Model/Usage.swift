@@ -10,6 +10,10 @@ public struct Usage: Codable, Hashable, Sendable {
     public var size: Int
     public var cost: Cost?
     public var at: Date
+    /// Claude's plan window, when this update carried it (052, R2). Kept in memory only
+    /// and out of `CodingKeys`: it is the allowance's state, not the agent's, and is
+    /// written where allowances are kept rather than into every `agent.json`.
+    public var rateLimit: RateLimitInfo?
 
     public init(used: Int, size: Int, cost: Cost? = nil, at: Date = Date()) {
         self.used = used
@@ -17,6 +21,8 @@ public struct Usage: Codable, Hashable, Sendable {
         self.cost = cost
         self.at = at
     }
+
+    private enum CodingKeys: String, CodingKey { case used, size, cost, at }
 
     /// Nil when the runtime did not say how big the window is, which is how the meter
     /// knows to stay hidden rather than draw a zero.

@@ -1096,6 +1096,11 @@ public actor DaemonCore {
         // transcript and out of agent.json, exactly like an update kind we do not know.
         case .unknownNotification(let method):
             DaemonLog.shared.write("agent \(agentID) sent a notification we do not know: \(method)")
+
+        // A failure the runtime reported with no turn running (052): said once in the
+        // conversation, and nothing about the agent's state changes.
+        case .sessionFailure(let failure):
+            await noteFailure(failure, for: agentID)
         }
     }
 

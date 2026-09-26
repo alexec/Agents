@@ -317,6 +317,21 @@ struct ACPSessionTests {
         #expect(unknown == ["something_new_next_year"], "ignored-on-purpose and unrecognised are different things")
     }
 
+    /// A typed failure with no turn out is the session's, not a turn's (052): it comes
+    /// out of the stream as its own event, with its title, rather than being dropped.
+    @Test func aFailureOutsideATurnIsItsOwnEvent() async throws {
+        let (session, agent) = pair()
+        let meta = try SessionFailureDecodingTests.fixture("overloaded")
+        let events = try await collect(session, until: hasUsage) {
+            try await session.initialize()
+            try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
+            await agent.emit(["sessionUpdate": "session_info_update", "_meta": meta])
+            await agent.emit(["sessionUpdate": "usage_update", "used": 10, "size": 100])
+        }
+        let failures = events.compactMap { if case .sessionFailure(let f) = $0 { return f } else { return nil } }
+        #expect(failures.map(\.title) == ["Claude is temporarily overloaded."])
+    }
+
     @Test func aNotificationUnderAMethodWeDoNotKnowIsReportedRatherThanDropped() async throws {
         // Cursor sends three of these, under `cursor/`. Before this they returned at the
         // guard in `receive` and left nothing behind at all, so an agent could be quietly

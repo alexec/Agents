@@ -937,6 +937,15 @@ extension DaemonCore {
         }
     }
 
+    /// A typed failure's own sentence, in the conversation (052). A warning is a retry
+    /// in progress: said, and nothing else. The details are the debugger's.
+    func noteFailure(_ failure: SessionFailure, for agentID: UUID) async {
+        let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+        await record(.runtimeNote("\(runtimeName): \(failure.title)"), for: agentID)
+        DaemonLog.shared.write("agent \(agentID): \(failure.severity) \(failure.category) \(failure.actions) "
+                               + "\(failure.reason ?? "") \(failure.details ?? "")")
+    }
+
     private func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
         // Read before anything is awaited, so a stop in any of the waits below is seen.
@@ -975,8 +984,16 @@ extension DaemonCore {
                 if usage.cost != nil { broadcastCostState() }
             }
         }
+        // A warning is a retry the runtime is making: said, and the turn's own ending stands.
+        if let warning = result.failure, !warning.isError { await noteFailure(warning, for: agentID) }
         var reason: EndedReason
-        if let failure = result.runtimeError {
+        if let failure = result.failure, failure.isError {
+            // Said in a shape (052, R1): a refused turn now ends `end_turn` with the
+            // failure beside it, and read as a plain `end_turn` it would call the agent
+            // done. Its own sentence goes in the conversation; the ending says it failed.
+            await noteFailure(failure, for: agentID)
+            reason = .runtimeError
+        } else if let failure = result.runtimeError {
             // It said in words that the turn failed and then ended it normally (049).
             // Its words are in the conversation already; this says what they mean, and
             // keeps the row from reading as done.

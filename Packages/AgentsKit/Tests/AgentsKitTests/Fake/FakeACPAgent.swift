@@ -39,6 +39,18 @@ actor FakeACPAgent {
         var promptError: JSONRPCError?
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
+        /// `_meta` on the `session/prompt` result: where Claude's and Codex's adapters put
+        /// a typed failure when the client asked for them (052, research R1).
+        var promptResultMeta: JSONValue?
+        /// Sent as a `usage_update` carrying this `_meta` before the turn ends: Claude's
+        /// `_claude/rateLimit` (052, R2).
+        var usageMeta: JSONValue?
+        /// Sent during the turn as a `session_info_update` with no title and this `_meta`:
+        /// a failure not tied to the turn's own answer (052).
+        var sessionInfoMeta: JSONValue?
+        /// Fail this many prompts, with `promptError` or `promptResultMeta`, and then take
+        /// turns normally. Zero means every prompt fails the way the script says.
+        var failTimes = 0
         /// What the runtime says on its way out, sent while answering `session/close`.
         /// Real ones do this — a tool call marked cancelled, a last usage line — and
         /// it is the last thing they ever say, so there is no second chance to hear it.
@@ -101,6 +113,10 @@ actor FakeACPAgent {
     /// what we served rather than only on what we were asked.
     private(set) var clientAnswers: [(method: String, result: Result<JSONValue, JSONRPCError>)] = []
     private(set) var promptContent: JSONValue?
+    /// Every prompt's content, in the order they came, so a test can see what was sent
+    /// and how many times (052: a failed prompt is sent to the next runtime once).
+    private(set) var prompts: [JSONValue] = []
+    private var promptsFailed = 0
     private(set) var deletedSessions: [String] = []
     /// What `session/new` was asked for, so a test can see what we attached to a
     /// session rather than only what we recorded against the agent.
@@ -197,8 +213,13 @@ actor FakeACPAgent {
 
         case ACP.Method.prompt:
             promptContent = params?["prompt"]
-            if let error = script.promptError { return .failure(error) }
-            return await runTurn()
+            prompts.append(params?["prompt"] ?? .null)
+            // Failing a set number of times, then working: the retry and the "succeeds on
+            // the next runtime" cases (052). Without a count, the script fails every time.
+            let failing = script.failTimes == 0 || promptsFailed < script.failTimes
+            if failing, script.promptError != nil || script.promptResultMeta != nil { promptsFailed += 1 }
+            if failing, let error = script.promptError { return .failure(error) }
+            return await runTurn(failing: failing)
 
         case ACP.Method.authenticate, ACP.Method.logout:
             return .success([:])
@@ -212,7 +233,7 @@ actor FakeACPAgent {
         }
     }
 
-    private func runTurn() async -> Result<JSONValue, JSONRPCError> {
+    private func runTurn(failing: Bool = true) async -> Result<JSONValue, JSONRPCError> {
         if script.turnDelay > .zero { try? await Task.sleep(for: script.turnDelay) }
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
@@ -244,9 +265,16 @@ actor FakeACPAgent {
         }
         // Held after everything the turn does and before it ends: a test sees the turn
         // at work, and it ends when the test says.
+        if let meta = script.usageMeta {
+            await send(update: ["sessionUpdate": "usage_update", "used": 1000, "size": 200000, "_meta": meta])
+        }
+        if failing, let meta = script.sessionInfoMeta {
+            await send(update: ["sessionUpdate": "session_info_update", "_meta": meta])
+        }
         if let gate = script.gate { await gate.pass() }
         var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
         if let usage = script.usage { result["usage"] = usage }
+        if failing, let meta = script.promptResultMeta { result["_meta"] = meta }
         return .success(.object(result))
     }
 

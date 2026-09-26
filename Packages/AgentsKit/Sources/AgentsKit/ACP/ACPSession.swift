@@ -6,6 +6,9 @@ public enum ACPSessionEvent: Sendable {
     case optionsChanged([ConfigOption])
     case commandsChanged([SlashCommand])
     case titleChanged(String)
+    /// A typed failure that arrived while no turn was running, so there is no turn's
+    /// answer to carry it (052). One arriving during a turn rides on `TurnResult.failure`.
+    case sessionFailure(SessionFailure)
     /// How full the context is, sent several times a turn.
     case usageChanged(Usage)
     case planChanged(Plan)
@@ -39,13 +42,18 @@ public struct TurnResult: Sendable {
     /// The turn's own words said it failed, for a runtime that says so in words and then
     /// ends the turn normally (049). Nil for every other turn.
     public var runtimeError: RuntimeLaunch.TurnError?
+    /// A failure the runtime reported in a shape (052, R1): from the answer's `_meta`, or
+    /// from a `session_info_update` that came during the turn. An error-severity one
+    /// means the turn did not do its work, whatever `reason` says.
+    public var failure: SessionFailure?
 
     public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
-                runtimeError: RuntimeLaunch.TurnError? = nil) {
+                runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil) {
         self.reason = reason
         self.rawStopReason = rawStopReason
         self.usage = usage
         self.runtimeError = runtimeError
+        self.failure = failure
     }
 }
 
@@ -96,6 +104,10 @@ public actor ACPSession {
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
+    /// Whether a `session/prompt` is out, so a failure reported alongside it belongs to
+    /// the turn rather than to the session at large (052).
+    private var turnInFlight = false
+    private var turnFailure: SessionFailure?
 
     private var isReplaying = false
 
@@ -402,13 +414,21 @@ public actor ACPSession {
             "prompt": blocks.wire,
         ]
         turnText = ""
+        turnFailure = nil
+        turnInFlight = true
+        defer { turnInFlight = false }
         let result = try await connection.call(ACP.Method.prompt, params)
         let decoded = try? result.decode(ACP.PromptResult.self)
         let raw = decoded?.stopReason
+        var failure = turnFailure
+        if let answered = SessionFailure.from(meta: result["_meta"]) {
+            failure = failure?.superseded(by: answered) ?? answered
+        }
         return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
                           rawStopReason: raw,
                           usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
-                          runtimeError: launch?.turnError(in: turnText))
+                          runtimeError: launch?.turnError(in: turnText),
+                          failure: failure)
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -646,6 +666,14 @@ public actor ACPSession {
             eventsContinuation.yield(.planRemoved(id))
         case .title(let title):
             eventsContinuation.yield(.titleChanged(title))
+        case .failure(let failure, let title):
+            if let title { eventsContinuation.yield(.titleChanged(title)) }
+            guard !isReplaying else { return }
+            if turnInFlight {
+                turnFailure = turnFailure?.superseded(by: failure) ?? failure
+            } else {
+                eventsContinuation.yield(.sessionFailure(failure))
+            }
         case .ignored:
             break
         case .unknown(let kind):

@@ -74,6 +74,11 @@ public enum ACP {
         public var terminalAuth: Bool
         public var elicitationForm: Bool
         public var elicitationURL: Bool
+        /// JetBrains' AIR session-failure extension (052, R1). Asked for only where every
+        /// kind of typed failure is read: once asked, Claude and Codex end a refused turn
+        /// with `end_turn` and the failure under `_meta`, and a client that does not read
+        /// it would call the turn done.
+        public var sessionFailures: Bool
 
         public init(readTextFile: Bool = false,
                     writeTextFile: Bool = false,
@@ -83,7 +88,8 @@ public enum ACP {
                     plan: Bool = false,
                     terminalAuth: Bool = false,
                     elicitationForm: Bool = false,
-                    elicitationURL: Bool = false) {
+                    elicitationURL: Bool = false,
+                    sessionFailures: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
             self.terminal = terminal
@@ -93,6 +99,7 @@ public enum ACP {
             self.terminalAuth = terminalAuth
             self.elicitationForm = elicitationForm
             self.elicitationURL = elicitationURL
+            self.sessionFailures = sessionFailures
         }
 
         /// What 001 sent. Kept as a named thing so the change that turns a flag on is
@@ -117,7 +124,8 @@ public enum ACP {
             plan: true,
             terminalAuth: true,
             elicitationForm: true,
-            elicitationURL: true)
+            elicitationURL: true,
+            sessionFailures: true)
 
         public var wire: JSONValue {
             var caps: [String: JSONValue] = [
@@ -134,6 +142,9 @@ public enum ACP {
             if elicitationForm { elicitation["form"] = .object([:]) }
             if elicitationURL { elicitation["url"] = .object([:]) }
             if !elicitation.isEmpty { caps["elicitation"] = .object(elicitation) }
+            if sessionFailures {
+                caps["_meta"] = ["jetbrains": ["air": ["version": 1, "capabilities": ["sessionFailure"]]]]
+            }
             return .object(caps)
         }
     }

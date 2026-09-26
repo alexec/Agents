@@ -47,6 +47,14 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// conversation; this keeps the row from reading as done.
     case runtimeError
 
+    /// The runtime's allowance ran out and the chat did not move on, because carrying on
+    /// was off, there was no pool, or every entry in it was out too (052). Recognised,
+    /// never guessed.
+    case allowanceSpent
+
+    /// The runtime kept saying "too many requests just now" after the retries (052, R7).
+    case rateLimited
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -66,6 +74,8 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .stoppedByAgent: return "Stopped by the agent that started it"
         case .signInRefused: return "Its sign-in was refused"
         case .runtimeError: return "The runtime reported an error"
+        case .allowanceSpent: return "Its allowance ran out"
+        case .rateLimited: return "Rate limited, and still limited after retrying"
         }
     }
 

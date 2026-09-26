@@ -52,9 +52,9 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge `main` into `agents/052-quota-fallback` in this worktree. Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge output. Then check what the plan assumes is on main: `git grep -n 'runtimeError\|usageLimit\|quotaUsage\|openAIAPIKey\|geminiAPIKey' main -- Pkg/Sources`. Each must be found. Record any that moved in `specs/052-quota-fallback/walk/README.md`.
-- [ ] T002 Record the baseline in `specs/052-quota-fallback/walk/README.md`: run `swift test` in `Pkg/` twice, and write down which tests fail before any change. The suite is flaky under load, so a later failure belongs to this lane only if it is new, and only after six runs on both commits.
-- [ ] T003 [P] Capture fixtures in `Pkg/Tests/AgentsKitTests/Fixtures/session-failures/`. Take them from the adapters' own policy tables (research R1), one JSON file per row of the classification table in `contracts/acp-session-failure.md`:
+- [X] T001 Merge `main` into `agents/052-quota-fallback` in this worktree. Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge output. Then check what the plan assumes is on main: `git grep -n 'runtimeError\|usageLimit\|quotaUsage\|openAIAPIKey\|geminiAPIKey' main -- Pkg/Sources`. Each must be found. Record any that moved in `specs/052-quota-fallback/walk/README.md`.
+- [X] T002 Record the baseline in `specs/052-quota-fallback/walk/README.md`: run `swift test` in `Pkg/` twice, and write down which tests fail before any change. The suite is flaky under load, so a later failure belongs to this lane only if it is new, and only after six runs on both commits.
+- [X] T003 [P] Capture fixtures in `Pkg/Tests/AgentsKitTests/Fixtures/session-failures/`. Take them from the adapters' own policy tables (research R1), one JSON file per row of the classification table in `contracts/acp-session-failure.md`:
   - `quota_exhausted` as `limit`/`[]`;
   - `rate_limited` as `limit`/`["retry"]`;
   - `budget_exhausted` as `limit`/`["new_session"]`;
@@ -63,7 +63,7 @@
   - a warning-severity retry.
 
   Add `claude-rate-limit-info.json`, the `SDKRateLimitInfo` shape with `status`, `resetsAt`, `rateLimitType`, `isUsingOverage`, `overageInUse` and `overageStatus`. Head each file with a comment naming the adapter version it came from: Claude 0.81.2, Codex 1.13.1.
-- [ ] T004 [P] Extend `FakeACPAgent.Script` in `Pkg/Tests/AgentsKitTests/Fake/FakeACPAgent.swift` with four fields:
+- [X] T004 [P] Extend `FakeACPAgent.Script` in `Pkg/Tests/AgentsKitTests/Fake/FakeACPAgent.swift` with four fields:
   - `promptResultMeta: JSONValue?`, returned as `_meta` on the `session/prompt` result;
   - `usageMeta: JSONValue?`, sent as a `usage_update` carrying that `_meta` before the turn ends;
   - `sessionInfoMeta: JSONValue?`, sent as a `session_info_update` with no title;
@@ -78,25 +78,25 @@
 
 **Purpose**: Once the app asks Claude and Codex for typed failures, a spent plan arrives as `end_turn` with `_meta`. It must never read as finished. This phase ships value on its own: a spent Claude plan stops saying "stopped answering".
 
-- [ ] T006 [P] Write `Pkg/Tests/AgentsKitTests/Unit/SessionFailureDecodingTests.swift`. There is one test per T003 fixture. Each decodes `_meta.jetbrains.air.sessionFailure` into `SessionFailure`, keeping `{id, revision, category, severity, title, details, reason, actions}`. Also test:
+- [X] T006 [P] Write `Pkg/Tests/AgentsKitTests/Unit/SessionFailureDecodingTests.swift`. There is one test per T003 fixture. Each decodes `_meta.jetbrains.air.sessionFailure` into `SessionFailure`, keeping `{id, revision, category, severity, title, details, reason, actions}`. Also test:
   - an unknown category or action decodes and is kept as itself;
   - a missing `_meta`, or a `_meta` without `jetbrains.air`, gives `nil`;
   - a higher `revision` of the same `id` replaces a lower one;
   - `_claude/rateLimit` decodes into `RateLimitInfo`, with `resetsAt` read as Unix seconds.
-- [ ] T007 [P] Write `Pkg/Tests/AgentsKitTests/Unit/ClientCapabilitiesTests.swift`, asserting that `ACP.ClientCapabilities.wire` carries `_meta.jetbrains.air = {version: 1, capabilities: ["sessionFailure"]}` and still carries every key it carried before (`fs`, `terminal`, `session`, `plan`, `auth`, `elicitation`).
-- [ ] T008 Implement `Pkg/Sources/AgentsKitCore/ACP/SessionFailure.swift` with `SessionFailure`, `RateLimitInfo`, and `static func in(_ meta: JSONValue?) -> SessionFailure?`, so that T006 passes. Model it on how `ACPSession.quotaUsage(in:)` reads Gemini's `_meta.quota` (046).
-- [ ] T009 Add the AIR capability to `ACP.ClientCapabilities.wire` in `Pkg/Sources/AgentsKitCore/ACP/ACPTypes.swift`, merging it with any `_meta` already sent, so that T007 passes.
-- [ ] T010 In `Pkg/Sources/AgentsKitCore/ACP/SessionUpdate.swift`, make a `session_info_update` with a failure `_meta` a new case, `.failure(SessionFailure)`, instead of `.ignored`. A title and a failure in one update give both. Make `usage_update` keep its `_meta["_claude/rateLimit"]` on `Usage` as `rateLimit: RateLimitInfo?`, as an optional field.
-- [ ] T011 In `Pkg/Sources/AgentsKit/ACP/ACPSession.swift`, add `failure: SessionFailure?` to `TurnResult`, read from the prompt result's `_meta` beside `quotaUsage`. A session-scoped failure that arrives by `session_info_update` during a turn attaches to that turn's result.
-- [ ] T012 [P] Write `Pkg/Tests/AgentsKitTests/Integration/TypedFailureNeverFinishesTests.swift`, using the fake agent with `promptResultMeta`. Check that:
+- [X] T007 [P] Write `Pkg/Tests/AgentsKitTests/Unit/ClientCapabilitiesTests.swift`, asserting that `ACP.ClientCapabilities.wire` carries `_meta.jetbrains.air = {version: 1, capabilities: ["sessionFailure"]}` and still carries every key it carried before (`fs`, `terminal`, `session`, `plan`, `auth`, `elicitation`).
+- [X] T008 Implement `Pkg/Sources/AgentsKitCore/ACP/SessionFailure.swift` with `SessionFailure`, `RateLimitInfo`, and `static func in(_ meta: JSONValue?) -> SessionFailure?`, so that T006 passes. Model it on how `ACPSession.quotaUsage(in:)` reads Gemini's `_meta.quota` (046).
+- [X] T009 Add the AIR capability to `ACP.ClientCapabilities.wire` in `Pkg/Sources/AgentsKitCore/ACP/ACPTypes.swift`, merging it with any `_meta` already sent, so that T007 passes.
+- [X] T010 In `Pkg/Sources/AgentsKitCore/ACP/SessionUpdate.swift`, make a `session_info_update` with a failure `_meta` a new case, `.failure(SessionFailure)`, instead of `.ignored`. A title and a failure in one update give both. Make `usage_update` keep its `_meta["_claude/rateLimit"]` on `Usage` as `rateLimit: RateLimitInfo?`, as an optional field.
+- [X] T011 In `Pkg/Sources/AgentsKit/ACP/ACPSession.swift`, add `failure: SessionFailure?` to `TurnResult`, read from the prompt result's `_meta` beside `quotaUsage`. A session-scoped failure that arrives by `session_info_update` during a turn attaches to that turn's result.
+- [X] T012 [P] Write `Pkg/Tests/AgentsKitTests/Integration/TypedFailureNeverFinishesTests.swift`, using the fake agent with `promptResultMeta`. Check that:
   - (a) `end_turn` with an error `quota_exhausted` failure ends the agent **not** `finished`, with its `title` written as a runtime note;
   - (b) the same holds for `auth_required`, `overloaded` and `budget_exhausted`, each with its own note;
   - (c) a warning-severity failure leaves the turn's outcome alone and writes the title as a note;
   - (d) a plain `end_turn` with no failure still finishes, as on main;
   - (e) a session-scoped failure with no turn running writes one note and changes no state;
   - (f) 049's `runtimeError` path still behaves exactly as on main.
-- [ ] T013 In the turn-result path of `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`, beside the `result.runtimeError` branch that 049 added, handle an error-severity `result.failure`. Write "\(runtimeName): \(failure.title)" as a runtime note, and end with the reason chosen by the classification in T018. Until then, end with `.runtimeError`. Never end with `.endTurn`. Handle `.failure` updates from `SessionUpdate` in the same file's update handling. This makes T012 pass.
-- [ ] T014 [P] Add `allowanceSpent` ("Its allowance ran out") and `rateLimited` ("Rate limited, and still limited after retrying") to `Pkg/Sources/AgentsKitCore/Model/EndedReason.swift`, beside `runtimeError`. Neither comes from `init(stopReason:)`. Extend `EndedReasonTests`, which walks `allCases`, so that each has a summary and neither is ever `finished`.
+- [X] T013 In the turn-result path of `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`, beside the `result.runtimeError` branch that 049 added, handle an error-severity `result.failure`. Write "\(runtimeName): \(failure.title)" as a runtime note, and end with the reason chosen by the classification in T018. Until then, end with `.runtimeError`. Never end with `.endTurn`. Handle `.failure` updates from `SessionUpdate` in the same file's update handling. This makes T012 pass.
+- [X] T014 [P] Add `allowanceSpent` ("Its allowance ran out") and `rateLimited` ("Rate limited, and still limited after retrying") to `Pkg/Sources/AgentsKitCore/Model/EndedReason.swift`, beside `runtimeError`. Neither comes from `init(stopReason:)`. Extend `EndedReasonTests`, which walks `allCases`, so that each has a summary and neither is ever `finished`.
 
 **Checkpoint**: A Claude or Codex refusal, typed or not, shows its own sentence in the chat and never reads as done.
 

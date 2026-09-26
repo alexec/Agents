@@ -1,0 +1,17 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:error",
+        "revision": 1,
+        "category": "somethingNew",
+        "severity": "error",
+        "title": "A kind of failure nobody has seen yet.",
+        "actions": [
+          "dance"
+        ]
+      }
+    }
+  }
+}
