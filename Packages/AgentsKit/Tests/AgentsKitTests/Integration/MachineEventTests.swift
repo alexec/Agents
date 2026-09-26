@@ -25,9 +25,10 @@ struct MachineEventTests {
         return (StoreLocations(root: root.appendingPathComponent("store")), Project.standardize(p), Project.standardize(q))
     }
 
-    private func core(_ locations: StoreLocations) async throws -> DaemonCore {
+    private func core(_ locations: StoreLocations,
+                      script: FakeACPAgent.Script = .init()) async throws -> DaemonCore {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
-                              discovery: .findsEverything, launcher: FakeLauncher())
+                              discovery: .findsEverything, launcher: FakeLauncher(script: script))
         await core.loadFromDisk()
         await core.useForEvents(holdLimit: .milliseconds(100))
         return core
@@ -103,7 +104,9 @@ struct MachineEventTests {
 
     @Test func leasesGivenAndGivenBackAreOnTheMacsLog() async throws {
         let (locations, p, _) = try temporary()
-        let core = try await core(locations)
+        // Its turn held open: a turn that ends lets its token go, and the holder has two
+        // calls to make with it.
+        let core = try await core(locations, script: .init(gate: TurnGate()))
         await core.useForLeases(catalog: FixedCatalog([.screen]))
         let holder = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: p, prompt: "Hold"))
         await core.bindAppToken("h", to: holder)

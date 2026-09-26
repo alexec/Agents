@@ -89,15 +89,6 @@ struct BlockedTests {
         do { try await body(); return nil } catch let error as JSONRPCError { return error.message } catch { return "\(error)" }
     }
 
-    /// Settled: finished, nothing queued, no turn going.
-    private func settled(_ core: DaemonCore, _ id: UUID, _ what: String = "the agent settled") async {
-        await eventually(what) {
-            guard let agent = await core.agent(id) else { return false }
-            let turning = await core.turnTasks[id] != nil
-            return agent.state == .finished && agent.queuedPrompts.isEmpty && !turning
-        }
-    }
-
     /// The resumes this agent was sent: the app's prompts that say a block cleared or
     /// its time came.
     private func resumes(_ core: DaemonCore, _ id: UUID) async throws -> [String] {

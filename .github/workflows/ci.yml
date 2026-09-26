@@ -74,29 +74,12 @@ jobs:
       - name: Test CodeText
         run: swift test --package-path Packages/CodeText
 
-      # Reported, not yet blocking (Alex, 2026-09-26). Many AgentsKit tests give a fake
-      # runtime a turn that lasts a fixed stretch of real time, and on a shared runner
-      # the turn is over before the test acts on it: about ten fail each run, a
-      # different ten each time, in parallel or one at a time. The failures are listed
-      # in the run's summary. Make this blocking again once turns end on command.
-      - name: Test AgentsKit (not yet blocking)
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          swift test --package-path Packages/AgentsKit 2>&1 | tee agentskit-tests.log
-      - name: AgentsKit failures
-        if: ${{ !cancelled() }}
-        run: |
-          {
-            echo "## AgentsKit tests (not yet blocking)"
-            grep -E 'Test run with' agentskit-tests.log | tail -1 || true
-            echo
-            if grep -qE 'recorded an issue' agentskit-tests.log; then
-              grep -E 'recorded an issue' agentskit-tests.log | sed 's/^/- /'
-            else
-              echo "No failures."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+      # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
+      # past the question about a silent ending (`settled`), and `eventually` waits
+      # 45 s where CI is set rather than 10, since a test on a three-core runner can
+      # wait that long for its first turn on the pool.
+      - name: Test AgentsKit
+        run: swift test --package-path Packages/AgentsKit
 
       # The quarantined tests, alone and with the machine quieter than in a full run.
       # A failure here is reported and does not fail the build.

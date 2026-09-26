@@ -216,7 +216,9 @@ struct UnreportedEndingTests {
         try await core.prompt(.init(agentID: id, text: "something else entirely"))
         first.open()
         try await settle(core, id)
-        try await Task.sleep(for: .milliseconds(200))
+        // The question comes a moment after the ending it is about, and may start a
+        // runtime of its own; 200 ms was a bet on that moment.
+        await settled(core, id, "the question about the second ending was asked and answered")
 
         // In order: their first prompt, their second, and then one question about the
         // ending that one caused. Nothing was asked about the ending in between.
