@@ -102,6 +102,7 @@ actor FakeACPAgent {
     private(set) var clientAnswers: [(method: String, result: Result<JSONValue, JSONRPCError>)] = []
     private(set) var promptContent: JSONValue?
     private(set) var deletedSessions: [String] = []
+    private(set) var disabledProviders: [String] = []
     /// What `session/new` was asked for, so a test can see what we attached to a
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
@@ -160,6 +161,10 @@ actor FakeACPAgent {
 
         case ACP.Method.list:
             return .success(["sessions": .array(script.sessions)])
+
+        case ACP.Method.disableProvider:
+            if let id = params?["providerId"]?.stringValue { disabledProviders.append(id) }
+            return .success([:])
 
         case ACP.Method.deleteSession:
             if let id = params?["sessionId"]?.stringValue { deletedSessions.append(id) }

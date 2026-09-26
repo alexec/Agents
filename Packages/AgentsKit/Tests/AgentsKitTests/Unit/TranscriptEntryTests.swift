@@ -17,4 +17,11 @@ struct TranscriptEntryTests {
         // Only the agent's reply: the person's own message is never dropped.
         #expect(!TranscriptEntry.Kind.userMessage("\u{200B}").isInvisibleAgentText)
     }
+
+    @Test func aNoticeIsKeptInTheRecord() throws {
+        let entry = TranscriptEntry(kind: .notice(SessionNotice(severity: "error", title: "Model unavailable",
+                                                                detail: "Fell back to a smaller one.")))
+        let read = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(entry))
+        #expect(read.kind == entry.kind)
+    }
 }

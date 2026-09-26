@@ -336,6 +336,13 @@ public actor ACPSession {
         _ = try await connection.call(ACP.Method.setProvider, ["providerId": .string(id)])
     }
 
+    public func disableProvider(id: String) async throws {
+        guard initializeResult?.supportsProviders ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.disableProvider)
+        }
+        _ = try await connection.call(ACP.Method.disableProvider, ["providerId": .string(id)])
+    }
+
     // MARK: The sessions a runtime is holding
 
     /// Every conversation this runtime has in this folder, including ones this app did
@@ -495,7 +502,8 @@ public actor ACPSession {
     public func setOption(id: String, value: JSONValue) async throws -> [ConfigOption] {
         guard let sessionID else { throw ACPSessionError.noSession }
         if olderStyle.contains(id), let chosen = value.stringValue {
-            let (method, key) = id == Self.modelOption ? ("session/set_model", "modelId") : ("session/set_mode", "modeId")
+            let (method, key) = id == Self.modelOption ? (ACP.Method.setSessionModel, "modelId")
+                                                           : (ACP.Method.setSessionMode, "modeId")
             _ = try await connection.call(method, ["sessionId": .string(sessionID), key: .string(chosen)])
             if let index = options.firstIndex(where: { $0.id == id }) { options[index].currentValue = value }
             // Said the way a runtime's own `config_option_update` would be: the older calls
