@@ -380,6 +380,9 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.folderGone,
                                message: "\(cwd.path) is not there any more.")
         }
+        // Before the runtime reads the folder, so a project from before the layout
+        // existed has it by the first turn.
+        layOutOnce(cwd)
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed, or is not where we looked.",

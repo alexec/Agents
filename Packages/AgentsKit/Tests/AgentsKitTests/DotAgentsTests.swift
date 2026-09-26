@@ -99,7 +99,17 @@ struct DotAgentsTests {
         #expect(link(work, "CLAUDE.md") == "AGENTS.md")
     }
 
-    @Test func addingAProjectLaysItOut() async throws {
+    @Test func theHomeFolderIsNeverLaidOut() throws {
+        let home = fileManager.homeDirectoryForCurrentUser
+        let before = link(home, "CLAUDE.md")
+        DotAgents.apply(to: home)
+        DotAgents.apply(to: URL(fileURLWithPath: "/"))
+        #expect(link(home, "CLAUDE.md") == before)
+        #expect(!fileManager.fileExists(atPath: "/AGENTS.md"))
+    }
+
+    /// A project somewhere, with a core that has not laid it out.
+    private func world() async throws -> (DaemonCore, URL, StoreLocations) {
         let root = try project()
         let work = root.appending(path: "work", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: work, withIntermediateDirectories: true)
@@ -109,6 +119,31 @@ struct DotAgentsTests {
                               discovery: .findsEverything,
                               launcher: FakeLauncher(script: FakeACPAgent.Script()))
         await core.loadFromDisk()
+        return (core, Project.standardize(work), locations)
+    }
+
+    @Test func aProjectFromBeforeIsLaidOutWhenAnAgentStartsInIt() async throws {
+        let (core, work, locations) = try await world()
+
+        _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "hello"))
+
+        #expect(link(work, "CLAUDE.md") == "AGENTS.md")
+        #expect(ProjectStore(locations: locations).load().first { $0.folder == work }?.laidOutAt != nil)
+    }
+
+    @Test func aProjectIsLaidOutOnlyOnce() async throws {
+        let (core, work, _) = try await world()
+        _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "one"))
+        // The person did not want Claude's link, and said so by deleting it.
+        try fileManager.removeItem(at: work.appending(path: "CLAUDE.md"))
+
+        _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "two"))
+
+        #expect(link(work, "CLAUDE.md") == nil)
+    }
+
+    @Test func addingAProjectLaysItOut() async throws {
+        let (core, work, _) = try await world()
 
         _ = try await core.addProject(work)
 

@@ -127,9 +127,8 @@ extension DaemonCore {
         if records[standardized] == nil {
             records[standardized] = Project(folder: standardized)
             saveProjectRecords(records)
-            // Laid out once, when it is first added; the person owns it from then on.
-            DotAgents.apply(to: standardized)
         }
+        layOutOnce(standardized)
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) could not be added.")
@@ -140,6 +139,29 @@ extension DaemonCore {
         // nothing else about a project moves a need.
         reconsider()
         return summary
+    }
+
+    /// Give a project the dotagents layout, unless it has had it already.
+    ///
+    /// Called when a project is added and whenever a runtime session is made in a
+    /// folder, so a project that was there before this existed is laid out the first
+    /// time an agent starts in it — before the runtime has read anything. A folder in
+    /// one of the app's own worktrees is left alone: it is a checkout of the project,
+    /// and whatever the project has committed is already in it.
+    func layOutOnce(_ folder: URL) {
+        let standardized = Project.standardize(folder)
+        guard !standardized.path.contains("/\(WorktreeName.folder)/"),
+              Self.isDirectory(standardized) else { return }
+        var records = projectRecords()
+        // A folder that became a project by an agent running in it has no record yet;
+        // the one made here keeps the age the derived project already had.
+        let oldest = agents.values.filter { $0.projectFolder == standardized }.map(\.createdAt).min()
+        var record = records[standardized] ?? Project(folder: standardized, addedAt: oldest ?? Date())
+        guard record.laidOutAt == nil else { return }
+        DotAgents.apply(to: standardized)
+        record.laidOutAt = Date()
+        records[standardized] = record
+        saveProjectRecords(records)
     }
 
     /// Put a project away.

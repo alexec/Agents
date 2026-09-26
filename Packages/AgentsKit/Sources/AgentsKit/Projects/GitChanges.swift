@@ -68,7 +68,12 @@ public enum GitChanges {
     /// Every tracked file that differs from `since` in the working tree, and every
     /// untracked file git does not ignore, under `scope` (a path relative to the top,
     /// or nil for all of it).
+    ///
+    /// Except the dotagents layout at `scope` while it is untracked: the daemon wrote it
+    /// as the first agent started (`DotAgents`), so it is not that agent's work.
     static func changed(since: String, in root: URL, scope: String?) async throws -> [Changed] {
+        let prefix = scope.map { $0.hasSuffix("/") ? $0 : $0 + "/" } ?? ""
+        let layout = Set(DotAgents.untrackedLayout.map { prefix + $0 })
         let pathspec = ["--"] + (scope.map { [$0] } ?? [])
         async let numbers = run(["diff", "--numstat", "-z"] + diffFlags + [since] + pathspec, in: root)
         async let statuses = run(["diff", "--name-status", "-z"] + diffFlags + [since] + pathspec, in: root)
@@ -80,7 +85,7 @@ public enum GitChanges {
                     added: counted[path].flatMap { $0.added },
                     removed: counted[path].flatMap { $0.removed })
         }
-        for path in split(try await others.data) {
+        for path in split(try await others.data) where !layout.contains(path) {
             changed.append(Changed(path: path, status: "?", added: nil, removed: nil))
         }
         return changed

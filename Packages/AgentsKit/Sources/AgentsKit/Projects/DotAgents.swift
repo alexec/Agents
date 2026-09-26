@@ -1,7 +1,8 @@
 import Foundation
 
-/// The layout a folder is given when it is added as a project: the dotagents convention
-/// (github.com/bgreenwell/dotagents), with `.agents` as the one real copy.
+/// The layout a project is given, once — when it is added, or for a project from before
+/// this, when the first agent starts in it (`DaemonCore.layOutOnce`): the dotagents
+/// convention (github.com/bgreenwell/dotagents), with `.agents` as the one real copy.
 ///
 ///     AGENTS.md                the router every agent reads first
 ///     .agents/skills/          task-specific Agent Skills
@@ -43,6 +44,13 @@ public enum DotAgents {
 
     public static func apply(to project: URL) {
         let fileManager = FileManager.default
+        // The home folder's `.claude` is Claude's own, for every project: its skills
+        // are not this folder's to move, and nothing above it is a project either.
+        let home = fileManager.homeDirectoryForCurrentUser.standardizedFileURL.resolvingSymlinksInPath().path
+        let path = project.standardizedFileURL.resolvingSymlinksInPath().path
+        guard path != "/", !(home + "/").hasPrefix(path.hasSuffix("/") ? path : path + "/") else {
+            return
+        }
         for name in resourceFolders {
             attempt("create \(folder)/\(name)") {
                 try fileManager.createDirectory(
