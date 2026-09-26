@@ -17,9 +17,9 @@ struct ServersSettingsView: View {
                                   name: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)
                 }
             } header: {
-                Text("Signing in on servers")
+                Text("Runtime credentials")
             } footer: {
-                Text("Used only by agents on servers; agents on this Mac use this Mac’s own sign-in. Kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
+                Text("Claude’s is used only by agents on servers; Claude on this Mac uses this Mac’s own sign-in. Gemini’s is used by Gemini agents here and on servers. Kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
             }
             .paperListRow()
             Section {
@@ -79,6 +79,11 @@ private struct ServerLine: View {
             Text(subtitle).appText(.fine).foregroundStyle(.secondary)
             Text(model.hosts.claudeLine(host.id, hasCredential: model.credentials.record("claude") != nil))
                 .appText(.fine).foregroundStyle(.secondary)
+            ForEach(ServerCredentials.runtimes.filter { $0 != RuntimeCatalog.claude.id }, id: \.self) { runtimeID in
+                Text(model.hosts.toolsetLine(host.id, runtimeID: runtimeID,
+                                             hasCredential: model.credentials.record(runtimeID) != nil))
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
             if isChosen {
                 Toggle("Use this server’s own sign-in only", isOn: Binding(
                     get: { model.hosts.host(host.id)?.ownSignInOnly ?? false },

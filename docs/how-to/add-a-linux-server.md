@@ -41,12 +41,24 @@ asks.
 
 1. On this Mac, in Terminal, run `claude setup-token` and copy the token it prints. An API
    key from console.anthropic.com works too.
-2. Open **Settings ▸ Servers**. Under **Signing in on servers**, paste it into **Paste a
+2. Open **Settings ▸ Servers**. Under **Runtime credentials**, paste it into **Paste a
    Claude token** and click **Save**. After a moment it says **Works**.
 
    The token is kept in this Mac's Keychain and is never written on a server. Agents lends
    it to a server only while an agent runs there. Agents on this Mac keep using this Mac's
    own sign-in.
+
+### Give Gemini a key
+
+Gemini works the same way, with a Gemini API key instead of a token.
+
+1. Get a key at aistudio.google.com/apikey.
+2. Paste it under **Gemini** in **Settings ▸ Agents** or under **Runtime credentials** in
+   **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
+
+With a key saved, Agents installs Gemini on a server as it connects, and each server's
+entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent the same way
+as Claude's token and is never written on the server.
 
 ### Add the server
 
