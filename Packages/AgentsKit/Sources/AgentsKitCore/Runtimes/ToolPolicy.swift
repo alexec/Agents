@@ -146,36 +146,66 @@ public struct EnvironmentFile: Codable, Hashable, Sendable {
     }
 }
 
-/// A runtime's sign-in relayed from the Mac to a server (047, research R12): on the server
-/// it gets a home of the app's own holding a stand-in sign-in (no secret) and a config that
-/// sends its sign-in traffic to the relay gate on loopback, over TLS it is told to trust.
+/// A runtime's sign-in relayed from the Mac to a server (047, research R12; Claude's, 056).
+///
+/// The sign-in stays on the Mac. On the server the runtime starts with a stand-in that holds
+/// no secret, pointed at the relay gate on loopback over TLS it is told to trust; the Mac's
+/// relay puts its own current token on each request and sends it on to `upstreamHost`.
 public struct SignInRelay: Codable, Hashable, Sendable {
-    /// The variable naming the runtime's home, and the one naming a certificate to trust.
-    public var homeVariable: String
-    public var certificateVariable: String
-    /// The files the app writes into that home.
-    public var configFile: String
-    public var signInFile: String
-    /// The config, with `{port}` for the gate's port.
-    public var configTemplate: String
-    /// Where the Mac's own sign-in is, relative to the home folder, and the host the relay
-    /// sends the runtime's requests on to.
-    public var macSignIn: String
-    public var upstreamHost: String
-
-    public init(homeVariable: String, certificateVariable: String, configFile: String, signInFile: String,
-                configTemplate: String, macSignIn: String, upstreamHost: String) {
-        self.homeVariable = homeVariable
-        self.certificateVariable = certificateVariable
-        self.configFile = configFile
-        self.signInFile = signInFile
-        self.configTemplate = configTemplate
-        self.macSignIn = macSignIn
-        self.upstreamHost = upstreamHost
+    /// Where the Mac's own sign-in is kept.
+    public enum MacSignInLocation: Codable, Hashable, Sendable {
+        /// A file, relative to the home folder (Codex's `~/.codex/auth.json`).
+        case file(String)
+        /// A generic password in the login Keychain, as `/usr/bin/security` reads it
+        /// (Claude's `Claude Code-credentials`, 056 research R5).
+        case keychain(service: String)
     }
 
-    public func config(gatePort: UInt16) -> String {
-        configTemplate.replacingOccurrences(of: "{port}", with: String(gatePort))
+    /// How the runtime on the server is pointed at the gate.
+    public enum Pointing: Codable, Hashable, Sendable {
+        /// A home of the app's own holding a config (with `{port}` for the gate's port) and
+        /// the stand-in sign-in file, named by `homeVariable` (Codex).
+        case home(homeVariable: String, configFile: String, signInFile: String, configTemplate: String)
+        /// Variables only; their values may hold `{port}` and `{standIn}` (Claude, 056 R7).
+        case environment([String: String])
+    }
+
+    public var upstreamHost: String
+    public var macSignIn: MacSignInLocation
+    public var pointing: Pointing
+    /// The variable naming the CA certificate the runtime is told to trust.
+    public var certificateVariable: String
+    /// Taken out of the environment of a relayed run, so no other sign-in wins over it.
+    public var clearedVariables: [String]
+    /// Where a server's own sign-in for this runtime may be, to tell whether it has one:
+    /// variables in the login environment, and a file relative to the home folder.
+    public var ownSignInVariables: [String]
+    public var ownSignInFile: String?
+
+    public init(upstreamHost: String, macSignIn: MacSignInLocation, pointing: Pointing,
+                certificateVariable: String, clearedVariables: [String] = [],
+                ownSignInVariables: [String] = [], ownSignInFile: String? = nil) {
+        self.upstreamHost = upstreamHost
+        self.macSignIn = macSignIn
+        self.pointing = pointing
+        self.certificateVariable = certificateVariable
+        self.clearedVariables = clearedVariables
+        self.ownSignInVariables = ownSignInVariables
+        self.ownSignInFile = ownSignInFile
+    }
+
+    /// The config written into the runtime's home, for a `.home` relay; nil otherwise.
+    public func config(gatePort: UInt16) -> String? {
+        guard case .home(_, _, _, let template) = pointing else { return nil }
+        return template.replacingOccurrences(of: "{port}", with: String(gatePort))
+    }
+
+    /// The variables of an `.environment` relay, filled in; empty for a `.home` one.
+    public func environment(gatePort: UInt16, standIn: String) -> [String: String] {
+        guard case .environment(let template) = pointing else { return [:] }
+        return template.mapValues {
+            $0.replacingOccurrences(of: "{port}", with: String(gatePort)).replacingOccurrences(of: "{standIn}", with: standIn)
+        }
     }
 }
 

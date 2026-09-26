@@ -413,4 +413,28 @@ struct ToolPolicyTests {
         #expect(names.contains("ExitWorktree"))
         #expect(RemitCategory.workingFolder.instead.contains(AppTool.enterWorktree))
     }
+
+    /// The relay table (056): Codex's config reads as it did in 047, Claude's relay is
+    /// variables only, and a relayed run's other sign-ins go from the environment.
+    @Test func relayedSignInsAreDataNotCode() throws {
+        let codex = try #require(ToolPolicyCatalog.codex.relay)
+        #expect(codex.config(gatePort: 4242) == "chatgpt_base_url = \"https://127.0.0.1:4242/backend-api/\"\n")
+        #expect(codex.environment(gatePort: 4242, standIn: "x").isEmpty)
+
+        let claude = try #require(ToolPolicyCatalog.claude.relay)
+        #expect(claude.config(gatePort: 4242) == nil)
+        #expect(claude.environment(gatePort: 4242, standIn: "sk-ant-oat01-agents-relay-standin")
+                == ["ANTHROPIC_BASE_URL": "https://127.0.0.1:4242",
+                    "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-agents-relay-standin"])
+        for relay in [codex, claude] {
+            let decoded = try JSONDecoder().decode(SignInRelay.self, from: JSONEncoder().encode(relay))
+            #expect(decoded == relay)
+        }
+
+        let relayed = LentEnvironment.$value.withValue(["NODE_EXTRA_CA_CERTS": "/ca.pem", "ANTHROPIC_BASE_URL": "https://127.0.0.1:1"]) {
+            LentEnvironment.applied(to: ["ANTHROPIC_API_KEY": "sk-ant-api-own", "CLAUDE_CODE_USE_BEDROCK": "1", "PATH": "/usr/bin"])
+        }
+        #expect(relayed["ANTHROPIC_API_KEY"] == nil && relayed["CLAUDE_CODE_USE_BEDROCK"] == nil)
+        #expect(relayed["PATH"] == "/usr/bin" && relayed["NODE_EXTRA_CA_CERTS"] == "/ca.pem")
+    }
 }

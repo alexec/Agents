@@ -1,9 +1,9 @@
 import AgentsKit
 import Foundation
 
-/// The sign-ins this Mac relays to its servers (047, research R12): one relay per runtime
-/// that has one (Codex's ChatGPT sign-in), started the first time a server connects while
-/// this Mac is signed in, and shared by every server after that.
+/// The sign-ins this Mac relays to its servers (047 Codex's, 056 Claude's): one relay per
+/// runtime whose policy has one, started the first time a server connects while this Mac is
+/// signed in, and shared by every server after that.
 ///
 /// A relay's keys and certificates live in `<root>/relay/`; its log, which says only what
 /// was asked and how it was answered, is `<root>/hosts/relay.log`.
@@ -16,33 +16,54 @@ final class SignInRelays: @unchecked Sendable {
         self.locations = locations
     }
 
-    /// The Mac's own sign-in file for `runtimeID`, when its policy relays one.
-    static func signIn(for runtimeID: String) -> MacSignIn? {
+    /// The runtimes whose sign-in this Mac may relay, in the catalog's order.
+    static let relayed: [String] = RuntimeCatalog.builtIn.map(\.id).filter { ToolPolicyCatalog.policy(for: $0).relay != nil }
+
+    private static let sourcesLock = NSLock()
+    nonisolated(unsafe) private static var sources: [String: any MacSignInSource] = [:]
+
+    /// This Mac's own sign-in for `runtimeID`, where its policy says it is kept: one source
+    /// per runtime for the life of the app, so what a source remembers (056: Claude's cached
+    /// read) is shared by every server and by Settings.
+    static func signIn(for runtimeID: String) -> (any MacSignInSource)? {
+        sourcesLock.lock()
+        defer { sourcesLock.unlock() }
+        if let known = sources[runtimeID] { return known }
         guard let relay = ToolPolicyCatalog.policy(for: runtimeID).relay else { return nil }
-        return MacSignIn(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(relay.macSignIn))
+        let made: (any MacSignInSource)?
+        switch relay.macSignIn {
+        case .file(let path):
+            made = CodexFileSignIn(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path))
+        case .keychain:
+            made = nil
+        }
+        sources[runtimeID] = made
+        return made
     }
 
     /// Whether this Mac can relay `runtimeID`'s sign-in right now: it is signed in the way
-    /// the relay lends (a ChatGPT sign-in, for Codex).
+    /// the relay lends (a ChatGPT sign-in for Codex, a Claude account's for Claude).
     static func canRelay(_ runtimeID: String) -> Bool {
         signIn(for: runtimeID)?.isSignedIn ?? false
     }
 
-    /// What a server is offered for Codex, or nil when this Mac is not signed in to lend it.
-    func grant() async -> ServerConnection.RelayGrant? {
-        let runtimeID = RuntimeCatalog.codex.id
-        guard let policy = ToolPolicyCatalog.policy(for: runtimeID).relay,
-              let signIn = Self.signIn(for: runtimeID), signIn.isSignedIn else { return nil }
-        let relay = relay(for: runtimeID, policy: policy, signIn: signIn)
-        do {
-            let port = try await relay.start()
-            return ServerConnection.RelayGrant(runtime: runtimeID, localPort: port,
-                                               caCertificate: try relay.certificates.caPEM(),
-                                               standIn: try signIn.standIn())
-        } catch {
-            write("relay for \(runtimeID) could not start: \(error)")
-            return nil
+    /// What a server is offered: every sign-in this Mac is signed in to lend.
+    func grants() async -> [ServerConnection.RelayGrant] {
+        var grants: [ServerConnection.RelayGrant] = []
+        for runtimeID in Self.relayed {
+            guard let policy = ToolPolicyCatalog.policy(for: runtimeID).relay,
+                  let signIn = Self.signIn(for: runtimeID), signIn.isSignedIn else { continue }
+            let relay = relay(for: runtimeID, policy: policy, signIn: signIn)
+            do {
+                let port = try await relay.start()
+                grants.append(ServerConnection.RelayGrant(runtime: runtimeID, localPort: port,
+                                                          caCertificate: try relay.certificates.caPEM(),
+                                                          standIn: try signIn.standIn()))
+            } catch {
+                write("relay for \(runtimeID) could not start: \(error)")
+            }
         }
+        return grants
     }
 
     func stop() {
@@ -53,7 +74,7 @@ final class SignInRelays: @unchecked Sendable {
         for relay in all { relay.stop() }
     }
 
-    private func relay(for runtimeID: String, policy: SignInRelay, signIn: MacSignIn) -> MacSignInRelay {
+    private func relay(for runtimeID: String, policy: SignInRelay, signIn: any MacSignInSource) -> MacSignInRelay {
         lock.lock()
         defer { lock.unlock() }
         if let existing = relays[runtimeID] { return existing }

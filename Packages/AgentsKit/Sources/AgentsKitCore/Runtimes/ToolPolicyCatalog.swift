@@ -64,7 +64,19 @@ public enum ToolPolicyCatalog {
                      because: "It is the escalation path: the adapter raises it as a form elicitation, which the daemon holds and the phone can answer."),
         ],
         lever: .sessionMetaDenyList(path: ["claudeCode", "options", "disallowedTools"]),
-        escalationTool: "AskUserQuestion")
+        escalationTool: "AskUserQuestion",
+        // The Mac's Claude sign-in, relayed (056, research R3–R7). No files: Claude takes its
+        // base URL and a stand-in subscription token from the environment, and trusts the
+        // relay's CA through NODE_EXTRA_CA_CERTS. A cloud provider or key in the server's
+        // environment would win over the relay, so they go for a relayed run.
+        relay: SignInRelay(upstreamHost: "api.anthropic.com", macSignIn: .keychain(service: "Claude Code-credentials"),
+                           pointing: .environment(["ANTHROPIC_BASE_URL": "https://127.0.0.1:{port}",
+                                                   "CLAUDE_CODE_OAUTH_TOKEN": "{standIn}"]),
+                           certificateVariable: "NODE_EXTRA_CA_CERTS",
+                           clearedVariables: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                                              "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"],
+                           ownSignInVariables: ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"],
+                           ownSignInFile: ".claude/.credentials.json"))
 
     /// Grok: an allow list, as a profile, plus a config overlay on disk.
     ///
@@ -239,10 +251,10 @@ public enum ToolPolicyCatalog {
         serverEnvironment: ["NO_BROWSER": "1"],
         // The Mac's ChatGPT sign-in, relayed (research R12). Codex insists on HTTPS for it,
         // keeps only the origin for its model calls, and trusts CODEX_CA_CERTIFICATE.
-        relay: SignInRelay(homeVariable: "CODEX_HOME", certificateVariable: "CODEX_CA_CERTIFICATE",
-                           configFile: "config.toml", signInFile: "auth.json",
-                           configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n",
-                           macSignIn: ".codex/auth.json", upstreamHost: "chatgpt.com"))
+        relay: SignInRelay(upstreamHost: "chatgpt.com", macSignIn: .file(".codex/auth.json"),
+                           pointing: .home(homeVariable: "CODEX_HOME", configFile: "config.toml", signInFile: "auth.json",
+                                           configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n"),
+                           certificateVariable: "CODEX_CA_CERTIFICATE"))
 
     /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
     ///

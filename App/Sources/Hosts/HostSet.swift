@@ -223,7 +223,7 @@ final class HostSet {
                            wants: @escaping @Sendable (String) async -> Bool = { _ in false },
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                            lender: DaemonClient.CredentialLender? = nil,
-                           relay: @escaping @Sendable () async -> ServerConnection.RelayGrant? = { nil }) -> ServerConnection {
+                           relay: @escaping @Sendable () async -> [ServerConnection.RelayGrant] = { [] }) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
@@ -247,11 +247,11 @@ final class HostSet {
     }
 
     /// What this window relays to a server (047): nothing to one marked "own sign-in only".
-    func relayFor(_ id: HostID) -> @Sendable () async -> ServerConnection.RelayGrant? {
+    func relayFor(_ id: HostID) -> @Sendable () async -> [ServerConnection.RelayGrant] {
         let relays = self.relays
         return { [weak self] in
             let ownOnly = await MainActor.run { self?.host(id)?.ownSignInOnly ?? true }
-            return ownOnly ? nil : await relays.grant()
+            return ownOnly ? [] : await relays.grants()
         }
     }
 
