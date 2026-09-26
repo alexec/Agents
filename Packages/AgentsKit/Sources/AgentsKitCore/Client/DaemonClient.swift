@@ -44,8 +44,8 @@ public actor DaemonClient {
     public func connect(startIfNeeded: Bool = true, timeout: Duration = .seconds(8)) async throws {
         if let connection {
             // A connection that has quietly died still looks like one, so it is asked
-            // before it is trusted.
-            if (try? await connection.call(DaemonAPI.Method.ping)) != nil { return }
+            // before it is trusted — and a quiet one is not waited on for ever.
+            if await Self.answers(connection, within: pingPatience) { return }
             await connection.close()
             self.connection = nil
         }
@@ -70,8 +70,45 @@ public actor DaemonClient {
     private func open() async throws -> JSONRPCConnection {
         let connection = JSONRPCConnection(transport: try await link.transport())
         await connection.start()
-        _ = try await connection.call(DaemonAPI.Method.ping)
+        // Up is not answering: the bridge finishes the handshake before it has reached
+        // the daemon, and a daemon that never answers would hold this here for ever.
+        guard await Self.answers(connection, within: pingPatience) else {
+            await connection.close()
+            throw ConnectError.couldNotConnect
+        }
         return connection
+    }
+
+    /// How long a ping is given before the connection it went over is let go.
+    public var pingPatience: Duration = .seconds(15)
+
+    public func setPingPatience(_ patience: Duration) {
+        pingPatience = patience
+    }
+
+    /// Whether the far end answers a ping within `patience`. One that does not is
+    /// closed, which fails whatever else was waiting on it.
+    public func answers(within patience: Duration) async -> Bool {
+        guard let connection else { return false }
+        return await Self.answers(connection, within: patience)
+    }
+
+    ///
+    /// Out of patience it closes the connection rather than cancelling the ping: a call
+    /// waiting on an answer does not hear cancellation, and a task group waits for every
+    /// child before it returns, so a race that only cancelled waited for the ping anyway.
+    private static func answers(_ connection: JSONRPCConnection, within patience: Duration) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { (try? await connection.call(DaemonAPI.Method.ping)) != nil }
+            group.addTask {
+                try? await Task.sleep(for: patience)
+                if !Task.isCancelled { await connection.close() }
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
     }
 
     // MARK: Asking
