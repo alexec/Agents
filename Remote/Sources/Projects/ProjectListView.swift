@@ -158,8 +158,8 @@ private struct Waiting: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        if model.needsPairingAtHome {
-            PairAtHomeView()
+        if model.needsPairing {
+            PairingView()
         } else if model.isStale {
             ContentUnavailableView("Can't reach your Mac",
                                    systemImage: "wifi.slash",
