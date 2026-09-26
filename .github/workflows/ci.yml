@@ -35,6 +35,8 @@ jobs:
         run: |
           xcodebuild -version
           brew install xcodegen
+          # The runner's Xcode comes without it, and the app's build compiles Metal.
+          xcodebuild -downloadComponent MetalToolchain
 
       - name: Generate the project
         run: xcodegen generate
