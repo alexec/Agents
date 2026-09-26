@@ -21,7 +21,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge current `main` into this branch and confirm `swift test` in `Kit/` and both Xcode schemes build before any change; record the failing-test baseline (main's known flakes) in `specs/046-gemini-cli/walk/baseline.md`
+- [X] T001 Merge current `main` into this branch and confirm `swift test` in `Kit/` and both Xcode schemes build before any change; record the failing-test baseline (main's known flakes) in `specs/046-gemini-cli/walk/baseline.md`
 - [X] T002 Create `scripts/update-gemini-toolset.sh` from `scripts/update-claude-toolset.sh`: package `@google/gemini-cli`, version `0.61.0`, `entry` `bundle/gemini.js`, `forwardsArguments: true`, `minFreeBytes` 419430400; writes `App/Resources/toolsets/gemini/{manifest.json,package.json,package-lock.json,mac-node.json}` with Node v24.21.0 checksums for Linux `x86_64`/`aarch64` and macOS `arm64`/`x64` (same Node pin as `App/Resources/toolsets/claude/`)
 - [X] T003 Run `scripts/update-gemini-toolset.sh` and commit `App/Resources/toolsets/gemini/`; check the folder is copied into the app bundle's `toolsets/` beside `claude/` in `project.yml` (add it if the Claude folder is listed by name)
 - [X] T004 [P] Add `"gemini": [<toolset shim>, "--acp"]` to `RUNTIMES` in `scripts/acp-handshake.sh` and the Gemini tool names to `scripts/runtime-tools.sh`, taking the shim path from `AGENTS_GEMINI_SHIM` (no PATH lookup)
@@ -88,8 +88,8 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 **Independent test**: ask a Gemini agent to list its tools, end with a report, lease a resource and ask a question (spec US3).
 
-- [ ] T030 [US3] Check `Daemon-side/ACP/Serve/Briefing.swift` produces Gemini's removed/residue/escalation lines from the table (no escalation tool named) and stays under the briefing ceiling; add a `Tests/Unit/BriefingTests.swift` case for Gemini
-- [ ] T031 [US3] If T006 found that `deny` only refuses and does not hide, say so in `ToolPolicyCatalog.gemini`'s comment and make sure `Tests/Integration/ResidualToolTests.swift` does not count refused tools as residue
+- [X] T030 [US3] Check `Daemon-side/ACP/Serve/Briefing.swift` produces Gemini's removed/residue/escalation lines from the table (no escalation tool named) and stays under the briefing ceiling; add a `Tests/Unit/BriefingTests.swift` case for Gemini
+- [X] T031 [US3] If T006 found that `deny` only refuses and does not hide, say so in `ToolPolicyCatalog.gemini`'s comment and make sure `Tests/Integration/ResidualToolTests.swift` does not count refused tools as residue
 - [ ] T032 [US3] Live (`AGENTS_GEMINI=1`) in `Tests/Live/RuntimeToolScopingLiveTests.swift`: Gemini's tool list has the app's MCP tools and lacks `invoke_agent` and `tracker_*` (or they are refused with the category's sentence)
 - [ ] T033 [US3] Live in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`: Gemini ends turns through `finish_turn` (SC-006: 9 of 10 over ten short prompts; record the count); a question mid-turn ends as needs_answer, as for Grok
 - [ ] T034 [US3] Walk: Gemini agent leases and releases a resource and waits for a `custom.` event; note results in the walk README
@@ -159,7 +159,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 ## Phase 10: Polish & cross-cutting
 
-- [ ] T055 [P] Everywhere a runtime is chosen: check the phone/iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Gemini from `RuntimeCatalog.builtIn`; fix any hard-coded list; build Remote for the generic simulator only
+- [X] T055 [P] Everywhere a runtime is chosen: check the phone/iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Gemini from `RuntimeCatalog.builtIn`; fix any hard-coded list; build Remote for the generic simulator only
 - [X] T056 [P] Docs: `docs/reference/runtimes.md` (five runtimes, Gemini row: install from the set-up page, app's copy only, pictures, sign-in, questions end as Waiting on your answer, tokens but no cost, quota), `docs/how-to/sign-a-runtime-in.md` (Gemini's choices), `docs/how-to/add-a-linux-server.md` (Gemini key), `docs/reference/settings.md` (Settings ▸ Agents and Runtime credentials list Gemini); `scripts/docs-check.py` passes
 - [ ] T057 Full `swift test` six times on this branch and on its merge base; only main's known flakes may differ (memory: the suite is flaky under load); both Xcode schemes and the Linux agentsd gate build
 - [ ] T058 Run quickstart.md end to end on a scratch root and agents-bare; tick the spec checklist; leave the real app untouched until Alex says to merge

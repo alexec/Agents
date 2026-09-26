@@ -244,7 +244,10 @@ public enum ToolPolicyCatalog {
     /// it and not `GEMINI_CLI_SYSTEM_SETTINGS_PATH`: system settings override the person's
     /// key by key, so their own `tools.exclude` and MCP servers would quietly go. Priority
     /// is 999, the top of the band Gemini allows (0–999), so a person's own `allow` for the
-    /// same tool does not win inside the app's agents.
+    /// same tool does not win inside the app's agents. A deny rule with no `argsPattern`
+    /// takes the tool out of the model's list, not only refuses it: measured on a real
+    /// turn, `invoke_agent` is listed without the file and gone with it (R13). So nothing
+    /// here is residue.
     public static let gemini: ToolPolicy = {
         let removed = [
             RemovedTool(name: "invoke_agent", category: .agents),
