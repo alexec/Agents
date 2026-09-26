@@ -27,11 +27,12 @@ struct EventsView: View {
     /// The newest position the person has had in view, to count what arrived since.
     @State private var seenHead: EventPosition = 0
 
+    private var filter: EventFilter { EventFilter(scope: scope, groups: groups) }
+
+    /// The daemon sends pages already narrowed; narrowing here too keeps the list right
+    /// in the moment between a capsule changing and its page arriving.
     private var events: [Event] {
-        model.work.recentEvents.filter { event in
-            (scope == nil || event.scope == scope)
-                && (groups.isEmpty || (event.subject.map { groups.contains($0.group) } ?? false))
-        }
+        model.work.recentEvents.filter(filter.matches)
     }
 
     private var unseen: Int {
@@ -46,31 +47,40 @@ struct EventsView: View {
         HStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    // Lazy, and the days' rows straight inside it rather than in a stack
+                    // of their own, so a thousand paged-in events are not all laid out
+                    // again each time one arrives. No spacing of its own: a day's rows
+                    // touch, and everything else keeps the page's 20 above it.
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: 0).id(Self.top)
                         if !model.work.waitingAgents.isEmpty {
                             WaitingNow(waiting: model.work.waitingAgents)
+                                .padding(.top, 20)
                                 .id(Self.waitingNow)
                         }
                         filters
+                            .padding(.top, 20)
                         if events.isEmpty {
                             Text(model.work.eventsLoaded ? emptyWords : "Loading…")
                                 .appText(.supporting)
                                 .foregroundStyle(.secondary)
+                                .padding(.top, 20)
                         }
                         ForEach(EventDay.grouped(events), id: \.day) { day in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(EventDay.heading(for: day.day).uppercased())
-                                    .appText(.fine).fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                VStack(spacing: 0) {
-                                    ForEach(Array(day.events.enumerated()), id: \.element.position) { index, event in
-                                        if index > 0 { Divider().padding(.leading, 62) }
-                                        row(event)
+                            Text(EventDay.heading(for: day.day).uppercased())
+                                .appText(.fine).fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 20)
+                                .padding(.bottom, 8)
+                            ForEach(Array(day.events.enumerated()), id: \.element.position) { index, event in
+                                let isFirst = index == 0, isLast = index == day.events.count - 1
+                                row(event)
+                                    .padding(.top, isFirst ? 4 : 0)
+                                    .padding(.bottom, isLast ? 4 : 0)
+                                    .overlay(alignment: .top) {
+                                        if !isFirst { Divider().padding(.leading, 62) }
                                     }
-                                }
-                                .padding(.vertical, 4)
-                                .paperRaised(in: RoundedRectangle(cornerRadius: 10))
+                                    .background { CardSlice(isFirst: isFirst, isLast: isLast) }
                             }
                         }
                         if model.work.moreEvents {
@@ -78,6 +88,7 @@ struct EventsView: View {
                                 .buttonStyle(.plain)
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
+                                .padding(.top, 20)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,8 +124,8 @@ struct EventsView: View {
             }
         }
         .navigationTitle("Events")
-        .task {
-            await model.refreshEvents()
+        .task(id: filter) {
+            await model.refreshEvents(filter)
             seenHead = model.work.recentEvents.first?.position ?? 0
         }
     }
@@ -199,6 +210,66 @@ struct EventsView: View {
             groups = []
             picked = position
             proxy.scrollTo(position, anchor: .center)
+        }
+    }
+}
+
+/// One row's piece of its day's raised card, so the rows can sit in a lazy stack and
+/// still read as one card: raised paper, a rule round the outside, the shadow only
+/// where the card's outside edge is. Rounded at the top of the first row and the foot
+/// of the last.
+private struct CardSlice: View {
+    let isFirst: Bool
+    let isLast: Bool
+
+    private static let radius: CGFloat = 10
+
+    var body: some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: isFirst ? Self.radius : 0,
+                                           bottomLeadingRadius: isLast ? Self.radius : 0,
+                                           bottomTrailingRadius: isLast ? Self.radius : 0,
+                                           topTrailingRadius: isFirst ? Self.radius : 0)
+        shape.fill(Paper.raised)
+            .shadow(color: Paper.shadow, radius: 6, y: 2)
+            // A slice's shadow falling on its neighbours would draw a band across the
+            // card; keep only what falls outside it.
+            .mask {
+                Rectangle()
+                    .padding(.horizontal, -12)
+                    .padding(.top, isFirst ? -12 : 0)
+                    .padding(.bottom, isLast ? -12 : 0)
+            }
+            .overlay { Edges(isFirst: isFirst, isLast: isLast, radius: Self.radius).stroke(Paper.rule, lineWidth: 1) }
+    }
+
+    /// The card's rule where it runs past this slice: both sides always, the top and
+    /// its corners on the first, the foot and its corners on the last.
+    private struct Edges: Shape {
+        let isFirst: Bool
+        let isLast: Bool
+        let radius: CGFloat
+
+        func path(in rect: CGRect) -> Path {
+            let r = rect.insetBy(dx: 0.5, dy: 0.5)
+            let top = isFirst ? r.minY : rect.minY
+            let bottom = isLast ? r.maxY : rect.maxY
+            var path = Path()
+            path.move(to: CGPoint(x: r.minX, y: isLast ? bottom - radius : bottom))
+            path.addLine(to: CGPoint(x: r.minX, y: isFirst ? top + radius : top))
+            if isFirst {
+                path.addArc(tangent1End: CGPoint(x: r.minX, y: top), tangent2End: CGPoint(x: r.minX + radius, y: top), radius: radius)
+                path.addLine(to: CGPoint(x: r.maxX - radius, y: top))
+                path.addArc(tangent1End: CGPoint(x: r.maxX, y: top), tangent2End: CGPoint(x: r.maxX, y: top + radius), radius: radius)
+            } else {
+                path.move(to: CGPoint(x: r.maxX, y: top))
+            }
+            path.addLine(to: CGPoint(x: r.maxX, y: isLast ? bottom - radius : bottom))
+            if isLast {
+                path.addArc(tangent1End: CGPoint(x: r.maxX, y: bottom), tangent2End: CGPoint(x: r.maxX - radius, y: bottom), radius: radius)
+                path.addLine(to: CGPoint(x: r.minX + radius, y: bottom))
+                path.addArc(tangent1End: CGPoint(x: r.minX, y: bottom), tangent2End: CGPoint(x: r.minX, y: bottom - radius), radius: radius)
+            }
+            return path
         }
     }
 }
