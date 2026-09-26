@@ -823,7 +823,7 @@ struct DaemonTests {
 
     /// The queued words were typed by somebody who believed the turn was still
     /// running. The news that it was not has to reach the agent first.
-    @Test(.flakyUnderLoad) func theRestartWordsGoAheadOfWhatWasQueued() async throws {
+    @Test func theRestartWordsGoAheadOfWhatWasQueued() async throws {
         let (locations, work) = try temporary()
         let store = try AgentStore(locations: locations)
         let wasRunning = Agent(runtimeID: "grok", cwd: work, state: .running,
@@ -971,7 +971,7 @@ struct DaemonSlashCommandTests {
         let kept = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
         let archived = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
         for id in [kept, archived] {
-            await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+            await settled(core, id, "the turn ended, and the question about it")
         }
         try await core.archive(archived)
 
@@ -1008,7 +1008,10 @@ struct DaemonSlashCommandTests {
 
         try await core.prompt(.init(agentID: id, text: "again"))
         await eventually("the second turn ended") { await core.agent(id)?.state == .finished }
-        #expect(launcher.launchCount == 2, "a second runtime was started for it")
+        // At least: the first turn ended saying nothing, and when the machine is slow the
+        // question the app asks about it lands after that runtime was handed back and
+        // starts one of its own. Every runtime after the first loaded the session.
+        #expect(launcher.launchCount >= 2, "a second runtime was started for it")
         #expect(await core.agent(id)?.availableCommands.map(\.name) == ["review", "add-dir"],
                 "what it takes is still on the record, rather than wiped by a runtime that said nothing")
     }

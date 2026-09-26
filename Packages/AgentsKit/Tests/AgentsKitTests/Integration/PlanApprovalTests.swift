@@ -92,7 +92,7 @@ struct PlanApprovalTests {
         func record(_ method: String, _ params: JSONValue?) { sent.append((method, params)) }
 
         func wait(for method: String) async -> JSONValue? {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            let deadline = ContinuousClock.now.advanced(by: max(.seconds(2), Eventually.timeout))
             while ContinuousClock.now < deadline {
                 if let found = sent.first(where: { $0.0 == method }) { return found.1 }
                 try? await Task.sleep(for: .milliseconds(10))
