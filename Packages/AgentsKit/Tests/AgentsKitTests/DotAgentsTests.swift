@@ -174,6 +174,119 @@ struct DotAgentsTests {
         #expect(options["plugins"] != nil)
     }
 
+    private func object(_ project: URL, _ path: String) throws -> [String: Any] {
+        try #require(JSONSerialization.jsonObject(with: Data(contentsOf: project.appending(path: path))) as? [String: Any])
+    }
+
+    @Test func theIndexListsEveryPluginAndIsLinkedForClaudeAndCopilot() throws {
+        let work = try project().appending(path: "My Work", directoryHint: .isDirectory)
+        DotAgents.apply(to: work)
+        try write(work, ".agents/plugins/deploy/.claude-plugin/plugin.json",
+                  #"{"name": "deploy", "version": "1.2.0", "description": "Ship it"}"#)
+        try write(work, ".agents/plugins/lint/skills/lint/SKILL.md", "lint")
+
+        DotAgents.refreshPlugins(for: work)
+
+        let index = try object(work, ".agents/plugins/marketplace.json")
+        #expect(index["name"] as? String == "my-work")
+        #expect((index["owner"] as? [String: Any])?["name"] as? String == "My Work")
+        let plugins = try #require(index["plugins"] as? [[String: Any]])
+        #expect(plugins.map { $0["name"] as? String } == ["deploy", "lint"])
+        #expect(plugins.map { $0["source"] as? String } == ["./.agents/plugins/deploy", "./.agents/plugins/lint"])
+        #expect(plugins[0]["version"] as? String == "1.2.0")
+        #expect(plugins[0]["description"] as? String == "Ship it")
+        #expect(link(work, ".claude-plugin/marketplace.json") == "../.agents/plugins/marketplace.json")
+    }
+
+    @Test func theIndexFollowsThePluginsAndIsOnlyWrittenWhenItChanges() throws {
+        let work = try project()
+        DotAgents.apply(to: work)
+        DotAgents.refreshPlugins(for: work)
+        #expect(!fileManager.fileExists(atPath: work.appending(path: ".agents/plugins/marketplace.json").path),
+                "no plugins, no index")
+        #expect(link(work, ".claude-plugin/marketplace.json") == nil, "and no link to nothing")
+
+        try write(work, ".agents/plugins/a/plugin.json", #"{"name": "a"}"#)
+        DotAgents.refreshPlugins(for: work)
+        let url = work.appending(path: ".agents/plugins/marketplace.json")
+        let written = try fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        DotAgents.refreshPlugins(for: work)
+        #expect(try fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date == written)
+
+        try write(work, ".agents/plugins/b/plugin.json", #"{"name": "b"}"#)
+        DotAgents.refreshPlugins(for: work)
+        #expect(try (object(work, ".agents/plugins/marketplace.json")["plugins"] as? [[String: Any]])?.count == 2)
+    }
+
+    @Test func anIndexThePersonWroteIsTheirs() throws {
+        let work = try project()
+        DotAgents.apply(to: work)
+        try write(work, ".agents/plugins/marketplace.json", #"{"name": "mine", "plugins": []}"#)
+        try write(work, ".agents/plugins/a/plugin.json", #"{"name": "a"}"#)
+
+        DotAgents.refreshPlugins(for: work)
+
+        #expect(try read(work, ".agents/plugins/marketplace.json") == #"{"name": "mine", "plugins": []}"#)
+        #expect(link(work, ".claude-plugin/marketplace.json") == nil)
+    }
+
+    @Test func aWorktreeRefreshesItsProjectsIndex() throws {
+        let work = try project()
+        DotAgents.apply(to: work)
+        try write(work, ".agents/plugins/a/plugin.json", #"{"name": "a"}"#)
+        let worktree = work.appending(path: "\(WorktreeName.folder)/lane", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: worktree, withIntermediateDirectories: true)
+
+        DotAgents.refreshPlugins(for: worktree)
+
+        #expect(fileManager.fileExists(atPath: work.appending(path: ".agents/plugins/marketplace.json").path))
+        #expect(!fileManager.fileExists(atPath: worktree.appending(path: ".agents").path))
+    }
+
+    @Test func eachPluginGetsAGeminiManifestOnce() throws {
+        let work = try project()
+        DotAgents.apply(to: work)
+        try write(work, ".agents/plugins/Team_Tools/.claude-plugin/plugin.json",
+                  #"{"name": "Team_Tools", "version": "2.0.0", "description": "Tools"}"#)
+        try write(work, ".agents/plugins/Team_Tools/.mcp.json",
+                  #"{"mcpServers": {"db": {"command": "${CLAUDE_PLUGIN_ROOT}/bin/db"}}}"#)
+        try write(work, ".agents/plugins/bare/skills/x/SKILL.md", "x")
+
+        DotAgents.refreshPlugins(for: work)
+
+        let tools = try object(work, ".agents/plugins/Team_Tools/gemini-extension.json")
+        #expect(tools["name"] as? String == "team-tools")
+        #expect(tools["version"] as? String == "2.0.0")
+        #expect(tools["description"] as? String == "Tools")
+        let db = (tools["mcpServers"] as? [String: Any])?["db"] as? [String: Any]
+        #expect(db?["command"] as? String == "${extensionPath}/bin/db")
+        let bare = try object(work, ".agents/plugins/bare/gemini-extension.json")
+        #expect(bare["name"] as? String == "bare")
+        #expect(bare["version"] as? String == "0.1.0")
+
+        try write(work, ".agents/plugins/bare/gemini-extension.json", "edited")
+        DotAgents.refreshPlugins(for: work)
+        #expect(try read(work, ".agents/plugins/bare/gemini-extension.json") == "edited")
+    }
+
+    @Test func theHomeFoldersPluginsAreNeverIndexed() throws {
+        let home = fileManager.homeDirectoryForCurrentUser
+        let index = home.appending(path: ".agents/plugins/marketplace.json")
+        let before = try? Data(contentsOf: index)
+        DotAgents.refreshPlugins(for: home)
+        #expect((try? Data(contentsOf: index)) == before)
+    }
+
+    @Test func startingASessionRefreshesTheIndex() async throws {
+        let (core, work, _) = try await world()
+        DotAgents.apply(to: work)
+        try write(work, ".agents/plugins/a/plugin.json", #"{"name": "a"}"#)
+
+        _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "hello"))
+
+        #expect(fileManager.fileExists(atPath: work.appending(path: ".agents/plugins/marketplace.json").path))
+    }
+
     @Test func theHomeFolderIsNeverLaidOut() throws {
         let home = fileManager.homeDirectoryForCurrentUser
         let before = link(home, "CLAUDE.md")

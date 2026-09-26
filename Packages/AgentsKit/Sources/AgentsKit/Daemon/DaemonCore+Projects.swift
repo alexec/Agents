@@ -170,9 +170,12 @@ extension DaemonCore {
 
     /// The `_meta` a session in `cwd` is made with: the runtime's tool scoping, and the
     /// project's plugins for a runtime that takes them that way. Worked out on every
-    /// session, so a plugin added to `.agents/plugins` is there from the next one.
+    /// session, so a plugin added to `.agents/plugins` is there from the next one — and
+    /// so is its line in the project's marketplace index, for the runtimes that load
+    /// plugins only from one.
     func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
-        Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
+        DotAgents.refreshPlugins(for: cwd)
+        return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
                      DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd)))
     }
 

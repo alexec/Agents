@@ -20,8 +20,9 @@ import Foundation
 /// `.agents/plugins/` and Grok reads `.claude/plugins/`, so the link is for Grok: Claude
 /// has no project plugin folder at all. What reaches Claude and Grok in the app is the
 /// list `sessionMeta` hands them on every session, which needs no folder of theirs.
-/// Codex, Cursor, Copilot and Gemini load plugins only from their own home folders or
-/// from a marketplace, so nothing here reaches them yet. A plugin that carries
+/// Codex and Copilot load plugins only from a marketplace, and Gemini only from its
+/// own extensions folder, so `refreshPlugins` keeps a marketplace index and a Gemini
+/// manifest for each plugin (DotAgents+Plugins.swift). A plugin that carries
 /// `.claude-plugin/plugin.json` is read by all of Claude, Grok, Codex, Cursor and
 /// Copilot; Antigravity wants a `plugin.json` at the plugin's root as well.
 ///
@@ -70,19 +71,13 @@ public enum DotAgents {
         Link(path: ".claude/plugins", destination: "../.agents/plugins", since: 2),
     ]
 
-    /// What `apply` adds outside `.agents`, as `git status` names it before it is committed.
-    public static var untrackedLayout: [String] { [router] + links.map(\.path) }
+    /// What the app adds outside `.agents`, as `git status` names it before it is committed.
+    public static var untrackedLayout: [String] { [router] + links.map(\.path) + [indexLink.path] }
 
     /// Lay the project out, or bring one laid out by layout `from` up to this one.
     public static func apply(to project: URL, from: Int = 0) {
         let fileManager = FileManager.default
-        // The home folder's `.claude` is Claude's own, for every project: its skills
-        // are not this folder's to move, and nothing above it is a project either.
-        let home = fileManager.homeDirectoryForCurrentUser.standardizedFileURL.resolvingSymlinksInPath().path
-        let path = project.standardizedFileURL.resolvingSymlinksInPath().path
-        guard path != "/", !(home + "/").hasPrefix(path.hasSuffix("/") ? path : path + "/") else {
-            return
-        }
+        guard isLayable(project) else { return }
         for name in resources.filter({ $0.since > from }).map(\.name) {
             attempt("create \(folder)/\(name)") {
                 try fileManager.createDirectory(
@@ -104,6 +99,26 @@ public enum DotAgents {
         for link in links where link.since > from {
             attempt("link \(link.path)") { try place(link, in: project) }
         }
+    }
+
+    /// Whether the folder may be given the layout. The home folder's `.claude` is
+    /// Claude's own, for every project: its skills are not this folder's to move, and
+    /// `~/.agents/plugins/marketplace.json` is Codex's personal marketplace. Nothing
+    /// above the home folder is a project either.
+    static func isLayable(_ project: URL) -> Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.resolvingSymlinksInPath().path
+        let path = project.standardizedFileURL.resolvingSymlinksInPath().path
+        return path != "/" && !(home + "/").hasPrefix(path.hasSuffix("/") ? path : path + "/")
+    }
+
+    /// The project a working folder belongs to: itself, or for one of the app's
+    /// worktrees, the project it was made from.
+    static func projectFolder(for cwd: URL) -> URL {
+        var path = cwd.standardizedFileURL.resolvingSymlinksInPath().path
+        if let range = path.range(of: "/\(WorktreeName.folder)/") {
+            path = String(path[..<range.lowerBound])
+        }
+        return URL(filePath: path, directoryHint: .isDirectory)
     }
 
     /// The link, or nothing when something the person made is in the way.
@@ -159,11 +174,10 @@ public enum DotAgents {
     /// An agent in one of the app's worktrees gets its project's, because the layout is
     /// untracked and is not in the worktree's checkout.
     public static func pluginFolders(for cwd: URL) -> [URL] {
-        var path = cwd.standardizedFileURL.resolvingSymlinksInPath().path
-        if let range = path.range(of: "/\(WorktreeName.folder)/") {
-            path = String(path[..<range.lowerBound])
-        }
-        let plugins = URL(filePath: path, directoryHint: .isDirectory).appending(path: "\(folder)/\(Self.plugins)")
+        pluginFolders(in: projectFolder(for: cwd).appending(path: "\(folder)/\(Self.plugins)"))
+    }
+
+    static func pluginFolders(in plugins: URL) -> [URL] {
         let entries = (try? FileManager.default.contentsOfDirectory(atPath: plugins.path)) ?? []
         return entries.sorted()
             .filter { !$0.hasPrefix(".") }
@@ -190,21 +204,21 @@ public enum DotAgents {
         }
     }
 
-    private static func attempt(_ what: String, _ body: () throws -> Void) {
+    static func attempt(_ what: String, _ body: () throws -> Void) {
         do { try body() } catch { DaemonLog.shared.write("dotagents: could not \(what): \(error)") }
     }
 
     /// Whether anything is at the path, a dangling link included.
-    private static func exists(_ url: URL) -> Bool {
+    static func exists(_ url: URL) -> Bool {
         (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil
     }
 
-    private static func isDirectory(_ url: URL) -> Bool {
+    static func isDirectory(_ url: URL) -> Bool {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         return attributes?[.type] as? FileAttributeType == .typeDirectory
     }
 
-    private static func isPlainFile(_ url: URL) -> Bool {
+    static func isPlainFile(_ url: URL) -> Bool {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         return attributes?[.type] as? FileAttributeType == .typeRegular
     }
