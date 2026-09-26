@@ -45,7 +45,8 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                 message: message, prompts: prompts,
                                                 title: title, waitingOn: words.waitingOn,
-                                                checkAgainInMinutes: words.checkAgainInMinutes),
+                                                checkAgainInMinutes: words.checkAgainInMinutes,
+                                                afterwards: words.afterwards?.rawValue),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,

@@ -19,8 +19,11 @@ struct SidebarView: View {
     var body: some View {
         HStack(spacing: 0) {
             ResizeHandle(windowWidth: windowWidth)
+            // Capped here as well as when it opens: a width chosen when the inspector
+            // shared the whole window is too much for the chat's column alone, and the
+            // conversation keeps its minimum whatever was stored.
             content
-                .frame(width: frame.width)
+                .frame(width: min(frame.width, SidebarFrame.maximumWidth(inWindowOf: windowWidth)))
         }
         .background(Paper.ground)
     }

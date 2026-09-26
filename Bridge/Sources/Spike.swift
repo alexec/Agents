@@ -50,3 +50,55 @@ enum Peek {
         }
     }
 }
+
+/// 046 T005: the relay through the real iCloud, both ends in this one process — a phone
+/// end with a key of its own, the Mac's end with another, and a pretend daemon that
+/// answers every request. Ten round trips timed with the Mac polling as it ships (every
+/// second), then one reply big enough to go as an asset, then the zone deleted. What it
+/// cannot measure is the phone's radio; that is T006.
+enum RelaySpike {
+    static func run() async throws {
+        let device = UUID()
+        let mac = DeviceKey.ephemeral(), phone = DeviceKey.ephemeral()
+        let (near, far) = PairedTransport.pair()
+        let answering = Task {
+            for try await line in far.lines() {
+                guard let object = try? JSONDecoder().decode(JSONValue.self, from: Data(line.utf8)).objectValue,
+                      let id = object["id"] else { continue }
+                let reply: JSONValue = object["method"]?.stringValue == "big"
+                    ? ["jsonrpc": "2.0", "id": id, "result": .string(String(repeating: "x", count: 3_000_000))]
+                    : ["jsonrpc": "2.0", "id": id, "result": [:]]
+                try far.write(line: String(decoding: try JSONEncoder().encode(reply), as: UTF8.self))
+            }
+        }
+        defer { answering.cancel() }
+        let host = RelayHostCore(channel: CloudKitRelayChannel(), key: mac, openDaemon: { near })
+        await host.pair(device, key: phone.publicKey)
+        let hosting = Task { await host.run() }
+        defer { hosting.cancel() }
+
+        let opened = ContinuousClock.now
+        let transport = RelayTransport(channel: CloudKitRelayChannel(), device: device, key: phone,
+                                       macKey: mac.publicKey)
+        try await transport.open(timeout: .seconds(30))
+        log("relay spike: session open in \(ContinuousClock.now - opened)")
+        var lines = transport.lines().makeAsyncIterator()
+        var times: [Duration] = []
+        for n in 1...10 {
+            let sent = ContinuousClock.now
+            try transport.write(line: #"{"jsonrpc":"2.0","id":\#(n),"method":"daemon/ping"}"#)
+            _ = try await lines.next()
+            let took = ContinuousClock.now - sent
+            times.append(took)
+            log("relay spike: round trip \(n): \(took)")
+        }
+        log("relay spike: worst \(times.max()!), median \(times.sorted()[times.count / 2])")
+        let sent = ContinuousClock.now
+        try transport.write(line: #"{"jsonrpc":"2.0","id":99,"method":"big"}"#)
+        let big = try await lines.next()
+        log("relay spike: a 3 MB reply came back whole (\(big?.utf8.count ?? 0) bytes) in \(ContinuousClock.now - sent)")
+        transport.close()
+        await host.forget(device)
+        log("relay spike: zone deleted; ok")
+    }
+}

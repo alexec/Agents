@@ -507,6 +507,52 @@ struct AppServiceTests {
         await service.close()
     }
 
+    // MARK: Parked or archived once the turn ends
+
+    @Test func afterwardsIsOfferedOnTheOneCallAlone() async throws {
+        let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
+        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park", "archive"])
+        #expect(AppService.reportOutcomeTool["inputSchema"]?["properties"]?["afterwards"] == nil)
+        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("afterwards") == true)
+    }
+
+    @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
+                          "afterwards": "archive"],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.words.afterwards == .archive)
+        await service.close()
+    }
+
+    /// A word that is neither, and each pairing that would hide or bury something,
+    /// refused before the daemon is asked.
+    @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let cases: [(JSONValue, String)] = [
+            (["outcome": "done", "message": "m", "afterwards": "delete"], AfterTurn.unknown),
+            (["outcome": "partly_done", "message": "m", "afterwards": "archive"], AfterTurn.archive.refusal),
+            (["outcome": "needs_answer", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
+            (["outcome": "stuck", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
+            (["outcome": "blocked", "message": "m", "check_again_in_minutes": 5, "afterwards": "park"],
+             AfterTurn.park.refusal),
+        ]
+        for (arguments, refusal) in cases {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
+            ])
+            #expect(result["isError"]?.boolValue == true, "\(arguments)")
+            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == refusal, "\(arguments)")
+        }
+        #expect(await box.calls == 0)
+        await service.close()
+    }
+
     @Test func aFinishCallReachesTheSinkWithBothHalves() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))

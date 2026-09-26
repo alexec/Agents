@@ -94,7 +94,18 @@ extension DaemonCore {
 
             case DaemonAPI.Method.devicesAnnounce:
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
-                return .success(try JSONValue.encoding(try announce(announcement)))
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.AnnounceReply(device: try announce(announcement), macKey: relayKey())))
+
+            case DaemonAPI.Method.devicesForget:
+                let request = try require(params, as: DaemonAPI.DeviceForget.self)
+                try forgetDevice(request.id, from: surface)
+                return .success([:])
+
+            case DaemonAPI.Method.relayRegister:
+                let registration = try require(params, as: DaemonAPI.RelayRegistration.self)
+                try registerRelayKey(registration.publicKey)
+                return .success([:])
 
             case DaemonAPI.Method.projectsList:
                 let request = try require(params, as: DaemonAPI.ProjectsListRequest.self)
@@ -235,9 +246,14 @@ extension DaemonCore {
                 // Only the Mac and the phone send this, so a person's prompt here is a
                 // person typing, and that picks a parked chat back up (040, FR-009).
                 // Workflows, the restart pick-up and the outcome question reach
-                // `prompt` directly and leave the chat parked.
+                // `prompt` directly and leave the chat parked. It also drops an agent's
+                // ask to be parked or archived when its turn ends: the person has moved
+                // the work on.
                 return .success(try await once(request.sendID) {
-                    if request.from == .person { await self.unparkQuietly(request.agentID) }
+                    if request.from == .person {
+                        await self.unparkQuietly(request.agentID)
+                        await self.dropAfterTurnAsk(request.agentID)
+                    }
                     try await self.prompt(request)
                     return [:]
                 })

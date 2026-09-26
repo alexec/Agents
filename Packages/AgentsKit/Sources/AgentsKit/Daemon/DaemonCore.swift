@@ -638,15 +638,31 @@ public actor DaemonCore {
         // it parks when it does. Archiving takes the mark away, and unarchiving does
         // not put it back (FR-010). The triggers below read `next`, never the mark, so
         // a workflow sees the ending it always did (FR-015).
+        //
+        // An agent's own ask to be parked, made on the call that ended its turn, is the
+        // same park at the same moment — but only for the ending it asked about: the
+        // turn it made the ask in, ended by its own hand, with nothing the person has
+        // queued since. Any other ending drops the ask. An ask to be archived is left
+        // for `finishTurn`, which archives once the runtime is let go.
         switch next {
         case .finished, .stopped:
-            if case .whenTurnEnds = agent.parking,
-               !(event == .foundDead && agent.mayBePickedUpAfterRestart) {
+            let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
+            if case .whenTurnEnds = agent.parking, !pickingUp {
                 agent.parking = .parked(at: now())
                 agent.isUnread = false
             }
+            if let after = agent.afterTurn, !pickingUp {
+                let endedAsAsked = next == .finished && reasonThisEventSet == .endTurn
+                    && agent.queuedPrompts.isEmpty
+                if after == .park, endedAsAsked, agent.parking == nil {
+                    agent.parking = .parked(at: now())
+                    agent.isUnread = false
+                }
+                if !(after == .archive && endedAsAsked) { agent.afterTurn = nil }
+            }
         case .archived:
             agent.parking = nil
+            agent.afterTurn = nil
         case .starting, .running, .waitingOnUser:
             break
         }
