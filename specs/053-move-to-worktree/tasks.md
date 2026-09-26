@@ -247,12 +247,16 @@ and the next launch's cwd is the worktree, with an app prompt sent.
     `artifactEdits`.
 
   Make T016 pass.
-- [ ] T019 [US1] Build both schemes (memory: skip plugin validation, run them one after the
+- [X] T019 [US1] Build both schemes (memory: skip plugin validation, run them one after the
   other), then run `swift test --filter 'Move|WorktreeStart|AppService'`.
-- [ ] T020 [US1] **Gate**: quickstart §3 for Claude, Grok, Copilot and Cursor on a run-app scratch
+- [X] T020 [US1] **Gate**: quickstart §3 for Claude, Grok, Copilot and Cursor on a run-app scratch
   root.
   - Record each result in `specs/053-move-to-worktree/walk/README.md`.
   - Stop and bring any runtime that doesn't work in the new folder to Alex.
+  **Walked 2026-09-26** (`walk/README.md`): Claude and Cursor moved, kept their session, carried on
+  and committed in the worktree. Grok moved and carried on, but in a new session (it lost the
+  conversation). Copilot cannot call the app's tools at all (known since 036), so it made its own
+  worktree by hand.
 
 **Checkpoint**: MVP. An agent can move itself and carry on, on all four runtimes.
 
@@ -266,7 +270,7 @@ agent's own.
 **Independent test**: move, restart the daemon and resume the agent: it's in the worktree.
 Commit, archive, and the worktree is removed.
 
-- [ ] T021 [P] [US2] Add to `MoveTests.swift`:
+- [X] T021 [P] [US2] Add to `MoveTests.swift`:
   - A moved agent, with a new `DaemonCore` loaded from the same store, resumes with
     `continuedSessionParams["cwd"]` equal to the worktree.
   - A `pendingMove` stored with no turn running is applied by `recover()`.
@@ -281,15 +285,17 @@ Commit, archive, and the worktree is removed.
   - With the fake's resume set to fail, the agent carries on in a new session, the transcript has
     the "no longer has this conversation" note, and the briefing is sent again.
   - Archiving an agent with a `pendingMove` clears it, and nothing is made.
-- [ ] T022 [US2] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift` `recover()`, after agents are
+- [X] T022 [US2] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift` `recover()`, after agents are
   loaded, call `applyPendingMove` for every agent with a `pendingMove` whose state has no turn to
   pick up. Leave agents that 025 will resume mid-turn to T018's turn-end path.
-- [ ] T023 [US2] In `DaemonCore+Commands.swift`, make `archive` and delete clear `pendingMove`
+- [X] T023 [US2] In `DaemonCore+Commands.swift`, make `archive` and delete clear `pendingMove`
   (next to `dropAfterTurnAsk`). Make T021 pass.
-- [ ] T024 [US2] Check every daemon reader of `agent.cwd` listed in research R8 (Changes, file
+- [X] T024 [US2] Check every daemon reader of `agent.cwd` listed in research R8 (Changes, file
   mentions, Serving, Shells, Runtimes session list) reads it when it is used, not from a copy.
   Fix any that caches it, and add a MoveTests case for each fix.
-- [ ] T025 [US2] Add removal on exit to `MoveTests.swift`:
+  **Found one**: `startingPoint.repository` kept the Changes pane on the old folder. Now re-anchored
+  on a move (`itsChangesAreMeasuredInTheNewCheckout`). The rest read `agent.cwd` when used.
+- [X] T025 [US2] Add removal on exit to `MoveTests.swift`:
   - `exit_worktree remove` from a worktree the app made, with everything committed: after the turn
     the agent is in the project folder, the worktree is gone, and an unmerged app branch is kept.
     The note says so.
@@ -299,7 +305,7 @@ Commit, archive, and the worktree is removed.
   - An edit made after asking with `remove` means the move applies but the removal is skipped,
     with the reason in the note.
   - Remove from a worktree the app did not make is refused. So is one another agent works in.
-- [ ] T026 [US2] In `applyPendingMove`, after the folder change, when `removeLeft` is set, call
+- [X] T026 [US2] In `applyPendingMove`, after the folder change, when `removeLeft` is set, call
   `removeWorktree(WorktreeRemovalRequest(project:, root: oldRoot, confirmed: discardChanges))`.
   Because the mover has already left, it no longer blocks the removal. Catch its refusal into
   the note. Make T025 pass.

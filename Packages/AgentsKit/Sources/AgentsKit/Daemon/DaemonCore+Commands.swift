@@ -1357,6 +1357,13 @@ extension DaemonCore {
         dropBlock(agentID)
         endWait(agentID, by: .archived)
         shownPlanFiles.removeValue(forKey: agentID)
+        // And a move still waiting: taken back before the stop below ends the turn it was
+        // waiting on, which would otherwise make it on the way into the archive (053).
+        if var waiting = agents[agentID], waiting.pendingMove != nil {
+            waiting.pendingMove = nil
+            changed(waiting)
+        }
+        moveNotes.removeValue(forKey: agentID)
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)

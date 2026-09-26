@@ -185,6 +185,7 @@ extension DaemonCore {
         guard var moved = agents[agentID] else { return nil }
         moved.cwd = place.cwd
         moved.worktree = place.worktree
+        moved.startingPoint = await Self.startingPoint(after: moved.startingPoint, in: place.cwd)
         changed(moved)
         projectChanged(forAgentIn: moved.projectFolder)
 
@@ -228,6 +229,17 @@ extension DaemonCore {
         } catch {
             await record(.runtimeNote("Could not start again after the move: \(reason(error))"), for: agentID)
         }
+    }
+
+    /// What the Changes pane measures from once the agent is somewhere else (035). The
+    /// same commit, in the new checkout, when that checkout's history has it — a worktree
+    /// made from where the agent was always does, so everything it did still shows. A
+    /// fresh start from the new checkout's HEAD when it does not: an existing worktree on
+    /// another line of work, or back to a project folder that moved on.
+    static func startingPoint(after old: StartingPoint?, in folder: URL) async -> StartingPoint? {
+        guard let fresh = await GitChanges.startingPoint(of: folder) else { return nil }
+        guard let old, await GitWorktrees.isAncestor(old.commit, of: "HEAD", in: folder) else { return fresh }
+        return StartingPoint(repository: fresh.repository, commit: old.commit)
     }
 
     // MARK: Words

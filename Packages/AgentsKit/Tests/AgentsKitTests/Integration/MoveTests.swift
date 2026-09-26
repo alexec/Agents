@@ -63,7 +63,30 @@ struct MoveTests {
         let id = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: folder ?? repo.project,
                                                              prompt: prompt))
         await settled(core, id)
+        await quiet(core, id)
         return id
+    }
+
+    /// No runtime, no turn and nothing being sent, several looks in a row. `settled` is
+    /// true as soon as the app has *asked* how a silent turn went, and that question is
+    /// a turn of its own: a move made in it waits for it, which is not what a test of an
+    /// idle agent means.
+    private func quiet(_ core: DaemonCore, _ id: UUID,
+                       sourceLocation: SourceLocation = #_sourceLocation) async {
+        var calm = 0
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while calm < 5 {
+            guard ContinuousClock.now < deadline else {
+                Issue.record("the agent never went quiet", sourceLocation: sourceLocation)
+                return
+            }
+            let noRuntime = await core.live[id] == nil
+            let noTurn = await core.turnTasks[id] == nil
+            let notSending = await !core.sending.contains(id)
+            let settledState = await core.agent(id)?.state.hasTurnInFlight == false
+            calm = (noRuntime && noTurn && notSending && settledState) ? calm + 1 : 0
+            try? await Task.sleep(for: .milliseconds(20))
+        }
     }
 
     private func personMove(_ core: DaemonCore, _ id: UUID, _ target: MoveTarget?,
@@ -417,5 +440,213 @@ struct MoveTests {
         let answer = try await personMove(core, id, .projectFolder)
         #expect(answer.when == .nothing)
         #expect(answer.message.contains("not in a worktree"))
+    }
+
+    // MARK: Everything that follows a folder (US2)
+
+    @Test func aMovedAgentResumesInItsWorktreeAfterARestart() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "kept"))
+        let cwd = try #require(await core.agent(id)?.cwd)
+        await core.saveTail?.value
+
+        let launcher = FakeLauncher()
+        let again = try await makeCore(repo, launcher)
+        _ = await again.recover()
+        #expect(await again.agent(id)?.cwd == cwd)
+        try await again.prompt(.init(agentID: id, text: "carry on"))
+        await settled(again, id)
+
+        #expect(launcher.launches.first.map { Project.standardize($0.cwd).path } == cwd.path)
+        let asked = try #require(await launcher.allAgents.first?.continuedSessionParams?["cwd"]?.stringValue)
+        #expect(Project.standardize(URL(filePath: asked)).path == cwd.path)
+    }
+
+    @Test func aMoveWaitingWhenTheDaemonWentIsMadeWhenItComesBack() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        var agent = try #require(await core.agent(id))
+        agent.pendingMove = PendingMove(target: .newWorktree(name: "after-restart"), askedBy: .agent, askedAt: Date())
+        await core.changed(agent)
+        await core.saveTail?.value
+
+        let again = try await makeCore(repo, FakeLauncher())
+        _ = await again.recover()
+
+        let moved = try #require(await again.agent(id))
+        #expect(moved.worktree?.name == "after-restart")
+        #expect(moved.pendingMove == nil)
+    }
+
+    @Test func archivingAMovedAgentCleansUpItsWorktreeAsIfItStartedThere() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "done-with"))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+
+        try await core.archive(id)
+
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+    }
+
+    /// The Changes pane follows: git's view is the new checkout, measured from the
+    /// commit the agent started on, which a worktree made from its folder still has.
+    @Test func itsChangesAreMeasuredInTheNewCheckout() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        let started = try #require(await core.agent(id)?.startingPoint)
+        _ = try await personMove(core, id, .newWorktree(name: "measured"))
+        let agent = try #require(await core.agent(id))
+        let root = try #require(agent.worktree?.root)
+
+        #expect(agent.startingPoint?.repository.resolvingSymlinksInPath().path == root.resolvingSymlinksInPath().path)
+        #expect(agent.startingPoint?.commit == started.commit)
+        let (context, _) = await core.gitContext(for: agent)
+        #expect(context?.rootPath == root.resolvingSymlinksInPath().path)
+    }
+
+    @Test func theProjectPageListsTheAgentInItsNewWorktree() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "listed"))
+
+        let listed = await core.listWorktrees(for: repo.project)
+        let here = try #require(listed.worktrees.first { $0.name == "listed" })
+        #expect(here.agents == [id])
+        #expect(here.madeByApp)
+        #expect(listed.worktrees.first { $0.isProjectFolder }?.agents.contains(id) == false)
+    }
+
+    @Test func aMovedAgentWhoseWorktreeWasDeletedIsNotStartedAnywhereElse() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "deleted"))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        try FileManager.default.removeItem(at: root)
+        let launchesBefore = launcher.launchCount
+
+        let error = await failure { try await core.prompt(.init(agentID: id, text: "carry on")) }
+
+        #expect(error?.code == DaemonAPI.Failure.worktreeMissing)
+        #expect(launcher.launchCount == launchesBefore)
+    }
+
+    @Test func aRuntimeThatCannotFindItsSessionInTheNewFolderCarriesOnInANewOne() async throws {
+        let repo = try await repository()
+        var forgetful = FakeACPAgent.Script()
+        forgetful.sessionGoneError = JSONRPCError(code: -32603, message: "Path not found.")
+        let launcher = FakeLauncher(script: forgetful)
+        let core = try await makeCore(repo, launcher)
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "fresh"))
+        let cwd = try #require(await core.agent(id)?.cwd)
+
+        try await core.prompt(.init(agentID: id, text: "carry on"))
+        await settled(core, id)
+
+        #expect(try await notes(core, id).contains { $0.contains("no longer has this conversation") })
+        var started = false
+        for runtime in launcher.allAgents {
+            if let asked = await runtime.newSessionParams?["cwd"]?.stringValue,
+               Project.standardize(URL(filePath: asked)).path == cwd.path { started = true }
+        }
+        #expect(started, "the new session is in the new folder")
+    }
+
+    @Test func archivingWithAMoveWaitingTakesItBackAndMakesNothing() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+        _ = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "never")))
+
+        try await core.archive(id)
+        gate.open()
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(await core.agent(id)?.pendingMove == nil)
+        #expect(await core.agent(id)?.cwd == repo.project)
+        #expect(worktreesMade(repo).isEmpty)
+    }
+
+    // MARK: Leaving a worktree and removing it
+
+    @Test func leavingWithRemoveTakesAwayACleanWorktreeAndItsMergedBranch() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "tidy"))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+
+        let answer = try await personMove(core, id, .projectFolder, removeLeft: true)
+
+        #expect(answer.when == .now)
+        #expect(await core.agent(id)?.cwd == repo.project)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(try await git(["branch", "--list", "agents/tidy"], in: repo.top).isEmpty, "nothing on it but main's commit")
+        #expect(try await notes(core, id).contains { $0.contains("Removed the worktree tidy and its branch.") })
+    }
+
+    @Test func leavingWithRemoveKeepsABranchThatHoldsCommits() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "worked"))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        try "work\n".write(to: root.appending(path: "work.txt"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "."], in: root)
+        _ = try await git(["commit", "-q", "-m", "work"], in: root)
+
+        let refused = await failure { try await personMove(core, id, .projectFolder, removeLeft: true) }
+        #expect(refused?.code == DaemonAPI.Failure.worktreeFailed, "unmerged commits need discard_changes")
+        #expect(refused?.message.contains("commits not in main") == true)
+
+        _ = try await personMove(core, id, .projectFolder, removeLeft: true, discard: true)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+        #expect(await core.agent(id)?.cwd == repo.project)
+    }
+
+    @Test func removingOverUncommittedWorkNeedsDiscard() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        _ = try await personMove(core, id, .newWorktree(name: "dirty"))
+        let root = try #require(await core.agent(id)?.worktree?.root)
+        try "unsaved\n".write(to: root.appending(path: "unsaved.txt"), atomically: true, encoding: .utf8)
+
+        let refused = await failure { try await personMove(core, id, .projectFolder, removeLeft: true) }
+        #expect(refused?.code == DaemonAPI.Failure.worktreeFailed)
+        #expect(refused?.message.contains("1 uncommitted change") == true)
+        #expect(await core.agent(id)?.pendingMove == nil)
+        #expect(await core.agent(id)?.cwd == root, "nothing moved")
+
+        _ = try await personMove(core, id, .projectFolder, removeLeft: true, discard: true)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+    }
+
+    @Test func removingAWorktreeTheAppDidNotMakeOrAnotherAgentIsInIsRefused() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let first = try await idleAgent(core, repo)
+        let byHand = try await addByHand(repo, "by-hand")
+        _ = try await personMove(core, first, .existing(byHand))
+        let foreign = await failure { try await personMove(core, first, .projectFolder, removeLeft: true) }
+        #expect(foreign?.code == DaemonAPI.Failure.notAWorktree)
+
+        _ = try await personMove(core, first, .newWorktree(name: "shared"))
+        let root = try #require(await core.agent(first)?.worktree?.root)
+        let second = try await idleAgent(core, repo, prompt: "Another")
+        _ = try await personMove(core, second, .existing(root))
+        let shared = await failure { try await personMove(core, first, .projectFolder, removeLeft: true) }
+        #expect(shared?.code == DaemonAPI.Failure.worktreeInUse)
+        #expect(FileManager.default.fileExists(atPath: root.path))
     }
 }

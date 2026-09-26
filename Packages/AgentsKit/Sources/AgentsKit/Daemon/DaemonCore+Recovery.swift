@@ -71,6 +71,12 @@ extension DaemonCore {
             interrupted[id] = agent.state
             recovered.append(id)
         }
+        // A move that was waiting for a turn the last daemon took with it (053). That
+        // turn is over now, so the move is made here, before anything is picked up: a
+        // pick-up is a new runtime, and it starts in whatever folder the agent has.
+        for waiting in agents.values where waiting.pendingMove != nil && waiting.state != .archived {
+            await applyPendingMove(waiting.id)
+        }
         // The leases as they were (036 FR-008). Whatever ran out while the daemon was
         // down is released now and handed on, and every waiter is one to start rather
         // than one to answer: no call survives a restart.
