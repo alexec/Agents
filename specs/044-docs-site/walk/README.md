@@ -87,6 +87,22 @@ Two things to tidy in the workflows, neither blocking:
   Node 20.
 - **uv cache.** `setup-uv` warns that its cache has no lock file to key on. It could be turned off.
 
+## iPhone pictures (T014)
+
+Taken on 2026-09-25 from Alex's iPhone with `devicectl device capture screenshot`, one frame every 3 s while he tapped
+through. For about five minutes his real bridge was paused and a second copy of it served the scratch root
+(`/tmp/run-044`, port 8791). The real one was restarted from main's build on 8790 afterwards. Five of the 78 frames
+are on the page. Everything else was deleted:
+- **The Projects list:** the phone showed its cached list of Alex's real projects ("Last heard from your Mac 5
+  minutes ago"), so step 2 has no picture.
+- **An app-switcher frame.**
+- **The lock screen.**
+
+What the walk corrected in the tutorial:
+- The phone's **Mode** was **Auto**, so Claude added the test without asking, and step 5 now says that whether it
+  asks depends on Mode.
+- The new-agent button is **+**, and the start button is an arrow.
+
 ## Still to do after the gate
 
-- Alex's: the iPhone pictures for the second tutorial (T014), a timed run of the first tutorial by someone new to the app (SC-001), and reading the site on the iPhone (SC-007).
+- Alex's: a timed run of the first tutorial by someone new to the app (SC-001), and reading the site on the iPhone (SC-007).
