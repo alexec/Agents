@@ -17,13 +17,13 @@ struct ClaudeRelayTests {
         let folder: URL
     }
 
-    private func setUp(ownSignIn: Bool = false) async throws -> Setup {
+    private func setUp(ownSignIn: Bool = false, script: FakeACPAgent.Script = .init()) async throws -> Setup {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("relayed-\(UUID().uuidString)")
         let locations = StoreLocations(root: root)
         try locations.createDirectories()
         let folder = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let launcher = FakeLauncher()
+        let launcher = FakeLauncher(script: script)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
         await core.loadFromDisk()
@@ -92,5 +92,27 @@ struct ClaudeRelayTests {
         await offerRelay(setup, "claude", standIn: Self.standIn, on: UUID())
         let offer = await RequestConnection.$current.withValue(nil) { await setup.core.relayOffer(for: "claude") }
         #expect(offer?.standIn == Self.standIn)
+    }
+
+    /// This Mac's sign-in refused through the relay, after the relay re-read it: the agent
+    /// ends saying the Mac needs signing in, never pointing at Settings (US3 scenario 3).
+    @Test func aRefusedRelayedSignInSaysTheMacNeedsSigningInAgain() async throws {
+        let refusal = JSONRPCError(code: -32603, message: "Internal error: Failed to authenticate. API Error: 401",
+                                   data: ["errorKind": "authentication_failed"])
+        let setup = try await setUp(script: .init(promptError: refusal))
+        let window = UUID()
+        await offerRelay(setup, "claude", standIn: Self.standIn, on: window)
+        guard case .success(let made) = await start(setup, "claude", on: window),
+              let id = made.stringValue.flatMap(UUID.init(uuidString:)) else { Issue.record("start"); return }
+        var notes: [String] = []
+        for _ in 0..<50 {
+            notes = try await setup.core.transcript(.init(agentID: id, before: nil, limit: 500)).entries.compactMap {
+                if case .runtimeNote(let text) = $0.kind { return text } else { return nil }
+            }
+            if notes.contains(where: { $0.contains("signing in") }) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(notes.contains("Claude on this Mac needs signing in again."))
+        #expect(!notes.contains { $0.contains("Settings") || $0.contains("stopped answering") })
     }
 }

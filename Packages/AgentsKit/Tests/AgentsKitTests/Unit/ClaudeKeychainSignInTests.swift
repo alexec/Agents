@@ -3,7 +3,7 @@ import Testing
 @testable import AgentsKit
 
 /// Claude's sign-in on this Mac, as the relay reads it (056, research R5), against a fake
-/// Keychain: never the real one, and nothing here renews anything.
+/// Keychain and a fake renewer: never the real item, and nothing here renews anything.
 @Suite("Claude's sign-in on this Mac")
 struct ClaudeKeychainSignInTests {
     final class FakeKeychain: @unchecked Sendable {
@@ -104,5 +104,56 @@ struct ClaudeKeychainSignInTests {
     @Test func aMissingKeychainItemIsNotSignedIn() {
         let source = ClaudeKeychainSignIn(service: "agents-056-test-\(UUID().uuidString)")
         #expect(source.whyNot == .notSignedIn)
+    }
+
+    // MARK: Renewal by the Mac's own Claude (US3, research R6)
+
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = 0
+        func add() { lock.withLock { value += 1 } }
+        var count: Int { lock.withLock { value } }
+    }
+
+    /// Two refused requests at once: the Mac's Claude is asked once, and both get its token.
+    @Test func manyRefusalsAskTheMacsClaudeOnce() async throws {
+        let clock = Clock()
+        let keychain = FakeKeychain(.success(Self.item(access: "EXPIRED", expiresIn: -10, from: clock)))
+        let asked = Counter()
+        let source = ClaudeKeychainSignIn(reader: { try keychain.read() }, now: { clock.now }, renewer: {
+            asked.add()
+            try? await Task.sleep(for: .milliseconds(100))
+            keychain.item = .success(Self.item(access: "RENEWED", expiresIn: 3600, from: clock))
+        })
+        let stale = MacSignInToken(access: "EXPIRED")
+        async let first = source.renew(after: stale)
+        async let second = source.renew(after: stale)
+        let (a, b) = try await (first, second)
+        #expect(a.access == "RENEWED" && b.access == "RENEWED")
+        #expect(asked.count == 1)
+    }
+
+    /// Already renewed on the Mac: nothing is asked of Claude.
+    @Test func aRenewalAlreadyMadeAsksNothing() async throws {
+        let clock = Clock()
+        let keychain = FakeKeychain(.success(Self.item(access: "NEWER", expiresIn: 3600, from: clock)))
+        let asked = Counter()
+        let source = ClaudeKeychainSignIn(reader: { try keychain.read() }, now: { clock.now }, renewer: { asked.add() })
+        #expect(try await source.renew(after: MacSignInToken(access: "OLDER")).access == "NEWER")
+        #expect(asked.count == 0)
+    }
+
+    /// Claude asked and nothing changed (signed out, revoked): refused, and the Mac's sign-in
+    /// is left exactly as it was.
+    @Test func aRenewalThatChangesNothingIsRefused() async throws {
+        let clock = Clock()
+        let keychain = FakeKeychain(.success(Self.item(access: "SAME", expiresIn: -10, from: clock)))
+        let asked = Counter()
+        let source = ClaudeKeychainSignIn(reader: { try keychain.read() }, now: { clock.now }, renewer: { asked.add() })
+        await #expect(throws: MacSignInFailure.renewalRefused(401)) {
+            try await source.renew(after: MacSignInToken(access: "SAME"))
+        }
+        #expect(asked.count == 1)
+        #expect(try ClaudeKeychainSignIn.parse(try keychain.read()).0.access == "SAME")
     }
 }

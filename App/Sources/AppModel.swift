@@ -1186,8 +1186,10 @@ final class AppModel {
             return
         case DaemonAPI.Notification.credentialRefused:
             // The key in Settings was refused: Settings turns red, and says why (043).
-            if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self), refused.lent {
-                credentials.markRefused(refused.runtime)
+            if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self) {
+                if refused.lent { credentials.markRefused(refused.runtime) }
+                // This Mac's own sign-in was refused through the relay (056): sign in here.
+                if refused.relayed == true { signInRuntimeID = refused.runtime }
             }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,

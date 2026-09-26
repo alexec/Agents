@@ -15,21 +15,29 @@ public final class ClaudeKeychainSignIn: MacSignInSource, @unchecked Sendable {
 
     /// The item's text, or the reason there is none.
     public typealias Reader = @Sendable () throws -> Data
+    /// Asks the Mac's own Claude to renew its sign-in, however it does (R6); returns when it
+    /// has finished or given up. The item is read again afterwards either way.
+    public typealias Renewer = @Sendable () async -> Void
 
     private let read: Reader
+    private let renewer: Renewer
+    private var renewing: Task<Void, Never>?
     private let now: @Sendable () -> Date
     private let lock = NSLock()
     private var cached: (token: MacSignInToken, expires: Date)?
     private var failed: (at: Date, why: MacSignInFailure)?
 
-    public init(service: String) {
+    public init(service: String, renewer: @escaping Renewer = ClaudeKeychainSignIn.askTheMacsClaude) {
         read = { try Self.readKeychain(service: service) }
         now = { Date() }
+        self.renewer = renewer
     }
 
-    init(reader: @escaping Reader, now: @escaping @Sendable () -> Date = { Date() }) {
+    init(reader: @escaping Reader, now: @escaping @Sendable () -> Date = { Date() },
+         renewer: @escaping Renewer = {}) {
         read = reader
         self.now = now
+        self.renewer = renewer
     }
 
     public var isSignedIn: Bool { (try? current()) != nil }
@@ -49,11 +57,49 @@ public final class ClaudeKeychainSignIn: MacSignInSource, @unchecked Sendable {
     }
 
     /// `stale` was refused. Whatever the Keychain holds now is read afresh: if the Mac's own
-    /// Claude renewed it, that is used. Otherwise nothing is spent here.
+    /// Claude renewed it already, that is used and nothing is spent. Otherwise the Mac's
+    /// Claude is asked to renew it, once however many requests are waiting, and the item is
+    /// read again. The app never renews or writes the item itself (D4, R6).
     public func renew(after stale: MacSignInToken) async throws -> MacSignInToken {
+        if let token = try? lock.withLock({ try fresh(at: now()) }), token.access != stale.access { return token }
+        let task = lock.withLock { () -> Task<Void, Never> in
+            if let renewing { return renewing }
+            let made = Task { [renewer] in await renewer() }
+            renewing = made
+            return made
+        }
+        await task.value
+        lock.withLock { if renewing == task { renewing = nil } }
         let token = try lock.withLock { try fresh(at: now()) }
         guard token.access != stale.access else { throw MacSignInFailure.renewalRefused(401) }
         return token
+    }
+
+    /// The command the Mac's own Claude is asked to renew with (research R6, measured by
+    /// T035): Claude checks its sign-in on the way and renews one near or past its expiry.
+    public static let renewArguments = ["auth", "status"]
+
+    /// Run the Mac's own `claude`, found on the login shell's PATH, with `renewArguments`,
+    /// and give up after 30 seconds.
+    public static let askTheMacsClaude: Renewer = {
+        let environment = LoginShellPath.environment()
+        let path = (environment["PATH"] ?? "/usr/bin:/bin").split(separator: ":").map(String.init)
+        guard let claude = path.map({ URL(fileURLWithPath: $0).appendingPathComponent("claude") })
+            .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return }
+        let process = Process()
+        process.executableURL = claude
+        process.arguments = renewArguments
+        process.environment = environment
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            let once = OnceFlag()
+            process.terminationHandler = { _ in if once.take() { done.resume() } }
+            do { try process.run() } catch { if once.take() { done.resume() }; return }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
+                if process.isRunning { process.terminate() }
+            }
+        }
     }
 
     public func standIn() throws -> String { Self.standInToken }

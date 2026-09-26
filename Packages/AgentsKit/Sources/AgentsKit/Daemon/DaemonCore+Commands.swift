@@ -1198,7 +1198,9 @@ extension DaemonCore {
         let signIn = refused == nil ? Self.signInReason(error) : nil
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
-            await record(.runtimeNote(refused.lent
+            await record(.runtimeNote(refused.relayed == true
+                ? "\(runtimeName) on this Mac needs signing in again."
+                : refused.lent
                 ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)

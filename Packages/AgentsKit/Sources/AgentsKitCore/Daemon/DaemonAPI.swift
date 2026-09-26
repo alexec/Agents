@@ -2494,11 +2494,15 @@ public extension DaemonAPI {
         public var agentID: UUID
         public var runtime: String
         public var lent: Bool
+        /// The refused sign-in was this Mac's own, relayed (056): signing in on the Mac is
+        /// the remedy, not Settings. Absent from older daemons.
+        public var relayed: Bool?
 
-        public init(agentID: UUID, runtime: String, lent: Bool) {
+        public init(agentID: UUID, runtime: String, lent: Bool, relayed: Bool? = nil) {
             self.agentID = agentID
             self.runtime = runtime
             self.lent = lent
+            self.relayed = relayed
         }
     }
 

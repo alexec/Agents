@@ -219,8 +219,13 @@ extension DaemonCore {
     /// `data.errorKind == "authentication_failed"`, for a subscription token and an API key
     /// alike. Only on a server; the Mac's own sign-in is 037's business.
     func credentialRefusal(agentID: UUID, error: any Error) -> DaemonAPI.CredentialRefused? {
-        guard !exitsWhenIdle, let agent = agents[agentID], Self.lendableRuntimes.contains(agent.runtimeID),
-              let error = error as? JSONRPCError, Self.isAuthenticationFailure(error) else { return nil }
+        guard !exitsWhenIdle, let agent = agents[agentID], let error = error as? JSONRPCError,
+              Self.isAuthenticationFailure(error) else { return nil }
+        // This Mac's own sign-in, relayed and refused even after the relay re-read it (056).
+        if ToolPolicyCatalog.policy(for: agent.runtimeID).relay != nil, relayOffer(for: agent.runtimeID) != nil {
+            return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: false, relayed: true)
+        }
+        guard Self.lendableRuntimes.contains(agent.runtimeID) else { return nil }
         let lent = lentCredentials.values.contains { $0[agent.runtimeID] != nil }
         return DaemonAPI.CredentialRefused(agentID: agentID, runtime: agent.runtimeID, lent: lent)
     }
