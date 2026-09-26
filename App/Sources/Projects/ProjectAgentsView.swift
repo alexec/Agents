@@ -149,6 +149,9 @@ struct ProjectAgentsView: View {
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
 
+                // What the project gives every agent working in it (059, frame D).
+                ProjectSkillsSection(folder: folder)
+
                 // Worktrees the app made here, which outlive the agents in them (030).
                 WorktreesSection(folder: folder)
             }

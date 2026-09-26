@@ -122,16 +122,7 @@ extension DaemonCore {
     func skillsList(_ request: DaemonAPI.SkillsListRequest) throws -> DaemonAPI.SkillsListAnswer {
         let place: SkillPlace
         do { place = try skillPlace(request.destination) } catch let e as DaemonAPI.CatalogError { throw Self.refusal(e) }
-        let managed = catalogInstaller.managed(at: place)
-        let names = ((try? FileManager.default.contentsOfDirectory(atPath: place.skills.path)) ?? []).sorted()
-        var skills: [DaemonAPI.ListedSkill] = []
-        for name in names where !name.hasPrefix(".") {
-            let folder = place.skills.appending(path: name)
-            guard let text = try? String(contentsOf: folder.appending(path: "SKILL.md"), encoding: .utf8) else { continue }
-            skills.append(.init(name: name, description: SkillFile(text: text).description, folder: folder.path,
-                                managed: managed[name]))
-        }
-        return .init(skills: skills)
+        return .init(skills: catalogInstaller.list(at: place))
     }
 
     /// Settings ▸ Shared's personal skills, each with where a lock says it came from.

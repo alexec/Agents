@@ -1567,6 +1567,14 @@ final class AppModel {
         }
     }
 
+    /// A project's (or worktree's) own skills, for its page (frame D). Nil when they could
+    /// not be read, so the section keeps what it last had.
+    func projectSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
+        try? await client.call(DaemonAPI.Method.skillsList,
+                               DaemonAPI.SkillsListRequest(destination: .project(folder: folder.path)),
+                               returning: DaemonAPI.SkillsListAnswer.self).skills
+    }
+
     /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
     private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,

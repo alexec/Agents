@@ -124,6 +124,22 @@ struct SkillInstaller: Sendable {
         return out
     }
 
+    /// Every skill in the destination's folder, a lock's or the person's own, by name
+    /// (frame D). A folder with no SKILL.md is not a skill and is left out; a missing
+    /// folder is an empty list, not an error.
+    func list(at place: SkillPlace) -> [DaemonAPI.ListedSkill] {
+        let managed = managed(at: place)
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: place.skills.path)) ?? []).sorted()
+        var skills: [DaemonAPI.ListedSkill] = []
+        for name in names where !name.hasPrefix(".") {
+            let folder = place.skills.appending(path: name)
+            guard let text = try? String(contentsOf: folder.appending(path: "SKILL.md"), encoding: .utf8) else { continue }
+            skills.append(.init(name: name, description: SkillFile(text: text).description, folder: folder.path,
+                                managed: managed[name]))
+        }
+        return skills
+    }
+
     /// The folder no longer hashes to what its lock recorded (research R6).
     func edited(_ folder: URL, entry: SkillLock.Entry, kind: SkillLock.Kind) -> Bool {
         guard let recorded = entry.recordedHash, !recorded.isEmpty else { return false }

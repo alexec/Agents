@@ -52,6 +52,18 @@ struct AddSkillSheet: View {
             addTo = destination
             added = installed
         }
+        // The **added** marks follow Add to, with no new search (US2 #5).
+        .task(id: addTo) {
+            guard addTo != destination || added.isEmpty else { return }
+            switch addTo {
+            case .personal:
+                if let snapshot = await model.sharedSnapshot() {
+                    added = Set(snapshot.skills.filter { $0.source == .personal }.map(\.name))
+                }
+            case .project(let folder):
+                if let listed = await model.projectSkills(URL(filePath: folder)) { added = Set(listed.map(\.name)) }
+            }
+        }
     }
 
     // MARK: Frame B
