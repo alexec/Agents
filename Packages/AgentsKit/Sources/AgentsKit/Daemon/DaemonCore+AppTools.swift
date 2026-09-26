@@ -5,14 +5,19 @@ import Foundation
 ///
 /// The app hands every session an MCP server of its own. It is not a process we start:
 /// the runtime starts it, the way it starts any stdio MCP server, by running the same
-/// helper binary the daemon is running with `mcp <token>` after it. That helper does
-/// nothing but speak MCP on its stdin and pass what it hears back down the daemon's
-/// socket, which is why the whole of the decision-making is here and testable.
+/// helper binary the daemon is running with `mcp` after it. That helper does nothing
+/// but speak MCP on its stdin and pass what it hears back down the daemon's socket,
+/// which is why the whole of the decision-making is here and testable.
 ///
 /// The token is what makes the call belong to an agent. It is minted per session,
 /// bound when the agent exists, and dropped when the session ends, so a helper left
 /// behind by a dead runtime cannot post into a conversation it is no longer part of.
+/// It rides in the helper's environment (`AGENTS_MCP_TOKEN`), not on its argv, so a
+/// casual `ps` on a shared host does not print it (security review S7).
 extension DaemonCore {
+    /// Environment key for the helper's token. Not on the command line (S7).
+    public static let mcpTokenVariable = "AGENTS_MCP_TOKEN"
+
     /// The MCP server every agent is given, beside whatever the user attached.
     ///
     /// The helper is told where this daemon lives rather than left to work it out. A
@@ -28,9 +33,10 @@ extension DaemonCore {
     func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) -> MCPServer {
         MCPServer(name: AppTool.serverName,
                   transport: .stdio(command: Self.helperPath,
-                                    args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag])
+                                    args: ["mcp"] + (managesAgents ? [] : [Self.noAgentToolsFlag])
                                         + (movesItself ? [] : [Self.noMoveToolsFlag]),
-                                    env: [StoreLocations.rootVariable: locations.root.path]))
+                                    env: [StoreLocations.rootVariable: locations.root.path,
+                                          Self.mcpTokenVariable: token]))
     }
 
     /// What tells the helper to leave the agent tools out.

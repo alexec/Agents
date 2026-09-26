@@ -227,6 +227,14 @@ struct MCPBridgeTests {
         #expect(headers["Authorization"]?.hasPrefix("Bearer ") == true)
         #expect(try await bridge.route(for: http, token: "t", cwd: FileManager.default.temporaryDirectory) == http)
     }
+
+    @Test func bearerCompareRejectsNearMisses() {
+        #expect(MCPBridge.bearer("Bearer secret", matches: "secret"))
+        #expect(!MCPBridge.bearer("Bearer secret", matches: "Secret"))
+        #expect(!MCPBridge.bearer("Bearer secre", matches: "secret"))
+        #expect(!MCPBridge.bearer(nil, matches: "secret"))
+        #expect(!MCPBridge.bearer("secret", matches: "secret"))
+    }
 }
 
 private struct TestFailure: Error, CustomStringConvertible {

@@ -188,13 +188,17 @@ extension DaemonCore {
     /// session, so a plugin added to `.agents/plugins` is there from the next one — and
     /// so is its line in the project's marketplace index, for the runtimes that load
     /// plugins only from one.
+    ///
+    /// Only the plugins the person has approved (security review, S2): one waiting is in
+    /// neither the `_meta` nor the index until they do.
     func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
-        DotAgents.refreshPlugins(for: cwd)
+        let plugins = approvedPluginFolders(for: cwd)
+        DotAgents.refreshPlugins(for: cwd, approved: plugins)
         // The person's own plugins after the project's (054, R12), for the runtimes that
         // take plugins this way.
         let personal = locations.personalHome.map(PersonalDotAgents.personalPluginFolders) ?? []
         return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
-                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd) + personal))
+                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: plugins + personal))
     }
 
     /// Two `_meta` objects as one, key by key and all the way down, because Claude's

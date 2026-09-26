@@ -221,7 +221,7 @@ final class MCPBridge: @unchecked Sendable {
         let bearer = request.headers.first { $0.name.lowercased() == "authorization" }?.value
         guard parts.count == 2, parts[0] == "mcp",
               let route = lock.withLock({ routes[String(parts[1])] }),
-              bearer == "Bearer \(route.key)" else {
+              Self.bearer(bearer, matches: route.key) else {
             return ("404 Not Found", Data())
         }
         switch request.method {
@@ -265,6 +265,17 @@ final class MCPBridge: @unchecked Sendable {
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
+
+    /// Constant-time compare of `Authorization: Bearer <key>` (security review S5).
+    static func bearer(_ header: String?, matches key: String) -> Bool {
+        guard let header else { return false }
+        let expected = Array("Bearer \(key)".utf8)
+        let got = Array(header.utf8)
+        guard got.count == expected.count else { return false }
+        var diff: UInt8 = 0
+        for i in got.indices { diff |= got[i] ^ expected[i] }
+        return diff == 0
+    }
 }
 
 /// A route's stdio server: started on the route's first request, and a table of the
@@ -287,7 +298,9 @@ final class RouteProcess: @unchecked Sendable {
         self.log = log
         process.executableURL = URL(filePath: "/usr/bin/env")
         process.arguments = [route.command] + route.args
-        process.environment = ProcessInfo.processInfo.environment.merging(route.env) { $1 }
+        // Same scrubbing a runtime launch gets: never the daemon's full environment
+        // (security review S5).
+        process.environment = RuntimeEnvironment.forRuntimes().merging(route.env) { $1 }
         process.currentDirectoryURL = route.cwd
         process.standardInput = input
         process.standardOutput = output

@@ -30,6 +30,10 @@ public final class AgentsModel {
     /// own model because a workflow is about the work, and the phone will want them.
     public private(set) var workflows: [WorkflowSummary] = []
 
+    /// Each project's plugins, by its standardized folder, as the daemon last listed them:
+    /// which are waiting for the person's OK (security review, S2).
+    public private(set) var plugins: [URL: [ProjectPlugin]] = [:]
+
     /// The transcript of the agent being read, and only that one. A client holds one
     /// page of one conversation, because an hour of transcript is not something to
     /// carry around, least of all over a mobile connection.
@@ -218,6 +222,7 @@ public final class AgentsModel {
         case usage(DaemonAPI.UsageNotification)
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
+        case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
         case poolChanged(PoolStatus)
@@ -250,6 +255,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentUsage: return decode(DaemonAPI.UsageNotification.self, Update.usage)
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
+        case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
         case DaemonAPI.Notification.poolChanged: return decode(PoolStatus.self, Update.poolChanged)
@@ -358,6 +364,9 @@ public final class AgentsModel {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
 
+        case .pluginsChanged(let list):
+            replacePlugins(list)
+
         case .costChanged(let state):
             costState = state
 
@@ -444,6 +453,18 @@ public final class AgentsModel {
         workflows = summaries.sorted {
             $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending
         }
+    }
+
+    public func replacePlugins(_ list: DaemonAPI.PluginsList) {
+        plugins[Project.standardize(list.folder)] = list.plugins.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    /// The plugins of one project, which is what a project page shows.
+    public func plugins(in folder: URL?) -> [ProjectPlugin] {
+        guard let folder else { return [] }
+        return plugins[Project.standardize(folder)] ?? []
     }
 
     /// The workflows of one project, which is what a project page shows.

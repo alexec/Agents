@@ -25,8 +25,15 @@ struct DaemonCommandLineTests {
     }
 
     @Test func mcpIsTheHelperNotTheDaemon() {
+        // Legacy argv form still parses while helpers migrate (S7).
         let line = DaemonCommandLine(["/x/agentsd", "mcp", "tok", "--no-agent-tools"])
         #expect(line.mode == .mcp(token: "tok"))
+    }
+
+    @Test func mcpTokenPrefersTheEnvironment() {
+        let line = DaemonCommandLine(["/x/agentsd", "mcp", "--no-agent-tools"],
+                                       environment: [DaemonCore.mcpTokenVariable: "from-env"])
+        #expect(line.mode == .mcp(token: "from-env"))
     }
 
     @Test func aServingDaemonNeverLeavesForBeingIdle() async throws {

@@ -17,7 +17,9 @@ extension DaemonCore {
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
         let answer = await RequestConnection.$current.withValue(connection) {
-            await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
+            await RequestConnection.$role.withValue(role) {
+                await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
+            }
         }
         return retiredInstead(of: answer, params: params)
     }
@@ -41,11 +43,11 @@ extension DaemonCore {
 
     /// A token speaks for its agent only from inside that agent's runtime.
     ///
-    /// The token is on the helper's command line, where every process of this account
-    /// can read it. So a call carrying one has to come from a process the agent's own
-    /// runtime started — the helper, through `npx` or a shell at most — or it is turned
-    /// away as if the token meant nothing. A token nobody holds is left for the method
-    /// to refuse in its own words.
+    /// The token is in the helper's environment, which every process of this account
+    /// can still read on a shared host. So a call carrying one has to come from a
+    /// process the agent's own runtime started — the helper, through `npx` or a shell
+    /// at most — or it is turned away as if the token meant nothing. A token nobody
+    /// holds is left for the method to refuse in its own words.
     ///
     /// For a runtime that takes its stdio servers through the bridge (Copilot, 054), the
     /// helper is this daemon's child, started for the token's route only on a request that
@@ -177,6 +179,15 @@ extension DaemonCore {
             case DaemonAPI.Method.workflowsRun:
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))
+
+            case DaemonAPI.Method.pluginsList:
+                let request = try require(params, as: DaemonAPI.PluginsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.PluginsList(folder: request.folder, plugins: projectPlugins(in: request.folder))))
+
+            case DaemonAPI.Method.pluginsApprove:
+                let request = try require(params, as: DaemonAPI.PluginApproveRequest.self)
+                return .success(try JSONValue.encoding(try approvePlugin(request)))
 
             case DaemonAPI.Method.workflowsApprove:
                 let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)

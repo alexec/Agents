@@ -75,9 +75,19 @@ final class SignInRelays: @unchecked Sendable {
             let relay = relay(for: runtimeID, policy: policy, signIn: signIn)
             do {
                 let port = try await relay.start()
+                let standIn: String
+                switch policy.macSignIn {
+                case .keychain:
+                    // A per-grant secret: the fixed Claude stand-in in source must never
+                    // be enough to draw this Mac's token from loopback (S4).
+                    standIn = MacSignInRelay.freshClaudeStandIn()
+                case .file:
+                    standIn = try signIn.standIn()
+                }
+                relay.expectClientBearer(MacSignInRelay.clientBearer(fromStandIn: standIn))
                 grants.append(ServerConnection.RelayGrant(runtime: runtimeID, localPort: port,
                                                           caCertificate: try relay.certificates.caPEM(),
-                                                          standIn: try signIn.standIn()))
+                                                          standIn: standIn))
             } catch {
                 write("relay for \(runtimeID) could not start: \(error)")
             }

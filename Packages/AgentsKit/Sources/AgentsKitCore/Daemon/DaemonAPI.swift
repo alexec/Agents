@@ -184,6 +184,9 @@ public enum DaemonAPI {
         public static let workflowsArchive = "workflows/archive"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
+        /// A project's plugins and which are waiting for the person's OK (security review, S2).
+        public static let pluginsList = "plugins/list"
+        public static let pluginsApprove = "plugins/approve"
         /// Change what a workflow is allowed to do, by writing its own file. The daemon
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
@@ -385,6 +388,8 @@ public enum DaemonAPI {
         /// does: two windows cannot then disagree, and one that missed a notification
         /// is put right by the next rather than drifting.
         public static let workflowChanged = "workflow/changed"
+        /// A project's plugins, sent whole, when one is found waiting or is approved.
+        public static let pluginsChanged = "plugins/changed"
         public static let workflowRemoved = "workflow/removed"
         /// A project's pull requests changed: a refresh, a fire, a refusal or a run
         /// ending (038). The whole `PullRequestList`, for the reason `workflow/changed`
@@ -1796,6 +1801,32 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.archived = archived
+        }
+    }
+
+    /// A project's plugins.
+    public struct PluginsListRequest: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    /// Every plugin in one project, for `plugins/list` and `plugins/changed`.
+    public struct PluginsList: Codable, Sendable {
+        public var folder: URL
+        public var plugins: [ProjectPlugin]
+        public init(folder: URL, plugins: [ProjectPlugin]) {
+            self.folder = folder
+            self.plugins = plugins
+        }
+    }
+
+    /// Approve a plugin's folder as the row showed it.
+    public struct PluginApproveRequest: Codable, Sendable {
+        public var plugin: URL
+        public var digest: String
+        public init(plugin: URL, digest: String) {
+            self.plugin = plugin
+            self.digest = digest
         }
     }
 

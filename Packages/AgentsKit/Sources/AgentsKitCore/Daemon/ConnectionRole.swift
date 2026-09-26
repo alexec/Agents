@@ -52,8 +52,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// it. Left out on purpose: `credentials/*`, `runtimes/authenticate`, `logout`,
     /// `install`, `setProvider` and `disableProvider`, `files/browse` and `files/write`, `daemon/quit`,
     /// `hosts/*`, `devices/list` and `forget`, `relay/register`, `mailbox/carry`,
-    /// `workflows/approve`, `projects/add` and `clone`, `sessions/*`, and every agent
-    /// tool.
+    /// `workflows/approve`, `plugins/list` and `approve`, `projects/add` and `clone`,
+    /// `sessions/*`, and every agent tool.
     public static let deviceMethods: Set<String> = Set<String>([
         DaemonAPI.Method.projectsList,
         DaemonAPI.Method.agentsList,

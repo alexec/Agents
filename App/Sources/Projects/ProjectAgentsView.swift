@@ -152,6 +152,9 @@ struct ProjectAgentsView: View {
                 // What the project gives every agent working in it (059, frame D).
                 ProjectSkillsSection(folder: folder)
 
+                // What this project's agents are handed, and which wait for your OK (S2).
+                PluginsSection(folder: folder)
+
                 // Worktrees the app made here, which outlive the agents in them (030).
                 WorktreesSection(folder: folder)
             }

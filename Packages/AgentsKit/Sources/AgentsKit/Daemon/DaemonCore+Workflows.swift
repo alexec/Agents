@@ -25,6 +25,8 @@ extension DaemonCore {
         pruneWorkflowRuns()
         // After adoption, so every file already here is what gets approved as it stands.
         beginWorkflowApprovalsIfNeeded()
+        // And the projects' plugins, on the same terms (security review, S2).
+        beginPluginApprovalsIfNeeded()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it
@@ -975,8 +977,9 @@ extension DaemonCore {
         }
 
         // A save through the app is the person's own change, so it is approved as it is
-        // written — but only if what it changed was approved already. Changing one
-        // setting on a file an agent wrote must not approve the rest of it unseen.
+        // written — but only if what it changed was approved already, and only from a
+        // control connection. A phone rewriting permission-mode on an approved file must
+        // not keep that approval (security review S6); the new text waits for the Mac.
         let before = workflowStore.load()
         let wasApproved = awaitingApproval(existing, state: before.state(folder: existing.folder,
                                                                          workflowID: existing.workflowID),
@@ -988,7 +991,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "\(url.lastPathComponent) could not be written: \(error.localizedDescription)")
         }
-        if wasApproved {
+        if wasApproved, RequestConnection.role == .control {
             var records = workflowStore.load()
             approve(existing, digest: ContentDigest.sha256(Data(edited.utf8)), in: &records)
             workflowStore.save(records)

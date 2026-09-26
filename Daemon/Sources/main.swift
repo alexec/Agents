@@ -5,18 +5,21 @@
 import AgentsKit
 import Foundation
 
-// Run as `agentsd mcp <token>` this is not the daemon at all: it is the MCP server the
+// Run as `agentsd mcp` this is not the daemon at all: it is the MCP server the
 // daemon hands to every agent, started by the runtime the way it starts any stdio MCP
 // server. One binary rather than two, so there is one thing to build, sign and ship.
-if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
-    let token = CommandLine.arguments[2]
+// The agent's token is in AGENTS_MCP_TOKEN (S7), not on the command line.
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
+    let token = ProcessInfo.processInfo.environment[DaemonCore.mcpTokenVariable]
+        ?? (CommandLine.arguments.count >= 3 && !CommandLine.arguments[2].hasPrefix("--")
+            ? CommandLine.arguments[2] : "")
     // An agent another agent started is not offered the tools for starting, stopping
     // or archiving agents (028). The daemon says so here, when it hands the runtime
     // this server; it refuses the calls as well, so this only keeps the menu honest.
-    let managesAgents = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noAgentToolsFlag)
+    let managesAgents = !CommandLine.arguments.contains(DaemonCore.noAgentToolsFlag)
     // Nor, on a runtime that forgets its conversation in another folder, the tools for
     // moving itself (053).
-    let movesItself = !CommandLine.arguments.dropFirst(3).contains(DaemonCore.noMoveToolsFlag)
+    let movesItself = !CommandLine.arguments.contains(DaemonCore.noMoveToolsFlag)
     // The daemon that started this said where it is. Anything else would be a guess.
     let client = DaemonClient(locations: .default)
     // Every tool does the same thing with what it is given: hand it to the daemon

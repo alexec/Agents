@@ -120,38 +120,27 @@ struct LevelDetailView: View {
     }
 }
 
-/// The Pool row under Spending, with the Mac's dot and count line (FR-024).
+/// The Pool row under Spending, with the Mac's icon, dot and count line (FR-024).
 struct PoolRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        NavigationLink {
-            PoolPageView()
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Pool")
-                    if let line = model.poolStatus?.countLine {
-                        Text(line).appText(.fine)
-                    }
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 1) {
+                Label("Pool", systemImage: "arrow.triangle.swap")
+                if let line = model.poolStatus?.countLine {
+                    Text(line)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 36)
                 }
-                Spacer()
-                if model.poolStatus?.anyOut == true {
-                    Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                        .accessibilityLabel("A runtime is out")
-                }
-                Image(systemName: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
             }
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            Spacer()
+            if model.poolStatus?.anyOut == true {
+                Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
+                    .accessibilityLabel("A runtime is out")
+            }
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
-        .overlay(alignment: .top) { Rectangle().fill(Paper.rule).frame(height: 1) }
         .accessibilityHint("Opens the Pool")
     }
 }
