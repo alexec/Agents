@@ -444,15 +444,20 @@ public struct RelayCertificates: Sendable {
         try ensure()
         let password = try String(contentsOf: bundlePassword, encoding: .utf8)
         var items: CFArray?
-        let status = SecPKCS12Import(try Data(contentsOf: bundle) as CFData,
-                                     [kSecImportExportPassphrase as String: password] as CFDictionary, &items)
+        // In memory only: nothing goes into the person's keychain, and the import works the
+        // same in a process that has no keychain of its own to put it in.
+        let options: [String: Any] = [kSecImportExportPassphrase as String: password,
+                                      kSecImportToMemoryOnly as String: true]
+        let status = SecPKCS12Import(try Data(contentsOf: bundle) as CFData, options as CFDictionary, &items)
         guard status == errSecSuccess, let first = (items as? [[String: Any]])?.first,
               let identity = first[kSecImportItemIdentity as String] else { throw Failure.identity }
         return identity as! SecIdentity
     }
 
     /// Make the CA and the server certificate when either is missing. Two years each; the
-    /// folder is 0700 and every key 0600.
+    /// folder is 0700 and every key 0600. The curve is named, not spelled out: macOS's own
+    /// LibreSSL spells it out unless told, and Security then cannot read the key. And SHA-256
+    /// throughout: its default signature hash is SHA-1, which Security and rustls refuse.
     public func ensure() throws {
         let fm = FileManager.default
         if fm.fileExists(atPath: caCertificate.path), fm.fileExists(atPath: bundle.path),
@@ -464,12 +469,12 @@ public struct RelayCertificates: Sendable {
         try "subjectAltName=IP:127.0.0.1\nextendedKeyUsage=serverAuth\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature\n"
             .write(to: ext, atomically: true, encoding: .utf8)
         let password = UUID().uuidString + UUID().uuidString
-        try run(["req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "730",
+        try run(["req", "-x509", "-sha256", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-pkeyopt", "ec_param_enc:named_curve", "-nodes", "-days", "730",
                  "-subj", "/CN=Agents sign-in relay", "-addext", "basicConstraints=critical,CA:TRUE",
                  "-addext", "keyUsage=critical,keyCertSign,cRLSign", "-keyout", caKey.path, "-out", caCertificate.path])
-        try run(["req", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
+        try run(["req", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-pkeyopt", "ec_param_enc:named_curve", "-nodes",
                  "-subj", "/CN=127.0.0.1", "-keyout", key.path, "-out", csr.path])
-        try run(["x509", "-req", "-in", csr.path, "-CA", caCertificate.path, "-CAkey", caKey.path, "-CAcreateserial",
+        try run(["x509", "-req", "-sha256", "-in", csr.path, "-CA", caCertificate.path, "-CAkey", caKey.path, "-CAcreateserial",
                  "-days", "730", "-extfile", ext.path, "-out", cert.path])
         try password.write(to: bundlePassword, atomically: true, encoding: .utf8)
         try run(["pkcs12", "-export", "-inkey", key.path, "-in", cert.path, "-out", bundle.path,
