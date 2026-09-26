@@ -63,10 +63,29 @@ jobs:
       - name: Test CodeText
         run: swift test --package-path Packages/CodeText
 
-      - name: Test AgentsKit
-        # One test at a time. In parallel the runner's three cores stall and a dozen
-        # timing tests fail together, a different dozen each run (2026-09-26).
-        run: swift test --package-path Packages/AgentsKit --no-parallel
+      # Reported, not yet blocking (Alex, 2026-09-26). Many AgentsKit tests give a fake
+      # runtime a turn that lasts a fixed stretch of real time, and on a shared runner
+      # the turn is over before the test acts on it: about ten fail each run, a
+      # different ten each time, in parallel or one at a time. The failures are listed
+      # in the run's summary. Make this blocking again once turns end on command.
+      - name: Test AgentsKit (not yet blocking)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          swift test --package-path Packages/AgentsKit 2>&1 | tee agentskit-tests.log
+      - name: AgentsKit failures
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## AgentsKit tests (not yet blocking)"
+            grep -E 'Test run with' agentskit-tests.log | tail -1 || true
+            echo
+            if grep -qE 'recorded an issue' agentskit-tests.log; then
+              grep -E 'recorded an issue' agentskit-tests.log | sed 's/^/- /'
+            else
+              echo "No failures."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # The quarantined tests, alone and with the machine quieter than in a full run.
       # A failure here is reported and does not fail the build.
