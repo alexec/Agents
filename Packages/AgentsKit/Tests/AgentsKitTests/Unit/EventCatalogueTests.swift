@@ -47,4 +47,22 @@ struct EventCatalogueTests {
         #expect(Set(grouped) == Set(EventSubject.allCases))
         #expect(EventGroup.mac.subjects.contains(.person))
     }
+
+    /// A kind nothing raises is a wait that never ends and a workflow that never runs:
+    /// every name in the catalogue is written somewhere in the sources besides the
+    /// catalogue itself, which is where its events are raised.
+    @Test func everyKindIsRaisedSomewhere() throws {
+        let sources = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appending(path: "Sources")
+        var text = ""
+        let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+        while let file = files?.nextObject() as? URL {
+            guard file.pathExtension == "swift", file.lastPathComponent != "EventCatalogue.swift" else { continue }
+            text += try String(contentsOf: file, encoding: .utf8)
+        }
+        #expect(!text.isEmpty)
+        for kind in EventCatalogue.all {
+            #expect(text.contains("\"\(kind.name)\""), "nothing raises \(kind.name)")
+        }
+    }
 }

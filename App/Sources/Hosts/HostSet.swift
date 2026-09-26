@@ -70,7 +70,11 @@ final class HostSet {
     /// Since when a server that was connected has been gone. Kept through the retries,
     /// so the heading says Offline and since when rather than flickering to a spinner
     /// every time the window tries again (037, ui.md § Offline).
-    private(set) var offlineSince: [HostID: Date] = [:]
+    private(set) var reachability = ServerReachability()
+    var offlineSince: [HostID: Date] { reachability.offlineSince }
+    /// A server went offline (`false`) or came back (`true`): the daemon raises it as
+    /// `server.offline` or `server.online`, so agents and workflows can wait on it (042).
+    @ObservationIgnored var onReachability: ((String, Bool) async -> Void)?
 
     func state(_ id: HostID) -> ServerConnection.State {
         guard id != .mac else { return .connected }
@@ -182,6 +186,7 @@ final class HostSet {
         }
         connections[id] = nil
         states[id] = nil
+        reachability.forget(id)
         hosts.remove(id)
         try? store.save(hosts)
     }
@@ -325,10 +330,12 @@ final class HostSet {
         states[id] = state
         if case .failed(.hostKeyChanged) = state, rebuiltAsk == nil { rebuiltAsk = id }
         log("\(hosts[id]?.label ?? id.rawValue): \(state)")
+        if let edge = reachability.moved(id, to: state), let host = hosts[id] {
+            await onReachability?(host.label, edge == .cameBack)
+        }
         switch state {
         case .connected:
             nextTry[id] = nil
-            offlineSince[id] = nil
             if let facts = await connections[id]?.facts, var host = hosts[id] {
                 host.facts = facts
                 update(host)
@@ -346,8 +353,7 @@ final class HostSet {
                 guard !Task.isCancelled else { return }
                 await self?.connections[id]?.connect()
             }
-        case .offline(let since):
-            if offlineSince[id] == nil { offlineSince[id] = since }
+        case .offline:
             listening[id]?.cancel()
             scheduleRetry(id)
         default:
