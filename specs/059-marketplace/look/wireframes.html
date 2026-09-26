@@ -1,0 +1,258 @@
+<!doctype html><html><head><meta charset="utf-8"><title>059 wireframes</title><style>
+/* Wireframes for 059, search and add skills. Lo-fi, in 054 and 055's hand: paper ground, one accent.
+   One window size for every pane, 1000 × 640. Open with #a … #h to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:960px;line-height:1.4}
+.win{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex}
+/* The rail runs the full height, under the traffic lights, as System Settings has it. */
+.rail{width:200px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.lights{height:38px;display:flex;align-items:center;gap:8px;padding:0 6px}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.ri{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;color:#1d1d1d}
+.ri i{font-style:normal;width:22px;height:22px;border-radius:6px;background:#dcd8cf;color:#555;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.ri.on{background:#3d5a80;color:#fff}.ri.on i{background:rgba(255,255,255,.2);color:#fff}
+.ri.open{font-weight:600}
+.ri .d{margin-left:auto;color:#8a877f;font-size:10px}
+.sub-i{display:flex;align-items:center;padding:4px 8px 4px 38px;border-radius:6px;color:#333}
+.sub-i .n{margin-left:auto;color:#8a877f;font-size:12px}
+.sub-i .warn{margin-left:auto;color:#b5651d}
+.sub-i.on{background:#3d5a80;color:#fff}.sub-i.on .n{color:#dfe6ef}.sub-i.on .warn{color:#ffd9b0}
+.gap{height:10px}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.bar{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)}
+.bar .t{font:600 14px -apple-system}.bar .p{color:#8a877f;font:12px "SF Mono",Menlo,monospace}
+.bar .sp{flex:1}.bar .crumb{color:#8a877f;font-weight:400}
+.body{flex:1;display:flex;min-height:0}
+/* A form pane: one reading column, left-aligned, never stretched past 560. */
+.col{width:560px;padding:18px 28px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.sh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 4px 2px}
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:9px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f0eb}
+.line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}.line .s{color:#8a877f;font-size:11.5px;margin-top:2px}
+.line.indent{padding-left:34px}
+.foot{color:#8a877f;font-size:11.5px;line-height:1.4;padding:4px 4px 2px}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}.link{color:#3d5a80;font-size:12px}
+.seg{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:12px}
+.seg span{padding:3px 14px;border-right:1px solid #cfcac0}.seg span:last-child{border-right:none}.seg .on{background:#3d5a80;color:#fff}
+.pop{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+.pop:after{content:" ⌄";color:#8a877f}
+.field{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:2px 8px;width:80px;text-align:right;font-size:12px}
+.cdot{width:8px;height:8px;border-radius:4px;flex:none}
+.g{background:#5b8a5b}.o{background:#b5651d}.x{background:#c2beb6}
+.ic{width:22px;text-align:center;color:#8a877f}
+/* Shared's own pieces, as 054 drew them. */
+.lst{flex:1;overflow:hidden;padding:14px 18px 0;min-width:0}
+.lst.fixed{flex:none;width:400px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e3dfd6;margin-bottom:6px}
+.row.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.row .nm{font-weight:600;white-space:nowrap}
+.row .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.mono{font:12px "SF Mono",Menlo,monospace}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}.chip.w{background:#f7e7d6;color:#9a4f10}
+.reach{display:flex;gap:3px}
+.r{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px -apple-system;background:#e3eaf3;color:#3d5a80}
+.r.no{background:#f0eeea;color:#b9b5ad;text-decoration:line-through}
+.r.q{background:#f0eeea;color:#999;border:1px dashed #bbb;width:16px;height:16px}
+.detail{flex:1;min-width:0;border-left:1px solid rgba(0,0,0,.08);padding:14px;display:flex;flex-direction:column;gap:10px;background:#fbfaf7;overflow:hidden}
+.detail .t{font:600 15px -apple-system}
+.kv{display:grid;grid-template-columns:70px 1fr;gap:4px 8px;font-size:12px}.kv b{font-weight:400;color:#8a877f}
+.doc{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 12px;font:14px "Iowan Old Style",Georgia,serif;line-height:1.4;color:#333;flex:1;overflow:hidden}
+.doc .m{font:11px "SF Mono",Menlo,monospace;color:#999}
+.search{margin-bottom:10px;background:#fff;border:1px solid #dcd8cf;border-radius:7px;padding:4px 8px;color:#aaa}
+table.m{border-collapse:separate;border-spacing:0;width:100%;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden}
+table.m th{font:600 11px -apple-system;color:#8a877f;text-align:center;padding:7px 4px;border-bottom:1px solid #eee}
+table.m th:first-child,table.m td:first-child{text-align:left;padding-left:12px}
+table.m td{text-align:center;padding:8px 4px;border-bottom:1px solid #f2f0eb}table.m tr:last-child td{border-bottom:none}
+.ok{color:#3d5a80;font-weight:600}.part{color:#9a4f10}.none{color:#c2beb6}.qq{color:#999}
+.sec{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
+/* H only: Shared keeping a column of its own beside the rail. */
+.inner{width:170px;flex:none;border-right:1px solid rgba(0,0,0,.08);padding:12px 8px;background:#f4f1eb;display:flex;flex-direction:column;gap:1px}
+.inner .si{padding:5px 8px;border-radius:6px;display:flex}.inner .si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.inner .si.on{background:#3d5a80;color:#fff}.inner .si .warn{margin-left:auto;color:#b5651d}.inner .si.on .warn{color:#ffd9b0}
+/* 059's own pieces: a sheet over a window, and the main window's project page. */
+.stage{position:relative}
+.veil{position:absolute;inset:0;background:rgba(40,36,30,.28);border-radius:12px;display:flex;justify-content:center;align-items:flex-start;padding-top:38px}
+.sheet{width:720px;height:540px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.2),0 18px 40px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.sheet .top{display:flex;align-items:center;gap:10px;padding:14px 18px 10px}
+.sheet .top .t{font:600 15px -apple-system}
+.sheet .top .sp{flex:1}
+.sheet .q{margin:0 18px 10px;background:#fff;border:1px solid #3d5a80;box-shadow:0 0 0 2px #cdd8e6;border-radius:7px;padding:5px 9px;color:#1d1d1d}
+.sheet .q .ph{color:#aaa}
+.sheet .res{flex:1;overflow:hidden;padding:0 18px}
+.sheet .bot{display:flex;align-items:center;gap:8px;padding:10px 18px;border-top:1px solid rgba(0,0,0,.08);background:#f1eee8}
+.sheet .bot .sp{flex:1}.sheet .bot .note{color:#8a877f;font-size:11.5px}
+.res .row{align-items:flex-start}
+.res .row .col2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.res .row .col2 .src{color:#8a877f;font:11.5px "SF Mono",Menlo,monospace}
+.res .row .col2 .ds{white-space:normal}
+.res .row .n{color:#6d6a64;font-size:12px;white-space:nowrap;text-align:right;min-width:72px}
+.back{color:#3d5a80;font-size:12px}
+.warnbox{background:#f7e7d6;color:#6b3a0c;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.infobox{background:#e3eaf3;color:#27405f;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.files{font:12px/1.6 "SF Mono",Menlo,monospace;color:#333;background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:8px 12px}
+.files .c{color:#9a4f10;font-family:-apple-system;font-size:11.5px}
+/* The main window: projects down the left, the project page beside them. */
+.side{width:230px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.side .h{font:600 11px -apple-system;color:#8a877f;padding:10px 8px 4px;text-transform:uppercase;letter-spacing:.04em}
+.page{flex:1;overflow:hidden;padding:26px 60px 0}
+.page .pt{font:600 20px -apple-system}.page .ps{color:#8a877f;font-size:12px;margin-top:2px}
+.sh2{display:flex;align-items:center;gap:10px;font:600 14px -apple-system;margin:20px 2px 8px}
+.sh2 .sp{flex:1}
+.gh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:4px 2px 6px}
+.muted{color:#8a877f}
+.anno{color:#c0305a;font:italic 13px Georgia,serif;max-width:960px;line-height:1.35}
+.bar .btn.p{font:12px -apple-system,"SF Pro Text",sans-serif}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- A — Shared ▸ Skills, with Add -->
+<div class="frame" id="a"><div class="cap">A · Shared ▸ Skills: an Add button, and where a skill came from</div>
+<div class="sub">The page 054 and 055 built, with two changes. <b>Add skill…</b> goes in the bar, next to Reveal in Finder, and opens the sheet (B) aimed at ~/.agents. A skill that came from a catalogue says so in its detail, with the commit it was taken at and <b>Update</b> / <b>Remove</b>. A skill you made by hand has neither: the app does not delete your own work, it only reveals and edits it, as today.</div>
+<div class="win">
+ <div class="rail">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="ri"><i>◐</i>Appearance</div><div class="gap"></div>
+  <div class="ri"><i>▣</i>Agents</div><div class="ri"><i>⚙</i>Agent Runtimes</div>
+  <div class="ri open"><i>⧉</i>Shared<span class="d">▾</span></div>
+  <div class="sub-i">Overview</div><div class="sub-i">Instructions <span class="n">1</span></div>
+  <div class="sub-i on">Skills <span class="n">5</span></div>
+  <div class="sub-i">MCP servers <span class="n">3</span></div><div class="sub-i">Plugins <span class="n">2</span></div><div class="sub-i">Other files <span class="n">4</span></div>
+  <div class="ri"><i>$</i>Spending</div><div class="ri"><i>⇄</i>Pool</div><div class="gap"></div>
+  <div class="ri"><i>▯</i>Devices</div><div class="ri"><i>≡</i>Servers</div>
+ </div>
+ <div class="main">
+  <div class="bar"><span class="t">Shared <span class="crumb">› Skills</span></span><span class="p">~/.agents/skills</span><span class="sp"></span><span class="btn">Reveal in Finder</span><span class="btn p">Add skill…</span></div>
+  <div class="body">
+   <div class="lst fixed">
+    <div class="search">⌕ Filter skills</div>
+    <div class="sec">Yours</div>
+    <div class="row"><span class="nm">dataviz</span><span class="ds">Use whenever you are about to…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="row sel"><span class="nm">swiftui-pro</span><span class="chip a">skills.sh</span><span class="ds">SwiftUI review…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="row"><span class="nm">find-skills</span><span class="chip a">skills.sh</span><span class="chip w">update</span><span class="ds">Helps…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="row"><span class="nm">role-sourcing</span><span class="ds">Sweeps every source…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="row"><span class="nm">security-review</span><span class="ds">Review pending…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+   </div>
+   <div class="detail">
+    <div class="t">swiftui-pro</div>
+    <div class="kv"><b>Folder</b><span class="mono">~/.agents/skills/swiftui-pro</span><b>From</b><span>skills.sh · <span class="link">twostraws/swiftui-agent-skill</span></span><b>Taken at</b><span class="mono">3f2a1c9 · 2 days ago</span><b>Claude</b><span>through a link in ~/.claude/skills</span></div>
+    <div class="doc"><div class="m">SKILL.md</div><b>swiftui-pro</b><br>Reviews SwiftUI code for modern API use, performance and accessibility, and writes new views the way Apple's own samples do…</div>
+    <div class="btns"><span class="btn">Reveal in Finder</span><span class="btn">Edit SKILL.md</span><span class="sp" style="flex:1"></span><span class="btn">Remove</span></div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="anno">"update" appears when the source has moved past the commit it was taken at; the detail of that skill then has Update beside Remove. Nothing updates by itself.</div>
+</div>
+
+<!-- B — the Add sheet, searching -->
+<div class="frame" id="b"><div class="cap">B · Add a skill: search</div>
+<div class="sub">One sheet, opened from Settings ▸ Shared (aimed at you) or from a project page (aimed at that project, frame D). <b>Add to</b> says where it will go and can be switched here. Results come from skills.sh as you type, most-installed first. The owner is shown on every row, because it is the only thing that says who wrote it. <b>Known</b> marks an owner on the app's short list (Anthropic, OpenAI, Google, GitHub, Vercel, Apple…); everything else is plain, not flagged: most good skills come from people.</div>
+<div class="win stage">
+ <div class="rail">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="ri"><i>◐</i>Appearance</div><div class="gap"></div><div class="ri"><i>▣</i>Agents</div><div class="ri"><i>⚙</i>Agent Runtimes</div>
+  <div class="ri open"><i>⧉</i>Shared<span class="d">▾</span></div><div class="sub-i">Overview</div><div class="sub-i">Instructions</div><div class="sub-i on">Skills</div>
+ </div>
+ <div class="main"><div class="bar"><span class="t">Shared <span class="crumb">› Skills</span></span></div></div>
+ <div class="veil"><div class="sheet">
+  <div class="top"><span class="t">Add a skill</span><span class="sp"></span><span class="muted">Add to</span><span class="seg"><span class="on">You</span><span>Agents (project)</span></span></div>
+  <div class="q">⌕ swiftui</div>
+  <div class="res">
+   <div class="row sel"><div class="col2"><div><span class="nm">swiftui-expert-skill</span></div><div class="src">avdlee/swiftui-agent-skill</div></div><span class="n">33k installs</span></div>
+   <div class="row"><div class="col2"><div><span class="nm">swiftui-pro</span> <span class="chip">added</span></div><div class="src">twostraws/swiftui-agent-skill</div></div><span class="n">30k installs</span></div>
+   <div class="row"><div class="col2"><div><span class="nm">Expo UI SwiftUI</span> <span class="chip a">known</span></div><div class="src">expo/skills</div></div><span class="n">13k installs</span></div>
+   <div class="row"><div class="col2"><div><span class="nm">swiftui-patterns</span></div><div class="src">affaan-m/ecc</div></div><span class="n">9.2k installs</span></div>
+   <div class="row"><div class="col2"><div><span class="nm">swiftui-performance-audit</span></div><div class="src">dimillian/skills</div></div><span class="n">9.1k installs</span></div>
+   <div class="row"><div class="col2"><div><span class="nm">figma-swiftui</span> <span class="chip a">known</span></div><div class="src">figma/mcp-server-guide</div></div><span class="n">951 installs</span></div>
+  </div>
+  <div class="bot"><span class="note">From skills.sh. Choose one to see what is in it before adding.</span><span class="sp"></span><span class="btn">Cancel</span></div>
+ </div></div>
+</div>
+<div class="anno">"added" = already in the place Add to points at; choosing it shows the detail with Remove instead of Add. Skills.sh gives name, repo and installs only: no description until the skill is opened (C).</div>
+</div>
+
+<!-- C — the Add sheet, one skill -->
+<div class="frame" id="c"><div class="cap">C · Add a skill: what is in it, before it goes in</div>
+<div class="sub">Nothing is added from the list. Choosing a row fetches that skill at the repo's current commit and shows it as the agent will read it: SKILL.md, every file beside it, and which runtimes will get it (054's dots, for the place Add to points at). A skill that brings <b>scripts</b> says so, because an agent may run them. <b>Add</b> copies exactly what is shown, at that commit, and nothing later.</div>
+<div class="win stage">
+ <div class="rail"><div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="ri"><i>◐</i>Appearance</div><div class="gap"></div><div class="ri"><i>▣</i>Agents</div><div class="ri open"><i>⧉</i>Shared<span class="d">▾</span></div><div class="sub-i on">Skills</div></div>
+ <div class="main"><div class="bar"><span class="t">Shared <span class="crumb">› Skills</span></span></div></div>
+ <div class="veil"><div class="sheet">
+  <div class="top"><span class="back">‹ Results</span><span class="t">swiftui-expert-skill</span><span class="sp"></span><span class="muted">Add to</span><span class="seg"><span class="on">You</span><span>Agents (project)</span></span></div>
+  <div style="display:flex;gap:14px;padding:0 18px;flex:1;min-height:0">
+   <div style="width:300px;display:flex;flex-direction:column;gap:10px">
+    <div class="kv"><b>Owner</b><span class="link">avdlee</span><b>Repo</b><span class="link">swiftui-agent-skill</span><b>Commit</b><span class="mono">a91e04b · 5 days ago</span><b>Installs</b><span>33k on skills.sh</span><b>Goes to</b><span class="mono">~/.agents/skills/swiftui-expert-skill</span></div>
+    <div class="files">SKILL.md<br>references/<br>&nbsp;&nbsp;layout.md<br>&nbsp;&nbsp;state.md<br>scripts/<br>&nbsp;&nbsp;lint.sh <span class="c">script</span></div>
+    <div class="warnbox">This skill brings a script. An agent may run it when the skill is in use, with the same permissions as the agent.</div>
+    <div class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span><span class="muted" style="margin-left:6px;font-size:12px">every agent you start</span></div>
+   </div>
+   <div class="doc" style="margin-bottom:10px"><div class="m">SKILL.md</div><b>swiftui-expert-skill</b><br>Write, review, or improve SwiftUI code following best practices for state management, view composition, performance, modern APIs, Swift concurrency, and iOS 26+ Liquid Glass adoption…</div>
+  </div>
+  <div class="bot"><span class="note">Taken from github.com/avdlee/swiftui-agent-skill at a91e04b.</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Add to ~/.agents</span></div>
+ </div></div>
+</div>
+<div class="anno">The primary button names the place: "Add to ~/.agents" or "Add to Agents". Switching Add to changes it, and the dots, in place.</div>
+</div>
+
+<!-- D — the project page -->
+<div class="frame" id="d"><div class="cap">D · A project page: its skills</div>
+<div class="sub">A project's own skills have had no place in the app. They get a section on the project page, after Workflows and before Worktrees: what the project gives every agent working in it. <b>Add skill…</b> opens the same sheet aimed at this project. The line under the heading says the one thing that is different from your own: this folder is committed, so a skill added here reaches everyone who clones the project.</div>
+<div class="win">
+ <div class="side">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="h">Projects</div>
+  <div class="ri on">Agents</div><div class="ri">work</div><div class="ri">website</div>
+  <div class="h">Activity</div><div class="ri">Events</div><div class="ri">Resources</div><div class="ri">Spending</div>
+ </div>
+ <div class="main" style="overflow:hidden">
+  <div class="page">
+   <div class="pt">Agents</div><div class="ps">~/Agents · $412.30 all time</div>
+   <div class="sh2">Workflows</div>
+   <div class="row"><span class="nm">Review each PR</span><span class="ds">When an agent opens a pull request</span><span class="chip">on</span></div>
+   <div class="sh2">Skills <span class="chip">4</span><span class="sp"></span><span class="btn">Reveal in Finder</span><span class="btn p">Add skill…</span></div>
+   <div class="gh" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:12px">In .agents/skills, committed with the project: everyone who clones it gets these.</div>
+   <div class="row"><span class="nm">run-app</span><span class="ds">Build, launch and drive this Mac app on a scratch daemon…</span></div>
+   <div class="row"><span class="nm">ship-app</span><span class="ds">Build main and put it live on Alex's own devices…</span></div>
+   <div class="row"><span class="nm">test-servers</span><span class="ds">Test agents on servers end to end…</span></div>
+   <div class="row sel"><span class="nm">swiftui-pro</span><span class="chip a">skills.sh</span><span class="ds">twostraws/swiftui-agent-skill · 3f2a1c9</span><span class="btn">Remove</span></div>
+   <div class="sh2">Worktrees</div>
+   <div class="row"><span class="nm">agents/059-marketplace</span><span class="ds">no agent in it</span></div>
+  </div>
+ </div>
+</div>
+<div class="anno">Adding writes the folder; the app does not commit it. The skill shows as a new file in the project's changes, like anything else an agent writes. Speckit's own skills (speckit-*) are in the folder too; the wireframe leaves them out.</div>
+</div>
+
+<!-- E — when it can't just go in -->
+<div class="frame" id="e"><div class="cap">E · When it can't just go in</div>
+<div class="sub">Left: the name is already taken where Add to points. Only a skill the app added itself can be replaced from here; one you made or another tool put there is left alone, and the sheet says where it is. Right: skills.sh can't be reached. The sheet says so, keeps what you typed, and has Try again; nothing already added is affected.</div>
+<div style="display:flex;gap:24px">
+ <div class="sheet" style="width:488px;height:360px">
+  <div class="top"><span class="back">‹ Results</span><span class="t">review</span><span class="sp"></span><span class="seg"><span class="on">You</span><span>Agents</span></span></div>
+  <div style="padding:0 18px;display:flex;flex-direction:column;gap:10px;flex:1">
+   <div class="kv"><b>Owner</b><span class="link">someone</span><b>Commit</b><span class="mono">77c2d10</span></div>
+   <div class="warnbox">You already have a skill called <b>review</b> in ~/.agents/skills. You made it (it didn't come from here), so the app won't replace it. Rename or remove yours first, or add this one to the project instead.</div>
+   <div class="infobox">Adding to the project would work: in the project its copy is the one agents there get, ahead of yours.</div>
+  </div>
+  <div class="bot"><span class="sp"></span><span class="btn">Reveal yours</span><span class="btn">Cancel</span></div>
+ </div>
+ <div class="sheet" style="width:488px;height:360px">
+  <div class="top"><span class="t">Add a skill</span><span class="sp"></span><span class="seg"><span class="on">You</span><span>Agents</span></span></div>
+  <div class="q">⌕ changelog</div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#6d6a64;text-align:center;padding:0 40px">
+   <div style="font:600 15px -apple-system;color:#1d1d1d">Can't reach skills.sh</div>
+   <div>The Mac looks to be offline, or skills.sh isn't answering. The skills you have are unaffected.</div>
+   <span class="btn">Try again</span>
+  </div>
+  <div class="bot"><span class="sp"></span><span class="btn">Cancel</span></div>
+ </div>
+</div>
+</div>
+
+</body></html>
