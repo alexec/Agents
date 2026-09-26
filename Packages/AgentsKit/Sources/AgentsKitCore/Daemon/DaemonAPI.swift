@@ -14,6 +14,8 @@ public enum DaemonAPI {
         public static let runtimeAuthenticate = "runtimes/authenticate"
         public static let runtimeLogOut = "runtimes/logout"
         public static let runtimeSetProvider = "runtimes/setProvider"
+        /// Takes a `SetProviderRequest`: the provider named is the one turned off.
+        public static let runtimeDisableProvider = "runtimes/disableProvider"
         public static let sessionsList = "sessions/list"
         public static let sessionsAdopt = "sessions/adopt"
         public static let sessionsDelete = "sessions/delete"

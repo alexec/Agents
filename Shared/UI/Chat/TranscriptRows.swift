@@ -100,6 +100,9 @@ private struct EntryRow: View {
                 }
             }
 
+        case .notice(let notice):
+            NoticeLine(notice: notice)
+
         case .permissionAsked(let request):
             Text("Asked: \(request.toolCall.title)")
                 .appText(.supporting)
@@ -130,6 +133,29 @@ private struct EntryRow: View {
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
         }
+    }
+}
+
+/// Something the runtime wanted said beside the reply: a limit coming up, a model it
+/// fell back to. Drawn like the app's own notes, because it is not the agent talking.
+/// An error is the one worth a colour; a warning gets its title in medium weight.
+private struct NoticeLine: View {
+    let notice: SessionNotice
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(notice.title)
+                .appText(.supporting)
+                .fontWeight(notice.isError || notice.isWarning ? .medium : .regular)
+                .foregroundStyle((notice.isError ? StateTint.failure : .none).style(or: .secondary))
+            if let detail = notice.detail {
+                Text(detail)
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

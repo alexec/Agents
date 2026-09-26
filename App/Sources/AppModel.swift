@@ -2020,6 +2020,16 @@ final class AppModel {
         await refreshAccounts()
     }
 
+    func disableProvider(runtimeID: String, providerID: String) async {
+        await attempt {
+            _ = try await self.client.call(DaemonAPI.Method.runtimeDisableProvider,
+                                           DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
+                                                                        providerID: providerID),
+                                           returning: RuntimeAccount.self)
+        }
+        await refreshAccounts()
+    }
+
     /// Which agents a sign-out would stop, so the user is told before it happens.
     func agentsHolding(runtimeID: String) -> [Agent] {
         agents.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }
