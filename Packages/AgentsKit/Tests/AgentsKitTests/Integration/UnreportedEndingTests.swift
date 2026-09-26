@@ -25,6 +25,13 @@ struct UnreportedEndingTests {
                    launcher: launcher)
     }
 
+    /// A runtime whose turn lasts until the test opens `gate`.
+    private static func held(_ gate: TurnGate) -> FakeACPAgent.Script {
+        var script = FakeACPAgent.Script()
+        script.gate = gate
+        return script
+    }
+
     private func settle(_ core: DaemonCore, _ id: UUID) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))
         while ContinuousClock.now < deadline {
@@ -72,9 +79,9 @@ struct UnreportedEndingTests {
     /// new one, and the ending is accounted for either way (FR-018).
     @Test func anAnswerByEitherNameAccountsForTheEnding() async throws {
         let (locations, work) = try temporary()
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .milliseconds(300)
-        let launcher = FakeLauncher(script: script)
+        // The asked turn is the second runtime: held, so it is answered in the middle.
+        let asked = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [.init(), Self.held(asked)])
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
 
@@ -86,6 +93,7 @@ struct UnreportedEndingTests {
         _ = try await core.finishTurn(.init(token: token, outcome: "done",
                                             message: "Renamed 14 call sites.",
                                             prompts: [.init(label: "Push", prompt: "Push it")]))
+        asked.open()
         try await settle(core, id)
 
         let agent = try #require(await core.agent(id))
@@ -135,11 +143,10 @@ struct UnreportedEndingTests {
     /// An agent that answers is indistinguishable from one that reported first time.
     @Test func anAnsweredQuestionLeavesNothingMarkingItAsHavingBeenAsked() async throws {
         let (locations, work) = try temporary()
-        // A turn long enough to answer in the middle of, which is when a real agent
-        // answers: the daemon lets the runtime go the moment a turn ends.
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .milliseconds(300)
-        let launcher = FakeLauncher(script: script)
+        // The asked turn held open, to be answered in the middle of, which is when a
+        // real agent answers: the daemon lets the runtime go the moment a turn ends.
+        let asked = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [.init(), Self.held(asked)])
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
 
@@ -153,6 +160,7 @@ struct UnreportedEndingTests {
         } ?? ""
         _ = try await core.reportOutcome(.init(token: token, outcome: "done",
                                                message: "Renamed 14 call sites."))
+        asked.open()
 
         try await settle(core, id)
 
@@ -197,16 +205,16 @@ struct UnreportedEndingTests {
         try await settle(core, id)
     }
 
-    @Test(.flakyUnderLoad) func theEndingAPersonsPromptOvertookIsNotAskedAbout() async throws {
+    @Test func theEndingAPersonsPromptOvertookIsNotAskedAbout() async throws {
         let (locations, work) = try temporary()
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .milliseconds(300)
-        let core = try core(FakeLauncher(script: script), locations: locations)
+        let first = TurnGate()
+        let core = try core(FakeLauncher(script: .init(), then: [Self.held(first)]), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
 
         // Queued while the first turn is still in flight, so it is waiting when that
         // turn ends and the gate is shut.
         try await core.prompt(.init(agentID: id, text: "something else entirely"))
+        first.open()
         try await settle(core, id)
         try await Task.sleep(for: .milliseconds(200))
 
@@ -242,9 +250,7 @@ struct UnreportedEndingTests {
     /// An archived agent is not asked, and is not in Needs attention whatever it says.
     @Test func anArchivedAgentIsNotAsked() async throws {
         let (locations, work) = try temporary()
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .milliseconds(300)
-        let core = try core(FakeLauncher(script: script), locations: locations)
+        let core = try core(FakeLauncher(script: Self.held(TurnGate())), locations: locations)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
 
         await eventually("it is working") { await core.agent(id)?.state == .running }
@@ -259,8 +265,8 @@ struct UnreportedEndingTests {
     /// record: how it ended, and what it last said about the work.
     @Test func aReportAndAShortEndingAreBothKept() async throws {
         let (locations, work) = try temporary()
-        var script = FakeACPAgent.Script()
-        script.turnDelay = .milliseconds(400)
+        let turn = TurnGate()
+        var script = Self.held(turn)
         script.stopReason = "max_tokens"
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
@@ -273,6 +279,7 @@ struct UnreportedEndingTests {
         } ?? ""
         _ = try await core.reportOutcome(.init(token: token, outcome: "partly_done",
                                                message: "Five of six."))
+        turn.open()
         try await settle(core, id)
 
         let agent = try #require(await core.agent(id))
