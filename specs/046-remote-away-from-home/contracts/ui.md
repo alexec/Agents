@@ -15,7 +15,7 @@ One line, on every screen, in this order of precedence:
 | Relayed | `icloud` | "**Away** — slower, through iCloud" |
 | Direct | — | nothing (as today) |
 
-"Away" is in the accent colour. Everything else is secondary. There is one accessibility element
+"Away" is in the primary colour and semibold; the rest is secondary. (The mock drew it in the accent colour; colour here means only attention, failure or vouched, so it is weight instead.) There is one accessibility element
 per row (see the stacked-labels memory).
 
 ## Never-paired card (look C)

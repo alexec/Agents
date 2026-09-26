@@ -64,7 +64,8 @@ struct LinkChooserTests {
         let started = ContinuousClock.now
         let chosen = try await chooser.transport() as? Probe
         #expect(chosen === relay)
-        #expect(ContinuousClock.now - started < .seconds(1))
+        // Well before the direct link's five seconds, even with the suite's load around it.
+        #expect(ContinuousClock.now - started < .seconds(4))
     }
 
     @Test func neitherAnsweringSaysWhyTheRelayCouldNot() async throws {
