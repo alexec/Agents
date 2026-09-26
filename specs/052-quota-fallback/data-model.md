@@ -62,11 +62,12 @@ one level. `pool/set` rejects a grid that breaks this, and says which cell broke
 
 `isEffective` is `isOn && entries.count >= 2` (FR-003).
 
-## AllowanceState (`allowances.json`, one per entry per host)
+## AllowanceState (`allowances.json` on the Mac, one per credential)
 
 | field | type | notes |
 |---|---|---|
-| `entryID` | `UUID` | |
+| `entryID` | `UUID` | the first entry with this credential; others with the same credential share this state |
+| `credentialKey` | `String` | what makes two entries one allowance: the runtime's account id for a plan (the Mac's ChatGPT plan is the same whether used on the Mac or relayed to a server, 047), or the lent credential's id for a key |
 | `status` | `Status` | see below |
 | `since` | `Date` | when the status last changed |
 | `learnedFrom` | `Source` | `.typedFailure`, `.words`, `.overageReport`, `.ledger`, `.expiry`, `.person` |

@@ -80,7 +80,11 @@ Linux `agentsd`, where entries are judged per host.
 
 **Scale/Scope**:
 
-- 6 catalogue runtimes (Gemini, 046, merged 2026-09-25), plus 047 servers and 049–050 as they land.
+- 7 catalogue runtimes on main as of 2026-09-26: Claude, Grok, Copilot, Cursor, Codex (047, with
+  its server relay), Gemini (046) and Antigravity (049). OpenCode and Goose are specced, but not
+  built.
+- One allowance state per credential, shared by the Mac and any server that relays the same plan
+  (R6).
 - Pools of 2–8 entries.
 - Up to hundreds of chats on one entry.
 - 30 days of switches.
@@ -192,7 +196,10 @@ Each slice can be merged on its own, and each is visible when it lands.
    - never mark a failed turn as finished;
    - write every failure's title into the chat.
 
-   Also add the two `EndedReason` cases, used when there is no pool. On its own, this ends
+   The finished guard sits beside the `result.runtimeError` branch that 049 added in the
+   turn-result path of `DaemonCore+Commands.swift`: a typed error failure is handled the same way,
+   with its own note, and never reaches `finished`. Also add the two `EndedReason` cases, used
+   when there is no pool. On its own, this ends
    "Claude stopped answering" for a spent plan. It needs a real-runtime read-only check (quickstart
    §10).
 2. **Recognition, and allowance state.** `LimitRecognition` (all three layers), `AllowanceState`,
@@ -218,8 +225,11 @@ Each slice can be merged on its own, and each is visible when it lands.
   must re-run quickstart §10.
 - **Codex rate-limit data may not be forwarded** (R2). The fallbacks are the failure title, then
   the one-hour rule. Neither blocks the feature.
-- **EndedReason merge clash** with the Antigravity and Gemini lanes (R11). It is a mechanical
-  merge, guarded by the `allCases` test.
+- **EndedReason.** Both of the other lanes' cases are on main now (R11), so there is no clash
+  left. 052 adds its two cases beside `runtimeError`, and the `allCases` test covers them.
+- **Antigravity's quota wording is not captured yet** (R13). Until it is, Antigravity cannot be
+  switched away from automatically. The unrecognised-refusal log line (R1, layer 3) is how it
+  gets captured.
 - **Handoff quality** (SC-004). It depends on the new runtime reading a long document well. The
   budget and the keep-first-and-latest rule are tunable constants, and SC-004 is measured by hand
   on real test conversations before release.

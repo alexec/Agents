@@ -10,7 +10,7 @@
 
 ## Why this feature exists
 
-Every runtime the app can start (Claude, Codex, Copilot, Cursor, Grok, Gemini, and those still to come)
+Every runtime the app can start (Claude, Codex, Copilot, Cursor, Grok, Gemini, Antigravity, and those still to come)
 comes with an allowance: a subscription window, a monthly quota, some free credit. When it runs
 out, the turn fails, and the chat stops. Some runtimes go further and offer to carry on at
 pay-as-you-go prices. The person using this app does not want that. They already have several
@@ -57,10 +57,11 @@ Yes, with two limits the person should know about up front:
   open the same sheet afterwards to correct what it chose.
 - Q: Is a pool entry a runtime, or a runtime with a particular way of paying for it? → A: A
   runtime with its credential. The same runtime can be an allowance in one place and billed by
-  the token in another. Codex on the Mac uses a ChatGPT plan, but on a server it is lent an
-  OpenAI API key (047). Gemini only ever runs on a key (046). Antigravity uses a Google account on
-  the Mac (the 049 Antigravity lane), and OpenCode and Goose use whatever provider the person has
-  signed them in to. An API key is pay-as-you-go by nature, so falling back to one is exactly the
+  the token in another. Codex uses a ChatGPT plan on the Mac, and on a server it uses either the
+  same plan, reached through the Mac's relay, or an OpenAI API key lent from the Mac (047, on main
+  since 2026-09-26). Gemini only ever runs on a key (046). Antigravity signs in with a Google
+  account, on the Mac and, copied, on servers (049, on main since 2026-09-26). OpenCode and Goose,
+  specced but not built, use whatever provider the person has signed them in to. An API key is pay-as-you-go by nature, so falling back to one is exactly the
   pay-by-the-token carrying-on this feature exists to avoid. Each entry therefore shows how it is
   paid for: **allowance** (a plan or account sign-in: ChatGPT, Google account, Copilot, a Claude
   subscription, a subscription provider) or **billed per token** (an API key). Keyed entries can
@@ -88,12 +89,16 @@ Yes, with two limits the person should know about up front:
   this model.") is the first captured example.
 - Q: How is a spent allowance recorded, given that other lanes are changing the same list of
   endings? → A: As an ending of its own, beside the others in `EndedReason`, never folded into
-  `refusal`. The Antigravity lane, uncommitted as of 2026-09-25, adds a `runtimeError` ending to the
-  same enum, so whichever lane merges second takes the other's cases and re-runs the tests over
-  every ending. The two stay distinct: `runtimeError` is a runtime reporting a failure in words,
-  which FR-006 says never switches, and a spent allowance is one that has been positively
-  recognised. As of the 046 merge, main has Gemini's `usageLimit`, which ends a limit as `refusal`,
-  and has no `runtimeError` yet.
+  `refusal`. Main now has both of the other lanes' changes to that list: Gemini's `usageLimit`
+  (046), which ends a limit as `refusal`, and Antigravity's `runtimeError` (049), for a turn a
+  runtime says in words it could not do. The two stay distinct. `runtimeError` never switches by
+  itself (FR-006). A spent allowance is one that has been positively recognised, and that may
+  include a `runtimeError` whose words match a captured quota refusal for that runtime.
+- Q: If a server's Codex uses the Mac's ChatGPT plan through the relay, is that a separate
+  allowance? → A: No. It is the same plan, so it is one allowance. When the plan is spent on the
+  Mac it is spent on every server that relays it, and the other way round. An entry's allowance
+  state belongs to its credential (the plan or the key), not to the host it runs on. A server
+  Codex on a lent OpenAI key is a different credential, and is judged as a key (FR-001a).
 - Q: Gemini runs only on an API key, and its free tier is a quota that comes back every day. Is
   that credit that never returns? → A: No. It is a third kind of key: a **free tier**. The key
   has no billing account behind it, so the provider refuses rather than charges, and its quota

@@ -197,8 +197,14 @@ no window is open. It follows the pattern of `limits.json` and `cost/setLimits`:
 | `switches.jsonl` | one line per switch | appended; lines over 30 days old dropped at start |
 
 The app pushes `pool.json` to each connected server on connect, as it does the cost limits
-(037 R7). Each host keeps its own `allowances.json`, because allowances are per credential and
-per host (spec, Clarifications).
+(037 R7).
+
+Allowance state belongs to the **credential**, not to the host. This matters since 047 merged:
+a server's Codex can use the Mac's own ChatGPT plan through the relay, and then it is the same
+allowance as the Mac's. So the Mac's daemon holds the single `allowances.json`. A server's daemon
+sends what it learns (spent, rate limited, returned) to the Mac over the existing server link,
+and gets the current states back with `pool.json`. Two entries on one host that share a
+credential share one state. A lent key on a server is its own credential, with its own state.
 
 ## R7. Rate limits
 
@@ -242,12 +248,19 @@ this:
 - **Gemini (046)** is on main, and ends a limit as `.refusal` through `DaemonCore.usageLimit`. 052
   replaces that with the two cases above, and moves the test into `LimitRecognition`. Its
   `UsageLimitTests` become rows of `LimitRecognitionTests`.
-- **Antigravity** adds `runtimeError`, which stays separate: a runtime reporting a failure in
-  words never switches.
+- **Antigravity (049)** is on main since 2026-09-26, as one commit (`819ff22`), not as a merge of
+  its branch. It adds `EndedReason.runtimeError`, `RuntimeLaunch.turnErrorPrefix` and
+  `TurnResult.runtimeError`. Antigravity ends a failed turn normally, having said "Agent execution
+  error: …" in its own text, and the daemon turns that into `.runtimeError` in the turn-result
+  path of `DaemonCore+Commands.swift`. That branch is exactly where 052's "a refused turn is never
+  finished" hooks in, beside it. A `runtimeError` stays separate, and never switches by itself.
+  `LimitRecognition` looks at its `sentence` with Antigravity's word list. Its quota wording is
+  still "to measure" in 049's research (not provoked on the free tier). Until it is captured,
+  Antigravity is listed as not yet recognised.
 - **Order.** Whichever lane merges second takes in the other's cases. `EndedReasonTests` walks
   `allCases`, so a missing summary line fails the suite.
 - **Checks before building.** At task time, check `git grep -n 'runtimeError\|usageLimit' main`
-  first. After the 046 merge on 2026-09-25, `usageLimit` is on main and `runtimeError` is not.
+  first. As of 2026-09-26 both are on main: `usageLimit` (046) and `runtimeError` (049).
 
 ## R12. Events
 
@@ -267,6 +280,9 @@ They sit in the existing `agent` and `cost` families, so workflows can already f
 | Claude | typed | typed | `_claude/rateLimit.resetsAt` | overage fields (R3) |
 | Codex | typed | typed | if forwarded (R2), else title, else 1 h | `spendControlReached` |
 | Gemini (046, on main) | words, daily quota | words, 429 | free tier: next midnight Pacific; credit: none | always a key: free tier, free credit or prepaid only (FR-001a) |
+| Codex on a server, relayed (047) | typed, as on the Mac | typed | as on the Mac; one state with the Mac's plan (R6) | as on the Mac |
+| Codex on a server, lent key (047) | `insufficient_quota` → credit gone | 429 | credit: none | key: free tier, free or prepaid credit only |
+| Antigravity (049) | **not yet**: its quota words arrive inside "Agent execution error: …" (`runtimeError`) and are still to be captured | not yet | — | Google account = allowance |
 | Copilot, Cursor, Grok | **not yet**, and the docs say so | not yet | — | — |
 
 Copilot, Cursor and Grok are listed in `docs/reference/runtimes.md` as "not yet recognised". A
