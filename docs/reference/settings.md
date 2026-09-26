@@ -10,15 +10,15 @@ This page lists every control in the Mac's Settings window, **Agents ▸ Setting
 by pane, and the system settings the app on iPhone and iPad depends on.
 
 The Mac's Settings window has eight panes, chosen from one rail down its left side:
-**Appearance**; then **Agents**, **Agent Runtimes**, **Shared**, **Spending** and **Pool**; then
-**Devices** and **Servers**. Choosing **Shared** opens its pages under it in the same rail,
-each with a count, and a warning sign on any that needs a look. The window stays the same
+**General**; then **Agents**, **Agent Runtimes**, **Spending** and **Pool**; then **Shared**,
+a heading with its pages always listed under it, each with a count, and a warning sign on
+any that needs a look; then **Devices** and **Servers**. The window stays the same
 size whichever pane you choose. Agents on iPhone and iPad has no Settings screen of its
 own; it follows the Mac it is paired with.
 
 | Device | Pane | Control | What it does |
 | --- | --- | --- | --- |
-| Mac | Appearance | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |
+| Mac | General | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |
 | Mac | Agents | **Archived agents** | How many archived agents there are and how much space they take, and how long they are kept. When they are over the space they may take and nothing more can be retired yet, it says so and why. |
 | Mac | Agents | **Keep archived agents**: **7 days**, **14 days**, **30 days**, **90 days**, **Forever** | How long an archived agent is kept before it is retired: its conversation is deleted and a short record of who it was is kept. The default is **30 days**. If a change would retire agents at once, you are asked first, with how many and how much space it frees. Each server keeps to the same setting. |
 | Mac | Agents | **Up to**: **1 GB**, **2 GB**, **5 GB**, **10 GB**, **No limit** | The most space archived agents may take. Over it, the ones archived longest ago are retired first. The default is **2 GB**. **Forever** with **No limit** keeps archived agents for good. |

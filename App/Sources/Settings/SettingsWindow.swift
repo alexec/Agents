@@ -4,11 +4,11 @@ import SwiftUI
 
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it, in one window size for every pane, so choosing another pane never makes the
-/// window jump. Shared's pages open under it in the rail rather than in a column of their
-/// own, so there is one place to choose from.
+/// window jump. Shared's pages are listed in the rail under a heading of their own rather
+/// than in a column of their own, so there is one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @State private var pane: SettingsPane = .appearance
+    @State private var pane: SettingsPane = .general
     @State private var sharedPage: SharedPage = .overview
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
@@ -45,7 +45,7 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane {
-        case .appearance: FormColumn { AppearanceSettingsView() }
+        case .general: FormColumn { AppearanceSettingsView() }
         case .agents: FormColumn { AgentsSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage)
@@ -62,11 +62,11 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: Hashable, CaseIterable {
-    case appearance, agents, runtimes, shared, spending, pool, devices, servers
+    case general, agents, runtimes, shared, spending, pool, devices, servers
 
     var title: String {
         switch self {
-        case .appearance: "Appearance"
+        case .general: "General"
         case .agents: "Agents"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
@@ -79,7 +79,7 @@ enum SettingsPane: Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .appearance: "circle.lefthalf.filled"
+        case .general: "gearshape"
         case .agents: "person.2"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
@@ -90,8 +90,9 @@ enum SettingsPane: Hashable, CaseIterable {
         }
     }
 
-    /// Appearance on its own; the panes about agents; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.appearance], [.agents, .runtimes, .shared, .spending, .pool], [.devices, .servers]]
+    /// General on its own; the panes about agents; Shared, drawn as a heading over its
+    /// pages; the ways in from elsewhere.
+    static let groups: [[SettingsPane]] = [[.general], [.agents, .runtimes, .spending, .pool], [.shared], [.devices, .servers]]
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
@@ -118,8 +119,7 @@ private struct SettingsRail: View {
             ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
                 if index > 0 { Spacer().frame(height: 10) }
                 ForEach(group, id: \.self) { each in
-                    paneItem(each)
-                    if each == .shared, pane == .shared { sharedPages }
+                    if each == .shared { sharedGroup } else { paneItem(each) }
                 }
             }
             Spacer()
@@ -137,29 +137,35 @@ private struct SettingsRail: View {
     }
 
     private func paneItem(_ each: SettingsPane) -> some View {
-        // Shared, while open, is a heading over its pages; the chosen page is what is lit.
-        let lit = pane == each && each != .shared
+        let lit = pane == each
         return RailButton(lit: lit, label: each.title,
-                          selected: pane == each, action: { pane = each }) {
+                          selected: lit, action: { pane = each }) {
             HStack(spacing: 8) {
                 Image(systemName: each.symbol)
                     .frame(width: 20)
                     .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                     .accessibilityHidden(true)
-                Text(each.title).fontWeight(each == .shared && pane == .shared ? .semibold : .regular)
+                Text(each.title)
                 Spacer()
-                if each == .shared {
-                    Image(systemName: pane == .shared ? "chevron.down" : "chevron.right")
-                        .imageScale(.small)
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
             }
         }
     }
 
+    /// Shared is a heading, not a button: its pages are always listed under it, so none is
+    /// hidden behind a click. Which page is lit only shows while Shared is the pane.
     @ViewBuilder
-    private var sharedPages: some View {
+    private var sharedGroup: some View {
+        HStack(spacing: 8) {
+            Image(systemName: SettingsPane.shared.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(SettingsPane.shared.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
         page("Overview", .overview, count: nil, warns: false)
         if let snapshot, snapshot.laidOut, !snapshot.isEmpty {
             page("Instructions", .instructions, count: snapshot.instructions?.exists == true ? 1 : 0,
@@ -173,10 +179,10 @@ private struct SettingsRail: View {
     }
 
     private func page(_ title: String, _ target: SharedPage, count: Int?, warns: Bool) -> some View {
-        let chosen = sharedPage == target
+        let chosen = pane == .shared && sharedPage == target
         return RailButton(lit: chosen,
                           label: title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : ""),
-                          selected: chosen, action: { sharedPage = target }) {
+                          selected: chosen, action: { pane = .shared; sharedPage = target }) {
             HStack(spacing: 6) {
                 Text(title)
                 Spacer()
