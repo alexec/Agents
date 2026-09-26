@@ -111,3 +111,27 @@ On scratch roots, with the branch's `agentsd`:
 
 The first try at Retire now answered "Method not found": that daemon copy was built before US7.
 Rebuilt and rerun above.
+
+## Killing the daemon mid-retire (T058, SC-006), 2026-09-26
+
+Each round seeded 50 agents archived 31 days ago with 5 MB transcripts. It started the branch's
+`agentsd`, and `kill -9`'d it between 29.97 s and 30.08 s after the socket appeared, so inside the
+first check's retiring. Then it started it again and listed the agents. Script: `/tmp/051-kill.sh`.
+
+| Round | Killed at | Retired when killed | Whole and listed after restart | Neither |
+|---|---|---|---|---|
+| 1 | 29.970 s | 2 | 48 | 0 |
+| 2 | 29.982 s | 15 | 35 | 0 |
+| 3 | 29.994 s | 10 | 40 | 0 |
+| 4 | 30.006 s | 14 | 36 | 0 |
+| 5 | 30.018 s | 14 | 36 | 0 |
+| 6 | 30.030 s | 2 | 48 | 0 |
+| 7 | 30.042 s | 15 | 35 | 0 |
+| 8 | 30.054 s | 14 | 36 | 0 |
+| 9 | 30.066 s | 24 | 26 | 0 |
+| 10 | 30.078 s | 20 | 30 | 0 |
+
+Every agent in every round was either whole and listed, or had its tombstone and no folder. None
+was lost, and none was half-deleted and listed. The first attempt at this test reported 33
+"neither" in round 1. That was the script: it listed agents from the killed daemon's leftover
+socket before the new daemon was up. Fixed to wait for the new pid in `daemon.lock`.
