@@ -288,3 +288,41 @@ Found and fixed:
   switch itself. A prompt queued, or a Stop waiting, in that gap was undone. Each now writes
   with no await between reading and writing. `AllowanceWaitTests` failed about one run in
   three before the fix, and passed 18 runs out of 19 after it.
+
+## Six runs on the branch and six on main (T074), 2026-09-26
+
+The branch was at 948fb7fc (main a7a9656f merged in). Main was a7a9656f, in
+`/private/tmp/w-052-base`. The runs alternated, one at a time, so load hit both alike. Other
+lanes were building throughout: load averages were 19 to 74. The raw lists are in
+`walk/compare/`.
+
+| | runs with no failure | failures per run |
+|---|---|---|
+| branch (2,665 tests) | 1 of 6 | 0, 1, 32, 35, 3, 33 |
+| main (2,517 tests) | 1 of 6 | 30, 0, 29, 24, 21, 2 |
+
+The same set of about 30 tests fails on both, in the same runs as the load peaks:
+- restarting and picking agents back up (`theyAreStartedOneAtATime`,
+  `severalInterruptedAgentsAreAllPickedBackUp`, …);
+- the socket's connection roles;
+- workflow depth;
+- `aQuietDirectLinkLosesAfterTheWindow`.
+
+None of these is this lane's.
+
+This lane's own failures under that load:
+- `theWholePoolIsReplacedAndTheWindowsAreTold`, 3 of 6. It waited 10 s for a broadcast that the
+  one-a-second limit holds back, and under a load of 40 to 70 the held one took longer. It now
+  waits for the last broadcast, for up to 30 s.
+- `aRestartKeepsTheWaitAndStillCarriesOn`, 1 of 6: the same wait, lengthened the same way.
+
+Both pass alone and together, three times out of three. The other one-offs on the branch are
+outside the pool, in files, pairing, TLS, servers and the terminal:
+- `twoHundredFilesAreQuickToList`;
+- `thePairingCodeOpensTheListener`;
+- `aTLSClientTrustingTheRelaysCAIsAnswered`;
+- `aWipedServerIsSetUpAgainWithoutAsking`;
+- `outputArrivesAsItIsProduced`.
+
+The same kinds of test fail one-off on main (`aPhoneThatComesStraightBackIsKnownAgain`,
+`theWindowSizeReachesTheChild`).

@@ -163,7 +163,7 @@ struct AllowanceWaitTests {
         let (second, _, launcher) = try await core([], clock: clock, root: root)
         #expect(await second.agent(id)?.allowanceWait?.runtimeID == "claude")
         await second.tickWorkflows(now: clock.now)
-        await eventually("it carried on after the restart") {
+        await eventually("it carried on after the restart", within: .seconds(30)) {
             await second.agent(id)?.runtimeID == "claude" && launcher.launchCount >= 1
         }
         #expect(await second.agent(id)?.allowanceWait == nil)

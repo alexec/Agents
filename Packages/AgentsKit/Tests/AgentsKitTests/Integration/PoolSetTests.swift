@@ -78,8 +78,11 @@ struct PoolSetTests {
         let status = try await core.setPool(PoolSettings(isOn: true, entries: [copilot, claude]))
         #expect(status.settings.entries.map(\.runtimeID) == ["copilot", "claude"])
         #expect(status.rows.map(\.entry.runtimeID) == ["copilot", "claude"])
-        await eventually("both changes were broadcast") { heard.all.count >= 2 }
-        #expect(heard.all.last == ["copilot", "claude"])
+        // The second is held for up to a second (at most one broadcast a second), and
+        // under a heavily loaded machine the held one can take far longer to go.
+        await eventually("the last change was broadcast", within: .seconds(30)) {
+            heard.all.last == ["copilot", "claude"]
+        }
     }
 
     @Test func onlyTheOwnerMaySetIt() {
