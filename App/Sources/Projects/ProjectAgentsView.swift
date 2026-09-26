@@ -1,8 +1,9 @@
 import AgentsKit
 import SwiftUI
 
-/// The project itself, filling the page: its name, somewhere to say what you want done,
-/// and the agents working on it.
+/// The project itself, with no session picked: its name, somewhere to say what you want
+/// done, and its pull requests, workflows and worktrees. Its sessions are the middle
+/// column's (`SessionsColumn`).
 ///
 /// The prompt is the chat's own `PromptBar`, not a copy of it — the runtime picker, the
 /// options, the folders and servers, attachments, dictation, the lot. On a project page
@@ -14,15 +15,7 @@ import SwiftUI
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
-    /// False where the sessions have a column of their own beside this page (the Mac's
-    /// three columns): the page is then the project's overview, without its chats.
-    var showsSessions = true
 
-    @AppStorage("showsArchivedAgents") private var showsArchived = false
-    /// How many archived agents are shown. Raised ten at a time, in the view, because
-    /// this window already holds every one of them.
-    @State private var archivedShown = Self.pageSize
-    static let pageSize = 10
     static let cardSpacing: CGFloat = 2
 
     private var folder: URL? { model.selectedProject }
@@ -61,7 +54,6 @@ struct ProjectAgentsView: View {
         .navigationTitle(summary?.name ?? "Project")
         .onAppear { adopt(folder) }
         .onChange(of: folder) { _, folder in
-            archivedShown = Self.pageSize
             adopt(folder)
         }
         // The pull requests the daemon has, then a refresh, each time a project opens
@@ -149,30 +141,6 @@ struct ProjectAgentsView: View {
     private var agents: some View {
         GlassEffectContainer(spacing: Self.cardSpacing) {
             LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                if folder != nil, showsSessions {
-                    SectionHeading(title: "Sessions")
-                    if !hasSessions {
-                        Text("No sessions")
-                            .appText(.reading)
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 6)
-                    }
-                }
-                ForEach(showsSessions ? AgentGroup.live : [], id: \.self) { group in
-                    ForEach(group.headings(model.agents(in: model.selectedProjectKey, group: group))) { heading in
-                        GroupHeading(title: heading.title, count: heading.agents.count)
-                        ForEach(heading.agents) { agent in
-                            AgentCard(id: agent.id, selection: $selection) {
-                                AgentRow(agent: agent)
-                            }
-                            .swipeToArchive { await model.archive(agent.id) }
-                        }
-                    }
-                }
-
-                // The archive closes the chats, before the workflows start.
-                if showsSessions { archivedSection }
-
                 // What the work is on, between what is happening and what will (038).
                 // Absent on a project that is not on GitHub.
                 PullRequestsSection(folder: folder, selection: $selection)
@@ -196,83 +164,13 @@ struct ProjectAgentsView: View {
         .onChange(of: states) { Task { await model.loadDraftWorktrees() } }
     }
 
-    private var hasSessions: Bool {
-        AgentGroup.allCases.contains { !model.agents(in: model.selectedProjectKey, group: $0).isEmpty }
-    }
-
     /// Every agent's state on this page, archived ones included.
     private var states: [AgentState] {
         AgentGroup.allCases.flatMap { model.agents(in: model.selectedProjectKey, group: $0) }.map(\.state)
     }
 
-    private var archived: [Agent] {
-        model.agents(in: model.selectedProjectKey, group: .archived)
-    }
-
-    /// Out of the way until it is wanted, because looking at what you archived is a
-    /// rare thing to want. Behind the same chevron heading as archived workflows.
-    @ViewBuilder
-    private var archivedSection: some View {
-        if folder != nil, !archived.isEmpty {
-            Button {
-                withAnimation(.snappy(duration: 0.18)) { showsArchived.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: showsArchived ? "chevron.down" : "chevron.right")
-                        .appText(.fine)
-                    Text("Archived")
-                    Text("\(archived.count)")
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .appText(.fine).fontWeight(.medium)
-            .foregroundStyle(.secondary)
-            .padding(.top, 14)
-            .padding(.leading, 2)
-            .accessibilityAddTraits(.isHeader)
-
-            if showsArchived {
-                ForEach(archived.prefix(archivedShown)) { agent in
-                    AgentCard(id: agent.id, selection: $selection) {
-                        AgentRow(agent: agent)
-                    }
-                }
-                if archived.count > archivedShown {
-                    Button("Show more") { archivedShown += Self.pageSize }
-                        .buttonStyle(.paper)
-                }
-            }
-        }
-    }
 }
 
-/// One agent, as a card you can go into.
-///
-/// It is a real control — the whole card opens that conversation — which is why it
-/// is a paper row that answers the pointer rather than a line of text.
-private struct AgentCard<Content: View>: View {
-    let id: UUID
-    @Binding var selection: UUID?
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        Button {
-            selection = id
-        } label: {
-            content
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(RoundedRectangle(cornerRadius: 14))
-                .paperRow()
-        }
-        .buttonStyle(.plain)
-    }
-}
 
 /// One of the page's three parts — starting a session, the sessions, the workflows —
 /// a step above the `GroupHeading`s inside them.

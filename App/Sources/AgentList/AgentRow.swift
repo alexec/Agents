@@ -10,9 +10,13 @@ struct AgentRow: View {
     @Environment(AppModel.self) private var model
     /// The agent as the list had it when it drew this row. Only its id is trusted.
     private let given: Agent
+    /// A row of the Mac's sessions list rather than a card on a page: a list-sized
+    /// title and one line of what it said, so a column of them reads at a glance.
+    private let isCompact: Bool
 
-    init(agent: Agent) {
+    init(agent: Agent, isCompact: Bool = false) {
         given = agent
+        self.isCompact = isCompact
     }
 
     /// The agent as the window has it now, read from the model rather than kept.
@@ -44,7 +48,7 @@ struct AgentRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(agent.title ?? "Untitled")
-                        .appText(.reading).fontWeight(.semibold)
+                        .appText(isCompact ? .supporting : .reading).fontWeight(.semibold)
                         .lineLimit(1)
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
@@ -81,9 +85,9 @@ struct AgentRow: View {
                 // keeps current; this is what it said.
                 if let report = agent.report?.message {
                     Text(report)
-                        .appText(.supporting)
+                        .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 

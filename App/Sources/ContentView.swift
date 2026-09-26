@@ -53,6 +53,24 @@ struct ContentView: View {
         }
     }
 
+    private var isShowingActivity: Bool {
+        model.showsEvents || model.showsResources || model.showsSpending
+    }
+
+    /// The projects column, the same in both layouts.
+    private var projects: some View {
+        @Bindable var model = model
+        return ProjectListView(selection: $model.sidebarItem)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            // A server asked for a credential there is none of (043).
+            .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+            // A known server with a new key: rebuilt, or not what it says (043).
+            .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
+                                 set: { model.hosts.rebuiltAsk = $0 })) { host in
+                RebuiltServerSheet(host: host).paperSheet()
+            }
+    }
+
     /// What the right-hand column shows: a page about all the work, a workflow, the
     /// chat picked in the middle column, or — with nothing picked — the project itself.
     @ViewBuilder
@@ -73,8 +91,7 @@ struct ContentView: View {
             // The project on its own: a new session, its pull requests, workflows and
             // worktrees. Its sessions are the middle column's.
             ProjectAgentsView(selection: Binding(get: { model.selection },
-                                                 set: { model.selection = $0 }),
-                              showsSessions: false)
+                                                 set: { model.selection = $0 }))
                 .paperGround()
         }
     }
@@ -85,26 +102,30 @@ struct ContentView: View {
         // sessions in the one picked, and what is being read. Picking a session shows
         // its chat beside the list rather than pushing it over the project, so moving
         // between two chats is one click, and the list stays in sight.
-        NavigationSplitView(columnVisibility: $columns) {
-            ProjectListView(selection: $model.sidebarItem)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-                // A server asked for a credential there is none of (043).
-                .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
-                // A known server with a new key: rebuilt, or not what it says (043).
-                .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
-                                     set: { model.hosts.rebuiltAsk = $0 })) { host in
-                    RebuiltServerSheet(host: host).paperSheet()
+        Group {
+            if isShowingActivity {
+                // Events, Resources and Spending are about all of the work, so the
+                // sessions of one project have no place beside them: two columns.
+                NavigationSplitView(columnVisibility: $columns) {
+                    projects
+                } detail: {
+                    detail(inPaneOf: 0)
                 }
-        } content: {
-            SessionsColumn(selection: $model.selection)
-                .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
-        } detail: {
-            GeometryReader { pane in
-                detail(inPaneOf: pane.size.width)
+            } else {
+                NavigationSplitView(columnVisibility: $columns) {
+                    projects
+                } content: {
+                    SessionsColumn(selection: $model.selection)
+                        .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
+                } detail: {
+                    GeometryReader { pane in
+                        detail(inPaneOf: pane.size.width)
+                    }
+                    // The chat and the inspector share this column now, not the window,
+                    // so this is the width the inspector measures itself against.
+                    .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
+                }
             }
-            // The chat and the inspector share this column now, not the window, so
-            // this is the width the inspector measures itself against.
-            .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
         }
         .environment(frame)
         .environment(requests)

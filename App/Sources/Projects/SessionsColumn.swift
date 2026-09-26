@@ -27,9 +27,7 @@ struct SessionsColumn: View {
                 ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
                     Section {
                         ForEach(part.agents) { agent in
-                            AgentRow(agent: agent)
-                                .padding(.vertical, 4)
-                                .tag(agent.id)
+                            row(agent)
                         }
                     } header: {
                         heading(part.title, count: part.agents.count)
@@ -40,9 +38,7 @@ struct SessionsColumn: View {
             if !archived.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(archived.prefix(Self.archivedShown)) { agent in
-                        AgentRow(agent: agent)
-                            .padding(.vertical, 4)
-                            .tag(agent.id)
+                        row(agent)
                     }
                 } header: {
                     heading("Archived", count: archived.count)
@@ -64,7 +60,18 @@ struct SessionsColumn: View {
                                                          : "Nothing here says “\(query)”."))
             }
         }
+        // ⌫ (Edit ▸ Delete) archives the picked session, as it deletes the picked
+        // message in Mail. Archived is not gone: Bring Back is on its row.
+        .onDeleteCommand {
+            guard let id = selection, let agent = model.agents.first(where: { $0.id == id }),
+                  agent.state != .archived else { return }
+            Task { await model.archive(id) }
+            selection = nil
+        }
         .searchable(text: $query, placement: .toolbar, prompt: "Search sessions")
+        // The window's title is this column's: whatever the right-hand side is reading.
+        .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
+        .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
         .toolbar {
             ToolbarItem {
                 Button {
@@ -77,6 +84,24 @@ struct SessionsColumn: View {
                 .disabled(model.selectedProjectSummary == nil)
             }
         }
+    }
+
+    private func row(_ agent: Agent) -> some View {
+        AgentRow(agent: agent, isCompact: true)
+            .padding(.vertical, 3)
+            .tag(agent.id)
+            // The list's own swipe, in place of the cards' hand-built one.
+            .swipeActions(edge: .trailing) {
+                if agent.state == .archived {
+                    Button("Bring Back") { Task { await model.unarchive(agent.id) } }
+                } else {
+                    Button("Archive", systemImage: "archivebox") {
+                        Task { await model.archive(agent.id) }
+                        if selection == agent.id { selection = nil }
+                    }
+                    .tint(.gray)
+                }
+            }
     }
 
     private func heading(_ title: String, count: Int) -> some View {
