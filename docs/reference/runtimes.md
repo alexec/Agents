@@ -37,8 +37,9 @@ In every column:
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
 - **On a server**: an agent in a server project is offered only the runtimes on that
-  server. Claude and Gemini are the exceptions: with a Claude token, or a Gemini key, in
-  Settings, Agents installs that runtime on the server itself and signs it in with it. See
+  server. Claude, Codex and Gemini are the exceptions: Agents installs them on the server
+  itself. Claude and Codex sign in there through this Mac's own sign-ins, and Gemini with
+  the key in Settings. See
   [Add a Linux server](../how-to/add-a-linux-server.md).
 
 ## What each gets from `~/.agents`

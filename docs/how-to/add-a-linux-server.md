@@ -16,8 +16,9 @@ closed. You follow them from the Mac as you would any other project.
 - `ssh` from this Mac to it with a key and no typing: `ssh devbox.example.com` (or an
   alias from `~/.ssh/config`) should log you straight in. Agents uses your own ssh setup,
   including your keys, ssh-agent and any jump hosts.
-- For Claude, nothing on the server: Agents installs what Claude needs there. You need a
-  Claude token on this Mac instead; see [Give Claude a token](#give-claude-a-token) below.
+- For Claude, nothing on the server: Agents installs what Claude needs there, and Claude
+  signs in through this Mac. Claude on this Mac must be signed in with your Claude account;
+  see [Claude and Codex: your Mac's sign-ins](#claude-and-codex-your-macs-sign-ins) below.
   The server needs `curl` or `wget`, access to the internet, and a glibc Linux (glibc 2.28
   or newer, as on Debian 10, Ubuntu 20.04 or RHEL 8 and later).
 - For Grok, Copilot or Cursor: install the runtime on the server yourself and sign in
@@ -34,42 +35,35 @@ ssh.
 
 ## Steps
 
-### Give Claude a token
-
-Do this first if you will use Claude on the server. You can also do it later, when Agents
-asks.
-
-1. On this Mac, in Terminal, run `claude setup-token` and copy the token it prints. An API
-   key from console.anthropic.com works too.
-2. Open **Settings ▸ Servers**. Under **Runtime credentials**, paste it into **Paste a
-   Claude token** and click **Save**. After a moment it says **Works**.
-
-   The token is kept in this Mac's Keychain and is never written on a server. Agents lends
-   it to a server only while an agent runs there. Agents on this Mac keep using this Mac's
-   own sign-in.
-
 ### Give Gemini a key
 
-Gemini works the same way, with a Gemini API key instead of a token.
+Gemini takes an API key, kept on this Mac and lent to a server while an agent runs there.
 
 1. Get a key at aistudio.google.com/apikey.
 2. Paste it under **Gemini** in **Settings ▸ Agents** or under **Runtime credentials** in
    **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
 
 With a key saved, Agents installs Gemini on a server as it connects, and each server's
-entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent the same way
-as Claude's token and is never written on the server.
+entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent to a server
+only while an agent runs there, and is never written on the server.
 
-### Codex: your ChatGPT sign-in
+### Claude and Codex: your Mac's sign-ins
 
-If Codex on this Mac is signed in with ChatGPT, Codex on a server uses that sign-in with
-nothing to set up. Agents installs Codex on the server as it connects, and the server's
-Codex requests go back through this Mac, which adds your sign-in and sends them on to
-OpenAI. No token of yours is written on the server, and other accounts on the server cannot
-use it. This works only while the Mac is connected to the server.
+If Claude on this Mac is signed in with your Claude account (Pro, Max, Team or
+Enterprise), Claude on a server uses that sign-in with nothing to set up. The same goes for
+Codex signed in with ChatGPT. Agents installs them on the server as it connects. Their
+requests go back through this Mac, which adds your sign-in and sends them on to Anthropic
+or OpenAI. No token of yours is written on the server, and other accounts on the server
+cannot use it. Turns on a server count against the same plan as turns on this Mac.
 
-Codex takes no key in **Settings**. Without a ChatGPT sign-in on this Mac, sign Codex in on
-the server itself and mark the server **Use this server’s own sign-in only**.
+This works only while the Mac is connected to the server. If Claude on this Mac hasn't been
+used for a few hours, its sign-in may have expired: Agents asks Claude on this Mac to renew
+it, and the server's turn carries on.
+
+Neither takes anything in **Settings**. If Claude on this Mac isn't signed in (run `claude`
+in Terminal and `/login`), a server's Claude can't start, unless the server has its own
+sign-in: sign Claude in on the server itself, and mark the server **Use this server’s own
+sign-in only** if you want it used every time.
 
 ### Add the server
 
@@ -81,12 +75,12 @@ the server itself and mark the server **Use this server’s own sign-in only**.
    server: on the server, `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` prints it.
    Click **Trust and continue**.
 4. Wait while the steps tick: **Connect**, **Check the system**, **Set up**, then
-   **Install Claude** if you gave Claude a token, then **Find agent runtimes**, which lists
-   the runtimes on the server. Click **Done**.
+   **Install Claude** if Claude on this Mac is signed in, then **Find agent runtimes**,
+   which lists the runtimes on the server. Click **Done**.
 
-   Without a token, the sheet says **Claude will be installed the first time you start it
-   here.** If the server already has Claude signed in, **Install Claude** says **… has its
-   own; Agents uses it**.
+   If Claude on this Mac isn't signed in, the sheet says **Claude will be installed here
+   once Claude on this Mac is signed in.** If the server already has Claude signed in,
+   **Install Claude** says **… has its own; Agents uses it**.
 
    The project list now has a heading for **THIS MAC** and one for the server, with a
    green dot while it is connected.
@@ -100,17 +94,19 @@ the server itself and mark the server **Use this server’s own sign-in only**.
    **Add as project**. A clone goes into your home folder on the server.
 
    The project appears under the server's heading. Start agents in it the usual way; the
-   runtime menu offers the runtimes on the server. Claude says **signs in with the token
-   in Settings**, or **needs a token**.
+   runtime menu offers the runtimes on the server. Claude says **signs in through this
+   Mac**, **its own sign-in**, or **needs this Mac signed in to it**.
 
-   If you start Claude on a server with no token, a sheet says **Claude on … needs a
-   token**. Paste one and the agent starts.
+   If you start Claude on a server while Claude on this Mac isn't signed in, and the server
+   has no sign-in of its own, Agents says **Claude on this Mac isn’t signed in with a Claude
+   account** and opens the sign-in sheet for Claude on this Mac.
 
 ### Use the server's own sign-in instead
 
-If Claude is already signed in on the server and you would rather Agents did not lend it
-your token, open **Settings ▸ Servers**, find the server, and turn on **Use this server's
-own sign-in only**. That also stops Codex from using this Mac's ChatGPT sign-in there.
+If Claude is already signed in on the server and you would rather its own sign-in were
+used than this Mac's, open **Settings ▸ Servers**, find the server, and turn on **Use this
+server's own sign-in only**. That also stops Codex from using this Mac's ChatGPT sign-in
+there.
 
 ### When the server is offline
 
@@ -163,17 +159,21 @@ The sheet says what went wrong in one sentence. The common ones:
 - **… doesn't allow forwarding a socket over ssh (AllowStreamLocalForwarding)** Set
   `AllowStreamLocalForwarding yes` in the server's `/etc/ssh/sshd_config` and restart
   sshd.
-- **No agent runtime on …** under **Find agent runtimes**. Give Claude a token in
-  **Settings ▸ Servers**, or install another runtime on the server and sign in there, then
-  click **Check again**.
+- **No agent runtime on …** under **Find agent runtimes**. Sign Claude in on this Mac,
+  or install another runtime on the server and sign in there, then click **Check again**.
 - **… has neither curl nor wget to download Claude.** Install one of them on the server.
 - **… can't reach the internet to download Claude.** The server needs to reach the
   internet once, to download Claude's tools.
 - **Claude can't be installed on …: it uses musl.** Agents installs Claude only on glibc
   Linux. Install Claude there yourself, or use another server.
-- **Claude refused the token in Settings. Replace it in Settings ▸ Servers.** The token
-  was revoked or has expired. Make a new one with `claude setup-token` and click
-  **Replace…**.
+- **Claude on this Mac isn’t signed in with a Claude account.** Sign Claude in on this
+  Mac from the sheet (or `claude` then `/login` in Terminal), or sign Claude in on the
+  server itself.
+- **Agents couldn’t read Claude’s sign-in on this Mac.** Check `claude` works in Terminal
+  on this Mac, and sign in again if it asks.
+- **Claude on this Mac needs signing in again.** This Mac's Claude sign-in was refused
+  even after renewing, for example because you signed out elsewhere. Sign in again from the
+  sheet.
 - **…'s host key has changed since you last connected.** The server was rebuilt, or it is
   not the machine you think. Check with whoever runs it, then see
   [When the server was rebuilt](#when-the-server-was-rebuilt).
