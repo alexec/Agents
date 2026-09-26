@@ -403,6 +403,7 @@ extension DaemonCore {
                 try launcher.launch(runtime: runtime, path: path, cwd: cwd)
             }
             launched = session
+            await hearAuthStatus(from: session, runtimeID: runtimeID)
             let handshake = try await session.initialize()
             // Recorded here rather than after the session is made, because the reason
             // to have it is the case where making the session fails: what comes back
@@ -877,6 +878,7 @@ extension DaemonCore {
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         }
+        await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
             return try await connect(session, runtime: runtime, for: agent)
         } catch {

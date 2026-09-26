@@ -57,6 +57,7 @@ extension DaemonCore {
         let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }
         try await session.logOut()
+        accounts[runtimeID]?.signedInAs = nil
         markNeedsSignIn(runtimeID: runtimeID)
         return stopped
     }
@@ -258,6 +259,7 @@ extension DaemonCore {
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
         }
+        await hearAuthStatus(from: session, runtimeID: runtimeID)
         do {
             let handshake = try await session.initialize()
             noteAccount(runtimeID: runtimeID, from: handshake)

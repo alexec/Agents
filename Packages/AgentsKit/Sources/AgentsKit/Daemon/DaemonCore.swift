@@ -559,6 +559,8 @@ public actor DaemonCore {
         // Providers are asked for separately, so a previous answer is kept.
         account.providers = accounts[runtimeID]?.providers ?? []
         account.currentProviderID = accounts[runtimeID]?.currentProviderID
+        // Pushed by the runtime after the handshake, so a handshake has nothing to say about it.
+        account.signedInAs = accounts[runtimeID]?.signedInAs
         // A handshake does not prove a sign-in (see `RuntimeAccount.init`), so it does
         // not take back a refusal: a window warming up a draft would otherwise put the
         // runtime back to ready a second after it refused. A turn that works does.
@@ -569,6 +571,26 @@ public actor DaemonCore {
         guard accounts[runtimeID] != account else { return }
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// What a runtime pushed about its own account. Its word is better than a handshake's:
+    /// "nobody" is a sign-in needed before any session fails, and a named account takes
+    /// back an earlier refusal.
+    func noteAuthStatus(runtimeID: String, _ status: AuthStatus) {
+        var account = accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
+        account.signedInAs = status
+        account.state = status.isSignedOut ? .needsSignIn : .ready
+        account.checkedAt = Date()
+        guard accounts[runtimeID] != account else { return }
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// Hear what this session's runtime says about its account for as long as it runs.
+    func hearAuthStatus(from session: ACPSession, runtimeID: String) async {
+        await session.whenAuthStatusChanges { [weak self] status in
+            await self?.noteAuthStatus(runtimeID: runtimeID, status)
+        }
     }
 
     /// A runtime that just refused for want of a sign-in.
@@ -1129,6 +1151,9 @@ public actor DaemonCore {
         // transcript and out of agent.json, exactly like an update kind we do not know.
         case .unknownNotification(let method):
             DaemonLog.shared.write("agent \(agentID) sent a notification we do not know: \(method)")
+
+        case .unknownRequest(let method):
+            DaemonLog.shared.write("agent \(agentID) sent a request we do not know, declined: \(method)")
         }
     }
 

@@ -3,9 +3,17 @@ import Foundation
 /// The wire shapes we use, and the names of everything either side can call.
 ///
 /// Deliberately thin. Everything a runtime sends that is not listed here stays a
-/// `JSONValue` and is either kept whole or ignored, including every `_meta` block:
-/// Grok's `x.ai/hooks`, Claude's `jetbrains`, `steering` and `goal`. Reading any of
-/// them is how one code path becomes three.
+/// `JSONValue` and is either kept whole or ignored.
+///
+/// `_meta` is read in a few named places and nowhere else: `authMethods[]._meta.terminal-auth`
+/// (the command that signs in), `PromptResponse._meta.quota` (Gemini's tokens),
+/// `initialize`'s `_meta.steering.supported` (the marker for `_session/steering`) and
+/// `agentCapabilities._meta.authStatus` (the marker for `_auth/status_update`). It is
+/// written on `session/new`, `load`, `resume` and `fork` for tool scoping and plugins,
+/// by runtime through the catalogs (`ToolPolicyCatalog`, `DotAgents`). What is not
+/// read: vendor `_meta` on updates, and the rest of the handshake's — Grok's
+/// `x.ai/hooks`, Claude's `jetbrains` and `goal`. Reading those is how one code path
+/// becomes three.
 public enum ACP {
     public static let protocolVersion = 1
 
@@ -176,6 +184,8 @@ public enum ACP {
         }
         public var supportsLogout: Bool { agentCapabilities?.auth?.logout != nil }
         public var supportsProviders: Bool { agentCapabilities?.providers != nil }
+        /// The runtime pushes `_auth/status_update` whenever its account changes.
+        public var pushesAuthStatus: Bool { agentCapabilities?._meta?["authStatus"] != nil }
         /// Whether words can be put into a running turn (`_session/steering`). Read off
         /// what the agent said, never off which runtime it is.
         public var supportsSteering: Bool { _meta?["steering"]?["supported"]?.boolValue ?? false }
@@ -190,6 +200,7 @@ public enum ACP {
         public var sessionCapabilities: SessionCapabilities?
         public var auth: AgentAuthCapabilities?
         public var providers: JSONValue?
+        public var _meta: JSONValue?
     }
 
     /// The protocol's own rule: text and resource links are baseline, everything else

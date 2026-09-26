@@ -27,6 +27,10 @@ public enum ACPSessionEvent: Sendable {
     /// extension of its own. Nothing to act on, but reported for the same reason as
     /// `unknownUpdate`: an agent is never quietly poorer for what it was sent.
     case unknownNotification(String)
+    /// A request whose method we do not recognise, declined with `-32601`. Said out
+    /// loud for the same reason: a runtime falls back quietly, and the next vendor
+    /// method is otherwise invisible.
+    case unknownRequest(String)
 }
 
 /// How a turn came to an end, including the case where a runtime invents a stop reason.
@@ -86,6 +90,19 @@ public actor ACPSession {
     public private(set) var options: [ConfigOption] = []
     public private(set) var commands: [SlashCommand] = []
     public private(set) var initializeResult: ACP.InitializeResult?
+    /// The last account the runtime said it was using, for a runtime that says.
+    public private(set) var authStatus: AuthStatus?
+    /// Cursor's todo list as it stands, so a merging update has something to merge into.
+    private var todos = TodoList()
+    /// Who hears `authStatus` change. A handler rather than an event, because a session
+    /// only asked a question has no listener, and the account is still worth hearing.
+    private var authStatusHandler: (@Sendable (AuthStatus) async -> Void)?
+
+    /// Be told whenever the runtime says which account it is using. Set before
+    /// `initialize`: the first push follows the handshake.
+    public func whenAuthStatusChanges(_ handler: @escaping @Sendable (AuthStatus) async -> Void) {
+        authStatusHandler = handler
+    }
 
     /// True while a `session/load` replay is arriving. The replayed conversation is
     /// confirmation, not content: we already have the transcript, and recording it
@@ -618,7 +635,7 @@ public actor ACPSession {
         }
     }
 
-    private func receive(_ method: String, _ params: JSONValue?) {
+    private func receive(_ method: String, _ params: JSONValue?) async {
         if method == JSONRPCConnection.markerMethod {
             // Our own marker, back out of the stream behind everything that was in it
             // when we put it there. All of that has now been through here.
@@ -636,10 +653,17 @@ public actor ACPSession {
             }
             return
         }
+        if method == ACP.ExtensionMethod.authStatusUpdate, initializeResult?.pushesAuthStatus == true {
+            if let status = AuthStatus(wire: params), status != authStatus {
+                authStatus = status
+                await authStatusHandler?(status)
+            }
+            return
+        }
         // A notification is a method we know or a method we do not, and until now the
-        // second kind left no trace at all. Cursor sends `cursor/update_todos` and two
-        // others; something else will send something else next year. Nothing to act on,
-        // but it is said out loud, the way an unrecognised update kind already is.
+        // second kind left no trace at all. Something will send something new next
+        // year. Nothing to act on, but it is said out loud, the way an unrecognised
+        // update kind already is.
         guard method == ACP.ClientMethod.sessionUpdate else {
             eventsContinuation.yield(.unknownNotification(method))
             return
@@ -702,9 +726,39 @@ public actor ACPSession {
             return await serveTerminal(method: method, params: params, service: terminalService)
         case ACP.ClientMethod.createElicitation where capabilities.elicitationForm || capabilities.elicitationURL:
             return await askElicitation(params)
+        case ACP.ExtensionMethod.updateTodos where capabilities.plan:
+            return takeTodos(params)
+        case ACP.ExtensionMethod.askQuestion where capabilities.elicitationForm:
+            return await askQuestions(params)
         default:
+            eventsContinuation.yield(.unknownRequest(method))
             return .failure(.methodNotFound(method))
         }
+    }
+
+    /// Cursor's todo list, as the session's plan. Answered with `{}` whatever it held:
+    /// Cursor does not wait for or read the answer, only for an error to log.
+    private func takeTodos(_ params: JSONValue?) -> Result<JSONValue, JSONRPCError> {
+        guard todos.apply(params) else { return .success(.object([:])) }
+        // Kept through a replay but not said: the plan the daemon holds already says
+        // what the replay would, which is why a replayed `plan` update is not said either.
+        if !isReplaying { eventsContinuation.yield(.planChanged(todos.plan)) }
+        return .success(.object([:]))
+    }
+
+    /// Cursor's questions, on the same card as a form elicitation, answered in Cursor's
+    /// own shape. A set we cannot draw is refused, so Cursor falls back to its own
+    /// permission prompts as it did before.
+    private func askQuestions(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+        guard let request = CursorQuestion.request(from: params, agentID: UUID()) else {
+            eventsContinuation.yield(.unknownRequest(ACP.ExtensionMethod.askQuestion))
+            return .failure(.methodNotFound(ACP.ExtensionMethod.askQuestion))
+        }
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<ElicitationOutcome, Never>) in
+            pendingElicitations[request.id] = continuation
+            eventsContinuation.yield(.elicitationRequested(request))
+        }
+        return .success(CursorQuestion.reply(to: outcome))
     }
 
     // MARK: Serving what an agent asks of us
