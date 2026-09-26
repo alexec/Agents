@@ -126,6 +126,26 @@ public struct EnvironmentFile: Codable, Hashable, Sendable {
     }
 }
 
+/// A home of the app's own for a runtime started with a lent key (047): a folder under
+/// `<root>/runtimes/`, a config file the app writes into it, the variable that points the
+/// runtime there, and anything else the sign-in needs.
+public struct LentKeyHome: Codable, Hashable, Sendable {
+    public var variable: String
+    public var folder: String
+    public var configFile: String
+    public var config: String
+    public var environment: [String: String]
+
+    public init(variable: String, folder: String, configFile: String, config: String,
+                environment: [String: String] = [:]) {
+        self.variable = variable
+        self.folder = folder
+        self.configFile = configFile
+        self.config = config
+        self.environment = environment
+    }
+}
+
 /// How a removal is asked for.
 ///
 /// Four ways of asking, not four runtimes. Nothing downstream switches on a runtime id:
@@ -188,6 +208,13 @@ public struct ToolPolicy: Hashable, Sendable {
     /// Codex puts ChatGPT before an API key, D1). Methods not named keep their order after
     /// these. Empty keeps the rule for everyone else: the first one without a terminal.
     public var preferredAuthMethods: [String]
+    /// Added to its environment by a server's daemon only (047: Codex's `NO_BROWSER`, so a
+    /// ChatGPT sign-in is never offered on a server).
+    public var serverEnvironment: [String: String]
+    /// What a lent key needs besides itself (047, research T008): Codex saves an API-key
+    /// sign-in into its home, so a server running it with a lent key points it at a home
+    /// of the app's own that says to keep sign-ins in memory only.
+    public var lentKeyHome: LentKeyHome?
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -196,7 +223,9 @@ public struct ToolPolicy: Hashable, Sendable {
                 lever: Lever,
                 environmentFiles: [EnvironmentFile] = [],
                 escalationTool: String? = nil,
-                preferredAuthMethods: [String] = []) {
+                preferredAuthMethods: [String] = [],
+                serverEnvironment: [String: String] = [:],
+                lentKeyHome: LentKeyHome? = nil) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -205,6 +234,8 @@ public struct ToolPolicy: Hashable, Sendable {
         self.environmentFiles = environmentFiles
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods
+        self.serverEnvironment = serverEnvironment
+        self.lentKeyHome = lentKeyHome
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.

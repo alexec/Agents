@@ -1073,9 +1073,12 @@ public protocol SessionLauncher: Sendable {
 /// that file belongs under the daemon's own root like everything else the app writes.
 public struct ProcessSessionLauncher: SessionLauncher {
     let locations: StoreLocations
+    /// A server's daemon (`--serve`): its runtimes get their policy's server environment.
+    let onServer: Bool
 
-    public init(locations: StoreLocations) {
+    public init(locations: StoreLocations, onServer: Bool = false) {
         self.locations = locations
+        self.onServer = onServer
     }
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
@@ -1084,16 +1087,42 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                      arguments: runtime.arguments + policy.launchArguments,
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
-                                                                   onto: LoginShellPath.environment()),
+                                                                   onto: LoginShellPath.environment(),
+                                                                   onServer: onServer),
                                      capabilities: .app)
     }
 
     /// What a runtime is started with: `base` with anything lent (043), the policy's files
     /// (Grok) and its variables (Codex's `CODEX_CONFIG`, 047), the policy's word last.
     static func environment(for policy: ToolPolicy, locations: StoreLocations,
-                            onto base: [String: String]) -> [String: String] {
-        RuntimePolicyFiles(locations: locations)
+                            onto base: [String: String], onServer: Bool = false) -> [String: String] {
+        var environment = RuntimePolicyFiles(locations: locations)
             .environment(for: policy, onto: LentEnvironment.applied(to: base))
             .merging(policy.launchEnvironment) { _, policy in policy }
+        guard onServer else { return environment }
+        environment.merge(policy.serverEnvironment) { _, server in server }
+        // A key lent for this runtime: its own home, whose config keeps the sign-in in
+        // memory, so the key is never written to the server's disk (047, FR-019).
+        if let home = policy.lentKeyHome, !LentEnvironment.value.isEmpty,
+           let folder = Self.lentKeyHome(home, locations: locations) {
+            environment[home.variable] = folder.path
+            environment.merge(home.environment) { _, home in home }
+        }
+        return environment
+    }
+
+    /// Write the home's config (and only that) under `<root>/runtimes/`, private to this
+    /// account. Nil when it cannot be written: then the runtime is not pointed there.
+    static func lentKeyHome(_ home: LentKeyHome, locations: StoreLocations) -> URL? {
+        let folder = locations.root.appendingPathComponent("runtimes/\(home.folder)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            try home.config.write(to: folder.appendingPathComponent(home.configFile), atomically: true, encoding: .utf8)
+            return folder
+        } catch {
+            DaemonLog.shared.write("could not write \(home.folder)/\(home.configFile): \(error)")
+            return nil
+        }
     }
 }

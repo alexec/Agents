@@ -38,6 +38,9 @@ public final class Daemon: @unchecked Sendable {
                 discovery: discovery,
                 toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
         }
+        // A server's runtimes get their policy's server environment (047: Codex never
+        // offers ChatGPT there).
+        let launcher = launcher ?? (serve ? ProcessSessionLauncher(locations: locations, onServer: true) : nil)
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
                                installer: installer, launcher: launcher)
         self.serve = serve

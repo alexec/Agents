@@ -29,6 +29,9 @@ final class HostSet {
     /// Whether a server should get Claude as it connects: the window has a credential it
     /// may lend there (043, FR-002). Set by `AppModel`, which knows the credentials.
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
+    /// Whether to install a runtime's toolset as a server connects (047): the window has a
+    /// key for it in Settings, and the server takes lent keys. Claude's is `claudeWanted`.
+    @ObservationIgnored var toolsetWanted: (HostID, String) -> Bool = { _, _ in false }
     /// What a server may be lent from this window, and who answers when it asks (043).
     @ObservationIgnored var offerFor: (HostID) -> DaemonAPI.CredentialsOffer? = { _ in nil }
     @ObservationIgnored var lenderFor: (HostID) -> DaemonClient.CredentialLender? = { _ in nil }
@@ -214,6 +217,7 @@ final class HostSet {
 
     static func connection(for host: ServerHost, locations: StoreLocations,
                            wantsClaude: @escaping @Sendable () async -> Bool,
+                           wants: (@Sendable (String) async -> Bool)? = nil,
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                            lender: DaemonClient.CredentialLender? = nil) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
@@ -221,13 +225,16 @@ final class HostSet {
                          installedBy: ServerHost.currentMacName,
                          binary: { await ServerBinaries.binary(for: $0) },
                          toolset: { ServerBinaries.claudeToolset },
-                         wantsClaude: wantsClaude, offer: offer, lender: lender)
+                         wantsClaude: wantsClaude,
+                         toolsets: { ServerBinaries.toolsets },
+                         wants: wants ?? { runtimeID in runtimeID == RuntimeCatalog.claude.id ? await wantsClaude() : false },
+                         offer: offer, lender: lender)
     }
 
     /// A new connection for a host, asking this set what to offer and who lends (043).
     func newConnection(for host: ServerHost) -> ServerConnection {
         let id = host.id
-        return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id),
+        return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id), wants: wants(id),
                                offer: { [weak self] in await MainActor.run { self?.offerFor(id) } },
                                lender: lenderFor(id))
     }
@@ -245,6 +252,16 @@ final class HostSet {
     /// actor, at the moment the server connects.
     func wantsClaude(_ id: HostID) -> @Sendable () async -> Bool {
         { [weak self] in await MainActor.run { self?.claudeWanted(id) ?? false } }
+    }
+
+    /// Per runtime (047): Claude's is `claudeWanted`, every other toolset's `toolsetWanted`.
+    func wants(_ id: HostID) -> @Sendable (String) async -> Bool {
+        { [weak self] runtimeID in
+            await MainActor.run {
+                guard let self else { return false }
+                return runtimeID == RuntimeCatalog.claude.id ? self.claudeWanted(id) : self.toolsetWanted(id, runtimeID)
+            }
+        }
     }
 
     private func makeConnection(_ host: ServerHost) -> ServerConnection {
@@ -442,6 +459,12 @@ enum ServerBinaries {
         else { return nil }
         return ServerBinary(file: file, sha256: sha.trimmingCharacters(in: .whitespacesAndNewlines), version: version)
     }
+
+    /// Every pinned toolset the app carries, from `Resources/toolsets/` (043, 047). Read once.
+    nonisolated static let toolsets: [Toolset] = {
+        guard let folder = Bundle.main.url(forResource: "toolsets", withExtension: nil) else { return [] }
+        return Toolset.loadAll(from: folder).values.sorted { $0.manifest.runtimeID < $1.manifest.runtimeID }
+    }()
 
     /// Claude's pinned toolset, from `Resources/toolsets/claude` (043). Read once.
     nonisolated static let claudeToolset: Toolset? = {
