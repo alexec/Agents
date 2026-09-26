@@ -26,7 +26,7 @@ real sign-in was found on the box.
 **This feature makes a server's Claude sign in the way this Mac's Claude does**, through the
 Mac. The pasted token goes away entirely.
 
-## Defaults taken *(Alex to confirm or overturn)*
+## Defaults taken
 
 Alex settled D1 and D2, and confirmed D3–D7, on 2026-09-26. Each is marked *(default Dn)*
 where it is used.
@@ -44,9 +44,10 @@ where it is used.
   is not signed in.
 - **D4. The relay keeps the sign-in fresh without signing the Mac out.** The Mac's Claude
   renews its own sign-in when it's used. If nobody uses it and a server's request is
-  refused because the sign-in expired, the relay renews it once, the same way Claude does,
-  and saves the result where Claude keeps it. First it re-reads what Claude has saved, so
-  the relay and the Mac's own Claude never both spend the same renewal. If the renewal
+  refused because the sign-in expired, the relay has the Mac's own Claude renew it, once,
+  and uses the result. First it re-reads what Claude has saved, in case Claude already
+  renewed it. The app never renews or writes the sign-in itself, so it and the Mac's Claude
+  can never both spend the same renewal (plan research R6). If the renewal
   fails, the turn ends saying so. The relay never discards the Mac's sign-in.
 - **D5. Only the person's own agents on a server can use it.** The relay answers only
   requests from the server account the Mac connects as, as 047's gate does for Codex. Other
@@ -80,7 +81,7 @@ either.
 
 1. **Given** Claude on this Mac is signed in with a Claude account, **When** a server
    connects, **Then** the Add a server checklist installs Claude there without asking for
-   anything, and the runtime menu for that server says Claude **uses this Mac's sign-in**.
+   anything, and the runtime menu for that server says Claude **signs in through this Mac**.
 2. **Given** that server, **When** the person starts a Claude agent there, **Then** it
    answers, and every request it makes to Anthropic goes through this Mac.
 3. **Given** several servers connected at once, **When** Claude agents run on each,
@@ -145,8 +146,8 @@ Then run a renewal on the Mac and a server request at the same moment: both end 
 **Acceptance Scenarios**:
 
 1. **Given** the Mac's sign-in has expired but can still be renewed, **When** a server's
-   request is refused as expired, **Then** the relay renews it once, saves it where Claude
-   keeps it, sends the request again, and the turn goes on *(default D4)*.
+   request is refused as expired, **Then** the relay has the Mac's Claude renew it once, sends
+   the request again with the renewed sign-in, and the turn goes on *(default D4)*.
 2. **Given** Claude on the Mac renewed the sign-in a moment ago, **When** the relay goes to
    renew, **Then** it finds the renewed sign-in, uses it, and does not renew again.
 3. **Given** the renewal itself is refused (the person signed out, or the sign-in was
@@ -252,9 +253,9 @@ port on the server. It is refused. As the person's own account, a Claude turn st
   sign-in, and at the latest on the next refused request, so a renewal made on the Mac is
   never lost.
 - **FR-006**: When a request is refused because the sign-in expired, the relay MUST re-read
-  the saved sign-in, renew it at most once if it's still expired, save the renewed sign-in
-  where Claude keeps it, and send the request again. It MUST NOT discard or overwrite the
-  Mac's sign-in with anything but a successful renewal *(D4)*.
+  the saved sign-in. If it's still expired, the relay MUST have the Mac's own Claude renew it
+  at most once, then send the request again. The app MUST NOT renew, write or discard the
+  Mac's sign-in itself *(D4)*.
 - **FR-007**: A server marked "own sign-in only" MUST get no relay for Claude, and its own
   sign-in MUST be used *(D6)*. On any other server the relayed sign-in MUST win over one on
   the server *(D7)*.
@@ -272,9 +273,9 @@ port on the server. It is refused. As the person's own account, a Claude turn st
 
 **What the person is told**
 
-- **FR-012**: The runtime menu for a server MUST say Claude **uses this Mac's sign-in**
-  when the relay is available, **uses this server's sign-in** on a server marked "own
-  sign-in only", and **needs this Mac signed in to Claude** otherwise.
+- **FR-012**: The runtime menu for a server MUST say Claude **signs in through this
+  Mac** when the relay is available, **its own sign-in** on a server marked "own sign-in
+  only", and **needs this Mac signed in to it** otherwise (contracts/ui.md).
 - **FR-013**: A Claude agent that can't start or can't go on because of the sign-in MUST end
   with one sentence naming the cause: this Mac not signed in with a Claude account, the
   sign-in couldn't be read, the renewal was refused, a plan limit, or the Mac went offline.
