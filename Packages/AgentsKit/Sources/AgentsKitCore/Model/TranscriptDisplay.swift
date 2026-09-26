@@ -73,6 +73,15 @@ extension TranscriptEntry {
     }
 }
 
+extension ToolCall {
+    /// Nothing a line could show: no title of its own, no tool, no state, no input,
+    /// output or content. `raw` does not count; it always holds the wire object.
+    var saysNothing: Bool {
+        (title.isEmpty || title == "Tool call") && name == nil && kind == nil && status == nil
+            && content.isEmpty && locations.isEmpty && rawInput == nil && rawOutput == nil
+    }
+}
+
 extension TranscriptItem {
     /// Whether the chat puts anything on the page for this item.
     ///
@@ -145,6 +154,9 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// follows one carries neither the name nor the title: on its own it reads as
     /// an anonymous "Tool call", and that is what would end up on screen.
     private var suppressed: Set<String> = []
+    /// Where in `drawn` each closed run's calls are, by call id, for an update that
+    /// arrives after something else has closed its run.
+    private var closedRunAt: [String: Int] = [:]
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
@@ -183,6 +195,17 @@ public struct TranscriptDisplayBuilder: Sendable {
             // already in the run rather than adding a line to it.
             if let id = call.toolCallID, let existing = run.firstIndex(where: { $0.toolCallID == id }) {
                 run[existing] = TranscriptEntry.merge(call, onto: run[existing])
+            } else if case .toolCallUpdate = entry.kind, let id = call.toolCallID,
+                      mergeIntoClosedRun(call, id: id) {
+                // A call already drawn in a run that something has since closed: the
+                // Bash call that starts a background shell finishes after the line
+                // saying so (057). A new run would be a second, nameless "Tool call".
+                return
+            } else if case .toolCallUpdate = entry.kind, call.saysNothing {
+                // An update for no call on the page that carries nothing to draw. Claude
+                // sends one for a background Agent call whose tool_call never arrives
+                // (057): on its own it is a line reading "Tool call" and nothing else.
+                return
             } else {
                 run.append(call)
             }
@@ -226,8 +249,20 @@ public struct TranscriptDisplayBuilder: Sendable {
         while let last = drawn.last, last.isPassing { drawn.removeLast() }
     }
 
+    /// Merge an update into the closed run that holds its call, if one does.
+    private mutating func mergeIntoClosedRun(_ update: ToolCall, id: String) -> Bool {
+        guard let at = closedRunAt[id], drawn.indices.contains(at),
+              case .toolRun(let runID, var calls) = drawn[at],
+              let index = calls.firstIndex(where: { $0.toolCallID == id }) else { return false }
+        calls[index] = TranscriptEntry.merge(update, onto: calls[index])
+        drawn[at] = .toolRun(id: runID, calls: calls)
+        return true
+    }
+
     private mutating func closeRun() {
         guard !run.isEmpty, let runID else { return }
+        // Only lines after a run are ever taken back off `drawn`, so its place holds.
+        for id in run.compactMap(\.toolCallID) { closedRunAt[id] = drawn.count }
         drawn.append(.toolRun(id: runID, calls: run))
         run = []
         self.runID = nil

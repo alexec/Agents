@@ -148,3 +148,36 @@ capture ([walk/card-mark.png](../walk/card-mark.png)) shows the agent's card wit
 so no click can reach the scratch window, and its accessibility tree is empty. So the chat
 could not be opened, and the block over the prompt (A), Stop pressed on screen, and the
 Background pane (C) are still unseen. The phone (E) is Alex's to see.
+
+**Walked on screen (2026-09-26 11:20–11:32, Mac still locked).** The scratch window was opened
+straight onto the agent with the Debug launch argument `-open-agent <id>`, which needs no click.
+`screencapture -l` works while locked once the display is awake (`caffeinate -u`). A real Claude
+turn ran a tick loop in the background and a background subagent, "Count ticks slowly".
+
+- [walk/1-running-shell-and-subagent.png](../walk/1-running-shell-and-subagent.png): frame A as
+  approved. "In the background · 2", the shell with Output and Stop, and the subagent with what it
+  was asked, Steps, and "stops with the agent". The card in the list reads "1 shell, 1 subagent
+  in t…".
+- [walk/2-after-stop.png](../walk/2-after-stop.png): after Stop on the shell. The row has left,
+  the header reads "· 1", the card reads "1 subagent in the back…", and the chat has Claude's
+  notice once: "Task stopped by user". Stop was sent as `agents/stopBackground`, which is what
+  the button calls (`AppModel.stopBackground`). The button could not be pressed, because the
+  accessibility tree is empty while the Mac is locked.
+- [walk/0-permission-before-start.png](../walk/0-permission-before-start.png): the Bash
+  permission, asked before the shell starts.
+
+**Fixed:** a bare "Tool call" line sat in the chat under "Started … in the background". It
+was the Bash call's completion update, which arrives after the background line has closed the
+call's run, so it opened a second run with no name. There was also a lone update from the
+background Agent call, whose `tool_call` never arrives. A late update now joins the run that
+already holds its call, and an update for no call that carries nothing is not drawn
+(`TranscriptDisplayBuilder`). See
+[walk/3-after-fix-no-bare-tool-call.png](../walk/3-after-fix-no-bare-tool-call.png).
+
+**Still differs from frame A:** the shell row shows Claude's name for the command ("Print a
+tick every second for 10 minutes") and not the command itself. `async_task_spawned` carries only
+the name and a description, which are the same words. The command is on the linked tool call,
+and the daemon keeps no transcript in memory to read it from. This is left for Alex to decide.
+
+**Not seen:** the Background pane (frame C), because Steps cannot be pressed while the Mac is locked,
+and the phone (frame E), which is Alex's to see.
