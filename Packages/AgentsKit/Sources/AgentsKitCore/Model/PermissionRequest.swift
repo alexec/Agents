@@ -11,14 +11,18 @@ public struct PermissionRequest: Codable, Hashable, Sendable, Identifiable {
     public var toolCall: ToolCall
     public var options: [PermissionOption]
     public var askedAt: Date
+    /// The name of the subagent asking, when it is one of the agent's subagents rather
+    /// than the agent itself (057). The question is still the agent's to be answered.
+    public var subagent: String?
 
     public init(id: UUID = UUID(), agentID: UUID, toolCall: ToolCall,
-                options: [PermissionOption], askedAt: Date = Date()) {
+                options: [PermissionOption], askedAt: Date = Date(), subagent: String? = nil) {
         self.id = id
         self.agentID = agentID
         self.toolCall = toolCall
         self.options = options
         self.askedAt = askedAt
+        self.subagent = subagent
     }
 }
 

@@ -1586,6 +1586,21 @@ final class RemoteModel {
         }
     }
 
+    /// Stop one shell an agent left running, and nothing else it is doing (057). The
+    /// row goes when the daemon says the agent changed.
+    func stopBackground(_ item: BackgroundItem, of agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be stopped."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsStopBackground,
+                                  DaemonAPI.StopBackgroundRequest(agentID: agentID, itemID: item.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
     /// What a command an agent ran has printed, as far as this phone heard it.
     func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 

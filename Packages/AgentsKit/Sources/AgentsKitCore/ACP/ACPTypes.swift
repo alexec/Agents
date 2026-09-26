@@ -3,9 +3,11 @@ import Foundation
 /// The wire shapes we use, and the names of everything either side can call.
 ///
 /// Deliberately thin. Everything a runtime sends that is not listed here stays a
-/// `JSONValue` and is either kept whole or ignored, including every `_meta` block:
-/// Grok's `x.ai/hooks`, Claude's `jetbrains`, `steering` and `goal`. Reading any of
-/// them is how one code path becomes three.
+/// `JSONValue` and is either kept whole or ignored, including almost every `_meta`
+/// block: Grok's `x.ai/hooks`, Claude's `steering` and `goal`. Reading any of them is
+/// how one code path becomes three. The one opt-in the app sends there, JetBrains
+/// "AIR" (057), is a capability two runtimes share and is read as one: what comes of it
+/// arrives as update kinds of their own, never by asking which runtime this is.
 public enum ACP {
     public static let protocolVersion = 1
 
@@ -36,6 +38,10 @@ public enum ACP {
         /// `set_config_option` is used wherever the runtime offers it.
         public static let setSessionMode = "session/set_mode"
         public static let setSessionModel = "session/set_model"
+        /// Stop one background task without cancelling the turn (057). Claude and Codex
+        /// both answer it, once `asyncTasks` was advertised. `{stopped: false}` is an
+        /// answer, not an error: the task had already gone.
+        public static let stopAsyncTask = "_session/async_task/stop"
     }
 
     /// Named so that "we chose not to" and "we forgot" stay different things. Each of
@@ -79,6 +85,14 @@ public enum ACP {
         public var elicitationForm: Bool
         public var elicitationURL: Bool
         public var notices: Bool
+        /// JetBrains "AIR" `asyncTasks` (057): the runtime sends `async_task_*` updates for
+        /// what it runs in the background, and takes `_session/async_task/stop`. It stops
+        /// saying so in the Bash result's prose the moment this is on.
+        public var backgroundTasks: Bool
+        /// JetBrains "AIR" `nativeSubagentSessions` (057): a subagent is announced with
+        /// `subagent_*`, and everything it says and does arrives under its own session id.
+        /// The Agent tool card stops coming, so this is only on where those are routed.
+        public var subagentSessions: Bool
 
         public init(readTextFile: Bool = false,
                     writeTextFile: Bool = false,
@@ -89,7 +103,9 @@ public enum ACP {
                     terminalAuth: Bool = false,
                     elicitationForm: Bool = false,
                     elicitationURL: Bool = false,
-                    notices: Bool = false) {
+                    notices: Bool = false,
+                    backgroundTasks: Bool = false,
+                    subagentSessions: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
             self.terminal = terminal
@@ -100,6 +116,8 @@ public enum ACP {
             self.elicitationForm = elicitationForm
             self.elicitationURL = elicitationURL
             self.notices = notices
+            self.backgroundTasks = backgroundTasks
+            self.subagentSessions = subagentSessions
         }
 
         /// What 001 sent. Kept as a named thing so the change that turns a flag on is
@@ -125,7 +143,9 @@ public enum ACP {
             terminalAuth: true,
             elicitationForm: true,
             elicitationURL: true,
-            notices: true)
+            notices: true,
+            backgroundTasks: true,
+            subagentSessions: true)
 
         public var wire: JSONValue {
             var caps: [String: JSONValue] = [
@@ -143,6 +163,14 @@ public enum ACP {
             if elicitationForm { elicitation["form"] = .object([:]) }
             if elicitationURL { elicitation["url"] = .object([:]) }
             if !elicitation.isEmpty { caps["elicitation"] = .object(elicitation) }
+            var air: [JSONValue] = []
+            if backgroundTasks { air.append("asyncTasks") }
+            if subagentSessions { air.append("nativeSubagentSessions") }
+            if !air.isEmpty {
+                // Version 1 is the only one either adapter reads, and each checks for
+                // `>= 1`, so this is the floor rather than a guess.
+                caps["_meta"] = ["jetbrains": ["air": ["version": 1, "capabilities": .array(air)]]]
+            }
             return .object(caps)
         }
     }

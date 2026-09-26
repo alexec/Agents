@@ -3,6 +3,16 @@
 **Approved by Alex, 2026-09-26: frame A (the list over the prompt) with subagents opted in and
 their steps in a Background sidebar pane (frame C); frame E on the phone.** Frame D is not taken.
 
+**Frame B does not happen, by decision (Alex, 2026-09-26): background work ends with the turn.**
+The app lets a runtime go when its turn ends, and a second capture
+([probe/claude-0.81.2-shell-after-turn.jsonl](../probe/claude-0.81.2-shell-after-turn.jsonl))
+showed what keeping one would take: the shell runs on, and when it finishes Claude wakes itself
+and replies with no prompt (`_claude/origin: task-notification`). The runtime is not kept, so
+the list shows what runs while the turn does: a server started and then tested, or a subagent,
+which Claude holds the turn open for. Whatever is still running when the turn ends is marked
+"ended with the turn", on the row and once in the chat. Keeping runtimes alive for
+background work is a possible follow-up.
+
 The goal is for a person to see the shells and subagents an agent has running in the background as
 a list, each shell with a Stop button, instead of reading about them in prose.
 
@@ -107,3 +117,26 @@ the sheet has Stop. A subagent's row opens its steps. The iPad uses the Mac's la
   smaller, but it leaves subagents out of the list.
 - **Finished items leave the list** and leave a line in the transcript. There is no history in
   frame A. Frame D keeps a short "Finished" group.
+
+## Built, and walked (2026-09-26)
+
+**Subagents given back (Alex, 2026-09-26).** The first walk found that the app's own tool policy
+took subagents away from both runtimes: Claude's `Agent`, `TaskOutput` and `TaskStop` were
+removed, and Codex ran with `multi_agent` off. Now Claude keeps those three, and Codex runs
+with `multi_agent` on, so its six agent tools are no longer refused. `ListAgents` and
+`SendMessage` stay removed: they address other agents as peers, which is the app's job.
+
+Walked on a scratch root (`/tmp/run-bg057`) with real Claude turns, driven over the scratch
+daemon's socket:
+
+- A turn that started a ticking shell and a background subagent listed both on
+  `Agent.background`. The subagent's permission request arrived named "Count files". Its tool
+  calls and its report were filed under its own id, and left out of the agent's chat.
+- When the turn ended, the shell was marked `disconnected` ("ended with the turn"), and the
+  ticking process was gone.
+- On a turn still working in the foreground, `agents/stopBackground` answered
+  `{stopped: true}`. The row became `stopped` within 3 s, the turn carried on to its own end,
+  and the chat got exactly one line: Claude's notice "Task stopped by user".
+
+Not walked: the rows on screen. Driving the scratch window was declined while Alex was at the
+Mac, so the look of frames A, C and E is still to be seen. Both schemes build.

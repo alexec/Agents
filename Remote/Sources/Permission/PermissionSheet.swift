@@ -22,6 +22,11 @@ struct PermissionSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
+                // Its subagent asking, not the agent itself (057). Still the agent's
+                // question to answer, so it is asked here and not somewhere else.
+                if let subagent = request.subagent {
+                    Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
+                }
                 Text(request.toolCall.title)
                     .appText(.reading).fontWeight(.semibold)
                     .fixedSize(horizontal: false, vertical: true)

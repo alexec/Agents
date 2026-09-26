@@ -70,6 +70,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// What the agent said it was going to do. The current one is last.
     public var plans: [Plan]
 
+    /// What it left running in the background — shells, subagents — and the last few
+    /// that finished (057). Only a runtime told it may send these ever fills it.
+    public var background: [BackgroundItem]
+
     /// Folders beyond `cwd` that this agent may reach, where the runtime takes them.
     public var additionalDirectories: [URL]
 
@@ -274,6 +278,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // own, which is the app-wide per-agent limit applying.
         costCeiling = try c.decodeIfPresent(Cost.self, forKey: .costCeiling)
         plans = try c.decodeIfPresent([Plan].self, forKey: .plans) ?? []
+        background = try c.decodeIfPresent([BackgroundItem].self, forKey: .background) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
         // New in 004. A record written before it has nothing waiting.
@@ -362,6 +367,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !costToDate.isEmpty { try c.encode(costToDate, forKey: .costToDate) }
         try c.encodeIfPresent(costCeiling, forKey: .costCeiling)
         if !plans.isEmpty { try c.encode(plans, forKey: .plans) }
+        if !background.isEmpty { try c.encode(background, forKey: .background) }
         if !additionalDirectories.isEmpty {
             try c.encode(additionalDirectories, forKey: .additionalDirectories)
         }
@@ -409,6 +415,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case titledByAgent
         case parking
         case afterTurn
+        case background
         case archivedAt, retirement
     }
 
@@ -439,6 +446,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 costToDate: [String: Decimal] = [:],
                 costCeiling: Cost? = nil,
                 plans: [Plan] = [],
+                background: [BackgroundItem] = [],
                 additionalDirectories: [URL] = [],
                 mcpServers: [MCPServer] = [],
                 queuedPrompts: [QueuedPrompt] = [],
@@ -481,6 +489,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.costToDate = costToDate
         self.costCeiling = costCeiling
         self.plans = plans
+        self.background = background
         self.additionalDirectories = additionalDirectories
         self.mcpServers = mcpServers
         self.queuedPrompts = queuedPrompts

@@ -19,8 +19,15 @@ struct ChatActions {
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.
     var showEdit: (@MainActor (ToolCallContent.Diff, String?) -> Void)? = nil
+    /// Open a subagent's own steps, by its id (057): the Mac's Background pane, the
+    /// phone's sheet. Nil offers nothing.
+    var subagentSteps: (@MainActor (String) -> Void)? = nil
+    /// Open what a background task printed, from its output file (057).
+    var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
 }
 
 extension EnvironmentValues {
     @Entry var chatActions = ChatActions()
+    /// The open agent's background work (057), for a tool call to say it runs on.
+    @Entry var backgroundWork: [BackgroundItem] = []
 }

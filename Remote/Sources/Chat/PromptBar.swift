@@ -16,6 +16,8 @@ import SwiftUI
 struct PromptBar: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.chatActions) private var chatActions
     let agent: Agent
     /// A question or a form is floating above. The bar keeps to its field row while it
     /// is not being typed in, so the question has the room.
@@ -49,7 +51,13 @@ struct PromptBar: View {
                              projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
-                             waitHint: agent.eventWait.map(EventWords.hint) ?? "") {
+                             waitHint: agent.eventWait.map(EventWords.hint) ?? "",
+                             background: agent.background,
+                             backgroundActions: BackgroundActions(
+                                stop: { [model] item in await model.stopBackground(item, of: agent.id) },
+                                steps: { [chatActions] item in chatActions.subagentSteps?(item.id) }),
+                             // One line on a phone, the Mac's rows on an iPad (frame E).
+                             compactBackground: sizeClass == .compact) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }

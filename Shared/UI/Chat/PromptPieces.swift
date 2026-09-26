@@ -66,6 +66,11 @@ struct PromptHeader<Meter: View>: View {
     /// What the wait capsule does when pressed, and its ✕. See `WaitCapsule`.
     var openWait: (() -> Void)? = nil
     var cancelWait: (() -> Void)? = nil
+    /// What it has running in the background (057), drawn above the leases: a block of
+    /// rows, or on a phone one line that opens them (`compactBackground`).
+    var background: [BackgroundItem] = []
+    var backgroundActions = BackgroundActions()
+    var compactBackground = false
     /// What stands where the place is named, when an app can move the agent from here:
     /// the Mac's Worktree choice (053). Nil names the place as a label, as the phone does.
     var place: AnyView? = nil
@@ -75,6 +80,11 @@ struct PromptHeader<Meter: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if let waitStatus {
                 WaitCapsule(status: waitStatus, hint: waitHint, open: openWait, cancel: cancelWait)
+            }
+            if compactBackground {
+                BackgroundLine(items: background, actions: backgroundActions)
+            } else {
+                BackgroundBlock(items: background, actions: backgroundActions)
             }
             if let leaseStatus {
                 LeaseRow(status: leaseStatus, open: openLease)

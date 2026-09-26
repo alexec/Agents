@@ -129,6 +129,9 @@ private struct EntryRow: View {
         case .runtimeNote(let text):
             Text(text).appText(.fine).foregroundStyle(.secondary)
 
+        case .background(let item):
+            BackgroundEntryLine(item: item)
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
@@ -267,6 +270,7 @@ private struct ToolRunRow: View {
 /// there: what it produced, where it worked, and what the runtime actually sent.
 private struct ToolCallLine: View {
     @Environment(\.chatActions) private var actions
+    @Environment(\.backgroundWork) private var background
     let call: ToolCall
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
@@ -309,13 +313,21 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        Text(call.line)
+        Text(call.line + runsOn)
             .appText(.supporting)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
+    }
+
+    /// " · running in the background", while what this call started still runs (057).
+    /// The call itself came back at once; without this it reads as done.
+    private var runsOn: String {
+        guard let id = call.toolCallID,
+              background.contains(where: { $0.toolCallID == id && $0.isRunning }) else { return "" }
+        return " · running in the background"
     }
 
     // MARK: What it did, once asked

@@ -33,8 +33,8 @@ extension TranscriptEntry {
     /// The whole page, from the top. A client holding a page that grows a chunk at a
     /// time keeps a `TranscriptDisplayBuilder` instead and feeds it each entry as it
     /// arrives, which is this same fold without starting over.
-    public static func display(_ entries: [TranscriptEntry]) -> [TranscriptItem] {
-        var builder = TranscriptDisplayBuilder()
+    public static func display(_ entries: [TranscriptEntry], subagent: String? = nil) -> [TranscriptItem] {
+        var builder = TranscriptDisplayBuilder(subagent: subagent)
         for entry in entries { builder.add(entry) }
         return builder.items
     }
@@ -148,10 +148,18 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
+    /// Whose page this is: nil for the chat, which is the agent's own, or a subagent's
+    /// id for that subagent's steps (057). Each leaves out everything the other says.
+    public let subagent: String?
 
-    public init() {}
+    public init(subagent: String? = nil) {
+        self.subagent = subagent
+    }
 
     public mutating func add(_ entry: TranscriptEntry) {
+        // Before anything else, including the join: a subagent's chunk arriving between
+        // two of the agent's is not part of either message.
+        guard entry.subagentID == subagent else { return }
         if let last, let joined = TranscriptEntry.join(entry, onto: last) {
             // The chunk continues the last message. That message closed any run before
             // it and nothing has been drawn since, so it is the last item on the page.
@@ -179,6 +187,10 @@ public struct TranscriptDisplayBuilder: Sendable {
                 run.append(call)
             }
             if runID == nil { runID = entry.id }
+        case .background(let item) where item.isRunning && item.kind == .task && item.toolCallID != nil:
+            // A task starting from a tool call: the call is already on the page, and
+            // says it runs on while it does (057). Not a break in the run either.
+            return
         case .optionChanged:
             // Plumbing, not conversation. The mode or model in force is on the prompt
             // controls, which is where anyone looks for it; a line saying "mode is now
