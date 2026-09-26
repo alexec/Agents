@@ -111,4 +111,31 @@ Gemini was not walked: it still has no sign-in here (R14, T050). Plugins are the
 this step, and come with Phase 9. Afterwards `/tmp/run-054b`, `/tmp/run-054c` and
 `/tmp/dotagents-probe` were removed.
 
+### Plugins from `~/.agents/plugins` (T037)
+
+2026-09-26, after Phase 9 (2f708ec). `probe/run.sh setup` made the probe home, then
+`~/.agents/plugins/heron-plugin` was added by hand: a manifest, the `plover-skill` skill, and
+`.mcp.json` with `plover-mcp` (stdio). No marketplace or links were made by hand, so everything
+else was the app's. Codex has to read the home the app adds the plugin into, so the built
+`agentsd` ran with `HOME` and `AGENTS_PERSONAL_HOME` both set to the probe home, and with sign-ins
+borrowed as the probe's `acp` mode does. It ran on scratch root `/tmp/run-054d`, with
+`tools/codex` a read-only link to the real toolset. One agent at a time was asked to call
+`plover_mcp_word`.
+
+| Runtime | How it got the plugin | `plover-mcp` in `mcp.log` | Answer |
+|---|---|---|---|
+| Claude | `_meta.claudeCode.options.plugins` | started, tools/list, tools/call | PLOVER-MCP-9 |
+| Grok | `_meta.pluginDirs`, and its server in `mcpServers` | started, tools/list, tools/call | PLOVER-MCP-9 |
+| Codex | `~/.agents/plugins/marketplace.json` (`agents-personal`, the app's marker) and the app's own `codex plugin add` at daemon start | started, tools/list, tools/call | PLOVER-MCP-9 |
+
+Codex's copy landed in `~/.codex/plugins/cache/agents-personal`.
+
+**Re-adding on a change.** The daemon started with an unchanged plugin. Then `touch` on
+`skills/plover-skill/SKILL.md` and a Codex start gave `codex plugin add heron-plugin: added`
+before the session. A second Codex start, with nothing changed, ran no add: the count in
+`daemon.log` stayed the same. An earlier `touch` also made the daemon's own start add it
+again, as it should.
+
+Afterwards `probe/run.sh clean` was run and `/tmp/run-054d` removed.
+
 ## 6. Settings ▸ Shared

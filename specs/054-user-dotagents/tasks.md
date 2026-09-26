@@ -250,7 +250,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
   It runs at daemon start and before a Codex session only.
 - [X] T036 [US7] Add the Gemini extension-link step to `Src/Projects/PersonalDotAgents+Plugins.swift`, recorded like skill links, only when Gemini is installed.
-- [ ] T037 [US7] Run quickstart step 5's plugin half live on the probe home. Record in `walk/README.md` that `plover-mcp` logged for Claude, Codex (after the app's own add) and Grok, and that touching a plugin file makes the next Codex start add it again while a second unchanged start does not.
+- [X] T037 [US7] Run quickstart step 5's plugin half live on the probe home. Record in `walk/README.md` that `plover-mcp` logged for Claude, Codex (after the app's own add) and Grok, and that touching a plugin file makes the next Codex start add it again while a second unchanged start does not.
 
 ---
 
