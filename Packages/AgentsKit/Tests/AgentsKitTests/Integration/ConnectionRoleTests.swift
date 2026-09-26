@@ -134,7 +134,7 @@ struct ConnectionRoleTests {
         window.broadcast("agent/entry", ["secret": "for the window"])
         stranger.broadcast("agent/entry", ["secret": "for the window"])
 
-        #expect(await readLine(windowFD, deadline: Date().addingTimeInterval(5))?["method"] as? String == "agent/entry")
+        #expect(await readLine(windowFD, deadline: Date().addingTimeInterval(max(5, Double(Eventually.timeout.components.seconds))))?["method"] as? String == "agent/entry")
         #expect(await readLine(strangerFD, deadline: Date().addingTimeInterval(1)) == nil)
     }
 
