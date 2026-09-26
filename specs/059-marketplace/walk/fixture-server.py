@@ -13,7 +13,8 @@ uses when AGENTS_TEST_CATALOG_URL and AGENTS_TEST_GITHUB_URL both name this serv
   /raw/<o>/<r>/<sha>/<path>               one file at the commit
   /codeload/<o>/<r>/tar.gz/<sha>          the commit's tarball
 
-POST /_down and /_up switch every route to 503 and back (frame E). Every request is
+POST /_down and /_up switch every route to 503 and back (frame E). POST /_advance moves HEAD
+to the second commit, where nested has changed (US3). Every request is
 printed, so a walk can see what the app asked for.
 
 Usage: python3 specs/059-marketplace/walk/fixture-server.py [--port 8931]
@@ -26,8 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIX = os.path.normpath(os.path.join(HERE, "../../../Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/catalog"))
 HTTP = os.path.join(FIX, "http")
 META = json.load(open(os.path.join(HTTP, "meta.json")))
-OWNER, REPO, COMMIT = META["owner"], META["repo"], META["commit"]
-STATE = {"down": False}
+OWNER, REPO, COMMIT, NEXT = META["owner"], META["repo"], META["commit"], META["next"]
+STATE = {"down": False, "moved": False}
 
 
 def read(name):
@@ -52,6 +53,8 @@ class Handler(BaseHTTPRequestHandler):
             STATE["down"] = True
         elif self.path == "/_up":
             STATE["down"] = False
+        elif self.path == "/_advance":
+            STATE["moved"] = True
         self.send(204)
 
     def do_GET(self):
@@ -73,9 +76,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, read(name))
             return self.send(404)
         if path == f"/{OWNER}/{REPO}.git/info/refs":
-            return self.send(200, read("info-refs.txt"), "application/x-git-upload-pack-advertisement")
+            name = "next/info-refs.txt" if STATE["moved"] else "info-refs.txt"
+            return self.send(200, read(name), "application/x-git-upload-pack-advertisement")
         if path == f"/api/repos/{OWNER}/{REPO}/git/trees/{COMMIT}":
             return self.send(200, read("tree.json"))
+        if path == f"/api/repos/{OWNER}/{REPO}/git/trees/{NEXT}":
+            return self.send(200, read("next/tree.json"))
+        nxt = f"/raw/{OWNER}/{REPO}/{NEXT}/"
+        if path.startswith(nxt):
+            rel = os.path.normpath(path[len(nxt):])
+            for base in (os.path.join(HTTP, "next", "raw"), FIX):
+                full = os.path.normpath(os.path.join(base, rel))
+                if rel.startswith("skills/") and full.startswith(base + os.sep) and os.path.isfile(full):
+                    with open(full, "rb") as f:
+                        return self.send(200, f.read(), "application/octet-stream")
+            return self.send(404)
         raw = f"/raw/{OWNER}/{REPO}/{COMMIT}/"
         if path.startswith(raw):
             rel = os.path.normpath(path[len(raw):])

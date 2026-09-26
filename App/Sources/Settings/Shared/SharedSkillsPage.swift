@@ -48,7 +48,7 @@ struct SharedSkillsPage: View {
                             hasUpdate: Self.available(updates[chosen.name]),
                             update: { updating = chosen.name },
                             removed: { Task { await refresh() } })
-                    .id(chosen.id)
+                    .id("\(chosen.id)@\(chosen.managed?.commit ?? "")")
             } else {
                 Text("Choose a skill").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -90,7 +90,7 @@ struct SharedSkillsPage: View {
 
     private func row(_ skill: DaemonAPI.Skill) -> some View {
         SharedRow(chosen: skill.id == chosen?.id,
-                  label: "\(skill.name)\(skill.clash != nil ? ", clash" : ""). \(ReachDots.spoken(snapshot.runtimes, skill.reach))",
+                  label: "\(skill.name)\(skill.clash != nil ? ", clash" : "")\(Self.available(updates[skill.name]) ? ", update available" : ""). \(ReachDots.spoken(snapshot.runtimes, skill.reach))",
                   action: { chosenID = skill.id }) {
             HStack(spacing: 8) {
                 Text(skill.name).fontWeight(.semibold).lineLimit(1).fixedSize()
@@ -165,15 +165,17 @@ private struct SkillDetail: View {
             if let removeFailure {
                 Text(removeFailure).appText(.fine).foregroundStyle(SharedInk.attention)
             }
-            HStack {
-                Button("Reveal in Finder") { SharedFiles.reveal(skill.path) }.buttonStyle(.paper)
-                Button("Edit SKILL.md") { SharedFiles.open(skill.path + "/SKILL.md") }.buttonStyle(.paper)
-                // Only for a skill a lock names: the person's own keep exactly today's actions (FR-021).
-                if skill.managed != nil {
-                    Spacer()
+            // Only for a skill a lock names: the person's own keep exactly today's actions (FR-021).
+            // A row of its own, so four buttons never squeeze the detail wider than the window.
+            if skill.managed != nil {
+                HStack {
                     if hasUpdate { Button("Update…", action: update).buttonStyle(.paperProminent) }
                     Button("Remove…") { confirmingRemove = true }.buttonStyle(.paper)
                 }
+            }
+            HStack {
+                Button("Reveal in Finder") { SharedFiles.reveal(skill.path) }.buttonStyle(.paper)
+                Button("Edit SKILL.md") { SharedFiles.open(skill.path + "/SKILL.md") }.buttonStyle(.paper)
             }
             .confirmationDialog("Move \(skill.name) to the Trash?", isPresented: $confirmingRemove) {
                 Button("Move to Trash", role: .destructive) {

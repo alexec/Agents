@@ -102,7 +102,10 @@ struct SkillPreviewView: View {
             SharedFact(label: "Owner", value: preview.result.owner)
             SharedFact(label: "Repo", value: preview.result.repo)
             SharedFact(label: "Commit", value: commitLine, code: true)
-            SharedFact(label: "Installs", value: "\(AddSkillSheet.count(preview.result.installs)) on skills.sh")
+            // An update comes from the lock, not a search, so there is no count to show.
+            if update == nil {
+                SharedFact(label: "Installs", value: "\(AddSkillSheet.count(preview.result.installs)) on skills.sh")
+            }
             SharedFact(label: "Goes to", value: goesTo, code: true)
         }
     }

@@ -254,13 +254,13 @@ any.
 
 ### Tests first
 
-- [ ] T044 [P] [US3] Write `Tests/Catalog/SkillUpdatesTests.swift`:
+- [X] T044 [P] [US3] Write `Tests/Catalog/SkillUpdatesTests.swift`:
   - an unchanged HEAD makes **no** tree request (the stub's log) and moves the sidecar commit on;
   - a moved HEAD with an unchanged folder tree gives `current`;
   - a changed folder gives `available(commit)`;
   - a second check within an hour for the same `source` makes no request (FR-018);
   - a skill the CLI added (no sidecar) is checked by tree SHA alone.
-- [ ] T045 [P] [US3] Write `Tests/Catalog/SkillInstallerUpdateRemoveTests.swift`:
+- [X] T045 [P] [US3] Write `Tests/Catalog/SkillInstallerUpdateRemoveTests.swift`:
   - `update-preview` lists added, changed and removed files against the installed folder;
   - `edited` is true once SKILL.md was changed locally (the hash differs from the lock, R6);
   - `add` with `replace:true` keeps `installedAt` and changes `updatedAt`;
@@ -269,13 +269,13 @@ any.
 
 ### Implementation
 
-- [ ] T046 [US3] Write `Src/Catalog/SkillUpdates.swift`, which checks each `source` at most once an hour. Implement `skills/check-updates` in `DaemonCore+Catalog.swift` and make T044 pass.
-- [ ] T047 [US3] Add `updatePreview` and `remove` to `Src/Catalog/SkillInstaller.swift`, implement `skills/update-preview` and `skills/remove`, and make T045 pass.
-- [ ] T048 [US3] In the app:
+- [X] T046 [US3] Write `Src/Catalog/SkillUpdates.swift`, which checks each `source` at most once an hour. Implement `skills/check-updates` in `DaemonCore+Catalog.swift` and make T044 pass.
+- [X] T047 [US3] Add `updatePreview` and `remove` to `Src/Catalog/SkillInstaller.swift`, implement `skills/update-preview` and `skills/remove`, and make T045 pass.
+- [X] T048 [US3] In the app:
   - `App/Settings/Shared/SharedSkillsPage.swift` and `App/Projects/ProjectSkillsSection.swift` call `check-updates` when they appear and show the orange `update` chip;
   - the detail gets **Update** (opening `SkillPreviewView` in update mode, which lists the changed files and warns a second time when `edited`) beside **Remove** (confirmed with "Move <name> to the Trash?");
   - both are offered only when `managed` is set (FR-021).
-- [ ] T049 [US3] Walk quickstart §3 steps 8–11 over the socket and the Update/Remove path on screen. Screenshots go in `specs/059-marketplace/walk/us3/`.
+- [X] T049 [US3] Walk quickstart §3 steps 8–11 over the socket and the Update/Remove path on screen. Screenshots go in `specs/059-marketplace/walk/us3/`.
 
 ---
 
