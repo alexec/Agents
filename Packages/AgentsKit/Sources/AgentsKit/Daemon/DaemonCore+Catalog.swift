@@ -5,6 +5,12 @@ import Foundation
 /// contracts/catalog-methods.md). Control-only: none of these is in `deviceMethods` or
 /// `agentMethods`.
 extension DaemonCore {
+    /// A test's stand-in for skills.sh and GitHub, as `useForLeases` is for leases.
+    func useForCatalog(session: URLSession, endpoints: CatalogEndpoints) {
+        catalogSession = session
+        catalogEndpoints = endpoints
+    }
+
     var catalog: SkillsCatalog { SkillsCatalog(session: catalogSession, endpoints: catalogEndpoints) }
 
     var catalogGitHub: GitHubSource {
