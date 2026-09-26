@@ -65,6 +65,9 @@ nav:
       - how-to/add-a-project.md
       - how-to/start-in-a-worktree.md
       - how-to/answer-a-question.md
+      - how-to/send-while-an-agent-works.md
+      - how-to/watch-background-work.md
+      - how-to/use-a-shell.md
       - how-to/add-a-linux-server.md
       - how-to/set-up-a-workflow.md
       - how-to/watch-a-pull-request.md

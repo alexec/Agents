@@ -32,8 +32,8 @@ agent, in the project folder.
    - A worktree already listed: join one that exists. The line under each says its
      branch and how many agents are working in it.
    - **New worktree on a branch**: make a worktree on a branch you already have, local
-     or from a remote. On the Mac, with more than six branches, type in **Find a branch**
-     to narrow the list.
+     or from a remote, marked **From** the remote. On the Mac every worktree and every
+     branch is listed, and the list scrolls when there are more than fit.
 4. Type the prompt and send it.
 
    The agent starts in the worktree.

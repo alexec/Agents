@@ -21,7 +21,8 @@ each. The conversation shows each edit where it happened.
 1. Open the agent's conversation. If the sidebar on the right is closed, open it with the
    sidebar button at the top right of the window.
 2. Click **Changes** at the top of the sidebar (beside **Files**, **Terminal**,
-   **Browser** and **Exchanged**).
+   **Browser**, **Exchanged** and **Background**), or press Command-2. When the sidebar
+   is narrow, the panes are shown as small pictures; hover over one for its name.
 
    The files it changed are listed, grouped by folder, each with the lines added and
    removed (**+12 −3**). Until it changes something, the pane says **Nothing changed

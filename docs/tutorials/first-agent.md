@@ -19,7 +19,7 @@ how every agent in the app works.
 
 - A Mac with Xcode installed.
 - One coding agent installed and signed in on this Mac. This tutorial uses **Claude
-  Code**. Grok, Copilot and Cursor work too; see [Runtimes](../reference/runtimes.md) for
+  Code**. Codex, Gemini, Antigravity, Grok, Copilot and Cursor work too; see [Runtimes](../reference/runtimes.md) for
   what each needs.
 
 ## 1. Build and open Agents

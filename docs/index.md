@@ -1,6 +1,6 @@
 ---
 diataxis: index
-description: Agents runs the coding agents you already have — Claude, Grok, Copilot, Cursor — on your Mac, and lets you follow them from your iPhone and iPad.
+description: Agents runs the coding agents you already have — Claude, Codex, Gemini, Antigravity, Grok, Copilot, Cursor — on your Mac, and lets you follow them from your iPhone and iPad.
 ---
 
 # Agents
@@ -13,8 +13,8 @@ Agents is a Mac app for working with coding agents. You give it the folders you 
 start an agent in one with a sentence of what you want done, and it keeps every agent in
 view: which ones need you, which are working, and which have finished.
 
-It runs the coding tools you already have (Claude, Grok, Copilot and Cursor) rather than
-bringing its own. The agents keep working when the window is closed, and you can answer
+It runs the coding tools you already have (Claude, Codex, Gemini, Antigravity, Grok,
+Copilot and Cursor) rather than bringing its own. The agents keep working when the window is closed, and you can answer
 them from your iPhone or iPad.
 
 [Start here: your first agent](tutorials/first-agent.md){ .md-button .md-button--primary }
