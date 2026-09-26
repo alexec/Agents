@@ -22,15 +22,22 @@ extension DaemonCore {
     /// An agent another agent started is told to leave out the tools for starting,
     /// stopping and archiving agents (028), so it is never offered what the daemon
     /// would refuse it.
-    func appServer(token: String, managesAgents: Bool = true) -> MCPServer {
+    ///
+    /// And an agent on a runtime that cannot carry its conversation into another folder is
+    /// not offered the tools for moving itself (053).
+    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) -> MCPServer {
         MCPServer(name: AppTool.serverName,
                   transport: .stdio(command: Self.helperPath,
-                                    args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag]),
+                                    args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag])
+                                        + (movesItself ? [] : [Self.noMoveToolsFlag]),
                                     env: [StoreLocations.rootVariable: locations.root.path]))
     }
 
     /// What tells the helper to leave the agent tools out.
     public static let noAgentToolsFlag = "--no-agent-tools"
+
+    /// What tells the helper to leave `enter_worktree` and `exit_worktree` out (053).
+    public static let noMoveToolsFlag = "--no-move-tools"
 
     /// The binary the runtime is told to run. The daemon's own path: one build, one
     /// signature, and no second thing to install or keep in step.

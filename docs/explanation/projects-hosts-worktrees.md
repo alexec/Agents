@@ -84,6 +84,24 @@ has checked out, and it lives inside the repository, under `.agents/worktrees`. 
 in a worktree is still listed in the same project, with the worktree's name on its row.
 An agent that starts helpers of its own can put each one in a worktree too.
 
+## An agent can change where it works
+
+Where an agent works is not fixed when it starts. An agent that finds its task has grown
+into something that needs its own branch can move into a worktree, or you can move it, and
+it can move back to the project folder later. The app makes the move between turns, because
+changing a runtime's folder while it is working is not something any runtime offers. The
+app already starts the runtime afresh for each turn, so the next turn simply starts in the
+new folder and picks up the same conversation.
+
+Everything that follows an agent's folder follows the move: its files and changes, a
+restart or resume, and archiving, which cleans up the worktree it moved into just as if it
+had started there. A shell you had open stays where it is, since it is yours.
+
+A runtime has to be able to pick its conversation back up in another folder for this to
+work. Claude, Copilot, Cursor and Codex can. Grok cannot, and Gemini and Antigravity have not
+been checked, so their agents are never moved: they would carry on having forgotten
+everything.
+
 ## Worktrees are never removed by accident
 
 Archiving an agent never throws work away. When you archive the last agent in a worktree

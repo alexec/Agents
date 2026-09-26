@@ -899,11 +899,13 @@ final class RemoteModel {
                 // The Mac sends a device only the shells it has open (034).
                 if notification.method == DaemonAPI.Notification.shellOutput,
                    let params = notification.params,
-                   let output = DaemonAPI.ShellOutputNotification(params: params) {
+                   let output = DaemonAPI.ShellOutputNotification(params: params),
+                   output.shell == 0 {
                     self.shells[output.agentID]?.received(output.bytes)
                 }
                 if notification.method == DaemonAPI.Notification.shellStateChanged,
-                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+                   let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self),
+                   change.shell == 0 {
                     self.shells[change.agentID]?.received(change.state)
                 }
                 if notification.method == DaemonAPI.Notification.filesChanged,

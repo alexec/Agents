@@ -425,15 +425,13 @@ extension DaemonCore {
 
     /// What a runtime that would not make a session is said to have done.
     private func startFailure(_ error: Error, runtime: Runtime, runtimeID: String) -> Error {
+        // Not a fault. The runtime is there and needs signing in, which is
+        // something the app can show and offer to fix.
+        if let why = Self.signInReason(error) {
+            markNeedsSignIn(runtimeID: runtimeID)
+            return signInNeeded(runtime: runtime, because: why)
+        }
         switch error {
-        case let error as JSONRPCError where error.isAuthRequired:
-            markNeedsSignIn(runtimeID: runtimeID)
-            // Not a fault. The runtime is there and needs signing in, which is
-            // something the app can show and offer to fix.
-            return signInNeeded(runtime: runtime, because: error.message)
-        case ACPSessionError.needsSignIn:
-            markNeedsSignIn(runtimeID: runtimeID)
-            return signInNeeded(runtime: runtime, because: "it is not signed in")
         case ACPSessionError.unsupportedProtocolVersion(let version):
             return JSONRPCError(code: DaemonAPI.Failure.wrongProtocolVersion,
                                 message: "\(runtime.name) speaks protocol version \(version), and this app speaks \(ACP.protocolVersion).")
@@ -444,6 +442,27 @@ extension DaemonCore {
             return JSONRPCError(code: DaemonAPI.Failure.runtimeWillNotStart,
                                 message: "\(runtime.name) would not start: \(error.localizedDescription)")
         }
+    }
+
+    /// Why a runtime refused, when what it refused for is a sign-in; nil for anything
+    /// else. The protocol's own `-32000`, and a turn that failed to authenticate, which
+    /// is how Claude says a sign-in has expired (the same test 043 uses on servers).
+    static func signInReason(_ error: any Error) -> String? {
+        switch error {
+        case let error as JSONRPCError where error.isAuthRequired || isAuthenticationFailure(error):
+            return error.message
+        case ACPSessionError.needsSignIn:
+            return "it is not signed in"
+        default:
+            return nil
+        }
+    }
+
+    /// Tell the windows an agent stopped for want of a sign-in, somewhere none of them
+    /// asked, so the one in front can offer the sign-in rather than an error.
+    func askForSignIn(runtimeID: String, agentID: UUID?) {
+        broadcast(DaemonAPI.Notification.signInNeeded,
+                  DaemonAPI.SignInNeeded(runtimeID: runtimeID, agentID: agentID))
     }
 
     /// The runtime is installed and unusable until somebody signs in. Its own auth
@@ -799,6 +818,14 @@ extension DaemonCore {
             // left behind here is a runtime nobody will ever end.
             dropAppTokens(for: agent.id)
             await session.end(gracePeriod: .seconds(1))
+            // The same refusal a new agent gets, with the ways to sign in, so a window
+            // shows the sign-in rather than the protocol's error. Said to every window
+            // too: a queued prompt or a pick-up has nobody waiting on the answer.
+            if let why = Self.signInReason(error) {
+                markNeedsSignIn(runtimeID: runtime.id)
+                askForSignIn(runtimeID: runtime.id, agentID: agent.id)
+                throw signInNeeded(runtime: runtime, because: why)
+            }
             throw error
         }
     }
@@ -833,7 +860,7 @@ extension DaemonCore {
                                                   mcpServers: servers,
                                                   meta: meta)
                 await record(.runtimeNote(RuntimeNote.pickedBackUp), for: agent.id)
-            } catch {
+            } catch where Self.signInReason(error) == nil {
                 // The runtime no longer has it. The agent is not lost: it carries on as
                 // the same agent, with our transcript, in a new runtime session.
                 await record(.runtimeNote("\(runtime.name) no longer has this conversation. Carrying on in a new one; everything above is kept."),
@@ -923,6 +950,9 @@ extension DaemonCore {
         var outgoing = blocks
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { outgoing.insert(.text(preface), at: 0) }
+        // Where it now works, when it has just been moved (053): first of all, so what
+        // follows is read from the right folder.
+        if let moved = moveNotes.removeValue(forKey: agentID) { outgoing.insert(.text(moved), at: 0) }
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
@@ -1001,6 +1031,7 @@ extension DaemonCore {
             reason = .runtimeError
         } else if let known = result.reason {
             reason = known
+            if let runtimeID = agents[agentID]?.runtimeID { markSignedIn(runtimeID: runtimeID) }
         } else {
             // Written down as given. The ending line says only that the reason is
             // one we do not know; the wire's own word for it is the one thing worth
@@ -1035,6 +1066,10 @@ extension DaemonCore {
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
+        // A move asked for in this turn is made now, between the runtime going and the
+        // next one starting, and before the stop below is heard: a stopped turn still
+        // moves, it just does not carry on by itself (053).
+        let movedBy = await applyPendingMove(agentID)
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
@@ -1054,6 +1089,17 @@ extension DaemonCore {
         // them.
         if crossedItsLimit {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
+            return
+        }
+        // The agent moved itself so that it could carry on working there: started again,
+        // unless the person has queued words, which go first. No question about how the
+        // turn went: it ended to move (053).
+        if movedBy == .agent {
+            if agents[agentID]?.queuedPrompts.isEmpty == true {
+                await continueAfterMove(agentID)
+            } else {
+                await drainQueue(after: agentID)
+            }
             return
         }
         // Ended blocked, with everything it named already over (039): carried on here,
@@ -1147,12 +1193,18 @@ extension DaemonCore {
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
         let refused = credentialRefusal(agentID: agentID, error: error)
+        let signIn = refused == nil ? Self.signInReason(error) : nil
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
                 ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
+        } else if let signIn, let runtimeID = agents[agentID]?.runtimeID {
+            // Nor here: it answered, and wants signing in. The window offers that.
+            markNeedsSignIn(runtimeID: runtimeID)
+            askForSignIn(runtimeID: runtimeID, agentID: agentID)
+            await record(.runtimeNote("\(runtimeName) needs signing in: \(signIn)"), for: agentID)
         } else if let limit = Self.usageLimit(error) {
             // Not "stopped answering" either: the provider said the quota or rate limit
             // was reached, in a sentence of its own (046, FR-018; Gemini's free tier).
@@ -1161,9 +1213,13 @@ extension DaemonCore {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        let limited = refused == nil && Self.usageLimit(error) != nil
-        await move(agentID, on: refused != nil ? .turnEnded(.signInRefused) : limited ? .turnEnded(.refusal) : .processDied)
+        let limited = refused == nil && signIn == nil && Self.usageLimit(error) != nil
+        await move(agentID, on: refused != nil || signIn != nil ? .turnEnded(.signInRefused)
+                                : limited ? .turnEnded(.refusal) : .processDied)
         await releaseRuntime(for: agentID)
+        // A move asked for before the runtime fell over is still made, but nothing starts
+        // by itself: the runtime failing is for the person to see first (053).
+        await applyPendingMove(agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)
@@ -1359,6 +1415,13 @@ extension DaemonCore {
         dropBlock(agentID)
         endWait(agentID, by: .archived)
         shownPlanFiles.removeValue(forKey: agentID)
+        // And a move still waiting: taken back before the stop below ends the turn it was
+        // waiting on, which would otherwise make it on the way into the archive (053).
+        if var waiting = agents[agentID], waiting.pendingMove != nil {
+            waiting.pendingMove = nil
+            changed(waiting)
+        }
+        moveNotes.removeValue(forKey: agentID)
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)

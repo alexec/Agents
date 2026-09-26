@@ -1,6 +1,6 @@
 import Foundation
 
-/// The shells the daemon is holding, one per agent.
+/// The shells the daemon is holding, as many per agent as the user opened (055).
 ///
 /// The daemon owns these for the same reason it owns agents: a build that dies when a
 /// window closes is a build you cannot start before lunch. Attaching starts one;
@@ -16,12 +16,16 @@ public final class ShellHost: @unchecked Sendable {
         /// means the replay is the end of the session rather than the whole of it.
         public var dropped: Int
         public var startedAt: Date
+        /// The folder the shell was started in. An agent that moved since (053) works
+        /// somewhere else, and the pane says so.
+        public var folder: URL?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
+            self.folder = folder
         }
     }
 
@@ -31,19 +35,30 @@ public final class ShellHost: @unchecked Sendable {
         case stillLive
     }
 
+    /// One shell: whose, and which of theirs. Zero is the one every agent has.
+    public struct Key: Hashable, Sendable {
+        public var agentID: UUID
+        public var shell: Int
+
+        public init(agentID: UUID, shell: Int = 0) {
+            self.agentID = agentID
+            self.shell = shell
+        }
+    }
+
     private let lock = NSLock()
-    private var sessions: [UUID: ShellSession] = [:]
+    private var sessions: [Key: ShellSession] = [:]
     /// Where a shell's output goes. One broadcaster, not a sink per connection: the
     /// daemon already sends every notification to every window, and a second way to
     /// route one would be a second way to talk to the daemon. A window ignores agents
     /// it is not showing, and two windows on one agent both hear it, which is FR-023
     /// for free.
-    private var broadcast: (@Sendable (UUID, ShellEvent) -> Void)?
+    private var broadcast: (@Sendable (Key, ShellEvent) -> Void)?
 
     /// Agents whose shell has gone since a window last looked, with the reason. Held so
     /// that the next attach can say what happened rather than silently handing over a
     /// new shell (FR-029).
-    private var epitaphs: [UUID: String] = [:]
+    private var epitaphs: [Key: String] = [:]
 
     public enum ShellEvent: Sendable {
         case output(Data)
@@ -54,21 +69,23 @@ public final class ShellHost: @unchecked Sendable {
 
     // MARK: Where output goes
 
-    public func setBroadcaster(_ broadcast: @escaping @Sendable (UUID, ShellEvent) -> Void) {
+    public func setBroadcaster(_ broadcast: @escaping @Sendable (Key, ShellEvent) -> Void) {
         lock.lock(); defer { lock.unlock() }
         self.broadcast = broadcast
     }
 
     // MARK: Attaching
 
-    /// Give this connection the shell for an agent, starting one if there is none.
+    /// Give this connection one of an agent's shells, starting it if there is none.
     public func attach(agentID: UUID,
+                       shell: Int = 0,
                        folder: URL,
                        rows: Int,
                        cols: Int) throws -> Attachment {
+        let key = Key(agentID: agentID, shell: shell)
         lock.lock()
-        let existing = sessions[agentID]
-        let epitaph = epitaphs.removeValue(forKey: agentID)
+        let existing = sessions[key]
+        let epitaph = epitaphs.removeValue(forKey: key)
         lock.unlock()
 
         if let existing, existing.state.isLive {
@@ -77,7 +94,8 @@ public final class ShellHost: @unchecked Sendable {
             return Attachment(state: existing.state,
                               scrollback: buffer.tail,
                               dropped: buffer.dropped,
-                              startedAt: existing.startedAt)
+                              startedAt: existing.startedAt,
+                              folder: existing.folder)
         }
 
         // A shell that is over but whose output is still worth reading stays until the
@@ -87,87 +105,110 @@ public final class ShellHost: @unchecked Sendable {
             return Attachment(state: existing.state,
                               scrollback: buffer.tail,
                               dropped: buffer.dropped,
-                              startedAt: existing.startedAt)
+                              startedAt: existing.startedAt,
+                              folder: existing.folder)
         }
 
-        let session = try start(agentID: agentID, folder: folder, rows: rows, cols: cols)
+        let session = try start(key, folder: folder, rows: rows, cols: cols)
         // The previous shell died with the daemon or the machine. Say so on this first
         // attach rather than pretending this new one is the old one.
         if let epitaph {
             let note = "\r\n\u{1B}[2m\(epitaph)\u{1B}[0m\r\n"
-            push(agentID, .output(Data(note.utf8)))
+            push(key, .output(Data(note.utf8)))
         }
         let buffer = session.scrollback
         return Attachment(state: session.state,
                           scrollback: buffer.tail,
                           dropped: buffer.dropped,
-                          startedAt: session.startedAt)
+                          startedAt: session.startedAt,
+                          folder: session.folder)
     }
 
     /// The window has stopped looking. Kills nothing and stops nothing: a shell
     /// belongs to the agent, not to whoever is watching it (FR-026). It exists as a
     /// named call because a window closing is a real event, and because the pane's own
     /// bookkeeping deserves a counterpart on this side.
-    public func detach(agentID: UUID) {
+    public func detach(agentID: UUID, shell: Int = 0) {
         // Deliberately without consequence. See above.
     }
 
-    private func start(agentID: UUID, folder: URL, rows: Int, cols: Int) throws -> ShellSession {
+    /// The shells held for an agent, by number, in the order they were opened. When
+    /// none is held yet, the first, which attaching will start: every agent has one.
+    public func shells(for agentID: UUID) -> [Int] {
+        lock.lock(); defer { lock.unlock() }
+        let held = sessions.keys.filter { $0.agentID == agentID }.map(\.shell).sorted()
+        return held.isEmpty ? [0] : held
+    }
+
+    /// The user closed this shell's tab: end it and forget it, output and all. Unlike
+    /// detaching, this is the user saying they are finished with it (055).
+    public func close(agentID: UUID, shell: Int) {
+        let key = Key(agentID: agentID, shell: shell)
+        lock.lock()
+        let session = sessions.removeValue(forKey: key)
+        epitaphs[key] = nil
+        lock.unlock()
+        session?.release(reason: "This shell was closed.")
+    }
+
+    private func start(_ key: Key, folder: URL, rows: Int, cols: Int) throws -> ShellSession {
         let session = ShellSession(
-            agentID: agentID,
+            agentID: key.agentID,
             folder: folder,
             rows: rows,
             cols: cols,
-            onOutput: { [weak self] data in self?.push(agentID, .output(data)) },
-            onStateChange: { [weak self] state in self?.push(agentID, .state(state)) })
+            onOutput: { [weak self] data in self?.push(key, .output(data)) },
+            onStateChange: { [weak self] state in self?.push(key, .state(state)) })
 
         if case .failed(let reason) = session.state {
             throw Failure.willNotStart(reason)
         }
         lock.lock()
-        sessions[agentID] = session
+        sessions[key] = session
         lock.unlock()
         return session
     }
 
-    /// Start a new shell for an agent whose old one is over (FR-024).
-    public func restart(agentID: UUID, folder: URL, rows: Int, cols: Int) throws -> Attachment {
+    /// Start a new shell in place of one that is over (FR-024).
+    public func restart(agentID: UUID, shell: Int = 0, folder: URL, rows: Int, cols: Int) throws -> Attachment {
+        let key = Key(agentID: agentID, shell: shell)
         lock.lock()
-        let existing = sessions[agentID]
+        let existing = sessions[key]
         lock.unlock()
         if let existing, existing.state.isLive { throw Failure.stillLive }
 
         lock.lock()
-        sessions[agentID] = nil
+        sessions[key] = nil
         lock.unlock()
 
-        let session = try start(agentID: agentID, folder: folder, rows: rows, cols: cols)
-        push(agentID, .state(session.state))
+        let session = try start(key, folder: folder, rows: rows, cols: cols)
+        push(key, .state(session.state))
         return Attachment(state: session.state,
                           scrollback: Data(),
                           dropped: 0,
-                          startedAt: session.startedAt)
+                          startedAt: session.startedAt,
+                          folder: session.folder)
     }
 
     // MARK: Using one
 
-    public func write(agentID: UUID, data: Data) throws {
-        guard let session = session(for: agentID), session.state.isLive else { throw Failure.notLive }
+    public func write(agentID: UUID, shell: Int = 0, data: Data) throws {
+        guard let session = session(for: agentID, shell: shell), session.state.isLive else { throw Failure.notLive }
         session.write(data)
     }
 
-    public func resize(agentID: UUID, rows: Int, cols: Int) {
-        session(for: agentID)?.resize(rows: rows, cols: cols)
+    public func resize(agentID: UUID, shell: Int = 0, rows: Int, cols: Int) {
+        session(for: agentID, shell: shell)?.resize(rows: rows, cols: cols)
     }
 
-    public func signal(agentID: UUID, number: Int32) throws {
-        guard let session = session(for: agentID), session.state.isLive else { throw Failure.notLive }
+    public func signal(agentID: UUID, shell: Int = 0, number: Int32) throws {
+        guard let session = session(for: agentID, shell: shell), session.state.isLive else { throw Failure.notLive }
         session.signal(number)
     }
 
-    public func session(for agentID: UUID) -> ShellSession? {
+    public func session(for agentID: UUID, shell: Int = 0) -> ShellSession? {
         lock.lock(); defer { lock.unlock() }
-        return sessions[agentID]
+        return sessions[Key(agentID: agentID, shell: shell)]
     }
 
     // MARK: Lifetime
@@ -186,16 +227,16 @@ public final class ShellHost: @unchecked Sendable {
     /// A shell with a job running is never idle, whatever the clock says.
     @discardableResult
     public func reapIdle(now: Date = Date(),
-                         threshold: TimeInterval = ShellSession.idleThreshold) -> [UUID] {
+                         threshold: TimeInterval = ShellSession.idleThreshold) -> [Key] {
         lock.lock()
         let all = sessions
         lock.unlock()
 
-        var reaped: [UUID] = []
-        for (agentID, session) in all where session.state.isLive {
+        var reaped: [Key] = []
+        for (key, session) in all where session.state.isLive {
             guard session.isIdle(now: now, threshold: threshold) else { continue }
             session.release(reason: "This shell was let go after sitting idle. Start a new one when you need it.")
-            reaped.append(agentID)
+            reaped.append(key)
         }
         return reaped
     }
@@ -206,8 +247,8 @@ public final class ShellHost: @unchecked Sendable {
         lock.lock()
         let all = sessions
         sessions = [:]
-        for (agentID, session) in all where session.state.isLive {
-            epitaphs[agentID] = "The shell that was running here went when the helper did."
+        for (key, session) in all where session.state.isLive {
+            epitaphs[key] = "The shell that was running here went when the helper did."
         }
         lock.unlock()
 
@@ -218,10 +259,10 @@ public final class ShellHost: @unchecked Sendable {
 
     // MARK: Pushing
 
-    private func push(_ agentID: UUID, _ event: ShellEvent) {
+    private func push(_ key: Key, _ event: ShellEvent) {
         lock.lock()
         let sink = broadcast
         lock.unlock()
-        sink?(agentID, event)
+        sink?(key, event)
     }
 }

@@ -177,7 +177,17 @@ final class AgentPaneState {
     /// The file open in the Changes pane, and which edit to bring into view. Nil is
     /// the list.
     var changesSelection: ChangesSelection?
-    var isAttachedToShell = false
+    /// The terminal tabs, by shell number, left to right (055). Filled from the daemon
+    /// the first time the pane is shown, so a window opening finds the shells that are
+    /// still running rather than only the first.
+    var shells: [Int] = [0]
+    /// The tab on top.
+    var frontShell = 0
+    /// A tab the user just chose or opened, whose screen should take the keyboard.
+    var shellToFocus: Int?
+    var shellsLoaded = false
+    /// False when the agent's daemon holds only one shell — a server not yet updated.
+    var canOpenMoreShells = true
 
     init(agentID: UUID) {
         self.agentID = agentID

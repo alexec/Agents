@@ -36,8 +36,32 @@ agent, in the project folder.
      to narrow the list.
 4. Type the prompt and send it.
 
-   The agent starts in the worktree. The choice is made once: an agent stays where it
-   started.
+   The agent starts in the worktree.
+
+**Move an agent that is already working**
+
+An agent that started in the project folder can move into a worktree later, or back out.
+
+1. Open the agent. On the Mac, the choice above the prompt names where it works: the
+   branch the project folder is on, or the worktree's name.
+2. Open it and choose **New worktree**, a worktree already listed, or **Project folder**.
+   - If the agent is between turns, it moves at once. The conversation says where to, and
+     how many uncommitted changes stayed behind.
+   - If it is working, the choice reads **Moving to …** and the move happens when its turn
+     ends. **Cancel move** takes it back until then.
+3. Send the next prompt. The agent carries on in the new folder with the whole
+   conversation, and the files, changes and row all follow it.
+
+Agents can also move themselves, with `enter_worktree` and `exit_worktree` (see
+[Tools the app gives agents](../reference/agent-tools.md)). An agent that asks is moved when
+its turn ends and started again there to carry on.
+
+Nothing uncommitted comes along: a new worktree starts from the last commit of the folder
+the agent is leaving, and what was not committed stays where it was.
+
+An agent on Grok, Gemini or Antigravity cannot move: those runtimes can't carry their
+conversation into another folder, or haven't been checked. The choice is greyed out and its
+tooltip says why. Start a new agent in a worktree instead.
 
 **When the work is done**
 
@@ -66,3 +90,6 @@ agent, in the project folder.
 - *… is already checked out in …* means that branch has a worktree already. Choose that
   worktree from the list instead of making a new one.
 - **Remove…** is greyed out: an agent is still working in the worktree. Archive it first.
+- The terminal says *This shell is in … The agent now works in …*: the agent moved while
+  your shell went on in the old folder. The shell is yours and is never stopped for you;
+  click **Type cd there** to follow the agent.

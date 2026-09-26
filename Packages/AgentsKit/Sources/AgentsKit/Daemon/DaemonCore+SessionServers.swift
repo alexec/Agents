@@ -73,7 +73,11 @@ extension DaemonCore {
             DaemonLog.shared.write("personal servers: left out, \(problem.message)"
                                    + (problem.line.map { " (line \($0))" } ?? ""))
         }
-        let plan = SessionServers.plan(app: appServer(token: token, managesAgents: managesAgents),
+        // Without the tools for moving folders for a runtime that forgets its conversation
+        // in another folder (053).
+        let app = appServer(token: token, managesAgents: managesAgents,
+                            movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))
+        let plan = SessionServers.plan(app: app,
                                        chosen: chosen, personal: personal, pluginServers: pluginServers,
                                        http: capabilities?.http ?? false, sse: capabilities?.sse ?? false)
         for (name, reason) in plan.dropped where reason != .mcpFileProblem {

@@ -144,6 +144,9 @@ public actor DaemonCore {
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
     /// and a daemon that restarts has nothing to apologise for (022 FR-016).
     var artifactEdits: [UUID: [ArtifactEdit]] = [:]
+    /// What an agent that has just moved is told at the start of its next turn, whoever
+    /// sends it (053). Once, and then forgotten: the chat keeps the line that says so.
+    var moveNotes: [UUID: String] = [:]
     /// Each agent's reported edits, folded from its transcript the first time the
     /// Changes pane asks and caught up on every ask after (035). Not persisted: the
     /// transcript is the record, and folding it again costs one read.
@@ -489,7 +492,7 @@ public actor DaemonCore {
     let shells = ShellHost()
     /// Everything the shells have printed, in the order they printed it, on its way to
     /// the windows. See `connectShells` for why it is a stream and not a task each.
-    var shellEvents: AsyncStream<(UUID, ShellHost.ShellEvent)>.Continuation?
+    var shellEvents: AsyncStream<(ShellHost.Key, ShellHost.ShellEvent)>.Continuation?
     var shellPump: Task<Void, Never>?
 
     struct Draft: Sendable {
@@ -556,6 +559,13 @@ public actor DaemonCore {
         // Providers are asked for separately, so a previous answer is kept.
         account.providers = accounts[runtimeID]?.providers ?? []
         account.currentProviderID = accounts[runtimeID]?.currentProviderID
+        // A handshake does not prove a sign-in (see `RuntimeAccount.init`), so it does
+        // not take back a refusal: a window warming up a draft would otherwise put the
+        // runtime back to ready a second after it refused. A turn that works does.
+        if accounts[runtimeID]?.state == .needsSignIn {
+            account.state = .needsSignIn
+            account.checkedAt = accounts[runtimeID]?.checkedAt ?? account.checkedAt
+        }
         guard accounts[runtimeID] != account else { return }
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
@@ -565,6 +575,15 @@ public actor DaemonCore {
     func markNeedsSignIn(runtimeID: String) {
         var account = accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
         account.state = .needsSignIn
+        account.checkedAt = Date()
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// A runtime that just did a turn, which is the proof a handshake is not.
+    func markSignedIn(runtimeID: String) {
+        guard var account = accounts[runtimeID], account.state == .needsSignIn else { return }
+        account.state = .ready
         account.checkedAt = Date()
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
