@@ -47,8 +47,8 @@ the device's key; a Mac frame the reverse.
   number. A frame copied into another session, or renumbered, does not open.
 - **The phone's key is in the Secure Enclave.** `SecureEnclave.P256.KeyAgreement.PrivateKey`
   conforms to `HPKEDiffieHellmanPrivateKey`, and `Envelope.open` already uses it that way as a
-  recipient. Being an *authenticating sender* with it is **unverified on hardware**, and the
-  spike (Phase 0) checks it first. If it fails, the fallback is a software P256 key made for
+  recipient. Being an *authenticating sender* with it was checked on this Mac's enclave
+  and works both ways (R13 results); the phone confirms it on first use. If it fails, the fallback is a software P256 key made for
   signing frames only and kept in the same keychain group. That is slightly weaker, and the same
   rule holds: the private half never leaves the device.
 
@@ -62,8 +62,9 @@ mode is one.
 `DeviceKey.load(account: "relay-mac-key", accessGroup: nil)`, which is the software key path.
 The Mac's Secure Enclave is avoided for now: a `dispatchMain` helper with no UI must not be able
 to lose its key when the Mac is locked. The bridge registers the public half with
-`relay/register` on its mailbox connection. The daemon keeps it in `devices.json` and returns it
-as `macKey` in the `devices/announce` reply. The phone keeps it in its keychain.
+`relay/register` on the relay's own daemon connection, every time it connects. The daemon keeps
+it in `relay.json` beside `devices.json` (not inside it, so that file keeps the shape older
+builds read) and returns it as `macKey` in the `devices/announce` reply. The phone keeps it in its keychain.
 
 `devices/announce` only ever arrives over the direct link, so that key is never learnt through
 iCloud (D1). A phone that has no `macKey` is not paired for the relay, and says so (FR-009).
@@ -117,9 +118,10 @@ device that asked for them, and away the phone never asks (R10).
 **Decision**: pull always, push when it comes.
 
 - **Mac**: `CKFetchDatabaseChangesOperation` to find which zones changed, then
-  `CKFetchRecordZoneChangesOperation` on those, with server change tokens kept in memory and in
-  the bridge's defaults. Every 1 s while any session has been live in the last 2 min, every 5 s
-  otherwise. Whether a push reaches a `dispatchMain` helper on macOS is unproven. It is not
+  `CKFetchRecordZoneChangesOperation` on those, with server change tokens kept in memory only (a restarted end reads its zone from the
+  start and ignores other sessions' frames). As built: a live session's zone is read directly
+  every 0.5 s, and which zones changed is asked every 3 s while a session is live and every 5 s
+  otherwise (R13 results). Whether a push reaches a `dispatchMain` helper on macOS is unproven. It is not
   needed, so it is not attempted (FR-015).
 - **Device**: a `CKRecordZoneSubscription` on its own zone (silent, content-available) wakes a
   fetch at once. While the app is in the foreground and on the relay, it also fetches every 1 s.

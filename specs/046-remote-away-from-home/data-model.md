@@ -5,7 +5,7 @@
 | Field | Where | Notes |
 |---|---|---|
 | private key (P256, software) | login keychain, account `relay-mac-key`, held by `agents-bridge` | Made on the bridge's first run and never leaves the Mac. |
-| `relayKey` (X9.63, 65 bytes) | daemon root `devices.json`, top level beside the device list | Set by `relay/register`. Handed to devices in the `devices/announce` reply as `macKey`. |
+| `relayKey` (X9.63, 65 bytes) | daemon root `relay.json`, beside `devices.json` | Set by `relay/register`. Handed to devices in the `devices/announce` reply as `macKey`. |
 
 A new `relayKey` replaces the old one. Devices paired to the old key are refused away until they
 next connect at home (research R4).
@@ -23,7 +23,7 @@ next connect at home (research R4).
 | Field | Where | Notes |
 |---|---|---|
 | `macKey` | shared keychain group, account `relay-mac-key-public` | From the last `devices/announce` reply. Its absence means not paired for the relay. |
-| zone change token | app defaults | So a relaunch fetches only what is new. |
+| zone change token | memory only | A new session reads the zone whole and ignores other sessions' frames. |
 
 ## Relayed session *(new, in memory only)*
 

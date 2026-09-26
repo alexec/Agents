@@ -37,6 +37,20 @@ colour.
 
 **Show in Finder** is on every agent's menu on the Mac.
 
+## The phone's connection
+
+The line at the top of the iPhone and iPad screens says how they are reaching the Mac.
+
+| Line | What it means | What works |
+| --- | --- | --- |
+| No line | On the Mac's network, connected directly. | Everything. |
+| **Away** — slower, through iCloud | On another network, reaching the Mac through your iCloud. | Everything but the terminal, the live page, files and attaching pictures, which say **Needs the same network as your Mac**. |
+| **Away** — slower than usual | As above, while iCloud has asked the app to slow down. | As above, more slowly. |
+| The relay needs iCloud on your iPhone and your Mac | One of them is not signed in to iCloud, or not to the same account. | Only the Mac's own network. |
+| iCloud is full, so the relay can't carry messages | Your iCloud storage is full. | Only the Mac's own network. |
+| Last heard from your Mac … | Neither way reaches the Mac: it is asleep, or the bridge is not running. What is shown is dimmed and offers nothing. | Nothing, until it answers. |
+| Not connected to your Mac yet | The app has not reached the Mac since it opened. Away, if it has never been on the Mac's network, the page says **Open Agents once on your Mac's Wi-Fi**. | Nothing, until it answers. |
+
 ## See also
 
 - [How-to guides](../how-to/index.md)
