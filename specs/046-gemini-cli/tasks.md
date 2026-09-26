@@ -92,7 +92,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T031 [US3] If T006 found that `deny` only refuses and does not hide, say so in `ToolPolicyCatalog.gemini`'s comment and make sure `Tests/Integration/ResidualToolTests.swift` does not count refused tools as residue
 - [X] T032 (spike R13: app tools present, invoke_agent gone; policy file by argument) [US3] Live (`AGENTS_GEMINI=1`) in `Tests/Live/RuntimeToolScopingLiveTests.swift`: Gemini's tool list has the app's MCP tools and lacks `invoke_agent` and `tracker_*` (or they are refused with the category's sentence)
 - [X] T033 (finish_turn used on every live turn; a question-only turn not run before the quota ran out) [US3] Live in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`: Gemini ends turns through `finish_turn` (SC-006: 9 of 10 over ten short prompts; record the count); a question mid-turn ends as needs_answer, as for Grok
-- [ ] T034 [US3] Walk: Gemini agent leases and releases a resource and waits for a `custom.` event; note results in the walk README
+- [X] T034 (2026-09-26, gemini-3.5-flash-lite) [US3] Walk: Gemini agent leases and releases a resource and waits for a `custom.` event; note results in the walk README
 
 ---
 
