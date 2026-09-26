@@ -367,6 +367,9 @@ public actor DaemonCore {
     /// The other way out: to the connections a predicate picks (034). What a device
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
+    /// Ends the connections a test picks: a forgotten device's, so its direct link
+    /// stops at once rather than when the phone next hangs up (security review, Phase 3).
+    let closer = CloserBox()
     var connectionCount = 0
     /// False on a server, where the daemon is started with `--serve` and stays up with
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
@@ -415,6 +418,19 @@ public actor DaemonCore {
 
         func callAsFunction(_ method: String, _ params: JSONValue?, to wanted: @escaping Wanted) {
             lock.withLock { send }?(method, params, wanted)
+        }
+    }
+
+    public final class CloserBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var close: (@Sendable (@escaping AddressedBox.Wanted) -> Void)?
+
+        func set(_ close: @escaping @Sendable (@escaping AddressedBox.Wanted) -> Void) {
+            lock.withLock { self.close = close }
+        }
+
+        func callAsFunction(_ wanted: @escaping AddressedBox.Wanted) {
+            lock.withLock { close }?(wanted)
         }
     }
 
@@ -518,6 +534,10 @@ public actor DaemonCore {
         _ send: @escaping @Sendable (String, JSONValue?, @escaping AddressedBox.Wanted) -> Void
     ) {
         addressed.set(send)
+    }
+
+    public func setConnectionCloser(_ close: @escaping @Sendable (@escaping AddressedBox.Wanted) -> Void) {
+        closer.set(close)
     }
 
     /// Hold lifecycle events rather than acting on them, until `startWorkflows`.

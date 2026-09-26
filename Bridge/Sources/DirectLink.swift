@@ -107,8 +107,24 @@ final class DirectLink {
         let keys = keys()
         guard Set(keys.keys) != listening else { return }
         listening = Set(keys.keys)
-        listener?.cancel()
-        listener = nil
+        // One listener on the port at a time: the next is made once the last has let go,
+        // or it finds the address in use.
+        if let old = listener {
+            listener = nil
+            old.stateUpdateHandler = { [weak self] state in
+                guard case .cancelled = state else { return }
+                Task { @MainActor in self?.listen(with: self?.keys() ?? keys) }
+            }
+            old.cancel()
+        } else {
+            listen(with: keys)
+        }
+    }
+
+    private func listen(with keys: [String: SymmetricKey]) {
+        // A later change may have been heard while the last listener let go.
+        listening = Set(keys.keys)
+        guard listener == nil else { relisten(); return }
         do {
             let parameters = LinkTLS.server(keys: keys, chosen: chosen)
             // So the iPad can find this without anybody typing an address.

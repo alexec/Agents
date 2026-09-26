@@ -136,6 +136,26 @@ struct PairingCodeTests {
         #expect(refusal(await announce(setup, id: id, as: .device)) == nil)
     }
 
+    /// Forgetting ends what the device has open now, not only what it opens next.
+    @Test func forgettingADeviceClosesItsConnections() async throws {
+        let setup = try await setUp()
+        final class Asked: @unchecked Sendable {
+            let lock = NSLock()
+            var wanted: [DaemonCore.AddressedBox.Wanted] = []
+        }
+        let asked = Asked()
+        await setup.core.setConnectionCloser { wanted in asked.lock.withLock { asked.wanted.append(wanted) } }
+        _ = try await startPairing(setup)
+        let id = UUID()
+        _ = try await announce(setup, id: id, as: .pairing).get()
+        _ = try await call(setup, DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id)).get()
+
+        let wanted = try #require(asked.lock.withLock { asked.wanted.first })
+        #expect(wanted(DaemonServer.ConnectionContext(id: UUID(), surface: .device(id), role: .device)))
+        #expect(!wanted(DaemonServer.ConnectionContext(id: UUID(), surface: .device(UUID()), role: .device)))
+        #expect(!wanted(DaemonServer.ConnectionContext(id: UUID(), surface: .mac)))
+    }
+
     /// The bridge rebuilds its listener on this, so the code's key is taken while it is
     /// good and not after.
     @Test func theBridgeIsToldWhenTheCodeBeginsAndEnds() async throws {

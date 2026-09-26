@@ -98,6 +98,9 @@ public final class Daemon: @unchecked Sendable {
         await core.setAddressedBroadcaster { method, params, wanted in
             server.broadcast(method, params, to: wanted)
         }
+        await core.setConnectionCloser { wanted in
+            server.closeConnections(where: wanted)
+        }
         // Shell output goes out the same door as every other notification.
         await core.connectShells()
         // Read every project's workflows, watch their folders, start the clock. After

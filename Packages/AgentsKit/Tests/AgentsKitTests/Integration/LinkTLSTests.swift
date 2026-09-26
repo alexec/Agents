@@ -87,6 +87,20 @@ struct LinkTLSTests {
         #expect(heard.line.hasPrefix("hello"))
     }
 
+    /// A phone coming straight back is told as itself again. A resumed TLS session skips
+    /// choosing a key, which left the bridge not knowing who it was.
+    @Test func aPhoneThatComesStraightBackIsKnownAgain() async throws {
+        let identity = LinkKey.deviceIdentity(phoneID)
+        let key = try phone.linkKey(with: mac.publicKey, device: phoneID)
+        let server = try Listener(keys: [identity: try mac.linkKey(with: phone.publicKey, device: phoneID)])
+        defer { server.stop() }
+        let port = try await server.start()
+
+        #expect(await send("first", to: port, identity: identity, key: key))
+        #expect(await send("second", to: port, identity: identity, key: key))
+        #expect(server.all.map(\.identity) == [identity, identity])
+    }
+
     /// Somebody on the network who knows a paired phone's id, but not its key.
     @Test func anotherKeyUnderAPairedPhonesNameGetsNothingThrough() async throws {
         let identity = LinkKey.deviceIdentity(phoneID)

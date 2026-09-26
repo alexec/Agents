@@ -57,6 +57,11 @@ public enum LinkTLS {
         sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
         sec_protocol_options_set_max_tls_protocol_version(sec, .TLSv12)
         sec_protocol_options_append_tls_ciphersuite(sec, tls_ciphersuite_t(rawValue: suite)!)
+        // Every connection proves its key afresh. A resumed session skips choosing a key,
+        // so the bridge would not learn which device it is and would close it: a phone
+        // coming straight back would be shut out until the cache forgot it.
+        sec_protocol_options_set_tls_resumption_enabled(sec, false)
+        sec_protocol_options_set_tls_tickets_enabled(sec, false)
         return tls
     }
 

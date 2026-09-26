@@ -91,6 +91,9 @@ extension DaemonCore {
         loadedDevices = all
         try deviceStore.save(Array(all.values))
         broadcast(DaemonAPI.Notification.deviceChanged, DaemonAPI.DeviceNotification(removed: id))
+        // Its open connections too: on the direct link a forgotten phone would otherwise
+        // keep what it had until it next hung up.
+        closer { $0.surface == .device(id) }
         reconsider()
     }
 

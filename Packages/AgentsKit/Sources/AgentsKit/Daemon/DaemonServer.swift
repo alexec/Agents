@@ -331,6 +331,14 @@ public final class DaemonServer: @unchecked Sendable {
 
     private let encoding = DispatchQueue(label: "com.alexecollins.agents.broadcast.encode")
 
+    /// End the connections `wanted` picks. The other end sees its connection go, as it
+    /// would if the daemon had quit, and a bridge takes the device's link down with it.
+    public func closeConnections(where wanted: @escaping @Sendable (ConnectionContext) -> Bool) {
+        for (connection, _, context, _) in connections.allAddressed where wanted(context) {
+            Task { await connection.close() }
+        }
+    }
+
     /// How long a write to one client may block before that client is given up on.
     /// Long enough for a window busy for a moment; a client that has read nothing for
     /// this long has stopped.
