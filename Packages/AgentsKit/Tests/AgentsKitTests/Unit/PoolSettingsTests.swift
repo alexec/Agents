@@ -6,7 +6,7 @@ import Testing
 /// What a pool must be before it is kept (052, FR-001a, FR-032).
 @Suite("A pool's settings")
 struct PoolSettingsTests {
-    private let openAI = CredentialKind.openAIAPIKey.rawValue
+    private let gemini = CredentialKind.geminiAPIKey.rawValue
 
     @Test func anAllowanceOnASignInIsFine() throws {
         let pool = PoolSettings(isOn: true, entries: [
@@ -23,17 +23,37 @@ struct PoolSettingsTests {
         .prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil),
     ])
     func aKeyWithAHardStopIsFine(payment: Payment) throws {
-        try PoolSettings(entries: [PoolEntry(runtimeID: "codex", payment: payment, credentialRef: openAI)]).validate()
+        try PoolSettings(entries: [PoolEntry(runtimeID: "gemini", payment: payment, credentialRef: gemini)]).validate()
     }
 
     @Test func aKeyIsNeverAnAllowance() {
-        let pool = PoolSettings(entries: [PoolEntry(runtimeID: "codex", payment: .allowance(label: nil), credentialRef: openAI)])
-        #expect(throws: PoolSettings.Invalid.keyAsAnAllowance(runtimeID: "codex")) { try pool.validate() }
+        let pool = PoolSettings(entries: [PoolEntry(runtimeID: "gemini", payment: .allowance(label: nil), credentialRef: gemini)])
+        #expect(throws: PoolSettings.Invalid.keyAsAnAllowance(runtimeID: "gemini")) { try pool.validate() }
     }
 
-    @Test func aSubscriptionTokenCanBeAnAllowance() throws {
-        try PoolSettings(entries: [PoolEntry(runtimeID: "claude", payment: .allowance(label: nil),
-                                             credentialRef: CredentialKind.oauthToken.rawValue)]).validate()
+    /// Only a key this Mac lends can run an entry: Gemini's. Claude's tokens are for servers
+    /// (and going, 056), and Codex's OpenAI key is gone (047).
+    @Test(arguments: [("claude", CredentialKind.oauthToken.rawValue), ("claude", CredentialKind.apiKey.rawValue),
+                      ("codex", "openAIAPIKey"), ("codex", CredentialKind.geminiAPIKey.rawValue)])
+    func aKeyThisMacDoesNotLendIsRefused(runtimeID: String, credential: String) {
+        let pool = PoolSettings(entries: [PoolEntry(runtimeID: runtimeID, payment: .prepaid(amount: nil, expires: nil),
+                                                    credentialRef: credential)])
+        #expect(throws: PoolSettings.Invalid.noKeyToLend(runtimeID: runtimeID)) { try pool.validate() }
+    }
+
+    @Test func creditOnASignInIsRefused() {
+        let pool = PoolSettings(entries: [PoolEntry(runtimeID: "codex", payment: .prepaid(amount: nil, expires: nil))])
+        #expect(throws: PoolSettings.Invalid.creditWithoutAKey(runtimeID: "codex")) { try pool.validate() }
+    }
+
+    /// A pool saved with a Codex key from before 047 loses that entry, not the rest.
+    @Test func anEntryOnAKeyNoLongerLentIsDroppedOnLoad() {
+        let kept = PoolEntry(runtimeID: "claude", payment: .allowance(label: nil))
+        let old = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: nil, expires: nil), credentialRef: "openAIAPIKey")
+        let gem = PoolEntry(runtimeID: "gemini", payment: .freeTier(reset: .gemini), credentialRef: gemini)
+        let (pool, dropped) = PoolSettings(isOn: true, entries: [kept, old, gem]).droppingKeysNotLent()
+        #expect(pool.entries == [kept, gem])
+        #expect(dropped == ["codex"])
     }
 
     @Test func geminiIsNeverAnAllowance() {
@@ -42,9 +62,9 @@ struct PoolSettingsTests {
     }
 
     @Test func creditMustBeSomething() {
-        let pool = PoolSettings(entries: [PoolEntry(runtimeID: "codex", payment: .prepaid(amount: Cost(amount: 0, currency: "USD"), expires: nil),
-                                                    credentialRef: openAI)])
-        #expect(throws: PoolSettings.Invalid.amountNotPositive(runtimeID: "codex")) { try pool.validate() }
+        let pool = PoolSettings(entries: [PoolEntry(runtimeID: "gemini", payment: .prepaid(amount: Cost(amount: 0, currency: "USD"), expires: nil),
+                                                    credentialRef: gemini)])
+        #expect(throws: PoolSettings.Invalid.amountNotPositive(runtimeID: "gemini")) { try pool.validate() }
     }
 
     @Test func aModelIsInOneLevelPerRuntime() {

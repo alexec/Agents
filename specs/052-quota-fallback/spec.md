@@ -58,8 +58,8 @@ Yes, with two limits the person should know about up front:
 - Q: Is a pool entry a runtime, or a runtime with a particular way of paying for it? → A: A
   runtime with its credential. The same runtime can be an allowance in one place and billed by
   the token in another. Codex uses a ChatGPT plan on the Mac, and on a server it uses either the
-  same plan, reached through the Mac's relay, or an OpenAI API key lent from the Mac (047, on main
-  since 2026-09-26). Gemini only ever runs on a key (046). Antigravity signs in with a Google
+  same plan, reached through the Mac's relay (047, on main since 2026-09-26; its OpenAI API key
+  was removed the same day, see the amendment below). Gemini only ever runs on a key (046). Antigravity signs in with a Google
   account, on the Mac and, copied, on servers (049, on main since 2026-09-26). OpenCode and Goose,
   specced but not built, use whatever provider the person has signed them in to. An API key is pay-as-you-go by nature, so falling back to one is exactly the
   pay-by-the-token carrying-on this feature exists to avoid. Each entry therefore shows how it is
@@ -98,7 +98,8 @@ Yes, with two limits the person should know about up front:
   allowance? → A: No. It is the same plan, so it is one allowance. When the plan is spent on the
   Mac it is spent on every server that relays it, and the other way round. An entry's allowance
   state belongs to its credential (the plan or the key), not to the host it runs on. A server
-  Codex on a lent OpenAI key is a different credential, and is judged as a key (FR-001a).
+  A credential other than the sign-in is a different allowance, and a key is judged as a key
+  (FR-001a).
 - Q: Gemini runs only on an API key, and its free tier is a quota that comes back every day. Is
   that credit that never returns? → A: No. It is a third kind of key: a **free tier**. The key
   has no billing account behind it, so the provider refuses rather than charges, and its quota
@@ -607,3 +608,21 @@ It builds on Story 5's sheet, which fills in the same rows.
   Gemini's `usageLimit` (046) as the first recogniser; runtime sign-in status (043/048) to know which runtimes are usable; events (042);
   the blocked-and-check-again machinery (039) for the everyone-out wait; servers (037) for
   per-host pools.
+
+
+## Amendment, 2026-09-26: one key, and sign-ins relayed
+
+Main removed Codex's OpenAI key (047, f10cd50). A server's Codex now signs in only through the
+Mac's ChatGPT sign-in, relayed. 056 (in progress) does the same for Claude, so pasted Claude
+tokens on servers are going too. For this feature, that means:
+
+- A pool entry can run on a key only if this Mac lends that key to the entry's runtime. Today
+  that is Gemini's key alone. `pool/set` refuses any other key: "… has no key this Mac lends, so
+  it joins the pool on its own sign-in." Credit, free or prepaid, is only ever on a key.
+- A saved pool that still holds an entry on a Codex key loses that entry when it is read, and
+  keeps the rest. The daemon's log says which entry went.
+- **Add credit on an API key** lists only runtimes with a key this Mac lends (Gemini).
+- A relayed sign-in is the Mac's own plan. A server chat on Codex, or on Claude once 056 lands,
+  spends the same allowance as the Mac, and is out when the Mac's plan is out (FR-006b, T069).
+- Wireframes §0 and §2 still show a Codex OpenAI key as the pool's last entry. Read that entry as
+  Gemini on its key, with prepaid credit.

@@ -41,15 +41,18 @@ struct PoolSetTests {
 
     @Test func eachRefusalSaysWhy() async throws {
         let (core, _, _) = try core()
-        let keyAsPlan = PoolEntry(runtimeID: "codex", payment: .allowance(label: nil),
-                                  credentialRef: CredentialKind.openAIAPIKey.rawValue)
+        let keyAsPlan = PoolEntry(runtimeID: "gemini", payment: .allowance(label: nil),
+                                  credentialRef: CredentialKind.geminiAPIKey.rawValue)
         #expect(await refusal(core, PoolSettings(isOn: true, entries: [keyAsPlan]))
-                == "Codex on an API key is paid by use, so it cannot be an allowance.")
+                == "Gemini on an API key is paid by use, so it cannot be an allowance.")
+        let oldCodexKey = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: nil, expires: nil), credentialRef: "openAIAPIKey")
+        #expect(await refusal(core, PoolSettings(isOn: true, entries: [oldCodexKey]))
+                == "Codex has no key this Mac lends, so it joins the pool on its own sign-in.")
         let gemini = PoolEntry(runtimeID: "gemini", payment: .allowance(label: nil))
         #expect(await refusal(core, PoolSettings(isOn: true, entries: [gemini]))?
             .hasSuffix("is paid by use, so it cannot be an allowance.") == true)
-        let nothing = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: Cost(amount: 0, currency: "USD"), expires: nil),
-                                credentialRef: CredentialKind.openAIAPIKey.rawValue)
+        let nothing = PoolEntry(runtimeID: "gemini", payment: .prepaid(amount: Cost(amount: 0, currency: "USD"), expires: nil),
+                                credentialRef: CredentialKind.geminiAPIKey.rawValue)
         #expect(await refusal(core, PoolSettings(isOn: true, entries: [nothing]))?
             .hasSuffix("has to be more than nothing.") == true)
         #expect(await refusal(core, PoolSettings(isOn: true, entries: [PoolEntry(runtimeID: "nope", payment: .allowance(label: nil))]))
@@ -87,8 +90,8 @@ struct PoolSetTests {
 
     @Test func itIsStillThereAfterARestart() async throws {
         let (first, work, _) = try core()
-        let prepaid = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil),
-                                credentialRef: CredentialKind.openAIAPIKey.rawValue)
+        let prepaid = PoolEntry(runtimeID: "gemini", payment: .prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil),
+                                credentialRef: CredentialKind.geminiAPIKey.rawValue)
         _ = try await first.setPool(PoolSettings(isOn: true, entries: [claude, prepaid]))
         let root = work.deletingLastPathComponent()
         let (second, _, _) = try core(root: root)

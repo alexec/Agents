@@ -18,7 +18,11 @@ public struct PoolStore: Sendable {
             StoreCoding.setAside(locations.pool)
             return PoolSettings()
         }
-        return pool
+        let (kept, dropped) = pool.droppingKeysNotLent()
+        if !dropped.isEmpty {
+            DaemonLog.shared.write("pool: dropped entries on a key this Mac no longer lends: \(dropped.joined(separator: ", "))")
+        }
+        return kept
     }
 
     public func save(_ pool: PoolSettings) throws {

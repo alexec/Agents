@@ -14,16 +14,17 @@ struct AddCreditSheet: View {
 
     enum Kind: Hashable { case freeTier, freeCredit, prepaid }
 
-    @State private var runtimeID = "codex"
+    @State private var runtimeID = "gemini"
     @State private var kind: Kind?
     @State private var amount = ""
     @State private var hasExpiry = false
     @State private var expires = Date.now.addingTimeInterval(30 * 86400)
 
-    /// The runtimes a key can be lent to, with the kind of key each takes.
-    private static let keyed: [(runtimeID: String, kind: CredentialKind)] = [
-        ("codex", .openAIAPIKey), ("gemini", .geminiAPIKey), ("claude", .apiKey),
-    ]
+    /// The runtimes this Mac lends a key to, with the kind of key each takes. Only Gemini
+    /// now: Codex's OpenAI key is gone (047), and Claude's tokens are for servers, which
+    /// are moving to the Mac's own sign-in, relayed (056).
+    private static let keyed: [(runtimeID: String, kind: CredentialKind)] =
+        CredentialKind.allCases.filter(\.isLentOnTheMac).map { ($0.runtimeID, $0) }
 
     private var credential: CredentialKind? { Self.keyed.first { $0.runtimeID == runtimeID }?.kind }
 

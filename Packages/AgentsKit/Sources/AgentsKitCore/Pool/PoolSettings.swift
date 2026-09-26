@@ -81,6 +81,13 @@ public struct PoolEntry: Codable, Hashable, Sendable, Identifiable {
 
     public var credentialKind: CredentialKind? { credentialRef.flatMap(CredentialKind.init(rawValue:)) }
 
+    /// Its key is one this Mac lends to its runtime (046). None else can run a pool entry:
+    /// Codex's OpenAI key is gone (047), and Claude's tokens are for servers only.
+    public var hasAKeyToLend: Bool {
+        guard let kind = credentialKind else { return false }
+        return kind.isLentOnTheMac && kind.runtimeID == runtimeID
+    }
+
     /// Runs on a key rather than a sign-in.
     public var isKeyed: Bool {
         guard let kind = credentialKind else { return false }
@@ -141,6 +148,11 @@ public struct PoolSettings: Codable, Hashable, Sendable {
         case amountNotPositive(runtimeID: String)
         case modelInTwoLevels(runtimeID: String, first: String, second: String)
         case emptyLevelName
+        /// A key this Mac does not lend to that runtime: only Gemini's is, now that Codex
+        /// and Claude on servers go through the Mac's own sign-in, relayed (047, 056).
+        case noKeyToLend(runtimeID: String)
+        /// Credit, free or prepaid, is only ever on a key.
+        case creditWithoutAKey(runtimeID: String)
 
         public var sentence: String {
             switch self {
@@ -156,10 +168,24 @@ public struct PoolSettings: Codable, Hashable, Sendable {
                 "A model can be in only one level for \(Self.name(id)); it is in both \(first) and \(second)."
             case .emptyLevelName:
                 "A level needs a name."
+            case .noKeyToLend(let id):
+                "\(Self.name(id)) has no key this Mac lends, so it joins the pool on its own sign-in."
+            case .creditWithoutAKey(let id):
+                "Credit for \(Self.name(id)) needs a key; on its sign-in it is an allowance."
             }
         }
 
         private static func name(_ id: String) -> String { RuntimeCatalog.runtime(id: id)?.name ?? id }
+    }
+
+    /// The pool without entries on a key this Mac no longer lends: kept from before Codex's
+    /// OpenAI key went (047). Dropped rather than refusing the whole file, so the rest of
+    /// the pool still works; the names of what went are returned to be said.
+    public func droppingKeysNotLent() -> (pool: PoolSettings, dropped: [String]) {
+        var kept = self
+        kept.entries = entries.filter { $0.credentialRef == nil || $0.hasAKeyToLend }
+        let dropped = entries.filter { $0.credentialRef != nil && !$0.hasAKeyToLend }.map(\.runtimeID)
+        return (kept, dropped)
     }
 
     /// Everything that must hold before the pool is kept (FR-001a, FR-032).
@@ -168,7 +194,9 @@ public struct PoolSettings: Codable, Hashable, Sendable {
             guard RuntimeCatalog.runtime(id: entry.runtimeID) != nil else { throw .unknownRuntime(entry.runtimeID) }
             // Gemini has no sign-in an individual can use but a key (046), so it is
             // never an allowance, whatever the entry says it runs on.
+            if entry.credentialRef != nil, !entry.hasAKeyToLend { throw .noKeyToLend(runtimeID: entry.runtimeID) }
             let keyed = entry.isKeyed || entry.runtimeID == RuntimeCatalog.gemini.id
+            if !keyed, entry.payment.isCredit { throw .creditWithoutAKey(runtimeID: entry.runtimeID) }
             if keyed, case .allowance = entry.payment { throw .keyAsAnAllowance(runtimeID: entry.runtimeID) }
             if let amount = entry.payment.amount, amount.amount <= 0 { throw .amountNotPositive(runtimeID: entry.runtimeID) }
         }

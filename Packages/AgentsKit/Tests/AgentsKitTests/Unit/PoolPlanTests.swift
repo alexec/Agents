@@ -10,8 +10,8 @@ struct PoolPlanTests {
     private let claude = PoolEntry(runtimeID: "claude", payment: .allowance(label: nil))
     private let copilot = PoolEntry(runtimeID: "copilot", payment: .allowance(label: nil))
     private let codex = PoolEntry(runtimeID: "codex", payment: .allowance(label: nil))
-    private let codexKey = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: nil, expires: nil),
-                                     credentialRef: CredentialKind.openAIAPIKey.rawValue)
+    private let codexKey = PoolEntry(runtimeID: "gemini", payment: .prepaid(amount: nil, expires: nil),
+                                     credentialRef: CredentialKind.geminiAPIKey.rawValue)
 
     private var pool: PoolSettings { PoolSettings(isOn: true, entries: [claude, copilot, codex, codexKey]) }
 

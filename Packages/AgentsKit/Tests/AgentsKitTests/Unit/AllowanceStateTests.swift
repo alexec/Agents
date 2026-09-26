@@ -135,8 +135,10 @@ struct AllowanceStateTests {
     @Test func aRelayedPlanIsTheSamePlan() {
         let mac = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
         let server = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
+        // Any credential but the sign-in is another allowance; the pool no longer takes a
+        // Codex key (047), but the rule is the credential's, not the runtime's.
         let keyed = PoolEntry(runtimeID: "codex", payment: .prepaid(amount: nil, expires: nil),
-                              credentialRef: CredentialKind.openAIAPIKey.rawValue)
+                              credentialRef: "another-credential")
         #expect(AllowanceState.credentialKey(for: mac) == AllowanceState.credentialKey(for: server))
         #expect(AllowanceState.credentialKey(for: mac) != AllowanceState.credentialKey(for: keyed))
     }

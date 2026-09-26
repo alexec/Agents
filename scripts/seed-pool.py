@@ -25,13 +25,14 @@ def ago(minutes): return iso(now - datetime.timedelta(minutes=minutes))
 def ahead(minutes): return iso(now + datetime.timedelta(minutes=minutes))
 def uid(): return str(uuid.uuid4()).upper()
 
-claude, copilot, codex, cursor, codexKey = (uid() for _ in range(5))
+claude, copilot, codex, cursor, geminiKey = (uid() for _ in range(5))
 entries = [
     {"id": claude, "runtimeID": "claude", "payment": {"allowance": {"label": "Max plan"}}},
     {"id": copilot, "runtimeID": "copilot", "payment": {"allowance": {"label": "Copilot Pro"}}},
     {"id": codex, "runtimeID": "codex", "payment": {"allowance": {"label": "ChatGPT plan"}}},
     {"id": cursor, "runtimeID": "cursor", "payment": {"allowance": {}}},
-    {"id": codexKey, "runtimeID": "codex", "credentialRef": "openAIAPIKey",
+    # The one key this Mac lends (046); Codex's OpenAI key went in 047.
+    {"id": geminiKey, "runtimeID": "gemini", "credentialRef": "geminiAPIKey",
      "payment": {"prepaid": {"amount": {"amount": 10, "currency": "USD"}}}},
 ]
 levels = [
@@ -50,7 +51,7 @@ allowances = [
      "status": {"out": {"until": ahead(280), "why": "allowanceSpent"}}, "spent": {"known": {}}, "rateLimitStreak": []},
     {"credentialKey": "copilot:sign-in", "entryID": copilot, "since": ago(6), "learnedFrom": "words",
      "status": {"out": {"retryAfter": ahead(54), "why": "allowanceSpent"}}, "spent": {"known": {}}, "rateLimitStreak": []},
-    {"credentialKey": "codex:openAIAPIKey", "entryID": codexKey, "since": ago(900), "learnedFrom": "person",
+    {"credentialKey": "gemini:geminiAPIKey", "entryID": geminiKey, "since": ago(900), "learnedFrom": "person",
      "status": {"available": {}}, "spent": {"known": {"_0": {"amount": 3.2, "currency": "USD"}}}, "rateLimitStreak": []},
 ]
 json.dump(allowances, open(f"{root}/allowances.json", "w"))
