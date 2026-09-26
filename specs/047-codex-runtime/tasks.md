@@ -117,8 +117,8 @@ place, and a Codex agent then works like any runtime.
   - press **Install** (AX by pid, only when Alex is away) and screenshot the progress and the tick;
   - save the shots under `specs/047-codex-runtime/walk/look/`, and show Alex before T024.
 - [ ] T024 [US1] Live test in `Tests/Live/LiveRuntimeTests.swift`, gated on `AGENTS_CODEX=1`, with Codex signed in (T006): a real Codex turn through the app's toolset writes a file and ends, and a resume loads the history.
-- [ ] T025 [US1] Walk on the scratch root, signed in (quickstart §3 steps 3 and 7): start, edit, `ls` with a permission ask answered on the Mac, stop mid-turn, resume, attach a picture. Also check the modes menu shows `read-only`/`agent`/`agent-full-access`, and that a picked mode is remembered for the next Codex agent. Record it in `specs/047-codex-runtime/walk/README.md` with screenshots.
-- [ ] T026 [US1] SC-004: compare `shasum ~/.codex/config.toml` and the account in `~/.codex/auth.json` before and after the walk; they must be identical. Note it in the walk README.
+- [X] T025 [US1] Walk on the scratch root, signed in (quickstart §3 steps 3 and 7): start, edit, `ls` with a permission ask answered on the Mac, stop mid-turn, resume, attach a picture. Also check the modes menu shows `read-only`/`agent`/`agent-full-access`, and that a picked mode is remembered for the next Codex agent. Record it in `specs/047-codex-runtime/walk/README.md` with screenshots.
+- [X] T026 [US1] SC-004: compare `shasum ~/.codex/config.toml` and the account in `~/.codex/auth.json` before and after the walk; they must be identical. Note it in the walk README.
 
 **Checkpoint**: the MVP. Codex installs from the set-up page and runs agents on the Mac.
 
@@ -131,11 +131,11 @@ place, and a Codex agent then works like any runtime.
 **Independent test**: ask a Codex agent to list its tools, end with a report, lease a resource and ask a question (spec US3).
 
 - [ ] T027 [US3] Check that `Daemon-side/ACP/Serve/Briefing.swift` builds Codex's removed, residue and escalation lines from the table (naming `request_user_input`) and stays under the briefing ceiling. Add a Codex case to `Tests/Unit/BriefingTests.swift`.
-- [ ] T028 [US3] If T007 found that the app's tools ask for approval in `agent` mode and a `CODEX_CONFIG` key stops it, add that key to the lever's value (and to contracts/runtime-launch.md). If nothing stops it, add a sentence to the policy's comment, and check that the briefing does not claim the tools run without asking (FR-015).
+- [X] T028 [US3] If T007 found that the app's tools ask for approval in `agent` mode and a `CODEX_CONFIG` key stops it, add that key to the lever's value (and to contracts/runtime-launch.md). If nothing stops it, add a sentence to the policy's comment, and check that the briefing does not claim the tools run without asking (FR-015).
 - [ ] T029 [US3] Live tests (`AGENTS_CODEX=1`):
   - in `Tests/Live/RuntimeToolScopingLiveTests.swift`, Codex's tool list has the app's MCP tools and lacks the removed ones (or they are refused, with the category's sentence);
   - in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`, Codex ends turns through `finish_turn`: SC-006 needs 9 of 10 over ten short prompts, so record the count.
-- [ ] T030 [US3] Walk (quickstart §3 steps 4–6): a question card appears on the Mac and on the phone, and the answer reaches Codex; the agent leases and releases `screen`, and waits for a `custom.` event. Note the results in the walk README.
+- [X] T030 [US3] Walk (quickstart §3 steps 4–6): a question card appears on the Mac and on the phone, and the answer reaches Codex; the agent leases and releases `screen`, and waits for a `custom.` event. Note the results in the walk README.
 
 ---
 
