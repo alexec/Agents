@@ -82,6 +82,7 @@ nav:
       - reference/keyboard-shortcuts.md
   - Explanation:
       - explanation/index.md
+      - explanation/why-agents.md
       - explanation/window-and-daemon.md
       - explanation/scoped-tools.md
       - explanation/projects-hosts-worktrees.md
