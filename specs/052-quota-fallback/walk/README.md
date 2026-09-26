@@ -214,3 +214,36 @@ moving one, now remember it too.
 
 Not seen on screen: the mode menu with its looser values left out, and "Stop the turn first"
 with its Stop button. `ContinueWithTests` covers both refusals.
+
+## US6: Matching models (T062–T066), 2026-09-26
+
+The run was on the scratch root `/tmp/run-052-us6`, with the stand-ins, which offer a model each
+(`<name>-fast`, `<name>-smart`).
+
+1. A chat on Copilot, then one on Grok, so each had said what it offers in the folder.
+2. `pool/models {grok, copilot}` answered `grok: [grok-fast, grok-smart]` and
+   `copilot: [copilot-fast, copilot-smart]`. Only the model is listed, not the mode, and
+   nothing was started, since both were remembered.
+3. `agents/continueWith` moved the Grok chat to Copilot on copilot-fast with
+   `remember: {newLevelName: "Everyday"}`. The pool then had one level, **Everyday**, with
+   `grok: grok-smart`, `copilot: copilot-fast` (`us6/pool-state.json`).
+
+There is no screenshot: the Mac locked (idle about 15 minutes) before the Pool page could be
+captured. The editable grid builds, and is still to be seen on screen:
+- cell menus from `pool/models`;
+- Add a level;
+- Rename…, Move up/down and Remove on a level's name;
+- gone models struck through;
+- a model moving out of its other level.
+
+The rules behind it are covered by `MatchingModelsTests` and `PoolModelsTests`:
+- a gone cell is treated as empty;
+- placing a model moves it;
+- Remember goes in the level that already holds the chat's model, else a new one;
+- a runtime never seen is started once, sent no prompt, and not started again within ten
+  minutes;
+- Remember through Continue with keeps FR-032.
+
+Found on the way: the run-app launch opened a window that never started its daemon, after
+earlier scratch windows had been killed. Opening with `-ApplePersistenceIgnoreState YES` (the
+memory note's workaround) worked.

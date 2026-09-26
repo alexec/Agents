@@ -343,6 +343,41 @@ extension DaemonCore {
         return false
     }
 
+    // MARK: Matching models (US6)
+
+    /// The model and effort options each runtime offers: what it last said in any folder,
+    /// newest first; for one never seen, a session started and ended again, which costs no
+    /// prompt, at most once in ten minutes.
+    public func poolModels(_ runtimeIDs: [String]) async -> [String: [ConfigOption]] {
+        if rememberedOptions == nil { rememberedOptions = optionCache.load() }
+        var found: [String: [ConfigOption]] = [:]
+        for runtimeID in Set(runtimeIDs) {
+            let newest = (rememberedOptions ?? [:])
+                .filter { $0.key.hasPrefix("\(runtimeID)\t") && !$0.value.options.isEmpty }
+                .max { $0.value.savedAt < $1.value.savedAt }?.value.options
+            if let newest {
+                found[runtimeID] = Self.modelAndEffort(newest)
+                continue
+            }
+            let at = now()
+            if let last = modelsProbedAt[runtimeID], at.timeIntervalSince(last) < 600 { continue }
+            modelsProbedAt[runtimeID] = at
+            let folder = locations.root
+            guard let made = try? await freshSession(runtimeID: runtimeID, cwd: folder, mcpServers: [],
+                                                      managesAgents: false) else { continue }
+            let options = await made.session.options
+            await made.session.end(gracePeriod: .seconds(1))
+            remember(OptionCache.Entry(options: options, commands: []),
+                     for: OptionCache.key(runtimeID: runtimeID, cwd: folder, mcpServers: []))
+            found[runtimeID] = Self.modelAndEffort(options)
+        }
+        return found
+    }
+
+    static func modelAndEffort(_ options: [ConfigOption]) -> [ConfigOption] {
+        options.filter { SettingsCarry.isModel($0) || $0.category == "thought_level" }
+    }
+
     /// The chat's mode now: what it set, else what its runtime says it is on.
     func currentMode(of agent: Agent) -> JSONValue? {
         guard let option = ModeMemory.modeOption(in: agent.advertisedOptions) else { return nil }
@@ -393,9 +428,22 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.stopTheTurnFirst, message: "Stop the turn first.")
         }
         dropAllowanceWait(agent.id)
+        let fromModel = SettingsCarry.model(in: agent.advertisedOptions).flatMap {
+            agent.startOptions.values[$0.id] ?? $0.currentValue
+        }
         _ = try await switchRuntime(agent.id, to: entry, reason: .byHand, why: "you asked to continue with it",
                                     choices: request.choices, resend: false)
         let moved = agents[agent.id]
+        // Remember the pair the person chose (US6), never breaking FR-032.
+        if let remember = request.remember, let fromModel, let moved,
+           let toModel = SettingsCarry.model(in: moved.advertisedOptions).flatMap({ moved.startOptions.values[$0.id] ?? $0.currentValue }) {
+            let next = pool.remembering(from: (agent.runtimeID, Cell(model: fromModel)),
+                                        to: (entry.runtimeID, Cell(model: toModel)),
+                                        levelID: remember.levelID, newLevelName: remember.newLevelName)
+            do { _ = try setPool(next) } catch {
+                DaemonLog.shared.write("remembering a pair was refused: \(error)")
+            }
+        }
         return .init(runtimeID: entry.runtimeID,
                      plan: CarryPlan(values: moved?.startOptions.values ?? [:]),
                      options: moved?.advertisedOptions ?? [], agent: moved)

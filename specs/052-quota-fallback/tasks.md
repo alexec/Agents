@@ -379,26 +379,26 @@
 
 **Independent Test**: Spec US6 test and AS1–AS4; quickstart §8 steps 1 and 4.
 
-- [ ] T062 [P] [US6] Extend `Pkg/Tests/AgentsKitTests/Unit/SettingsCarryTests.swift` with the grid:
+- [X] T062 [P] [US6] Extend `Pkg/Tests/AgentsKitTests/Unit/SettingsCarryTests.swift` with the grid:
   - the chat's model in a level with a cell for the new runtime → that cell's model and effort, with the source `.level(name)`;
   - the model is in no level, or the cell is empty → the fallbacks, and the note says the grid had no answer;
   - a cell whose model is no longer offered is treated as empty;
   - two entries for one runtime share its column.
-- [ ] T063 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/PoolModelsTests.swift` for `pool/models`:
+- [X] T063 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/PoolModelsTests.swift` for `pool/models`:
   - it reads from `OptionCache`;
   - a runtime missing from the cache gets a draft handshake that costs no prompt;
   - it refreshes at most once every 10 minutes per runtime.
 
   Also test Remember on `agents/continueWith`: it adds the pair to the chosen level, or to a new level, and never breaks FR-032.
-- [ ] T064 [US6] Implement the grid in `SettingsCarry.swift`, `pool/models`, and Remember, so that T062–T063 pass.
-- [ ] T065 [US6] Make the Matching models grid on `App/Sources/Pool/PoolPage.swift` editable:
+- [X] T064 [US6] Implement the grid in `SettingsCarry.swift`, `pool/models`, and Remember, so that T062–T063 pass.
+- [X] T065 [US6] *(Built 2026-09-26. Reordering is Move up/down on a level's menu, not drag. Not yet seen on screen: the Mac locked.)* Make the Matching models grid on `App/Sources/Pool/PoolPage.swift` editable:
   - cell menus from `pool/models`;
   - **Add a level**;
   - rename and reorder levels by drag;
   - gone cells shown struck through;
   - one column per pool runtime, in pool order;
   - a model already in another level moves when chosen.
-- [ ] T066 [US6] Walk quickstart §8 steps 1 and 4 on a scratch root, and take a screenshot of the grid into `specs/052-quota-fallback/walk/us6/`.
+- [X] T066 [US6] *(Walked over the socket 2026-09-26. The grid screenshot is still owed: the Mac locked.)* Walk quickstart §8 steps 1 and 4 on a scratch root, and take a screenshot of the grid into `specs/052-quota-fallback/walk/us6/`.
 
 ---
 

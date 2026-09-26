@@ -301,6 +301,8 @@ public enum DaemonAPI {
         public static let agentsContinueWith = "agents/continueWith"
         /// A chat's own "carry on when this runs out" (052, FR-003).
         public static let agentsSetSwitching = "agents/setSwitching"
+        /// The model and effort options each runtime offers, for Matching models (US6).
+        public static let poolModels = "pool/models"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -1048,9 +1050,22 @@ public enum DaemonAPI {
         public var adjust: Bool
         public var choices: [String: JSONValue]
         public var confirmed: Bool
+        /// Remember the pair in Matching models (US6): in the level that already holds the
+        /// chat's model, else this one, else a new level with this name.
+        public var remember: Remember?
+
+        public struct Remember: Codable, Sendable {
+            public var levelID: UUID?
+            public var newLevelName: String?
+            public init(levelID: UUID? = nil, newLevelName: String? = nil) {
+                self.levelID = levelID
+                self.newLevelName = newLevelName
+            }
+        }
 
         public init(agentID: UUID, entryID: UUID? = nil, runtimeID: String? = nil, adjust: Bool = false,
-                    choices: [String: JSONValue] = [:], confirmed: Bool = false) {
+                    choices: [String: JSONValue] = [:], confirmed: Bool = false, remember: Remember? = nil) {
+            self.remember = remember
             self.agentID = agentID
             self.entryID = entryID
             self.runtimeID = runtimeID
@@ -1067,6 +1082,7 @@ public enum DaemonAPI {
             adjust = try c.decodeIfPresent(Bool.self, forKey: .adjust) ?? false
             choices = try c.decodeIfPresent([String: JSONValue].self, forKey: .choices) ?? [:]
             confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+            remember = try c.decodeIfPresent(Remember.self, forKey: .remember)
         }
     }
 
@@ -1085,6 +1101,11 @@ public enum DaemonAPI {
             self.options = options
             self.agent = agent
         }
+    }
+
+    public struct PoolModelsRequest: Codable, Sendable {
+        public var runtimeIDs: [String]
+        public init(runtimeIDs: [String]) { self.runtimeIDs = runtimeIDs }
     }
 
     public struct SetSwitchingRequest: Codable, Sendable {

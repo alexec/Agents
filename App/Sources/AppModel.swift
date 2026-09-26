@@ -838,20 +838,22 @@ final class AppModel {
 
     /// Move the chat, or change what it carried on with. The daemon's sentence when it
     /// will not.
-    func applyContinue(_ request: ContinueWith, choices: [String: JSONValue]) async -> String? {
-        switch await continueWith(request, choices: choices, confirmed: true) {
+    func applyContinue(_ request: ContinueWith, choices: [String: JSONValue],
+                       remember: DaemonAPI.ContinueWithRequest.Remember? = nil) async -> String? {
+        switch await continueWith(request, choices: choices, confirmed: true, remember: remember) {
         case .success: return nil
         case .failure(let error): return error.message
         }
     }
 
-    private func continueWith(_ request: ContinueWith, choices: [String: JSONValue], confirmed: Bool)
+    private func continueWith(_ request: ContinueWith, choices: [String: JSONValue], confirmed: Bool,
+                              remember: DaemonAPI.ContinueWithRequest.Remember? = nil)
         async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
         let call = DaemonAPI.ContinueWithRequest(
             agentID: request.agentID,
             entryID: request.adjust ? nil : request.entry.id,
             runtimeID: request.adjust ? nil : request.entry.runtimeID,
-            adjust: request.adjust, choices: choices, confirmed: confirmed)
+            adjust: request.adjust, choices: choices, confirmed: confirmed, remember: remember)
         do {
             let result = try await client.call(DaemonAPI.Method.agentsContinueWith, call,
                                                returning: DaemonAPI.ContinueWithResult.self)
@@ -861,6 +863,12 @@ final class AppModel {
         } catch {
             return .failure(JSONRPCError(code: -32603, message: "\(error)"))
         }
+    }
+
+    /// The model options each runtime offers, for Matching models' menus (052, US6).
+    func poolModels(_ runtimeIDs: [String]) async -> [String: [ConfigOption]] {
+        (try? await client.call(DaemonAPI.Method.poolModels, DaemonAPI.PoolModelsRequest(runtimeIDs: runtimeIDs),
+                                returning: [String: [ConfigOption]].self)) ?? [:]
     }
 
     /// A chat's own "carry on when this runs out" (052, FR-003).

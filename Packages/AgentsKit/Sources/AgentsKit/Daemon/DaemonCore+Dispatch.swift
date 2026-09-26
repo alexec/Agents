@@ -416,6 +416,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ContinueWithRequest.self)
                 return .success(try JSONValue.encoding(try await continueWith(request)))
 
+            case DaemonAPI.Method.poolModels:
+                let request = try require(params, as: DaemonAPI.PoolModelsRequest.self)
+                return .success(try JSONValue.encoding(await poolModels(request.runtimeIDs)))
+
             case DaemonAPI.Method.agentsSetSwitching:
                 let request = try require(params, as: DaemonAPI.SetSwitchingRequest.self)
                 await setSwitching(agentID: request.agentID, off: !request.isOn)

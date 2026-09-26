@@ -71,3 +71,57 @@ struct SettingsCarryTests {
         #expect(plan.dropped == [.extraArguments(["--verbose"]), .alwaysAllow(count: 2), .queuedSlashCommand("/compact")])
     }
 }
+
+/// US6 of 052: the grid, as a switch reads it and as the person edits it.
+@Suite("Matching models")
+struct MatchingModelsTests {
+    private func side(_ runtimeID: String, models: [String], current: String? = nil) -> SettingsCarry.Side {
+        let option = ConfigOption(id: "model", name: "Model", category: "model", type: "select",
+                                  currentValue: current.map(JSONValue.string),
+                                  options: models.map { ConfigChoice(value: .string($0), name: $0) })
+        return .init(runtimeID: runtimeID, options: [option], values: current.map { ["model": .string($0)] } ?? [:])
+    }
+
+    @Test func aCellWhoseModelIsGoneIsTreatedAsEmpty() {
+        let level = Level(name: "Strongest", cells: ["claude": Cell(model: "opus"), "codex": Cell(model: "gpt-4")])
+        let plan = SettingsCarry.plan(from: side("claude", models: ["opus"], current: "opus"),
+                                      to: side("codex", models: ["gpt-5", "gpt-5-codex"]),
+                                      levels: [level], entryModel: "gpt-5-codex")
+        #expect(plan.values["model"] == .string("gpt-5-codex"))
+        #expect(plan.rows.first?.source == .poolEntry)
+        #expect(PoolSettings.isGone(Cell(model: "gpt-4"), offered: side("codex", models: ["gpt-5"]).options))
+        #expect(!PoolSettings.isGone(Cell(model: "gpt-5"), offered: side("codex", models: ["gpt-5"]).options))
+    }
+
+    @Test func noLevelGivesTheFallbacks() {
+        let plan = SettingsCarry.plan(from: side("claude", models: ["haiku"], current: "haiku"),
+                                      to: side("codex", models: ["gpt-5"]),
+                                      levels: [Level(name: "Strongest", cells: ["claude": Cell(model: "opus")])])
+        #expect(plan.rows.first?.source == .runtimeDefault)
+    }
+
+    @Test func placingAModelMovesItOutOfItsOtherLevel() throws {
+        var pool = PoolSettings(isOn: true, entries: [])
+        let (withFirst, first) = pool.addingLevel(named: "Strongest")
+        let (withBoth, second) = withFirst.addingLevel(named: "Everyday")
+        pool = withBoth.placing(Cell(model: "opus"), for: "claude", in: first)
+        pool = pool.placing(Cell(model: "opus"), for: "claude", in: second)
+        #expect(pool.levels[0].cells["claude"] == nil)
+        #expect(pool.levels[1].cells["claude"]?.model == "opus")
+        try pool.validate()
+    }
+
+    @Test func rememberGoesInTheLevelThatHoldsTheChatsModelOrANewOne() throws {
+        let (start, strongest) = PoolSettings(isOn: true, entries: []).addingLevel(named: "Strongest")
+        let pool = start.placing(Cell(model: "opus"), for: "claude", in: strongest)
+        let kept = pool.remembering(from: ("claude", Cell(model: "opus")), to: ("codex", Cell(model: "gpt-5-codex")))
+        #expect(kept.levels.count == 1)
+        #expect(kept.levels[0].cells["codex"]?.model == "gpt-5-codex")
+
+        let fresh = pool.remembering(from: ("claude", Cell(model: "haiku")), to: ("codex", Cell(model: "gpt-5")),
+                                     newLevelName: "Quick")
+        #expect(fresh.levels.map(\.name) == ["Strongest", "Quick"])
+        #expect(fresh.levels[1].cells == ["claude": Cell(model: "haiku"), "codex": Cell(model: "gpt-5")])
+        try fresh.validate()
+    }
+}

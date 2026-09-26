@@ -131,7 +131,7 @@ public enum SettingsCarry {
         return (ranked.min { $0.1 < $1.1 }!.0, .strictestMode)
     }
 
-    static func isModel(_ option: ConfigOption) -> Bool { option.category == "model" || option.id == "model" }
+    public static func isModel(_ option: ConfigOption) -> Bool { option.category == "model" || option.id == "model" }
 
     public static func model(in options: [ConfigOption]) -> ConfigOption? { options.first(where: isModel) }
 

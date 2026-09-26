@@ -327,6 +327,9 @@ public actor DaemonCore {
     /// of the second (052 US3): a burst of changes is one broadcast.
     var poolBroadcastAt: ContinuousClock.Instant?
     var poolBroadcastHeld = false
+    /// When each runtime was last started just to see its models (US6): at most once in
+    /// ten minutes, so an open Pool page never keeps starting runtimes.
+    var modelsProbedAt: [String: Date] = [:]
     /// Credentials already tried for the prompt a chat is carrying (052): never gone back
     /// to for the same prompt. Cleared by a turn that works.
     var carryTried: [UUID: Set<String>] = [:]

@@ -19,6 +19,9 @@ struct ContinueWithSheet: View {
     @State private var refusal: String?
     @State private var isApplying = false
     @State private var remember = false
+    /// Where Remember puts the pair: a level, or nil for a new one named below.
+    @State private var rememberIn: UUID?
+    @State private var newLevelName = ""
 
     private var agent: Agent? { model.agents.first { $0.id == request.agentID } }
     private var to: String { PoolWords.runtimeName(request.entry.runtimeID) }
@@ -54,12 +57,7 @@ struct ContinueWithSheet: View {
                 ProgressView().controlSize(.small)
             }
             if !request.adjust { wontCarry }
-            if !request.adjust {
-                Toggle("Remember this for next time", isOn: $remember)
-                    .disabled(true)
-                Text("Putting the model you pick beside this chat’s in a Matching models level arrives with the grid.")
-                    .appText(.fine).foregroundStyle(.secondary)
-            }
+            if !request.adjust { rememberRow }
             if let refusal {
                 Text(refusal).appText(.supporting).foregroundStyle(StateTint.failure.style(or: .primary))
             }
@@ -161,6 +159,38 @@ struct ContinueWithSheet: View {
         .paperWell(in: RoundedRectangle(cornerRadius: 8))
     }
 
+    /// Remember: the chat's model and the one picked here go side by side in a level, so
+    /// the next switch between these runtimes takes the same step (US6). The level that
+    /// already holds the chat's model wins, whatever is picked here.
+    private var levels: [Level] { model.poolStatus?.settings.levels ?? [] }
+
+    private var holdingLevel: Level? {
+        guard let agent, let option = SettingsCarry.model(in: agent.advertisedOptions),
+              let now = agent.startOptions.values[option.id] ?? option.currentValue else { return nil }
+        return levels.first { $0.cells[agent.runtimeID]?.model == now }
+    }
+
+    private var rememberRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Toggle("Remember this for next time", isOn: $remember)
+                if remember, holdingLevel == nil {
+                    Picker("in", selection: $rememberIn) {
+                        Text("a new level").tag(UUID?.none)
+                        ForEach(levels) { level in Text(level.name).tag(UUID?.some(level.id)) }
+                    }
+                    .fixedSize()
+                    if rememberIn == nil {
+                        TextField("Name", text: $newLevelName).frame(width: 140)
+                    }
+                }
+            }
+            Text(holdingLevel.map { "Goes in “\($0.name)”, which already has this chat’s model." }
+                 ?? "Puts the model you pick beside this chat’s in a Matching models level.")
+                .appText(.fine).foregroundStyle(.secondary)
+        }
+    }
+
     private var footer: some View {
         HStack {
             if isBusy {
@@ -214,7 +244,9 @@ struct ContinueWithSheet: View {
     private func apply() async {
         isApplying = true
         defer { isApplying = false }
-        if let why = await model.applyContinue(request, choices: choices) {
+        let keep = remember ? DaemonAPI.ContinueWithRequest.Remember(levelID: rememberIn,
+                                                                      newLevelName: newLevelName.isEmpty ? nil : newLevelName) : nil
+        if let why = await model.applyContinue(request, choices: choices, remember: keep) {
             refusal = why
         } else {
             dismiss()
