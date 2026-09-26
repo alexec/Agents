@@ -85,6 +85,10 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.eventsList,
         DaemonAPI.Method.leasesSnapshot,
         DaemonAPI.Method.costState,
+        // Reads only: the phone shows the notes, the retired line and the retired page,
+        // and never changes the settings or retires anything (051, FR-028).
+        DaemonAPI.Method.retentionState,
+        DaemonAPI.Method.agentsRetired,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,

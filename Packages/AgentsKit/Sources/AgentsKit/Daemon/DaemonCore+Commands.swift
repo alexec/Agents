@@ -992,7 +992,14 @@ extension DaemonCore {
             }
         }
         var reason: EndedReason
-        if let known = result.reason {
+        if let failure = result.runtimeError {
+            // It said in words that the turn failed and then ended it normally (049).
+            // Its words are in the conversation already; this says what they mean, and
+            // keeps the row from reading as done.
+            let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+            await record(.runtimeNote("\(runtimeName) could not do this turn: \(failure.sentence)"), for: agentID)
+            reason = .runtimeError
+        } else if let known = result.reason {
             reason = known
         } else {
             // Written down as given. The ending line says only that the reason is
@@ -1368,6 +1375,11 @@ extension DaemonCore {
             await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
+        // Whole for the ten minutes after, as if just read: the window that archived it
+        // is usually still showing it. The sweep slims it after that (051).
+        lastWhole[agentID] = now()
+        dropLiveState(for: agentID)
+        checkSoonAfterArchiving()
     }
 
     /// The line an agent that archived itself leaves in its transcript.
@@ -1402,6 +1414,8 @@ extension DaemonCore {
         guard agents[agentID] != nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
+        // Its lists back before it is live again (051): a live agent is never slim.
+        await makeWhole(agentID)
         await move(agentID, on: .unarchivedByUser)
     }
 
@@ -1490,6 +1504,13 @@ extension DaemonCore {
     }
 
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {
-        try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
+        // Deleted with the rest of it (051): say so rather than show an empty page.
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        // Somebody is reading it: whole while they do (051).
+        if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
+        return try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
     }
 }

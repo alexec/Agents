@@ -37,7 +37,23 @@ RUNTIMES = {
     # Never a gemini on the PATH (046, D1): the app's own toolset's shim, named by
     # AGENTS_GEMINI_SHIM, e.g. <root>/tools/gemini/current/bin/gemini.
     "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
+    # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
+    # AGENTS_ANTIGRAVITY_SHIM, e.g. <root>/tools/antigravity/current/bin/agy_acp_server.
+    "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
 }
+
+# What a runtime needs in its environment to run at all, scoped or not (049): Antigravity
+# keeps everything under GEMINI_HOME, which must never be the person's ~/.gemini here, and
+# signs in only with a key it is told to use (AGENTS_ANTIGRAVITY_KEY, optional).
+import tempfile as _tempfile
+RUNTIME_ENV = {
+    "antigravity": {"GEMINI_HOME": _tempfile.mkdtemp(prefix="agents-agy-home-"),
+                    "AGY_ACP_DISABLE_WORKSPACE_TRUST": "1",
+                    **({"GEMINI_API_KEY": os.environ["AGENTS_ANTIGRAVITY_KEY"]}
+                       if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {})},
+}
+# Signed in with before any session, when the key above is given.
+RUNTIME_AUTH = {"antigravity": "gemini-api-key"} if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {}
 
 CLIENT = {
     "fs": {"readTextFile": True, "writeTextFile": True},
@@ -114,6 +130,15 @@ POLICIES = {
         "args": [],
         "env": {},
     },
+    # A deny list under _meta.agy.disabledTools on session/new (049, R7).
+    "antigravity": {
+        "removed": ["start_subagent"],
+        "kept": ["ask_question"],
+        "residue": [],
+        "meta": {"agy": {"disabledTools": ["start_subagent"]}},
+        "args": [],
+        "env": {},
+    },
     # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
     "codex": {
         "removed": ["clock.sleep", "goals", "automations", "memories", "apps"],
@@ -167,6 +192,7 @@ def ask(name, command, policy, scoped):
     """Start a runtime, make a session, and hand back what it says about its own tools."""
     arguments = list(command) + (policy["args"] if scoped else [])
     environment = dict(BASE_ENV)
+    environment.update(RUNTIME_ENV.get(name, {}))
     if scoped:
         for flag, contents in policy.get("files", {}).items():
             handle = tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False)
@@ -249,6 +275,8 @@ def ask(name, command, policy, scoped):
                          time.time() + 60)
         if result is None:
             return None
+        if name in RUNTIME_AUTH:
+            call(9, "authenticate", {"methodId": RUNTIME_AUTH[name]}, time.time() + 30)
         params = {"cwd": work, "mcpServers": []}
         if scoped and policy["meta"] is not None:
             params["_meta"] = policy["meta"]

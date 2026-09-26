@@ -47,6 +47,13 @@ public struct MacToolsetInstaller: Sendable {
         case npm(String)
         case noSpace
         case other(String)
+        /// An archive toolset (049): the vendor publishes nothing for this Mac, or what it
+        /// publishes is known not to work. The reason is the manifest's.
+        case unavailable(String)
+        /// An archive toolset's download from its vendor failed.
+        case archiveDownload(String)
+        /// Less free space than the manifest says it needs, before anything is fetched.
+        case needsRoom(Int64)
 
         /// Said about the runtime being installed, by its name.
         public func sentence(for name: String) -> String {
@@ -54,6 +61,10 @@ public struct MacToolsetInstaller: Sendable {
             case .noMacPin: "This build of the app carries no Node.js for this Mac."
             case .noInternet: "Couldn’t reach the internet to download \(name)."
             case .download(let detail): "Couldn’t download Node.js: \(detail)"
+            case .unavailable(let reason): reason
+            case .archiveDownload(let detail): "Couldn’t download \(name): \(detail)"
+            case .needsRoom(let bytes):
+                "Not enough room: \(name) needs about \(String(format: "%.1f", Double(bytes) / 1_000_000_000)) GB free."
             case .checksum: "The download didn’t match its checksum, so nothing was installed."
             case .npm(let detail): "Installing \(name) failed: \(detail)"
             case .noSpace: "There isn’t room on this Mac to install \(name)."
@@ -186,6 +197,11 @@ public struct MacToolsetInstaller: Sendable {
     /// `ln -sfn <id> current`, by writing the new link beside and renaming it over, so
     /// there is never a moment without one.
     private func point(currentAt id: String) throws {
+        try Self.point(currentAt: id, in: folder)
+    }
+
+    /// The same, for any runtime's toolset folder (049's archives too).
+    static func point(currentAt id: String, in folder: URL) throws {
         let fm = FileManager.default
         let current = folder.appendingPathComponent("current")
         let next = folder.appendingPathComponent(".current-\(UUID().uuidString)")
@@ -205,9 +221,12 @@ public struct MacToolsetInstaller: Sendable {
     /// Remove every toolset but the current one, and anything half-built. Only when no
     /// agent can be running from them: at the daemon's start, before any is picked up.
     public func tidy() {
+        Self.tidy(folder: folder, keeping: currentID)
+    }
+
+    static func tidy(folder: URL, keeping keep: String?) {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
-        let keep = currentID
         for name in names where name != "current" && name != keep && !name.hasPrefix(".current-") {
             try? fm.removeItem(at: folder.appendingPathComponent(name))
         }

@@ -42,6 +42,7 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. |
 | `agent.stopped` | agent, by | An agent was stopped before finishing. |
 | `agent.failed` | agent, reason | An agent ended in an error. |
+| `agent.retired` | agent, because | An archived agent was retired and its conversation deleted. `because` is `age`, `cap` or `person`. |
 
 ## Workflows
 

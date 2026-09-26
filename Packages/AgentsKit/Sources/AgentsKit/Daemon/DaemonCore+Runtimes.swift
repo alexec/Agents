@@ -148,6 +148,8 @@ extension DaemonCore {
     /// Branch an agent. The original is untouched and keeps its own transcript; the new
     /// one starts with a copy of it.
     public func fork(agentID: UUID) async throws -> UUID {
+        // A branch copies the options and commands: from a whole record, never a slim one (051).
+        if agents[agentID]?.isSlim == true { await makeWhole(agentID) }
         guard let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }

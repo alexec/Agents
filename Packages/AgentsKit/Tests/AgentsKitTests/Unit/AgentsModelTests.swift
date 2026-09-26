@@ -459,6 +459,27 @@ struct AgentsModelTests {
         #expect(model.terminalOutput["s\(AgentsModel.terminalsKept + 49)"] == "x")
     }
 
+
+    /// A retired agent leaves every list (051), and a chat naming it as its starter says
+    /// who that was, once the window knows what is left of it.
+    @Test func aRetiredAgentLeavesTheListAndIsStillNamedAsAStarter() throws {
+        let model = AgentsModel()
+        let starter = agent(state: .archived)
+        var started = agent()
+        started.startedByAgent = starter.id
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(starter))
+        model.apply(DaemonAPI.Notification.agentChanged, try notification(started))
+
+        model.apply(DaemonAPI.Notification.agentRemoved,
+                    try notification(DaemonAPI.AgentRemovedNotification(agentID: starter.id)))
+        #expect(model.agent(starter.id) == nil)
+        #expect(model.agent(started.id) != nil)
+
+        var named = starter
+        named.title = "Plan the release"
+        model.takeTombstones([Tombstone(from: named, retiredAt: Date(), because: .age)])
+        #expect(model.startedByAgentLabel(started) == "Started by \u{201C}Plan the release\u{201D} (retired)")
+    }
 }
 
 @MainActor

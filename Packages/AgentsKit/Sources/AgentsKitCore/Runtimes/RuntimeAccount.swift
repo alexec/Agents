@@ -59,10 +59,13 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
     /// The methods in the order to offer them: the runtime's own order where its policy
     /// names one (047: Codex puts ChatGPT first), the rest after in the order it sent them.
     public var orderedAuthMethods: [ACP.AuthMethod] {
+        // Less any the app does not offer for this runtime (049).
+        let hidden = RuntimeLaunchCatalog.launch(for: runtimeID).hiddenAuthMethods
+        let offered = authMethods.filter { !hidden.contains($0.id) }
         let order = ToolPolicyCatalog.policy(for: runtimeID).preferredAuthMethods
-        guard !order.isEmpty else { return authMethods }
-        let named = order.compactMap { id in authMethods.first { $0.id == id } }
-        return named + authMethods.filter { !order.contains($0.id) }
+        guard !order.isEmpty else { return offered }
+        let named = order.compactMap { id in offered.first { $0.id == id } }
+        return named + offered.filter { !order.contains($0.id) }
     }
 
     /// The method to offer first: the runtime's own first choice where its policy names

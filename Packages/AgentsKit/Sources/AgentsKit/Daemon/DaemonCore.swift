@@ -237,6 +237,37 @@ public actor DaemonCore {
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
 
+    // MARK: Retiring archived agents (051)
+
+    lazy var retiredStore = RetiredStore(locations: locations)
+    lazy var retentionStore = RetentionStore(locations: locations)
+    lazy var archiveIndexStore = ArchiveIndex(locations: locations)
+    /// What is left of every retired agent, by id. Read at start, before the agents.
+    var retired: [UUID: Tombstone] = [:]
+    /// The person's settings and the clock retirement counts by, as `retention.json` has them.
+    var retention = RetentionStore.File()
+    var retentionIsLoaded = false
+    /// Sizes and file dates of archived agents, written to `archive.json`.
+    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:]
+    /// Over the cap with nothing more that could go, as the last check found.
+    var lastOverCap: OverCap?
+    /// When each archived agent was last made whole to be read. Gone when it is slim again.
+    var lastWhole: [UUID: Date] = [:]
+    /// The hourly check, and the sweep that slims what nobody is reading.
+    var retentionTimer: Task<Void, Never>?
+    var slimSweep: Task<Void, Never>?
+    /// A monotonic origin for `RetentionClock`, taken when the daemon was made.
+    let uptimeOrigin = ContinuousClock.now
+    /// How an agent's folder is measured. The tests swap it, so a cap can be crossed
+    /// without writing gigabytes.
+    var measureFolder: @Sendable (URL) -> Int = { ArchiveIndex.sizeOnDisk($0) }
+    /// The last time an archive asked for a check, so a busy archiving day asks at most
+    /// once a minute.
+    var lastArchiveCheck: Date?
+    /// A write of `archive.json` waiting to happen, so a check that changes a hundred
+    /// notes writes the index once.
+    var indexSave: Task<Void, Never>?
+
     // MARK: Events (042)
 
     /// Where the log and the event sources' memory are kept between runs.
@@ -594,6 +625,12 @@ public actor DaemonCore {
     func changed(_ agent: Agent) {
         agents[agent.id] = agent
         saveQuietly(agent)
+        // The index of archived agents follows them in and out (051). Only when it
+        // concerns one: this runs on every streamed token of a live agent.
+        if agent.state == .archived || archiveIndex[agent.id] != nil {
+            indexEntry(for: agent.id)
+            saveArchiveIndexSoon()
+        }
         broadcast(DaemonAPI.Notification.agentChanged, agent)
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
@@ -712,6 +749,14 @@ public actor DaemonCore {
         case .starting, .running, .waitingOnUser:
             break
         }
+        // When it was archived is when the time it is kept starts (051). Archiving again
+        // starts it again; anything else ends it.
+        if next == .archived {
+            if agents[agentID]?.state != .archived { agent.archivedAt = now() }
+        } else {
+            agent.archivedAt = nil
+            agent.retirement = nil
+        }
         let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
@@ -791,8 +836,40 @@ public actor DaemonCore {
     // MARK: Reading
 
     public func loadFromDisk() async {
-        let loaded = await store.loadAll()
-        for agent in loaded.agents { agents[agent.id] = seedingCost(agent) }
+        loadRetentionIfNeeded()
+        // A retire the last daemon was cut off in: its tombstone is written, so what is
+        // left is deleting, and it is done before anything is listed (051, FR-017).
+        await store.finishRetiring(retired.keys)
+        // Archived agents from the index, slim, without opening their records; the rest,
+        // and any archived one the index is behind on, read in full (051, research R3).
+        let index = archiveIndexStore.load() ?? [:]
+        var toRead: [UUID] = []
+        for id in await store.agentIDs() where retired[id] == nil {
+            if let entry = index[id], entry.agent.state == .archived,
+               let modified = ArchiveIndex.modifiedAt(locations.record(id)),
+               modified <= entry.fileModifiedAt.addingTimeInterval(Self.indexTolerance) {
+                agents[id] = seedingCost(entry.agent)
+                archiveIndex[id] = entry
+            } else {
+                toRead.append(id)
+            }
+        }
+        let loaded = await store.load(toRead)
+        for agent in loaded.agents {
+            if agent.state == .archived {
+                agents[agent.id] = seedingCost(agent).slimmed()
+                indexEntry(for: agent.id)
+            } else {
+                agents[agent.id] = seedingCost(agent)
+            }
+        }
+        if archiveIndex != index { saveArchiveIndex() }
+        // An agent archived before 051 has no time it was archived. It is given this
+        // start, so nothing goes by age on the day 051 arrives (FR-008).
+        for (id, agent) in agents where agent.state == .archived && agent.archivedAt == nil {
+            agents[id]?.archivedAt = now()
+            if let dated = agents[id] { try? await store.save(dated) }
+        }
         // A record the rules forbid was brought to one they allow on the way in, and
         // the person is told so here, in the transcript, which is where this app
         // already explains itself.
@@ -813,6 +890,7 @@ public actor DaemonCore {
             // of the list each time.
             if let mended = agents[id] { try? await store.save(mended) }
         }
+        startRetentionChecks()
     }
 
     /// Give a record written before the cost was banked its total back.
@@ -1134,6 +1212,12 @@ public struct ProcessSessionLauncher: SessionLauncher {
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
+        // A runtime's own home under the daemon's root (049's `GEMINI_HOME`), made private
+        // before it starts: one that is missing may be made world-readable by the runtime.
+        for folder in RuntimeLaunchCatalog.launch(for: runtime.id).folders(root: locations.root.path) {
+            try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+        }
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                      arguments: runtime.arguments + policy.launchArguments
                                          + RuntimePolicyFiles(locations: locations).arguments(for: policy),
@@ -1142,6 +1226,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                                                    onto: LoginShellPath.environment(),
                                                                    onServer: onServer),
                                      capabilities: Self.capabilities(for: policy),
+                                     launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                      authMethodBeforeContinuing: policy.authMethodBeforeContinuing)
     }
 
@@ -1153,12 +1238,15 @@ public struct ProcessSessionLauncher: SessionLauncher {
         return capabilities
     }
 
-    /// What a runtime is started with: `base` with anything lent (043), the policy's files
-    /// (Grok) and its variables (Codex's `CODEX_CONFIG`, 047), the policy's word last.
+    /// What a runtime is started with: `base` with the runtime's own launch variables
+    /// (049: Antigravity's home, and any stray key removed), then anything lent (043) on
+    /// top of those, the policy's files (Grok) and its variables (Codex's `CODEX_CONFIG`,
+    /// 047), the policy's word last.
     static func environment(for policy: ToolPolicy, locations: StoreLocations,
                             onto base: [String: String], onServer: Bool = false) -> [String: String] {
+        let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path)
         var environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LentEnvironment.applied(to: base))
+            .environment(for: policy, onto: LentEnvironment.applied(to: own))
             .merging(policy.launchEnvironment) { _, policy in policy }
         guard onServer else { return environment }
         environment.merge(policy.serverEnvironment) { _, server in server }

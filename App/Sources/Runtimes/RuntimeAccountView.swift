@@ -17,6 +17,10 @@ struct RuntimeAccountView: View {
     private var account: RuntimeAccount { model.accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID) }
     private var name: String { RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID }
 
+    private var notice: RuntimeLaunch.SignInNotice? {
+        RuntimeLaunchCatalog.launch(for: runtimeID).signInNotice
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(name).appText(.reading).fontWeight(.semibold)
@@ -39,6 +43,14 @@ struct RuntimeAccountView: View {
                         if let guidance = method.guidance {
                             Text(guidance).appText(.fine).foregroundStyle(.secondary)
                         }
+                    }
+                    // Words the runtime's vendor wants in front of the person at the moment
+                    // of choosing (049: Antigravity's terms on third-party tools). Once, under
+                    // the choices, when any of them is one it is about.
+                    if let notice, account.orderedAuthMethods.contains(where: { notice.methods.contains($0.id) }) {
+                        Text(notice.text).appText(.fine).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Link(notice.linkTitle, destination: notice.link).appText(.fine)
                     }
                 }
             }

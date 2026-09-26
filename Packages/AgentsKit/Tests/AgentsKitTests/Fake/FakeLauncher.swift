@@ -36,6 +36,7 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
 
         let (mine, theirs) = PairedTransport.pair()
         let session = ACPSession(transport: mine, capabilities: capabilities,
+                                 launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                  authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()

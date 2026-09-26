@@ -18,16 +18,21 @@ extension DaemonCore {
     public func allProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
         let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
+        let retiredByFolder = tombstonesByProject()
 
         // The union: every folder an agent is in, and every folder we kept a record for.
+        // And every folder a retired agent was in, so a project whose agents have all
+        // been retired keeps what it cost (051).
         var folders = Set(agentsByFolder.keys)
         folders.formUnion(records.keys)
+        folders.formUnion(retiredByFolder.keys)
 
         var projects: [Project] = folders.map { folder in
             if let kept = records[folder] { return kept }
             // Derived. A project nobody archived and nobody added by hand is as old as
             // its oldest agent, so the sidebar's order means something on day one.
-            let oldest = agentsByFolder[folder]?.map(\.createdAt).min() ?? Date()
+            let oldest = agentsByFolder[folder]?.map(\.createdAt).min()
+                ?? retiredByFolder[folder]?.map(\.createdAt).min() ?? Date()
             return Project(folder: folder, addedAt: oldest)
         }
         if !includeArchived { projects = projects.filter { !$0.isArchived } }
@@ -61,8 +66,16 @@ extension DaemonCore {
                 }
                 if agent.isUnmeasured { unmeasured += 1 }
             }
-            let newest = inFolder.map(\.lastActivityAt).max() ?? project.addedAt
-            return DaemonAPI.ProjectSummary(
+            // A retired agent still cost what it cost: retiring changes no total (051).
+            let gone = retiredByFolder[project.folder] ?? []
+            for tombstone in gone {
+                for (currency, amount) in tombstone.costToDate {
+                    costToDate[currency, default: 0] += amount
+                }
+            }
+            let newest = inFolder.map(\.lastActivityAt).max()
+                ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
+            var summary = DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
                 exists: Self.isDirectory(project.folder),
@@ -70,6 +83,8 @@ extension DaemonCore {
                 counts: counts,
                 costToDate: costToDate,
                 unmeasuredAgents: unmeasured)
+            summary.retiredCount = gone.count
+            return summary
         }
         .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }

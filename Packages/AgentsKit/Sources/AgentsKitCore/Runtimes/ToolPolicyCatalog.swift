@@ -308,6 +308,37 @@ public enum ToolPolicyCatalog {
         "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
 
+    /// Antigravity: a deny list in `_meta.agy.disabledTools` on `session/new`, and again on
+    /// `session/load` and `session/resume`, which is exactly the lever the server documents
+    /// for an ACP client ("Clients pass the filter under `_meta.agy`"). Measured against
+    /// `agy_acp_server` 1.2.1 on 2026-09-25 (049 research R7).
+    ///
+    /// Its built-in tools are `list_directory`, `search_directory`, `find_file`,
+    /// `view_file`, `create_file`, `edit_file`, `run_command`, `ask_question`,
+    /// `start_subagent`, `generate_image`, `search_web`, `read_url_content` and `finish`.
+    /// Only `start_subagent` duplicates the app. `ask_question` is the escalation tool: the
+    /// server raises it as `session/request_permission` whose options are the answers, and
+    /// allows it without a "Run ask_question?" prompt of its own.
+    ///
+    /// The `/plan` command writes "an implementation plan artifact" into the server's own
+    /// folder under `GEMINI_HOME`. It is a command the person types, not a tool the model
+    /// can call, so it is neither removed nor residue.
+    ///
+    /// A Google account, personal first, is the only way in (049 D3); the key methods the
+    /// server also offers are hidden (`RuntimeLaunchCatalog.hiddenAuthMethods`).
+    public static let antigravity = ToolPolicy(
+        runtimeID: RuntimeCatalog.antigravity.id,
+        removed: [
+            RemovedTool(name: "start_subagent", category: .agents),
+        ],
+        kept: [
+            KeptTool(name: "ask_question",
+                     because: "It is the escalation path: the server raises it as a permission request whose options are the answers, which the daemon holds and the phone can answer."),
+        ],
+        lever: .sessionMetaDenyList(path: ["agy", "disabledTools"]),
+        escalationTool: "ask_question",
+        preferredAuthMethods: ["oauth-personal", "oauth-business"])
+
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity]
 }

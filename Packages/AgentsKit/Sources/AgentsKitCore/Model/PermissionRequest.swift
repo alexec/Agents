@@ -198,7 +198,15 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// And the two that act on a pull request (038): they can only push to the pull
     /// request a run was started for, never forced, or reply on it, and an unattended
     /// run stopped at a question nobody is there to answer is no babysitting at all.
-    public var isAutoAllowable: Bool { isTheApps || isActingOnPullRequest }
+    ///
+    /// And any other tool of the app's own MCP server, named with that server in front
+    /// (049): leases, waits, events and agents. A runtime that asks before every MCP call
+    /// — Antigravity does, and Copilot asks before every call of any kind — would otherwise
+    /// stop an agent on a card each time it reached for the app, which is the one thing
+    /// the app has already agreed to by handing it the tool.
+    public var isAutoAllowable: Bool {
+        isTheApps || isActingOnPullRequest || AppTool.isServedByTheApp(name ?? title)
+    }
 
     /// Whether this is one of the two pull-request tools (038).
     public var isActingOnPullRequest: Bool {

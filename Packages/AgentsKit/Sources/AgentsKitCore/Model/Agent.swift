@@ -170,6 +170,22 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// memory because the event it counts is the daemon dying.
     public var restartPickUps: Int
 
+    /// When it was last archived (051): the start of the time it is kept before it is
+    /// retired. Cleared on unarchiving. A record archived before 051 has none, and the
+    /// daemon gives it the time it first reads it, so nothing goes on the day 051 ships.
+    public var archivedAt: Date?
+    /// What its row says about being retired, set by the daemon's check (051). Only
+    /// ever on an archived agent.
+    public var retirement: Retirement?
+    /// The three lists that are nearly all of a record — the options and commands the
+    /// runtime advertised, and the plans — are empty here and still on disk (051). An
+    /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
+    ///
+    /// In memory only and out of `CodingKeys`, like `rawState`, because it is a fact
+    /// about this copy and not about the agent. `AgentStore.save` reads the lists back
+    /// before writing, so a slim copy can never reach `agent.json`.
+    public var isSlim = false
+
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
     public var unknownFields: [String: JSONValue]
@@ -301,6 +317,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New with self-archiving. A record from before never asked; one from a
         // newer build asking for something this one does not know asked for nothing.
         afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
+        // New in 051. Absent on everything written before it.
+        archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        retirement = (try? c.decodeIfPresent(Retirement.self, forKey: .retirement)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -359,6 +378,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
+        try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
+        try c.encodeIfPresent(retirement, forKey: .retirement)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -382,6 +403,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case titledByAgent
         case parking
         case afterTurn
+        case archivedAt, retirement
     }
 
     struct AnyKey: CodingKey {
@@ -429,6 +451,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 titledByAgent: Bool = false,
                 parking: Parking? = nil,
                 afterTurn: AfterTurn? = nil,
+                archivedAt: Date? = nil,
+                retirement: Retirement? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -468,6 +492,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.titledByAgent = titledByAgent
         self.parking = parking
         self.afterTurn = afterTurn
+        self.archivedAt = archivedAt
+        self.retirement = retirement
         self.unknownFields = unknownFields
     }
 
@@ -589,5 +615,32 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // with `endTurn` was that rule 2 demanded *some* reason, and now nothing does.
         if state == .starting && (endedReason != nil || archivedReason != nil) { return false }
         return true
+    }
+}
+
+// MARK: Slim (051)
+
+extension Agent {
+    /// This agent without the lists that are nearly all of its record, for holding an
+    /// archived agent nobody is reading. Everything the list, the counts and retirement
+    /// need is still here.
+    public func slimmed() -> Agent {
+        var slim = self
+        slim.advertisedOptions = []
+        slim.availableCommands = []
+        slim.plans = []
+        slim.isSlim = true
+        return slim
+    }
+
+    /// This agent with the lists put back from the record on disk. Only the lists come
+    /// from `disk`: anything else changed in memory since it was slimmed is kept.
+    public func madeWhole(from disk: Agent) -> Agent {
+        var whole = self
+        whole.advertisedOptions = disk.advertisedOptions
+        whole.availableCommands = disk.availableCommands
+        whole.plans = disk.plans
+        whole.isSlim = false
+        return whole
     }
 }
