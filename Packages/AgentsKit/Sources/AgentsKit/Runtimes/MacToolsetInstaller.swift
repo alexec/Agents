@@ -64,7 +64,12 @@ public struct MacToolsetInstaller: Sendable {
         RuntimeCatalog.runtime(id: toolset.manifest.runtimeID)?.name ?? toolset.manifest.runtimeID
     }
 
-    /// Install, make it `current`, and remove any other. Returns the shim's path.
+    /// Install, and make it `current`. Returns the shim's path.
+    ///
+    /// An older toolset beside it is left where it is: an agent started from it before the
+    /// swap is still running from that folder (the shim resolves `current` once, when it
+    /// starts), and Node reads its modules lazily. `tidy()` removes old ones at the next
+    /// daemon start, when nothing can be running from them.
     @discardableResult
     public func install(progress: @Sendable (String) -> Void = { _ in }) async throws -> String {
         guard let node = toolset.macNode, let sha = node.sha256[architecture] else { throw Failure.noMacPin }
@@ -91,7 +96,6 @@ public struct MacToolsetInstaller: Sendable {
             }
         }
         try point(currentAt: id)
-        removeOthers(except: id)
         return finished.appendingPathComponent("bin/\(toolset.shimName)").path
     }
 
@@ -182,10 +186,18 @@ public struct MacToolsetInstaller: Sendable {
     }
 
     /// Every other toolset and half-built one. About half a gigabyte each.
-    private func removeOthers(except id: String) {
+    /// The id `current` points at, if there is one.
+    public var currentID: String? {
+        try? FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("current").path)
+    }
+
+    /// Remove every toolset but the current one, and anything half-built. Only when no
+    /// agent can be running from them: at the daemon's start, before any is picked up.
+    public func tidy() {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
-        for name in names where name != id && name != "current" {
+        let keep = currentID
+        for name in names where name != "current" && name != keep && !name.hasPrefix(".current-") {
             try? fm.removeItem(at: folder.appendingPathComponent(name))
         }
     }

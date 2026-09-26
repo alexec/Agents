@@ -33,6 +33,7 @@ public final class Daemon: @unchecked Sendable {
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
             let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
+            discovery.bundledToolsetIDs = toolsets.mapValues(\.id)
             installer = RuntimeInstaller(
                 discovery: discovery,
                 toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
@@ -55,6 +56,8 @@ public final class Daemon: @unchecked Sendable {
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).
         await core.clearCloneStaging()
+        // Before anything is picked up: nothing can be running from an old toolset yet.
+        (core.installer as? RuntimeInstaller)?.tidy()
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")

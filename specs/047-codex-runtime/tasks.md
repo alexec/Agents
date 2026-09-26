@@ -65,7 +65,7 @@ rebuild it from T003.
 
 ## Phase 3: Foundational (blocks every story; shared with 046's T009–T017)
 
-- [ ] T009 [P] Add `usesAppCopyOnly: Bool` to `Runtime` in `Core/Model/Runtime.swift`: default `false`, decoded leniently, absent reads as `false`.
+- [X] T009 [P] Add `usesAppCopyOnly: Bool` to `Runtime` in `Core/Model/Runtime.swift`: default `false`, decoded leniently, absent reads as `false`.
 - [X] T010 [P] In `Core/Runtimes/Toolset.swift`, make `shimLines` name no runtime in its comment, and add `shimName(for executable:)` so the shim is `bin/<runtime.executable>`. (046's `forwardsArguments` is not needed by Codex, but must not break it.)
 - [X] T011 [P] Tests in `Tests/Unit/ToolsetTests.swift`:
   - Claude's manifest and shim are unchanged byte for byte;
@@ -161,10 +161,10 @@ place, and a Codex agent then works like any runtime.
 
 **Independent test**: with two fake pins, install the old one and bundle the new one; the row shows **Update**. Start an agent on the old one and press Update: the agent keeps running, and the old folder is removed only after it ends (quickstart §4).
 
-- [ ] T035 [US1] Add "outdated" to discovery. `appToolset(for:)` resolves `current` and compares its id with the bundled toolset's id, and `RuntimeStatus` gains `outdated: Bool`, encoded leniently for older phones. In `Daemon-side/Runtimes/RuntimeDiscovery.swift` and `Core/Model/Runtime.swift`.
-- [ ] T036 [US1] In `Daemon-side/Daemon/DaemonCore+Install.swift`, `DaemonCore.installRuntime` proceeds when the runtime is available but outdated.
-- [ ] T037 [US1] Agents record the executable path they started from, and `ProcessSessionLauncher` launches through the resolved `<id>` path, never `current`. `MacToolsetInstaller.removeOthers(except:keeping:)` skips toolset ids an agent still runs from, and the daemon removes unused old folders at the next install and at start. In `Daemon-side/Runtimes/MacToolsetInstaller.swift`, `Daemon-side/Daemon/DaemonCore+Install.swift` and `Daemon-side/Daemon/DaemonCore.swift`.
-- [ ] T038 [P] [US1] Tests in `Tests/Unit/RuntimeInstallDispatchTests.swift` and `Tests/Unit/MacToolsetInstallerTests.swift`, with two fake pins, covering T035–T037 for Codex and Claude.
+- [X] T035 [US1] Add "outdated" to discovery. `appToolset(for:)` resolves `current` and compares its id with the bundled toolset's id, and `RuntimeStatus` gains `outdated: Bool`, encoded leniently for older phones. In `Daemon-side/Runtimes/RuntimeDiscovery.swift` and `Core/Model/Runtime.swift`.
+- [X] T036 [US1] In `Daemon-side/Daemon/DaemonCore+Install.swift`, `DaemonCore.installRuntime` proceeds when the runtime is available but outdated.
+- [X] T037 [US1] Agents record the executable path they started from, and `ProcessSessionLauncher` launches through the resolved `<id>` path, never `current`. `MacToolsetInstaller.removeOthers(except:keeping:)` skips toolset ids an agent still runs from, and the daemon removes unused old folders at the next install and at start. In `Daemon-side/Runtimes/MacToolsetInstaller.swift`, `Daemon-side/Daemon/DaemonCore+Install.swift` and `Daemon-side/Daemon/DaemonCore.swift`.
+- [X] T038 [P] [US1] Tests in `Tests/Unit/RuntimeInstallDispatchTests.swift` and `Tests/Unit/MacToolsetInstallerTests.swift`, with two fake pins, covering T035–T037 for Codex and Claude.
 - [ ] T039 [US1] `RuntimeInstallRow` in `App/Sources/Runtimes/InstallAgentsSheet.swift` shows **Update** beside the tick when `status.outdated`, calling the same `installRuntime`. Take one screenshot on the scratch root (look gate).
 
 ---

@@ -165,6 +165,9 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     public var runtime: Runtime
     public var availability: RuntimeAvailability
     public var checkedAt: Date
+    /// Available, from the app's own toolset, but not the one this app carries: an update
+    /// named a newer pin, and the row offers **Update** (047, 046).
+    public var outdated: Bool
 
     public var id: String { runtime.id }
 
@@ -187,9 +190,24 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
         }
     }
 
-    public init(runtime: Runtime, availability: RuntimeAvailability, checkedAt: Date = Date()) {
+    public init(runtime: Runtime, availability: RuntimeAvailability, checkedAt: Date = Date(),
+                outdated: Bool = false) {
         self.runtime = runtime
         self.availability = availability
         self.checkedAt = checkedAt
+        self.outdated = outdated
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case runtime, availability, checkedAt, outdated
+    }
+
+    /// Lenient about `outdated`, which a daemon from before 047 never sends.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        runtime = try c.decode(Runtime.self, forKey: .runtime)
+        availability = try c.decode(RuntimeAvailability.self, forKey: .availability)
+        checkedAt = try c.decode(Date.self, forKey: .checkedAt)
+        outdated = (try? c.decodeIfPresent(Bool.self, forKey: .outdated)) ?? false
     }
 }

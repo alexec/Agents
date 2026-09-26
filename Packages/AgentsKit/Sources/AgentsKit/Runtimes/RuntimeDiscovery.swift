@@ -11,6 +11,10 @@ public struct RuntimeDiscovery: Sendable {
     /// (048): Claude's for somebody with no Node, consulted after the person's own PATH so
     /// anyone who already has `npx` goes on using it; Codex's always, and only (047).
     public var macToolsHome: String?
+    /// The toolset id the app carries for each runtime it installs, so a Mac toolset left
+    /// by an older app is known as outdated (047, 046). Empty on a server, where 043's own
+    /// update-when-idle moves the toolset.
+    public var bundledToolsetIDs: [String: String] = [:]
 
     public init(searchPaths: [String]? = nil,
                 fileExists: (@Sendable (String) -> Bool)? = nil) {
@@ -54,6 +58,16 @@ public struct RuntimeDiscovery: Sendable {
             return .available(path: shim, supportsResume: false)
         }
         return .missing(lookedIn: searchPaths)
+    }
+
+    /// Whether the app's own copy of `runtime` is in use and is not the toolset this app
+    /// carries: an app update named a newer pin (047's D5). The row offers **Update**.
+    public func isOutdated(_ runtime: Runtime) -> Bool {
+        guard let macToolsHome, let bundled = bundledToolsetIDs[runtime.id],
+              case .available(let path, _) = locate(runtime), path == appToolset(for: runtime),
+              let current = try? FileManager.default.destinationOfSymbolicLink(
+                  atPath: "\(macToolsHome)/\(runtime.id)/current") else { return false }
+        return current != bundled
     }
 
     /// The Mac's own copy of a toolset, when it is whole: `current/ok` and an executable

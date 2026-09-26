@@ -112,6 +112,11 @@ struct RuntimeInstallRow: View {
                         .help("Try installing \(status.runtime.name) again")
                 }
             }
+        case .available where status.outdated && status.runtime.install != nil:
+            // This app carries a newer pin than the one installed (047). Agents already
+            // running keep the old one until they end.
+            Button("Update") { install() }
+                .help("Install the \(status.runtime.name) this version of Agents carries. Agents already running keep theirs.")
         default:
             EmptyView()
         }

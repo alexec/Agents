@@ -39,6 +39,11 @@ public struct RuntimeInstaller: RuntimeInstalling {
     /// Debug builds only: every vendor script is this URL instead (048's walk).
     public static let testScriptVariable = "AGENTS_TEST_INSTALL_SCRIPT"
 
+    /// Old toolsets out, at the daemon's start (see `MacToolsetInstaller.tidy`).
+    public func tidy() {
+        for toolset in toolsets.values { toolset.tidy() }
+    }
+
     public func recipe(for runtime: Runtime) -> RuntimeInstall? {
         switch runtime.install {
         case .toolset(let runtimeID):

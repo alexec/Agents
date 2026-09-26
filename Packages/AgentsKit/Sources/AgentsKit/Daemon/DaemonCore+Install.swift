@@ -22,7 +22,9 @@ extension DaemonCore {
                                message: "Install \(runtime.name) from the Mac.")
         }
         if installs[runtimeID] != nil { return status(of: runtime) }
-        if discovery.locate(runtime).isAvailable {
+        // Here, and the toolset this app carries: nothing to do. Here but outdated is what
+        // **Update** asks for, and installs the new one beside the old (047).
+        if discovery.locate(runtime).isAvailable, !discovery.isOutdated(runtime) {
             installStates[runtimeID] = nil
             return status(of: runtime)
         }
@@ -47,6 +49,7 @@ extension DaemonCore {
                 status.availability = state
             }
         }
+        status.outdated = status.availability.isAvailable && discovery.isOutdated(status.runtime)
         return status
     }
 

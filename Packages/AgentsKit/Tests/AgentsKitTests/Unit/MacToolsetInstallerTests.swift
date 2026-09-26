@@ -56,6 +56,46 @@ struct MacToolsetInstallerTests {
         #expect(MacToolsetInstaller.Failure.npm("E500").sentence(for: "Claude") == "Installing Claude failed: E500")
     }
 
+    /// A newer pin (047's D5): installed beside the old, made current, and the old folder
+    /// kept, because an agent may still be running from it, until `tidy` at the next start.
+    @Test func aNewerPinInstallsBesideTheOldWhichStaysUntilTidy() async throws {
+        let old = try FakeMacToolset()
+        defer { old.remove() }
+        let new = try FakeMacToolset(packageVersion: "0.0.1-fake")
+        defer { new.remove() }
+        #expect(old.toolset.id != new.toolset.id)
+        _ = try await old.installer().install()
+        let updater = MacToolsetInstaller(toolset: new.toolset, tools: old.tools, nodeDist: new.dist,
+                                          architecture: FakeMacToolset.architecture,
+                                          environment: ["PATH": "/usr/bin:/bin"])
+
+        var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
+        discovery.macToolsHome = old.tools.path
+        discovery.bundledToolsetIDs = ["claude": new.toolset.id]
+        #expect(discovery.isOutdated(RuntimeCatalog.claude))
+
+        _ = try await updater.install()
+        let folder = old.tools.appendingPathComponent("claude")
+        #expect(updater.currentID == new.toolset.id)
+        #expect(!discovery.isOutdated(RuntimeCatalog.claude))
+        #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(old.toolset.id)/ok").path),
+                "an agent may still be running from the old one")
+
+        updater.tidy()
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+                == [new.toolset.id, "current"].sorted())
+    }
+
+    @Test func aPersonsOwnNpxIsNeverOutdated() async throws {
+        let fake = try FakeMacToolset()
+        defer { fake.remove() }
+        _ = try await fake.installer().install()
+        var discovery = RuntimeDiscovery(searchPaths: ["/person/bin"]) { $0 == "/person/bin/npx" }
+        discovery.macToolsHome = fake.tools.path
+        discovery.bundledToolsetIDs = ["claude": "something-newer"]
+        #expect(!discovery.isOutdated(RuntimeCatalog.claude), "Claude runs from the person's npx, not the toolset")
+    }
+
     @Test func aChecksumMismatchInstallsNothing() async throws {
         let fake = try FakeMacToolset(wrongChecksum: true)
         defer { fake.remove() }

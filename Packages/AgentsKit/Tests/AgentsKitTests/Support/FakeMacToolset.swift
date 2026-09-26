@@ -17,7 +17,7 @@ struct FakeMacToolset {
     static let architecture = "arm64"
 
     init(wrongChecksum: Bool = false, runtimeID: String = "claude",
-         package: String = "@agentclientprotocol/claude-agent-acp") throws {
+         package: String = "@agentclientprotocol/claude-agent-acp", packageVersion: String = "0.0.0-fake") throws {
         let fm = FileManager.default
         root = fm.temporaryDirectory.appendingPathComponent("mac-toolset-\(UUID().uuidString)", isDirectory: true)
         dist = root.appendingPathComponent("dist", isDirectory: true)
@@ -55,7 +55,7 @@ struct FakeMacToolset {
 
         let manifest = Toolset.Manifest(
             runtimeID: runtimeID, node: .init(version: Self.nodeVersion, sha256: [:]),
-            package: package, packageVersion: "0.0.0-fake",
+            package: package, packageVersion: packageVersion,
             entry: "dist/index.js", minFreeBytes: 1024)
         try JSONEncoder().encode(manifest).write(to: bundle.appendingPathComponent(Toolset.manifestFile))
         try Data(#"{"lockfileVersion":3,"packages":{}}"#.utf8).write(to: bundle.appendingPathComponent(Toolset.lockFile))

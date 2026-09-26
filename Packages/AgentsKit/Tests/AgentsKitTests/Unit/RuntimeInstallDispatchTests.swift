@@ -96,6 +96,49 @@ struct RuntimeInstallDispatchTests {
         #expect(error.code == DaemonAPI.Failure.notSupported)
     }
 
+    /// An outdated toolset (047): available, marked outdated in the list, and
+    /// `runtimes/install` then installs rather than answering "already here".
+    @Test func anOutdatedToolsetIsListedAsSuchAndUpdateInstalls() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsInstallTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let tools = root.appendingPathComponent("tools", isDirectory: true)
+        let set = tools.appendingPathComponent("claude/old", isDirectory: true)
+        try FileManager.default.createDirectory(at: set.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: set.appendingPathComponent("bin/npx").path, contents: Data("#!/bin/sh\n".utf8),
+                                       attributes: [.posixPermissions: 0o700])
+        FileManager.default.createFile(atPath: set.appendingPathComponent("ok").path, contents: Data())
+        try FileManager.default.createSymbolicLink(atPath: tools.appendingPathComponent("claude/current").path,
+                                                   withDestinationPath: "old")
+        var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
+        discovery.macToolsHome = tools.path
+        discovery.bundledToolsetIDs = ["claude": "new"]
+        let gated = Gated(result: .available(path: "\(tools.path)/claude/current/bin/npx", supportsResume: false))
+        gated.open()
+        let locations = StoreLocations(root: root)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: discovery, installer: gated)
+
+        let listed = await core.runtimeStatuses().first { $0.id == "claude" }
+        #expect(listed?.availability.isAvailable == true)
+        #expect(listed?.outdated == true)
+        #expect(await core.runtimeStatuses().first { $0.id == "grok" }?.outdated == false)
+
+        _ = await install(core, "claude")
+        await core.waitForInstall("claude")
+        #expect(gated.count == 1, "Update installs even though Claude is here")
+    }
+
+    @Test func aStatusFromAnOlderDaemonIsNotOutdated() throws {
+        let status = RuntimeStatus(runtime: RuntimeCatalog.claude, availability: .missing(lookedIn: []))
+        var json = try JSONEncoder().encode(status)
+        var object = try JSONSerialization.jsonObject(with: json) as! [String: Any]
+        object["outdated"] = nil
+        json = try JSONSerialization.data(withJSONObject: object)
+        #expect(try JSONDecoder().decode(RuntimeStatus.self, from: json).outdated == false)
+    }
+
     @Test func twoCallsAtOnceAreOneInstall() async throws {
         let gated = Gated(result: .installFailed(reason: "The installer failed."))
         let (core, root) = try core(installer: gated)
