@@ -211,7 +211,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - `Src/Daemon/Daemon.swift` calls `stopAll()` at exit.
 
   Extend T022 and T023 to cover Copilot: a Copilot session's `agents` server is http.
-- [ ] T030 [US6] Run quickstart step 5's MCP half live on a scratch root with the R9 probe home. Record in `walk/README.md` which runtimes logged `tools/list` for `heron-mcp` and `egret-mcp`, including Copilot through the bridge, and that `finish_turn` works on a Copilot agent.
+- [X] T030 [US6] Run quickstart step 5's MCP half live on a scratch root with the R9 probe home. Record in `walk/README.md` which runtimes logged `tools/list` for `heron-mcp` and `egret-mcp`, including Copilot through the bridge, and that `finish_turn` works on a Copilot agent.
 
 **Checkpoint**: SC-007 holds for Claude, Codex, Grok, Cursor and Copilot.
 

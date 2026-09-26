@@ -82,4 +82,33 @@ a session is made.
 
 Copilot accepts the route, so Phase 8 goes on as planned.
 
+### MCP servers from `~/.agents/mcp.json` (T030)
+
+2026-09-26, after Phase 8 (69a926b), the built `agentsd` on scratch root `/tmp/run-054c` with
+`AGENTS_PERSONAL_HOME=/tmp/dotagents-probe/home`. That home's `~/.agents/mcp.json` held
+`heron-mcp` (stdio, `probe/mcp-server.py`) and `egret-mcp` (http, the same script with
+`--http 8799`). `tools/codex` was a read-only link to the real app's toolset, as in step 2.
+There was one agent per runtime, started over the socket as the window starts them, each asked
+to call both probe tools and then `finish_turn`.
+
+| Runtime | `heron-mcp` (stdio) | `egret-mcp` (http) | `finish_turn` |
+|---|---|---|---|
+| Claude | tools/list, tools/call | tools/list, tools/call | done |
+| Codex | tools/list, tools/call | tools/list, tools/call | done |
+| Grok | tools/list, tools/call | tools/list, tools/call | done |
+| Cursor | tools/list, tools/call | tools/list, tools/call | done |
+| Copilot | through the bridge: tools/list, tools/call | tools/list, tools/call | done, through the bridge |
+
+`mcp.log` counted 5 `initialize`, 5 `tools/list` and 5 `tools/call` for each server. Every agent's
+report named HERON-MCP-9 and EGRET-MCP-9. `daemon.log` shows Copilot's two routes (`agents`,
+`heron-mcp`) made, started and ended with the session. Only names and route ids are logged.
+
+**Broken file.** With a comma removed from `mcp.json`, a Cursor agent still started and finished
+(`done`). `daemon.log`: `personal servers: left out, mcp.json is not valid JSON. (line 1)`.
+Nothing reached `mcp.log`, and no value from the file is in `daemon.log`.
+
+Gemini was not walked: it still has no sign-in here (R14, T050). Plugins are the other half of
+this step, and come with Phase 9. Afterwards `/tmp/run-054b`, `/tmp/run-054c` and
+`/tmp/dotagents-probe` were removed.
+
 ## 6. Settings ▸ Shared
