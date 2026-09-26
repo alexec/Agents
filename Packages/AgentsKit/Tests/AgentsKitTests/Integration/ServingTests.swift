@@ -313,6 +313,9 @@ struct ServingTests {
         var script = FakeACPAgent.Script()
         script.clientRequests = [(ACP.ClientMethod.createTerminal,
                                   ["command": "sleep", "args": ["30"], "cwd": .string(work.path)])]
+        // The turn held open, so the terminal is the daemon's and not already gone
+        // with a turn that ended.
+        script.gate = TurnGate()
         let launcher = FakeLauncher(script: script, capabilities: serving)
         let core = try core(launcher, locations: locations)
 

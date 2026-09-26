@@ -199,7 +199,6 @@ actor FakeACPAgent {
 
     private func runTurn() async -> Result<JSONValue, JSONRPCError> {
         if script.turnDelay > .zero { try? await Task.sleep(for: script.turnDelay) }
-        if let gate = script.gate { await gate.pass() }
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
         }
@@ -228,6 +227,9 @@ actor FakeACPAgent {
         if let permission = script.permission {
             permissionOutcome = try? await connection.call(ACP.ClientMethod.requestPermission, permission)
         }
+        // Held after everything the turn does and before it ends: a test sees the turn
+        // at work, and it ends when the test says.
+        if let gate = script.gate { await gate.pass() }
         var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
         if let usage = script.usage { result["usage"] = usage }
         return .success(.object(result))
