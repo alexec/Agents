@@ -107,6 +107,15 @@ struct AgentRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                // Moved to another runtime when its own ran out (052): from which, and
+                // when, while it is still on the one it moved to.
+                if let moved = carriedOn {
+                    Text(PoolWords.carriedOnFrom(moved, now: Date()))
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
                 // What it holds or waits for (036), so an idle agent still holding the
                 // simulator can be seen from the list.
                 if let leases = model.work.leaseStatus(of: agent.id) {
@@ -201,6 +210,14 @@ struct AgentRow: View {
 
     private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
         FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
+    }
+
+    /// The switch that put this chat on the runtime it is on now, if one did.
+    private var carriedOn: SwitchRecord? {
+        guard agent.poolEntryID != nil,
+              let latest = model.poolStatus?.switches.first(where: { $0.agentID == agent.id }),
+              latest.to.runtimeID == agent.runtimeID else { return nil }
+        return latest
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.

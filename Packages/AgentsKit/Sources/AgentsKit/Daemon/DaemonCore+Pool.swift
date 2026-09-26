@@ -23,6 +23,7 @@ extension DaemonCore {
     /// or before there was one, is judged as its runtime's own sign-in: an allowance,
     /// except Gemini, which only ever runs on a key (046).
     func poolEntry(for agent: Agent) -> PoolEntry {
+        if let entry = pool.entry(agent.poolEntryID), entry.runtimeID == agent.runtimeID { return entry }
         if let entry = pool.entries.first(where: { $0.runtimeID == agent.runtimeID }) { return entry }
         if agent.runtimeID == RuntimeCatalog.gemini.id {
             return PoolEntry(runtimeID: agent.runtimeID, payment: .freeTier(reset: .gemini),
@@ -82,18 +83,26 @@ extension DaemonCore {
             state.lastRateLimit = latestRateLimit[agentID] ?? state.lastRateLimit
             state.markOut(.allowanceSpent, until: resetsAt, payment: entry.payment, now: at, from: .typedFailure)
             setAllowanceState(state)
-            await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, returnsAt: state.returnsAt, now: at)), for: agentID)
+            raiseAllowanceOut(entry, state: state, reason: "allowance spent")
+            if !willCarry(agent) {
+                await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, returnsAt: state.returnsAt, now: at)), for: agentID)
+            }
+            pendingCarry[agentID] = (.allowanceSpent, true)
             reason = .allowanceSpent
         case .creditGone:
             state.markOut(.creditUsedUp, until: nil, payment: entry.payment, now: at, from: .words)
             setAllowanceState(state)
-            await record(.runtimeNote(PoolWords.creditGone(agent.runtimeID)), for: agentID)
+            raiseAllowanceOut(entry, state: state, reason: "credit used up")
+            if !willCarry(agent) { await record(.runtimeNote(PoolWords.creditGone(agent.runtimeID)), for: agentID) }
+            pendingCarry[agentID] = (.creditUsedUp, true)
             reason = .allowanceSpent
         case .overage(let resetsAt):
             state.markOut(.overage, until: resetsAt, payment: entry.payment, now: at, from: .overageReport)
             setAllowanceState(state)
-            await record(.runtimeNote(PoolWords.overageBegan(agent.runtimeID)), for: agentID)
-            // The turn itself may have worked; the next one does not go here.
+            raiseAllowanceOut(entry, state: state, reason: "paid extra usage began")
+            if !willCarry(agent) { await record(.runtimeNote(PoolWords.overageBegan(agent.runtimeID)), for: agentID) }
+            // The turn itself may have worked; then only the next one goes elsewhere.
+            pendingCarry[agentID] = (.overage, reason != .endTurn)
             if reason == .endTurn { return false }
             reason = .allowanceSpent
         case .rateLimited(let retryAfter):
@@ -102,7 +111,9 @@ extension DaemonCore {
             if state.rateLimited(now: at, retryAt: retryAt, payment: entry.payment, policy: rateLimitPolicy) {
                 setAllowanceState(state)
                 rateLimitAttempts[agentID] = nil
-                await record(.runtimeNote(PoolWords.stillRateLimited(agent.runtimeID)), for: agentID)
+                raiseAllowanceOut(entry, state: state, reason: "still rate limited")
+                if !willCarry(agent) { await record(.runtimeNote(PoolWords.stillRateLimited(agent.runtimeID)), for: agentID) }
+                pendingCarry[agentID] = (.rateLimitPersisted, true)
                 reason = .rateLimited
                 return false
             }
@@ -125,6 +136,7 @@ extension DaemonCore {
     func allowanceWorked(agentID: UUID) async {
         guard let agent = agents[agentID] else { return }
         rateLimitAttempts[agentID] = nil
+        carryTried[agentID] = nil
         let entry = poolEntry(for: agent)
         var state = allowanceState(for: entry)
         let at = now()
@@ -139,6 +151,7 @@ extension DaemonCore {
             _ = state.checkExpiry(payment: entry.payment, now: at)
         }
         if state != before { setAllowanceState(state) }
+        if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked") }
     }
 
     /// What this agent spent since its turn began, from what it had banked then.
@@ -174,6 +187,188 @@ extension DaemonCore {
         } catch {
             await record(.runtimeNote("Could not try again: \(reason(error))"), for: agentID)
         }
+    }
+
+    // MARK: Carrying on (US1)
+
+    /// Whether a spent allowance will move this chat, so the note that it stopped is
+    /// not written only to be followed by the note that it moved.
+    func willCarry(_ agent: Agent) -> Bool {
+        pool.isEffective && !agent.switchingOff
+    }
+
+    /// Carry a chat on with the next entry, once its old runtime has been let go (FR-009
+    /// to FR-015). Called at the two places a turn ends. Nothing happens unless a spent
+    /// allowance was recognised this turn. True when a turn was started on the new
+    /// runtime; false when there was nowhere to go, or when the handoff waits for the
+    /// next prompt, so the caller carries on as for any ending.
+    @discardableResult
+    func carryOnIfPending(_ agentID: UUID) async -> Bool {
+        guard let pending = pendingCarry.removeValue(forKey: agentID),
+              var agent = agents[agentID], agent.state != .archived else { return false }
+        let current = poolEntry(for: agent)
+        var tried = carryTried[agentID, default: []]
+        tried.insert(AllowanceState.credentialKey(for: current))
+        let at = now()
+        var states = allowances
+        for key in states.keys { states[key]?.settle(now: at) }
+        let decision = PoolPlan.next(current: current, pool: pool, switchingOff: agent.switchingOff,
+                                     states: states, tried: tried, unusable: { self.unusable($0) }, now: at)
+        guard case .switchTo(let entry) = decision else {
+            await record(.runtimeNote(PoolWords.ranOut(current.runtimeID,
+                                                       returnsAt: allowances[AllowanceState.credentialKey(for: current)]?.returnsAt,
+                                                       now: at)), for: agentID)
+            if case .everyoneOut(let earliest) = decision {
+                let back = earliest.map { " The first is back at \(PoolWords.time($0, now: at))." } ?? ""
+                await record(.runtimeNote("Every other runtime in the pool is out too, so this chat stopped here.\(back)"),
+                             for: agentID)
+            }
+            return false
+        }
+        tried.insert(AllowanceState.credentialKey(for: entry))
+        carryTried[agentID] = tried
+        // What the old runtime was asking can no longer be answered there (T040).
+        await closeQuestionsOfAGoneRuntime(agentID)
+        await releaseRuntime(for: agentID)
+
+        let fromName = PoolWords.runtimeName(current.runtimeID)
+        let why = switch pending.reason {
+        case .overage: "it started using paid extra usage"
+        case .creditUsedUp: "its credit was used up"
+        case .rateLimitPersisted: "it stayed rate limited"
+        default: "its allowance ran out"
+        }
+        let page = try? await store.transcript(for: agentID, before: nil, limit: 10_000)
+        let size = agent.usage?.size ?? 0
+        let budget = size > 0 ? min(Handoff.defaultBudget, size * 2) : Handoff.defaultBudget
+        let handoff = Handoff.document(entries: page?.entries ?? [], fromRuntime: fromName, why: why, budget: budget)
+
+        let made: MadeSession
+        do {
+            made = try await freshSession(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers,
+                                          managesAgents: agent.startedByAgent == nil)
+        } catch {
+            await record(.runtimeNote("Could not carry on with \(PoolWords.runtimeName(entry.runtimeID)): \(reason(error))"),
+                         for: agentID)
+            return false
+        }
+        let options = await made.session.options
+        let carry = SettingsCarry.plan(
+            from: .init(runtimeID: agent.runtimeID, options: agent.advertisedOptions, values: agent.startOptions.values),
+            to: .init(runtimeID: entry.runtimeID, options: options),
+            levels: pool.levels, entryModel: entry.fallbackModel,
+            extraArguments: agent.startOptions.extraArguments,
+            queuedCommands: agent.queuedPrompts.compactMap { prompt in
+                prompt.text.hasPrefix("/") ? String(prompt.text.split(separator: " ").first ?? "") : nil
+            })
+
+        let record = SwitchRecord(at: at, agentID: agentID,
+                                  from: .init(entryID: agent.poolEntryID, runtimeID: agent.runtimeID,
+                                              model: SettingsCarry.model(in: agent.advertisedOptions).flatMap { agent.startOptions.values[$0.id] ?? $0.currentValue }),
+                                  to: .init(entryID: entry.id, runtimeID: entry.runtimeID,
+                                            model: carry.values["model"], mode: carry.values["mode"]),
+                                  reason: pending.reason, carried: carry.rows, dropped: carry.dropped,
+                                  shortened: handoff.leftOut, billing: entry.payment,
+                                  fromReturnsAt: allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
+
+        agent = agents[agentID] ?? agent
+        agent.runtimeID = entry.runtimeID
+        agent.runtimeSessionID = made.sessionID
+        agent.poolEntryID = entry.id
+        agent.startOptions = StartOptions(values: carry.values, extraArguments: [])
+        agent.advertisedOptions = options
+        agent.availableCommands = await made.session.commands
+        agents[agentID] = agent
+        try? await store.save(agent)
+        live[agentID] = made.session
+        bindAppToken(made.appToken, to: agentID)
+        needsBriefing.insert(agentID)
+        listen(to: made.session, agentID: agentID)
+        await prepareServing(made.session, agentID: agentID)
+        await made.session.apply(agent.startOptions)
+        changed(agents[agentID] ?? agent)
+
+        await self.record(.poolSwitch(record), for: agentID)
+        await self.record(.handoff(markdown: handoff.markdown, characters: handoff.markdown.count), for: agentID)
+        do { try poolStore.append(record) } catch { DaemonLog.shared.write("switch not written: \(error)") }
+        raise(EventDraft(name: "agent.runtime_switched", at: at, scope: .project(folder: agent.projectFolder),
+                         sentence: "\(LeaseWords.agentName(agent.title)) carried on with \(PoolWords.runtimeName(entry.runtimeID)).",
+                         details: ["from": current.runtimeID, "to": entry.runtimeID, "reason": pending.reason.rawValue]
+                            .merging(agentDetails(agent)) { $1 }))
+        broadcastPool()
+
+        let block = Self.handoffBlock(handoff.markdown, agentID: agentID,
+                                      embedded: await made.session.initializeResult?.accepts.embeddedContext == true)
+        if pending.resend, let prompt = lastPrompts[agentID] {
+            await beginTurn(agentID: agentID, text: prompt.text, blocks: [block] + prompt.blocks, from: prompt.from,
+                            session: made.session, preface: prompt.preface, recorded: false)
+            lastPrompts[agentID] = prompt
+            return true
+        }
+        pendingHandoff[agentID] = handoff.markdown
+        return false
+    }
+
+    /// This chat's own switch (FR-011a): off keeps it on its runtime whatever the pool
+    /// says. The window's control for it is US5's `agents/setSwitching`.
+    func setSwitching(agentID: UUID, off: Bool) async {
+        guard var agent = agents[agentID], agent.switchingOff != off else { return }
+        agent.switchingOff = off
+        try? await store.save(agent)
+        changed(agent)
+    }
+
+    /// A chat whose runtime is already known to be out moves before its turn rather than
+    /// failing first (FR-012, US3-AS5). Only when there is somewhere to go: otherwise the
+    /// turn is tried, and whatever the runtime says is heard as usual.
+    func moveFirstIfOut(_ agentID: UUID) async {
+        guard pool.isEffective, let agent = agents[agentID], !agent.switchingOff else { return }
+        let current = poolEntry(for: agent)
+        let at = now()
+        guard var state = allowances[AllowanceState.credentialKey(for: current)] else { return }
+        _ = state.settle(now: at)
+        guard state.isOut else { return }
+        var states = allowances
+        for key in states.keys { _ = states[key]?.settle(now: at) }
+        let decision = PoolPlan.next(current: current, pool: pool, switchingOff: false, states: states,
+                                     tried: [AllowanceState.credentialKey(for: current)],
+                                     unusable: { self.unusable($0) }, now: at)
+        guard case .switchTo = decision else { return }
+        pendingCarry[agentID] = (Self.carryReason(state), false)
+        await carryOnIfPending(agentID)
+    }
+
+    /// Why an out credential is out, as a switch says it.
+    static func carryReason(_ state: AllowanceState) -> SwitchRecord.Reason {
+        switch state.status {
+        case .out(_, _, .overage): .overage
+        case .out(_, _, .creditUsedUp), .out(_, _, .creditExpired): .creditUsedUp
+        case .out(_, _, .rateLimitPersisted): .rateLimitPersisted
+        default: .allowanceSpent
+        }
+    }
+
+    /// The handoff as the new runtime takes it: embedded, where it says it can hold
+    /// embedded context, and as plain text where it cannot.
+    static func handoffBlock(_ markdown: String, agentID: UUID, embedded: Bool) -> ContentBlock {
+        embedded ? .resource(uri: "agents://handoff/\(agentID.uuidString).md", text: markdown, blob: nil,
+                             mimeType: "text/markdown")
+                 : .text(markdown)
+    }
+
+    /// An allowance just went out, on the Mac's event log (042).
+    func raiseAllowanceOut(_ entry: PoolEntry, state: AllowanceState, reason: String) {
+        var details = ["runtime": entry.runtimeID, "reason": reason]
+        if let until = state.returnsAt { details["until"] = ISO8601DateFormatter().string(from: until) }
+        raise(EventDraft(name: "cost.allowance_out", at: now(), scope: .mac,
+                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out.", details: details))
+    }
+
+    /// An allowance came back: the person said so, or a turn on it worked (042).
+    func raiseAllowanceBack(_ entry: PoolEntry, how: String) {
+        raise(EventDraft(name: "cost.allowance_back", at: now(), scope: .mac,
+                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance came back.",
+                         details: ["runtime": entry.runtimeID, "how": how]))
     }
 
     // MARK: The Pool page
@@ -216,8 +411,10 @@ extension DaemonCore {
     public func markPoolEntryAvailable(_ entryID: UUID) -> PoolStatus {
         if let entry = pool.entry(entryID) {
             var state = allowanceState(for: entry)
+            let wasOut = state.isOut
             state.markAvailable(now: now())
             setAllowanceState(state)
+            if wasOut { raiseAllowanceBack(entry, how: "person") }
             broadcastPool()
         }
         return poolStatus()

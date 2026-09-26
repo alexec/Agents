@@ -157,6 +157,11 @@ public enum PoolWords {
         return (headline, lines)
     }
 
+    /// The agent row's line under a chat that moved (wireframes §2).
+    public static func carriedOnFrom(_ record: SwitchRecord, now: Date) -> String {
+        "⇄ Carried on from \(runtimeName(record.from.runtimeID)) at \(time(record.at, now: now))"
+    }
+
     public static func stillRateLimited(_ runtimeID: String) -> String {
         "\(runtimeName(runtimeID)) is still rate limited after retrying, so it is treated as out for an hour."
     }

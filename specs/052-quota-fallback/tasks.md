@@ -158,7 +158,7 @@
 
 - [X] T024 Add the transcript cases `.poolSwitch(SwitchRecord)`, `.handoff(markdown:characters:)` and `.settingsChanged(SwitchRecord)` to `Pkg/Sources/AgentsKitCore/Model/TranscriptEntry.swift` and `TranscriptEntry+Coding.swift`, with `SwitchRecord`, `CarriedSetting` and `Dropped` exactly as in `data-model.md`. An older reader must decode each as its existing unknown-entry fallback. Test that fallback in `Pkg/Tests/AgentsKitTests/Unit/TranscriptEntryCodingTests.swift`.
 - [X] T025 [P] Add `Pkg/Sources/AgentsKitCore/Pool/PoolStatus.swift`: the derived view (entries with status words, chat counts, waiting chats, switches, and `anyOut`) and `DaemonAPI` methods `pool/state` and `pool/changed` in `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, per `contracts/daemon-api.md`. Serve them read-only from `DaemonCore+Pool.swift`, reading the files as they are on disk.
-- [ ] T026 [P] Draw the switch note, and the folded handoff under it, in `App/Sources/Chat/Transcript.swift`, per wireframes §2. The note has a warm tint and one line for what happened. It then gives the model, effort and mode with their sources, what was handed over, and what was not carried. It has two links: **Change what it carried on with…** (inert at this stage) and **Pool**. Add the "⇄ Carried on from … at …" line to the agent row in `App/Sources/AgentList/`. Keep one accessibility element per row (memory: stacked accessibility labels crash AppKit).
+- [X] T026 [P] Draw the switch note, and the folded handoff under it, in `App/Sources/Chat/Transcript.swift`, per wireframes §2. The note has a warm tint and one line for what happened. It then gives the model, effort and mode with their sources, what was handed over, and what was not carried. It has two links: **Change what it carried on with…** (inert at this stage) and **Pool**. Add the "⇄ Carried on from … at …" line to the agent row in `App/Sources/AgentList/`. Keep one accessibility element per row (memory: stacked accessibility labels crash AppKit).
 - [X] T027 [P] Add the Pool row, last in the sidebar's Activity section, with a dot and count line, in `App/Sources/Projects/ProjectListView.swift`, and `SidebarItem.pool` in `App/Sources/Projects/SidebarItem.swift`. Add `App/Sources/Pool/PoolPage.swift`, following wireframes §1: runtimes in order with credential capsules and state words, **Mark available** (inert at this stage), a waiting-chats card, the Matching models grid (read-only at this stage), and recent switches. Route it in `ContentView.detail` beside Events, Resources and Spending. Do not change the modifier chain on `ContentView()` in `AgentsApp` (memory: scratch app opens no window).
 - [X] T028 [P] Add the **Pool** Settings tab, between Spending and Devices, in `App/Sources/AgentsApp.swift`. Add `App/Sources/Settings/PoolSettingsView.swift`, following wireframes §4: the switch, the ordered list with credential capsules and a Model menu, **Add a runtime**, **Add credit on an API key…**, and a link to the Pool page. At this stage it reads the files only.
 - [X] T029 [P] Add `App/Sources/Pool/AddCreditSheet.swift`, following wireframes §4a: runtime, key, the four kinds with *Billed with no limit* shown disabled with its reason, amount, expiry, and the "goes last" note. Add stays disabled until a kind is picked.
@@ -174,7 +174,7 @@
 
 **Independent Test**: quickstart §2 and §3, on a scratch root with two stand-in runtimes.
 
-- [ ] T033 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/PoolPlanTests.swift` for `PoolPlan.next(for:pool:states:tried:host:now:)`. Cover:
+- [X] T033 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/PoolPlanTests.swift` for `PoolPlan.next(for:pool:states:tried:host:now:)`. Cover:
   - the first usable entry in order that is not out;
   - skipping entries already tried for this prompt;
   - skipping unusable entries (not signed in, not installed, credential missing on this host);
@@ -182,14 +182,14 @@
   - `.off` when `!isEffective` or the chat's `switchingOff` is set;
   - a chat started outside the pool moving to the first usable entry;
   - a relayed Codex on a server being skipped when the Mac's plan is out.
-- [ ] T034 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/SettingsCarryTests.swift` for `SettingsCarry.plan(from:to:grid:poolEntry:remembered:)` without the grid. Cover:
+- [X] T034 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/SettingsCarryTests.swift` for `SettingsCarry.plan(from:to:grid:poolEntry:remembered:)` without the grid. Cover:
   - mode: the loosest mode on the new runtime that is no looser (`ModeLooseness`); an unranked current mode → the new runtime's strictest mode;
   - model: the pool entry's model, else the model remembered for that runtime, else the default; never matched by name across vendors;
   - effort and other options: the same value under the same category if offered, else the default;
   - `extraArguments` dropped;
   - `dropped` lists always-allow answers and queued slash commands the new runtime lacks;
   - every row carries its source.
-- [ ] T035 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/HandoffTests.swift` for `Handoff.document(entries:budget:)`. Cover:
+- [X] T035 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/HandoffTests.swift` for `Handoff.document(entries:budget:)`. Cover:
   - the person's prompts verbatim;
   - replies;
   - one line per tool call;
@@ -197,9 +197,9 @@
   - the latest plan;
   - over budget: the first prompt and the latest turns are kept, and "[N earlier turns left out]" is written;
   - the result is valid Markdown, and never contains the app's own switch notes.
-- [ ] T036 [US1] Implement `Pkg/Sources/AgentsKitCore/Pool/PoolPlan.swift`, `SettingsCarry.swift` and `Handoff.swift`, so that T033–T035 pass.
-- [ ] T037 [US1] Add `poolEntryID`, `switchingOff`, `allowanceWait` and `triedForPrompt` to `Pkg/Sources/AgentsKitCore/Model/Agent.swift`, as optional or defaulted fields with `CodingKeys` entries, following the file's own pattern for added fields. Extend `AgentsModelTests` with an old record that decodes, and a new record that an older decoder reads.
-- [ ] T038 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/PoolSwitchTests.swift`, with two fake runtimes, following quickstart §2. The first ends with `limit`/`[]`, and the agent is then on the second, without touching anything. Check that:
+- [X] T036 [US1] Implement `Pkg/Sources/AgentsKitCore/Pool/PoolPlan.swift`, `SettingsCarry.swift` and `Handoff.swift`, so that T033–T035 pass.
+- [X] T037 [US1] Add `poolEntryID`, `switchingOff`, `allowanceWait` and `triedForPrompt` to `Pkg/Sources/AgentsKitCore/Model/Agent.swift`, as optional or defaulted fields with `CodingKeys` entries, following the file's own pattern for added fields. Extend `AgentsModelTests` with an old record that decodes, and a new record that an older decoder reads.
+- [X] T038 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/PoolSwitchTests.swift`, with two fake runtimes, following quickstart §2. The first ends with `limit`/`[]`, and the agent is then on the second, without touching anything. Check that:
   - the transcript holds `.poolSwitch(allowanceSpent)`, then `.handoff`, then the second runtime's reply;
   - the second runtime received the handoff block and the failed prompt, once, in one `session/prompt`;
   - the first credential is out with `retryAfter` +1 h;
@@ -212,7 +212,13 @@
   - another chat on the first runtime moves before its next turn, without failing first (US3-AS5);
   - an open permission question is closed as unanswered;
   - a history over budget is shortened, and the note says so.
-- [ ] T039 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/NoSwitchTests.swift`, following quickstart §3. Each of these ends exactly as on main, and nothing moves:
+
+  *Done 2026-09-26.* The chain, the move before the next turn, events, `switches.jsonl`, the
+  unchanged record and the out credential are covered. The switch calls
+  `closeQuestionsOfAGoneRuntime`, but no test opens a question first. Shortening is covered by
+  `HandoffTests`, not end to end. `triedForPrompt` is kept on the daemon (`carryTried`), not on
+  the record.
+- [X] T039 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/NoSwitchTests.swift`, following quickstart §3. Each of these ends exactly as on main, and nothing moves:
   - a crash;
   - a refused sign-in;
   - `limit`/`["new_session"]`;
@@ -223,7 +229,14 @@
   - the pool off;
   - a pool of one;
   - the chat's own switch off.
-- [ ] T040 [US1] Implement the switch in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Pool.swift`:
+
+  *Done 2026-09-26, inside `PoolSwitchTests.swift` rather than a file of its own.* Covered:
+  budget exhausted, auth required, overloaded, an unrecognised error, a plain `end_turn`, the
+  pool off, a pool of one, and the chat's own switch off. Not covered here: a crash (the fake
+  has no crash script, so the unrecognised error stands in), the cost limit (the stop comes
+  first, and `pendingCarry` is cleared by the stop guard), and Antigravity's `runtimeError` (a
+  rate limit: retried, never moved; see `AllowanceRecognitionTests`).
+- [X] T040 [US1] Implement the switch in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Pool.swift`:
   1. On `.spent`, `.creditGone` or `.overage`, ask `PoolPlan`.
   2. Close the old runtime's open questions, as `closeQuestionsOfAGoneRuntime` does.
   3. Release the old runtime.
@@ -237,7 +250,7 @@
   11. Broadcast `pool/changed`.
 
   Before any turn on a runtime whose credential is out, move first (FR-012). Clear `triedForPrompt` on the first real reply. This makes T038 and T039 pass.
-- [ ] T041 [US1] Add `agent.runtime_switched`, `cost.allowance_out` and `cost.allowance_back` to `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`, with the fields in `contracts/daemon-api.md`, and make sure `events/list` shows them. Extend the events test that walks the catalogue.
+- [X] T041 [US1] Add `agent.runtime_switched`, `cost.allowance_out` and `cost.allowance_back` to `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`, with the fields in `contracts/daemon-api.md`, and make sure `events/list` shows them. Extend the events test that walks the catalogue.
 - [ ] T042 [US1] Walk quickstart §2–§5 on `/tmp/run-052-us1`, with the stand-ins from T005, using the run-app skill. Save the transcript, `pool/state`, the event lines and a screenshot of the switch note to `specs/052-quota-fallback/walk/us1/`, and record the result in `walk/README.md`.
 
 **Checkpoint**: With a pool set by `pool/set` on the socket, chats move by themselves. This is the MVP.

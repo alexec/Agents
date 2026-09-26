@@ -309,6 +309,15 @@ public actor DaemonCore {
     var rateLimitAttempts: [UUID: Int] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
+    /// before it carries on (052). `resend` is whether the turn failed and its prompt
+    /// goes again.
+    var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
+    /// Credentials already tried for the prompt a chat is carrying (052): never gone back
+    /// to for the same prompt. Cleared by a turn that works.
+    var carryTried: [UUID: Set<String>] = [:]
+    /// A handoff to send with the chat's next prompt, when the switch did not re-send one.
+    var pendingHandoff: [UUID: String] = [:]
     /// How rate limits are retried. A test shortens the waits; nothing else changes it.
     var rateLimitPolicy = RateLimitPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.

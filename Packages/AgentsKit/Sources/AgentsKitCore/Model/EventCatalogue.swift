@@ -151,6 +151,10 @@ public enum EventCatalogue {
         EventKind("person.away", .mac, ["why"], "You locked the screen or stepped away for 5 minutes."),
         EventKind("person.back", .mac, ["why"], "You unlocked the screen or came back."),
         EventKind("cost.limit_reached", .either, ["limit", "agent"], "A spending limit was reached."),
+        EventKind("agent.runtime_switched", .project, ["agent", "from", "to", "reason"],
+                  "An agent carried on with another runtime when its own ran out."),
+        EventKind("cost.allowance_out", .mac, ["runtime", "until", "reason"], "A runtime's allowance ran out."),
+        EventKind("cost.allowance_back", .mac, ["runtime", "how"], "A runtime's allowance came back."),
         EventKind("server.offline", .mac, ["server"], "A server went offline."),
         EventKind("server.online", .mac, ["server"], "A server came back."),
     ]

@@ -117,6 +117,15 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// the work would be overwritten a moment after it was given.
     public var titledByAgent: Bool
 
+    /// The pool entry the chat is on now (052): which runtime *and* which way of paying
+    /// for it, since Codex on its plan and Codex on a key are two entries. Nil when it
+    /// started outside the pool.
+    public var poolEntryID: UUID?
+
+    /// The chat's own "carry on when this runs out" is off (052, FR-003). Off is rare, so
+    /// only written when true.
+    public var switchingOff: Bool
+
     public var createdAt: Date
     public var lastActivityAt: Date
     /// A finished conversation nobody has looked at since it finished. Set by the
@@ -316,6 +325,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
         titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
+        // New in 052. An older record is on no pool entry and carries on by default.
+        poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
+        switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
         // New in 040. A record written before it was never parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
         // New with self-archiving. A record from before never asked; one from a
@@ -381,6 +393,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
+        try c.encodeIfPresent(poolEntryID, forKey: .poolEntryID)
+        if switchingOff { try c.encode(switchingOff, forKey: .switchingOff) }
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
@@ -407,6 +421,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
+        case poolEntryID, switchingOff
         case parking
         case afterTurn
         case archivedAt, retirement
@@ -498,6 +513,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.report = report
         self.outcomeAsked = outcomeAsked
         self.titledByAgent = titledByAgent
+        self.poolEntryID = nil
+        self.switchingOff = false
         self.parking = parking
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt
