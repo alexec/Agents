@@ -1,5 +1,7 @@
 # 054 · Wireframes: what every agent shares
 
+**Approved by Alex, 2026-09-26.** This is the look gate for the Settings ▸ Shared tab.
+
 A place to **see** what is in `~/.agents` — instructions, skills, MCP servers, plugins and
 anything else — and which runtime actually gets each. It replaces the spec's small read-only
 "Your skills" section (FR-016, FR-024) with a Settings tab of its own, because four kinds of
