@@ -309,24 +309,24 @@ state on archive.
 
 ### Tests for User Story 6
 
-- [ ] T046 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/SlimAgentTests.swift`. Cases:
+- [X] T046 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/SlimAgentTests.swift`. Cases:
   - After start, archived agents are slim and live ones whole.
   - A presence watching a slim agent makes it whole and broadcasts `agent/changed` with its commands.
   - `agents/transcript`, `unarchive` and `fork` make it whole first.
   - With `now` moved 11 minutes on and no watcher, the sweep slims it again.
   - Changing a slim agent (mark read) saves without losing the lists on disk.
   - `agents/list { archivedCommands: true }` for a slim agent returns empty commands. Record that as expected: the whole record arrives when it is opened.
-- [ ] T047 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/ArchiveIndexTests.swift`. Cases:
+- [X] T047 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/ArchiveIndexTests.swift`. Cases:
   - First start with no `archive.json` reads every directory and writes the index.
   - The second start reads only the index. Assert with a counting `AgentStore` seam that archived `agent.json` files are not opened.
   - An index entry whose `agent.json` is newer than `fileModifiedAt` is read in full, and `agent.json` wins.
   - A directory not in the index is read in full and indexed.
   - A corrupt index is rebuilt.
-- [ ] T048 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/ArchiveDropsLiveStateTests.swift`. Give an agent entries in every map in data-model.md's "Maps dropped on archive" table, archive it, and assert through `liveStateKeys(for:)` that none has a key for it except `stops`. Archive another mid-turn: the late reply writes nothing to its record or transcript, and no queued prompt is sent (FR-027).
+- [X] T048 [P] [US6] Write `Pkg/Tests/AgentsKitTests/Integration/ArchiveDropsLiveStateTests.swift`. Give an agent entries in every map in data-model.md's "Maps dropped on archive" table, archive it, and assert through `liveStateKeys(for:)` that none has a key for it except `stops`. Archive another mid-turn: the late reply writes nothing to its record or transcript, and no queued prompt is sent (FR-027).
 
 ### Implementation for User Story 6
 
-- [ ] T049 [US6] Add `DaemonCore+Hydration.swift`:
+- [X] T049 [US6] Add `DaemonCore+Hydration.swift`:
   - `makeWhole(_ id:) async` reads `agent.json` through the store and uses `madeWhole(from:)`, then sets `lastWhole[id]`, calls `changed`, and broadcasts.
   - `slimIdle()` runs every 60 s and slims any archived agent with no watching presence and `lastWhole` older than 10 minutes.
 
@@ -335,9 +335,9 @@ state on archive.
   - `transcript(_:)`
   - `unarchive`
   - `fork`/branch in `DaemonCore+Runtimes.swift`
-- [ ] T050 [US6] Slim on archive and at start. At the end of `archive`, after the stop and the worktree step, replace the agent with `slimmed()`. In `loadFromDisk`, archived agents come from the index already slim.
-- [ ] T051 [US6] Rewrite `loadFromDisk` in `DaemonCore.swift` and add `AgentStore.loadLive(excluding:)`, per research R3: list `agents/`, load `ArchiveIndex`, fully read what the index does not name or what is newer than its entry, then fold archived results into the index and write it once. Keep `seedingCost` and the mends as they are. Maintain `archiveIndex` and write `archive.json` on archive, unarchive, retire and note changes. Replace T019's per-call sizing with index sizes. Make T047 pass.
-- [ ] T052 [US6] Add `dropLiveState(for:)` and `liveStateKeys(for:)` (internal, for tests) in `DaemonCore.swift`, covering every row of the data-model table, and call `dropLiveState` in `archive` after `stop`. Make T048 pass.
+- [X] T050 [US6] Slim on archive and at start. At the end of `archive`, after the stop and the worktree step, replace the agent with `slimmed()`. In `loadFromDisk`, archived agents come from the index already slim.
+- [X] T051 [US6] Rewrite `loadFromDisk` in `DaemonCore.swift` and add `AgentStore.loadLive(excluding:)`, per research R3: list `agents/`, load `ArchiveIndex`, fully read what the index does not name or what is newer than its entry, then fold archived results into the index and write it once. Keep `seedingCost` and the mends as they are. Maintain `archiveIndex` and write `archive.json` on archive, unarchive, retire and note changes. Replace T019's per-call sizing with index sizes. Make T047 pass.
+- [X] T052 [US6] Add `dropLiveState(for:)` and `liveStateKeys(for:)` (internal, for tests) in `DaemonCore.swift`, covering every row of the data-model table, and call `dropLiveState` in `archive` after `stop`. Make T048 pass.
 - [ ] T053 [US6] Run quickstart §3 with the run-app skill's daemon launcher: 1,000 archived and 10 live agents against 10 live, 5 starts each, measuring footprint. Also run once on `main` for comparison. Record the figures in `walk/README.md`. The result must meet SC-003 (within 10%) and SC-004 (within 20 MB). If it does not, profile with `sample` before changing anything.
 
 ---

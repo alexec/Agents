@@ -115,7 +115,7 @@ drop one call, `dropLiveState(for:)`, which a test enumerates (R6).
 | `resuming`, `sending` | agent | when the work ends. **Add** as a belt |
 | `needsBriefing` | agent | on the next start of a conversation. **Add** |
 | `held` | agent | when the queue drains. **Add** |
-| `drafts` | draft id; entries naming the agent | **Add**, filtered by agent |
+| `drafts` | the start form's draft sessions, not any agent's | not dropped: no draft belongs to an agent (found while building T052) |
 | `pendingPermissions`, `elicitations` | request; entries naming the agent | already answered or cancelled by `stop`; **Add** the filter as a belt |
 | `deliveries`, `needRaisedAt`, `settlingTimers` | `NeedID`, naming the agent | when the need goes, which archiving causes. Checked by the test |
 | `costReadings` | session reader | by its listener, deliberately late (see its comment). **Not** dropped here |

@@ -419,6 +419,8 @@ struct RetirementTests {
         let before = try await core.transcript(.init(agentID: branch)).entries.count
         #expect(before > 0)
 
+        // Branching read it whole, which holds it for ten minutes; those have passed.
+        await core.forgetReads()
         _ = await core.setRetention(.init(settings: RetentionSettings(), confirmed: true))
         #expect(await core.agent(original.id) == nil)
         #expect(await core.agent(branch) != nil)
@@ -430,4 +432,6 @@ extension DaemonCore {
     /// For the tests: a workflow run in flight, and none.
     func putRun(_ run: WorkflowRun) { workflowRuns["test-\(run.id)"] = run }
     func clearRuns() { workflowRuns.removeAll() }
+    /// For the tests: as if ten minutes had passed since anything was read.
+    func forgetReads() { lastWhole.removeAll() }
 }

@@ -191,13 +191,23 @@ public actor AgentStore {
     /// different thing from a well-formed record in a forbidden state, which is mended
     /// and carried rather than skipped.
     public func loadAll() -> (agents: [Agent], unreadable: [URL], mends: [UUID: Mend]) {
+        load(agentIDs())
+    }
+
+    /// Every agent folder there is, by id, without opening any of them (051).
+    public func agentIDs() -> [UUID] {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: locations.agents, includingPropertiesForKeys: nil)) ?? []
+        return contents.compactMap { UUID(uuidString: $0.lastPathComponent) }
+    }
+
+    /// These agents' records, as `loadAll` reads them. Start reads the archived ones
+    /// from `archive.json` and only the rest from here (051, research R3).
+    public func load(_ ids: [UUID]) -> (agents: [Agent], unreadable: [URL], mends: [UUID: Mend]) {
         var agents: [Agent] = []
         var unreadable: [URL] = []
         var mends: [UUID: Mend] = [:]
-        let contents = (try? FileManager.default.contentsOfDirectory(
-            at: locations.agents, includingPropertiesForKeys: nil)) ?? []
-        for directory in contents {
-            guard let id = UUID(uuidString: directory.lastPathComponent) else { continue }
+        for id in ids {
             do {
                 let (agent, mend) = try load(id)
                 agents.append(agent)

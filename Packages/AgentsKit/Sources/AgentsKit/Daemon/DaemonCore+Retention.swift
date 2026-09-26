@@ -146,11 +146,113 @@ extension DaemonCore {
         }
     }
 
+    // MARK: The index and slim agents (US6)
+
+    /// How far a record may be newer than its index entry and still be taken from the
+    /// index: the entry is made when the agent changes, and the record is written just
+    /// after, by the save queue.
+    static let indexTolerance: TimeInterval = 5
+
+    /// Bring an archived agent's index entry up to date with it: slim, measured, and
+    /// stamped with when its record was last written.
+    func indexEntry(for id: UUID) {
+        guard let agent = agents[id], agent.state == .archived else {
+            archiveIndex.removeValue(forKey: id)
+            return
+        }
+        let size = archiveIndex[id]?.sizeOnDisk ?? measureFolder(locations.agent(id))
+        // The wall clock, not `now()`: this is compared with a file's modification date,
+        // which the file system stamps in real time whatever clock the daemon was given.
+        archiveIndex[id] = ArchiveIndex.Entry(agent: agent, sizeOnDisk: size, fileModifiedAt: Date())
+    }
+
+    /// Read an archived agent's lists back from its record, so it can be shown, branched
+    /// or brought back (FR-024). It stays whole while it is read, and ten minutes after.
+    func makeWhole(_ id: UUID) async {
+        guard let agent = agents[id], agent.state == .archived else { return }
+        lastWhole[id] = now()
+        guard agent.isSlim, let disk = try? await store.load(id).agent,
+              let current = agents[id], current.isSlim else { return }
+        let whole = current.madeWhole(from: disk)
+        agents[id] = whole
+        broadcast(DaemonAPI.Notification.agentChanged, whole)
+    }
+
+    /// Slim again every archived agent nobody has read for ten minutes (FR-025).
+    func slimIdle() {
+        let watched = Set(presences.values.compactMap(\.watching))
+        for (id, agent) in agents where agent.state == .archived && !agent.isSlim && !watched.contains(id) {
+            if let read = lastWhole[id], now().timeIntervalSince(read) < Self.letGoAfter { continue }
+            agents[id] = agent.slimmed()
+            lastWhole.removeValue(forKey: id)
+        }
+    }
+
+    /// Everything held in memory for an agent while it was live, let go when it is
+    /// archived (051, FR-026). Called after `stop`, so nothing here is still in use; the
+    /// entries are dropped rather than cancelled, and whatever was already unwinding
+    /// finishes on its own. `stops` is kept: it is how that unwinding work knows the
+    /// agent was stopped (FR-027). What unarchiving needs is on the record.
+    func dropLiveState(for id: UUID) {
+        live.removeValue(forKey: id)
+        eventTasks.removeValue(forKey: id)
+        turnTasks.removeValue(forKey: id)
+        terminalServices.removeValue(forKey: id)
+        shownPlanFiles.removeValue(forKey: id)
+        openEventWaits.removeValue(forKey: id)
+        openEventWaitStarted.removeValue(forKey: id)
+        artifactEdits.removeValue(forKey: id)
+        reportedChanges.removeValue(forKey: id)
+        shellWatchers.removeValue(forKey: id)
+        interrupted.removeValue(forKey: id)
+        resuming.remove(id)
+        sending.remove(id)
+        needsBriefing.remove(id)
+        held.remove(id)
+        pendingPermissions = pendingPermissions.filter { $0.value.agentID != id }
+        elicitations = elicitations.filter { $0.value.agentID != id }
+        appTokens = appTokens.filter { $0.value != id }
+    }
+
+    /// Which of those maps still hold something for this agent. For the test that keeps
+    /// the list above honest as the maps grow.
+    func liveStateKeys(for id: UUID) -> [String] {
+        var held: [String] = []
+        if live[id] != nil { held.append("live") }
+        if eventTasks[id] != nil { held.append("eventTasks") }
+        if turnTasks[id] != nil { held.append("turnTasks") }
+        if terminalServices[id] != nil { held.append("terminalServices") }
+        if shownPlanFiles[id] != nil { held.append("shownPlanFiles") }
+        if openEventWaits[id] != nil { held.append("openEventWaits") }
+        if openEventWaitStarted[id] != nil { held.append("openEventWaitStarted") }
+        if artifactEdits[id] != nil { held.append("artifactEdits") }
+        if reportedChanges[id] != nil { held.append("reportedChanges") }
+        if shellWatchers[id] != nil { held.append("shellWatchers") }
+        if interrupted[id] != nil { held.append("interrupted") }
+        if resuming.contains(id) { held.append("resuming") }
+        if sending.contains(id) { held.append("sending") }
+        if needsBriefing.contains(id) { held.append("needsBriefing") }
+        if self.held.contains(id) { held.append("held") }
+        if pendingPermissions.values.contains(where: { $0.agentID == id }) { held.append("pendingPermissions") }
+        if elicitations.values.contains(where: { $0.agentID == id }) { held.append("elicitations") }
+        if appTokens.values.contains(id) { held.append("appTokens") }
+        return held
+    }
+
     // MARK: Checking
 
     /// Thirty seconds after start, then hourly (FR-004). Never before the daemon is
     /// listening: start is not held up by it.
     func startRetentionChecks() {
+        if slimSweep == nil {
+            slimSweep = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(60))
+                    guard let self else { return }
+                    await self.slimIdle()
+                }
+            }
+        }
         guard retentionTimer == nil else { return }
         retentionTimer = Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))
@@ -216,6 +318,19 @@ extension DaemonCore {
             noted.retirement = notes[agent.id]
             changed(noted)
         }
+    }
+
+    func saveArchiveIndexSoon() {
+        guard indexSave == nil else { return }
+        indexSave = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            await self?.flushArchiveIndex()
+        }
+    }
+
+    func flushArchiveIndex() {
+        indexSave = nil
+        saveArchiveIndex()
     }
 
     func saveArchiveIndex() {

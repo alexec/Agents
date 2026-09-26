@@ -251,6 +251,9 @@ public actor DaemonCore {
     /// The last time an archive asked for a check, so a busy archiving day asks at most
     /// once a minute.
     var lastArchiveCheck: Date?
+    /// A write of `archive.json` waiting to happen, so a check that changes a hundred
+    /// notes writes the index once.
+    var indexSave: Task<Void, Never>?
 
     // MARK: Events (042)
 
@@ -576,6 +579,12 @@ public actor DaemonCore {
     func changed(_ agent: Agent) {
         agents[agent.id] = agent
         saveQuietly(agent)
+        // The index of archived agents follows them in and out (051). Only when it
+        // concerns one: this runs on every streamed token of a live agent.
+        if agent.state == .archived || archiveIndex[agent.id] != nil {
+            indexEntry(for: agent.id)
+            saveArchiveIndexSoon()
+        }
         broadcast(DaemonAPI.Notification.agentChanged, agent)
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
@@ -785,8 +794,30 @@ public actor DaemonCore {
         // A retire the last daemon was cut off in: its tombstone is written, so what is
         // left is deleting, and it is done before anything is listed (051, FR-017).
         await store.finishRetiring(retired.keys)
-        let loaded = await store.loadAll()
-        for agent in loaded.agents where retired[agent.id] == nil { agents[agent.id] = seedingCost(agent) }
+        // Archived agents from the index, slim, without opening their records; the rest,
+        // and any archived one the index is behind on, read in full (051, research R3).
+        let index = archiveIndexStore.load() ?? [:]
+        var toRead: [UUID] = []
+        for id in await store.agentIDs() where retired[id] == nil {
+            if let entry = index[id], entry.agent.state == .archived,
+               let modified = ArchiveIndex.modifiedAt(locations.record(id)),
+               modified <= entry.fileModifiedAt.addingTimeInterval(Self.indexTolerance) {
+                agents[id] = seedingCost(entry.agent)
+                archiveIndex[id] = entry
+            } else {
+                toRead.append(id)
+            }
+        }
+        let loaded = await store.load(toRead)
+        for agent in loaded.agents {
+            if agent.state == .archived {
+                agents[agent.id] = seedingCost(agent).slimmed()
+                indexEntry(for: agent.id)
+            } else {
+                agents[agent.id] = seedingCost(agent)
+            }
+        }
+        if archiveIndex != index { saveArchiveIndex() }
         // An agent archived before 051 has no time it was archived. It is given this
         // start, so nothing goes by age on the day 051 arrives (FR-008).
         for (id, agent) in agents where agent.state == .archived && agent.archivedAt == nil {
