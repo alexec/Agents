@@ -75,11 +75,15 @@ struct PoolModelsTests {
                                               offering(["opus", "sonnet"], current: "opus")],
                                              default: offering(["gpt-5", "gpt-5-codex"]))
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        // Both turns over: the one asked for, and the app's ask for a report after it.
+        // Continue with refuses while a turn runs, which under load the second may be.
         await eventually("the chat is quiet", within: .seconds(30)) {
             let agent = await core.agent(id)
-            return agent?.outcomeAsked == true && agent?.state == .finished
+            let endings = (try? await core.transcript(.init(agentID: id)).entries.count {
+                if case .stateChanged(.finished, _) = $0.kind { true } else { false }
+            }) ?? 0
+            return agent?.outcomeAsked == true && agent?.state == .finished && endings == 2
         }
-        try await Task.sleep(for: .milliseconds(200))
         _ = try await core.continueWith(.init(agentID: id, runtimeID: "codex", choices: ["model": "gpt-5-codex"],
                                               confirmed: true, remember: .init(newLevelName: "Strongest")))
         let levels = await core.poolStatus().settings.levels
