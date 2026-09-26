@@ -54,6 +54,8 @@ and each is marked *(default Dn)* where it is used.
   rotates as it uses it, so if the Mac and a server used it at once, each would sign the other
   out. Server turns are billed per token to the key's OpenAI account, not to the ChatGPT plan.
   *(Settled by Alex.)*
+  **Superseded 2026-09-26 (Alex):** the key is gone. A server's Codex signs in only through
+  the Mac's ChatGPT sign-in, relayed (research R12), or its own sign-in on the server.
 - **D5. Pinned, and moved on by the installer.** Each app version names one Codex version.
   Updating it is the start-up installer's job, under its rules. The one rule Codex adds is that
   a running Codex agent keeps the build it started on.
