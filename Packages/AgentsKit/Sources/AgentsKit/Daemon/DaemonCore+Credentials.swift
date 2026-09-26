@@ -4,6 +4,9 @@ import Foundation
 /// Which connection a request came in on, for the whole of the work it causes (043).
 public enum RequestConnection {
     @TaskLocal public static var current: UUID?
+    /// What that connection is allowed to do. Defaults to control for in-process callers
+    /// (tests, recover). A device must not auto-approve a workflow it rewrote (S6).
+    @TaskLocal public static var role: ConnectionRole = .control
 }
 
 /// What a runtime about to be started is lent, set around `SessionLauncher.launch` (043).

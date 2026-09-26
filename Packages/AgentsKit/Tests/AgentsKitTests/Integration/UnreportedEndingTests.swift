@@ -275,8 +275,7 @@ struct UnreportedEndingTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let token = await eventuallySome("the runtime was handed its token") {
-            let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
-            let minted = attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
             return minted.isEmpty ? nil : minted
         } ?? ""
         _ = try await core.reportOutcome(.init(token: token, outcome: "partly_done",

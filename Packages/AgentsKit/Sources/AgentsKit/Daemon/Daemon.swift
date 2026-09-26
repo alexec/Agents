@@ -1,4 +1,11 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 /// The daemon, assembled: the lock, the record, the core and the socket.
 ///
@@ -15,11 +22,18 @@ public final class Daemon: @unchecked Sendable {
         case alreadyRunning
     }
 
+    /// Every file the daemon creates is private by default (security review S8). Safe
+    /// today because the root is 0700; this keeps scratch roots under `/tmp` the same.
+    public static func applyPrivateUmask() {
+        _ = umask(0o077)
+    }
+
     public init(locations: StoreLocations = .default,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
                 toolsetsFolder: URL? = nil) throws {
+        Self.applyPrivateUmask()
         self.locations = locations
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }

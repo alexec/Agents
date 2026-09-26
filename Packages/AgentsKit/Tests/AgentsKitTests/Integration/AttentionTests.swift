@@ -49,8 +49,7 @@ struct AttentionTests {
 
     private func mintedToken(_ launcher: FakeLauncher) async -> String {
         await eventuallySome("the runtime was handed its token") {
-            let attached = await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []
-            let minted = attached.first?["args"]?.arrayValue?.last?.stringValue ?? ""
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
             return minted.isEmpty ? nil : minted
         } ?? ""
     }

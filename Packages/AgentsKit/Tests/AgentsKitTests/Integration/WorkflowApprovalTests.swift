@@ -163,6 +163,19 @@ struct WorkflowApprovalTests {
         #expect(saved.workflow.settings.model == "sonnet")
     }
 
+    /// A phone can rewrite settings, but must not keep an approved file approved (S6).
+    @Test func aSaveFromADeviceDoesNotKeepApproval() async throws {
+        let (core, work, _) = try await started()
+
+        let saved = try await RequestConnection.$role.withValue(.device) {
+            try await core.setWorkflowSettings(
+                .init(folder: work, workflowID: "tests", settings: WorkflowSettings(model: "opus")))
+        }
+
+        #expect(saved.workflow.settings.model == "opus")
+        #expect(saved.awaitingApproval != nil)
+    }
+
     /// Changing one setting on a file an agent wrote must not approve the rest of it.
     @Test func aSaveFromTheAppDoesNotApproveAFileThatWasWaiting() async throws {
         let (core, work, _) = try await started()

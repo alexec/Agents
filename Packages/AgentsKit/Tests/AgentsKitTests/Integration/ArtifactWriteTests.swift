@@ -41,8 +41,7 @@ struct ArtifactWriteTests {
     }
 
     private func token(_ launcher: FakeLauncher) async -> String {
-        (await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? [])
-            .first?["args"]?.arrayValue?.last?.stringValue ?? ""
+        MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
     }
 
     /// Wait until the runtime has actually been handed its token.
