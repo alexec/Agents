@@ -47,23 +47,39 @@ struct SidebarView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Picker("", selection: Binding(get: { frame.pane },
-                                          set: { frame.pane = $0 })) {
-                // Words rather than glyphs: a folder, a terminal, a globe and a tray
-                // had to be learnt, and "Exchanged" has no glyph that says it.
-                ForEach(SidebarPane.allCases) { pane in
-                    Text(pane.title)
-                        .help(pane.title)
-                        .tag(pane)
-                }
+            // Words rather than glyphs: a folder, a terminal, a globe and a tray
+            // had to be learnt, and "Exchanged" has no glyph that says it. Glyphs
+            // only when the column is too narrow for the words, which is when the
+            // words would be cut to "Fi…" and "Ex…" and say nothing either.
+            ViewThatFits(in: .horizontal) {
+                panePicker(iconsOnly: false)
+                panePicker(iconsOnly: true)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             // No close button here. The toolbar's toggle already closes it, and two
             // identical icons a few inches apart are one too many.
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+    }
+
+    private func panePicker(iconsOnly: Bool) -> some View {
+        Picker("", selection: Binding(get: { frame.pane },
+                                      set: { frame.pane = $0 })) {
+            ForEach(SidebarPane.allCases) { pane in
+                Group {
+                    if iconsOnly {
+                        Image(systemName: pane.symbol)
+                            .accessibilityLabel(pane.title)
+                    } else {
+                        Text(pane.title)
+                    }
+                }
+                .help(pane.title)
+                .tag(pane)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     @ViewBuilder
