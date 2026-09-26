@@ -554,8 +554,17 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(try attachShell(request, from: surface, connection: connection)))
 
             case DaemonAPI.Method.shellDetach:
+                let request = try require(params, as: DaemonAPI.ShellRequest.self)
+                detachShell(request, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.shellList:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                detachShell(request.agentID, connection: connection)
+                return .success(try JSONValue.encoding(listShells(request.agentID)))
+
+            case DaemonAPI.Method.shellClose:
+                let request = try require(params, as: DaemonAPI.ShellRequest.self)
+                closeShell(request)
                 return .success([:])
 
             case DaemonAPI.Method.shellInput:

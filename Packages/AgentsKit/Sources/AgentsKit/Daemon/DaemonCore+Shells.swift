@@ -15,6 +15,7 @@ extension DaemonCore {
         }
         do {
             let attachment = try shells.attach(agentID: agent.id,
+                                               shell: request.shell,
                                                folder: agent.cwd,
                                                rows: request.rows,
                                                cols: request.cols)
@@ -29,12 +30,22 @@ extension DaemonCore {
     }
 
     /// The window stopped looking. Nothing is killed (FR-026).
-    func detachShell(_ agentID: UUID, connection: UUID? = nil) {
+    func detachShell(_ request: DaemonAPI.ShellRequest, connection: UUID? = nil) {
         if let connection {
-            shellWatchers[agentID]?.remove(connection)
-            if shellWatchers[agentID]?.isEmpty == true { shellWatchers[agentID] = nil }
+            shellWatchers[request.agentID]?.remove(connection)
+            if shellWatchers[request.agentID]?.isEmpty == true { shellWatchers[request.agentID] = nil }
         }
-        shells.detach(agentID: agentID)
+        shells.detach(agentID: request.agentID, shell: request.shell)
+    }
+
+    /// The shells a window should show tabs for (055).
+    func listShells(_ agentID: UUID) -> DaemonAPI.ShellListResponse {
+        DaemonAPI.ShellListResponse(shells: shells.shells(for: agentID))
+    }
+
+    /// The user closed a shell's tab. Unlike detaching, this ends it (055).
+    func closeShell(_ request: DaemonAPI.ShellRequest) {
+        shells.close(agentID: request.agentID, shell: request.shell)
     }
 
     /// A device that opened this shell hears it from now on (034). A window hears every
@@ -57,24 +68,24 @@ extension DaemonCore {
         // daemon is the one place that knows who that was: two screens on one shell
         // each send their own size with their keystrokes, and the later wins.
         if let rows = request.rows, let cols = request.cols, rows > 0, cols > 0,
-           let session = shells.session(for: request.agentID),
+           let session = shells.session(for: request.agentID, shell: request.shell),
            session.rows != rows || session.cols != cols {
-            shells.resize(agentID: request.agentID, rows: rows, cols: cols)
+            shells.resize(agentID: request.agentID, shell: request.shell, rows: rows, cols: cols)
         }
         do {
-            try shells.write(agentID: request.agentID, data: request.bytes)
+            try shells.write(agentID: request.agentID, shell: request.shell, data: request.bytes)
         } catch ShellHost.Failure.notLive {
             throw JSONRPCError(code: DaemonAPI.Failure.shellNotLive, message: "That shell is not running.")
         }
     }
 
     func resizeShell(_ request: DaemonAPI.ShellResizeRequest) {
-        shells.resize(agentID: request.agentID, rows: request.rows, cols: request.cols)
+        shells.resize(agentID: request.agentID, shell: request.shell, rows: request.rows, cols: request.cols)
     }
 
     func signalShell(_ request: DaemonAPI.ShellSignalRequest) throws {
         do {
-            try shells.signal(agentID: request.agentID, number: request.signal)
+            try shells.signal(agentID: request.agentID, shell: request.shell, number: request.signal)
         } catch ShellHost.Failure.notLive {
             throw JSONRPCError(code: DaemonAPI.Failure.shellNotLive, message: "That shell is not running.")
         }
@@ -89,6 +100,7 @@ extension DaemonCore {
         }
         do {
             let attachment = try shells.restart(agentID: agent.id,
+                                                shell: request.shell,
                                                 folder: agent.cwd,
                                                 rows: request.rows,
                                                 cols: request.cols)
@@ -114,29 +126,30 @@ extension DaemonCore {
     /// Tasks started per chunk arrive in whatever order the runtime chooses.
     func connectShells() {
         let (events, continuation) = AsyncStream.makeStream(
-            of: (UUID, ShellHost.ShellEvent).self, bufferingPolicy: .unbounded)
+            of: (ShellHost.Key, ShellHost.ShellEvent).self, bufferingPolicy: .unbounded)
         shellEvents = continuation
         shellPump = Task { [weak self] in
-            for await (agentID, event) in events {
+            for await (key, event) in events {
                 guard let self else { return }
-                await self.forward(agentID, event)
+                await self.forward(key, event)
             }
         }
-        shells.setBroadcaster { [continuation] agentID, event in
-            continuation.yield((agentID, event))
+        shells.setBroadcaster { [continuation] key, event in
+            continuation.yield((key, event))
         }
     }
 
-    private func forward(_ agentID: UUID, _ event: ShellHost.ShellEvent) {
+    private func forward(_ key: ShellHost.Key, _ event: ShellHost.ShellEvent) {
+        let agentID = key.agentID
         let method: String
         let value: any Encodable & Sendable
         switch event {
         case .output(let data):
             method = DaemonAPI.Notification.shellOutput
-            value = DaemonAPI.ShellOutputNotification(agentID: agentID, bytes: data)
+            value = DaemonAPI.ShellOutputNotification(agentID: agentID, shell: key.shell, bytes: data)
         case .state(let state):
             method = DaemonAPI.Notification.shellStateChanged
-            value = DaemonAPI.ShellStateNotification(agentID: agentID, state: state)
+            value = DaemonAPI.ShellStateNotification(agentID: agentID, shell: key.shell, state: state)
         }
         // Every window, and only the devices that opened this shell (034): a phone on
         // WiFi does not carry an unrelated agent's build output because a Mac window
@@ -156,8 +169,8 @@ extension DaemonCore {
     /// Let go of shells nobody has touched for a long time (FR-028). Called on the same
     /// tick that decides whether the daemon has anything left to do.
     func reapIdleShells() {
-        for agentID in shells.reapIdle() {
-            DaemonLog.shared.write("let go of an idle shell for \(agentID)")
+        for key in shells.reapIdle() {
+            DaemonLog.shared.write("let go of idle shell \(key.shell) for \(key.agentID)")
         }
     }
 }
