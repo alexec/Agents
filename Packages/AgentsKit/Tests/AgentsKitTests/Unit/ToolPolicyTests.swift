@@ -157,7 +157,7 @@ struct ToolPolicyTests {
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.environmentFiles.isEmpty)
         #expect(policy.launchEnvironment == ["CODEX_CONFIG":
-            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"memories":false,"multi_agent":false}}"#])
+            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"in_app_local_automation":false,"memories":false,"multi_agent":false,"sleep_tool":false}}"#])
         #expect(policy.escalationTool == "request_user_input")
         #expect(policy.kept.map(\.name) == ["request_user_input"])
         #expect(policy.preferredAuthMethods == ["chat-gpt", "chat-gpt-device-code", "api-key"])

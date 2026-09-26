@@ -98,14 +98,16 @@ POLICIES = {
     },
     # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
     "codex": {
-        "removed": ["spawn_agent", "send_input", "wait", "close_agent"],
+        "removed": ["clock.sleep", "goals", "automations", "memories", "apps"],
         "kept": ["request_user_input"],
-        "residue": [],
+        "residue": ["spawn_agent", "send_message", "followup_task", "interrupt_agent",
+                    "list_agents", "wait_agent"],
         "meta": None,
         "args": [],
         "env": {},
         "inline_env": {"CODEX_CONFIG": json.dumps({"features": {
-            "multi_agent": False, "memories": False, "apps": False, "goals": False,
+            "sleep_tool": False, "goals": False, "in_app_local_automation": False,
+            "memories": False, "apps": False, "multi_agent": False,
             "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
     },
 }

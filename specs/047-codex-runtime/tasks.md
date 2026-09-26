@@ -45,8 +45,8 @@ toolset already `npm ci`'d in `/tmp/codex-lock` with Node from the pinned tarbal
 rebuild it from T003.
 
 - [X] T005 Ask Alex (AskUserQuestion) for a moment when he can sign Codex in with ChatGPT in the browser, and for an OpenAI API key for the server half. The key goes only in `/tmp` and the scratch root's launch environment, never in a repo file.
-- [ ] T006 In the real home, with Alex present: run the adapter, call `authenticate {methodId:"chat-gpt"}`, and let Alex finish in the browser. Record in research R4 whether it completed over ACP and wrote `~/.codex/auth.json`, and whether the toolset's own `codex login status` agrees. If it did not complete, repeat with `chat-gpt-device-code` and record that. Take `shasum ~/.codex/config.toml` before and after (the file may be absent).
-- [ ] T007 Signed in, run a real turn with the app's MCP server in `mcpServers` and `CODEX_CONFIG` from contracts/runtime-launch.md. Record in research:
+- [X] T006 In the real home, with Alex present: run the adapter, call `authenticate {methodId:"chat-gpt"}`, and let Alex finish in the browser. Record in research R4 whether it completed over ACP and wrote `~/.codex/auth.json`, and whether the toolset's own `codex login status` agrees. If it did not complete, repeat with `chat-gpt-device-code` and record that. Take `shasum ~/.codex/config.toml` before and after (the file may be absent).
+- [X] T007 Signed in, run a real turn with the app's MCP server in `mcpServers` and `CODEX_CONFIG` from contracts/runtime-launch.md. Record in research:
   - R2: the app's MCP tools reach the model.
   - R5: each of `multi_agent`, `memories`, `apps` and `goals` is accepted, and its tools are absent from Codex's tool list, or listed but refused.
   - R6: `request_user_input` arrives as `elicitation/create` in the `agent` mode.
@@ -111,7 +111,7 @@ place, and a Codex agent then works like any runtime.
   - `Tests/Integration/ToolScopingTests.swift` sees `CODEX_CONFIG` in a `FakeLauncher` launch of Codex and not in Claude's;
   - a new test checks that every `.toolset` runtime has `App/Resources/toolsets/<id>/manifest.json` with a matching `runtimeID` and `packageVersion`.
 - [X] T022 [US1] Starting an agent on a runtime whose status is `.missing`, `.installing` or `.installFailed` must answer with that status's sentence and the row's action instead of launching (FR-003). Check the existing start path in `Daemon-side/Daemon/DaemonCore+Commands.swift` and the start form already do this for 048's rows, and fix only what does not. Add a `Tests/Integration/StartResilienceTests.swift` case for an installing Codex.
-- [ ] T023 [US1] **Look gate**:
+- [X] T023 [US1] **Look gate**:
   - build, and launch a scratch root (run-app skill, clean env, dummy `npx` and `codex-acp` on the scratch PATH);
   - screenshot the set-up sheet listing Codex as **Not on this Mac**;
   - press **Install** (AX by pid, only when Alex is away) and screenshot the progress and the tick;

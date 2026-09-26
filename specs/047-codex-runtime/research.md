@@ -254,3 +254,41 @@ person's hands.
 A running agent's process was started from the old folder's resolved path, so it keeps it.
 **To confirm in Phase 4**: `SessionLauncher` launches through the resolved path, not
 through `current`.
+
+## Measured in the spike (2026-09-25, scratch root /tmp/run-codex, real ChatGPT account)
+
+- **Install (T023)**: from the set-up sheet's **Install**, `runtimes/install codex` took
+  **8 s** (04:03:18 to 04:03:26) and left a 540 MB toolset with only `codex-darwin-arm64`,
+  and the row ticked with `…/tools/codex/current/bin/codex-acp`. Screenshots
+  `walk/look/01–03`.
+- **R3/US2**: an unsigned `agents/start` answered `-32007` "Codex needs signing in:
+  Authentication required", with the three methods in `data`. `runtimes/accounts` then read
+  `needsSignIn` with `canLogOut: true`.
+- **R4**: `runtimes/authenticate {chat-gpt}` opened the browser from the adapter. Alex
+  finished it, and it returned in **10 s** with `state: ready` and wrote
+  `~/.codex/auth.json` (0600). No `~/.codex/config.toml` was created, before or after
+  (SC-004 holds). The device-code fallback was not needed.
+- **R2**: a real turn ("list your tools, write hello.txt, run ls, finish") listed all
+  seventeen `mcp__agents__*` tools, wrote the file, ran `ls`, and ended through
+  `finish_turn` with outcome `done`. It took 30 s.
+- **R8**: the `finish_turn` call went through Codex's own "Guardian Review" auto-reviewer
+  ("low-risk allow"), shown as a `think` tool call, and raised **no**
+  `session/request_permission`. The app's tools do not wait for the person in `agent` mode.
+  No `mcp_servers` approval key is needed.
+- **R7**: `usage_update` gives `used`/`size` (15 002 of 258 400), and the turn's
+  `usageRecorded` carries input, output and cached-read tokens. There is no cost figure
+  (FR-005 holds with nothing new).
+- **R6**: asked to use `request_user_input`, Codex raised a form elicitation ("Codex needs
+  your input to continue.") with a choice field (Red / Blue / None of the above) and a note
+  field. The agent went to `waitingOnUser`. Answering `{"colour":"Blue"}` over
+  `elicitations/answer` resumed it, and it wrote `blue` and finished.
+- **R5, revised**: the `CODEX_CONFIG` switches do apply. Turning off `shell_tool`,
+  `unified_exec` and `code_mode_host` in a probe emptied the shell tools. But the
+  `collaboration.*` tools (`spawn_agent`, `send_message`, `followup_task`,
+  `interrupt_agent`, `list_agents`, `wait_agent`) stay with `multi_agent` and
+  `multi_agent_v2` both off: the model's catalog entry names them. They are therefore
+  **residue**. `sleep_tool` takes `clock.sleep`. `codex features list` (0.156.1) is the
+  authoritative list of switches. Final value:
+  `{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"in_app_local_automation":false,"memories":false,"multi_agent":false,"sleep_tool":false}}`.
+  `scripts/runtime-tools.sh codex` then reports 5 of 5 removed, the kept tool present, the
+  6 residue named, and 0 unexplained.
