@@ -1,6 +1,7 @@
 # 058 · Wireframes: the control plane
 
-**Waiting for Alex's approval.** This is the look gate for 058. No code is written before it.
+**Approved by Alex 2026-09-26:** D/E/F over J, the name stays "Control plane", and This Mac's
+host has no buttons for now. This was the look gate for 058.
 
 The window stops starting a daemon and becomes a client of a **control plane**, like the
 iPhone and iPad already are of the bridge. These frames cover what the person sees of that:
@@ -72,12 +73,10 @@ there is nowhere to say where the control plane runs.
 
 ## What the frames decide, and what they leave open
 
-- **Proposed: D/E/F over J.** One opening group, matching Shared.
+- **Decided: D/E/F over J.** One opening group, matching Shared.
 - **Proposed: the window pairs as operator only with an operator code.** A second Mac can be
   paired as Device if the person wants a read-and-answer screen.
-- **Open: the name.** "Control plane" is accurate but technical. "Hub" is the alternative the
-  copy could use.
-- **Open: whether This Mac's host can be turned off** from Hosts. If it could, this Mac would
-  be a client only. The frames leave it without buttons.
+- **Decided: the name** is "Control plane".
+- **Decided: This Mac's host has no buttons** in Hosts for now.
 - **Not in these frames:** the Remote's host headers (they follow H's sidebar), and the Add a
   Server sheet, which is 037's, unchanged apart from being run by the control plane.
