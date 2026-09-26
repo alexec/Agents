@@ -130,19 +130,55 @@ public struct EnvironmentFile: Codable, Hashable, Sendable {
 /// `<root>/runtimes/`, a config file the app writes into it, the variable that points the
 /// runtime there, and anything else the sign-in needs.
 public struct LentKeyHome: Codable, Hashable, Sendable {
+    /// The lent variable that calls for this home: a relayed sign-in brings its own.
+    public var whenLent: String
     public var variable: String
     public var folder: String
     public var configFile: String
     public var config: String
     public var environment: [String: String]
 
-    public init(variable: String, folder: String, configFile: String, config: String,
+    public init(whenLent: String, variable: String, folder: String, configFile: String, config: String,
                 environment: [String: String] = [:]) {
+        self.whenLent = whenLent
         self.variable = variable
         self.folder = folder
         self.configFile = configFile
         self.config = config
         self.environment = environment
+    }
+}
+
+/// A runtime's sign-in relayed from the Mac to a server (047, research R12): on the server
+/// it gets a home of the app's own holding a stand-in sign-in (no secret) and a config that
+/// sends its sign-in traffic to the relay gate on loopback, over TLS it is told to trust.
+public struct SignInRelay: Codable, Hashable, Sendable {
+    /// The variable naming the runtime's home, and the one naming a certificate to trust.
+    public var homeVariable: String
+    public var certificateVariable: String
+    /// The files the app writes into that home.
+    public var configFile: String
+    public var signInFile: String
+    /// The config, with `{port}` for the gate's port.
+    public var configTemplate: String
+    /// Where the Mac's own sign-in is, relative to the home folder, and the host the relay
+    /// sends the runtime's requests on to.
+    public var macSignIn: String
+    public var upstreamHost: String
+
+    public init(homeVariable: String, certificateVariable: String, configFile: String, signInFile: String,
+                configTemplate: String, macSignIn: String, upstreamHost: String) {
+        self.homeVariable = homeVariable
+        self.certificateVariable = certificateVariable
+        self.configFile = configFile
+        self.signInFile = signInFile
+        self.configTemplate = configTemplate
+        self.macSignIn = macSignIn
+        self.upstreamHost = upstreamHost
+    }
+
+    public func config(gatePort: UInt16) -> String {
+        configTemplate.replacingOccurrences(of: "{port}", with: String(gatePort))
     }
 }
 
@@ -215,6 +251,9 @@ public struct ToolPolicy: Hashable, Sendable {
     /// sign-in into its home, so a server running it with a lent key points it at a home
     /// of the app's own that says to keep sign-ins in memory only.
     public var lentKeyHome: LentKeyHome?
+    /// How this runtime's sign-in is relayed from the Mac to a server (047), or nil when it
+    /// is not.
+    public var relay: SignInRelay?
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -225,7 +264,8 @@ public struct ToolPolicy: Hashable, Sendable {
                 escalationTool: String? = nil,
                 preferredAuthMethods: [String] = [],
                 serverEnvironment: [String: String] = [:],
-                lentKeyHome: LentKeyHome? = nil) {
+                lentKeyHome: LentKeyHome? = nil,
+                relay: SignInRelay? = nil) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -236,6 +276,7 @@ public struct ToolPolicy: Hashable, Sendable {
         self.preferredAuthMethods = preferredAuthMethods
         self.serverEnvironment = serverEnvironment
         self.lentKeyHome = lentKeyHome
+        self.relay = relay
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.

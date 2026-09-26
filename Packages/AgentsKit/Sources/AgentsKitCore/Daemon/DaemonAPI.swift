@@ -224,6 +224,10 @@ public enum DaemonAPI {
         /// Which runtimes this window could lend a credential for, and whether this server
         /// takes lends at all. Names only; sent on every connect to a server (043).
         public static let credentialsOffer = "credentials/offer"
+        /// That this window relays a runtime's sign-in from the Mac (047): where the relay's
+        /// socket was forwarded to on the server, the certificate it answers with, and the
+        /// stand-in sign-in the runtime is given. Nothing secret; sent on every connect.
+        public static let relayOffer = "relay/offer"
         /// A credential for one runtime, for this connection only, sent only after the
         /// daemon answered `credentialWanted`. Held in memory and dropped when the
         /// connection closes; a daemon without `--serve` refuses it (043, D5).
@@ -2150,6 +2154,24 @@ public extension DaemonAPI {
         public init(runtimes: [String], ownSignInOnly: Bool) {
             self.runtimes = runtimes
             self.ownSignInOnly = ownSignInOnly
+        }
+    }
+
+    /// `relay/offer` (047): the Mac lends a runtime its own sign-in through a relay, without
+    /// the sign-in ever reaching the server. `socketPath` is the server end of the window's
+    /// reverse forward to the relay (made owner-only by sshd); `caCertificate` is the PEM the
+    /// runtime is told to trust for it; `standIn` is a sign-in file with no secret in it.
+    struct RelayOffer: Codable, Hashable, Sendable {
+        public var runtime: String
+        public var socketPath: String
+        public var caCertificate: String
+        public var standIn: String
+
+        public init(runtime: String, socketPath: String, caCertificate: String, standIn: String) {
+            self.runtime = runtime
+            self.socketPath = socketPath
+            self.caCertificate = caCertificate
+            self.standIn = standIn
         }
     }
 

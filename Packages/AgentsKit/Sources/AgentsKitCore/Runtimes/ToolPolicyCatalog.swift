@@ -236,9 +236,16 @@ public enum ToolPolicyCatalog {
         // A lent key alone is not a sign-in (the adapter answers -32000), and the api-key
         // sign-in writes the key into Codex's home unless that home's config keeps sign-ins
         // in memory. Measured on agents-bare, research T008.
-        lentKeyHome: LentKeyHome(variable: "CODEX_HOME", folder: "codex-home", configFile: "config.toml",
+        lentKeyHome: LentKeyHome(whenLent: "CODEX_API_KEY", variable: "CODEX_HOME", folder: "codex-home",
+                                 configFile: "config.toml",
                                  config: "cli_auth_credentials_store = \"ephemeral\"\n",
-                                 environment: ["DEFAULT_AUTH_REQUEST": #"{"methodId":"api-key"}"#]))
+                                 environment: ["DEFAULT_AUTH_REQUEST": #"{"methodId":"api-key"}"#]),
+        // The Mac's ChatGPT sign-in, relayed (research R12). Codex insists on HTTPS for it,
+        // keeps only the origin for its model calls, and trusts CODEX_CA_CERTIFICATE.
+        relay: SignInRelay(homeVariable: "CODEX_HOME", certificateVariable: "CODEX_CA_CERTIFICATE",
+                           configFile: "config.toml", signInFile: "auth.json",
+                           configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n",
+                           macSignIn: ".codex/auth.json", upstreamHost: "chatgpt.com"))
 
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
     public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex]

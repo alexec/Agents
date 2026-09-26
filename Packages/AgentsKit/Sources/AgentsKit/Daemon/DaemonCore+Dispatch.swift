@@ -51,6 +51,11 @@ extension DaemonCore {
                 offerCredentials(request, connection: connection)
                 return .success([:])
 
+            case DaemonAPI.Method.relayOffer:
+                let request = try require(params, as: DaemonAPI.RelayOffer.self)
+                try offerRelay(request, connection: connection)
+                return .success([:])
+
             case DaemonAPI.Method.credentialsLend:
                 let request = try require(params, as: DaemonAPI.CredentialsLend.self)
                 try lendCredential(request, connection: connection)

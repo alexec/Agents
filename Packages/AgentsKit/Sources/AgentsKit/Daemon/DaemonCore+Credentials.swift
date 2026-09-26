@@ -72,6 +72,52 @@ extension DaemonCore {
     func forgetCredentials(_ connection: UUID) {
         credentialOffers[connection] = nil
         lentCredentials[connection] = nil
+        relayOffers[connection] = nil
+    }
+
+    // MARK: A sign-in relayed from the Mac (047)
+
+    /// A window relays a runtime's sign-in from its Mac: open a gate for it on loopback
+    /// (once per forwarded socket) and keep the offer for as long as the connection lasts.
+    /// Only on a server; the Mac's own agents use the Mac's sign-in directly.
+    func offerRelay(_ offer: DaemonAPI.RelayOffer, connection: UUID?) throws {
+        guard !exitsWhenIdle else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
+                               message: "This Mac's own agents use this Mac's sign-in; nothing is relayed to them.")
+        }
+        guard let connection else { return }
+        if relayGates[offer.socketPath] == nil {
+            relayGates[offer.socketPath] = try RelayGate(target: offer.socketPath)
+        }
+        relayOffers[connection] = offer
+        DaemonLog.shared.write("relay offered for \(offer.runtime) on port \(relayGates[offer.socketPath]?.port ?? 0)")
+    }
+
+    /// The environment a runtime starts with when its sign-in is relayed: a home of the
+    /// app's own holding the stand-in and a config pointing the runtime's sign-in traffic at
+    /// the gate, and the certificate to trust for it. Nil when no relay is offered for it.
+    func relayEnvironment(for runtimeID: String) -> [String: String]? {
+        let connection = RequestConnection.current
+        let offer = connection.flatMap { relayOffers[$0] }.flatMap { $0.runtime == runtimeID ? $0 : nil }
+            ?? relayOffers.values.first { $0.runtime == runtimeID }
+        guard let offer, let gate = relayGates[offer.socketPath],
+              let relay = ToolPolicyCatalog.policy(for: runtimeID).relay else { return nil }
+        let home = locations.root.appendingPathComponent("runtimes/\(runtimeID)-relay-home", isDirectory: true)
+        let certificate = locations.root.appendingPathComponent("runtimes/\(runtimeID)-relay-ca.pem")
+        do {
+            try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            try relay.config(gatePort: gate.port)
+                .write(to: home.appendingPathComponent(relay.configFile), atomically: true, encoding: .utf8)
+            try offer.standIn.write(to: home.appendingPathComponent(relay.signInFile), atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                                  ofItemAtPath: home.appendingPathComponent(relay.signInFile).path)
+            try offer.caCertificate.write(to: certificate, atomically: true, encoding: .utf8)
+        } catch {
+            DaemonLog.shared.write("could not write \(runtimeID)'s relay home: \(error)")
+            return nil
+        }
+        return [relay.homeVariable: home.path, relay.certificateVariable: certificate.path]
     }
 
     /// The environment to start `runtimeID` with, for the request under way (043, R6).
@@ -80,6 +126,12 @@ extension DaemonCore {
     /// credential it has not lent yet, or when nothing was lent and the server has no
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
+        // A sign-in relayed from the Mac comes first on a server (047): the person's own
+        // plan, with nothing of theirs on the server. "Own sign-in only" still means own.
+        if !exitsWhenIdle, !(RequestConnection.current.flatMap { credentialOffers[$0] }?.ownSignInOnly ?? false),
+           let relayed = relayEnvironment(for: runtimeID) {
+            return relayed
+        }
         guard !exitsWhenIdle, Self.lendableRuntimes.contains(runtimeID) else { return [:] }
         let connection = RequestConnection.current
         let offer = connection.flatMap { credentialOffers[$0] }

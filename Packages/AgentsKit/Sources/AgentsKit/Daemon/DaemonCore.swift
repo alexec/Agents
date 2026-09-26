@@ -373,6 +373,10 @@ public actor DaemonCore {
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
     var lentCredentials: [UUID: [String: Secret]] = [:]
+    /// Sign-in relays the windows connected here offered (047), by connection.
+    var relayOffers: [UUID: DaemonAPI.RelayOffer] = [:]
+    /// One gate per forwarded relay socket, started on the first offer of it.
+    var relayGates: [String: RelayGate] = [:]
     /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
     var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
@@ -1103,7 +1107,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
         environment.merge(policy.serverEnvironment) { _, server in server }
         // A key lent for this runtime: its own home, whose config keeps the sign-in in
         // memory, so the key is never written to the server's disk (047, FR-019).
-        if let home = policy.lentKeyHome, !LentEnvironment.value.isEmpty,
+        if let home = policy.lentKeyHome, LentEnvironment.value[home.whenLent] != nil,
            let folder = Self.lentKeyHome(home, locations: locations) {
             environment[home.variable] = folder.path
             environment.merge(home.environment) { _, home in home }
