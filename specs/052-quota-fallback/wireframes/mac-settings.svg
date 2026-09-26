@@ -48,12 +48,12 @@
   <text x="140" y="358" class="f s">not signed in, so skipped</text>
   <text x="704" y="359" class="f s" text-anchor="end">Remove</text>
   <line x1="56" y1="378" x2="704" y2="378" stroke="#f2f2f7"/>
-  <text x="56" y="404" class="r q">≡</text><text x="80" y="404" class="rb t">Codex</text><rect x="134" y="391" width="178" height="18" rx="9" fill="#fdecdf"/><text x="141" y="404" class="f" fill="#c93400">Billed per token · API key</text>
+  <text x="56" y="404" class="r q">≡</text><text x="80" y="404" class="rb t">Codex</text><rect x="134" y="391" width="220" height="18" rx="9" fill="#fdecdf"/><text x="141" y="404" class="f" fill="#c93400">Prepaid · $10 · auto-recharge off</text>
   <rect x="400" y="388" width="180" height="26" rx="6" class="btn"/><text x="410" y="406" class="f s">Model: as the chat had</text><text x="570" y="406" class="f q" text-anchor="end">▾</text>
   <text x="704" y="405" class="f s" text-anchor="end">Remove</text>
 
   <rect x="40" y="450" width="160" height="28" rx="6" class="btn"/><text x="120" y="469" class="f t" text-anchor="middle">Add a runtime ▾</text>
-  <rect x="214" y="450" width="200" height="28" rx="6" class="btn"/><text x="314" y="469" class="f out" text-anchor="middle">Add one billed per token…</text><text x="428" y="468" class="f s">Costs money by use. Never suggested.</text>
+  <rect x="214" y="450" width="200" height="28" rx="6" class="btn"/><text x="314" y="469" class="f out" text-anchor="middle">Add credit on an API key…</text><text x="428" y="468" class="f s">Free or prepaid credit only. Never suggested.</text>
 
   <text x="40" y="514" class="rb t">Matching models</text>
   <text x="40" y="534" class="f s">Which model stands in for which is kept on the Pool page.</text>

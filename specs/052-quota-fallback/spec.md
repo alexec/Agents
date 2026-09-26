@@ -64,9 +64,19 @@ Yes, with two limits the person should know about up front:
   pay-by-the-token carrying-on this feature exists to avoid. Each entry therefore shows how it is
   paid for: **allowance** (a plan or account sign-in: ChatGPT, Google account, Copilot, a Claude
   subscription, a subscription provider) or **billed per token** (an API key). Keyed entries can
-  be added, but only by the person choosing them, marked as billed, and never offered by default.
+  be added only by the person choosing them, and never offered by default. The next answer
+  narrows which keys may be added at all.
   The same runtime can appear as two entries with different credentials, and on a server the
   entry is judged by the credential that host would actually use.
+- Q: Can a pool entry run on an API key at all? → A: Only when its spending has a hard stop.
+  That means **free credit** (a trial or promotional grant) or **prepaid credit with auto-recharge
+  turned off**. In both cases the provider refuses once the balance is gone, so an empty balance
+  behaves like a spent allowance and can never grow a bill. A key with open-ended billing
+  (auto-recharge on, or invoiced) cannot join the pool. The app cannot see a provider's recharge
+  setting, so the person states which kind of credit it is when they add the entry. They can also
+  give the amount and an expiry date. With an amount given, the app stops using the entry once
+  what it has recorded spending on it reaches that amount, even if the provider has not yet said
+  no.
 - Q: Does every "limit" refusal mean the runtime is out? → A: No. A spent allowance (a daily or
   monthly quota, a used-up plan window, credit gone) is told apart from a short rate limit (too
   many requests just now). Only a spent allowance marks the runtime out and moves the chat. A rate
@@ -128,11 +138,20 @@ the ones they are happy to fall back to and drag them into the order they prefer
 model for an entry where the runtime offers a choice. A runtime that is not installed or not signed
 in cannot be added. With fewer than two runtimes in the pool, nothing switches.
 
-Each entry says how it is paid for. Codex signed in with a ChatGPT plan reads **Allowance**. Gemini
-on an API key reads **Billed per token**. **Add a runtime** offers allowances first. A keyed
-entry is under **Add one billed per token…**, which says plainly that falling back to it costs
-money. The same runtime can be added twice with different credentials, for example Codex on its
-plan early in the list and Codex on a key as a last resort.
+Each entry says how it is paid for. Codex signed in with a ChatGPT plan reads **Allowance**.
+**Add a runtime** offers allowances. An API key is under a separate **Add credit on an API
+key…**, which only accepts a key whose spending has a hard stop. The person picks one of two
+kinds:
+- **Free credit**: a trial or promotional grant.
+- **Prepaid, auto-recharge off**: a balance they topped up once that will not refill itself.
+
+A third choice, **Billed with no limit**, is shown, but it is greyed out with the reason: the pool
+never carries a chat onto open-ended billing. The person can also give the credit's amount (say
+$10) and when it expires. A Gemini key on its free tier then reads **Free credit · ≈ $1.40 of $10
+used · expires 31 Oct**.
+
+The same runtime can be added twice with different credentials. For example, Codex can be on its
+plan early in the list and on a prepaid key as a last resort.
 
 **Why this priority**: Without a pool there is nothing to switch to. It ships with Story 1.
 
@@ -148,12 +167,19 @@ and check the pool is as it was left. Check an uninstalled runtime is offered as
 3. **Given** a runtime in the pool is later signed out or uninstalled, **When** a switch would pick
    it, **Then** it is skipped and the next one is tried.
 4. **Given** the person opens Add a runtime, **When** the list appears, **Then** only allowance
-   entries are offered directly. A keyed entry needs the separate billed-per-token choice, and it
-   shows as Billed per token from then on (FR-001a).
-5. **Given** a pool with Codex on its plan and Codex on a key, **When** the plan runs out, **Then**
-   the plan entry is marked out, the next usable entry in the order is tried (the key entry only
-   when it is reached), and a switch onto the key says in its note that the chat is now billed
-   per token.
+   entries are offered directly. A key needs Add credit on an API key, and the person must say
+   whether it is free credit or prepaid with auto-recharge off (FR-001a).
+5. **Given** the person chooses Billed with no limit, **When** they try to add the key, **Then**
+   it cannot be added, and the sheet says why.
+6. **Given** a pool with Codex on its plan and Codex on a prepaid key, **When** the plan runs out,
+   **Then** the plan entry is marked out, and the next usable entry in the order is tried. The key
+   entry is tried only when the order reaches it. A switch onto the key says in its note that the
+   chat is now using prepaid credit, and how much is left.
+7. **Given** a prepaid entry with an amount of $10, **When** the app has recorded $10 of spending
+   on it, **Then** the entry is marked out ("Credit used up") before the provider refuses. It
+   stays out until the person tops up and marks it available, or raises the amount.
+8. **Given** a free-credit entry with an expiry date, **When** that date passes, **Then** the entry
+   is marked out ("Free credit expired") and is never tried again unless the person edits it.
 
 ---
 
@@ -161,7 +187,8 @@ and check the pool is as it was left. Check an uninstalled runtime is offered as
 
 The person wants one place to look at the state of their allowances. Beside Events, Resources and
 Spending in the sidebar's Activity section there is a **Pool** row. Its page lists the pool in
-order. Each entry shows whether it is an allowance or billed per token, and has a line that reads
+order. Each entry shows whether it is an allowance, free credit or prepaid credit, with what has been
+used of any credit, and has a line that reads
 plainly: *Available*, *Rate limited · trying again at 02:21*, *Out until 07:00*, *Out since 02:14,
 trying again after 03:14*, or *Can't be used: not signed in*. A rate limit is not "out": the
 chat stays where it is and nothing moves (FR-006a). Next to each runtime is how
@@ -372,10 +399,23 @@ It builds on Story 5's sheet, which fills in the same rows.
 
 - **FR-001**: The person MUST be able to keep one ordered pool of runtimes, each with its
   credential and optionally a model, and add, remove and reorder its entries in Settings.
-- **FR-001a**: Each entry MUST show whether it is an **allowance** (a plan or account sign-in) or
-  **billed per token** (an API key). Keyed entries MUST NOT be suggested or added by default. A
-  keyed entry the person adds MUST stay marked as billed on the Pool page and in every switch note.
-  On a server, an entry MUST be judged by the credential that host would use.
+- **FR-001a**: Each entry MUST show how it is paid for:
+  - **allowance**: a plan or account sign-in;
+  - **free credit**: a grant on an API key;
+  - **prepaid credit**: an API key with auto-recharge off, as the person states it.
+
+  An API key with open-ended billing MUST NOT be added to the pool. Keyed entries MUST NOT be
+  suggested or added by default. They are added only through a separate choice on which the
+  person states the kind of credit. The kind MUST show on the Pool page and in every switch note
+  onto that entry. On a server, an entry MUST be judged by the credential that host would use.
+- **FR-001b**: For free or prepaid credit, the person MAY give an amount and an expiry date. The
+  app MUST show what it has recorded spending on the entry against the amount. It MUST mark the
+  entry out when that spending reaches the amount, or when the expiry date passes, even if the
+  provider has not refused. Where the runtime reports no cost, the page MUST say that spending
+  is not known, rather than show zero.
+- **FR-001c**: A provider's "credit used up" or "insufficient balance" refusal on a keyed entry
+  MUST be recognised as that entry being out, with no return time. The entry MUST NOT come back
+  by itself. It returns only when the person marks it available, or raises its amount.
 - **FR-002**: Only installed, signed-in runtimes MUST be addable; entries that stop being usable
   MUST stay in the pool, shown as unavailable, and be skipped.
 - **FR-003**: Switching MUST be off until the pool holds at least two runtimes, and the person
@@ -487,7 +527,8 @@ It builds on Story 5's sheet, which fills in the same rows.
 ### Key Entities
 
 - **Pool**: the person's ordered list of acceptable runtimes; each entry is a runtime, the
-  credential it runs on (allowance or billed per token), and an optional model. App-wide.
+  credential it runs on (allowance, free credit or prepaid credit), an optional model, and, for
+  credit, an optional amount and expiry. App-wide.
 - **Runtime allowance state**: per runtime (and per host, for servers), available or out; when it
   ran out; when it is expected back, if known; how the app learned it.
 - **Matching row**: a level the person names, with at most one model, and effort, per runtime.
@@ -501,8 +542,8 @@ It builds on Story 5's sheet, which fills in the same rows.
 
 - **SC-001**: With two or more usable runtimes in the pool, a chat whose runtime runs out carries
   on with the next one within 30 seconds, with nobody touching anything.
-- **SC-002**: No chat ever runs at usage-based prices because of this feature: across all tests,
-  zero pay-as-you-go offers accepted.
+- **SC-002**: No chat is ever carried onto open-ended billing because of this feature. Across all
+  tests, no pay-as-you-go offer is accepted, and no key without a hard stop joins the pool.
 - **SC-003**: Zero switches caused by endings that were not a spent allowance, across a test set
   that includes every other kind of ending the app knows.
 - **SC-004**: After a switch, the new runtime can answer a question about something decided

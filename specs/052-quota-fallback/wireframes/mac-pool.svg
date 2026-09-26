@@ -41,7 +41,7 @@
   <!-- detail -->
   <text x="290" y="84" class="title t">Pool</text>
   <text x="1090" y="84" class="f t" text-anchor="end" text-decoration="underline">Edit the pool in Settings ›</text>
-  <text x="290" y="108" class="f s">When a runtime's allowance runs out, its chats carry on with the next one here that isn't out. Only entries marked Billed per token cost money by use.</text>
+  <text x="290" y="108" class="f s">When a runtime's allowance runs out, its chats carry on with the next one here that isn't out. Keys join only on free or prepaid credit that cannot grow a bill.</text>
 
   <!-- RUNTIMES -->
   <text x="290" y="146" class="h">RUNTIMES, IN ORDER</text>
@@ -76,8 +76,8 @@
   <line x1="306" y1="378" x2="1074" y2="378" stroke="#f2f2f7"/>
   <text x="306" y="402" class="f q">5</text>
   <circle cx="330" cy="397" r="5" fill="#34c759"/>
-  <text x="344" y="402" class="rb t">Codex</text><rect x="394" y="389" width="222" height="18" rx="9" fill="#fdecdf"/><text x="401" y="402" class="f" fill="#c93400">Billed per token · OpenAI API key</text>
-  <text x="344" y="422" class="f s">Available · last resort: only reached when every allowance above is out · no chats on it</text>
+  <text x="344" y="402" class="rb t">Codex</text><rect x="394" y="389" width="200" height="18" rx="9" fill="#fdecdf"/><text x="401" y="402" class="f" fill="#c93400">Prepaid credit · OpenAI API key</text>
+  <text x="344" y="422" class="f s">Available · <tspan class="t">≈ $3.20 of $10 used</tspan> · auto-recharge off, as you said · last resort · no chats on it</text>
 
   <text x="290" y="458" class="note">Chats waiting for an allowance to come back get a card of their own above this list, only while every runtime</text>
   <text x="290" y="474" class="note">is out: “Fix login · resumes on Claude at 07:00 · Stop waiting”. None now, because Codex is available (FR-022).</text>

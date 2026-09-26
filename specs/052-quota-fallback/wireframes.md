@@ -8,7 +8,8 @@ Every screen shows the same moment, 02:20:
 - Claude ran out at 02:03 and said it is back at 07:00. "Fix login" carried on with Codex.
 - Copilot ran out at 02:14 and gave no time. "Docs pass" carried on with Codex.
 - Cursor is in the pool but is not signed in.
-- Codex on an OpenAI API key is last, billed per token, as a last resort nobody has reached.
+- Codex on an OpenAI API key with $10 of prepaid credit (auto-recharge off) is last, as a last
+  resort nobody has reached. $3.20 of it has been used.
 - Codex has the three chats, so nothing is waiting.
 
 1. [Mac: the Pool page](#1-mac-the-pool-page)
@@ -32,7 +33,8 @@ Every screen shows the same moment, 02:20:
   - *Can't be used: not signed in* when it cannot be used at all.
 
   Each entry has a capsule saying how it is paid for: grey **Allowance · <plan>**, or orange
-  **Billed per token · <key>** (FR-001a). The same runtime can appear twice, as Codex does here.
+  **Free credit** or **Prepaid credit · <key>**. A credit entry's state line shows what has been
+  used against the amount ("≈ $3.20 of $10 used"), or "spending not known" (FR-001a, FR-001b). The same runtime can appear twice, as Codex does here.
   A short rate limit replaces the state line with *Rate limited · trying again at 02:21*. That
   has no dot and moves nothing, because it is not "out" (FR-006a).
 
@@ -66,7 +68,7 @@ Every screen shows the same moment, 02:20:
 
   **Change what it carried on with…** opens the sheet in §3, and **Pool** opens the Pool page at
   that switch (FR-013, FR-015a, FR-029). A switch onto a keyed entry adds a line in the same
-  orange: "Now billed per token on your OpenAI API key" (US2-AS5).
+  orange: "Now on prepaid credit, OpenAI key · ≈ $6.80 left" (US2-AS6).
 - **The agent row** shows the runtime the chat is on now, with a "⇄ Carried on from Claude at
   02:03" line. The line stays until the person's next prompt, the way a report line does.
 - **The runtime control** in the prompt bar becomes a menu:
@@ -103,11 +105,28 @@ Every screen shows the same moment, 02:20:
 - **A new Settings tab, Pool**, between Spending and Devices. It has the app-wide switch, the
   ordered list (drag ≡), a fallback **Model** per entry, and **Add a runtime** (FR-001–FR-003).
 - **How it is paid for** is a capsule on every entry. **Add a runtime** lists allowances only. A
-  keyed entry comes from a separate, orange **Add one billed per token…** that says it costs money
-  and is never suggested (FR-001a, US2-AS4).
+  key comes from a separate, orange **Add credit on an API key…** that opens the sheet in §4a
+  (FR-001a, US2-AS4).
 - **Model per entry** is used only when the chat's model is in no level. "As the chat had" is the
   default: the model last chosen for that runtime (FR-015).
 - **Matching models are not edited here**: one grid, on the Pool page, and a link to it.
+
+## 4a. Mac: adding credit on an API key
+
+![The Add credit on an API key sheet: runtime, key, kind of credit, amount, expiry](wireframes/mac-add-credit.svg)
+
+- **Only two kinds can be picked**: *Free credit* and *Prepaid, with auto-recharge off*.
+  *Billed with no limit* is shown greyed out, with the reason, so the person knows it was
+  thought of and refused on purpose (FR-001a, US2-AS5).
+- **The app takes the person's word for it.** The sheet says plainly that it cannot see the
+  provider's recharge setting.
+- **Amount and Expires** are optional (FR-001b). With an amount, the entry is marked out at that
+  spending even if the provider has not refused (US2-AS7). With a date, it is marked out when the
+  date passes (US2-AS8).
+- **It goes last** in the pool, after every allowance, and the sheet says how to move it up.
+- **When the credit runs out** the entry reads *Credit used up* or *Free credit expired*. It has no
+  return time and never comes back by itself. Topping up means editing the amount or pressing
+  Mark available (FR-001c).
 
 ## 5. Phone: the Pool page
 
@@ -132,3 +151,5 @@ Every screen shows the same moment, 02:20:
 - Continue with lives in the **prompt bar's runtime control**, not in the chat's title menu.
 - A runtime that is out **can** be picked by hand.
 - Remember is **on** by default.
+- A new key goes **last** in the pool.
+- *Billed with no limit* is **shown greyed out**, not left off the sheet.
