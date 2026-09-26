@@ -30,7 +30,7 @@ struct RuntimeInstallerTests {
         }
 
         func installer(path: String? = nil) -> RuntimeInstaller {
-            RuntimeInstaller(discovery: RuntimeDiscovery(searchPaths: [bin.path]), toolset: nil,
+            RuntimeInstaller(discovery: RuntimeDiscovery(searchPaths: [bin.path]), toolsets: [:],
                              environment: ["PATH": path ?? "/usr/bin:/bin", "HOME": root.path],
                              timeout: .seconds(20))
         }
@@ -112,8 +112,24 @@ struct RuntimeInstallerTests {
         defer { scene.remove() }
         #expect(scene.installer().recipe(for: RuntimeCatalog.claude) == nil)
         var withToolset = scene.installer()
-        withToolset.toolset = MacToolsetInstaller(toolset: try Toolset.load(from: ToolsetTests.bundled),
-                                                  tools: scene.root)
+        withToolset.toolsets = ["claude": MacToolsetInstaller(toolset: try Toolset.load(from: ToolsetTests.bundled),
+                                                              tools: scene.root)]
         #expect(withToolset.recipe(for: RuntimeCatalog.claude) == .toolset(runtimeID: "claude"))
+    }
+
+    /// Each toolset runtime is offered by its own toolset and no other (046).
+    @Test func aToolsetRuntimeIsOfferedOnlyByItsOwnToolset() throws {
+        let scene = try Scene()
+        defer { scene.remove() }
+        let gemini = Runtime(id: "gemini", name: "Gemini", executable: "gemini", arguments: ["--acp"],
+                             install: .toolset(runtimeID: "gemini"), usesAppCopyOnly: true)
+        var installer = scene.installer()
+        installer.toolsets = ["claude": MacToolsetInstaller(toolset: try Toolset.load(from: ToolsetTests.bundled),
+                                                            tools: scene.root)]
+        #expect(installer.recipe(for: gemini) == nil)
+        installer.toolsets["gemini"] = MacToolsetInstaller(toolset: try Toolset.load(from: ToolsetTests.bundledGemini),
+                                                           tools: scene.root)
+        #expect(installer.recipe(for: gemini) == .toolset(runtimeID: "gemini"))
+        #expect(installer.recipe(for: RuntimeCatalog.claude) == .toolset(runtimeID: "claude"))
     }
 }

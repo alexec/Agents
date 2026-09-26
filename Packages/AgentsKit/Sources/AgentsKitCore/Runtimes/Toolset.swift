@@ -3,12 +3,13 @@ import Foundation
 import CryptoKit
 #endif
 
-/// Everything a server needs to run one runtime that the app can install there (043).
+/// Everything a server (043) or this Mac (048) needs to run one runtime the app installs.
 ///
-/// Claude is the only one (D3): Node.js, and the ACP adapter from npm with its own
-/// per-platform Claude binary. The app carries `manifest.json` and an npm lock for it in
-/// `Resources/toolsets/<runtime>/`, made by `scripts/update-claude-toolset.sh`; a server
-/// downloads what they name and checks it against them.
+/// Node.js and one npm package: Claude's ACP adapter, with its per-platform Claude binary,
+/// or Gemini CLI, which speaks ACP itself (046). The app carries `manifest.json` and an npm
+/// lock for each in `Resources/toolsets/<runtime>/`, made by
+/// `scripts/update-<runtime>-toolset.sh`; whoever installs it downloads what they name and
+/// checks it against them.
 ///
 /// On a server it lives in `~/.agents-server/tools/<runtime>/<id>/`, with `current`
 /// pointing at the one in use and an `ok` file written last, so a half-installed one is
@@ -60,8 +61,39 @@ public struct Toolset: Hashable, Sendable {
         /// The adapter's script, relative to its package folder.
         public var entry: String
         /// Under this much free space in the server's home, the install is refused before
-        /// anything is downloaded. The toolset is about 484 MB once unpacked.
+        /// anything is downloaded. Claude's is about 484 MB once unpacked.
         public var minFreeBytes: Int64
+        /// Whether the shim hands its own arguments on (046). Gemini is started with
+        /// `--acp` and the policy file's `--policy <path>`; Claude's adapter takes none, and
+        /// its recipe's `-y <package>` were only ever meant for a real npx.
+        public var forwardsArguments: Bool
+
+        public init(runtimeID: String, node: Node, package: String, packageVersion: String,
+                    entry: String, minFreeBytes: Int64, forwardsArguments: Bool = false) {
+            self.runtimeID = runtimeID
+            self.node = node
+            self.package = package
+            self.packageVersion = packageVersion
+            self.entry = entry
+            self.minFreeBytes = minFreeBytes
+            self.forwardsArguments = forwardsArguments
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case runtimeID, node, package, packageVersion, entry, minFreeBytes, forwardsArguments
+        }
+
+        /// `forwardsArguments` is absent from Claude's manifest and every one before 046.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            runtimeID = try c.decode(String.self, forKey: .runtimeID)
+            node = try c.decode(Node.self, forKey: .node)
+            package = try c.decode(String.self, forKey: .package)
+            packageVersion = try c.decode(String.self, forKey: .packageVersion)
+            entry = try c.decode(String.self, forKey: .entry)
+            minFreeBytes = try c.decode(Int64.self, forKey: .minFreeBytes)
+            forwardsArguments = try c.decodeIfPresent(Bool.self, forKey: .forwardsArguments) ?? false
+        }
 
         public struct Node: Codable, Hashable, Sendable {
             public var version: String
@@ -106,14 +138,22 @@ public struct Toolset: Hashable, Sendable {
     /// no install scripts, and nothing said to a server about audits or funding.
     public static let npmCIArguments = ["ci", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"]
 
-    /// The `bin/npx` a toolset is started through: not npx, but the pinned adapter run by
-    /// the toolset's own Node. One line per element, none containing a single quote, so
-    /// the server's script can hand them to `printf` quoted.
+    /// The shim's name in the toolset's `bin/`: the runtime's own executable, so the same
+    /// discovery that looks for it on a PATH finds it here — `bin/npx` for Claude, whose
+    /// recipe runs npx, and `bin/gemini` for Gemini (046).
+    public var shimName: String {
+        RuntimeCatalog.runtime(id: manifest.runtimeID)?.executable ?? "npx"
+    }
+
+    /// The shim a toolset is started through: the pinned package run by the toolset's own
+    /// Node, never whatever the name finds elsewhere. One line per element, none containing
+    /// a single quote, so the server's script can hand them to `printf` quoted.
     public var shimLines: [String] {
-        ["#!/bin/sh",
-         "# Agents (043): not npx. Runs the Claude adapter this toolset was installed with.",
-         #"d=$(cd "$(dirname "$0")/.." && pwd -P)"#,
-         #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""#]
+        let arguments = manifest.forwardsArguments ? #" "$@""# : ""
+        return ["#!/bin/sh",
+                "# Agents: not the \(shimName) on a PATH. Runs \(manifest.package) as this toolset installed it.",
+                #"d=$(cd "$(dirname "$0")/.." && pwd -P)"#,
+                #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""# + arguments]
     }
 
     /// Where a server keeps one runtime's toolsets, relative to its home.
@@ -131,6 +171,13 @@ public struct Toolset: Hashable, Sendable {
             .flatMap { try? JSONDecoder().decode(MacNode.self, from: $0) }
         return Toolset(manifest: manifest, id: id(manifest: manifestData, lock: lockData), folder: folder,
                        macNode: macNode)
+    }
+
+    /// Every whole toolset folder in `folder` (the bundle's `toolsets/`), in name order. A
+    /// folder that does not read is left out rather than failing the rest.
+    public static func loadAll(in folder: URL) -> [Toolset] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        return names.sorted().compactMap { try? load(from: folder.appendingPathComponent($0, isDirectory: true)) }
     }
 
     public static func id(manifest: Data, lock: Data) -> String {

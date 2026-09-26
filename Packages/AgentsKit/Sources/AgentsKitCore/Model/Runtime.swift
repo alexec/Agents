@@ -17,22 +17,29 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     /// The vendor's own instructions. Always there, because an install that fails has to
     /// leave the person somewhere better than an error.
     public var installPage: URL
+    /// Run only from the copy the app installed, never one found on the PATH (046). For a
+    /// runtime whose protocol moves between releases, so an agent always gets the version
+    /// the app was built against, and a copy the person keeps for their terminal is left
+    /// to their terminal. Its set-up row reads "not on this Mac" until the app's is there.
+    public var usesAppCopyOnly: Bool
 
     /// Where a runtime with no page of its own sends people: the protocol's list of agents.
     public static let genericInstallPage = URL(string: "https://agentclientprotocol.com/overview/agents")!
 
     public init(id: String, name: String, executable: String, arguments: [String],
-                install: RuntimeInstall? = nil, installPage: URL? = nil) {
+                install: RuntimeInstall? = nil, installPage: URL? = nil,
+                usesAppCopyOnly: Bool = false) {
         self.id = id
         self.name = name
         self.executable = executable
         self.arguments = arguments
         self.install = install
         self.installPage = installPage ?? Self.genericInstallPage
+        self.usesAppCopyOnly = usesAppCopyOnly
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, executable, arguments, install, installPage
+        case id, name, executable, arguments, install, installPage, usesAppCopyOnly
     }
 
     /// Lenient about the two recipe fields, which a daemon from before 048 never sends.
@@ -45,6 +52,8 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         install = try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)
         installPage = (try? c.decodeIfPresent(URL.self, forKey: .installPage))
             ?? RuntimeCatalog.runtime(id: id)?.installPage ?? Self.genericInstallPage
+        // Absent from a daemon before 046, which never had such a runtime.
+        usesAppCopyOnly = (try? c.decodeIfPresent(Bool.self, forKey: .usesAppCopyOnly)) ?? false
     }
 }
 

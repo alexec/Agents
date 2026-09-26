@@ -36,4 +36,30 @@ struct ToolsetTests {
         #expect(id != Toolset.id(manifest: manifest, lock: Data("{ }".utf8)))
         #expect(id.allSatisfy { $0.isHexDigit })
     }
+
+    // MARK: A second toolset (046)
+
+    static var bundledGemini: URL {
+        bundled.deletingLastPathComponent().appendingPathComponent("gemini", isDirectory: true)
+    }
+
+    @Test func claudesShimTakesNoArgumentsAsBefore() throws {
+        let toolset = try Toolset.load(from: Self.bundled)
+        #expect(!toolset.manifest.forwardsArguments)
+        #expect(toolset.shimName == "npx")
+        #expect(!toolset.shimLines.joined().contains(#""$@""#))
+        #expect(toolset.shimLines.last?.hasSuffix(toolset.manifest.entryPath + #"""#) == true)
+    }
+
+    @Test func geminisShimHandsOnItsArguments() throws {
+        let toolset = try Toolset.load(from: Self.bundledGemini)
+        #expect(toolset.manifest.runtimeID == "gemini")
+        #expect(toolset.manifest.forwardsArguments)
+        #expect(toolset.manifest.entryPath == "lib/node_modules/@google/gemini-cli/bundle/gemini.js")
+        #expect(toolset.shimLines.last?.hasSuffix(#"bundle/gemini.js" "$@""#) == true)
+        #expect(toolset.shimLines.allSatisfy { !$0.contains("'") })
+        #expect(toolset.macNode?.sha256.count == 2)
+        #expect(toolset.id.count == 16)
+        #expect(toolset.id != (try Toolset.load(from: Self.bundled)).id)
+    }
 }

@@ -2,7 +2,8 @@ import Foundation
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// A Claude toolset for this Mac small enough to install in a test (048).
+/// A toolset for this Mac small enough to install in a test (048): Claude's by default, or
+/// Gemini's shape (046) with `runtimeID: "gemini"`.
 ///
 /// `dist` is a `file://` stand-in for nodejs.org holding a Node "tarball" whose `npm` lays
 /// down the adapter's folder, or fails the way `FAKE_NPM_FAIL` says. `mac-node.json`
@@ -15,7 +16,9 @@ struct FakeMacToolset {
     static let nodeVersion = "v24.0.0-fake"
     static let architecture = "arm64"
 
-    init(wrongChecksum: Bool = false) throws {
+    init(wrongChecksum: Bool = false, runtimeID: String = "claude") throws {
+        let package = runtimeID == "gemini" ? "@google/gemini-cli" : "@agentclientprotocol/claude-agent-acp"
+        let entry = runtimeID == "gemini" ? "bundle/gemini.js" : "dist/index.js"
         let fm = FileManager.default
         root = fm.temporaryDirectory.appendingPathComponent("mac-toolset-\(UUID().uuidString)", isDirectory: true)
         dist = root.appendingPathComponent("dist", isDirectory: true)
@@ -44,17 +47,17 @@ struct FakeMacToolset {
             # path went through a symlink (/tmp, /var on a Mac). Refuse the same way.
             [ "$prefix" = "$(cd "$prefix" && pwd -P)" ] || { echo "npm error code EUSAGE" >&2
                 echo "npm error Missing: lib@ from lock file" >&2; exit 1; }
-            d="$prefix/node_modules/@agentclientprotocol/claude-agent-acp/dist"
-            mkdir -p "$d" && echo "// fake adapter" > "$d/index.js"
+            f="$prefix/node_modules/\(package)/\(entry)"
+            mkdir -p "$(dirname "$f")" && echo "// fake package" > "$f"
             """)
         let tarball = dist.appendingPathComponent("\(Self.nodeVersion)/\(name).tar.gz")
         try Self.run("/usr/bin/tar", ["-czf", tarball.path, "-C", staging.path, name])
         let sha = wrongChecksum ? String(repeating: "0", count: 64) : try MacToolsetInstaller.sha256(of: tarball)
 
         let manifest = Toolset.Manifest(
-            runtimeID: "claude", node: .init(version: Self.nodeVersion, sha256: [:]),
-            package: "@agentclientprotocol/claude-agent-acp", packageVersion: "0.0.0-fake",
-            entry: "dist/index.js", minFreeBytes: 1024)
+            runtimeID: runtimeID, node: .init(version: Self.nodeVersion, sha256: [:]),
+            package: package, packageVersion: "0.0.0-fake",
+            entry: entry, minFreeBytes: 1024, forwardsArguments: runtimeID == "gemini")
         try JSONEncoder().encode(manifest).write(to: bundle.appendingPathComponent(Toolset.manifestFile))
         try Data(#"{"lockfileVersion":3,"packages":{}}"#.utf8).write(to: bundle.appendingPathComponent(Toolset.lockFile))
         try Data(#"{"private":true}"#.utf8).write(to: bundle.appendingPathComponent(Toolset.packageFile))

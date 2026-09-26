@@ -88,7 +88,31 @@ struct MacToolsetInstallerTests {
         facts.downloader = "curl"
         let script = ToolsetInstaller.installScript(toolset, facts)
         #expect(script.contains(#"npm ci --ignore-scripts --omit=dev --no-audit --no-fund --prefix "$P/lib""#))
-        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents (043): not npx."))
+        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents: not the npx on a PATH."))
+        #expect(script.contains(#"> "$P/bin/npx""#))
         #expect(script.contains(#"exec "$d/node/bin/node" "$d/lib/node_modules/@agentclientprotocol/claude-agent-acp/"#))
+    }
+
+    // MARK: A second toolset (046)
+
+    @Test func geminisToolsetInstallsBesideClaudesWithItsOwnShim() async throws {
+        let fake = try FakeMacToolset(runtimeID: "gemini")
+        defer { fake.remove() }
+        let shim = try await fake.installer().install()
+
+        let current = fake.tools.appendingPathComponent("gemini/current")
+        #expect(shim.hasSuffix("/bin/gemini"))
+        #expect(FileManager.default.isExecutableFile(atPath: shim))
+        #expect(try String(contentsOfFile: shim, encoding: .utf8).contains(#"bundle/gemini.js" "$@""#))
+        #expect(!FileManager.default.fileExists(atPath: fake.tools.appendingPathComponent("claude").path))
+
+        var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
+        discovery.macToolsHome = fake.tools.path
+        #expect(discovery.locate(RuntimeCatalog.gemini) == .available(path: "\(current.path)/bin/gemini", supportsResume: false))
+    }
+
+    @Test func aFailureNamesTheRuntimeBeingInstalled() {
+        #expect(MacToolsetInstaller.Failure.noSpace.sentence(for: "Gemini") == "There isn’t room on this Mac to install Gemini.")
+        #expect(MacToolsetInstaller.Failure.npm("E500").sentence(for: "Claude") == "Installing Claude failed: E500")
     }
 }

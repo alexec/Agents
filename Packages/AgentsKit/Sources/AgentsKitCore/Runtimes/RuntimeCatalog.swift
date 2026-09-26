@@ -16,6 +16,12 @@ import Foundation
 /// `LoginShellPath.fallbacks` already searches. Copilot's script rather than
 /// `npm install -g`, because it needs no Node of the person's and no write access to
 /// npm's global folder.
+///
+/// Gemini (046) is the one that is only ever the app's own copy: a pinned Gemini CLI on
+/// a pinned Node, installed from the set-up page like Claude's toolset, and never a
+/// `gemini` found on the PATH, because its ACP surface moves between releases. It speaks
+/// ACP itself with `--acp`. The version is `App/Resources/toolsets/gemini/manifest.json`'s
+/// (0.61.0 when this was written), and a test holds the two together.
 public enum RuntimeCatalog {
     public static let claude = Runtime(
         id: "claude",
@@ -49,7 +55,16 @@ public enum RuntimeCatalog {
         install: .script(url: URL(string: "https://cursor.com/install")!),
         installPage: URL(string: "https://cursor.com/docs/cli/installation")!)
 
-    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor]
+    public static let gemini = Runtime(
+        id: "gemini",
+        name: "Gemini",
+        executable: "gemini",
+        arguments: ["--acp"],
+        install: .toolset(runtimeID: "gemini"),
+        installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
+        usesAppCopyOnly: true)
+
+    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, gemini]
 
     public static func runtime(id: String) -> Runtime? {
         builtIn.first { $0.id == id }

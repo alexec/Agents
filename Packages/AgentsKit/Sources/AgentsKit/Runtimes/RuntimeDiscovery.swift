@@ -33,6 +33,13 @@ public struct RuntimeDiscovery: Sendable {
                 return .available(path: shim, supportsResume: false)
             }
         }
+        // Never the person's own copy (046): straight to the app's, or missing.
+        if runtime.usesAppCopyOnly {
+            if let shim = appToolset(for: runtime) {
+                return .available(path: shim, supportsResume: false)
+            }
+            return .missing(lookedIn: macToolsHome.map { ["\($0)/\(runtime.id)/current/bin"] } ?? [])
+        }
         if runtime.executable.contains("/") {
             return fileExists(runtime.executable)
                 ? .available(path: runtime.executable, supportsResume: false)

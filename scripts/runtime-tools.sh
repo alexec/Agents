@@ -56,15 +56,18 @@ video_gen = false
 """
 
 GEMINI_POLICY = """# Written by the Agents app. Do not edit: rebuilt on every launch.
-[[rule]]
-toolName = ["invoke_agent"]
-decision = "deny"
-priority = 900
 
 [[rule]]
 toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
 decision = "deny"
-priority = 900
+priority = 999
+denyMessage = "Use `manage_workflows` for anything that has to happen on its own."
+
+[[rule]]
+toolName = ["invoke_agent"]
+decision = "deny"
+priority = 999
+denyMessage = "This app starts and stops agents; ask me rather than starting one."
 """
 
 POLICIES = {

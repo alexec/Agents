@@ -1064,10 +1064,10 @@ public struct ProcessSessionLauncher: SessionLauncher {
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
-        let environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LentEnvironment.applied(to: LoginShellPath.environment()))
+        let files = RuntimePolicyFiles(locations: locations)
+        let environment = files.environment(for: policy, onto: LentEnvironment.applied(to: LoginShellPath.environment()))
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
-                                     arguments: runtime.arguments + policy.launchArguments,
+                                     arguments: runtime.arguments + policy.launchArguments + files.arguments(for: policy),
                                      cwd: cwd,
                                      environment: environment,
                                      capabilities: .app)

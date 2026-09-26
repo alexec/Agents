@@ -369,7 +369,7 @@ public actor ACPSession {
         let raw = decoded?.stopReason
         return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
                           rawStopReason: raw,
-                          usage: Self.turnUsage(in: result["usage"]))
+                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]))
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -378,6 +378,17 @@ public actor ACPSession {
     private static func turnUsage(in value: JSONValue?) -> TurnUsage? {
         guard let value, let usage = try? value.decode(TurnUsage.self) else { return nil }
         return usage
+    }
+
+    /// Gemini's way (046, R7): no `usage`, but `_meta.quota.token_count` with its input and
+    /// output tokens on every ending. Tokens only; Gemini names no cost, so none is made up.
+    static func quotaUsage(in quota: JSONValue?) -> TurnUsage? {
+        guard let count = quota?["token_count"],
+              let input = count["input_tokens"]?.intValue,
+              let output = count["output_tokens"]?.intValue else { return nil }
+        // A slash command Gemini handled itself reports zeros: nothing was consumed.
+        guard input + output > 0 else { return nil }
+        return TurnUsage(totalTokens: input + output, inputTokens: input, outputTokens: output)
     }
 
     /// A notification: the turn's own reply comes back as `cancelled` once the runtime

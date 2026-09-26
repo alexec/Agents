@@ -22,23 +22,23 @@ Rebuilt before every launch from `ToolPolicyCatalog.gemini.removed`; never read 
 
 ```toml
 # Written by the Agents app. Do not edit: rebuilt on every launch.
+
+[[rule]]
+toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
+decision = "deny"
+priority = 999
+denyMessage = "<RemitCategory.standingArrangements.instead>"
+
 [[rule]]
 toolName = ["invoke_agent"]
 decision = "deny"
-priority = 900
+priority = 999
 denyMessage = "<RemitCategory.agents.instead>"
-
-[[rule]]
-toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task",
-            "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
-decision = "deny"
-priority = 900
-denyMessage = "<RemitCategory.standingArrangements.instead>"
 ```
 
-One rule per category, so each refusal names the app's own tool. Priority is high so a
-person's own `allow` rule for the same tool does not win inside the app's agents; it has no
-effect outside them. (Exact priority band confirmed in the spike against Gemini's policy docs.)
+One rule per category, so each refusal names the app's own tool. Priority 999 is the top of the band Gemini's loader allows (0–999; it adds the file's tier, so
+1000 would jump tiers and is refused). Which tier `--policy` files land in, and so whether a
+person's own `allow` could still win, is confirmed in the spike.
 
 ## On a server
 
