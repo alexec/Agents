@@ -44,16 +44,21 @@ The phone reaches the Mac through a small helper, `agents-bridge`, that you star
 yourself and stop when you are done. In Xcode, choose the **agents-bridge** scheme with
 **My Mac** as the destination, and choose **Product ▸ Run**.
 
-!!! warning "Anyone on this network can reach it"
+You should see the phone say **Pair with your Mac**.
 
-    While the helper runs, a device on the same network can see and drive your agents
-    without asking. Run it on a network you trust, and stop it (**Product ▸ Stop**) when
-    you have finished.
+## 3. Pair the phone
 
-You should see the phone stop searching and show **Projects**, with the project you made
-in the first tutorial.
+Only a device you have paired can reach the Mac, and you pair it once, by scanning a code.
 
-## 3. Find your first agent
+1. On your Mac, open **Agents ▸ Settings ▸ Devices** and choose **Pair a Device…**. A code
+   appears, good for five minutes.
+2. On your phone, tap **Scan the Code** and point the camera at it. The first time, the
+   phone asks to use the camera; allow it.
+
+You should see the Mac say your phone **is paired**, and the phone show **Projects**, with
+the project you made in the first tutorial.
+
+## 4. Find your first agent
 
 Tap your project.
 
@@ -67,7 +72,7 @@ agent's explanation, and the fix it suggests you commit next.
 
 ![The finished conversation on the phone](images/follow-from-iphone-02.png){ width="300" }
 
-## 4. Start an agent from the phone
+## 5. Start an agent from the phone
 
 1. Go back to the project and tap **+** at the top right, for a new agent.
 2. Leave **Runtime** as it is. It is the runtime your Mac has set up.
@@ -84,7 +89,7 @@ agent's explanation, and the fix it suggests you commit next.
 You should see the new agent appear under **Working**, and its conversation fill in as it
 reads the code.
 
-## 5. Watch it finish, and answer it if it asks
+## 6. Watch it finish, and answer it if it asks
 
 Whether the agent stops to ask before it changes a file depends on **Mode** on the form.
 With **Auto**, as in the picture above, Claude goes ahead with changes inside the project
@@ -96,7 +101,7 @@ to say next. On the Mac, the same agent shows the same conversation.
 
 ![The second agent's finished conversation on the phone](images/follow-from-iphone-04.png){ width="300" }
 
-## 6. Take it with you
+## 7. Take it with you
 
 Leave your Mac's Wi‑Fi: turn Wi‑Fi off on the phone, or walk out of range, and keep the
 conversation open. Within a few seconds a line appears at the top:
@@ -108,8 +113,8 @@ at home, and a question the agent asks can be answered from here. Tap **Terminal
 and it says **Needs the same network as your Mac**; it opens by itself when you are back.
 Turn Wi‑Fi on again and the line goes.
 
-This works because the phone paired with your Mac the first time it connected at home, in
-step 3. Your Mac needs to stay awake with the bridge running.
+This works because the phone paired with your Mac in step 3, which also gave it what it
+needs to reach the Mac through iCloud. Your Mac needs to stay awake with the bridge running.
 
 ## Where next
 

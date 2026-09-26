@@ -15,7 +15,7 @@ struct CredentialKindTests {
         #expect(key.reveal() == "sk-ant-api03-abcdefghijkl-9x9z")
     }
 
-    @Test(arguments: ["", "hello", "sk-ant-", "sk-ant-oat", "sk-proj-abcdefgh", "ghp_abcdefghijk"])
+    @Test(arguments: ["", "hello", "sk-ant-", "sk-ant-oat", "sk-ant-xyz-abcdefghijkl", "sk-12", "ghp_abcdefghijk"])
     func anythingElseIsRefused(_ text: String) {
         #expect(Secret(text) == nil)
     }
@@ -30,5 +30,63 @@ struct CredentialKindTests {
         var dumped = ""
         dump(secret, to: &dumped)
         #expect(!dumped.contains("SECRET"))
+    }
+}
+
+/// Gemini's key (046): two shapes, one kind, never printed.
+@Suite("A Gemini key")
+struct GeminiKeyKindTests {
+    @Test func bothShapesAreGeminiKeys() throws {
+        for text in ["AIzaSyFAKEFAKEFAKEFAKEFAKEFAKEFAKE1234", "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"] {
+            let secret = try #require(Secret(text))
+            #expect(secret.kind == .geminiAPIKey)
+            #expect(secret.kind.runtimeID == "gemini")
+            #expect(secret.kind.environmentVariable == "GEMINI_API_KEY")
+            #expect(secret.kind.isLentOnTheMac)
+            #expect(!"\(secret)".contains(text.dropLast(4)))
+            #expect(secret.mask.hasPrefix("key …"))
+        }
+    }
+
+    @Test func tooShortOrOtherwiseIsNotOne() {
+        #expect(Secret("AIza12") == nil)
+        #expect(Secret("AQ.123") == nil)
+        #expect(Secret("ghp_something-long-enough") == nil)
+    }
+
+    @Test func claudesKindsAreUnchanged() {
+        #expect(CredentialKind.kinds(for: "claude") == [.oauthToken, .apiKey])
+        #expect(!CredentialKind.oauthToken.isLentOnTheMac && !CredentialKind.apiKey.isLentOnTheMac)
+        #expect(CredentialKind.allVariables == ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"])
+        #expect(CredentialKind.variables(for: "gemini") == ["GEMINI_API_KEY", "GOOGLE_API_KEY"])
+    }
+}
+
+/// Codex's OpenAI key (047): for servers only, never printed, and never mistaken for Claude's.
+@Suite("An OpenAI key")
+struct OpenAIKeyKindTests {
+    @Test func projectAndOlderKeysAreOpenAIKeys() throws {
+        for text in ["sk-proj-FAKEFAKEFAKEFAKEFAKEFAKE1234", "sk-FAKEFAKEFAKEFAKEFAKE5678"] {
+            let secret = try #require(Secret(text))
+            #expect(secret.kind == .openAIAPIKey)
+            #expect(secret.kind.runtimeID == "codex")
+            #expect(secret.kind.environmentVariable == "CODEX_API_KEY")
+            #expect(!secret.kind.isLentOnTheMac, "Codex on the Mac uses ChatGPT")
+            #expect(!"\(secret)".contains(text.dropLast(4)))
+            #expect(secret.mask.hasPrefix("key …"))
+        }
+    }
+
+    @Test func claudesKeysStayClaudes() throws {
+        #expect(try #require(Secret("sk-ant-api03-abcdefghijkl-9x9z")).kind == .apiKey)
+        #expect(try #require(Secret("sk-ant-oat01-abcdefghijkl-a3f9")).kind == .oauthToken)
+    }
+
+    @Test func settingsSaysWhatItIs() {
+        #expect(CredentialKind.kinds(for: "codex") == [.openAIAPIKey])
+        #expect(CredentialKind.variables(for: "codex") == ["CODEX_API_KEY", "OPENAI_API_KEY"])
+        #expect(CredentialKind.noun(for: "codex") == "key")
+        #expect(CredentialKind.whereToGet(for: "codex").contains("platform.openai.com"))
+        #expect(CredentialKind.pasteRefusal(for: "codex").contains("OpenAI"))
     }
 }

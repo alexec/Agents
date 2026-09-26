@@ -29,8 +29,9 @@ final class HostSet {
     /// Whether a server should get Claude as it connects: the window has a credential it
     /// may lend there (043, FR-002). Set by `AppModel`, which knows the credentials.
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
-    /// Whether to install a runtime's toolset as a server connects (047): the window has a
-    /// key for it in Settings, and the server takes lent keys. Claude's is `claudeWanted`.
+    /// Every other runtime the app installs, on each server, by runtime id (046: Gemini).
+    private(set) var toolsets: [HostID: [String: ServerConnection.Claude]] = [:]
+    /// The same question as `claudeWanted`, for the others (046).
     @ObservationIgnored var toolsetWanted: (HostID, String) -> Bool = { _, _ in false }
     /// What a server may be lent from this window, and who answers when it asks (043).
     @ObservationIgnored var offerFor: (HostID) -> DaemonAPI.CredentialsOffer? = { _ in nil }
@@ -219,7 +220,7 @@ final class HostSet {
 
     static func connection(for host: ServerHost, locations: StoreLocations,
                            wantsClaude: @escaping @Sendable () async -> Bool,
-                           wants: (@Sendable (String) async -> Bool)? = nil,
+                           wants: @escaping @Sendable (String) async -> Bool = { _ in false },
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                            lender: DaemonClient.CredentialLender? = nil,
                            relay: @escaping @Sendable () async -> ServerConnection.RelayGrant? = { nil }) -> ServerConnection {
@@ -229,15 +230,17 @@ final class HostSet {
                          binary: { await ServerBinaries.binary(for: $0) },
                          toolset: { ServerBinaries.claudeToolset },
                          wantsClaude: wantsClaude,
-                         toolsets: { ServerBinaries.toolsets },
-                         wants: wants ?? { runtimeID in runtimeID == RuntimeCatalog.claude.id ? await wantsClaude() : false },
-                         offer: offer, lender: lender, relay: relay)
+                         otherToolsets: { ServerBinaries.otherToolsets },
+                         wants: wants, offer: offer, lender: lender, relay: relay)
     }
 
     /// A new connection for a host, asking this set what to offer and who lends (043).
     func newConnection(for host: ServerHost) -> ServerConnection {
         let id = host.id
-        return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id), wants: wants(id),
+        return Self.connection(for: host, locations: locations, wantsClaude: wantsClaude(id),
+                               wants: { [weak self] runtimeID in
+                                   await MainActor.run { self?.toolsetWanted(id, runtimeID) ?? false }
+                               },
                                offer: { [weak self] in await MainActor.run { self?.offerFor(id) } },
                                lender: lenderFor(id),
                                relay: relayFor(id))
@@ -267,16 +270,6 @@ final class HostSet {
         { [weak self] in await MainActor.run { self?.claudeWanted(id) ?? false } }
     }
 
-    /// Per runtime (047): Claude's is `claudeWanted`, every other toolset's `toolsetWanted`.
-    func wants(_ id: HostID) -> @Sendable (String) async -> Bool {
-        { [weak self] runtimeID in
-            await MainActor.run {
-                guard let self else { return false }
-                return runtimeID == RuntimeCatalog.claude.id ? self.claudeWanted(id) : self.toolsetWanted(id, runtimeID)
-            }
-        }
-    }
-
     private func makeConnection(_ host: ServerHost) -> ServerConnection {
         let connection = newConnection(for: host)
         follow(host.id, connection)
@@ -290,6 +283,9 @@ final class HostSet {
             }
             await connection.setOnClaude { [weak self] next in
                 await self?.claudeMoved(id, to: next)
+            }
+            await connection.setOnToolset { [weak self] runtimeID, next in
+                await self?.toolsetMoved(id, runtimeID, to: next)
             }
             let now = await connection.claude
             claudeMoved(id, to: now)
@@ -312,6 +308,50 @@ final class HostSet {
             host.facts?.toolsetID = toolset
             update(host)
         }
+    }
+
+    /// Another runtime's toolset moved on a server (046). Claude's goes through
+    /// `claudeMoved`, which 043's lines and sheets read.
+    private func toolsetMoved(_ id: HostID, _ runtimeID: String, to next: ServerConnection.Claude) {
+        guard runtimeID != RuntimeCatalog.claude.id else { return }
+        toolsets[id, default: [:]][runtimeID] = next
+        if case .updateWaiting = next {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard let self, case .updateWaiting? = self.toolsets[id]?[runtimeID] else { return }
+                await self.connections[id]?.install(runtimeID: runtimeID)
+            }
+        }
+        log("\(hosts[id]?.label ?? id.rawValue): \(runtimeID) \(next)")
+        if case .ready(let toolset) = next, var host = hosts[id], host.facts?.toolsetID(for: runtimeID) != toolset {
+            host.facts?.toolsetIDs[runtimeID] = toolset
+            update(host)
+        }
+    }
+
+    /// How another runtime stands on a server, in one line for Settings (046), shaped like
+    /// Claude's.
+    func toolsetLine(_ id: HostID, runtimeID: String, hasCredential: Bool) -> String {
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        guard let host = hosts[id], let facts = host.facts else { return "\(name): not checked yet" }
+        switch toolsets[id]?[runtimeID] {
+        case .installing: return "\(name): installing…"
+        case .updateWaiting: return "\(name): update waiting for a turn to end"
+        case .failed(let problem): return problem.sentence(name: host.sshName, label: host.label)
+        default: break
+        }
+        let noun = CredentialKind.noun(for: runtimeID)
+        let signIn = host.ownSignInOnly ? " · its own sign-in only"
+            : hasCredential ? " · signs in with the \(noun) in Settings"
+            : facts.hasOwnSignIn(runtimeID) ? " · its own sign-in" : " · needs a \(noun)"
+        if facts.toolsetID(for: runtimeID) != nil { return "\(name): ready (installed by Agents)" + signIn }
+        if !facts.canInstallToolsets {
+            return "\(name) can’t be installed here: it uses \(facts.libc.display)."
+        }
+        if facts.downloader == nil { return "\(name) can’t be installed here: it has neither curl nor wget." }
+        return hasCredential && !host.ownSignInOnly
+            ? "\(name): installed when \(host.label) next connects"
+            : "\(name): installed when there is a \(noun) for it in Settings"
     }
 
     // MARK: A server that comes back empty (043 US3)
@@ -473,10 +513,14 @@ enum ServerBinaries {
         return ServerBinary(file: file, sha256: sha.trimmingCharacters(in: .whitespacesAndNewlines), version: version)
     }
 
-    /// Every pinned toolset the app carries, from `Resources/toolsets/` (043, 047). Read once.
-    nonisolated static let toolsets: [Toolset] = {
+    /// Every other pinned toolset a server may be given, for the runtimes Settings takes a
+    /// credential for (046: Gemini, 047: Codex).
+    nonisolated static let otherToolsets: [Toolset] = {
         guard let folder = Bundle.main.url(forResource: "toolsets", withExtension: nil) else { return [] }
-        return Toolset.loadAll(from: folder).values.sorted { $0.manifest.runtimeID < $1.manifest.runtimeID }
+        let lendable = Set(CredentialKind.allCases.map(\.runtimeID))
+        return Toolset.loadAll(from: folder).values
+            .filter { $0.manifest.runtimeID != RuntimeCatalog.claude.id && lendable.contains($0.manifest.runtimeID) }
+            .sorted { $0.manifest.runtimeID < $1.manifest.runtimeID }
     }()
 
     /// Claude's pinned toolset, from `Resources/toolsets/claude` (043). Read once.

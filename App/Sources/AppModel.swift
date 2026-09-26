@@ -452,8 +452,20 @@ final class AppModel {
         devices.sort { $0.announcedAt < $1.announcedAt }
     }
 
-    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac from away
-    /// until it is next on the same network, where it pairs again by itself.
+    /// Settings ▸ Devices ▸ Pair a Device (security review, Phase 3): a code for the
+    /// phone to scan, good for five minutes or one device.
+    func startPairing() async throws -> DaemonAPI.PairingCode {
+        try await client.call(DaemonAPI.Method.devicesStartPairing, Optional<String>.none,
+                              returning: DaemonAPI.PairingCode.self)
+    }
+
+    /// The pairing sheet closed: the code it showed stops working at once.
+    func stopPairing() async {
+        _ = try? await client.call(DaemonAPI.Method.devicesStopPairing, Optional<String>.none)
+    }
+
+    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac, at home
+    /// and away, until it is paired again with a new code.
     func forgetDevice(_ id: UUID) async {
         do {
             try await client.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
@@ -900,6 +912,10 @@ final class AppModel {
             try await client.connect()
             isConnected = true
             problem = nil
+            await client.setCredentialLender { [weak self] wanted in
+                await self?.answerMacCredentialWanted(wanted) ?? false
+            }
+            await lendToThisMac()
             listen()
             startPresence()
             presence?.connected()

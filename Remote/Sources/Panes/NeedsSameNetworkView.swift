@@ -32,30 +32,3 @@ struct NeedsSameNetworkView: View {
         .accessibilityElement(children: .combine)
     }
 }
-
-/// What a phone that has never been on the Mac's network shows away (046, look C): the
-/// one thing it has to do, and what doing it buys.
-struct PairAtHomeView: View {
-    private var device: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "phone" }
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "house")
-                // Decorative: a glyph above the words, not text, and hidden from VoiceOver.
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text("Open Agents once on your Mac's Wi-Fi")
-                .appText(.reading).fontWeight(.semibold)
-                .multilineTextAlignment(.center)
-            Text("After that, your \(device) reaches your Mac from anywhere, through your iCloud.")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(32)
-        .frame(maxWidth: 420)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-}

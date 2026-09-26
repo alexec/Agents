@@ -129,9 +129,18 @@ public enum GitWorktrees {
     /// Uncommitted changes outside the app's own `.agents` folder (038). A workflow just
     /// written there, the babysitter included, is not somebody's work in progress, and
     /// counting it would refuse every pull request checked out in the project folder.
+    ///
+    /// The rest of the dotagents layout (`DotAgents`) is left out the same way while it is
+    /// untracked, one file at a time so a real file beside it in `.claude` still counts.
+    /// Once committed, an edit to it is work like any other. `--short` rather than
+    /// `--porcelain` because only it gives paths from `folder`, where the layout is.
     public static func workInProgressCount(in folder: URL) async throws -> Int {
-        try await git(["status", "--porcelain", "--", ".", ":(exclude).agents"], in: folder)
-            .split(separator: "\n").count
+        let layout = Set(DotAgents.untrackedLayout.map { "?? \($0)" })
+        return try await git(["-c", "color.status=false", "status", "--short", "--untracked-files=all",
+                              "--", ".", ":(exclude).agents"], in: folder)
+            .split(separator: "\n")
+            .filter { !layout.contains(String($0)) }
+            .count
     }
 
     /// Whether every commit on `branch` is already in `base`.

@@ -107,6 +107,12 @@ final class RemoteModel {
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         away = link as? AwayLink
+        // The oldest of a long conversation go from the page as it runs on; what they
+        // say the agent touched is kept with the rest of the history read for Files.
+        work.onTrimmed = { [weak self] dropped in
+            guard let self, let agentID = work.watching else { return }
+            for entry in dropped { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
+        }
         guard let away else { return }
         self.link = away.chooser.link
         away.onTrouble { [weak self] trouble in
@@ -122,9 +128,83 @@ final class RemoteModel {
     /// the terminal, the live page and files behind "needs the same network".
     var isAway: Bool { link == .relayed }
 
-    /// The phone is away with nothing to reach the Mac with: it has not been on the
-    /// Mac's network since it was installed, or it was forgotten (FR-009).
-    var needsPairingAtHome: Bool { away != nil && !hasMacKey && !isConnected }
+    /// Nothing to reach the Mac with, near or far: never paired, or forgotten by the
+    /// Mac (FR-009). Since the security review's Phase 3 the direct link is locked with
+    /// the Mac's key too, so this is true at home as well as away.
+    var needsPairing: Bool { away != nil && !hasMacKey && !isConnected }
+
+    /// Where a pairing started from the scanner has got to.
+    enum Pairing: Equatable {
+        case idle
+        case pairing
+        case paired
+        case failed(String)
+    }
+
+    private(set) var pairing: Pairing = .idle
+
+    /// Pair with the Mac whose code was just scanned (security review, Phase 3).
+    ///
+    /// The code carries the Mac's key and a one-time secret. The secret locks a
+    /// connection that may do one thing, announce this device, and the Mac's key is kept
+    /// from the code, never from the reply: a Mac that cannot finish the handshake was
+    /// not the one on the screen.
+    func pair(scanned text: String) async {
+        guard let code = DaemonAPI.PairingCode(text: text) else {
+            pairing = .failed("That isn't a pairing code from Agents on your Mac.")
+            return
+        }
+        guard let key else {
+            pairing = .failed("This \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") has no key to pair with.")
+            return
+        }
+        pairing = .pairing
+        do {
+            let link = NetworkLink(howLongToLook: .seconds(10), name: code.name) {
+                (LinkKey.pairingIdentity(code.secret), LinkKey.pairing(code.secret))
+            }
+            let transport = try await link.transport()
+            let connection = JSONRPCConnection(transport: transport)
+            await connection.start()
+            let announced = await Result {
+                try await connection.call(
+                    DaemonAPI.Method.devicesAnnounce,
+                    try JSONValue.encoding(DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
+                                                                        name: UIDevice.current.name, kind: kind)))
+            }
+            await connection.close()
+            let reply = try announced.get().decode(DaemonAPI.AnnounceReply.self)
+            if let told = reply.macKey, told != code.macKey {
+                pairing = .failed("That Mac answered with a different key from its code, so it wasn't paired.")
+                return
+            }
+            AwayLink.keepMacKey(code.macKey)
+            AwayLink.keepMacName(code.name)
+            hasMacKey = true
+            thisDevice = reply.device
+            pairing = .paired
+            note("pairing: paired with \(code.name)")
+            await reconnectNow()
+        } catch NetworkLink.Failure.noMacOnThisNetwork {
+            pairing = .failed("Couldn't find \(code.name) on this Wi-Fi. Pair on the same network as your Mac.")
+        } catch let error as JSONRPCError {
+            pairing = .failed(error.message)
+        } catch {
+            note("pairing: failed: \(error)")
+            pairing = .failed("Your Mac didn't take that code. It may have run out: show a new one and scan again.")
+        }
+    }
+
+    func forgetPairingOutcome() {
+        pairing = .idle
+    }
+
+    /// Start looking for the Mac again now, not at the end of a backed-off wait.
+    private func reconnectNow() async {
+        reconnecting?.cancel()
+        reconnecting = nil
+        await connect()
+    }
 
     private func heard(_ trouble: RelayTrouble) {
         switch trouble {
@@ -671,7 +751,6 @@ final class RemoteModel {
         touchedHistoryAsked.insert(agentID)
         var before: Int? = selection == agentID ? work.firstEntryIndex : nil
         if before == 0 { return }
-        var touched = TouchedPaths()
         while true {
             guard let page = try? await client.call(
                 DaemonAPI.Method.agentsTranscript,
@@ -681,11 +760,12 @@ final class RemoteModel {
                 touchedHistoryAsked.remove(agentID)
                 break
             }
-            for entry in page.entries { touched.absorb(entry) }
+            // Added to what is there rather than replacing it: entries trimmed off the
+            // page while this was reading are already in it, and came after these.
+            for entry in page.entries { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
             guard page.hasMoreBefore else { break }
             before = page.firstIndex
         }
-        touchedEarlier[agentID] = touched
     }
 
     /// Something is being typed on this device: the prompt, a passage on a page, the
@@ -937,10 +1017,9 @@ final class RemoteModel {
         }
     }
 
-    /// `devices/announce`: who this is and its public key, once per connection — which
-    /// is all pairing is. A Mac that knows this id under another key, or one too old to
-    /// be asked, leaves `thisDevice` nil and the LAN link works as it always did; what
-    /// announcing buys is being reached when the LAN cannot.
+    /// `devices/announce`: who this is, once per connection, so the Mac's record of it
+    /// keeps its name and when it was last seen. Pairing is the scanned code
+    /// (`pair(scanned:)`); on a paired device's own link this only updates the record.
     private func announce() async {
         guard let key else { return }
         do {
@@ -950,12 +1029,10 @@ final class RemoteModel {
                                              name: UIDevice.current.name, kind: kind),
                 returning: DaemonAPI.AnnounceReply.self)
             thisDevice = reply.device
-            // The Mac's relay key, handed over only here, on the direct link: this is the
-            // pairing that lets the phone reach it from anywhere (046, D1). A Mac whose
-            // bridge has not registered one yet says nothing, and the key kept stays.
-            if let macKey = reply.macKey {
-                AwayLink.keepMacKey(macKey)
-                hasMacKey = true
+            // The Mac's key comes from the pairing code and nowhere else (security
+            // review, Phase 3). One that disagrees is only said, never kept.
+            if let macKey = reply.macKey, macKey != AwayLink.macKey {
+                note("pairing: the Mac answered with a key other than the one paired with")
             }
             note("pairing: announced as \(deviceID)")
         } catch {

@@ -2,7 +2,9 @@
 // agentsd has or needs (servers install through `ToolsetInstaller`).
 #if canImport(Security)
 import AgentsKitCore
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
 import Foundation
 
 /// A runtime the app installs itself (048): the server toolset of 043, installed on this Mac.
@@ -155,6 +157,7 @@ public struct MacToolsetInstaller: Sendable {
     }
 
     private func download(_ url: URL, to destination: URL) async throws {
+        #if canImport(Darwin)
         let fetched: URL
         let response: URLResponse
         do {
@@ -173,6 +176,11 @@ public struct MacToolsetInstaller: Sendable {
             throw Failure.download("nodejs.org answered \(http.statusCode) for \(url.lastPathComponent)")
         }
         try FileManager.default.moveItem(at: fetched, to: destination)
+        #else
+        // A server's agentsd has no network code of its own (043); its toolsets come by
+        // 043's shell script, which downloads with the server's curl or wget.
+        throw Failure.download("this build does not download")
+        #endif
     }
 
     /// `ln -sfn <id> current`, by writing the new link beside and renaming it over, so
@@ -212,6 +220,7 @@ public struct MacToolsetInstaller: Sendable {
     }
 
     static func sha256(of file: URL) throws -> String {
+        #if canImport(CryptoKit)
         let handle = try FileHandle(forReadingFrom: file)
         defer { try? handle.close() }
         var hasher = SHA256()
@@ -219,6 +228,11 @@ public struct MacToolsetInstaller: Sendable {
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        #else
+        // A server's agentsd compiles this but never installs a Mac toolset: 043's shell
+        // script does a server's, with `sha256sum`.
+        throw Failure.other("this build cannot check a download")
+        #endif
     }
 
     /// The same reading of npm's output as `ToolsetInstaller.problem`'s exit 23.

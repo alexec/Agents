@@ -103,4 +103,36 @@ struct ProbeParseTests {
         #expect(facts.libc == .unknown)
         #expect(facts.toolsetID == nil)
     }
+
+    // MARK: Every toolset, and Gemini's own key (046)
+
+    @Test func eachToolsetAndGeminisOwnKeyAreRead() throws {
+        let text = Self.bare.replacingOccurrences(of: "toolset:none", with: """
+            toolset:none
+            toolset.claude:none
+            toolset.codex:none
+            toolset.gemini:ab59d3a4f9e41eb5
+            """).replacingOccurrences(of: "npx:no", with: "npx:no\nsignin.gemini:env")
+        let facts = try ServerInstaller.parseProbe(text)
+        #expect(facts.toolsetID(for: "gemini") == "ab59d3a4f9e41eb5")
+        #expect(facts.toolsetID(for: "claude") == nil)
+        #expect(facts.toolsetID == nil)
+        #expect(facts.hasOwnSignIn("gemini"))
+        #expect(!facts.hasOwnSignIn("claude"))
+    }
+
+    @Test func theProbeAsksAboutEveryToolsetRuntime() {
+        #expect(ServerInstaller.toolsetRuntimes.split(separator: " ").contains("gemini"))
+        #expect(ServerInstaller.probeScript.contains("signin.gemini"))
+        #expect(ServerInstaller.toolsetRuntimes.split(separator: " ").contains("codex"))
+        #expect(ServerInstaller.probeScript.contains("signin.codex"))
+    }
+
+    /// Codex's own sign-in on a server is the file its own `codex login` saved (047).
+    @Test func codexsOwnSignInIsItsSavedFile() throws {
+        let with = try ServerInstaller.parseProbe(Self.bare + "\nsignin.codex:file")
+        #expect(with.hasOwnSignIn("codex"))
+        let without = try ServerInstaller.parseProbe(Self.bare + "\nsignin.codex:none")
+        #expect(!without.hasOwnSignIn("codex"))
+    }
 }

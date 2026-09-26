@@ -21,8 +21,14 @@ final class AwayLink: @unchecked Sendable {
 
     init(device: UUID, key: DeviceKey?) {
         let box = Box()
+        // The direct link is locked with what this device's key and the Mac's share
+        // (security review, Phase 3). No Mac key, no link: the phone pairs first.
+        let lock: NetworkLink.Lock = {
+            guard let key, let macKey = AwayLink.macKey else { throw RelayTrouble.notPaired }
+            return (LinkKey.deviceIdentity(device), try key.linkKey(with: macKey, device: device))
+        }
         chooser = LinkChooser(
-            direct: { try await NetworkLink(howLongToLook: .seconds(10)).transport() },
+            direct: { try await NetworkLink(howLongToLook: .seconds(10), name: AwayLink.macName, lock: lock).transport() },
             relay: {
                 guard let key, let macKey = AwayLink.macKey else { throw RelayTrouble.notPaired }
                 let transport = RelayTransport(channel: CloudKitRelayChannel(), device: device, key: key, macKey: macKey,
@@ -31,7 +37,7 @@ final class AwayLink: @unchecked Sendable {
                 try await transport.open()
                 return transport
             },
-            probe: { try await NetworkLink(howLongToLook: .seconds(3)).transport() })
+            probe: { try await NetworkLink(howLongToLook: .seconds(3), name: AwayLink.macName, lock: lock).transport() })
         box.link = self
     }
 
@@ -45,7 +51,8 @@ final class AwayLink: @unchecked Sendable {
         lock.withLock { relayed }?.poke()
     }
 
-    /// The Mac's relay key, as the last announce on the direct link handed it over.
+    /// The Mac's key, as the pairing code carried it. Never taken from anything the
+    /// network said: a Mac that could hand one over could be anybody's.
     static var macKey: Data? {
         DeviceKey.publicKey(account: macKeyAccount, accessGroup: DeviceKey.sharedAccessGroup)
     }
@@ -53,6 +60,16 @@ final class AwayLink: @unchecked Sendable {
     static func keepMacKey(_ key: Data?) {
         try? DeviceKey.keepPublicKey(key, account: macKeyAccount, accessGroup: DeviceKey.sharedAccessGroup)
     }
+
+    /// The Mac's name as the pairing code gave it, so Bonjour finds that Mac and no other.
+    /// Not a secret: it is what the Mac advertises to the whole network.
+    static var macName: String? { UserDefaults.standard.string(forKey: macNameKey) }
+
+    static func keepMacName(_ name: String?) {
+        UserDefaults.standard.set(name, forKey: macNameKey)
+    }
+
+    private static let macNameKey = "agents.pairedMacName"
 
     private func hold(_ transport: RelayTransport) {
         lock.withLock { relayed = transport }

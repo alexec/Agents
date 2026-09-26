@@ -41,12 +41,37 @@ asks.
 
 1. On this Mac, in Terminal, run `claude setup-token` and copy the token it prints. An API
    key from console.anthropic.com works too.
-2. Open **Settings ▸ Servers**. Under **Signing in on servers**, paste it into **Paste a
+2. Open **Settings ▸ Servers**. Under **Runtime credentials**, paste it into **Paste a
    Claude token** and click **Save**. After a moment it says **Works**.
 
    The token is kept in this Mac's Keychain and is never written on a server. Agents lends
    it to a server only while an agent runs there. Agents on this Mac keep using this Mac's
    own sign-in.
+
+### Give Gemini a key
+
+Gemini works the same way, with a Gemini API key instead of a token.
+
+1. Get a key at aistudio.google.com/apikey.
+2. Paste it under **Gemini** in **Settings ▸ Agents** or under **Runtime credentials** in
+   **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
+
+With a key saved, Agents installs Gemini on a server as it connects, and each server's
+entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent the same way
+as Claude's token and is never written on the server.
+
+### Codex: your ChatGPT sign-in, or a key
+
+If Codex on this Mac is signed in with ChatGPT, Codex on a server uses that sign-in with
+nothing to set up. Agents installs Codex on the server as it connects, and the server's
+Codex requests go back through this Mac, which adds your sign-in and sends them on to
+OpenAI. No token of yours is written on the server, and other accounts on the server cannot
+use it. This works only while the Mac is connected to the server.
+
+For Codex on a server when this Mac has no ChatGPT sign-in, paste an OpenAI API key
+(get one at platform.openai.com/api-keys) under **Codex** in **Runtime credentials** in
+**Settings ▸ Servers**. It says **Works** once OpenAI has checked it, and is lent the same
+way as Claude's token. Codex on this Mac always uses ChatGPT, not the key.
 
 ### Add the server
 
@@ -87,7 +112,7 @@ asks.
 
 If Claude is already signed in on the server and you would rather Agents did not lend it
 your token, open **Settings ▸ Servers**, find the server, and turn on **Use this server's
-own sign-in only**.
+own sign-in only**. That also stops Codex from using this Mac's ChatGPT sign-in there.
 
 ### When the server is offline
 

@@ -6,8 +6,8 @@ import Synchronization
 /// A project is its folder, which is why the folder is the identity and there is no id
 /// of our own to keep in step. Almost everything about a project is derived from the
 /// agents in it — the name, the activity, the counts — so the only things kept here are
-/// the two that cannot be: that it is archived, and that somebody added the folder
-/// before anything had run in it.
+/// the ones that cannot be: that it is archived, that somebody added the folder before
+/// anything had run in it, and that it has been given the dotagents layout.
 public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// Resolved and standardised, so one folder is one project however it was typed.
     public var folder: URL
@@ -15,6 +15,12 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     public var archivedAt: Date?
     /// When this record was made. Orders a project that has no agents to order it by.
     public var addedAt: Date
+    /// When it was given the dotagents layout. Once: after that the files are the
+    /// person's, and one they deleted is not put back.
+    public var laidOutAt: Date?
+    /// Which layout it was given (`DotAgents.version`). Nil with `laidOutAt` set is the
+    /// first, from before the layout had a version.
+    public var layoutVersion: Int?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -57,10 +63,12 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     private static let standardized = Mutex<[String: URL]>([:])
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
-                unknownFields: [String: JSONValue] = [:]) {
+                laidOutAt: Date? = nil, layoutVersion: Int? = nil, unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
+        self.laidOutAt = laidOutAt
+        self.layoutVersion = layoutVersion
         self.unknownFields = unknownFields
     }
 
@@ -69,6 +77,8 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         folder = Self.standardize(try c.decode(URL.self, forKey: .folder))
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
+        laidOutAt = try c.decodeIfPresent(Date.self, forKey: .laidOutAt)
+        layoutVersion = try c.decodeIfPresent(Int.self, forKey: .layoutVersion)
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -83,6 +93,8 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         try c.encode(folder, forKey: .folder)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
         try c.encode(addedAt, forKey: .addedAt)
+        try c.encodeIfPresent(laidOutAt, forKey: .laidOutAt)
+        try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -92,7 +104,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion
     }
 
     struct AnyKey: CodingKey {

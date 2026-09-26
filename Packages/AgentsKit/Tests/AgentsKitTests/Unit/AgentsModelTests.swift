@@ -428,6 +428,37 @@ struct AgentsModelTests {
         #expect(model.terminalOutput["t1"]?.hasSuffix("END") == true)
     }
 
+    /// Every agent's output reaches every window; what is kept of it is bounded as a
+    /// whole, the least recently written going first and the watched agent's last.
+    @Test func outputAcrossTerminalsIsBoundedOldestFirstWatchedLast() throws {
+        let model = AgentsModel()
+        let watched = UUID(), other = UUID()
+        model.watching = watched
+        func say(_ agent: UUID, _ terminal: String, _ chunk: String) throws {
+            model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                        try notification(DaemonAPI.TerminalOutputNotification(agentID: agent, terminalID: terminal,
+                                                                             chunk: chunk)))
+        }
+        // Each terminal is kept to its limit, so this many full ones fill the budget.
+        let full = String(repeating: "b", count: AgentsModel.terminalOutputLimit)
+        let fit = AgentsModel.terminalOutputBudget / AgentsModel.terminalOutputLimit
+        try say(watched, "mine", full)
+        for index in 1 ..< fit { try say(other, "o\(index)", full) }
+        #expect(model.terminalOutput.count == fit)
+        // One more over the budget: the oldest not on screen goes, not the older one that is.
+        try say(other, "last", full)
+        #expect(model.terminalOutput["o1"] == nil)
+        #expect(model.terminalOutput["o2"] != nil)
+        #expect(model.terminalOutput["mine"] != nil)
+        #expect(model.terminalOutput.values.reduce(0) { $0 + $1.utf8.count } <= AgentsModel.terminalOutputBudget)
+
+        // And many small ones stop at a count.
+        for index in 0 ..< AgentsModel.terminalsKept + 50 { try say(other, "s\(index)", "x") }
+        #expect(model.terminalOutput.count == AgentsModel.terminalsKept)
+        #expect(model.terminalOutput["mine"] != nil)
+        #expect(model.terminalOutput["s\(AgentsModel.terminalsKept + 49)"] == "x")
+    }
+
 }
 
 @MainActor
@@ -511,6 +542,131 @@ struct AgentsModelDisplayTests {
         model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [onPage]))
         try heard(onPage, by: model, for: id)
         #expect(model.entries.map(\.id) == [onPage.id])
+    }
+
+    // MARK: A page watched for hours
+
+    /// Entries as the daemon would have them on file, each its own row.
+    private func transcript(_ count: Int) -> [TranscriptEntry] {
+        (0..<count).map { TranscriptEntry(kind: .agentMessage(messageID: "m\($0)", text: "Line \($0)")) }
+    }
+
+    /// Open a chat on the last page of `file` and hear the rest of it live.
+    private func watch(_ file: [TranscriptEntry], pageFrom: Int, heardFrom: Int) throws -> AgentsModel {
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        model.replaceTranscript(with: TranscriptPage(
+            firstIndex: pageFrom, total: heardFrom, entries: Array(file[pageFrom..<heardFrom])))
+        for entry in file[heardFrom...] { try heard(entry, by: model, for: id) }
+        return model
+    }
+
+    /// The daemon's answer to `agents/transcript` with `before:`, out of `file`.
+    private func page(of file: [TranscriptEntry], before: Int) -> TranscriptPage {
+        let start = max(0, before - 200)
+        return TranscriptPage(firstIndex: start, total: file.count, entries: Array(file[start..<before]))
+    }
+
+    @Test func aFollowedPageKeepsOnlyTheNewestEntries() throws {
+        let file = transcript(5_000)
+        let followed = try watch(file, pageFrom: 0, heardFrom: 200)
+        #expect(followed.entries.count <= AgentsModel.entriesTrimmedAt)
+        #expect(followed.entries.count >= AgentsModel.entriesKept)
+        #expect(followed.entries.last?.id == file.last?.id)
+        #expect(followed.hasMoreBefore)
+        // What is held is the end of the file, in order, and it knows where it starts.
+        let start = followed.firstEntryIndex
+        #expect(followed.entries.map(\.id) == file[start...].map(\.id))
+        // The fold is what the held entries fold to, and nothing dropped is still known.
+        #expect(followed.transcriptItems == TranscriptEntry.display(followed.entries))
+    }
+
+    @Test func aTrimmedPagePagesBackToTheWholeConversation() throws {
+        let file = transcript(1_500)
+        let model = try watch(file, pageFrom: 300, heardFrom: 500)
+        #expect(model.firstEntryIndex > 0)
+        while model.hasMoreBefore {
+            model.isFollowingEnd = false
+            model.prepend(page(of: file, before: model.firstEntryIndex))
+        }
+        #expect(model.entries.map(\.id) == file.map(\.id))
+        #expect(model.transcriptItems == TranscriptEntry.display(file))
+    }
+
+    @Test func nothingGoesWhileTheReaderIsAwayFromTheEnd() throws {
+        let file = transcript(2_000)
+        let model = try watch(file, pageFrom: 0, heardFrom: 200)
+        let before = model.entries.count
+        model.isFollowingEnd = false
+        let top = model.transcriptItems.first?.id
+        let id = model.watching!
+        for index in 0..<500 {
+            try heard(TranscriptEntry(kind: .agentMessage(messageID: "new\(index)", text: "More")), by: model, for: id)
+        }
+        #expect(model.entries.count == before + 500)
+        #expect(model.transcriptItems.first?.id == top, "the row they were reading is still there")
+        // Back at the end, the next entry lets the backlog go.
+        model.isFollowingEnd = true
+        try heard(TranscriptEntry(kind: .agentMessage(messageID: "last", text: "Last")), by: model, for: id)
+        #expect(model.entries.count <= AgentsModel.entriesTrimmedAt)
+    }
+
+    @Test func theRowsLeftAreTheRowsTheyWere() throws {
+        // A long run of tool calls is one row. A trim leaves it whole or not at all,
+        // and every row it keeps has the id it had.
+        var file: [TranscriptEntry] = []
+        for turn in 0..<200 {
+            file.append(TranscriptEntry(kind: .agentMessage(messageID: "t\(turn)", text: "Turn \(turn)")))
+            for call in 0..<5 {
+                file.append(TranscriptEntry(kind: .toolCall(ToolCall(toolCallID: "c\(turn)-\(call)", title: "Read"))))
+            }
+        }
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        for entry in file { try heard(entry, by: model, for: id) }
+        let full = TranscriptEntry.display(file)
+        let kept = model.transcriptItems
+        #expect(model.hasMoreBefore)
+        #expect(kept.count >= AgentsModel.itemsKept)
+        #expect(Array(full.suffix(kept.count)) == kept)
+        #expect(model.entries.first.map { entry in kept.first?.id == entry.id } == true)
+    }
+
+    @Test func aPageOfFewRowsIsNotTrimmedBelowWhatFillsThePane() throws {
+        // Three thousand tool calls in one run are one row: nothing can go without
+        // taking the pane's only row with it.
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        try heard(TranscriptEntry(kind: .agentMessage(messageID: "a", text: "Starting")), by: model, for: id)
+        for call in 0..<3_000 {
+            try heard(TranscriptEntry(kind: .toolCall(ToolCall(toolCallID: "c\(call)", title: "Read"))),
+                      by: model, for: id)
+        }
+        #expect(model.entries.count == 3_001)
+        #expect(!model.hasMoreBefore)
+    }
+
+    @Test func whatIsTrimmedIsHandedOver() throws {
+        let file = transcript(1_000)
+        let model = AgentsModel()
+        let id = UUID()
+        model.watching = id
+        var handed: [TranscriptEntry] = []
+        model.onTrimmed = { handed += $0 }
+        for entry in file { try heard(entry, by: model, for: id) }
+        #expect((handed + model.entries).map(\.id) == file.map(\.id))
+    }
+
+    @Test func anEarlierPageOverlappingWhatIsHeldIsTakenOnce() {
+        let file = transcript(400)
+        let model = AgentsModel()
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 200, total: 400, entries: Array(file[200...])))
+        // The count was off by ten: the page asked for runs into what is held.
+        model.prepend(TranscriptPage(firstIndex: 10, total: 400, entries: Array(file[10..<210])))
+        #expect(model.entries.map(\.id) == file[10...].map(\.id))
     }
 
 }

@@ -19,7 +19,7 @@ public struct ToolsetInstaller: Sendable {
     /// Why this server cannot have the toolset, before anything is downloaded; nil when
     /// it can.
     public static func refusal(_ facts: ServerFacts, _ toolset: Toolset) -> HostProblem? {
-        guard facts.canInstallToolset else { return .unsupportedLibc(facts.libc.display) }
+        guard facts.canInstallToolsets else { return .unsupportedLibc(facts.libc.display) }
         guard facts.downloader != nil else { return .noDownloader }
         guard facts.freeBytes >= toolset.manifest.minFreeBytes else {
             return .diskFullForTools(needed: toolset.manifest.minFreeBytes, free: facts.freeBytes)
@@ -42,7 +42,7 @@ public struct ToolsetInstaller: Sendable {
 
     /// Whether a whole toolset with this id is already on the server, beside `current` or
     /// as it: an update installed earlier and still waiting to be swapped in.
-    public func isInstalled(_ id: String, runtimeID: String = "claude") async -> Bool {
+    public func isInstalled(_ id: String, runtimeID: String = RuntimeCatalog.claude.id) async -> Bool {
         let out = try? await ssh.run(ssh.runArguments(
             "[ -f \"$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))/\(id)/ok\" ]"))
         return out?.status == 0
@@ -50,7 +50,7 @@ public struct ToolsetInstaller: Sendable {
 
     /// Point `current` at an installed toolset. Last, and on its own, so an update can wait
     /// for a turn to end between installing and swapping.
-    public func swap(to id: String, runtimeID: String = "claude") async throws {
+    public func swap(to id: String, runtimeID: String = RuntimeCatalog.claude.id) async throws {
         try await check("""
             set -e; T="$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))"; \
             [ -f "$T/\(id)/ok" ]; ln -sfn \(ServerInstaller.quote(id)) "$T/current"
@@ -58,7 +58,7 @@ public struct ToolsetInstaller: Sendable {
     }
 
     /// Remove every toolset but this one. After a good start on it, never with the swap.
-    public func removeOthers(except id: String, runtimeID: String = "claude") async throws {
+    public func removeOthers(except id: String, runtimeID: String = RuntimeCatalog.claude.id) async throws {
         try await check("""
             T="$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))"; cd "$T" 2>/dev/null || exit 0; \
             for d in */ .part-*; do d=${d%/}; [ -e "$d" ] || continue; \

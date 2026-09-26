@@ -708,6 +708,8 @@ struct WorktreeStartTests {
 
         #expect(await core.agent(id)?.worktree == nil)
         #expect(launcher.launches.map { Project.standardize($0.cwd) } == [repo.project])
-        #expect(!FileManager.default.fileExists(atPath: repo.top.appending(path: ".agents").path))
+        // `.agents` itself is there — the start lays the project out (`DotAgents`) — but
+        // no worktree was made in it.
+        #expect(!FileManager.default.fileExists(atPath: repo.top.appending(path: WorktreeName.folder).path))
     }
 }

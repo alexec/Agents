@@ -3,11 +3,11 @@ import SwiftUI
 
 /// The devices that may be told when an agent needs somebody.
 ///
-/// A device pairs by opening Agents on this network, and there is nothing to approve
-/// here (Alex, 2026-09-21). The pane says, per FR-023, when a device has not let its own
-/// system show notifications, because otherwise it would appear to work and be chosen
-/// for silence. Since 046 a paired device can reach this Mac from anywhere, so each one
-/// can be forgotten: it stops being carried for until it is next on the same network.
+/// A device pairs by scanning the code this pane shows (security review, Phase 3, which
+/// replaced pairing by just opening Agents on this network). The pane says, per FR-023,
+/// when a device has not let its own system show notifications, because otherwise it
+/// would appear to work and be chosen for silence. A paired device can reach this Mac
+/// from anywhere, so each one can be forgotten: both of its links end at once.
 struct DevicesPane: View {
     @Environment(AppModel.self) private var model
 
@@ -15,13 +15,14 @@ struct DevicesPane: View {
         Form {
             Section {
                 if model.devices.isEmpty {
-                    Text("No device has paired. Open Agents on your iPhone or iPad while it is "
-                         + "on this network and it will appear here.")
+                    Text("No device has paired. Choose Pair a Device and scan the code with Agents "
+                         + "on your iPhone or iPad.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(model.devices) { device in
                     DeviceLine(device: device) { forgetting = device }
                 }
+                Button("Pair a Device…") { pairing = true }
             } header: {
                 Text("Devices")
             } footer: {
@@ -32,6 +33,7 @@ struct DevicesPane: View {
         }
         .paperForm()
         .task { await model.refreshDevices() }
+        .sheet(isPresented: $pairing) { PairDeviceSheet() }
         .confirmationDialog(forgetting.map { "Forget \($0.name)?" } ?? "",
                             isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
                             titleVisibility: .visible, presenting: forgetting) { device in
@@ -40,11 +42,12 @@ struct DevicesPane: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("It will stop reaching this Mac from away until it is next on the same network.")
+            Text("It stops reaching this Mac, at home and away, until you pair it again.")
         }
     }
 
     @State private var forgetting: Device?
+    @State private var pairing = false
 }
 
 private struct DeviceLine: View {

@@ -66,3 +66,40 @@ struct CredentialCheckTests {
     }
 }
 #endif
+
+/// Gemini's key is checked with Google, in a header (046, contracts/credentials.md).
+@Suite("Checking a Gemini key")
+struct GeminiCredentialCheckTests {
+    @Test func theKeyGoesInAHeaderAndNeverTheURL() throws {
+        let key = "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"
+        let request = CredentialCheck.request(for: try #require(Secret(key)))
+        #expect(request.url == CredentialCheck.geminiEndpoint)
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == key)
+        #expect(!(request.url?.absoluteString.contains(key) ?? true))
+        #expect(request.value(forHTTPHeaderField: "x-api-key") == nil)
+    }
+
+    @Test func googlesWordForAnUnknownKeyIsARefusal() {
+        let body = Data(#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"#.utf8)
+        #expect(CredentialCheck.isInvalidKey(body))
+        #expect(CredentialCheck.message(body) == "API key not valid. Please pass a valid API key.")
+    }
+}
+
+/// Codex's key is checked with OpenAI, as a bearer token (047).
+@Suite("Checking an OpenAI key")
+struct OpenAICredentialCheckTests {
+    @Test func theKeyGoesInTheAuthorizationHeader() throws {
+        let key = "sk-proj-FAKEFAKEFAKEFAKEFAKEFAKE1234"
+        let request = CredentialCheck.request(for: try #require(Secret(key)))
+        #expect(request.url == CredentialCheck.openAIEndpoint)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(key)")
+        #expect(!(request.url?.absoluteString.contains(key) ?? true))
+        #expect(request.value(forHTTPHeaderField: "x-api-key") == nil)
+    }
+
+    @Test func openAIsErrorSentenceIsRead() {
+        let body = Data(#"{"error":{"message":"Incorrect API key provided: sk-proj-****1234.","type":"invalid_request_error","code":"invalid_api_key"}}"#.utf8)
+        #expect(CredentialCheck.message(body) == "Incorrect API key provided: sk-proj-****1234.")
+    }
+}

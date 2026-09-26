@@ -83,6 +83,9 @@ public actor DaemonCore {
     /// `DaemonCore+Devices`.
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
+    /// The pairing code the Mac is showing, if it is showing one: memory only, so a
+    /// daemon that restarts has let it go.
+    var pendingPairing: DaemonAPI.PairingCode?
     /// What has already been told to whom, read once by `loadAttention()` and written
     /// whenever it moves. See `DaemonCore+Attention`.
     lazy var attentionStore = AttentionStore(locations: locations)
@@ -364,6 +367,9 @@ public actor DaemonCore {
     /// The other way out: to the connections a predicate picks (034). What a device
     /// watches, and the shells it has open, go this way.
     let addressed = AddressedBox()
+    /// Ends the connections a test picks: a forgotten device's, so its direct link
+    /// stops at once rather than when the phone next hangs up (security review, Phase 3).
+    let closer = CloserBox()
     var connectionCount = 0
     /// False on a server, where the daemon is started with `--serve` and stays up with
     /// no Mac connected, so scheduled workflows keep firing (037). A server has no
@@ -377,6 +383,11 @@ public actor DaemonCore {
     var relayOffers: [UUID: DaemonAPI.RelayOffer] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
     var relayGates: [String: RelayGate] = [:]
+    /// What a window lent this Mac's own agents (046, D3): Gemini's key, which has no other
+    /// way in. Kept for the daemon's life, not the connection's, so an agent a workflow starts
+    /// with no window open still has it; in memory only, and gone when the window stops
+    /// offering it.
+    var macLent: [String: Secret] = [:]
     /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
     var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
@@ -416,6 +427,19 @@ public actor DaemonCore {
 
         func callAsFunction(_ method: String, _ params: JSONValue?, to wanted: @escaping Wanted) {
             lock.withLock { send }?(method, params, wanted)
+        }
+    }
+
+    public final class CloserBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var close: (@Sendable (@escaping AddressedBox.Wanted) -> Void)?
+
+        func set(_ close: @escaping @Sendable (@escaping AddressedBox.Wanted) -> Void) {
+            lock.withLock { self.close = close }
+        }
+
+        func callAsFunction(_ wanted: @escaping AddressedBox.Wanted) {
+            lock.withLock { close }?(wanted)
         }
     }
 
@@ -519,6 +543,10 @@ public actor DaemonCore {
         _ send: @escaping @Sendable (String, JSONValue?, @escaping AddressedBox.Wanted) -> Void
     ) {
         addressed.set(send)
+    }
+
+    public func setConnectionCloser(_ close: @escaping @Sendable (@escaping AddressedBox.Wanted) -> Void) {
+        closer.set(close)
     }
 
     /// Hold lifecycle events rather than acting on them, until `startWorkflows`.
@@ -1088,12 +1116,22 @@ public struct ProcessSessionLauncher: SessionLauncher {
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
-                                     arguments: runtime.arguments + policy.launchArguments,
+                                     arguments: runtime.arguments + policy.launchArguments
+                                         + RuntimePolicyFiles(locations: locations).arguments(for: policy),
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: LoginShellPath.environment(),
                                                                    onServer: onServer),
-                                     capabilities: .app)
+                                     capabilities: Self.capabilities(for: policy),
+                                     authMethodBeforeContinuing: policy.authMethodBeforeContinuing)
+    }
+
+    /// What the app offers a runtime at the handshake: everything it can serve, less file
+    /// reading for a runtime that must read files itself (046: Gemini).
+    static func capabilities(for policy: ToolPolicy) -> ACP.ClientCapabilities {
+        var capabilities = ACP.ClientCapabilities.app
+        if policy.readsFilesItself { capabilities.readTextFile = false }
+        return capabilities
     }
 
     /// What a runtime is started with: `base` with anything lent (043), the policy's files

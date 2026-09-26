@@ -204,7 +204,8 @@ extension FakeSSHSuites {
                                                            sha256: (try? await ServerInstaller.sha256(of: agentsd)) ?? "",
                                                            version: "0.1.0+1")
                                           },
-                                          toolsets: { [claude, codex] }, wants: { $0 == "codex" })
+                                          toolset: { claude }, wantsClaude: { false },
+                                          otherToolsets: { [codex] }, wants: { $0 == "codex" })
             await server.connect()
             let states = await server.toolsetStates
             let facts = await server.facts

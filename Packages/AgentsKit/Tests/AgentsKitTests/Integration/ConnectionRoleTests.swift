@@ -13,7 +13,9 @@ import Testing
 struct ConnectionRoleTests {
     private func path() -> String { "/tmp/ag-role-\(UUID().uuidString.prefix(8)).sock" }
 
-    private func connect(_ path: String) -> Int32 {
+    /// `waiting` bounds each raw read below; a transport handed the socket must not have
+    /// it, or a slow answer reads as the socket closing.
+    private func connect(_ path: String, waiting: Bool = true) -> Int32 {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -25,14 +27,15 @@ struct ConnectionRoleTests {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, size) }
         }
         precondition(result == 0, "could not connect: \(errno)")
+        guard waiting else { return fd }
         var wait = timeval(tv_sec: 0, tv_usec: 200_000)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &wait, socklen_t(MemoryLayout<timeval>.size))
         return fd
     }
 
     /// One request, and the one line that answers it.
-    private func ask(_ fd: Int32, _ method: String) -> [String: Any]? {
-        let line = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\(method)\",\"params\":{}}\n"
+    private func ask(_ fd: Int32, _ method: String, _ params: String = "{}") -> [String: Any]? {
+        let line = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\(method)\",\"params\":\(params)}\n"
         _ = line.withCString { Darwin.write(fd, $0, strlen($0)) }
         return readLine(fd, deadline: Date().addingTimeInterval(5))
     }
@@ -130,6 +133,112 @@ struct ConnectionRoleTests {
         #expect(readLine(strangerFD, deadline: Date().addingTimeInterval(1)) == nil)
     }
 
+    // MARK: Devices (security review, Phase 3)
+
+    private func named(_ id: UUID) -> String {
+        "{\"id\":\"\(id.uuidString)\",\"name\":\"Phone\",\"kind\":\"iPhone\",\"publicKey\":\"\"}"
+    }
+
+    /// The bridge's connection is signed as the app's, so without this a phone had
+    /// every right the Mac's window has.
+    @Test func aDeviceDoesWhatTheRemoteDoesAndNothingPastIt() async throws {
+        let path = path()
+        let heard = Heard()
+        let server = try server(.control, at: path, heard: heard)
+        defer { server.stop() }
+        let fd = connect(path)
+        defer { close(fd) }
+
+        #expect(errorCode(ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(UUID().uuidString)\"}")) == nil)
+        for method in [DaemonAPI.Method.agentsList, DaemonAPI.Method.agentsStart, DaemonAPI.Method.agentsPrompt,
+                       DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.shellInput, DaemonAPI.Method.filesRead,
+                       DaemonAPI.Method.workflowsRun, DaemonAPI.Method.ping] {
+            #expect(errorCode(ask(fd, method)) == nil, "\(method)")
+        }
+        for method in [DaemonAPI.Method.credentialsLend, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.Method.runtimeAuthenticate, DaemonAPI.Method.runtimeLogOut,
+                       DaemonAPI.Method.filesBrowse, DaemonAPI.Method.filesWrite, DaemonAPI.Method.daemonQuit,
+                       DaemonAPI.Method.devicesForget, DaemonAPI.Method.devicesList, DaemonAPI.Method.relayRegister,
+                       DaemonAPI.Method.workflowsApprove, DaemonAPI.Method.projectsAdd,
+                       DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.connectionBindDevice] {
+            #expect(errorCode(ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
+        }
+        #expect(!heard.all.contains(DaemonAPI.Method.connectionBindDevice), "the binding is the server's alone")
+        #expect(!heard.all.contains(DaemonAPI.Method.credentialsLend))
+    }
+
+    @Test func aDeviceBoundByTheBridgeCannotSpeakAsAnother() async throws {
+        let path = path()
+        let server = try server(.control, at: path, heard: Heard())
+        defer { server.stop() }
+        let fd = connect(path)
+        defer { close(fd) }
+        let mine = UUID(), theirs = UUID()
+
+        #expect(errorCode(ask(fd, DaemonAPI.Method.connectionBindDevice, "{\"id\":\"\(mine.uuidString)\"}")) == nil)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.surfaceIdentify, named(theirs))) == DaemonAPI.Failure.notPermitted)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.devicesAnnounce, named(theirs))) == DaemonAPI.Failure.notPermitted)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.surfaceIdentify, named(mine))) == nil)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.devicesAnnounce, named(mine))) == nil)
+    }
+
+    /// The LAN link, until it has keys to know a device by: the first name it gives
+    /// is the only one it gets.
+    @Test func anUnnamedDeviceIsWhoItFirstSaysItIs() async throws {
+        let path = path()
+        let server = try server(.control, at: path, heard: Heard())
+        defer { server.stop() }
+        let fd = connect(path)
+        defer { close(fd) }
+        let first = UUID()
+
+        #expect(errorCode(ask(fd, DaemonAPI.Method.connectionBindDevice)) == nil)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.credentialsLend)) == DaemonAPI.Failure.notPermitted)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.devicesAnnounce, named(first))) == nil)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.surfaceIdentify, named(UUID()))) == DaemonAPI.Failure.notPermitted)
+        #expect(errorCode(ask(fd, DaemonAPI.Method.surfaceIdentify, named(first))) == nil)
+    }
+
+    /// A helper or a shell that could say this would be choosing its own rights.
+    @Test func onlyAWindowsConnectionCanBeGivenToADevice() async throws {
+        for role in [ConnectionRole.agent, .stranger] {
+            let path = path()
+            let server = try server(role, at: path, heard: Heard())
+            defer { server.stop() }
+            let fd = connect(path)
+            defer { close(fd) }
+            #expect(errorCode(ask(fd, DaemonAPI.Method.connectionBindDevice)) == DaemonAPI.Failure.notPermitted)
+        }
+    }
+
+    /// What the bridge and the relay host do with every connection they open: the
+    /// answer is theirs and never reaches the device, and nothing after it is a window's.
+    @Test func theBinderWaitsForTheDaemonAndKeepsTheAnswerFromTheDevice() async throws {
+        let path = path()
+        let heard = Heard()
+        let server = try server(.control, at: path, heard: heard)
+        defer { server.stop() }
+
+        let bound = try await DeviceBinder.bind(FDTransport(socket: connect(path, waiting: false)), device: UUID())
+        defer { bound.close() }
+        let client = JSONRPCConnection(transport: bound)
+        await client.start()
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await client.call(DaemonAPI.Method.daemonQuit)
+        }
+        _ = try await client.call(DaemonAPI.Method.agentsList)
+        #expect(heard.all == [DaemonAPI.Method.agentsList])
+    }
+
+    @Test func theBinderSaysSoWhenTheConnectionWasNotAWindows() async throws {
+        let path = path()
+        let server = try server(.agent, at: path, heard: Heard())
+        defer { server.stop() }
+        await #expect(throws: DeviceBinder.Failure.self) {
+            _ = try await DeviceBinder.bind(FDTransport(socket: connect(path, waiting: false)), device: nil)
+        }
+    }
+
     // MARK: Signatures
 
     /// This test binary is not the app, the bridge or the helper, so under the real
@@ -162,5 +271,6 @@ struct ConnectionRoleTests {
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))
         #expect(ConnectionRole.control.allows("anything/atAll"))
         #expect(!ConnectionRole.agent.hearsNotifications && !ConnectionRole.stranger.hearsNotifications)
+        #expect(ConnectionRole.device.hearsNotifications, "the phone's lists are kept by them")
     }
 }

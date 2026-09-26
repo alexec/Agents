@@ -112,7 +112,8 @@ extension DaemonCore {
 
     // MARK: Writing
 
-    /// Add a folder as a project before anything has run in it.
+    /// Add a folder as a project before anything has run in it, laid out the dotagents
+    /// way (`DotAgents`).
     ///
     /// Idempotent: adding a folder that is already a project returns it unchanged, so
     /// two windows racing settle on the same thing rather than one of them failing.
@@ -127,6 +128,7 @@ extension DaemonCore {
             records[standardized] = Project(folder: standardized)
             saveProjectRecords(records)
         }
+        layOutOnce(standardized)
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
                                message: "\(standardized.path) could not be added.")
@@ -137,6 +139,54 @@ extension DaemonCore {
         // nothing else about a project moves a need.
         reconsider()
         return summary
+    }
+
+    /// Give a project the dotagents layout, unless it has had it already.
+    ///
+    /// Called when a project is added and whenever a runtime session is made in a
+    /// folder, so a project that was there before this existed is laid out the first
+    /// time an agent starts in it — before the runtime has read anything. A folder in
+    /// one of the app's own worktrees is left alone: it is a checkout of the project,
+    /// and whatever the project has committed is already in it.
+    func layOutOnce(_ folder: URL) {
+        let standardized = Project.standardize(folder)
+        guard !standardized.path.contains("/\(WorktreeName.folder)/"),
+              Self.isDirectory(standardized) else { return }
+        var records = projectRecords()
+        // A folder that became a project by an agent running in it has no record yet;
+        // the one made here keeps the age the derived project already had.
+        let oldest = agents.values.filter { $0.projectFolder == standardized }.map(\.createdAt).min()
+        var record = records[standardized] ?? Project(folder: standardized, addedAt: oldest ?? Date())
+        // Once for each step: a project laid out by an older layout gets only what
+        // was added since, never the steps it already had back.
+        let from = record.laidOutAt == nil ? 0 : record.layoutVersion ?? 1
+        guard from < DotAgents.version else { return }
+        DotAgents.apply(to: standardized, from: from)
+        record.laidOutAt = record.laidOutAt ?? Date()
+        record.layoutVersion = DotAgents.version
+        records[standardized] = record
+        saveProjectRecords(records)
+    }
+
+    /// The `_meta` a session in `cwd` is made with: the runtime's tool scoping, and the
+    /// project's plugins for a runtime that takes them that way. Worked out on every
+    /// session, so a plugin added to `.agents/plugins` is there from the next one — and
+    /// so is its line in the project's marketplace index, for the runtimes that load
+    /// plugins only from one.
+    func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
+        DotAgents.refreshPlugins(for: cwd)
+        return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
+                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd)))
+    }
+
+    /// Two `_meta` objects as one, key by key and all the way down, because Claude's
+    /// scoping and its plugins both live in `claudeCode.options`.
+    static func merging(_ base: JSONValue?, _ added: JSONValue?) -> JSONValue? {
+        guard let base else { return added }
+        guard let added else { return base }
+        guard case .object(var merged) = base, case .object(let more) = added else { return added }
+        for (key, value) in more { merged[key] = merging(merged[key], value) }
+        return .object(merged)
     }
 
     /// Put a project away.

@@ -70,4 +70,19 @@ struct ToolsetTests {
         toolset.manifest.forwardsArguments = true
         #expect(toolset.shimLines[3].hasSuffix(#"dist/index.js" "$@""#))
     }
+
+    // MARK: Gemini's (046)
+
+    static var bundledGemini: URL { allBundled.appendingPathComponent("gemini", isDirectory: true) }
+
+    @Test func geminisToolsetIsLoadedAndItsShimHandsOnItsArguments() throws {
+        let toolset = try Toolset.load(from: Self.bundledGemini)
+        #expect(Toolset.loadAll(from: Self.allBundled)["gemini"]?.id == toolset.id)
+        #expect(toolset.manifest.package == "@google/gemini-cli")
+        #expect(toolset.manifest.forwardsArguments == true)
+        #expect(toolset.shimName == "gemini")
+        #expect(toolset.manifest.entryPath == "lib/node_modules/@google/gemini-cli/bundle/gemini.js")
+        #expect(toolset.shimLines.last?.hasSuffix(#"bundle/gemini.js" "$@""#) == true)
+        #expect(toolset.macNode?.sha256.keys.sorted() == ["arm64", "x64"])
+    }
 }

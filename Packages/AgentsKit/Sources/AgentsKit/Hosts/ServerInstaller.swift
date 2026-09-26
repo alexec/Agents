@@ -30,6 +30,12 @@ public struct ServerInstaller: Sendable {
 
     // MARK: § 5 Probe
 
+    /// Every runtime the app installs as a toolset, whose `current` the probe reads (046).
+    static var toolsetRuntimes: String {
+        RuntimeCatalog.builtIn.filter { if case .toolset = $0.install { true } else { false } }
+            .map(\.id).joined(separator: " ")
+    }
+
     static let probeScript = """
         uname -sm; printf '%s\\n' "$HOME"; df -Pk "$HOME" | tail -1; \
         tr -d '\\n' < "$HOME/.agents-server/install.json" 2>/dev/null; echo; \
@@ -38,11 +44,13 @@ public struct ServerInstaller: Sendable {
         printf 'fetch:%s\\n' "$(command -v curl || command -v wget || echo none)"; \
         t="$HOME/.agents-server/tools/claude/current"; \
         printf 'toolset:%s\\n' "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; \
-        for d in "$HOME/.agents-server/tools"/*/; do c="$d/current"; [ -f "$c/ok" ] && \
-        printf 'toolset.%s:%s\\n' "$(basename "$d")" "$(basename "$(readlink "$c")")"; done; \
+        for r in \(toolsetRuntimes); do t="$HOME/.agents-server/tools/$r/current"; \
+        printf 'toolset.%s:%s\\n' "$r" "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; done; \
         ${SHELL:-/bin/sh} -lc 'command -v npx >/dev/null 2>&1 && echo npx:yes || echo npx:no; \
-        [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none' 2>/dev/null </dev/null; \
-        [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none
+        [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none; \
+        [ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] && echo signin.gemini:env || echo signin.gemini:none' 2>/dev/null </dev/null; \
+        [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none; \
+        [ -f "$HOME/.codex/auth.json" ] && echo signin.codex:file || echo signin.codex:none
         """
 
     public func probe() async throws -> ServerFacts {
@@ -84,8 +92,13 @@ public struct ServerInstaller: Sendable {
             case "libc": facts.libc = Libc(lddFirstLine: value)
             case "fetch": facts.downloader = value == "none" || value.isEmpty ? nil : (value as NSString).lastPathComponent
             case "toolset": facts.toolsetID = value == "none" || value.isEmpty ? nil : value
-            case let key where key.hasPrefix("toolset."):
-                if !value.isEmpty { facts.toolsetIDs[String(key.dropFirst("toolset.".count))] = value }
+            case _ where key.hasPrefix("toolset."):
+                let runtime = String(key.dropFirst("toolset.".count))
+                facts.toolsetIDs[runtime] = value == "none" || value.isEmpty ? nil : value
+            case _ where key.hasPrefix("signin."):
+                // Codex's own is a sign-in saved in its home (047): a key in the login
+                // environment does not sign its adapter in by itself.
+                if value == "env" || value == "file" { facts.ownSignIns.insert(String(key.dropFirst("signin.".count))) }
             case "npx": facts.hasNpx = value == "yes"
             case "signin": if value == "env" || value == "file" { facts.hasOwnClaudeSignIn = true }
             default: continue

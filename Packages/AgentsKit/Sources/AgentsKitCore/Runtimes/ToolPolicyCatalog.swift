@@ -247,6 +247,67 @@ public enum ToolPolicyCatalog {
                            configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n",
                            macSignIn: ".codex/auth.json", upstreamHost: "chatgpt.com"))
 
+    /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
+    ///
+    /// Measured against Gemini CLI 0.61.0 on 2026-09-25 (`specs/046-gemini-cli/research.md`
+    /// R5). Two kinds of rival. `invoke_agent` starts Gemini's own subagents
+    /// (`codebase_investigator`, `cli_help`, `generalist`); the six `tracker_*` tools keep a
+    /// task queue of Gemini's own. `write_todos` stays, as Claude's to-do tool stays: a
+    /// list inside the turn, not a standing arrangement.
+    ///
+    /// The file adds to the person's own policies rather than replacing them, which is why
+    /// it and not `GEMINI_CLI_SYSTEM_SETTINGS_PATH`: system settings override the person's
+    /// key by key, so their own `tools.exclude` and MCP servers would quietly go. Priority
+    /// is 999, the top of the band Gemini allows (0–999), so a person's own `allow` for the
+    /// same tool does not win inside the app's agents. A deny rule with no `argsPattern`
+    /// takes the tool out of the model's list, not only refuses it: measured on a real
+    /// turn, `invoke_agent` is listed without the file and gone with it (R13). So nothing
+    /// here is residue.
+    public static let gemini: ToolPolicy = {
+        let removed = [
+            RemovedTool(name: "invoke_agent", category: .agents),
+            RemovedTool(name: "tracker_create_task", category: .standingArrangements),
+            RemovedTool(name: "tracker_update_task", category: .standingArrangements),
+            RemovedTool(name: "tracker_get_task", category: .standingArrangements),
+            RemovedTool(name: "tracker_list_tasks", category: .standingArrangements),
+            RemovedTool(name: "tracker_add_dependency", category: .standingArrangements),
+            RemovedTool(name: "tracker_visualize", category: .standingArrangements),
+        ]
+        return ToolPolicy(
+            runtimeID: RuntimeCatalog.gemini.id,
+            removed: removed,
+            lever: .file,
+            environmentFiles: [
+                EnvironmentFile(name: "gemini-policy.toml", contents: geminiPolicy(removing: removed),
+                                argument: "--policy"),
+            ],
+            readsFilesItself: true,
+            authMethodBeforeContinuing: "gemini-api-key")
+    }()
+    // No `escalationTool`, measured rather than omitted: in ACP mode Gemini takes its own
+    // `ask_user` out of its tool list (`if (!interactive || isAcpMode)
+    // extraExcludes.push(ASK_USER_TOOL_NAME)`), and its ACP code has no elicitation. A
+    // question ends the turn and arrives as needs_answer, exactly as Grok's does. R6.
+
+    /// Gemini's policy file: one deny rule per category, whose refusal says what to use.
+    static func geminiPolicy(removing removed: [RemovedTool]) -> String {
+        var text = "# Written by the Agents app. Do not edit: rebuilt on every launch.\n"
+        for category in RemitCategory.allCases {
+            let names = removed.filter { $0.category == category }.map(\.name)
+            guard !names.isEmpty else { continue }
+            text += "\n[[rule]]\n"
+            text += "toolName = [\(names.map(tomlString).joined(separator: ", "))]\n"
+            text += "decision = \"deny\"\n"
+            text += "priority = 999\n"
+            text += "denyMessage = \(tomlString(category.instead))\n"
+        }
+        return text
+    }
+
+    private static func tomlString(_ text: String) -> String {
+        "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini]
 }

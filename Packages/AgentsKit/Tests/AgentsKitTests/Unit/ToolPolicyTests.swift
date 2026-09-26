@@ -293,4 +293,71 @@ struct ToolPolicyTests {
         }
         #expect(!FileManager.default.fileExists(atPath: root.path))
     }
+
+    // MARK: A file named by an argument (046)
+
+    /// Gemini: nothing in `_meta`, no flags of its own, and one file whose path follows
+    /// `--policy`. One deny rule per category, each saying what to use instead.
+    @Test func geminiIsSentAPolicyFile() throws {
+        let policy = ToolPolicyCatalog.gemini
+        #expect(policy.lever == .file)
+        #expect(policy.sessionMeta == nil)
+        #expect(policy.launchArguments.isEmpty)
+        #expect(policy.escalationTool == nil)
+        let file = try #require(policy.environmentFiles.first)
+        #expect(policy.environmentFiles.count == 1)
+        #expect(file.argument == "--policy" && file.variable == nil)
+        #expect(file.contents == """
+            # Written by the Agents app. Do not edit: rebuilt on every launch.
+
+            [[rule]]
+            toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
+            decision = "deny"
+            priority = 999
+            denyMessage = "\(RemitCategory.standingArrangements.instead)"
+
+            [[rule]]
+            toolName = ["invoke_agent"]
+            decision = "deny"
+            priority = 999
+            denyMessage = "\(RemitCategory.agents.instead)"
+
+            """)
+    }
+
+    @Test func aFileNamedByAnArgumentIsWrittenAndPassed() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("agents-policy-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let files = RuntimePolicyFiles(locations: StoreLocations(root: root))
+
+        let path = root.appendingPathComponent("runtimes/gemini-policy.toml").path
+        #expect(files.arguments(for: ToolPolicyCatalog.gemini) == ["--policy", path])
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == ToolPolicyCatalog.gemini.environmentFiles[0].contents)
+        // And it is not also put in the environment, which is Grok's way, not Gemini's.
+        #expect(files.environment(for: ToolPolicyCatalog.gemini, onto: ["PATH": "/usr/bin"]) == ["PATH": "/usr/bin"])
+        // Nor does Grok's file turn into an argument.
+        #expect(files.arguments(for: ToolPolicyCatalog.grok).isEmpty)
+        #expect(files.arguments(for: ToolPolicyCatalog.claude).isEmpty)
+    }
+
+    /// The pin the app installs and the catalog's word for it cannot drift apart.
+    @Test func geminisPinIsTheToolsetsPin() throws {
+        let toolset = try Toolset.load(from: ToolsetTests.bundledGemini)
+        #expect(toolset.manifest.runtimeID == RuntimeCatalog.gemini.id)
+        #expect(toolset.shimName == RuntimeCatalog.gemini.executable)
+        #expect(RuntimeCatalog.gemini.usesAppCopyOnly)
+        #expect(RuntimeCatalog.gemini.install == .toolset(runtimeID: "gemini"))
+    }
+
+    /// Gemini reads files itself, since a missing file over ACP can never read as ENOENT to
+    /// it; it still writes through the app. Nobody else changes (046).
+    @Test func onlyGeminiReadsFilesItself() {
+        let gemini = ProcessSessionLauncher.capabilities(for: ToolPolicyCatalog.gemini)
+        #expect(!gemini.readTextFile)
+        #expect(gemini.writeTextFile)
+        for policy in ToolPolicyCatalog.builtIn where policy.runtimeID != RuntimeCatalog.gemini.id {
+            #expect(ProcessSessionLauncher.capabilities(for: policy) == .app, "\(policy.runtimeID)")
+        }
+    }
 }
