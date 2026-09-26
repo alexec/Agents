@@ -160,7 +160,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 ## Phase 10: Polish & cross-cutting
 
 - [ ] T055 [P] Everywhere a runtime is chosen: check the phone/iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Gemini from `RuntimeCatalog.builtIn`; fix any hard-coded list; build Remote for the generic simulator only
-- [ ] T056 [P] Docs: `docs/reference/runtimes.md` (five runtimes, Gemini row: install from the set-up page, app's copy only, pictures, sign-in, questions end as Waiting on your answer, tokens but no cost, quota), `docs/how-to/sign-a-runtime-in.md` (Gemini's choices), `docs/how-to/add-a-linux-server.md` (Gemini key), `docs/reference/settings.md` (Settings ▸ Agents and Runtime credentials list Gemini); `scripts/docs-check.py` passes
+- [X] T056 [P] Docs: `docs/reference/runtimes.md` (five runtimes, Gemini row: install from the set-up page, app's copy only, pictures, sign-in, questions end as Waiting on your answer, tokens but no cost, quota), `docs/how-to/sign-a-runtime-in.md` (Gemini's choices), `docs/how-to/add-a-linux-server.md` (Gemini key), `docs/reference/settings.md` (Settings ▸ Agents and Runtime credentials list Gemini); `scripts/docs-check.py` passes
 - [ ] T057 Full `swift test` six times on this branch and on its merge base; only main's known flakes may differ (memory: the suite is flaky under load); both Xcode schemes and the Linux agentsd gate build
 - [ ] T058 Run quickstart.md end to end on a scratch root and agents-bare; tick the spec checklist; leave the real app untouched until Alex says to merge
 
