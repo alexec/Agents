@@ -1,0 +1,119 @@
+{
+  "at": 812134691.101054,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "6BDEBAAC-A8F7-4D67-AB83-73A999DB8C75",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      "state": {
+        "credentialKey": "grok:sign-in",
+        "entryID": "6BDEBAAC-A8F7-4D67-AB83-73A999DB8C75",
+        "lastRateLimit": {
+          "isUsingOverage": false,
+          "rateLimitType": "five_hour",
+          "resetsAt": 812134804,
+          "status": "rejected"
+        },
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812134684.90856,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "until": 812134804,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    },
+    {
+      "chats": 1,
+      "entry": {
+        "id": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812134685.244074,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812138285.244074,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "6BDEBAAC-A8F7-4D67-AB83-73A999DB8C75",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      {
+        "id": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "switches": [
+    {
+      "agentID": "B2AAA2A7-96E7-41B8-891C-39D774C36618",
+      "at": 812134684.984,
+      "billing": {
+        "allowance": {}
+      },
+      "carried": [],
+      "dropped": [],
+      "from": {
+        "runtimeID": "grok"
+      },
+      "fromReturnsAt": 812134804,
+      "id": "DF503505-E349-436E-AC35-5357603E5D77",
+      "reason": "allowanceSpent",
+      "to": {
+        "entryID": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+        "runtimeID": "copilot"
+      }
+    }
+  ],
+  "titles": [
+    "B2AAA2A7-96E7-41B8-891C-39D774C36618",
+    "Tidy the README."
+  ],
+  "waiting": [
+    {
+      "agentID": "B2AAA2A7-96E7-41B8-891C-39D774C36618",
+      "resumeAt": 812134804,
+      "runtimeID": "grok"
+    }
+  ]
+}

@@ -95,6 +95,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         // pool (052, contracts/daemon-api.md).
         DaemonAPI.Method.poolState,
         DaemonAPI.Method.poolMarkAvailable,
+        DaemonAPI.Method.poolStopWaiting,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,

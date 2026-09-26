@@ -294,6 +294,8 @@ public enum DaemonAPI {
         public static let poolState = "pool/state"
         public static let poolSet = "pool/set"
         public static let poolMarkAvailable = "pool/markAvailable"
+        /// Stop a chat waiting for an allowance (052, US4).
+        public static let poolStopWaiting = "pool/stopWaiting"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -1030,6 +1032,11 @@ public enum DaemonAPI {
     public struct PoolMarkAvailable: Codable, Sendable {
         public var entryID: UUID
         public init(entryID: UUID) { self.entryID = entryID }
+    }
+
+    public struct PoolStopWaiting: Codable, Sendable {
+        public var agentID: UUID
+        public init(agentID: UUID) { self.agentID = agentID }
     }
 
     /// `pool/state`: the last day of switches unless `days` asks for more (052, FR-025).

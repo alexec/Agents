@@ -85,7 +85,7 @@ extension DaemonCore {
             setAllowanceState(state)
             raiseAllowanceOut(entry, state: state, reason: "allowance spent")
             if !willCarry(agent) {
-                await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, returnsAt: state.returnsAt, now: at)), for: agentID)
+                await record(.runtimeNote(PoolWords.ranOut(agent.runtimeID, state: state, now: at)), for: agentID)
             }
             pendingCarry[agentID] = (.allowanceSpent, true)
             reason = .allowanceSpent
@@ -214,13 +214,20 @@ extension DaemonCore {
         let decision = PoolPlan.next(current: current, pool: pool, switchingOff: agent.switchingOff,
                                      states: states, tried: tried, unusable: { self.unusable($0) }, now: at)
         guard case .switchTo(let entry) = decision else {
-            await record(.runtimeNote(PoolWords.ranOut(current.runtimeID,
-                                                       returnsAt: allowances[AllowanceState.credentialKey(for: current)]?.returnsAt,
-                                                       now: at)), for: agentID)
-            if case .everyoneOut(let earliest) = decision {
-                let back = earliest.map { " The first is back at \(PoolWords.time($0, now: at))." } ?? ""
-                await record(.runtimeNote("Every other runtime in the pool is out too, so this chat stopped here.\(back)"),
-                             for: agentID)
+            if let state = allowances[AllowanceState.credentialKey(for: current)] {
+                await record(.runtimeNote(PoolWords.ranOut(current.runtimeID, state: state, now: at)), for: agentID)
+            }
+            if case .everyoneOut = decision {
+                // Wait for the first that said when it is back, the chat's own included,
+                // and carry on then (US4). Only with words to send again: a chat that ran
+                // out without being refused has nothing to wait to say.
+                if pending.resend, let prompt = lastPrompts[agentID],
+                   let back = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
+                                                      unusable: { self.unusable($0) }, now: at) {
+                    await startWaiting(agentID, for: back, prompt: prompt)
+                } else {
+                    await record(.runtimeNote(PoolWords.everyoneOutNoTime), for: agentID)
+                }
             }
             return false
         }
@@ -228,6 +235,9 @@ extension DaemonCore {
         carryTried[agentID] = tried
         // What the old runtime was asking can no longer be answered there (T040).
         await closeQuestionsOfAGoneRuntime(agentID)
+        // Its plan window was the old runtime's: left, it would mark the new one out
+        // until the old one's reset.
+        latestRateLimit[agentID] = nil
         await releaseRuntime(for: agentID)
 
         let fromName = PoolWords.runtimeName(current.runtimeID)
@@ -308,6 +318,78 @@ extension DaemonCore {
         return false
     }
 
+    // MARK: Everyone out (US4)
+
+    /// Wait for `back`, and carry on then with the words that were refused.
+    func startWaiting(_ agentID: UUID, for back: (at: Date, entry: PoolEntry), prompt: SentPrompt) async {
+        guard var agent = agents[agentID] else { return }
+        agent.allowanceWait = AllowanceWait(resumeAt: back.at, entryID: back.entry.id, runtimeID: back.entry.runtimeID,
+                                            text: prompt.text, blocks: prompt.blocks, from: prompt.from)
+        agents[agentID] = agent
+        try? await store.save(agent)
+        changed(agent)
+        await record(.runtimeNote(PoolWords.waiting(back.entry.runtimeID, until: back.at, now: now())), for: agentID)
+        broadcastPool()
+    }
+
+    /// Drop a chat's wait: the person prompted, stopped, parked or archived it (FR-017),
+    /// or it has just been resumed. Says nothing; whatever dropped it says what it did.
+    func dropAllowanceWait(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.allowanceWait != nil else { return }
+        agent.allowanceWait = nil
+        agents[agentID] = agent
+        changed(agent)
+        let saved = agent
+        Task { try? await self.store.save(saved) }
+        broadcastPool()
+    }
+
+    /// Every wait whose time has come, on the workflow heartbeat, which is also the first
+    /// tick after a restart, so a wait that fell due while nothing ran is kept too. The
+    /// chat carries on where it can: on its own runtime if that is back, otherwise on
+    /// the first in the pool that is not out. If none is yet, it waits again, or stops.
+    func resumeAllowanceWaits(now at: Date) async {
+        let due = agents.values.filter { $0.allowanceWait?.isDue(now: at) == true && $0.state != .archived }
+        for agent in due {
+            guard let wait = agent.allowanceWait else { continue }
+            dropAllowanceWait(agent.id)
+            // A turn under way, or words already queued: the person has moved on.
+            guard turnTasks[agent.id] == nil, agent.queuedPrompts.isEmpty else { continue }
+            let prompt = SentPrompt(text: wait.text, blocks: wait.blocks, from: wait.from, preface: nil,
+                                    costBefore: agent.costToDate)
+            lastPrompts[agent.id] = prompt
+            carryTried[agent.id] = nil
+            let current = poolEntry(for: agent)
+            let states = settledStates(at: at)
+            if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) ?? true {
+                await record(.runtimeNote(PoolWords.cameBack(agent.runtimeID)), for: agent.id)
+                await sendAgain(agent.id, prompt: prompt)
+            } else {
+                pendingCarry[agent.id] = (.everyoneOutResumed, true)
+                await carryOnIfPending(agent.id)
+            }
+        }
+    }
+
+    /// The refused words, sent again on the chat's own runtime, not recorded twice.
+    private func sendAgain(_ agentID: UUID, prompt: SentPrompt) async {
+        guard let agent = agents[agentID] else { return }
+        do {
+            let session = try await liveSession(for: agent)
+            await beginTurn(agentID: agentID, text: prompt.text, blocks: prompt.blocks, from: prompt.from,
+                            session: session, preface: prompt.preface, recorded: false)
+        } catch {
+            await record(.runtimeNote("Could not carry on: \(reason(error))"), for: agentID)
+        }
+    }
+
+    /// Stop waiting, from the Pool page or the phone (US4).
+    public func stopWaitingForAllowance(_ agentID: UUID) async {
+        guard agents[agentID]?.allowanceWait != nil else { return }
+        dropAllowanceWait(agentID)
+        await record(.runtimeNote(PoolWords.stoppedWaiting), for: agentID)
+    }
+
     /// This chat's own switch (FR-011a): off keeps it on its runtime whatever the pool
     /// says. The window's control for it is US5's `agents/setSwitching`.
     func setSwitching(agentID: UUID, off: Bool) async {
@@ -385,7 +467,12 @@ extension DaemonCore {
         let titles = Dictionary(switches.compactMap { record in
             agents[record.agentID].map { (record.agentID, $0.title ?? "Untitled") }
         }, uniquingKeysWith: { first, _ in first })
-        return PoolStatus(settings: pool, rows: rows, switches: switches, titles: titles, at: at)
+        let waiting = live.compactMap { agent in
+            agent.allowanceWait.map { PoolStatus.Waiting(agentID: agent.id, runtimeID: $0.runtimeID, resumeAt: $0.resumeAt) }
+        }.sorted { $0.resumeAt < $1.resumeAt }
+        var named = titles
+        for wait in waiting { named[wait.agentID] = agents[wait.agentID]?.title ?? "Untitled" }
+        return PoolStatus(settings: pool, rows: rows, waiting: waiting, switches: switches, titles: named, at: at)
     }
 
     /// Keep a new pool, whole (contracts/daemon-api.md). Refused, with the sentence the

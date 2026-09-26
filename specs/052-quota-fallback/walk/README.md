@@ -146,3 +146,38 @@ had said. It now says "tried again after" for that case.
 
 With the Settings rail from 055 merged in, Pool is a rail pane after Spending, and the Pool
 page's two links open Settings on it. That is built, but not yet clicked.
+
+## US4: everyone out, wait, then carry on (T055–T057), 2026-09-26
+
+The run was on the scratch root `/tmp/run-052-us4`, with the stand-ins, driven over `daemon.sock`.
+The stand-in now takes `spent <epoch>`, which sends a plan window saying when it is back, as
+Claude's does. The pool was Grok (out until 10:00:04) then Copilot (out, with no time given).
+
+1. A chat started on Grok with "Tidy the README." Grok refused it. The chat moved to Copilot,
+   which refused it too. The chat then stopped as `allowanceSpent`, and waited:
+   "Every runtime in the pool is out. This chat waits, and carries on with Grok at 10:00 AM."
+   `pool/state` listed it under `waiting` (`us4/pool-state-waiting.json`). In
+   `1-waiting.png` (mostly covered by the scratch root's first-run install sheet), the row
+   shows a grey stop icon, not the attention colour, with the hourglass mark, and the Pool row
+   shows "2 out".
+2. Grok was set to answer again. At 10:00:09, the first heartbeat after 10:00:04, the chat
+   carried on by itself. The transcript has `.poolSwitch` copilot → grok (everyoneOutResumed)
+   and a handoff, then Grok's reply to the refused words, sent once: "You said: Tidy the README."
+   The wait was cleared (`us4/transcript.json`, `2-carried-on.png`).
+
+Found and fixed:
+- **A switch carried the old runtime's plan window.** Claude's rate-limit data is kept per
+  chat, so when Codex failed after a move, Codex was marked out until Claude's reset time. A
+  switch now clears it.
+- **Retry times read as return times.** "ran out, until 10:58 AM" gave the app's own one-hour
+  retry as if the provider had said it. It now reads "It is tried again after …", and a wait
+  is scheduled only on a time the provider gave (`knownReturn`).
+
+`AllowanceWaitTests` (7) cover:
+- the wait and its note;
+- carrying on once, at the time, on the entry that is back;
+- stop, park and archive dropping the wait;
+- the person's next prompt replacing it;
+- Stop waiting;
+- no known return, in which case it stops and schedules nothing;
+- a restart that keeps the wait and still carries on.

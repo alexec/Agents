@@ -68,6 +68,16 @@ public enum PoolWords {
         return "\(name)’s allowance ran out, until \(time(returnsAt, now: now))."
     }
 
+    /// The same, from its state: "until" only for a time the provider gave, and the
+    /// app's own retry said as what it is.
+    public static func ranOut(_ runtimeID: String, state: AllowanceState, now: Date) -> String {
+        if let back = state.knownReturn { return ranOut(runtimeID, returnsAt: back, now: now) }
+        if case .out(nil, let retry?, _) = state.status {
+            return "\(runtimeName(runtimeID))’s allowance ran out. It is tried again after \(time(retry, now: now))."
+        }
+        return ranOut(runtimeID, returnsAt: nil, now: now)
+    }
+
     public static func overageBegan(_ runtimeID: String) -> String {
         "\(runtimeName(runtimeID)) started using paid extra usage, so it is treated as out."
     }
@@ -174,6 +184,25 @@ public enum PoolWords {
     /// The agent row's line under a chat that moved (wireframes §2).
     public static func carriedOnFrom(_ record: SwitchRecord, now: Date) -> String {
         "⇄ Carried on from \(runtimeName(record.from.runtimeID)) at \(time(record.at, now: now))"
+    }
+
+    /// Every runtime is out, and the first back said when (US4).
+    public static func waiting(_ runtimeID: String, until: Date, now: Date) -> String {
+        "Every runtime in the pool is out. This chat waits, and carries on with \(runtimeName(runtimeID)) at \(time(until, now: now))."
+    }
+
+    public static let everyoneOutNoTime =
+        "Every other runtime in the pool is out too, and none has said when it is back, so this chat stopped here."
+
+    public static func cameBack(_ runtimeID: String) -> String {
+        "\(runtimeName(runtimeID))’s allowance is back, so this chat carries on."
+    }
+
+    public static let stoppedWaiting = "Stopped waiting for an allowance. It carries on when you next prompt it."
+
+    /// The agent row's line while it waits (US4).
+    public static func waitingLine(_ wait: AllowanceWait, now: Date) -> String {
+        "Waiting for an allowance · carries on with \(runtimeName(wait.runtimeID)) at \(time(wait.resumeAt, now: now))"
     }
 
     public static func stillRateLimited(_ runtimeID: String) -> String {

@@ -332,14 +332,14 @@
 
 **Independent Test**: Spec US4; quickstart §7.
 
-- [ ] T055 [P] [US4] Write `Pkg/Tests/AgentsKitTests/Integration/AllowanceWaitTests.swift`, modelled on `BlockedTests.swift` with an injected `now`. Cover:
+- [X] T055 [P] [US4] Write `Pkg/Tests/AgentsKitTests/Integration/AllowanceWaitTests.swift`, modelled on `BlockedTests.swift` with an injected `now`. Cover:
   - everyone out, with a known return: the chat stops with the note and shows as waiting, not failed, and `allowanceWait` is set;
   - time passes: it resumes on that entry with the prompt, once;
   - a prompt from the person, stop, park or archive drops the wait (FR-017);
   - with no known return, it stops and nothing is scheduled;
   - a daemon restart keeps the wait and still resumes.
-- [ ] T056 [US4] Implement the wait in `DaemonCore+Pool.swift`, and resume it from the due-timer in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Blocks.swift` (`resumeDueBlocks`) and after a restart (`resumeBlocksAfterRestart`). Clear it in the prompt, stop, park and archive paths. This makes T055 pass.
-- [ ] T057 [US4] Show waiting chats on the Pool page's card, with **Stop waiting**, and a *Waiting for an allowance* status on the agent row. Add the status word to `App/Sources/AgentList/` and `PoolWords`.
+- [X] T056 [US4] *(Done 2026-09-26. Resumed from the workflow heartbeat, which also runs on the first tick after a restart. The pick-up path is not touched. `pool/stopWaiting` was added for the Pool page and the phone.)* Implement the wait in `DaemonCore+Pool.swift`, and resume it from the due-timer in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Blocks.swift` (`resumeDueBlocks`) and after a restart (`resumeBlocksAfterRestart`). Clear it in the prompt, stop, park and archive paths. This makes T055 pass.
+- [X] T057 [US4] Show waiting chats on the Pool page's card, with **Stop waiting**, and a *Waiting for an allowance* status on the agent row. Add the status word to `App/Sources/AgentList/` and `PoolWords`.
 
 ---
 

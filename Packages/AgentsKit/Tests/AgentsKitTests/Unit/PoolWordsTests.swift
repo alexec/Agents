@@ -36,6 +36,13 @@ struct PoolWordsTests {
     @Test func theNotesNameTheRuntime() {
         #expect(PoolWords.ranOut("claude", returnsAt: nil, now: now) == "Claude’s allowance ran out.")
         #expect(PoolWords.ranOut("codex", returnsAt: now.addingTimeInterval(60), now: now).hasPrefix("Codex’s allowance ran out, until "))
+        // The app's own retry is never passed off as a return time.
+        var retrying = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: now)
+        retrying.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
+        #expect(PoolWords.ranOut("codex", state: retrying, now: now).hasPrefix("Codex’s allowance ran out. It is tried again after "))
+        var told = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: now)
+        told.markOut(.allowanceSpent, until: now.addingTimeInterval(60), payment: .allowance(label: nil), now: now, from: .typedFailure)
+        #expect(PoolWords.ranOut("codex", state: told, now: now).hasPrefix("Codex’s allowance ran out, until "))
         #expect(PoolWords.creditGone("gemini") == "Gemini’s credit is used up.")
     }
 }

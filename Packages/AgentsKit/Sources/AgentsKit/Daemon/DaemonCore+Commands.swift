@@ -487,6 +487,8 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        // New words go first: a chat waiting for an allowance waits no more (052, FR-017).
+        dropAllowanceWait(request.agentID)
         try await enqueue(request, first: false)
     }
 
@@ -1355,6 +1357,7 @@ extension DaemonCore {
         // stops the pick-up, but `resuming` must go too or the daemon stays alive for
         // a chat nobody is bringing back.
         stops[agentID, default: 0] += 1
+        dropAllowanceWait(agentID)
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
@@ -1454,6 +1457,7 @@ extension DaemonCore {
         // and so does a wait on events (042).
         dropBlock(agentID)
         endWait(agentID, by: .archived)
+        dropAllowanceWait(agentID)
         shownPlanFiles.removeValue(forKey: agentID)
         // And a move still waiting: taken back before the stop below ends the turn it was
         // waiting on, which would otherwise make it on the way into the archive (053).
@@ -1533,6 +1537,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         guard agent.state != .archived else { return }
+        dropAllowanceWait(agentID)
+        agent = agents[agentID] ?? agent
         let inFlight = agent.state.hasTurnInFlight
         switch (agent.parking, inFlight) {
         case (.parked, _), (.whenTurnEnds, true): return

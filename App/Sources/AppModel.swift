@@ -829,6 +829,14 @@ final class AppModel {
         }
     }
 
+    /// A chat stops waiting for an allowance (052, US4).
+    func stopWaiting(_ agentID: UUID) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
+                                                  DaemonAPI.PoolStopWaiting(agentID: agentID),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
+
     /// The person says a runtime is back: bought more credit, a new month began (FR-023).
     func markPoolEntryAvailable(_ entryID: UUID) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,

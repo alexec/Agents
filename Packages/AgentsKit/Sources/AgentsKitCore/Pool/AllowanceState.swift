@@ -84,6 +84,16 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public var isOut: Bool { if case .out = status { return true } else { return false } }
 
     /// When it is expected back, for "resumes at" and the earliest return (FR-016).
+    /// When the provider said it comes back: never the app's own retry time, which is a
+    /// guess to try again, not a return (US4 waits only on this).
+    public var knownReturn: Date? {
+        switch status {
+        case .available: nil
+        case .rateLimited(let until): until
+        case .out(let until, _, _): until
+        }
+    }
+
     public var returnsAt: Date? {
         switch status {
         case .available: return nil

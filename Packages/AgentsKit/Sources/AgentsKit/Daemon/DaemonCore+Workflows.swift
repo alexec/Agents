@@ -345,6 +345,8 @@ extension DaemonCore {
 
         // Allowances whose time to come back has come, and grants past their date (052).
         settlePoolClocks(now: now)
+        // Chats waiting for one of them (US4).
+        await resumeAllowanceWaits(now: now)
 
         // Pull requests that are due a look (038 R3), also above the guard: the first
         // tick after a start is when a restarted daemon should catch up. It starts a

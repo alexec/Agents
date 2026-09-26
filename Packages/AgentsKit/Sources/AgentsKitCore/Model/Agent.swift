@@ -125,6 +125,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The chat's own "carry on when this runs out" is off (052, FR-003). Off is rare, so
     /// only written when true.
     public var switchingOff: Bool
+    /// Waiting for an allowance to come back, when every runtime in the pool was out
+    /// (052, US4). Kept on the record, so a restart still resumes it.
+    public var allowanceWait: AllowanceWait?
 
     public var createdAt: Date
     public var lastActivityAt: Date
@@ -328,6 +331,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 052. An older record is on no pool entry and carries on by default.
         poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
         switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
+        allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
         // New in 040. A record written before it was never parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
         // New with self-archiving. A record from before never asked; one from a
@@ -395,6 +399,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         try c.encodeIfPresent(poolEntryID, forKey: .poolEntryID)
         if switchingOff { try c.encode(switchingOff, forKey: .switchingOff) }
+        try c.encodeIfPresent(allowanceWait, forKey: .allowanceWait)
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
@@ -421,7 +426,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
-        case poolEntryID, switchingOff
+        case poolEntryID, switchingOff, allowanceWait
         case parking
         case afterTurn
         case archivedAt, retirement
@@ -515,6 +520,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.titledByAgent = titledByAgent
         self.poolEntryID = nil
         self.switchingOff = false
+        self.allowanceWait = nil
         self.parking = parking
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt

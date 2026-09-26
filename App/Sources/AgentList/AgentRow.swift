@@ -58,7 +58,8 @@ struct AgentRow: View {
                        outcome: agent.report?.outcome,
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
-                       isParked: agent.parking?.isParked == true)
+                       isParked: agent.parking?.isParked == true,
+                       isWaitingForAllowance: agent.allowanceWait != nil)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -89,6 +90,14 @@ struct AgentRow: View {
                     // sessions list a mark, as the two above are: a list row keeps the
                     // height it first had, and the pool's state arrives after it, so a
                     // line added then is cut in half.
+                    if isCompact, let wait = agent.allowanceWait {
+                        let words = PoolWords.waitingLine(wait, now: Date())
+                        Image(systemName: "hourglass")
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .help(words)
+                            .accessibilityLabel(words)
+                    }
                     if isCompact, let moved = carriedOn {
                         let words = PoolWords.carriedOnFrom(moved, now: Date())
                         Image(systemName: "arrow.triangle.swap")
@@ -121,6 +130,13 @@ struct AgentRow: View {
 
                 // Moved to another runtime when its own ran out (052): from which, and
                 // when, while it is still on the one it moved to.
+                // Waiting for an allowance to come back (052, US4): stopped, not failed.
+                if !isCompact, let wait = agent.allowanceWait {
+                    Text(PoolWords.waitingLine(wait, now: Date()))
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 if !isCompact, let moved = carriedOn {
                     Text(PoolWords.carriedOnFrom(moved, now: Date()))
                         .appText(.fine)
@@ -263,6 +279,9 @@ struct StatusIcon: View {
     /// Parked (040): the shape still says how it ended, but it is not orange, because
     /// the person has seen it and chosen later.
     var isParked = false
+    /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
+    /// it does not want a person, whatever its stopped shape says.
+    var isWaitingForAllowance = false
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
@@ -274,7 +293,7 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
-                    .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
+                    .foregroundStyle((shape.wantsAPerson && !isParked && !isWaitingForAllowance ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 ProgressView()
@@ -297,6 +316,7 @@ struct StatusIcon: View {
     /// reads too, and a stopped agent says why.
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
+        if isWaitingForAllowance { return "Waiting for an allowance" }
         if let settledOutcome { return settledOutcome.heading }
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
         switch state {

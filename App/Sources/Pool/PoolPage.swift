@@ -83,6 +83,10 @@ struct PoolPage: View {
                         Text("resumes on \(PoolWords.runtimeName(wait.runtimeID)) at \(PoolWords.time(wait.resumeAt, now: status.at))")
                             .foregroundStyle(.secondary)
                         Spacer()
+                        // Asks nothing first: the chat keeps its words, and the next
+                        // prompt carries on (US4).
+                        Button("Stop waiting") { Task { await model.stopWaiting(wait.agentID) } }
+                            .controlSize(.small)
                     }
                     .appText(.supporting)
                     .padding(.horizontal, 14).padding(.vertical, 10)

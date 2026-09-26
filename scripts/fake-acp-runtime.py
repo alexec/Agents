@@ -8,6 +8,8 @@ every turn, from `<its folder>/<its name>.behaviour`:
 
   spent   the turn ends with the typed session failure a spent plan sends
           (limit, no actions): the pool moves the chat on.
+  spent <epoch>
+          the same, with the plan window's reset time first, so it is out until then.
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -56,7 +58,15 @@ SPENT = {"jetbrains": {"air": {"version": 1, "sessionFailure": {
 def prompt(request_id, params):
     session_id = params.get("sessionId", "")
     blocks = params.get("prompt", [])
-    if behaviour() == "spent":
+    how = behaviour().split()
+    if how and how[0] == "spent":
+        # `spent <epoch>`: the plan window says when it is back, as Claude's does.
+        if len(how) > 1:
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {
+                "sessionId": session_id,
+                "update": {"sessionUpdate": "usage_update", "used": 1000, "size": 200000,
+                           "_meta": {"_claude/rateLimit": {"status": "rejected", "resetsAt": int(how[1]),
+                                                           "rateLimitType": "five_hour", "isUsingOverage": False}}}}})
         reply(request_id, {"stopReason": "end_turn", "_meta": SPENT})
         return
     handoff = next((b["resource"]["text"] for b in blocks

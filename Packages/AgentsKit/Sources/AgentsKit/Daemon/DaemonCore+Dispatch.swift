@@ -412,6 +412,11 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.PoolMarkAvailable.self)
                 return .success(try JSONValue.encoding(await markPoolEntryAvailable(request.entryID)))
 
+            case DaemonAPI.Method.poolStopWaiting:
+                let request = try require(params, as: DaemonAPI.PoolStopWaiting.self)
+                await stopWaitingForAllowance(request.agentID)
+                return .success(try JSONValue.encoding(await poolStatus()))
+
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
                 return .success(try JSONValue.encoding(await setLimits(request)))
