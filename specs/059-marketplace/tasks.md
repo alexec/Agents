@@ -215,32 +215,32 @@ any.
 
 ### Tests first
 
-- [ ] T035 [P] [US2] Write `Tests/Catalog/SkillInstallerProjectTests.swift`:
+- [X] T035 [P] [US2] Write `Tests/Catalog/SkillInstallerProjectTests.swift`:
   - `add` to a project writes `<folder>/.agents/skills/<name>` and `<folder>/skills-lock.json`, whose `computedHash` equals the staged folder's;
   - `.agents/skills` is created when missing;
   - `.claude/skills` is linked through `DotAgents` when missing (R7);
   - `git status --porcelain` shows both files untracked, and no commit or index change is made;
   - a worktree folder gets the worktree's own files, not the main checkout's (FR-017).
-- [ ] T036 [P] [US2] Write `Tests/Catalog/SkillsListTests.swift`: `skills/list` for a project returns every folder with a SKILL.md, with its `description`, and `managed` from `skills-lock.json` plus the sidecar. A project with no `.agents/skills` returns `[]`, not an error.
+- [X] T036 [P] [US2] Write `Tests/Catalog/SkillsListTests.swift`: `skills/list` for a project returns every folder with a SKILL.md, with its `description`, and `managed` from `skills-lock.json` plus the sidecar. A project with no `.agents/skills` returns `[]`, not an error.
 
 ### Implementation
 
-- [ ] T037 [US2] Extend `Src/Catalog/SkillInstaller.swift` to the project destination (project lock, the `.claude/skills` link, `.agents/skills` created) and make T035 pass.
-- [ ] T038 [US2] Implement `skills/list` in `Src/Daemon/DaemonCore+Catalog.swift` and make T036 pass.
-- [ ] T039 [US2] Add `projectSkills(folder:)` to `App/Catalog/AppModel+Catalog.swift` (an `extension AppModel`, as `App/Hosts/Lending.swift` does). Reload it when the project page appears and after every add or remove.
-- [ ] T040 [US2] Write `App/Projects/ProjectSkillsSection.swift` as frame D:
+- [X] T037 [US2] Extend `Src/Catalog/SkillInstaller.swift` to the project destination (project lock, the `.claude/skills` link, `.agents/skills` created) and make T035 pass.
+- [X] T038 [US2] Implement `skills/list` in `Src/Daemon/DaemonCore+Catalog.swift` and make T036 pass.
+- [X] T039 [US2] Add `projectSkills(folder:)` to `App/Catalog/AppModel+Catalog.swift` (an `extension AppModel`, as `App/Hosts/Lending.swift` does). Reload it when the project page appears and after every add or remove.
+- [X] T040 [US2] Write `App/Projects/ProjectSkillsSection.swift` as frame D:
   - the `SectionHeading` "Skills" with a count chip, Reveal in Finder and **Add skill…**;
   - the line "In .agents/skills, committed with the project: everyone who clones it gets these.";
   - a card per skill (name and description; managed ones also show the `skills.sh` chip, `owner/repo · <commit7>` and Remove);
   - an empty state that still offers Add skill….
 
   Not drawn for a server project (R10).
-- [ ] T041 [US2] Insert `ProjectSkillsSection` between `WorkflowsSection` and `WorktreesSection` in `App/Projects/ProjectAgentsView.swift`.
-- [ ] T042 [US2] Make the sheet's **Add to** work both ways in `App/Catalog/AddSkillSheet.swift` and `SkillPreviewView.swift`:
+- [X] T041 [US2] Insert `ProjectSkillsSection` between `WorkflowsSection` and `WorktreesSection` in `App/Projects/ProjectAgentsView.swift`.
+- [X] T042 [US2] Make the sheet's **Add to** work both ways in `App/Catalog/AddSkillSheet.swift` and `SkillPreviewView.swift`:
   - opened from a project, it starts set to that project;
   - opened from Settings, the project half lists the person's Mac projects with the selected one first;
   - switching calls `catalog/destination-state` and changes the button wording, the dots and the `added` marks, with no new search (US2 #5).
-- [ ] T043 [US2] Walk quickstart §3 step 6 and frame D on screen, including a worktree page. Screenshots go in `specs/059-marketplace/walk/us2/`.
+- [X] T043 [US2] Walk quickstart §3 step 6 and frame D on screen, including a worktree page. Screenshots go in `specs/059-marketplace/walk/us2/`.
 
 **Checkpoint**: adding works both to You and to a project. Commit.
 
