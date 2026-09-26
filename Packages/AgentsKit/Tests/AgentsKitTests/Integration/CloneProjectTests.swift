@@ -243,7 +243,12 @@ struct CloneProjectTests {
         let summary = try await world.core.cloneProject("https://github.com/octocat/Hello-World.git")
 
         #expect(summary.folder == Project.standardize(checkout))
-        #expect(try git(["status", "--porcelain", "--branch"], in: checkout) == before,
+        // The one addition is the dotagents layout every added project gets; the
+        // branch and the person's own changes are exactly as they were.
+        let layout = ["?? .agents/", "?? .claude/", "?? AGENTS.md", "?? CLAUDE.md"]
+        let after = try git(["status", "--porcelain", "--branch"], in: checkout)
+            .split(separator: "\n").map(String.init).filter { !layout.contains($0) }
+        #expect(after == before.split(separator: "\n").map(String.init),
                 "branch and working changes exactly as they were")
         #expect(world.heard.all.isEmpty, "nothing was cloned")
     }
