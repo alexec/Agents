@@ -126,34 +126,21 @@ private struct EventSheet: View {
     }
 }
 
-/// The way into Events, under the projects beside Spending, with the Mac's shape.
+/// The Events row under Activity, the Mac's shape.
 struct EventsRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        NavigationLink {
-            EventsListView()
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Events")
-                Spacer()
-                if let last = model.work.lastEventAt {
-                    Text("Last \(LeaseWords.clock(last))").monospacedDigit()
-                }
-                Image(systemName: "chevron.right")
+        HStack(alignment: .firstTextBaseline) {
+            Label("Events", systemImage: "bolt")
+            Spacer()
+            if let last = model.work.lastEventAt {
+                Text("Last \(LeaseWords.clock(last))")
+                    .monospacedDigit()
                     .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
-        .overlay(alignment: .top) { Rectangle().fill(Paper.rule).frame(height: 1) }
         .accessibilityHint("Opens Events")
     }
 }
