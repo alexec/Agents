@@ -94,6 +94,21 @@ You can also remove a worktree yourself. The app refuses while an agent is worki
 and tells you what would be lost, and asks you to confirm, if it has changes that are not
 committed or a branch that is not merged.
 
+## Your own set, and a project's
+
+A project can carry its own `.agents` folder, with skills, instructions and plugins that
+belong to that project and apply only inside it. `~/.agents` in your home folder is the same
+idea one level up: your own set, which every agent the app starts gets, in every project and
+on every runtime. The app lays it out on your Mac only; a project on a server gets the
+project's own folder, and the runtimes on the server keep whatever they were set up with
+there.
+
+Your set goes to each runtime the way that runtime can take it, which differs. Some read
+`~/.agents/skills` themselves; for others the app places links, which it never puts back
+once you delete them; MCP servers go with each conversation as it starts, so nothing is
+written into a runtime's own config. **Settings ▸ Shared** shows what each runtime ends up
+with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
+
 ## Related
 
 - [How-to guides](../how-to/index.md), for adding a project, adding a Linux server and

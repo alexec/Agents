@@ -29,6 +29,8 @@ something particular done.
   keeps.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Copilot, Cursor or Grok in
   or out from the app.
+- [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
+  put them in `~/.agents` once, for every runtime and project.
 
 ### Servers
 
