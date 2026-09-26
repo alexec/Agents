@@ -34,6 +34,8 @@ signing in** beside it, and you can sign it in from there.
      code to enter on OpenAI's page instead, and **API Key** uses an OpenAI API key.
      Antigravity offers a personal or a business Google account, and opens Google's
      sign-in in your browser.
+   - Claude Code signs in in Terminal: run `claude`, type `/login`, and follow what it
+     asks. Then open the sheet again; it says which account, such as **Claude Max**.
    - Some hand you a command to run instead, and the sheet says, for example, **Copilot
      signs in from a terminal. Run this:** with the command under it. Click **Open
      Terminal** (it also copies the command), paste it and follow what it asks. **Copy**

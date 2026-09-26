@@ -11,7 +11,8 @@ preview with `scripts/docs.sh serve`). This README is for building and working o
 
 The window is a list of the projects you work in — a project is a folder, named by that
 folder, on this Mac or on a Linux server — with that project's agents beside it, grouped
-by what they need from you: needs attention, blocked, working, complete, stopped, parked.
+by what they need from you: needs attention, blocked, waiting, working, complete, stopped,
+parked.
 An agent can start up to three helpers of its own, and a project's workflows (Markdown
 files under `.agents/workflows/`) start agents by themselves on a schedule or when
 something happens.
