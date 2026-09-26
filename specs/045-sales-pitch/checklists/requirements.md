@@ -33,7 +33,8 @@
 
 - The Docs section names files (`mkdocs.yml`, the spec template) because the feature *is* docs; this
   is the template's own requirement, not an implementation leak.
-- Four open choices were taken as defaults D1–D4 rather than left as markers; Alex can overturn any.
+- D1–D3 confirmed by Alex; D4 (the reader) is a default.
 - Claims were checked against the docs on main (e.g. "keeps the Mac awake" is only while a turn is in
   flight; a Mac restart stops agents and they resume on next open).
 - Revised 2026-09-25 at Alex's prompt: leases, events and workflows promoted to a headline pillar (US3, FR-004/004a, SC-007) and 042's missing docs pulled into scope (FR-016, SC-008). Every event name the example uses (pull_request.checks_failed/checks_passed, custom.*) is raised on main.
+- Fixed 2026-09-25: stale 043/042 statements after main moved to 075d9f9; the order of the reasons at the top now matches FR-004; the notification wording now matches the docs; the example's custom event now has a reason; server.* events are listed but never raised (an app bug, excluded from the docs); README's stale 'lead' paragraph; server docs lag 043 (FR-017).

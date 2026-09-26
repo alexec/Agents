@@ -26,11 +26,6 @@ is built around several agents working at once, while the person is often somewh
 - **Many agents, sorted by who needs you.** Every agent is in one of these groups: Needs attention,
   Blocked, Working, Complete, Stopped or Parked. Each one ends its turn with a sentence saying how it went,
   so you can see what needs doing without reading the conversations.
-- **They keep going without you.** Agents run in a background helper, not in the window. Closing the
-  window or quitting the app does not stop them. The Mac stays awake while a turn is in progress. After
-  the Mac restarts, the agents that were working pick up where they stopped when you next open Agents.
-- **You can follow them from anywhere.** On the iPhone and iPad you can read, answer, start, stop and
-  attach, and a notification goes to the device you are using.
 - **They work together, and they work on their own.** An IDE's assistant does what you ask, while you
   watch. Here, agents coordinate, and work starts without you:
   - **Leases**: agents take turns with anything only one of them should use at a time, such as the
@@ -47,8 +42,15 @@ is built around several agents working at once, while the person is often somewh
     resolves conflicts on your open pull requests.
   - **Agents that manage agents**: an agent can start up to three others, brief them, wait for them and
     stop them. Each can have a worktree of its own, so they do not edit the same files.
+- **They keep going without you.** Agents run in a background helper, not in the window. Closing the
+  window or quitting the app does not stop them. The Mac stays awake while a turn is in progress. After
+  the Mac restarts, the agents that were working pick up where they stopped when you next open Agents.
+- **You can follow them from anywhere.** On the iPhone and iPad you can read, answer, start, stop and
+  attach. When an agent needs you and you are away from the Mac, a notification goes to the device you
+  used last.
 - **The work runs on your machines.** The work stays on your Mac, or on Linux servers you own, reached
-  over SSH. There is no cloud service of ours in between.
+  over SSH. On a server, Agents installs what Claude needs by itself, and your token stays in the
+  Mac's Keychain. There is no cloud service of ours in between.
 - **One figure for spending**, across every runtime and server.
 
 This feature writes that case down once, honestly, on the public site. It also says where an editor or
@@ -145,8 +147,8 @@ A developer already has three terminal tabs of Claude Code open, and has had two
 simulator. On "Why Agents" they reach one section, "Agents that work together, and on their own". It
 opens with one example, told from start to finish. A workflow starts an agent when a pull request's
 checks fail. The agent leases the simulator to reproduce the failure, pushes a fix, and waits for the
-checks to pass without spending anything while it waits. Once they pass, it publishes an event that
-another agent was waiting for. After the example, the section has one short paragraph each on leases,
+checks to pass without spending anything while it waits. Once they pass, it publishes
+`custom.release_ready`, and a release agent that was waiting for that event wakes up and starts. After the example, the section has one short paragraph each on leases,
 events and waiting, workflows, pull requests, and agents managing agents. Each paragraph links to its
 docs page.
 
@@ -225,11 +227,13 @@ that the review steps flag it. Separately, check that the spec template's guidan
 - **A named example product changes** (for example, an editor adds a phone app). Products are only
   examples of a kind (D2), so a change in one product does not make the page false. Only the section for
   its kind may need a look.
-- **A feature is built but not merged** (043 zero-setup servers, 042's phone look). The pitch describes
-  only what is on main. Coming features are not mentioned.
-- **An event 042 describes but does not raise.** For example, the `server.*` events are not raised,
-  because the server connection lives in the app. The reference lists only the events main raises
-  today, and the pitch claims only those.
+- **A feature merges while the pitch is being written.** Main moved during this spec: 043 (zero-setup
+  servers) merged as `075d9f9`. Before publishing, the claims are checked again against main as it is
+  then (SC-003), not against this spec.
+- **An event is listed but never raised.** `server.offline` and `server.online` are in the app's own
+  list of events, so an agent can wait for them. But nothing raises them, because the server connection
+  lives in the app and not the daemon, so that agent would wait forever. The docs do not offer them, and
+  the pitch does not claim them. The app bug is reported separately and is not fixed here.
 - **The reader is on a phone.** The page reads well on a narrow screen: no wide tables that must be
   scrolled sideways to read the main points.
 
@@ -269,7 +273,8 @@ that the review steps flag it. Separately, check that the spec template's guidan
 - **FR-009**: The page MUST NOT mention features that are not on main.
 - **FR-010**: The page MUST end with one clearly marked link to the first tutorial.
 - **FR-011**: The docs home page and the README MUST each open with a two-line version of the case that
-  links to the page.
+  links to the page. The README's paragraph about each project having a "lead" agent is no longer true,
+  and MUST be replaced by it.
 - **FR-012**: The page MUST follow the site's existing voice: plain words, short sentences, no
   superlatives or marketing adjectives ("revolutionary", "seamless", "blazing"), no claims about other
   tools' quality.
@@ -287,6 +292,8 @@ that the review steps flag it. Separately, check that the spec template's guidan
   - the workflow reference's new dotted triggers and filters;
   - `wait_for_event`, `cancel_wait` and `publish_event` added to the list of tools;
   - the events log on the Mac and on the phone and iPad.
+- **FR-017**: Before the pitch claims zero-setup servers, the server docs MUST match 043. Today "Add a
+  Linux server" still says to install and sign in to a runtime on the server by hand.
 
 ### Key Entities
 
@@ -327,17 +334,20 @@ that the review steps flag it. Separately, check that the spec template's guidan
 - `docs/reference/agent-tools.md`: change. Add `wait_for_event`, `cancel_wait` and `publish_event`.
 - `docs/reference/statuses.md`, `docs/explanation/phone-and-ipad.md`: change if needed. Waiting on an
   event, and the events log on the phone and iPad.
+- `docs/how-to/add-a-linux-server.md`, `docs/reference/runtimes.md`, `docs/reference/settings.md`:
+  change. Claude installed on the server by Agents, and the token in Mac Settings (FR-017).
 - `docs/index.md`: change. Open with the two-line case and the link to it (FR-011).
 - `mkdocs.yml`: change. Put the page in the nav, first under Explanation.
-- `README.md`: change. Two-line case and link at the top, above the build notes (FR-011).
+- `README.md`: change. Two-line case and link at the top in place of the stale "lead" paragraph
+  (FR-011).
 - `.specify/templates/spec-template.md`: change. The Docs guidance names "Why Agents" (FR-014).
 
 ## Assumptions
 
 - The reader already uses at least one coding agent and knows what one is (D4).
-- The claims are taken from what main does on 2026-09-25, including 042 (events and waiting),
-  037 (servers) and 038 (pull requests). The phone look of 042 and all of 043 are not on main and are
-  left out (FR-009).
+- The claims are taken from what main does at `075d9f9` (2026-09-25), including 037 (servers), 038 (pull
+  requests), 042 (events and waiting, with the events list on the phone and iPad) and 043 (zero-setup
+  servers).
 - The only way to get the app is to build it from source, as the first tutorial says. There is no
   download, price or licence to state.
 - The site's voice follows the existing docs pages. The pitch is persuasive by being specific, not by
