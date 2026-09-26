@@ -12,6 +12,9 @@ actor FakeACPAgent {
         var supportsResume = false
         var supportsLoad = true
         var configOptions: [ConfigOption] = []
+        /// `models` and `modes` in a session answer, the older way Gemini CLI sends them
+        /// instead of `configOptions` (046).
+        var olderStyle: [String: JSONValue] = [:]
         var updates: [JSONValue] = []
         var stopReason = "end_turn"
         /// How long a turn takes. Zero for almost every test; a real duration for the
@@ -142,7 +145,13 @@ actor FakeACPAgent {
                       let options = try? JSONValue.encoding(script.configOptions) {
                 result["configOptions"] = options
             }
+            result.merge(script.olderStyle) { current, _ in current }
             return .success(.object(result))
+
+        case "session/set_model", "session/set_mode":
+            let key = method == "session/set_model" ? "modelId" : "modeId"
+            setOptions.append((method == "session/set_model" ? "model" : "mode", params?[key] ?? .null))
+            return .success([:])
 
         case ACP.Method.list:
             return .success(["sessions": .array(script.sessions)])
