@@ -91,7 +91,7 @@ struct WorktreeRow: View {
         var text = Text(branch)
         if let status = worktree.status {
             let summary = Text(status.summary)
-            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundColor(.orange) : summary)
+            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundStyle(StateTint.attention.style(or: .secondary)) : summary)
         }
         switch worktree.agents.count {
         case 0: return text

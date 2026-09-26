@@ -359,6 +359,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.EventRaiseRequest.self)
                 return .success(try JSONValue.encoding(try raiseByHand(request)))
 
+            case DaemonAPI.Method.eventsServer:
+                let request = try require(params, as: DaemonAPI.ServerReachabilityChange.self)
+                return .success(try JSONValue.encoding(try raiseServerChange(request, from: surface)))
+
             case DaemonAPI.Method.leasesSnapshot:
                 return .success(try JSONValue.encoding(await leaseSnapshot()))
 

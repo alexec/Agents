@@ -68,10 +68,9 @@ struct ProjectPageView: View {
                 }
 
                 ForEach(AgentGroup.live, id: \.self) { group in
-                    let agents = model.agents(group: group)
-                    if !agents.isEmpty {
-                        GroupHeading(title: group.title, count: agents.count)
-                        ForEach(agents) { agent in
+                    ForEach(group.headings(model.agents(group: group))) { heading in
+                        GroupHeading(title: heading.title, count: heading.agents.count)
+                        ForEach(heading.agents) { agent in
                             AgentCard(agent: agent)
                         }
                     }

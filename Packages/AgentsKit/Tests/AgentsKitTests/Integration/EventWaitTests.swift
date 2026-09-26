@@ -144,6 +144,45 @@ struct EventWaitTests {
         #expect(event?.consequences == [.woke(agentID: a, title: "Waiter")])
     }
 
+    /// `server.offline` and `server.online` come from the window, which holds the
+    /// servers' connections: its word wakes a wait on the server it names, and no other.
+    @Test func theWindowSayingAServerWentWakesAWaitOnIt() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (a, token) = try await agent(core, in: work, "Watcher")
+
+        let call = Task { try await wait(core, token, ["server.offline"], where: ["server": "devbox"]) }
+        try await eventually("held") { await isHeld(core, a) }
+        let other = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "buildbox", online: false))
+        _ = await core.handle(method: DaemonAPI.Method.eventsServer, params: other, from: .mac)
+        #expect(await isHeld(core, a))
+        let params = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "devbox", online: false))
+        guard case .success = await core.handle(method: DaemonAPI.Method.eventsServer, params: params, from: .mac) else {
+            Issue.record("the window's word was refused"); return
+        }
+        let answer = try await call.value
+        #expect(answer.hasPrefix("server.offline happened at "))
+        let event = await core.eventLog.events.last { $0.name == "server.offline" }
+        #expect(event?.details["server"] == "devbox")
+        #expect(event?.scope == .mac)
+
+        let back = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "devbox", online: true))
+        _ = await core.handle(method: DaemonAPI.Method.eventsServer, params: back, from: .mac)
+        #expect(await core.eventLog.events.last?.name == "server.online")
+    }
+
+    @Test func aPhoneCannotSayAServerWent() async throws {
+        let (locations, _, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let params = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "devbox", online: false))
+        guard case .failure(let error) = await core.handle(method: DaemonAPI.Method.eventsServer, params: params,
+                                                           from: .device(UUID())) else {
+            Issue.record("a phone said a server went"); return
+        }
+        #expect(error.code == DaemonAPI.Failure.eventRefused)
+        #expect(!(await core.eventLog.events.contains { $0.name.hasPrefix("server.") }))
+    }
+
     @Test func pastTheHoldItSaysStillWaitingAndIsStartedWhenItComes() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(150))

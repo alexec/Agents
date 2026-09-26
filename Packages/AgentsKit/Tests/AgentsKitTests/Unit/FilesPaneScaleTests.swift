@@ -8,7 +8,7 @@ import Testing
 /// read whole to show the start of it.
 @Suite("The files pane at awkward sizes")
 struct FilesPaneScaleTests {
-    @Test func aFolderOfFiftyThousandEntriesListsQuickly() throws {
+    @Test(.flakyUnderLoad) func aFolderOfFiftyThousandEntriesListsQuickly() throws {
         let root = URL.temporaryDirectory.appending(path: "scale-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }

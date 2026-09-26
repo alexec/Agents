@@ -93,3 +93,26 @@ After Alex signed in to Claude in the box (`claude login`, 2026-09-25): a turn t
 forward read the README, ran `uname -a` (aarch64 Linux), asked permission to write, wrote
 `from-the-mac.txt` in `~/src/hello` on the box (nothing on the Mac), answered, and reported with
 `finish_turn`: the app's agent tools work for a runtime on the server. About 12 s end to end.
+
+## server.offline and server.online, live (2026-09-25)
+
+Before this branch (`549dadb`), nothing raised either event, so a wait on one never ended.
+Walked on scratch root `/tmp/run-srvev`, built from this branch, against the devbox. The server
+was written into the root's `hosts.json` by hand, marked own sign-in only, and connected without
+reinstalling (the box already had the same aarch64 binary).
+
+1. A real Claude agent on the Mac called `wait_for_event` for `server.offline` where
+   `server: 127.0.0.1`. The 45 s hold ran out, its turn ended Blocked, and it was listed as
+   waiting.
+2. `devbox.sh down` at 01:01:37Z. `hosts.log` went offline at 01:01:39Z and stayed offline
+   through several retries. `server.offline` (`server: 127.0.0.1`, "127.0.0.1 went offline.")
+   was raised once, woke the agent, and it answered "`server.offline` fired: server 127.0.0.1
+   went offline at 18:01."
+3. Told to wait for `server.online`, it did. `devbox.sh up` at about 01:02:20Z. The window
+   reconnected at 01:02:42Z (the retry had backed off), raised `server.online` once ("127.0.0.1
+   came back."), and the agent woke and answered "`server.online` fired: server 127.0.0.1 came
+   back online at 18:02."
+
+The real app, also connected to the devbox, showed it offline for that minute and reconnected by
+itself at 01:02:44Z. The events are raised only while the Mac's window is running, because the
+window holds the servers' connections.

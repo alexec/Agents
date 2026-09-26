@@ -281,4 +281,20 @@ struct AgentGroupTests {
         agent.state = .archived
         #expect(agent.parkAction == nil)
     }
+
+    /// Complete is drawn as Unread above Read, and a heading with nobody under it is not
+    /// drawn. Every other group is its one heading, under its own title.
+    @Test func completeIsDrawnAsUnreadThenRead() {
+        let dir = URL(fileURLWithPath: "/tmp/work")
+        var unread = Agent(runtimeID: "claude", cwd: dir, state: .finished, endedReason: .endTurn)
+        unread.isUnread = true
+        let read = Agent(runtimeID: "claude", cwd: dir, state: .finished, endedReason: .endTurn)
+
+        let both = AgentGroup.finished.headings([read, unread])
+        #expect(both.map(\.title) == ["Unread", "Read"])
+        #expect(both.map { $0.agents.map(\.id) } == [[unread.id], [read.id]])
+        #expect(AgentGroup.finished.headings([read]).map(\.title) == ["Read"])
+        #expect(AgentGroup.finished.headings([]).isEmpty)
+        #expect(AgentGroup.stopped.headings([read]).map(\.title) == ["Stopped"])
+    }
 }

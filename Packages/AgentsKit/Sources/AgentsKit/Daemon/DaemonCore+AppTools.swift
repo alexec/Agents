@@ -542,8 +542,8 @@ extension DaemonCore {
         }
         return """
             \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
-            It is live now; it shows on the project page, where they can run it, pause \
-            it, or archive it if it is not what they wanted.
+            It is live now; it shows on the project page, where they can run it, or \
+            archive it if it is not what they wanted.
             """ + warning
     }
 

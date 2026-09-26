@@ -5,6 +5,10 @@ description: Agents runs the coding agents you already have — Claude, Grok, Co
 
 # Agents
 
+**Keep your editor and your coding agent. Agents runs several agents at once, shows which
+one needs you, lets them work together and on their own, and lets you answer them from
+your phone.** [Why Agents](explanation/why-agents.md)
+
 Agents is a Mac app for working with coding agents. You give it the folders you work in,
 start an agent in one with a sentence of what you want done, and it keeps every agent in
 view: which ones need you, which are working, and which have finished.

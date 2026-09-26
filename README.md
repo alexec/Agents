@@ -1,5 +1,9 @@
 # Agents
 
+Keep your editor and your coding agent. Agents runs several agents at once, shows which
+one needs you, lets them work together and on their own, and lets you answer them from
+your phone. [Why Agents](https://alexec.github.io/Agents/explanation/why-agents/)
+
 A Mac app, rebuilt one feature at a time against a written spec.
 
 Using the app? The docs are at https://alexec.github.io/Agents/ (source in `docs/`;

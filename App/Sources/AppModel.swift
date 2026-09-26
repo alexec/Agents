@@ -1000,6 +1000,12 @@ final class AppModel {
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
         }
+        hosts.onReachability = { [weak self] server, online in
+            guard let self else { return }
+            _ = try? await self.client.call(DaemonAPI.Method.eventsServer,
+                                            DaemonAPI.ServerReachabilityChange(server: server, online: online),
+                                            returning: Event.self)
+        }
         hosts.start()
     }
 
