@@ -573,6 +573,23 @@ final class AppModel {
                                                                 archived: archived))
     }
 
+    /// Approve a workflow's file as the row showed it. Said when it fails: the likely
+    /// reason is that the file changed after the person looked, and they should look again.
+    func approveWorkflow(_ summary: WorkflowSummary) async {
+        guard let waiting = summary.awaitingApproval else { return }
+        do {
+            let updated: WorkflowSummary = try await client.call(
+                DaemonAPI.Method.workflowsApprove,
+                DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                 digest: waiting.digest),
+                returning: WorkflowSummary.self)
+            work.upsert(updated)
+        } catch {
+            problem = describe(error)
+            await refreshWorkflows()
+        }
+    }
+
     /// Change what a workflow is allowed to do. The daemon writes the file.
     ///
     /// The one call in this section that does **not** swallow its error, and the

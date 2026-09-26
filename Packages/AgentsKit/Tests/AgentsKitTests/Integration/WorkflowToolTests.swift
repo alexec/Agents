@@ -444,7 +444,7 @@ struct WorkflowToolTests {
         let description = AppService.workflowTool["description"]?.stringValue ?? ""
         #expect(!description.contains("removing one asks"))
         #expect(!description.contains("if they decline"))
-        #expect(description.contains("Nothing here asks the person:"))
+        #expect(description.contains("Nothing here asks the person,"))
 
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -459,5 +459,22 @@ struct WorkflowToolTests {
         #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "advisories", in: work).path))
         #expect(answer.contains("It is live now"))
         #expect(!answer.contains("pause"))
+        #expect(description.contains("does not run until they approve it"))
+    }
+
+    /// Once approval has begun, what an agent writes waits for the person, and the
+    /// agent is told so in words it can pass on rather than believing it will run.
+    @Test func aWorkflowAnAgentWritesWaitsForTheirOKAndTheAgentIsTold() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        await core.startWorkflows()
+
+        let answer = try await call(core, token, .write, id: "advisories", content: sample, keepingAlive: agentID)
+
+        #expect(answer.contains("It will not run until they approve it on the project page"))
+        let summary = try #require(await core.allWorkflows(in: work).first)
+        #expect(summary.awaitingApproval?.isNew == true)
+        #expect(summary.needsAPerson)
     }
 }

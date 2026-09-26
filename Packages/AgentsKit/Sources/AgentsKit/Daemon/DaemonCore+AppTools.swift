@@ -354,8 +354,9 @@ extension DaemonCore {
 /// The workflow tool: what an agent may do to its own project's standing arrangements.
 ///
 /// Nothing here asks first. An agent told to set up a workflow sets one up, and the
-/// person's say is on the project page afterwards, where a workflow can be archived by
-/// somebody looking at what it actually does. Asking first was tried and
+/// person's say is on the project page afterwards: what an agent writes waits there for
+/// their Approve before it ever runs (security review), and can be archived by somebody
+/// looking at what it actually does. Asking in the middle of the call was tried and
 /// was worse in both directions: it put a prompt nobody had asked to read in front of
 /// a decision, and it left the agent blocked whenever there was no window to read it.
 extension DaemonCore {
@@ -538,6 +539,18 @@ extension DaemonCore {
                 \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
                 It is archived, though, so it will not run until they bring it back \
                 from the project page. Tell them it is there.
+                """ + warning
+        }
+        // Waiting for the person, which is the usual case for a file an agent wrote:
+        // said plainly, so the agent tells them rather than believing it will run.
+        let records = workflowStore.load()
+        if let written = workflow(workflowID, in: project),
+           awaitingApproval(written, state: records.state(folder: project, workflowID: workflowID),
+                            records: records) != nil {
+            return """
+                \(exists ? "Changed" : "Created") \(workflowID). \(parsed.summary). \
+                It will not run until they approve it on the project page, so tell them \
+                it is waiting for their OK and what it does.
                 """ + warning
         }
         return """

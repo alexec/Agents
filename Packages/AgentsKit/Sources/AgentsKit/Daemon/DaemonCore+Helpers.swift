@@ -38,6 +38,17 @@ extension DaemonCore {
                 message: "Nothing was started: this project already has \(HelperLimit.perProject) "
                     + "agents started by agents\(naming). Archive one to free its place.")
         }
+        // A mode it names may be its own or stricter, never looser: otherwise an agent
+        // kept on a short lead starts one on none and hands it the work.
+        if let wanted = request.permissionMode {
+            let own = inheritedMode(from: caller, runtime: caller.runtimeID)
+            guard let own, ModeLooseness.isNoLooser(wanted, than: own) else {
+                throw JSONRPCError(
+                    code: JSONRPCError.invalidParams,
+                    message: "Nothing was started: \(wanted) would let it do more without asking "
+                        + "than you may (\(own ?? "your runtime's own mode")). Name no mode and it takes yours.")
+            }
+        }
         // Read now, while the caller's own run — if it has one — is still in flight.
         // The helper can outlive that run by hours, and a depth worked out from it then
         // would be zero.
