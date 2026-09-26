@@ -373,7 +373,7 @@ struct PairMacSheet: View {
                 .fixedSize()
             }
             Divider()
-            Text("Pairing another Mac needs the control plane to listen on the network, which comes next. For now a Mac joins by running its own control plane.")
+            Text("Pairing another Mac needs the control plane to listen on the network, which comes next. Until then, this Mac’s own window is the only Mac that can use it.")
                 .appText(.supporting).tinted(.attention)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {

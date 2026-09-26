@@ -175,13 +175,13 @@ or on Alex's paired devices.
 
 **Independent test**: pair a fake device, promote it and see an operator call succeed; forget it and see it cut off and refused.
 
-- [ ] T046 [P] [US5] Add a **Control plane** rail group that opens like Shared, in `App/Sources/Settings/SettingsRail.swift` (or wherever 055's rail lives). It replaces the Devices and Servers entries when `ControlConfig` exists.
-- [ ] T047 [P] [US5] Build frame D in `App/Sources/Control/ControlOverviewPane.swift`: where the control plane runs, its version, uptime and port, Restart, Reachable away from home, the sleep caveat, and summary cards for Hosts and Clients.
-- [ ] T048 [P] [US5] Build frame E in `App/Sources/Control/ControlHostsPane.swift`: today's Servers pane plus This Mac, which has no buttons (the look-gate decision). Each host shows its state and "connects out" or "reached over ssh". Add a server… uses T042.
-- [ ] T049 [P] [US5] Build frame F in `App/Sources/Control/ControlClientsPane.swift`: today's Devices pane plus the window. Each client gets a grant menu (`clients/setGrant`) and Forget (`clients/forget`), and `lastOperator` shows as a plain sentence.
-- [ ] T050 [US5] Build frame G in `App/Sources/Control/PairClientSheet.swift`: choose the grant first, then show the QR code for a device or the code as text for a Mac.
-- [ ] T051 [US5] Grant changes apply to the next call. The router reopens that client's channels with the new grant (data-model rule). Test it in `ControlRouterTests.swift`.
-- [ ] T052 [US5] Walk: a fake device client over TLS-PSK (the test-servers helper). Promote it, call an operator method, forget it, and see its connection close and its reconnect refused. Screenshot D, E, F and G against the frames. Record in `specs/058-control-plane/walks/us5.md`.
+- [x] T046 [P] [US5] Add a **Control plane** rail group that opens like Shared, in `App/Sources/Settings/SettingsRail.swift` (or wherever 055's rail lives). It replaces the Devices and Servers entries when `ControlConfig` exists.
+- [x] T047 [P] [US5] Build frame D in `App/Sources/Control/ControlOverviewPane.swift`: where the control plane runs, its version, uptime and port, Restart, Reachable away from home, the sleep caveat, and summary cards for Hosts and Clients.
+- [x] T048 (Add a Server… and Add by Code… disabled until US3 and pairing) [P] [US5] Build frame E in `App/Sources/Control/ControlHostsPane.swift`: today's Servers pane plus This Mac, which has no buttons (the look-gate decision). Each host shows its state and "connects out" or "reached over ssh". Add a server… uses T042.
+- [x] T049 (phones paired to the host listed with a fixed Device grant until US4) [P] [US5] Build frame F in `App/Sources/Control/ControlClientsPane.swift`: today's Devices pane plus the window. Each client gets a grant menu (`clients/setGrant`) and Forget (`clients/forget`), and `lastOperator` shows as a plain sentence.
+- [x] T050 (Pair a Mac: grant first; the code waits for network pairing and the sheet says so; Pair a Device is today’s sheet) [US5] Build frame G in `App/Sources/Control/PairClientSheet.swift`: choose the grant first, then show the QR code for a device or the code as text for a Mac.
+- [x] T051 [US5] (tested in ControlRouterTests.changingAGrantReopensTheChannelsWithTheNewOne; seen live in walks/us5.md) Grant changes apply to the next call. The router reopens that client's channels with the new grant (data-model rule). Test it in `ControlRouterTests.swift`.
+- [x] T052 (walks/us5.md) [US5] Walk: a fake device client over TLS-PSK (the test-servers helper). Promote it, call an operator method, forget it, and see its connection close and its reconnect refused. Screenshot D, E, F and G against the frames. Record in `specs/058-control-plane/walks/us5.md`.
 
 ---
 
