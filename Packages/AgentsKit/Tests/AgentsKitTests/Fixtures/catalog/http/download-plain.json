@@ -1,0 +1,13 @@
+{
+  "files": [
+    {
+      "path": "SKILL.md",
+      "contents": "---\nname: plain\ndescription: A plain fixture skill.\n---\n\n# Plain\n\nDo the plain thing.\n"
+    },
+    {
+      "path": "notes.md",
+      "contents": "Some notes.\n"
+    }
+  ],
+  "hash": "not-used-by-the-app"
+}

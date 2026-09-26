@@ -1,0 +1,29 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "contents": "file README.md\n"
+    },
+    {
+      "path": "SKILL.md",
+      "contents": "---\nname: mixed\ndescription: Names that sort differently by locale and by bytes.\n---\n\n# Mixed\n"
+    },
+    {
+      "path": "Zeta.md",
+      "contents": "file Zeta.md\n"
+    },
+    {
+      "path": "a-b.md",
+      "contents": "file a-b.md\n"
+    },
+    {
+      "path": "a_b.md",
+      "contents": "file a_b.md\n"
+    },
+    {
+      "path": "alpha.md",
+      "contents": "file alpha.md\n"
+    }
+  ],
+  "hash": "not-used-by-the-app"
+}
