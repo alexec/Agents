@@ -198,4 +198,70 @@ struct LendTests {
         #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32000, message: "Authentication required")))
         #expect(!DaemonCore.isAuthenticationFailure(JSONRPCError(code: -32603, message: "Internal error: overloaded")))
     }
+
+    // MARK: Gemini's key on this Mac (046, D3)
+
+    /// Made up, in the shape Google issues now.
+    static let geminiKey = "AQ.Ab8RN6Kfake-LENDTEST-gemini-key-0000000000000000"
+
+    private func lendGemini(_ setup: Setup, on connection: UUID) async -> Result<JSONValue, JSONRPCError> {
+        await call(setup, DaemonAPI.Method.credentialsLend,
+                   DaemonAPI.CredentialsLend(runtime: "gemini", secret: Secret(Self.geminiKey)!), on: connection)
+    }
+
+    private func startGemini(_ setup: Setup, on connection: UUID) async -> Result<JSONValue, JSONRPCError> {
+        await call(setup, DaemonAPI.Method.agentsStart,
+                   DaemonAPI.StartRequest(runtimeID: "gemini", cwd: setup.folder, prompt: "hello", requestID: UUID()),
+                   on: connection)
+    }
+
+    /// Whether this machine's own login environment already signs Gemini in, which would
+    /// make "nothing lent" start anyway, rightly.
+    private var personHasAGeminiKey: Bool {
+        let own = LoginShellPath.environment()
+        return CredentialKind.variables(for: "gemini").contains { !(own[$0] ?? "").isEmpty }
+    }
+
+    @Test func theMacsOwnDaemonTakesGeminisKeyAndHandsItOnlyToGemini() async throws {
+        let setup = try await setUp(server: false)
+        let window = UUID()
+        guard case .success = await lendGemini(setup, on: window) else { Issue.record("refused"); return }
+        guard case .success = await startGemini(setup, on: window) else { Issue.record("did not start"); return }
+        #expect(setup.launcher.lent.last == ["GEMINI_API_KEY": Self.geminiKey])
+        _ = await start(setup, on: window)
+        #expect(setup.launcher.lent.last?.isEmpty == true, "Claude on the Mac is lent nothing")
+    }
+
+    @Test func itOutlivesTheWindowThatLentIt() async throws {
+        let setup = try await setUp(server: false)
+        let window = UUID()
+        _ = await lendGemini(setup, on: window)
+        await setup.core.forgetCredentials(window)
+        guard case .success = await startGemini(setup, on: UUID()) else { Issue.record("did not start"); return }
+        #expect(setup.launcher.lent.last?["GEMINI_API_KEY"] == Self.geminiKey)
+    }
+
+    @Test func aKeyTakenOutOfSettingsIsNoLongerLent() async throws {
+        let setup = try await setUp(server: false)
+        let window = UUID()
+        _ = await lendGemini(setup, on: window)
+        _ = await call(setup, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.CredentialsOffer(runtimes: [], ownSignInOnly: false), on: window)
+        let result = await startGemini(setup, on: window)
+        if personHasAGeminiKey {
+            #expect(setup.launcher.lent.last?.isEmpty == true, "the person's own key, untouched")
+        } else {
+            guard case .failure(let error) = result else { Issue.record("started with no key"); return }
+            #expect(error.code == DaemonAPI.Failure.credentialWanted)
+            #expect(error.message == "Gemini needs an API key. Add one in Settings ▸ Runtime credentials.")
+            #expect(wanted(result)?.runtime == "gemini")
+        }
+    }
+
+    @Test func aLentGeminiKeyTakesOutTheOnesGeminiWouldPrefer() {
+        let applied = LentEnvironment.$value.withValue(["GEMINI_API_KEY": Self.geminiKey]) {
+            LentEnvironment.applied(to: ["GOOGLE_API_KEY": "theirs", "ANTHROPIC_API_KEY": "claude's", "PATH": "/bin"])
+        }
+        #expect(applied == ["GEMINI_API_KEY": Self.geminiKey, "ANTHROPIC_API_KEY": "claude's", "PATH": "/bin"])
+    }
 }

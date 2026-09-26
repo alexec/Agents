@@ -8,16 +8,18 @@ public enum RequestConnection {
 
 /// What a runtime about to be started is lent, set around `SessionLauncher.launch` (043).
 ///
-/// Empty for everything but a server's runtime that a window lent a credential for. When
-/// set, every Claude credential variable the login environment had is taken out first, so
-/// the one from Settings is the one used (D1).
+/// Empty for everything but a server's runtime that a window lent a credential for, or
+/// Gemini on this Mac (046). When set, every variable that runtime might read a credential
+/// from is taken out of the login environment first, so the one from Settings is the one
+/// used (D1).
 public enum LentEnvironment {
     @TaskLocal public static var value: [String: String] = [:]
 
     public static func applied(to environment: [String: String]) -> [String: String] {
         guard !value.isEmpty else { return environment }
         var result = environment
-        for name in CredentialKind.allVariables { result[name] = nil }
+        let lentKinds = CredentialKind.allCases.filter { value.keys.contains($0.environmentVariable) }
+        for name in lentKinds.flatMap(\.clearedVariables) { result[name] = nil }
         result.merge(value) { _, lent in lent }
         return result
     }
@@ -43,12 +45,24 @@ extension DaemonCore {
     static let lendableRuntimes: Set<String> = ["claude"]
 
     func offerCredentials(_ offer: DaemonAPI.CredentialsOffer, connection: UUID?) {
-        guard let connection, !exitsWhenIdle else { return }
+        // On this Mac an offer is the window saying what it still holds: a key taken out
+        // of Settings stops being lent to agents started from now on.
+        if exitsWhenIdle {
+            for runtime in macLent.keys where !offer.runtimes.contains(runtime) { macLent[runtime] = nil }
+            return
+        }
+        guard let connection else { return }
         credentialOffers[connection] = offer
         if offer.ownSignInOnly { lentCredentials[connection] = nil }
     }
 
     func lendCredential(_ lend: DaemonAPI.CredentialsLend, connection: UUID?) throws {
+        // This Mac's own agents are lent only what has no other way in (046, D3).
+        if exitsWhenIdle, let secret = Secret(lend.secret), secret.kind == lend.kind,
+           secret.kind.isLentOnTheMac, secret.kind.runtimeID == lend.runtime {
+            macLent[lend.runtime] = secret
+            return
+        }
         guard !exitsWhenIdle else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAServer,
                                message: "This Mac's own agents use this Mac's sign-in; nothing is lent to them.")
@@ -80,7 +94,8 @@ extension DaemonCore {
     /// credential it has not lent yet, or when nothing was lent and the server has no
     /// sign-in of its own. The window lends and asks again with the same `sendID`.
     func launchEnvironment(for runtimeID: String) throws -> [String: String] {
-        guard !exitsWhenIdle, Self.lendableRuntimes.contains(runtimeID) else { return [:] }
+        if exitsWhenIdle { return try macLaunchEnvironment(for: runtimeID) }
+        guard Self.lendableRuntimes.contains(runtimeID) else { return [:] }
         let connection = RequestConnection.current
         let offer = connection.flatMap { credentialOffers[$0] }
         if offer?.ownSignInOnly == true { return [:] }
@@ -97,6 +112,23 @@ extension DaemonCore {
         }
         guard hasOwnSignIn(runtimeID) else { throw Self.wanted(runtimeID, offered: false) }
         return [:]
+    }
+
+    /// On this Mac (046, D3): the key a window lent, for a runtime that takes one here;
+    /// else the person's own, if their environment has one; else ask the window, which
+    /// lends it from Settings and sends the start again, or says where to add one.
+    func macLaunchEnvironment(for runtimeID: String) throws -> [String: String] {
+        let kinds = CredentialKind.kinds(for: runtimeID).filter(\.isLentOnTheMac)
+        guard !kinds.isEmpty else { return [:] }
+        if let secret = macLent[runtimeID] {
+            return [secret.kind.environmentVariable: secret.reveal()]
+        }
+        let own = LoginShellPath.environment()
+        if CredentialKind.variables(for: runtimeID).contains(where: { !(own[$0] ?? "").isEmpty }) { return [:] }
+        let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
+        throw JSONRPCError(code: DaemonAPI.Failure.credentialWanted,
+                           message: "\(name) needs an API key. Add one in Settings ▸ Runtime credentials.",
+                           data: (try? JSONValue.encoding(DaemonAPI.CredentialWanted(runtime: runtimeID, offered: false))) ?? nil)
     }
 
     /// A turn that failed because the provider refused the sign-in (043, R7). What the

@@ -227,7 +227,12 @@ extension DaemonCore {
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
-        let session = try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
+        // Lent what an agent would be, where there is something (Gemini's key on this Mac);
+        // a check that finds none is answered by the runtime's own refusal, as before.
+        let lent = (try? launchEnvironment(for: runtime.id)) ?? [:]
+        let session = try LentEnvironment.$value.withValue(lent) {
+            try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
+        }
         do {
             let handshake = try await session.initialize()
             noteAccount(runtimeID: runtimeID, from: handshake)

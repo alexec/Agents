@@ -373,6 +373,11 @@ public actor DaemonCore {
     var credentialOffers: [UUID: DaemonAPI.CredentialsOffer] = [:]
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
     var lentCredentials: [UUID: [String: Secret]] = [:]
+    /// What a window lent this Mac's own agents (046, D3): Gemini's key, which has no other
+    /// way in. Kept for the daemon's life, not the connection's, so an agent a workflow starts
+    /// with no window open still has it; in memory only, and gone when the window stops
+    /// offering it.
+    var macLent: [String: Secret] = [:]
     /// Whether this server has a sign-in of its own for a runtime. Replaced in tests.
     var hasOwnSignIn: @Sendable (String) -> Bool = { ServerSignIn.exists(runtimeID: $0) }
     /// Set by `daemon/quit`: `runUntilIdle` returns on its next look, idle or not.
