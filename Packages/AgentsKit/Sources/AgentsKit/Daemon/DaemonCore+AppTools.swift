@@ -64,6 +64,7 @@ extension DaemonCore {
         // the old one rather than leaving it answerable.
         for (existing, id) in appTokens where id == agentID && existing != token {
             appTokens.removeValue(forKey: existing)
+            endBridgeRoutes(for: existing)
         }
         appTokens[token] = agentID
     }
@@ -71,6 +72,7 @@ extension DaemonCore {
     func dropAppTokens(for agentID: UUID) {
         for (token, id) in appTokens where id == agentID {
             appTokens.removeValue(forKey: token)
+            endBridgeRoutes(for: token)
         }
     }
 

@@ -46,12 +46,17 @@ extension DaemonCore {
     /// runtime started — the helper, through `npx` or a shell at most — or it is turned
     /// away as if the token meant nothing. A token nobody holds is left for the method
     /// to refuse in its own words.
+    ///
+    /// For a runtime that takes its stdio servers through the bridge (Copilot, 054), the
+    /// helper is this daemon's child, started for the token's route only on a request that
+    /// carried the route's bearer, which only the runtime holds. That counts the same.
     func tokenRefusal(_ params: JSONValue?, peer: Int32?) async -> JSONRPCError? {
         guard let peer, let token = params?["token"]?.stringValue,
               let agentID = appTokens[token] else { return nil }
         if let runtime = await live[agentID]?.processIdentifier, PeerCredentials.descends(peer, from: runtime) {
             return nil
         }
+        if isBridged(peer, token: token) { return nil }
         DaemonLog.shared.write("refused a token call from pid \(peer): not started by that agent's runtime")
         return JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                             message: "That conversation is not open to this process, so nothing was done.")
@@ -187,6 +192,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
+
+            case DaemonAPI.Method.personalShared:
+                return .success(try JSONValue.encoding(sharedSnapshot()))
 
             case DaemonAPI.Method.runtimesInstall:
                 let request = try require(params, as: DaemonAPI.RuntimeRequest.self)

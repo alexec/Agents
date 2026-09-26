@@ -1,0 +1,306 @@
+<!doctype html><html><head><meta charset="utf-8"><title>054 wireframes</title><style>
+/* Wireframes for Settings ▸ Shared (054). Lo-fi on purpose: paper ground, one accent, no icons
+   beyond what SF Symbols would give. Open with #a … #h to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:900px;line-height:1.4}
+.win{width:900px;height:600px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.titlebar{height:28px;display:flex;align-items:center;padding:0 12px;gap:8px;position:relative}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.titlebar .t{position:absolute;left:0;right:0;text-align:center;font:600 13px -apple-system;color:#555;pointer-events:none}
+.tabs{display:flex;justify-content:center;gap:4px;padding:2px 0 8px;border-bottom:1px solid rgba(0,0,0,.08)}
+.tab{width:78px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;border-radius:6px;color:#666;font-size:11px}
+.tab i{font-style:normal;font-size:19px;line-height:22px}
+.tab.on{background:rgba(0,0,0,.07);color:#3d5a80}
+.split{flex:1;display:flex;min-height:0}
+.side{width:196px;border-right:1px solid rgba(0,0,0,.08);padding:10px 8px;display:flex;flex-direction:column;gap:1px;background:#f1eee8}
+.side .h{font:600 11px -apple-system;color:#8a877f;padding:8px 8px 4px;text-transform:uppercase;letter-spacing:.04em}
+.si{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px}
+.si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.si.on{background:#3d5a80;color:#fff}.si.on .n{color:#dfe6ef}
+.si .warn{margin-left:auto;color:#b5651d}.si.on .warn{color:#ffd9b0}
+.side .foot{margin-top:auto;padding:8px;color:#8a877f;font-size:11px;line-height:1.4}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.head{display:flex;align-items:center;gap:10px;padding:12px 16px 8px}
+.head .t{font:600 15px -apple-system}
+.head .p{color:#8a877f;font:12px "SF Mono",Menlo,monospace}
+.head .sp{flex:1}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}
+.search{margin:0 16px 8px;background:#fff;border:1px solid #dcd8cf;border-radius:7px;padding:4px 8px;color:#aaa}
+.lst{flex:1;overflow:hidden;padding:0 16px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e3dfd6;margin-bottom:6px}
+.row.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.row .nm{font-weight:600;white-space:nowrap}
+.row .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.mono{font:12px "SF Mono",Menlo,monospace}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}
+.chip.w{background:#f7e7d6;color:#9a4f10}
+.reach{display:flex;gap:3px}
+.r{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px -apple-system;background:#e3eaf3;color:#3d5a80}
+.r.no{background:#f0eeea;color:#b9b5ad;text-decoration:line-through}
+.r.q{background:#f0eeea;color:#999;border:1px dashed #bbb;width:16px;height:16px}
+.detail{width:300px;border-left:1px solid rgba(0,0,0,.08);padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:#fbfaf7;overflow:hidden}
+.detail .t{font:600 15px -apple-system}
+.kv{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px}
+.kv b{font-weight:400;color:#8a877f}
+.doc{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 12px;font:14px "Iowan Old Style",Georgia,serif;line-height:1.4;color:#333;flex:1;overflow:hidden}
+.doc .m{font:11px "SF Mono",Menlo,monospace;color:#999}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+table.m{border-collapse:separate;border-spacing:0;width:100%;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden}
+table.m th{font:600 11px -apple-system;color:#8a877f;text-align:center;padding:7px 4px;border-bottom:1px solid #eee}
+table.m th:first-child,table.m td:first-child{text-align:left;padding-left:12px}
+table.m td{text-align:center;padding:8px 4px;border-bottom:1px solid #f2f0eb}
+table.m tr:last-child td{border-bottom:none}
+.ok{color:#3d5a80;font-weight:600}.part{color:#9a4f10}.none{color:#c2beb6}.qq{color:#999}
+.sec{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px}
+.banner{margin:0 16px 10px;padding:9px 12px;border-radius:8px;background:#f7e7d6;color:#6b3a0c;display:flex;gap:10px;align-items:center;line-height:1.35}
+.banner .sp{flex:1}
+.tree{font:12px/1.7 "SF Mono",Menlo,monospace;color:#333;background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 14px}
+.tree .c{color:#8a877f;font-family:-apple-system;font-size:12px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:#6d6a64;padding:0 90px}
+.empty .i{font-size:40px;opacity:.5}.empty .h{font:600 17px -apple-system;color:#1d1d1d}
+.empty .t{line-height:1.45}
+.legend{font-size:12px;color:#666;display:flex;gap:16px;align-items:center}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- One chrome, repeated: title bar, tabs, then the Shared tab's own split. -->
+
+<!-- A — Overview -->
+<div class="frame" id="a"><div class="cap">A · Settings ▸ Shared — the overview</div>
+<div class="sub">A new Settings tab beside Agents. The first page answers "what does every agent get, and who is missing what" in one grid; anything that needs a look is listed under it and links to its own page.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si on">Overview</div>
+   <div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div>
+   <div class="si">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si">MCP servers <span class="n">3</span></div>
+   <div class="si">Plugins <span class="n">2</span></div>
+   <div class="si">Other files <span class="n">4</span></div>
+   <div class="foot">Your own set, for every project. A project's own .agents folder is on its project page.</div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">Shared by every agent</span><span class="p">~/.agents</span><span class="sp"></span><span class="btn">Reveal in Finder</span></div>
+   <div class="lst">
+    <table class="m">
+     <tr><th></th><th>Claude</th><th>Codex</th><th>Grok</th><th>Cursor</th><th>Copilot</th><th>Gemini</th></tr>
+     <tr><td>Instructions</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="none">—</td><td class="ok">✓</td><td class="qq">?</td></tr>
+     <tr><td>Skills <span class="chip">14</span></td><td class="ok">14</td><td class="ok">14</td><td class="ok">14</td><td class="ok">14</td><td class="ok">14</td><td class="qq">?</td></tr>
+     <tr><td>MCP servers <span class="chip">3</span></td><td class="ok">3</td><td class="part">3 · 1 its own</td><td class="ok">3</td><td class="ok">3</td><td class="part">1 of 3</td><td class="qq">?</td></tr>
+     <tr><td>Plugins <span class="chip">2</span></td><td class="ok">2</td><td class="ok">2</td><td class="part">2 · no servers</td><td class="none">—</td><td class="none">—</td><td class="qq">?</td></tr>
+    </table>
+    <div class="legend" style="margin:8px 2px 0"><span><span class="ok">✓ / n</span> gets it</span><span><span class="part">2 of 3</span> some left out — see why</span><span><span class="none">—</span> has no way to take it</span><span><span class="qq">?</span> not checked yet</span></div>
+    <div class="sec">Needs a look</div>
+    <div class="row"><span class="chip w">clash</span><span class="nm">github</span><span class="ds">Also in ~/.codex/config.toml. Codex uses its own copy.</span><span class="btn">Show</span></div>
+    <div class="row"><span class="chip w">clash</span><span class="nm">review</span><span class="ds">A skill of that name is also in ~/.claude/skills and was left there. Claude gets that copy.</span><span class="btn">Show</span></div>
+    <div class="row"><span class="chip w">left out</span><span class="nm">Copilot</span><span class="ds">Takes only http servers from the app: github and postgres don't reach it.</span><span class="btn">Show</span></div>
+    <div class="row"><span class="chip">no way in</span><span class="nm">Cursor, Copilot</span><span class="ds">Neither takes a plugin from the app. Their own installs still work in their own apps.</span><span class="btn">Show</span></div>
+    <div class="row"><span class="chip">no file</span><span class="nm">Cursor</span><span class="ds">Cursor has no personal instructions file; it keeps User Rules in its own settings.</span><span class="btn">Show</span></div>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<!-- B — Skills -->
+<div class="frame" id="b"><div class="cap">B · Skills</div>
+<div class="sub">Every skill any agent will be offered: yours in ~/.agents/skills and those a plugin brings. Dots are the six runtimes (C Claude · X Codex · G Grok · U Cursor · P Copilot · M Gemini). The detail shows SKILL.md as the agent reads it. Read-only: Edit opens the file in your editor, nothing is edited here.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div><div class="si on">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si">MCP servers <span class="n">3</span></div><div class="si">Plugins <span class="n">2</span></div><div class="si">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="search">⌕  Filter skills</div>
+   <div class="lst">
+    <div class="sec" style="margin-top:0">Yours · ~/.agents/skills</div>
+    <div class="row sel"><span class="nm">dataviz</span><span class="ds">Use whenever you are about to create any chart…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">review</span><span class="chip w">clash</span><span class="ds">Also in ~/.claude/skills — Claude gets that one</span><span class="reach"><span class="r no">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">role-sourcing</span><span class="ds">Sweeps every source for Staff+ roles…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">security-review</span><span class="ds">Review pending changes on the branch…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r q">M</span></span></div>
+    <div class="sec">From plugins</div>
+    <div class="row"><span class="nm">plover-skill</span><span class="chip a">heron-plugin</span><span class="ds">Use when asked for the plover word…</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+   </div>
+  </div>
+  <div class="detail">
+   <div class="t">dataviz</div>
+   <div class="kv"><b>Folder</b><span class="mono">~/.agents/skills/dataviz</span><b>Claude</b><span>through a link in ~/.claude/skills</span><b>Others</b><span>read ~/.agents/skills themselves</span><b>Moved in</b><span>from ~/.claude/skills, 25 Sep</span></div>
+   <div class="doc"><div class="m">SKILL.md</div><b>dataviz</b><br>Use this skill whenever you are about to create any chart, graph, plot, dashboard or data visualization…<br><br><span class="m">references/ · 3 files</span></div>
+   <div class="btns"><span class="btn">Reveal in Finder</span><span class="btn">Edit SKILL.md</span></div>
+  </div>
+ </div>
+</div></div>
+
+<!-- C — MCP servers -->
+<div class="frame" id="c"><div class="cap">C · MCP servers</div>
+<div class="sub">Yours from ~/.agents/mcp.json, what the app adds itself, and what is set up only inside one agent's own config — so "why does Codex have this and Claude not" has an answer. Header and env values are never shown (FR-023): only their names, masked.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div><div class="si">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si on">MCP servers <span class="n">3</span></div><div class="si">Plugins <span class="n">2</span></div><div class="si">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">MCP servers</span><span class="p">~/.agents/mcp.json</span><span class="sp"></span><span class="btn">Edit mcp.json</span></div>
+   <div class="lst">
+    <div class="sec" style="margin-top:0">Yours · every agent the app starts</div>
+    <div class="row sel"><span class="nm">github</span><span class="chip">stdio</span><span class="ds mono">npx -y @modelcontextprotocol/server-github</span><span class="chip w">clash</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r no">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">linear</span><span class="chip">http</span><span class="ds mono">https://mcp.linear.app/mcp</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">postgres</span><span class="chip">stdio</span><span class="ds mono">uvx mcp-postgres</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r no">P</span><span class="r q">M</span></span></div>
+    <div class="sec">From the app · always there, always wins a name</div>
+    <div class="row"><span class="nm">agents</span><span class="chip">stdio</span><span class="ds">finish_turn, show_file, lease_resource and the rest</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r no">P</span><span class="r">M</span></span></div>
+    <div class="sec">Only in one agent's own config · not shared</div>
+    <div class="row"><span class="nm">figma</span><span class="chip">http</span><span class="ds">In ~/.codex/config.toml — only Codex has it</span><span class="btn">Reveal</span></div>
+   </div>
+  </div>
+  <div class="detail">
+   <div class="t">github</div>
+   <div class="kv"><b>Runs</b><span class="mono">npx -y @model…/server-github</span><b>Env</b><span class="mono">GITHUB_TOKEN ••••••</span><b>Last start</b><span>Codex agent "Fix login", 2 min ago · 26 tools</span></div>
+   <div class="sec" style="margin:4px 0 0">Reach</div>
+   <div class="kv"><b>Claude</b><span>✓ sent at start</span><b>Codex</b><span>uses its own <span class="mono">github</span> from ~/.codex/config.toml</span><b>Grok</b><span>✓ sent at start</span><b>Cursor</b><span>✓ sent at start</span><b>Copilot</b><span>✕ takes only http servers from the app</span><b>Gemini</b><span>? not checked yet</span></div>
+   <div style="font-size:12px;color:#6d6a64;line-height:1.4">Terminal sessions you start yourself don't get these — only agents the app starts.</div>
+   <div class="btns" style="margin-top:auto"><span class="btn">Edit mcp.json</span></div>
+  </div>
+ </div>
+</div></div>
+
+<!-- D — mcp.json broken -->
+<div class="frame" id="d"><div class="cap">D · MCP servers, when mcp.json can't be read</div>
+<div class="sub">Agents still start, without your servers (Story 6, scenario 4). The problem is said once, here and on the overview, with the line — never swallowed, never a modal.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div><div class="si">Skills <span class="n">14</span></div>
+   <div class="si on">MCP servers <span class="warn">⚠</span></div><div class="si">Plugins <span class="n">2</span></div><div class="si">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">MCP servers</span><span class="p">~/.agents/mcp.json</span><span class="sp"></span></div>
+   <div class="banner"><span>⚠</span><span><b>mcp.json can't be read</b> — line 7: expected “,” after “args”. Agents are starting without your servers until it's fixed.</span><span class="sp"></span><span class="btn">Edit mcp.json</span></div>
+   <div class="lst">
+    <div class="sec" style="margin-top:0">From the app</div>
+    <div class="row"><span class="nm">agents</span><span class="chip">stdio</span><span class="ds">finish_turn, show_file, lease_resource and the rest</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r no">P</span><span class="r">M</span></span></div>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<!-- E — Plugins -->
+<div class="frame" id="e"><div class="cap">E · Plugins</div>
+<div class="sub">One folder per plugin; the row says what is inside, the detail says how each runtime is handed it, since that differs per runtime (research R9). Removing is Finder's job: delete the folder and the next agent starts without it.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div><div class="si">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si">MCP servers <span class="n">3</span></div><div class="si on">Plugins <span class="n">2</span></div><div class="si">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">Plugins</span><span class="p">~/.agents/plugins</span><span class="sp"></span><span class="btn">Reveal in Finder</span></div>
+   <div class="lst">
+    <div class="row sel"><span class="nm">heron-plugin</span><span class="chip">1 skill</span><span class="chip">1 command</span><span class="chip">1 MCP server</span><span class="ds"></span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r no">U</span><span class="r no">P</span><span class="r q">M</span></span></div>
+    <div class="row"><span class="nm">house-style</span><span class="chip">3 skills</span><span class="chip">2 hooks</span><span class="ds"></span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r no">U</span><span class="r no">P</span><span class="r q">M</span></span></div>
+   </div>
+  </div>
+  <div class="detail">
+   <div class="t">heron-plugin <span class="chip">1.0.0</span></div>
+   <div class="tree" style="padding:8px 10px">.claude-plugin/plugin.json<br>skills/plover-skill/SKILL.md<br>commands/plover-cmd.md<br>.mcp.json <span class="c">plover-mcp</span></div>
+   <div class="sec" style="margin:2px 0 0">How each gets it</div>
+   <div class="kv"><b>Claude</b><span>✓ handed at start</span><b>Grok</b><span>✓ handed at start; its server goes out with your MCP servers</span><b>Codex</b><span>✓ added to Codex, a copy — added again when it changes</span><b>Cursor</b><span>✕ no way in from the app</span><b>Copilot</b><span>✕ not in agents the app starts (its own CLI has it)</span><b>Gemini</b><span>? link in ~/.gemini/extensions, not checked yet</span></div>
+   <div class="btns" style="margin-top:auto"><span class="btn">Reveal in Finder</span></div>
+  </div>
+ </div>
+</div></div>
+
+<!-- F — Instructions -->
+<div class="frame" id="f"><div class="cap">F · Instructions</div>
+<div class="sub">The one AGENTS.md, as agents read it, and where each runtime reads it from. A file that was already yours and was left alone is shown as the thing that runtime reads instead.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si on">Instructions <span class="n">1</span></div><div class="si">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si">MCP servers <span class="n">3</span></div><div class="si">Plugins <span class="n">2</span></div><div class="si">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">Instructions</span><span class="p">~/.agents/AGENTS.md</span><span class="sp"></span><span class="btn">Edit AGENTS.md</span></div>
+   <div class="lst" style="display:flex;flex-direction:column;gap:10px">
+    <div class="doc" style="flex:none;height:170px"><b>Personal instructions</b><br><br>Use they/them for anyone whose pronouns you don't know. Prefer small commits with messages that say why. Never push without asking…</div>
+    <table class="m">
+     <tr><th>Runtime</th><th style="text-align:left">Reads</th><th>Gets AGENTS.md</th></tr>
+     <tr><td>Claude</td><td style="text-align:left" class="mono">~/.claude/CLAUDE.md → link</td><td class="ok">✓</td></tr>
+     <tr><td>Codex</td><td style="text-align:left" class="mono">~/.codex/AGENTS.md</td><td><span class="chip w">its own file, left alone</span></td></tr>
+     <tr><td>Grok</td><td style="text-align:left" class="mono">~/.grok/AGENTS.md → link</td><td class="ok">✓</td></tr>
+     <tr><td>Cursor</td><td style="text-align:left;color:#8a877f">no file — User Rules in Cursor's settings</td><td class="none">—</td></tr>
+     <tr><td>Copilot</td><td style="text-align:left" class="mono">~/.copilot/copilot-instructions.md → link</td><td class="ok">✓</td></tr>
+     <tr><td>Gemini</td><td style="text-align:left;color:#8a877f">not checked yet</td><td class="qq">?</td></tr>
+    </table>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<!-- G — Other files -->
+<div class="frame" id="g"><div class="cap">G · Other files</div>
+<div class="sub">Everything else in ~/.agents, with what (if anything) uses it — personas, notes, a dotfiles repo's README. Nothing here is hidden, so the tab is the whole folder.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split">
+  <div class="side">
+   <div class="si">Overview</div><div class="h">In ~/.agents</div>
+   <div class="si">Instructions <span class="n">1</span></div><div class="si">Skills <span class="warn">⚠ 14</span></div>
+   <div class="si">MCP servers <span class="n">3</span></div><div class="si">Plugins <span class="n">2</span></div><div class="si on">Other files <span class="n">4</span></div>
+  </div>
+  <div class="main">
+   <div class="head"><span class="t">Other files</span><span class="p">~/.agents</span><span class="sp"></span><span class="btn">Reveal in Finder</span></div>
+   <div class="lst">
+    <div class="row sel"><span class="nm mono">personas/reviewer.md</span><span class="ds">A persona: agents can be asked to adopt it</span><span class="chip">persona</span></div>
+    <div class="row"><span class="nm mono">personas/designer.md</span><span class="ds">A persona</span><span class="chip">persona</span></div>
+    <div class="row"><span class="nm mono">README.md</span><span class="ds">Not read by any agent</span><span class="chip">unused</span></div>
+    <div class="row"><span class="nm mono">.git/</span><span class="ds">~/.agents is a git repository — kept in your dotfiles</span><span class="chip">git</span></div>
+   </div>
+  </div>
+  <div class="detail">
+   <div class="t">reviewer.md</div>
+   <div class="doc"><b>Reviewer</b><br>You read a change the way a careful senior engineer would…</div>
+   <div class="btns"><span class="btn">Reveal in Finder</span><span class="btn">Edit</span></div>
+  </div>
+ </div>
+</div></div>
+
+<!-- H — Empty -->
+<div class="frame" id="h"><div class="cap">H · Nothing shared yet</div>
+<div class="sub">A Mac with no ~/.agents, or an empty one. The app has made the folder (FR-001); this says what goes where, and nothing more.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="t">Shared</div></div>
+ <div class="tabs"><div class="tab"><i>◐</i>Appearance</div><div class="tab"><i>▣</i>Agents</div><div class="tab on"><i>⧉</i>Shared</div><div class="tab"><i>$</i>Spending</div><div class="tab"><i>▯</i>Devices</div><div class="tab"><i>≡</i>Servers</div></div>
+ <div class="split"><div class="main">
+  <div class="empty"><div class="i">⧉</div><div class="h">Nothing shared yet</div>
+   <div class="t">Put things in <span class="mono">~/.agents</span> once and every agent gets them, on every runtime:<br>
+   <span class="mono">AGENTS.md</span> for instructions · <span class="mono">skills/</span> · <span class="mono">mcp.json</span> for MCP servers · <span class="mono">plugins/</span></div>
+   <span class="btn p">Reveal ~/.agents in Finder</span></div>
+ </div></div>
+</div></div>
+
+</body></html>

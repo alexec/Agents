@@ -71,7 +71,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let note = try await report(core, launcher, "needs_answer",
                                     "Drop the old index first, or migrate it?")
@@ -93,7 +93,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await report(core, launcher, "done", "Renamed 14 call sites; tests pass.")
         try await settle(core, id)
@@ -112,7 +112,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await report(core, launcher, "partly_done", "Five of six.")
         try await report(core, launcher, "done", "Got the sixth after all.")
@@ -127,7 +127,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await report(core, launcher, "needs_answer", "Which index?")
         try await settle(core, id)
@@ -146,7 +146,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await report(core, launcher, "needs_answer", "Which index?")
         try await settle(core, id)
@@ -164,7 +164,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await report(core, launcher, "stuck", "No signing certificate on this machine.")
         try await settle(core, id)
@@ -187,7 +187,7 @@ struct OutcomeReportTests {
             let (locations, work) = try temporary()
             let launcher = midTurn()
             let core = try core(launcher, locations: locations)
-            let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+            let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
             try await report(core, launcher, wire, "what the agent said about \(wire)")
             try await settle(core, id)
@@ -208,7 +208,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let error = await #expect(throws: JSONRPCError.self) {
             _ = try await core.reportOutcome(.init(token: "not-a-token", outcome: "done",
@@ -222,7 +222,7 @@ struct OutcomeReportTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let token = await mintedToken(launcher)
 
         let unknown = await #expect(throws: JSONRPCError.self) {
@@ -255,7 +255,7 @@ struct OutcomeReportTests {
                                           "kind": "reject_once"]]]
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the agent is blocked on the question") {
             await core.agent(id)?.state == .waitingOnUser

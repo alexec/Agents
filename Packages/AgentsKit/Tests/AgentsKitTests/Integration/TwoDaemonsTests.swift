@@ -64,7 +64,7 @@ struct TwoDaemonsTests {
 
         _ = try await toFirst.call(DaemonAPI.Method.agentsStart,
                                    try JSONValue.encoding(DaemonAPI.StartRequest(
-                                       runtimeID: "copilot", cwd: hereWork, prompt: "mine")))
+                                       runtimeID: "cursor", cwd: hereWork, prompt: "mine")))
         await eventually("the first daemon has its agent") {
             (try? await toFirst.call(DaemonAPI.Method.agentsList,
                                      ["includeArchived": true]).arrayValue?.count) == 1
@@ -79,7 +79,7 @@ struct TwoDaemonsTests {
         // And the other way round, so neither is merely the quiet one.
         _ = try await toSecond.call(DaemonAPI.Method.agentsStart,
                                     try JSONValue.encoding(DaemonAPI.StartRequest(
-                                        runtimeID: "copilot", cwd: thereWork, prompt: "theirs")))
+                                        runtimeID: "cursor", cwd: thereWork, prompt: "theirs")))
         await eventually("the second daemon has its own") {
             (try? await toSecond.call(DaemonAPI.Method.agentsList,
                                       ["includeArchived": true]).arrayValue?.count) == 1
@@ -115,7 +115,7 @@ struct TwoDaemonsTests {
         let toFirst = try await client(to: here)
         _ = try await toFirst.call(DaemonAPI.Method.agentsStart,
                                    try JSONValue.encoding(DaemonAPI.StartRequest(
-                                       runtimeID: "copilot", cwd: work, prompt: "mine")))
+                                       runtimeID: "cursor", cwd: work, prompt: "mine")))
         await eventually("the agent was written to the first root") {
             ((try? FileManager.default.contentsOfDirectory(atPath: here.agents.path)) ?? []).count == 1
         }
@@ -140,7 +140,7 @@ struct TwoDaemonsTests {
                               discovery: .findsEverything,
                               launcher: launcher)
 
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let server = (await launcher.lastAgent?.newSessionParams?["mcpServers"]?.arrayValue ?? []).first
         // ACP sends an environment as a list of name/value pairs, not as an object.

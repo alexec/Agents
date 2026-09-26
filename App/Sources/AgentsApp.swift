@@ -41,6 +41,7 @@ struct AgentsApp: App {
             TabView {
                 Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
                 Tab("Agents", systemImage: "cpu") { AgentsSettingsView() }
+                Tab("Shared", systemImage: "square.on.square") { SharedSettingsView() }
                 Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
                 Tab("Devices", systemImage: "iphone") { DevicesPane() }
                 Tab("Servers", systemImage: "server.rack") { ServersSettingsView() }

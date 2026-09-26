@@ -124,6 +124,16 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var appTokens: [String: UUID] = [:]
+    /// The one `codex plugin add/remove` pass running, which a second Codex start waits
+    /// on rather than running its own (054, R12).
+    var codexPluginSync: Task<Void, Never>?
+    /// The `codex` a test runs in place of the toolset's.
+    var codexCLIOverride: URL?
+    #if canImport(Network) && canImport(Security)
+    /// Stdio MCP servers over loopback http, for a runtime that takes none from the client
+    /// (054, research R11). It listens only once a session needs it.
+    let bridge = MCPBridge()
+    #endif
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the
@@ -491,6 +501,10 @@ public actor DaemonCore {
         /// What this session was made with. MCP servers are only read at `session/new`,
         /// so a draft made before the user attached one cannot be used for it.
         var mcpServers: [MCPServer]
+        /// `~/.agents/mcp.json` as it was when the session was made (054). The person's
+        /// servers are read at `session/new` too, so a draft made before an edit cannot be
+        /// used after it (R10).
+        var personalServers: PersonalDotAgents.MCPStamp?
         /// The session being made, which may not exist yet.
         ///
         /// A draft is handed out the moment it is asked for, because a remembered form
@@ -1162,6 +1176,11 @@ public actor DaemonCore {
         stopWatchingAllWorkflows()
         machineWatch?.stop()
         machineWatch = nil
+        // The servers the bridge started for Copilot sessions are this daemon's children,
+        // not a runtime's, so nobody else ends them (054).
+        #if canImport(Network) && canImport(Security)
+        bridge.stopAll()
+        #endif
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this

@@ -68,7 +68,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let file = try write("README.md", in: work)
 
         let note = try await core.showFile(.init(token: await mintedToken(launcher),
@@ -90,7 +90,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let outside = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("elsewhere-\(UUID().uuidString).txt")
@@ -109,7 +109,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await #expect(throws: JSONRPCError.self) {
             _ = try await core.showFile(.init(
@@ -127,7 +127,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let path = work.appendingPathComponent("notes.md").path
         let reply = try await core.showFile(.init(token: await mintedToken(launcher),
@@ -151,7 +151,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await #expect(throws: JSONRPCError.self) {
             _ = try await core.showFile(.init(token: await mintedToken(launcher),
@@ -164,7 +164,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let file = try write("README.md", in: work)
 
         await #expect(throws: JSONRPCError.self) {
@@ -181,7 +181,7 @@ struct ShowFileTests {
         let launcher = midTurn()
         let heard = Broadcasts()
         let core = try await core(launcher, locations: locations, watching: heard)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let file = try write("README.md", in: work)
         await core.setConnectionCount(0)
 

@@ -54,7 +54,7 @@ struct ArtifactWriteTests {
     }
 
     private func started(_ launcher: FakeLauncher, _ core: DaemonCore, in work: URL) async throws -> UUID {
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         _ = await mintedToken(launcher)
         return id
     }
