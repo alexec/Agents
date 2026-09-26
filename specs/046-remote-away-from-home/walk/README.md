@@ -52,3 +52,24 @@ first, or set `AGENTS_BRIDGE_PORT=8791`. Only one bridge should run the relay fo
    shows "Open Agents once on your Mac's Wi-Fi".
 8. **CloudKit Console (SC-005).** In the private database, the `relay-*` zones should hold
    only ids, numbers, dates and ciphertext.
+
+## Walked on Alex's iPhone, 2026-09-25 (scratch root)
+
+The scratch root was `/tmp/run-046`, with this branch's app, daemon and bridge. Alex's real
+bridge was paused for the walk and restarted afterwards from main's build. The phone was
+Alex's iPhone, running this branch's Remote. Every step was on mobile data with Wi‑Fi off
+unless it says otherwise.
+
+| Step | Result |
+|---|---|
+| Pair (Wi‑Fi) | The phone announced and was listed. The daemon wrote `relay.json`, and the bridge was "carrying". |
+| Away | A new session came over the relay a few seconds after Wi‑Fi went off: `lastSeenAt` was 03:24:37 UTC. Alex saw "Away — slower, through iCloud". |
+| Answer (SC-001) | The agent asked to write `hello.txt`, and Alex tapped Yes on the phone. The daemon took it at 03:25:35 and the agent finished 3.7 s later. The card went "quick" (Alex). The file says "hello from away". |
+| Send (SC-003) | "Say hi in one line" is on the record once, at 03:26:45, and "Hi!" came back at 03:26:49. |
+| Away-only (SC-006) | Terminal and Files said "Needs the same network as your Mac", and the prompt bar's paperclip was greyed. |
+| Home (SC-004) | The Away line went when Wi‑Fi came back. |
+| Forget (SC-007) | The first try found a bug: the pair-at-home card was only the empty project list's, so a forgotten phone that still held its list showed "Last heard…" instead. Now the top line on every screen says "Open Agents once on your Mac's Wi-Fi to reach it from anywhere". Reinstalled and walked again: forgotten at 03:36:24, and Alex saw that line. It paired again by itself on Wi‑Fi. |
+| Secure Enclave (T006) | The phone's enclave key sealed and opened relayed frames: every step above depends on it. |
+
+Still open: T054, a look in the CloudKit Console, which needs Alex's sign-in. T056, restarting
+the real app and bridge onto this work, comes with the merge.

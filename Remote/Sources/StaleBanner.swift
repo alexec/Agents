@@ -12,7 +12,11 @@ struct StaleBanner: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        if model.isStale {
+        if model.needsPairingAtHome {
+            // Never paired, or forgotten by the Mac (046): the list below may still be what
+            // it last knew, so the one thing to do is said here, on every screen.
+            row(icon: "house", lead: nil, line: "Open Agents once on your Mac's Wi-Fi to reach it from anywhere")
+        } else if model.isStale {
             row(icon: "wifi.slash", lead: nil, line: staleLine)
         } else if let trouble = troubleLine {
             row(icon: "icloud.slash", lead: nil, line: trouble)

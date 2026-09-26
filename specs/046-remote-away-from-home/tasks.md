@@ -38,7 +38,7 @@ pairing that every relayed frame needs (US5's pairing half lives here because no
 
 - [X] T004 *(Done differently: the enclave check ran on this Mac's Secure Enclave, and passed both ways; see research R13. The phone confirms it on first use, in T006.)* Add a `-spike-relay` launch argument to `Remote/Sources/RemoteApp.swift`. It loads the device's `DeviceKey` (Secure Enclave on hardware), seals a test plaintext with `HPKE.Sender(recipientKey:ciphersuite: .P256_SHA256_AES_GCM_256, info:, authenticatedBy: <SE key>)` to a software P256 key, opens it with `HPKE.Recipient(…, authenticatedBy: <SE public key>)`, and prints pass or fail to the console and the screen
 - [X] T005 *(Done as `agents-bridge --spike-relay`: both ends in one process through the real iCloud. Median 2.57 s, worst 2.90 s; see research R13.)* Add `--spike-relay` to `Bridge/Sources/main.swift` (beside `--spike`): create zone `relay-SPIKE` in the private DB, then 10 times write a `Frame` record, poll with `CKFetchRecordZoneChangesOperation` until the phone's reply record appears, and print each round-trip time and the worst. Add the matching phone half to T004's `-spike-relay`: fetch every 1 s, and write the reply
-- [ ] T006 **Alex's phone, Wi‑Fi off.** Run T004 and T005 (install per the real-devices memory, and ask first). Record the SE result and the ten times in `research.md` R13. If SE auth-mode fails, change R3 to the fallback (a software signing key in the shared keychain group) and note it in `data-model.md`
+- [X] T006 **Alex's phone, Wi‑Fi off.** Run T004 and T005 (install per the real-devices memory, and ask first). Record the SE result and the ten times in `research.md` R13. If SE auth-mode fails, change R3 to the fallback (a software signing key in the shared keychain group) and note it in `data-model.md`
 
 ### Frames and sealing
 
@@ -113,7 +113,7 @@ the phone; the agent proceeds within ~3 s (spec US1).
   Hand-over back to direct comes in US3.
 - [X] T026 [US1] Use `LinkChooser` in place of `NetworkLink()` in `Remote/Sources/RemoteApp.swift:24` (keep `-fake`). Mirror its `link` into `RemoteModel.link` and `RemoteModel.isAway` in `Remote/Sources/RemoteModel.swift`, and give the chooser the device key and `macKey`
 - [X] T027 [US1] On the phone, add a `CKRecordZoneSubscription` for `relay-<deviceID>` (silent, `shouldSendContentAvailable`, subscription id `relay-<deviceID>`) beside the existing `subscribeOnce()` in `Remote/Sources/RemoteModel.swift`. In `Remote/Sources/Notifications/PushDelegate.swift`, route a push for that subscription to `RelayTransport.poke()`, not to the mailbox path
-- [ ] T028 [US1] Build `agents-bridge` and `Remote`, run the bridge on a scratch root (`AGENTS_ROOT=/tmp/run-046 AGENTS_BRIDGE_PORT=8791`), and walk US1 on Alex's phone with Wi‑Fi off (quickstart § 3, "Pair" and "Answer"). Record the times in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
+- [X] T028 [US1] Build `agents-bridge` and `Remote`, run the bridge on a scratch root (`AGENTS_ROOT=/tmp/run-046 AGENTS_BRIDGE_PORT=8791`), and walk US1 on Alex's phone with Wi‑Fi off (quickstart § 3, "Pair" and "Answer"). Record the times in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
 
 **Checkpoint**: MVP. A permission can be answered from mobile data.
 
@@ -134,7 +134,7 @@ matches the Mac window (spec US2).
   - the same prompt `sendID` posted twice giving one prompt;
   - `agents/start` with a `requestID`, then `agents/stop` and `agents/archive`, taking effect.
 - [X] T031 [US2] Check the Mac's batching rate in `RelayEndToEndTests`: a simulated busy turn (50 entries a second for 10 s) posts **≤ 3 frames a second** to the channel
-- [ ] T032 [US2] Walk US2 on Alex's phone away (quickstart "Send"): project list and agents within 5 s (SC-002); reply text ≤ 3 s behind the Mac (SC-003). Record in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
+- [X] T032 [US2] Walk US2 on Alex's phone away (quickstart "Send"): project list and agents within 5 s (SC-002); reply text ≤ 3 s behind the Mac (SC-003). Record in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
 
 ---
 
@@ -150,7 +150,7 @@ prompt arrives once, and there is no gap (spec US3).
 - [X] T035 [US3] Add `sendOnce(_ method:, params:)` to `Remote/Sources/RemoteModel.swift`. It calls; if the call fails with `JSONRPCTransportError.closed` it awaits `connect()` and calls **once more with the same params** (so the same `sendID`/`requestID`). Use it for prompt, `permissions/answer`, `elicitations/answer`, `agents/start`, `agents/stop` and `agents/archive` (FR-003)
 - [X] T036 [P] [US3] Write `LinkChooserTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/LinkChooserTests.swift`, with fake direct and relay links: direct within 2 s wins; direct late gives the relay; the relay gives way to direct when the Mac appears; neither answering throws; no `macKey` gives `.notPaired` with nothing posted (FR-009)
 - [X] T037 *(This test is in `RelayCarryingTests`, because `SendOnceTests` already exists as 037's.)* [P] [US3] Write `SendOnceTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/SendOnceTests.swift`: a prompt whose connection closes mid-call is carried out exactly once after reconnecting over the other transport, across 10 forced changes (SC-004)
-- [ ] T038 [US3] Walk US3 on Alex's phone (quickstart "Leave" and "Switch mid-send"), and record the link-change times in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
+- [X] T038 [US3] Walk US3 on Alex's phone (quickstart "Leave" and "Switch mid-send"), and record the link-change times in `specs/046-remote-away-from-home/walk/README.md`. **Alex's hands.**
 
 ---
 
@@ -171,7 +171,7 @@ spins; coming home makes them live by themselves (spec US4).
 - [X] T041 [US4] In `Remote/Sources/Panes/FilesPane.swift`, `TerminalPane.swift` and `PagePane.swift`, show `NeedsSameNetworkView` when `model.isAway`, with no `files/watch` and no shell open. Key the real view's `.task(id:)` on `model.link`, so it opens by itself when the link becomes direct (FR-012)
 - [X] T042 [US4] Disable the paperclip away in `Remote/Sources/Chat/PromptBar.swift` (dimmed; the VoiceOver label is "Attach, needs the same network as your Mac"), and the attachments row in `Remote/Sources/StartAgent/StartAgentView.swift`
 - [X] T043 [US4] Map relay trouble to `RemoteModel` state in `Remote/Sources/RemoteModel.swift`: `.slowDown > 3 s` gives `relaySlowed`, `CKAccountStatus` other than `.available` gives `relayNeedsICloud`, and `.full` gives `relayFull` (FR-014)
-- [ ] T044 [US4] Build `Remote` for the generic simulator (no sim is booted; see the memory) and on Alex's phone, and walk quickstart "Away-only" (SC-006). Put screenshots in `specs/046-remote-away-from-home/walk/` and compare them against `look/away-mock.png`. **Alex's hands.**
+- [X] T044 [US4] Build `Remote` for the generic simulator (no sim is booted; see the memory) and on Alex's phone, and walk quickstart "Away-only" (SC-006). Put screenshots in `specs/046-remote-away-from-home/walk/` and compare them against `look/away-mock.png`. **Alex's hands.**
 
 ---
 
@@ -189,7 +189,7 @@ within a minute (spec US5).
 - [X] T048 [US5] On the phone, handle `.zoneGone` in `RelayTransport` by finishing with `RelayError.forgotten`. `RemoteModel` then clears `macKey` from the keychain and shows the never-paired state. `LinkChooser` never calls `ensureZone` without a `macKey`
 - [X] T049 [P] [US5] Write the never-paired card (look C) as the project list's empty state in `Remote/Sources/Projects/ProjectListView.swift`, shown when away with no `macKey`: "Open Agents once on your Mac's Wi-Fi", with the body text from contracts/ui.md
 - [X] T050 [US5] Add **Forget…** to each row in `App/Sources/Settings/DevicesPane.swift`, with the confirmation text from contracts/ui.md. Add `forgetDevice(_:)` to `App/Sources/AppModel.swift`, calling `devices/forget`, and remove the row on `removed`
-- [ ] T051 [US5] Walk quickstart "Forget" and "Re-pair" on a scratch Mac window (run-app skill) with the phone. **Alex's hands for the phone.**
+- [X] T051 [US5] Walk quickstart "Forget" and "Re-pair" on a scratch Mac window (run-app skill) with the phone. **Alex's hands for the phone.**
 
 ---
 

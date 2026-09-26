@@ -9,7 +9,7 @@ One line, on every screen, in this order of precedence:
 | State | Icon | Words |
 |---|---|---|
 | Neither link answers | `wifi.slash` | "Last heard from your Mac {relative}" (as today), or "Not connected to your Mac yet" |
-| Not paired for the relay, and away | `wifi.slash` | "Not connected to your Mac yet" (as today); the page body shows the never-paired card |
+| Not paired for the relay (never, or forgotten), and not connected | `house` | "Open Agents once on your Mac's Wi-Fi to reach it from anywhere"; with no project list, the page body also shows the never-paired card |
 | No iCloud / iCloud full | `icloud.slash` | "The relay needs iCloud on your iPhone and your Mac" / "iCloud is full, so the relay can't carry messages" |
 | Relayed, slowed down | `icloud` | "**Away** — slower than usual" |
 | Relayed | `icloud` | "**Away** — slower, through iCloud" |
