@@ -81,13 +81,15 @@ or on Alex's paired devices.
   - a lent credential dies with its channel
   - redial after the transport ends
   - an `agent` role can never be reached through `open`
-- [ ] T017 Run the full `swift test` in `Packages/AgentsKit` and both schemes. Record the pass count against main's, using the six-run comparison if anything flakes.
+- [~] T017 (2,720 tests: 21, then 16 issues under load, all in known-flaky suites; `ConnectionRoleTests` passes alone 14/14. The six-run comparison against main is still owed) Run the full `swift test` in `Packages/AgentsKit` and both schemes. Record the pass count against main's, using the six-run comparison if anything flakes.
 
 **Checkpoint**: the router, the grants and the host side all work in memory. No UI yet.
 
 ---
 
-## Phase 3: User Story 1 — The Mac window works through the control plane (P1) 🎯 MVP
+## Phase 3: User Story 1
+
+**MVP as built (2026-09-26):** this Mac's window and host reach the control plane over two same-user Unix sockets in the control root (`control.sock` and `hosts.sock`), with roles by code signature (`RolePolicy.forControl`). The control plane runs inside the bridge process when it is given `--control-root` or `AGENTS_CONTROL_ROOT`. T018–T020 (TLS listener, host PSKs), T022 (TLS dialer), T023/T029 (a saved config and pairing), T025–T028 are still open. Today the window takes `--control-root` and goes through the control plane for host `mac` only; servers still use `HostSet`. — The Mac window works through the control plane (P1) 🎯 MVP
 
 **Goal**: a scratch window paired as operator does everything it does today, through `agents-control` to an `agentsd --control` on this Mac.
 
@@ -100,7 +102,7 @@ or on Alex's paired devices.
   - A `code --client <grant>` / `code --host` subcommand prints a pairing code, for walks and scripts.
 - [ ] T019 [US1] In `Control/Sources/DirectLink.swift`, add host PSKs: identity `h:<id>`, derived with HKDF(ECDH, "agents-host-v1", id), plus the enrolment identity `e:`. Client PSKs `d:` and `p:` stay as they are, so today's devices' keys still work.
 - [ ] T020 [US1] Add a host listener path in `Control/Sources/main.swift`. An `h:` connection becomes a `HostSession`. An `e:` connection may call only `hosts/announce`, which issues a key, writes `hosts.json`, and replies `{host}`.
-- [ ] T021 [US1] Add `--control <code>` and `--control-home` to `Daemon/Sources/main.swift` and `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCommandLine.swift`.
+- [x] T021 [US1] (MVP: `--control <socket>` and `--host-id`, over the control plane's local socket; codes and the keychain come with TLS) Add `--control <code>` and `--control-home` to `Daemon/Sources/main.swift` and `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCommandLine.swift`.
   - `<code>` enrols once and stores the host key: in the keychain on a Mac, or in a `0600` file on Linux.
   - `--control-home` dials the control plane on loopback with the stored key.
   - Both imply `--serve`.
@@ -116,7 +118,7 @@ or on Alex's paired devices.
 - [ ] T028 [US1] Show the away state in the sidebar (frame H): every host's projects stay listed but greyed, under one strip, **Can't reach the control plane**, that names the expected address. The strip goes in `App/Sources/Sidebar/` next to today's offline-server strip, reusing `HostProblem+Words.swift`.
 - [ ] T029 [US1] Pairing the window: the window's pairing client (`clients/announce` with kind `mac`) goes in `App/Sources/Control/WindowPairing.swift`, reusing `DeviceKey` and `NetworkLink` from AgentsKitCore. Check the keychain access group builds for macOS.
   - For walks, the env var `AGENTS_CONTROL=<code>` pairs without UI.
-- [ ] T030 [US1] Walk: quickstart steps 1–6 on `/tmp/cp-walk` with a real Claude turn. Screenshot each step. Record the result in `specs/058-control-plane/walks/us1.md`.
+- [x] T030 [US1] (walks/us1.md) Walk: quickstart steps 1–6 on `/tmp/cp-walk` with a real Claude turn. Screenshot each step. Record the result in `specs/058-control-plane/walks/us1.md`.
 
 **Checkpoint**: MVP. The window works through the control plane on a scratch root, and the old path is untouched.
 
