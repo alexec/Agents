@@ -688,6 +688,14 @@ public actor DaemonCore {
         case .starting, .running, .waitingOnUser:
             break
         }
+        // When it was archived is when the time it is kept starts (051). Archiving again
+        // starts it again; anything else ends it.
+        if next == .archived {
+            if agents[agentID]?.state != .archived { agent.archivedAt = now() }
+        } else {
+            agent.archivedAt = nil
+            agent.retirement = nil
+        }
         let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
@@ -768,8 +776,17 @@ public actor DaemonCore {
 
     public func loadFromDisk() async {
         loadRetentionIfNeeded()
+        // A retire the last daemon was cut off in: its tombstone is written, so what is
+        // left is deleting, and it is done before anything is listed (051, FR-017).
+        await store.finishRetiring(retired.keys)
         let loaded = await store.loadAll()
-        for agent in loaded.agents { agents[agent.id] = seedingCost(agent) }
+        for agent in loaded.agents where retired[agent.id] == nil { agents[agent.id] = seedingCost(agent) }
+        // An agent archived before 051 has no time it was archived. It is given this
+        // start, so nothing goes by age on the day 051 arrives (FR-008).
+        for (id, agent) in agents where agent.state == .archived && agent.archivedAt == nil {
+            agents[id]?.archivedAt = now()
+            if let dated = agents[id] { try? await store.save(dated) }
+        }
         // A record the rules forbid was brought to one they allow on the way in, and
         // the person is told so here, in the transcript, which is where this app
         // already explains itself.
@@ -790,6 +807,7 @@ public actor DaemonCore {
             // of the list each time.
             if let mended = agents[id] { try? await store.save(mended) }
         }
+        startRetentionChecks()
     }
 
     /// Give a record written before the cost was banked its total back.

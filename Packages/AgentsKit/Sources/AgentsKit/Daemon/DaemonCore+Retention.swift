@@ -85,4 +85,103 @@ extension DaemonCore {
             DaemonLog.shared.write("retention.json: could not write: \(error.localizedDescription)")
         }
     }
+
+    // MARK: Checking
+
+    /// Thirty seconds after start, then hourly (FR-004). Never before the daemon is
+    /// listening: start is not held up by it.
+    func startRetentionChecks() {
+        guard retentionTimer == nil else { return }
+        retentionTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.checkRetention()
+                try? await Task.sleep(for: .seconds(60 * 60))
+            }
+        }
+    }
+
+    /// Seconds since this daemon was made, for `RetentionClock`.
+    var uptime: TimeInterval {
+        let elapsed = ContinuousClock.now - uptimeOrigin
+        return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+    }
+
+    /// Decide, retire what the rules say, and update every archived row's note.
+    public func checkRetention() async {
+        loadRetentionIfNeeded()
+        let saneNow = retention.clock.tick(now: now(), uptime: uptime)
+        let before = retentionState()
+        let decision = RetentionPlan.decide(archived: candidates(), holds: [:],
+                                            settings: retention.settings, saneNow: saneNow)
+        for retiring in decision.retire {
+            do {
+                try await retire(retiring.id, because: retiring.because)
+            } catch {
+                DaemonLog.shared.write("could not retire \(retiring.id): \(error)")
+            }
+        }
+        lastOverCap = decision.overCap
+        noteRetirements(decision.notes)
+        saveRetention()
+        saveArchiveIndex()
+        let after = retentionState()
+        if after != before { broadcast(DaemonAPI.Notification.retentionChanged, after) }
+    }
+
+    /// Every archived agent, as the rules see it.
+    func candidates() -> [RetentionPlan.Candidate] {
+        agents.values.filter { $0.state == .archived }.map { agent in
+            RetentionPlan.Candidate(id: agent.id, archivedAt: agent.archivedAt ?? now(),
+                                    lastActivityAt: agent.lastActivityAt, sizeOnDisk: size(of: agent.id))
+        }
+    }
+
+    /// Put each archived agent's note on its record, and only where it changed.
+    func noteRetirements(_ notes: [UUID: Retirement]) {
+        for agent in agents.values where agent.state == .archived && agent.retirement != notes[agent.id] {
+            var noted = agent
+            noted.retirement = notes[agent.id]
+            changed(noted)
+        }
+    }
+
+    func saveArchiveIndex() {
+        do { try archiveIndexStore.save(archiveIndex, now: now()) } catch {
+            DaemonLog.shared.write("archive.json: could not write: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: Retiring
+
+    /// The one path every retire takes: the check, a change of setting, and Retire now.
+    ///
+    /// The tombstone is written and synced first, and nothing is deleted if it cannot
+    /// be (FR-017). Then the worktree, by archiving's own rule, while the agent is still
+    /// here for that rule to read; then the files; then the agent leaves every list.
+    func retire(_ id: UUID, because: RetiredBecause) async throws {
+        guard let agent = agents[id], agent.state == .archived else {
+            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.notArchived)
+        }
+        DaemonLog.shared.write("retiring \(id) (\(because.rawValue))")
+        let tombstone = Tombstone(from: agent, retiredAt: now(), because: because)
+        try retiredStore.append(tombstone)
+        retired[id] = tombstone
+        raiseAgentEvent("agent.retired", id, sentence: "was retired and its conversation deleted.",
+                        details: ["because": because.rawValue])
+        await removeWorktreeIfDone(archiving: id)
+        do {
+            try await store.deleteRetired(id)
+        } catch {
+            // The tombstone is written, so the next start finishes this.
+            DaemonLog.shared.write("retired \(id) but could not delete all of it yet: \(error)")
+        }
+        agents.removeValue(forKey: id)
+        archiveIndex.removeValue(forKey: id)
+        lastWhole.removeValue(forKey: id)
+        stops.removeValue(forKey: id)
+        broadcast(DaemonAPI.Notification.agentRemoved, DaemonAPI.AgentRemovedNotification(agentID: id))
+        projectChanged(forAgentIn: agent.projectFolder)
+    }
 }

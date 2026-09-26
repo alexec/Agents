@@ -171,7 +171,7 @@ The surfaces are built and fed by hand, before any retiring code, so Alex can ju
   - the started-by line
 
   Build Remote for the generic iOS simulator to prove it compiles.
-- [ ] T025 [US4] **Look gate**: ask Alex with AskUserQuestion, attaching the screenshots from T024, whether the Settings section, notes, retired line and retired page are right. Change them until he approves. Record the approval in `walk/README.md`. No retiring code is written before this.
+- [X] T025 [US4] **Look gate**: ask Alex with AskUserQuestion, attaching the screenshots from T024, whether the Settings section, notes, retired line and retired page are right. Change them until he approves. Record the approval in `walk/README.md`. No retiring code is written before this.
 
 ---
 
@@ -184,21 +184,21 @@ nothing else is touched.
 
 ### Tests for User Story 1
 
-- [ ] T026 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/RetirementTests.swift` with an injected `now`. It must fail until T032. Cases:
+- [X] T026 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Integration/RetirementTests.swift` with an injected `now`. It must fail until T032. Cases:
   - An agent archived 31 days ago is retired at the first check: its directory is gone, a tombstone exists, it is gone from `agents/list`, `agent/removed` is broadcast, and the `agent.retired` event is raised.
   - One archived 29 days ago is kept.
   - A `finished`, a `stopped` and a parked agent 400 days old are kept (FR-005).
   - Unarchive, then archive again, restarts the 30 days (Story 1, scenario 4).
   - A legacy record with no `archivedAt` gets one at first start and is not retired for 30 days (FR-008).
   - Restarting after 31 days retires it soon after start, and `agents/list` answers without waiting on the check.
-- [ ] T027 [P] [US1] Add to the same file: an agent method on a retired id (`agents/unarchive`, `agents/prompt`, `agents/transcript`, `agents/fork`) fails with `-32050`, and the message is `RetirementWords.retiredSentence` (contracts, Failures).
+- [X] T027 [P] [US1] Add to the same file: an agent method on a retired id (`agents/unarchive`, `agents/prompt`, `agents/transcript`, `agents/fork`) fails with `-32050`, and the message is `RetirementWords.retiredSentence` (contracts, Failures).
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift` (`archive`) and the `move` handling for `.archivedByUser`/`.archivedByAgent`/`.unarchivedByUser`: set `archivedAt = now()` on archive, and clear `archivedAt` and `retirement` on unarchive. Do it in the same `changed` as the state change.
-- [ ] T029 [US1] In `DaemonCore.loadFromDisk` (`Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`), set `archivedAt` to the start time for any archived record without one, and save it once (FR-008).
-- [ ] T030 [US1] In `DaemonCore.loadFromDisk`, **before** filling `agents`, call `store.finishRetiring(ids:)` for ids that are in `retired` and still have a directory, and skip those ids. Log each one.
-- [ ] T031 [US1] Implement `retire(_ id: UUID, because: RetiredBecause) async throws` in `DaemonCore+Retention.swift`, the one path every retire takes. It follows the data-model "Retire steps" 1–5:
+- [X] T028 [US1] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift` (`archive`) and the `move` handling for `.archivedByUser`/`.archivedByAgent`/`.unarchivedByUser`: set `archivedAt = now()` on archive, and clear `archivedAt` and `retirement` on unarchive. Do it in the same `changed` as the state change.
+- [X] T029 [US1] In `DaemonCore.loadFromDisk` (`Pkg/Sources/AgentsKit/Daemon/DaemonCore.swift`), set `archivedAt` to the start time for any archived record without one, and save it once (FR-008).
+- [X] T030 [US1] In `DaemonCore.loadFromDisk`, **before** filling `agents`, call `store.finishRetiring(ids:)` for ids that are in `retired` and still have a directory, and skip those ids. Log each one.
+- [X] T031 [US1] Implement `retire(_ id: UUID, because: RetiredBecause) async throws` in `DaemonCore+Retention.swift`, the one path every retire takes. It follows the data-model "Retire steps" 1–5:
   - The tombstone goes to `retired`.
   - The agent is dropped from `agents` and `lastWhole`.
   - The worktree step reuses `removeWorktreeIfDone`'s facts, but only when no agent that is not archived has the same worktree root (FR-018).
@@ -206,15 +206,15 @@ nothing else is touched.
   - `raise` is called with `agent.retired`, whose details are `agent`, `agent_title`, `project` and `because`.
 
   Add `agent.retired` to the catalogue in `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`, with the contract's sentence.
-- [ ] T032 [US1] Implement the check in `DaemonCore+Retention.swift`:
+- [X] T032 [US1] Implement the check in `DaemonCore+Retention.swift`:
   1. `startRetentionChecks()`: a detached timer task, like `startPruningEvents`, that checks 30 s after start and hourly after.
   2. `checkRetention()`: builds `Candidate`s from archived agents, computes `saneNow` from `retention.json`'s `lastCheck` and a `ContinuousClock` reading kept in memory, and calls `RetentionPlan.decide` with no holds (holds come in US5).
   3. It calls `retire` for each id in order, and saves notes that changed with `changed(_:)`.
   4. It writes `lastCheck`, and broadcasts `retention/changed` if anything moved.
 
   Log "retiring <id> (<because>)" to `DaemonLog`. Make T026 pass.
-- [ ] T033 [US1] Map the retired-id failure: in the dispatch for every method taking an `agentID`, when `agents[id] == nil` and `retired[id] != nil`, throw `-32050` with `retiredSentence`. Put it once, in the helper those methods use to find an agent (`noSuchAgent` today). The same applies to the agent tools that name another agent (`archive_agent`, `stop_agent`, helpers). Make T027 pass.
-- [ ] T034 [US1] Handle `agent/removed` in `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift`: remove the agent from `agents`, and if it was selected or watched, clear that so the retired page shows (T023). Add a unit test in `AgentsModelTests.swift`.
+- [X] T033 [US1] Map the retired-id failure: in the dispatch for every method taking an `agentID`, when `agents[id] == nil` and `retired[id] != nil`, throw `-32050` with `retiredSentence`. Put it once, in the helper those methods use to find an agent (`noSuchAgent` today). The same applies to the agent tools that name another agent (`archive_agent`, `stop_agent`, helpers). Make T027 pass.
+- [X] T034 [US1] Handle `agent/removed` in `Pkg/Sources/AgentsKitCore/Client/AgentsModel.swift`: remove the agent from `agents`, and if it was selected or watched, clear that so the retired page shows (T023). Add a unit test in `AgentsModelTests.swift`.
 
 **Checkpoint**: quickstart §2's first block passes on a scratch daemon. This is the MVP.
 

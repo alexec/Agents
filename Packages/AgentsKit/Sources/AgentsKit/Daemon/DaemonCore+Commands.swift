@@ -1457,6 +1457,11 @@ extension DaemonCore {
     }
 
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {
-        try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
+        // Deleted with the rest of it (051): say so rather than show an empty page.
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        return try await store.transcript(for: request.agentID, before: request.before, limit: request.limit)
     }
 }

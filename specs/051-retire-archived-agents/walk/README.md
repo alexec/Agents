@@ -40,3 +40,5 @@ Two things found and fixed on the way: a retired agent's project URL has a trail
 Mistake on the way: `ui.swift press "Settings…"` matched "Services Settings…" and opened System
 Settings on Alex's screen at 22:57:43. It was quit at once. Exact menu titles are pressed with
 `/tmp/ax-exact.swift` from now on.
+
+Alex approved the look as is (AskUserQuestion, 2026-09-25).

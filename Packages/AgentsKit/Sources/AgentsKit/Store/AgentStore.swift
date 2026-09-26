@@ -271,7 +271,7 @@ public actor AgentStore {
     public func retire(_ tombstone: Tombstone, into retired: RetiredStore) throws {
         try retired.append(tombstone)
         try check(.tombstone)
-        try deleteRetired(tombstone.id)
+        try deleteRetiredFiles(tombstone.id)
     }
 
     /// Finish what a stopped retire began: for each of these ids that still has a
@@ -279,13 +279,19 @@ public actor AgentStore {
     public func finishRetiring(_ ids: some Sequence<UUID>) {
         for id in ids where FileManager.default.fileExists(atPath: locations.agent(id).path) {
             DaemonLog.shared.write("finishing the retirement of \(id), cut off last time")
-            try? deleteRetired(id)
+            try? deleteRetiredFiles(id)
         }
+    }
+
+    /// Delete what the app kept for an agent whose tombstone is already written. The
+    /// daemon's path: it writes the tombstone itself, and does the worktree in between.
+    public func deleteRetired(_ id: UUID) throws {
+        try deleteRetiredFiles(id)
     }
 
     /// The record first, then the transcript, then the folder: a folder with no record
     /// is one `loadAll` cannot read, so a half-deleted agent is never listed as whole.
-    private func deleteRetired(_ id: UUID) throws {
+    private func deleteRetiredFiles(_ id: UUID) throws {
         closeTranscript(for: id)
         lineIndexes.removeValue(forKey: id)
         try check(.closeTranscript)

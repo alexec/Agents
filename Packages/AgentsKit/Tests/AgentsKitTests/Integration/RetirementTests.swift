@@ -1,0 +1,182 @@
+import Foundation
+import Testing
+@testable import AgentsKit
+@testable import AgentsKitCore
+
+/// Retiring archived agents (051), through the real daemon.
+///
+/// The clock is fixed and the agents are seeded already archived for as long as each test
+/// needs, because moving the daemon's wall clock forward by weeks inside one run is
+/// exactly the jump `RetentionClock` refuses to believe.
+@Suite("Retiring archived agents", .timeLimit(.minutes(1)))
+struct RetirementTests {
+    let day: TimeInterval = 86_400
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    // MARK: Scaffolding
+
+    private func temporary() throws -> (StoreLocations, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsRetirementTests-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        return (StoreLocations(root: root), Project.standardize(work))
+    }
+
+    private func core(_ locations: StoreLocations, seeded: [Agent] = [], at time: Date? = nil,
+                      settings: RetentionSettings? = nil) async throws -> DaemonCore {
+        let store = try AgentStore(locations: locations)
+        for agent in seeded {
+            try await store.save(agent)
+            try await store.append(TranscriptEntry(kind: .userMessage("hello")), for: agent.id)
+        }
+        if let settings { try RetentionStore(locations: locations).save(.init(settings: settings)) }
+        let clock = time ?? now
+        let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything,
+                              launcher: FakeLauncher(script: .init()), now: { clock })
+        await core.loadFromDisk()
+        return core
+    }
+
+    private func archived(_ work: URL, daysAgo: Double, title: String = "old", size: Int = 0) -> Agent {
+        var agent = Agent(runtimeID: "claude", cwd: work, title: title, state: .archived,
+                          endedReason: .endTurn, archivedReason: .byUser,
+                          archivedAt: now.addingTimeInterval(-daysAgo * day))
+        agent.lastActivityAt = now.addingTimeInterval(-daysAgo * day)
+        agent.costToDate = ["USD": 1.5]
+        return agent
+    }
+
+    private func folderExists(_ locations: StoreLocations, _ id: UUID) -> Bool {
+        FileManager.default.fileExists(atPath: locations.agent(id).path)
+    }
+
+    // MARK: US1
+
+    @Test func anAgentArchivedThirtyOneDaysAgoIsRetiredAndLeavesATombstone() async throws {
+        let (locations, work) = try temporary()
+        let gone = archived(work, daysAgo: 31, title: "Plan the release")
+        let core = try await core(locations, seeded: [gone])
+
+        await core.checkRetention()
+
+        #expect(await core.agent(gone.id) == nil)
+        #expect(!folderExists(locations, gone.id))
+        #expect(await !core.listAgents(.init()).contains { $0.id == gone.id })
+        let tombstones = await core.retiredTombstones(.init(ids: [gone.id]))
+        #expect(tombstones.first?.title == "Plan the release")
+        #expect(tombstones.first?.retiredBecause == .age)
+        #expect(RetiredStore(locations: locations).loadAll()[gone.id] != nil)
+        // The project keeps what it cost, and counts what went.
+        let project = await core.allProjects().first { $0.folder == work }
+        #expect(project?.retiredCount == 1)
+        #expect(project?.costToDate["USD"] == 1.5)
+    }
+
+    @Test func anAgentArchivedTwentyNineDaysAgoIsKept() async throws {
+        let (locations, work) = try temporary()
+        let kept = archived(work, daysAgo: 29)
+        let core = try await core(locations, seeded: [kept])
+        await core.checkRetention()
+        #expect(await core.agent(kept.id) != nil)
+        #expect(folderExists(locations, kept.id))
+    }
+
+    @Test func nothingThatIsNotArchivedIsEverRetired() async throws {
+        let (locations, work) = try temporary()
+        let old = now.addingTimeInterval(-400 * day)
+        let finished = Agent(runtimeID: "claude", cwd: work, title: "finished", state: .finished,
+                             createdAt: old, lastActivityAt: old, endedReason: .endTurn)
+        let stopped = Agent(runtimeID: "claude", cwd: work, title: "stopped", state: .stopped,
+                            createdAt: old, lastActivityAt: old, endedReason: .cancelled)
+        var parked = finished
+        parked.id = UUID()
+        parked.parking = .parked(at: old)
+        let core = try await core(locations, seeded: [finished, stopped, parked],
+                                  settings: RetentionSettings(keepFor: .days7, cap: .gb1))
+        await core.checkRetention()
+        for id in [finished.id, stopped.id, parked.id] {
+            #expect(await core.agent(id) != nil)
+            #expect(folderExists(locations, id))
+        }
+    }
+
+    @Test func unarchivingAndArchivingAgainStartsTheTimeAgain() async throws {
+        let (locations, work) = try temporary()
+        let agent = archived(work, daysAgo: 40)
+        let core = try await core(locations, seeded: [agent])
+        try await core.unarchive(agent.id)
+        #expect(await core.agent(agent.id)?.archivedAt == nil)
+        try await core.archive(agent.id)
+        #expect(await core.agent(agent.id)?.archivedAt == now)
+        await core.checkRetention()
+        #expect(await core.agent(agent.id) != nil)
+    }
+
+    @Test func aRecordFromBefore051IsTimedFromItsFirstStart() async throws {
+        let (locations, work) = try temporary()
+        var legacy = archived(work, daysAgo: 400)
+        legacy.archivedAt = nil
+        let core = try await core(locations, seeded: [legacy])
+        #expect(await core.agent(legacy.id)?.archivedAt == now)
+        await core.checkRetention()
+        #expect(await core.agent(legacy.id) != nil)
+        // And it was written down, so the next start does not move it again.
+        let disk = try StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: locations.record(legacy.id)))
+        #expect(disk.archivedAt == now)
+    }
+
+    @Test func aStartSoonAfterTheTimeRanOutRetiresItWithoutHoldingStartUp() async throws {
+        let (locations, work) = try temporary()
+        let agent = archived(work, daysAgo: 29.9)
+        let first = try await core(locations, seeded: [agent])
+        await first.checkRetention()
+        #expect(await first.agent(agent.id) != nil)
+
+        // Six hours later, a new daemon on the same root.
+        let later = now.addingTimeInterval(6 * 3_600)
+        let store = try AgentStore(locations: locations)
+        let second = DaemonCore(store: store, locations: locations, discovery: .findsEverything,
+                                launcher: FakeLauncher(script: .init()), now: { later })
+        await second.loadFromDisk()
+        // Listed straight away: start does not wait on the check.
+        #expect(await second.agent(agent.id) != nil)
+        await second.checkRetention()
+        #expect(await second.agent(agent.id) == nil)
+    }
+
+    @Test func aRetireCutOffLastTimeIsFinishedBeforeAnythingIsListed() async throws {
+        let (locations, work) = try temporary()
+        let agent = archived(work, daysAgo: 40)
+        let store = try AgentStore(locations: locations)
+        try await store.save(agent)
+        // The tombstone was written and the daemon died before deleting anything.
+        try RetiredStore(locations: locations).append(Tombstone(from: agent, retiredAt: now, because: .age))
+        let core = try await core(locations)
+        #expect(await core.agent(agent.id) == nil)
+        #expect(!folderExists(locations, agent.id))
+        #expect(await core.retiredTombstones(.init(ids: [agent.id])).count == 1)
+    }
+
+    @Test func aRetiredAgentSaysSoWhenAsked() async throws {
+        let (locations, work) = try temporary()
+        let gone = archived(work, daysAgo: 31, title: "Plan the release")
+        let core = try await core(locations, seeded: [gone])
+        await core.checkRetention()
+
+        for method in [DaemonAPI.Method.agentsUnarchive, DaemonAPI.Method.agentsTranscript] {
+            let answer = await core.handle(method: method,
+                                           params: try JSONValue.encoding(DaemonAPI.AgentRequest(agentID: gone.id)))
+            guard case .failure(let error) = answer else {
+                Issue.record("\(method) answered for a retired agent")
+                continue
+            }
+            #expect(error.code == DaemonAPI.Failure.agentRetired, "\(method)")
+            #expect(error.message.contains("Plan the release"), "\(method)")
+        }
+        // An id nobody has ever heard of is still just not here.
+        let unknown = await core.handle(method: DaemonAPI.Method.agentsUnarchive,
+                                        params: try JSONValue.encoding(DaemonAPI.AgentRequest(agentID: UUID())))
+        if case .failure(let error) = unknown { #expect(error.code == DaemonAPI.Failure.noSuchAgent) }
+    }
+}
