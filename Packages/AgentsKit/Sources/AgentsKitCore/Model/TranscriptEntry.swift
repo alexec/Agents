@@ -51,7 +51,9 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case usageRecorded(TurnUsage)
         case servedRequest(ServedRequest)
         case elicitationAsked(ElicitationRequest)
-        case elicitationAnswered(id: UUID, summary: String)
+        /// `answers` is what was said, question by question, when the form was
+        /// answered; empty for a decline, a withdrawal, and every record written before.
+        case elicitationAnswered(id: UUID, summary: String, answers: [ElicitationAnswer] = [])
         case compaction(status: String, summary: [ContentBlock])
         /// The runtime telling the person something beside the reply (ACP `notice`).
         case notice(SessionNotice)

@@ -313,6 +313,62 @@ public struct ElicitationSchema: Codable, Hashable, Sendable {
     public func problems(with answer: [String: JSONValue]) -> [String] {
         properties.compactMap { $0.problem(with: answer[$0.name]) }
     }
+
+    /// What was asked and what was said, one line a page, in the words the card showed:
+    /// a choice's title rather than its value, and the free-text box beside a choice
+    /// joined onto it. A page left empty is left out.
+    ///
+    /// `message` stands in for the question when a lone property has no title of its
+    /// own, which is how a one-question form arrives.
+    public func answers(_ content: [String: JSONValue], message: String? = nil) -> [ElicitationAnswer] {
+        let pages = pages
+        return pages.compactMap { page in
+            guard let first = page.first else { return nil }
+            let said = page.flatMap { $0.words(for: content[$0.name]) }
+            guard !said.isEmpty else { return nil }
+            let question = first.title
+                ?? (pages.count == 1 ? message : nil)
+                ?? first.description
+                ?? first.name
+            return ElicitationAnswer(question: question, answer: said.joined(separator: ", "))
+        }
+    }
+}
+
+extension ElicitationSchema.Property {
+    /// The value as the card drew it, or nothing when there is none.
+    func words(for value: JSONValue?) -> [String] {
+        guard let value, !value.isNull else { return [] }
+        switch kind {
+        case .string(_, _, _, let choices):
+            guard let text = value.stringValue, !text.isEmpty else { return [] }
+            return [choices?.first { $0.value == text }?.title ?? text]
+        case .multiSelect(let items, _, _):
+            return (value.arrayValue ?? []).compactMap(\.stringValue).map { chosen in
+                items.first { $0.value == chosen }?.title ?? chosen
+            }
+        case .boolean:
+            return value.boolValue.map { [$0 ? "Yes" : "No"] } ?? []
+        case .number, .integer:
+            switch value {
+            case .int(let n): return [String(n)]
+            case .double(let n): return [n.formatted()]
+            default: return value.stringValue.map { [$0] } ?? []
+            }
+        }
+    }
+}
+
+/// One question on a form and what the person said to it, kept in the record so the
+/// conversation shows the answer after the card has gone.
+public struct ElicitationAnswer: Codable, Hashable, Sendable {
+    public var question: String
+    public var answer: String
+
+    public init(question: String, answer: String) {
+        self.question = question
+        self.answer = answer
+    }
 }
 
 /// What the user did with a form.
