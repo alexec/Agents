@@ -50,6 +50,9 @@ struct FirstRunView: View {
                     Button("Connect…") { connecting = true }
                 }
             }
+            // As tall as the taller card's words, and no taller: the spacer in each
+            // card only lines the two buttons up.
+            .fixedSize(horizontal: false, vertical: true)
             Text("Nothing passes through a service of ours. You can change this later in Settings ▸ Control plane.")
                 .appText(.supporting).foregroundStyle(.secondary)
         }
@@ -65,7 +68,7 @@ struct FirstRunView: View {
             action()
         }
         .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.background, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)

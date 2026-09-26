@@ -130,19 +130,19 @@ or on Alex's paired devices.
 
 **Independent test**: a scratch root with no control plane: choose Run one here, see This Mac as a host, restart the window, and see it connect at once.
 
-- [ ] T031 [P] [US2] Add the two launch-agent plists to `App/LaunchAgents/` and copy them to `Contents/Library/LaunchAgents` in `project.yml`:
+- [x] T031 [P] [US2] Add the two launch-agent plists to `App/LaunchAgents/` and copy them to `Contents/Library/LaunchAgents` in `project.yml`:
   - `com.alexecollins.agents.control.plist` runs `agents-control` with `KeepAlive` and `RunAtLoad`.
   - `com.alexecollins.agents.host.plist` runs `agentsd --serve --control-home`.
-- [ ] T032 [US2] Write `LocalServices` in `App/Sources/Control/LocalServices.swift` using `SMAppService.agent(plistName:)`: register, status and unregister (R5).
+- [x] T032 (scratch roots: labelled launchd jobs from plists in `<root>/control`, booted out by `remove`) [US2] Write `LocalServices` in `App/Sources/Control/LocalServices.swift` using `SMAppService.agent(plistName:)`: register, status and unregister (R5).
   - Before registering, check for leftover jobs with `launchctl print gui/<uid>/<label>`.
   - A scratch root uses labels suffixed with the root's hash, so it never touches the real labels.
   - If the service is already registered, don't install it twice; just pair (US2.4).
-- [ ] T033 [US2] Loopback pairing: `agents-control` issues an operator code to a caller with the same uid on a loopback-only Unix socket `<control root>/pair.sock`. `LocalServices` uses it to pair the window.
-- [ ] T034 [P] [US2] Build frame A in `App/Sources/Control/FirstRunView.swift`: two cards, with Run one on this Mac marked as the usual choice and the sleep caveat. There is no sidebar or toolbar until one is chosen.
-- [ ] T035 [P] [US2] Build frame B in `App/Sources/Control/RunHereSheet.swift`: the steps, and the Login Items note when macOS asks.
-- [ ] T036 [P] [US2] Build frame C in `App/Sources/Control/ConnectSheet.swift`: control planes found by Bonjour, listed by name, plus a code field. The window is an operator only if the code is an operator code.
-- [ ] T037 [US2] Show `FirstRunView` from `App/Sources/ContentView.swift` when there is neither a `ControlConfig` nor a legacy root with data. Keep the modifier chain on `ContentView()` in `AgentsApp` identical (the scratch-app-opens-no-window lesson).
-- [ ] T038 [US2] Walk: a scratch root with no data. Run one here, then check the host is listed, a restart reconnects, and logout survival (`launchctl print` shows both jobs). Unregister afterwards. Record in `specs/058-control-plane/walks/us2.md`.
+- [x] T033 (in its place: the local socket is the pairing, operator by code signature; a code comes with pairing another Mac) [US2] Loopback pairing: `agents-control` issues an operator code to a caller with the same uid on a loopback-only Unix socket `<control root>/pair.sock`. `LocalServices` uses it to pair the window.
+- [x] T034 [P] [US2] Build frame A in `App/Sources/Control/FirstRunView.swift`: two cards, with Run one on this Mac marked as the usual choice and the sleep caveat. There is no sidebar or toolbar until one is chosen.
+- [x] T035 [P] [US2] Build frame B in `App/Sources/Control/RunHereSheet.swift`: the steps, and the Login Items note when macOS asks.
+- [x] T036 (the Bonjour list and code field are real; Connect says pairing is not built yet) [P] [US2] Build frame C in `App/Sources/Control/ConnectSheet.swift`: control planes found by Bonjour, listed by name, plus a code field. The window is an operator only if the code is an operator code.
+- [x] T037 [US2] Show `FirstRunView` from `App/Sources/ContentView.swift` when there is neither a `ControlConfig` nor a legacy root with data. Keep the modifier chain on `ContentView()` in `AgentsApp` identical (the scratch-app-opens-no-window lesson).
+- [x] T038 (walks/us2.md) [US2] Walk: a scratch root with no data. Run one here, then check the host is listed, a restart reconnects, and logout survival (`launchctl print` shows both jobs). Unregister afterwards. Record in `specs/058-control-plane/walks/us2.md`.
 
 ---
 
