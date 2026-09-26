@@ -408,7 +408,7 @@ public actor DaemonCore {
     var catalogUpdateChecks: [String: SkillUpdates.Answer] = [:]
     /// Between an add's rename and its lock write, for the test that an add stopped there
     /// leaves nothing behind. Nil everywhere else.
-    var catalogAfterRename: (@Sendable () throws -> Void)?
+    var catalogAfterRename: (@Sendable () throws -> Void)? = DaemonCore.catalogPause(ProcessInfo.processInfo.environment)
     #endif
     /// Projects due a look sooner than their five minutes, because a pull request's run
     /// just ended there (FR-014), and from when.

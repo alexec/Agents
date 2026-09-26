@@ -11,6 +11,20 @@ extension DaemonCore {
         catalogEndpoints = endpoints
     }
 
+    /// At start: undo an add the last daemon died in the middle of (SC-003).
+    func recoverCatalog() {
+        if let undone = SkillInstaller.recover(journal: catalogInstaller.journal) {
+            DaemonLog.shared.write("catalog: \(undone)")
+        }
+    }
+
+    /// `AGENTS_TEST_CATALOG_PAUSE=afterRename` holds every add for 30 s between the rename
+    /// and the lock write, so a walk can kill the daemon there (quickstart §3 step 13).
+    static func catalogPause(_ environment: [String: String]) -> (@Sendable () throws -> Void)? {
+        guard environment["AGENTS_TEST_CATALOG_PAUSE"] == "afterRename" else { return nil }
+        return { Thread.sleep(forTimeInterval: 30) }
+    }
+
     var catalog: SkillsCatalog { SkillsCatalog(session: catalogSession, endpoints: catalogEndpoints) }
 
     var catalogGitHub: GitHubSource {

@@ -24,6 +24,8 @@ struct SkillPreviewView: View {
     @State private var confirmingReplace = false
     @State private var askedAgain = false
     @State private var confirmingLoss = false
+    /// Frame E: when the name is taken where Add points, whether the other place is free.
+    @State private var otherIsFree = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -82,6 +84,10 @@ struct SkillPreviewView: View {
             }
             askedAgain = true
             failure = nil
+            otherIsFree = false
+            if case .unmanaged? = state, update == nil, let other = otherDestination {
+                otherIsFree = await model.catalogDestinationState(preview.previewID, for: other) == .free
+            }
         }
         .confirmationDialog("Your edits to \(preview.name) will be lost", isPresented: $confirmingLoss) {
             Button("Update anyway", role: .destructive) { Task { await add(replace: true) } }
@@ -181,6 +187,12 @@ struct SkillPreviewView: View {
         case .unmanaged(let path)?:
             note("You already have a skill called \(preview.name) in \(Self.tilde(URL(filePath: path).deletingLastPathComponent().path)). You made it (it didn't come from here), so the app won't replace it.",
                  attention: true)
+            if otherIsFree {
+                note(addTo == .personal
+                     ? "Adding to \(projectName ?? "the project") would work: in the project its copy is the one agents there get, ahead of yours."
+                     : "Adding to you would work: every agent you start gets it, and this project's own copy still comes first here.",
+                     attention: false)
+            }
         case .managedOther(let source)?:
             note("A skill of this name from \(source) is there already. Adding this one replaces it.", attention: false)
         case .sameSkill(let update)? where self.update == nil:
@@ -271,6 +283,14 @@ struct SkillPreviewView: View {
             return model.liveProjects.first { $0.host == .mac }?.project.folder.path
         }
         return key.folder.path
+    }
+
+    /// The destination Add to is not pointing at, if there is one to offer.
+    private var otherDestination: DaemonAPI.SkillDestination? {
+        switch addTo {
+        case .personal: projectFolder.map { .project(folder: $0) }
+        case .project: .personal
+        }
     }
 
     private var placeName: String { addTo == .personal ? "~/.agents" : (projectName ?? "the project") }

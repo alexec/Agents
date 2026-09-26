@@ -21,6 +21,43 @@ struct SkillInstaller: Sendable {
         self.afterRename = afterRename
     }
 
+    /// Thrown from `afterRename` in a test to stand for the daemon dying at that moment: the
+    /// add stops where it is, with nothing undone, as a killed process would leave it.
+    struct Stop: Error {}
+
+    // MARK: The journal
+
+    /// An add under way, written before anything moves and removed once the lock is written.
+    /// A daemon that died in between finds it at its next start and undoes the add
+    /// (`recover`), so the destination is never left half-changed (SC-003). Without it, a
+    /// folder moved into place with no lock entry would look like the person's own and would
+    /// never be touched again.
+    struct Pending: Codable, Equatable {
+        var lock: String
+        var personal: Bool
+        var key: String
+        var hash: String
+        var target: String
+        var trashed: String?
+    }
+
+    var journal: URL { sidecar.deletingLastPathComponent().appending(path: "catalog-pending.json") }
+
+    /// Undo an add a dead daemon left unfinished; nothing to do if the lock was written.
+    /// Returns what was undone, for the log.
+    @discardableResult
+    static func recover(journal: URL) -> String? {
+        guard let data = try? Data(contentsOf: journal),
+              let pending = try? JSONDecoder().decode(Pending.self, from: data) else { return nil }
+        defer { try? FileManager.default.removeItem(at: journal) }
+        let lock = try? SkillLock.load(pending.personal ? .personal : .project, at: URL(filePath: pending.lock))
+        if lock?.entry(pending.key)?.recordedHash == pending.hash { return nil }
+        let target = URL(filePath: pending.target)
+        try? FileManager.default.removeItem(at: target)
+        if let trashed = pending.trashed { try? FileManager.default.moveItem(at: URL(filePath: trashed), to: target) }
+        return "undid an unfinished add of \(target.lastPathComponent)"
+    }
+
     // MARK: What is there
 
     func state(of preview: DaemonAPI.SkillPreview, at place: SkillPlace) -> DaemonAPI.DestinationState {
@@ -63,14 +100,34 @@ struct SkillInstaller: Sendable {
         let target = place.skills.appending(path: preview.name)
         try fm.createDirectory(at: place.skills, withIntermediateDirectories: true)
 
-        // 1. The old folder, if any, to the Trash, remembered so it can come back.
+        // 0. The journal, before anything moves, so a daemon that dies from here on is undone
+        //    at its next start.
+        let hash = place.lockKind == .personal ? preview.treeSHA : preview.computedHash
+        var pending = Pending(lock: place.lock.path, personal: place.lockKind == .personal, key: staged.lockKey,
+                              hash: hash, target: target.path, trashed: nil)
+        do {
+            try fm.createDirectory(at: journal.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(pending).write(to: journal, options: .atomic)
+        } catch {
+            throw DaemonAPI.CatalogError.failed("could not note the add before starting it")
+        }
+        // 1. The old folder, if any, to the Trash, remembered (here and in the journal) so it
+        //    can come back.
         var trashed: URL?
-        if Self.exists(target) { trashed = try trash(target, place: place, now: now) }
+        if Self.exists(target) {
+            do { trashed = try trash(target, place: place, now: now) } catch {
+                try? fm.removeItem(at: journal)
+                throw DaemonAPI.CatalogError.failed("could not move the old copy to the Trash")
+            }
+            pending.trashed = trashed?.path
+            try? JSONEncoder().encode(pending).write(to: journal, options: .atomic)
+        }
         // 2. The staged folder into place.
         do {
             try fm.moveItem(at: staged.folder, to: target)
         } catch {
             if let trashed { try? fm.moveItem(at: trashed, to: target) }
+            try? fm.removeItem(at: journal)
             throw DaemonAPI.CatalogError.failed("could not move the skill into \(place.skills.path)")
         }
         // 3. The lock. A failure here takes the new folder back out and puts the old one back.
@@ -79,12 +136,15 @@ struct SkillInstaller: Sendable {
             if let old = place.managedEntry(folderName: preview.name, in: lock), old.key != staged.lockKey {
                 lock.remove(name: old.key)
             }
-            let hash = place.lockKind == .personal ? preview.treeSHA : preview.computedHash
             lock.upsert(name: staged.lockKey, source: preview.result.source, skillPath: preview.skillPath, hash: hash, now: now)
             try lock.write()
+            try? fm.removeItem(at: journal)
+        } catch is Stop {
+            throw DaemonAPI.CatalogError.failed("stopped")
         } catch {
             try? fm.removeItem(at: target)
             if let trashed { try? fm.moveItem(at: trashed, to: target) }
+            try? fm.removeItem(at: journal)
             if let e = error as? DaemonAPI.CatalogError { throw e }
             throw DaemonAPI.CatalogError.failed("could not write \(place.lock.lastPathComponent)")
         }
