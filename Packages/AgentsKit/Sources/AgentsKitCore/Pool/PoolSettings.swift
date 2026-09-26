@@ -82,17 +82,14 @@ public struct PoolEntry: Codable, Hashable, Sendable, Identifiable {
     public var credentialKind: CredentialKind? { credentialRef.flatMap(CredentialKind.init(rawValue:)) }
 
     /// Its key is one this Mac lends to its runtime (046). None else can run a pool entry:
-    /// Codex's OpenAI key is gone (047), and Claude's tokens are for servers only.
+    /// Codex's OpenAI key is gone (047), and so are Claude's tokens (056).
     public var hasAKeyToLend: Bool {
         guard let kind = credentialKind else { return false }
         return kind.isLentOnTheMac && kind.runtimeID == runtimeID
     }
 
-    /// Runs on a key rather than a sign-in.
-    public var isKeyed: Bool {
-        guard let kind = credentialKind else { return false }
-        return kind != .oauthToken
-    }
+    /// Runs on a key rather than a sign-in. Every kind Settings still takes is a key (056).
+    public var isKeyed: Bool { credentialKind != nil }
 }
 
 /// One model, and an effort where the runtime has one, in a level's column.

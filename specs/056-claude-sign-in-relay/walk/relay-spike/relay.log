@@ -1,0 +1,3 @@
+09:28:19 HEAD /api/hello -> 200 (asked with OTHER:)
+09:28:21 POST /v1/messages -> 200 (asked with stand-in)
+09:28:22 POST /v1/messages -> 200 (asked with stand-in)

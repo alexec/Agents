@@ -26,8 +26,8 @@ final class HostSet {
     var rebuiltAsk: HostID?
     /// Claude's toolset on each server (043).
     private(set) var claude: [HostID: ServerConnection.Claude] = [:]
-    /// Whether a server should get Claude as it connects: the window has a credential it
-    /// may lend there (043, FR-002). Set by `AppModel`, which knows the credentials.
+    /// Whether a server should get Claude as it connects: this Mac can relay its own Claude
+    /// sign-in there (056; a credential in Settings before). Set by `AppModel`.
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
     /// Every other runtime the app installs, on each server, by runtime id (046: Gemini).
     private(set) var toolsets: [HostID: [String: ServerConnection.Claude]] = [:]
@@ -154,8 +154,9 @@ final class HostSet {
         connect(id)
     }
 
-    /// How Claude stands on a server, in one line for Settings (043, contracts/ui.md § 2).
-    func claudeLine(_ id: HostID, hasCredential: Bool) -> String {
+    /// How Claude stands on a server, in one line for Settings (043; 056 contracts/ui.md).
+    /// `canRelay`: this Mac can relay its own Claude sign-in.
+    func claudeLine(_ id: HostID, canRelay: Bool) -> String {
         guard let host = hosts[id], let facts = host.facts else { return "Claude: not checked yet" }
         switch claude[id] {
         case .installing: return "Claude: installing…"
@@ -164,17 +165,17 @@ final class HostSet {
         default: break
         }
         let signIn = host.ownSignInOnly ? " · its own sign-in only"
-            : hasCredential ? " · signs in with the token in Settings"
-            : facts.hasOwnClaudeSignIn ? " · its own sign-in" : " · needs a token"
+            : canRelay ? " · signs in through this Mac"
+            : facts.hasOwnClaudeSignIn ? " · its own sign-in" : " · needs this Mac signed in to it"
         if facts.toolsetID != nil { return "Claude: ready (installed by Agents)" + signIn }
         if facts.hasNpx { return "Claude: the server’s own" + signIn }
         if !facts.canInstallClaude {
             return "Claude can’t be installed here: it uses \(facts.libc.display). Install it there yourself to use it."
         }
         if facts.downloader == nil { return "Claude can’t be installed here: it has neither curl nor wget." }
-        return hasCredential && !host.ownSignInOnly
+        return canRelay && !host.ownSignInOnly
             ? "Claude: installed when \(host.label) next connects"
-            : "Claude: installed the first time you start it here"
+            : "Claude: installed when this Mac is signed in to it"
     }
 
     /// How many agents removing this server would stop, for the Remove dialog.
@@ -223,7 +224,7 @@ final class HostSet {
                            wants: @escaping @Sendable (String) async -> Bool = { _ in false },
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
                            lender: DaemonClient.CredentialLender? = nil,
-                           relay: @escaping @Sendable () async -> ServerConnection.RelayGrant? = { nil }) -> ServerConnection {
+                           relay: @escaping @Sendable () async -> [ServerConnection.RelayGrant] = { [] }) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
@@ -247,11 +248,14 @@ final class HostSet {
     }
 
     /// What this window relays to a server (047): nothing to one marked "own sign-in only".
-    func relayFor(_ id: HostID) -> @Sendable () async -> ServerConnection.RelayGrant? {
+    /// A server being added is not saved until it has connected, and is not marked yet, so
+    /// its first connection is relayed to as well (056 walk: it was not, for Codex either).
+    func relayFor(_ id: HostID) -> @Sendable () async -> [ServerConnection.RelayGrant] {
         let relays = self.relays
         return { [weak self] in
-            let ownOnly = await MainActor.run { self?.host(id)?.ownSignInOnly ?? true }
-            return ownOnly ? nil : await relays.grant()
+            guard let self else { return [] }
+            let ownOnly = await MainActor.run { self.host(id)?.ownSignInOnly ?? false }
+            return ownOnly ? [] : await relays.grants()
         }
     }
 

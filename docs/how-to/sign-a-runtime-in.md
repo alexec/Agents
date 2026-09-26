@@ -84,8 +84,10 @@ off**, beside a provider the runtime does not need, stops it being offered.
 2. Confirm with **Sign out**. The dialog says first whether anything is running on it, for
    example **This stops 2 agents mid-conversation.**
 
-iPhone and iPad cannot sign runtimes in: sign in on the Mac. For a runtime on a Linux
-server, sign in on the server itself; see [Add a Linux server](add-a-linux-server.md).
+iPhone and iPad cannot sign runtimes in: sign in on the Mac. Signing Claude or Codex in on
+this Mac also signs them in on your Linux servers: their requests go through this Mac. For
+any other runtime on a server, sign in on the server itself; see
+[Add a Linux server](add-a-linux-server.md).
 
 ## If it doesn't work
 
