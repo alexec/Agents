@@ -627,6 +627,33 @@ public actor ACPSession {
 
     // MARK: Incoming
 
+    /// The command lines of calls asked to run in the background, by the call's id and
+    /// by its description, until the task they start is announced. Only the last few:
+    /// a task is announced straight after the call that started it.
+    private var backgroundCommands: [(keys: Set<String>, command: String)] = []
+
+    /// A tool call that says `run_in_background` and carries a `command` is a shell
+    /// about to be announced without one. Keyed on those two fields, not on a runtime.
+    private func noteBackgroundCommand(in update: JSONValue) {
+        guard let input = update["rawInput"], input["run_in_background"]?.boolValue == true,
+              let command = input["command"]?.stringValue, !command.isEmpty else { return }
+        var keys: Set<String> = []
+        if let id = update["toolCallId"]?.stringValue { keys.insert(id) }
+        if let description = input["description"]?.stringValue { keys.insert(description) }
+        guard !keys.isEmpty else { return }
+        backgroundCommands.removeAll { !$0.keys.isDisjoint(with: keys) }
+        backgroundCommands.append((keys, command))
+        if backgroundCommands.count > 8 { backgroundCommands.removeFirst() }
+    }
+
+    private func backgroundCommand(for item: BackgroundItem) -> String? {
+        let wanted = Set([item.toolCallID, item.detail, item.name].compactMap { $0 })
+        guard let index = backgroundCommands.lastIndex(where: { !$0.keys.isDisjoint(with: wanted) }) else {
+            return nil
+        }
+        return backgroundCommands.remove(at: index).command
+    }
+
     private func startListening() {
         guard notificationTask == nil else { return }
         notificationTask = Task { [weak self] in
@@ -670,10 +697,14 @@ public actor ACPSession {
             return
         }
         let decoded = SessionUpdate.decode(update)
+        noteBackgroundCommand(in: update)
         if case .background(var background) = decoded {
             guard !isReplaying || recordsReplay else { return }
             if case .spawned(var item) = background {
                 item.parentID = owner(of: params)
+                if item.kind == .task, item.command == nil {
+                    item.command = backgroundCommand(for: item)
+                }
                 if item.kind == .subagent { subagents[item.id] = item.name }
                 background = .spawned(item)
             }

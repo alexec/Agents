@@ -15,6 +15,13 @@ struct BackgroundWorkTests {
         "name": "Print a tick every second for 5 minutes", "taskType": "shell",
         "description": "Print a tick every second for 5 minutes",
         "showInTranscript": false, "canStop": true]
+    /// The Bash call that starts it, which is the only place the command line is.
+    static let shellCall: JSONValue = [
+        "sessionUpdate": "tool_call_update", "toolCallId": "toolu_01JBKqYEYTNwBecLVD7vX3q2",
+        "kind": "execute", "title": "for i in $(seq 1 300); do echo tick $i; sleep 1; done",
+        "rawInput": ["command": "for i in $(seq 1 300); do echo tick $i; sleep 1; done",
+                     "description": "Print a tick every second for 5 minutes",
+                     "run_in_background": true]]
     static let shellLinked: JSONValue = [
         "sessionUpdate": "async_task_progress", "asyncTaskId": "bixt00wz6",
         "toolCallId": "toolu_01JBKqYEYTNwBecLVD7vX3q2"]
@@ -145,7 +152,7 @@ struct BackgroundWorkTests {
     private var capturedTurn: FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
         script.air = [
-            (nil, Self.shellSpawned), (nil, Self.shellLinked), (nil, Self.shellOutput),
+            (nil, Self.shellCall), (nil, Self.shellSpawned), (nil, Self.shellLinked), (nil, Self.shellOutput),
             (nil, Self.subagentSpawned),
             (Self.subagent, ["sessionUpdate": "tool_call", "toolCallId": "toolu_sub1", "title": "ls /usr/bin | wc -l",
                              "kind": "execute", "status": "pending"]),
@@ -195,6 +202,9 @@ struct BackgroundWorkTests {
         let shell = try #require(agent.background.first { $0.id == "bixt00wz6" })
         #expect(shell.isRunning && shell.offersStop)
         #expect(shell.toolCallID == "toolu_01JBKqYEYTNwBecLVD7vX3q2")
+        #expect(shell.command == "for i in $(seq 1 300); do echo tick $i; sleep 1; done",
+                "found on the call that started it, for the row's hover")
+        #expect(shell.name == "Print a tick every second for 5 minutes", "the row still leads with the name")
         let sub = try #require(agent.background.first { $0.id == Self.subagent })
         #expect(sub.state == .completed && sub.endedAt != nil)
         // The subagent's context is not the agent's.

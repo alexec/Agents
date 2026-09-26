@@ -21,6 +21,10 @@ public struct BackgroundItem: Codable, Hashable, Sendable, Identifiable {
     public var taskType: String?
     /// A task's description (for a shell, its command), or what a subagent was asked.
     public var detail: String?
+    /// A shell's command line, when the tool call that started it said. The row leads
+    /// with the runtime's plain name for it and keeps this for hovering (Alex, 2026-09-26):
+    /// `async_task_spawned` carries only the description, so it is found on the call.
+    public var command: String?
     public var state: State
     /// Whether the runtime says Stop works on it. A task says so itself; a subagent says
     /// so with `capabilities.cancel`, which no runtime sends yet (research, 057).
@@ -187,6 +191,7 @@ extension BackgroundItem {
                 var merged = items[index]
                 merged.name = item.name
                 merged.detail = item.detail ?? merged.detail
+                merged.command = item.command ?? merged.command
                 merged.canStop = item.canStop
                 merged.toolCallID = item.toolCallID ?? merged.toolCallID
                 merged.outputFilePath = item.outputFilePath ?? merged.outputFilePath

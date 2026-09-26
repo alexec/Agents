@@ -82,7 +82,7 @@ struct BackgroundItemRow: View {
             .appText(.supporting)
             .fontWeight(.medium)
             .lineLimit(1)
-            .help("\(BackgroundWords.noun(item)): \(item.name)")
+            .help(item.command ?? "\(BackgroundWords.noun(item)): \(item.name)")
     }
 
     @ViewBuilder
