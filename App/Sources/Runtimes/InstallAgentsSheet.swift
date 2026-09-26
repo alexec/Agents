@@ -13,8 +13,7 @@ struct InstallAgentsSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Install your agents").appText(.reading).fontWeight(.semibold)
-            Text("Agents runs the coding CLIs on this Mac. These aren’t here yet. "
-                 + "Install them now, or later from Settings ▸ Agents.")
+            Text(summary)
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 10) {
@@ -35,6 +34,23 @@ struct InstallAgentsSheet: View {
         .padding(20)
         .frame(width: 480)
     }
+
+    /// Names what is missing rather than saying "these" over a list that also has the
+    /// ones already here, ticked.
+    private var summary: String {
+        let missing = model.missingRuntimes.map(\.runtime.name)
+        let lead = "Agents runs the coding CLIs on this Mac."
+        guard let names = ListFormatter.localizedString(byJoining: missing).nilIfEmpty else {
+            return "\(lead) Everything it knows is here."
+        }
+        let verb = missing.count == 1 ? "isn’t" : "aren’t"
+        let them = missing.count == 1 ? "it" : "them"
+        return "\(lead) \(names) \(verb) here yet. Install \(them) now, or later from Settings ▸ Agents."
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 /// One agent: here and where, being installed, or a way to get it. The same row in the
