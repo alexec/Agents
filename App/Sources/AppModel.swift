@@ -46,6 +46,12 @@ final class AppModel {
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
     private(set) var problem: String?
+    /// A runtime of this Mac's that refused for want of a sign-in: the window answers
+    /// with its sign-in sheet rather than an error nobody can act on.
+    var signInRuntimeID: String?
+    /// Sheets put away without signing in, so that the agents a restart picks back up
+    /// do not each raise it again. Forgotten when the runtime says it is signed in.
+    private var signInsPutAway: Set<String> = []
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Projects column until it becomes a project or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
@@ -1068,6 +1074,14 @@ final class AppModel {
         case DaemonAPI.Notification.runtimeAccountChanged:
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
+            if account.state == .ready { signInsPutAway.remove(account.runtimeID) }
+
+        case DaemonAPI.Notification.signInNeeded:
+            // A turn, a queued prompt or a pick-up refused with nobody waiting on the
+            // call, so this is the only place the window hears it.
+            guard let needed = try? params?.decode(DaemonAPI.SignInNeeded.self),
+                  !signInsPutAway.contains(needed.runtimeID), signInRuntimeID == nil else { return }
+            signInRuntimeID = needed.runtimeID
 
         case DaemonAPI.Notification.pullRequestsChanged:
             // The Mac's own, like the shells (038 FR-010).
@@ -1668,7 +1682,7 @@ final class AppModel {
             // in a row should not mean coming back twice.
             return true
         } catch {
-            problem = describe(error)
+            fail(error, on: selectedProjectHost)
             return false
         }
     }
@@ -1700,7 +1714,7 @@ final class AppModel {
     /// that need not be the one selected. A person's prompt is what clears a block, so
     /// this is an ordinary prompt and nothing else.
     func carryOn(_ id: UUID) async {
-        await attempt {
+        await attempt(on: work.agent(id)?.host ?? .mac) {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
         }
@@ -1967,7 +1981,7 @@ final class AppModel {
             await refreshAgents()
             selection = id
         } catch {
-            problem = describe(error)
+            fail(error, on: selectedProjectHost)
         }
     }
 
@@ -2078,7 +2092,7 @@ final class AppModel {
         }
     }
 
-    private func attempt(_ work: () async throws -> Void) async -> Bool {
+    private func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
         do {
             try await work()
             return true
@@ -2089,9 +2103,30 @@ final class AppModel {
                 await connect()
                 if isConnected, (try? await work()) != nil { return true }
             }
-            problem = describe(error)
+            fail(error, on: host)
             return false
         }
+    }
+
+    /// A failure put in front of the person. A runtime of this Mac's that needs signing
+    /// in gets its sign-in sheet; everything else is said in words. A server's runtime
+    /// is signed in on the server, which this sheet cannot do, so it stays words.
+    private func fail(_ error: any Error, on host: HostID) {
+        if host == .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.needsSignIn,
+           let runtimeID = error.data?["runtimeID"]?.stringValue {
+            signInRuntimeID = runtimeID
+            return
+        }
+        problem = describe(error)
+    }
+
+    /// The sign-in sheet, put away. Signed in or not, it does not come back for this
+    /// runtime by itself until the runtime has been signed in once more.
+    func putAwaySignIn() {
+        if let runtimeID = signInRuntimeID, accounts[runtimeID]?.state != .ready {
+            signInsPutAway.insert(runtimeID)
+        }
+        signInRuntimeID = nil
     }
 
     /// What a person can read. The daemon's errors are already written for someone

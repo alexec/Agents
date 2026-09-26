@@ -301,6 +301,10 @@ public enum DaemonAPI {
         /// Carries the `RuntimeStatus`; a window may just ask `runtimes/list` again.
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
+        /// An agent's runtime refused it for want of a sign-in, somewhere the window did
+        /// not ask: a turn, a queued prompt, a pick-up after a restart. `SignInNeeded`.
+        /// The window answers it with the sign-in sheet rather than an error.
+        public static let signInNeeded = "runtime/signInNeeded"
         public static let agentUsage = "agent/usage"
         public static let agentPlan = "agent/plan"
         public static let agentElicitation = "agent/elicitation"
@@ -2321,6 +2325,17 @@ public extension DaemonAPI {
             self.agentID = agentID
             self.runtime = runtime
             self.lent = lent
+        }
+    }
+
+    /// `runtime/signInNeeded`: which runtime wants signing in, and the agent it stopped.
+    struct SignInNeeded: Codable, Hashable, Sendable {
+        public var runtimeID: String
+        public var agentID: UUID?
+
+        public init(runtimeID: String, agentID: UUID?) {
+            self.runtimeID = runtimeID
+            self.agentID = agentID
         }
     }
 
