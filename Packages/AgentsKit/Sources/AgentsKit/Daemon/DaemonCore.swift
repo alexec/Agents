@@ -224,6 +224,28 @@ public actor DaemonCore {
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
 
+    // MARK: Retiring archived agents (051)
+
+    lazy var retiredStore = RetiredStore(locations: locations)
+    lazy var retentionStore = RetentionStore(locations: locations)
+    lazy var archiveIndexStore = ArchiveIndex(locations: locations)
+    /// What is left of every retired agent, by id. Read at start, before the agents.
+    var retired: [UUID: Tombstone] = [:]
+    /// The person's settings and the clock retirement counts by, as `retention.json` has them.
+    var retention = RetentionStore.File()
+    var retentionIsLoaded = false
+    /// Sizes and file dates of archived agents, written to `archive.json`.
+    var archiveIndex: [UUID: ArchiveIndex.Entry] = [:]
+    /// Over the cap with nothing more that could go, as the last check found.
+    var lastOverCap: OverCap?
+    /// When each archived agent was last made whole to be read. Gone when it is slim again.
+    var lastWhole: [UUID: Date] = [:]
+    /// The hourly check, and the sweep that slims what nobody is reading.
+    var retentionTimer: Task<Void, Never>?
+    var slimSweep: Task<Void, Never>?
+    /// A monotonic origin for `RetentionClock`, taken when the daemon was made.
+    let uptimeOrigin = ContinuousClock.now
+
     // MARK: Events (042)
 
     /// Where the log and the event sources' memory are kept between runs.
@@ -745,6 +767,7 @@ public actor DaemonCore {
     // MARK: Reading
 
     public func loadFromDisk() async {
+        loadRetentionIfNeeded()
         let loaded = await store.loadAll()
         for agent in loaded.agents { agents[agent.id] = seedingCost(agent) }
         // A record the rules forbid was brought to one they allow on the way in, and

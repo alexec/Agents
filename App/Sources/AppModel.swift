@@ -66,6 +66,8 @@ final class AppModel {
     /// Every resource an agent can lease and who holds it (036).
     var leases: DaemonAPI.LeaseSnapshot? { work.leases }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
+    /// How long archived agents are kept (051). Nil from a daemon before 051.
+    var retentionState: DaemonAPI.RetentionState? { work.retentionState }
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -183,6 +185,16 @@ final class AppModel {
         showsEvents = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
+        } else if let gone = work.tombstones[agentID] {
+            select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
+        } else {
+            // Perhaps retired (051): ask, and open its project once the answer is in.
+            Task { [weak self] in
+                guard let self, let gone = await self.tombstone(for: agentID),
+                      self.selection == agentID else { return }
+                self.select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
+                self.selection = agentID
+            }
         }
         openWorkflow = nil
         selection = agentID
@@ -372,6 +384,14 @@ final class AppModel {
     /// adding them up would be an all-time figure wearing the word "session". Taking
     /// away what was spent before we were watching leaves what this sitting cost.
     var selectedAgent: Agent? { work.agent(selection) }
+    /// What is left of an agent that has been retired, when this window has asked (051).
+    func retiredTombstone(_ id: UUID) -> Tombstone? { work.tombstones[id] }
+    /// "Started by …" for a retired agent, named as a live one's would be.
+    func retiredStarterLabel(_ tombstone: Tombstone) -> String? {
+        guard let starter = tombstone.startedByAgent else { return nil }
+        let title = work.agent(starter)?.title ?? work.tombstones[starter]?.title
+        return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
+    }
 
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
@@ -717,6 +737,50 @@ final class AppModel {
 
     /// The reader setting or clearing a limit. Theirs alone: nothing an agent or a
     /// workflow can reach calls this.
+    // MARK: Retiring archived agents (051)
+
+    func refreshRetentionState() async {
+        guard let state = try? await client.call(DaemonAPI.Method.retentionState,
+                                                 Optional<String>.none,
+                                                 returning: DaemonAPI.RetentionState.self) else { return }
+        work.replaceRetentionState(state)
+    }
+
+    /// The person changing how long archived agents are kept. Unconfirmed, a change that
+    /// would retire agents at once comes back unapplied with what it would retire, for
+    /// the confirmation; confirmed, it is applied here and then on every server, which
+    /// keeps to the Mac's settings the way it keeps to its limits (037 R7).
+    func setRetention(_ settings: RetentionSettings, confirmed: Bool) async -> DaemonAPI.RetentionSetResult? {
+        guard let result = try? await client.call(
+            DaemonAPI.Method.retentionSet,
+            DaemonAPI.RetentionSetRequest(settings: settings, confirmed: confirmed),
+            returning: DaemonAPI.RetentionSetResult.self) else { return nil }
+        if let state = result.state { work.replaceRetentionState(state) }
+        if result.applied { await pushRetentionToServers(settings) }
+        return result
+    }
+
+    func pushRetentionToServers(_ settings: RetentionSettings) async {
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(
+                DaemonAPI.Method.retentionSet,
+                DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
+                returning: DaemonAPI.RetentionSetResult.self)
+        }
+    }
+
+    /// What is left of a retired agent, asked of the daemon once and then remembered.
+    func tombstone(for agentID: UUID, on host: HostID = .mac) async -> Tombstone? {
+        if let known = work.tombstones[agentID] { return known }
+        guard let found = try? await client(for: host).call(
+            DaemonAPI.Method.agentsRetired,
+            DaemonAPI.RetiredRequest(ids: [agentID]),
+            returning: [Tombstone].self) else { return nil }
+        let stamped = found.map { var t = $0; t.host = host; return t }
+        work.takeTombstones(stamped)
+        return stamped.first
+    }
+
     func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {
         guard let state = try? await client.call(
             DaemonAPI.Method.costSetLimits,
@@ -1103,6 +1167,12 @@ final class AppModel {
         // for again, and everything it shows is read again.
         await serverFilesByHost[host]?.reconnected()
         await refreshServerRuntimes(host)
+        // And its retention settings (051).
+        if let settings = work.retentionState?.settings {
+            _ = try? await server.call(DaemonAPI.Method.retentionSet,
+                                       DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
+                                       returning: DaemonAPI.RetentionSetResult.self)
+        }
         // The Mac's limits hold on every server too; each keeps to them on its own.
         if let limits = work.costState?.limits {
             serverCosts[host] = try? await server.call(
@@ -1151,6 +1221,7 @@ final class AppModel {
         async let attention: Void = refreshAttention()
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
+        async let retention: Void = refreshRetentionState()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
@@ -1158,8 +1229,29 @@ final class AppModel {
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, cloning, wake, leases, events, modes, transcript)
+                   elicitations, attention, resuming, cost, retention, cloning, wake, leases, events, modes,
+                   transcript)
+        #if DEBUG
+        openFromLaunchArguments()
+        #endif
     }
+
+    #if DEBUG
+    /// `-open-agent <id>` opens that agent once the window has its lists, as the phone's
+    /// `-agent` does: a way to put a screen in front of a test that no accessibility
+    /// action reaches, such as a link inside an event's card. Debug builds only.
+    private func openFromLaunchArguments() {
+        // Once: this runs on every reconnect, and a window yanked back to the same agent
+        // each time would be a test hook getting in the way of the test.
+        guard !Self.launchArgumentsOpened else { return }
+        Self.launchArgumentsOpened = true
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-open-agent"), index + 1 < arguments.endIndex,
+              let id = UUID(uuidString: arguments[index + 1]) else { return }
+        openAgent(id)
+    }
+    private static var launchArgumentsOpened = false
+    #endif
 
     func refreshElicitations() async {
         guard let list = try? await client.call(DaemonAPI.Method.elicitationsPending,

@@ -97,6 +97,17 @@ struct AgentRow: View {
                     LeaseMark(status: leases)
                 }
 
+                // When an archived agent will be retired, or why it is being kept
+                // (051): on the same kind of line, only when there is something to say.
+                if agent.state == .archived,
+                   let note = RetirementWords.rowNote(agent.retirement, now: Date(),
+                                                      cap: model.retentionState?.settings.cap) {
+                    Text(note)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
                 // Waiting on events (042), on the same kind of line.
                 if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
                     Text(wait.mark)

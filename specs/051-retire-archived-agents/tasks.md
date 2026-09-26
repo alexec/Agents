@@ -134,14 +134,14 @@ differently yet.
 
 The surfaces are built and fed by hand, before any retiring code, so Alex can judge them.
 
-- [ ] T019 [US3] Serve what the surfaces need, read-only, in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Retention.swift` (new) and `DaemonCore+Dispatch.swift`:
+- [X] T019 [US3] Serve what the surfaces need, read-only, in `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Retention.swift` (new) and `DaemonCore+Dispatch.swift`:
   - Load `retention.json` and `retired.jsonl` at start into `retentionSettings` and `retired`.
   - `retention/state` counts archived agents and totals their sizes by `ArchiveIndex.sizeOnDisk`, per call for now; T039 moves this to the index.
   - `agents/retired`.
   - `ProjectSummary.retiredCount`, with retired costs added to `costToDate` in `DaemonCore+Projects.swift`.
 
   `retention/set` saves and broadcasts but retires nothing yet.
-- [ ] T020 [P] [US3] Add an **Archived agents** section to `App/Sources/Settings/AgentsSettingsView.swift`, with its body in a new `App/Sources/Settings/ArchiveSettingsView.swift`:
+- [X] T020 [P] [US3] Add an **Archived agents** section to `App/Sources/Settings/AgentsSettingsView.swift`, with its body in a new `App/Sources/Settings/ArchiveSettingsView.swift`:
   - `RetirementWords.settingsSummary`.
   - A **Keep archived agents** picker: 7 days, 14 days, 30 days, 90 days, Forever.
   - A **Up to** picker: 1 GB, 2 GB, 5 GB, 10 GB, No limit.
@@ -149,15 +149,15 @@ The surfaces are built and fed by hand, before any retiring code, so Alex can ju
   - A confirm sheet showing `RetirementWords.confirmSettings` when `retention/set` answers `applied: false`.
 
   Use the section and picker styles already in `AgentsSettingsView`. Nothing is tinted.
-- [ ] T021 [P] [US4] Add the row note to `App/Sources/AgentList/AgentRow.swift`: when `agent.state == .archived`, show `RetirementWords.rowNote(agent.retirement, now)` as the secondary line, in the style of the existing ended-reason line. Add the same to `Remote/Sources/Projects/AgentCard.swift`.
-- [ ] T022 [P] [US4] Add the retired line under the Archived section: `RetirementWords.retiredLine(summary.retiredCount)`, in `App/Sources/Projects/SessionsColumn.swift` and `Remote/Sources/Projects/ProjectPageView.swift`. Show it only when the count is above 0, as the last row of the open section.
-- [ ] T023 [US4] Add the retired page:
+- [X] T021 [P] [US4] Add the row note to `App/Sources/AgentList/AgentRow.swift`: when `agent.state == .archived`, show `RetirementWords.rowNote(agent.retirement, now)` as the secondary line, in the style of the existing ended-reason line. Add the same to `Remote/Sources/Projects/AgentCard.swift`.
+- [X] T022 [P] [US4] Add the retired line under the Archived section: `RetirementWords.retiredLine(summary.retiredCount)`, in `App/Sources/Projects/SessionsColumn.swift` and `Remote/Sources/Projects/ProjectPageView.swift`. Show it only when the count is above 0, as the last row of the open section.
+- [X] T023 [US4] Add the retired page:
   - Create `App/Sources/Chat/RetiredAgentView.swift` and `Remote/Sources/Chat/RemoteRetiredView.swift`. They show the title, "Retired", `RetirementWords.retiredSentence`, the project, the runtime, created and archived dates, cost, "Started by …" when set, and the worktree name and branch when set. Share the body in `Shared/UI/` if both can use it.
   - `AgentsModel` gains `tombstones: [UUID: Tombstone]` and `func tombstone(for id: UUID) async -> Tombstone?`, which calls `agents/retired { ids: [id] }` and caches the answer.
   - In `App/Sources/AppModel.swift`, `openAgent(_:)`, and the chat's view for a selection the model has no agent for, fall back to it.
   - Do the same wherever the phone navigates to an agent by id.
   - `startedByAgentLabel` uses the tombstone title when the starter is retired, adding "(retired)".
-- [ ] T024 [US4] Seed `/tmp/run-051-look`:
+- [X] T024 [US4] Seed `/tmp/run-051-look`:
   - Use `scripts/seed-archived.swift` for agents at 25, 27 and 29 days.
   - Write `retirement` values into three records by hand (`.at` 5 days, `.nextUnderCap`, `.held(.worktreeHasWork)`).
   - Write three tombstones into `retired.jsonl`, one of which a live seeded agent names as `startedByAgent`.

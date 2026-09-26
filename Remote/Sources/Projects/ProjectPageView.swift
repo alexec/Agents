@@ -146,6 +146,15 @@ struct ProjectPageView: View {
                 }
             }
         }
+        // What has been retired from here (051): the list's last line, or the only one
+        // when nothing archived is left.
+        if showsArchived || archivedCount == 0,
+           let line = RetirementWords.retiredLine(model.selectedSummary?.retiredCount) {
+            Text(line)
+                .appText(.supporting)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
     }
 }
 

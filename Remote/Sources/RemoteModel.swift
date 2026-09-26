@@ -1107,6 +1107,16 @@ final class RemoteModel {
     /// The newest `limit` archived agents in a project, for its Archived section when
     /// it is opened. Without their slash commands: an archived chat has no prompt bar
     /// here to use them.
+    /// What is left of an agent that has been retired, when something here leads to an
+    /// agent the Mac no longer lists (051). Remembered once found.
+    func lookUpRetired(_ agentID: UUID) async {
+        guard work.agent(agentID) == nil, work.tombstones[agentID] == nil,
+              let found = try? await client.call(DaemonAPI.Method.agentsRetired,
+                                                 DaemonAPI.RetiredRequest(ids: [agentID]),
+                                                 returning: [Tombstone].self) else { return }
+        work.takeTombstones(found)
+    }
+
     func loadArchivedAgents(in folder: URL, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
                                             folder: folder, limit: limit)

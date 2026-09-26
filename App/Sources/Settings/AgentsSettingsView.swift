@@ -17,9 +17,14 @@ struct AgentsSettingsView: View {
                 Text(footer)
             }
             .paperListRow()
+
+            ArchiveSettingsSection()
         }
         .paperForm()
-        .task { await model.refreshRuntimes() }
+        .task {
+            await model.refreshRuntimes()
+            await model.refreshRetentionState()
+        }
     }
 
     /// Where Claude actually is: the person's own Node is used whenever there is one, so
