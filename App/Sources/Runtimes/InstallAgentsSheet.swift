@@ -6,7 +6,7 @@ import SwiftUI
 ///
 /// Once per missing agent, not once per launch: "Not now" is remembered for the agents
 /// missing at the time, and the sheet comes back only for one that has not been offered
-/// yet. Settings ▸ Agents has the same list for any time after.
+/// yet. Settings ▸ Agent Runtimes has the same list for any time after.
 struct InstallAgentsSheet: View {
     @Environment(AppModel.self) private var model
 
@@ -45,7 +45,7 @@ struct InstallAgentsSheet: View {
         }
         let verb = missing.count == 1 ? "isn’t" : "aren’t"
         let them = missing.count == 1 ? "it" : "them"
-        return "\(lead) \(names) \(verb) here yet. Install \(them) now, or later from Settings ▸ Agents."
+        return "\(lead) \(names) \(verb) here yet. Install \(them) now, or later from Settings ▸ Agent Runtimes."
     }
 }
 
@@ -54,7 +54,7 @@ private extension String {
 }
 
 /// One agent: here and where, being installed, or a way to get it. The same row in the
-/// sheet, in Settings ▸ Agents and under an empty project list.
+/// sheet, in Settings ▸ Agent Runtimes and under an empty project list.
 ///
 /// Laid out the way an `AgentRow` is: the state as an icon on the left, the name on the
 /// top line and where it stands on the line under it, so this list reads like every
