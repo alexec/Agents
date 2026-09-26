@@ -38,6 +38,8 @@ public struct ServerInstaller: Sendable {
         printf 'fetch:%s\\n' "$(command -v curl || command -v wget || echo none)"; \
         t="$HOME/.agents-server/tools/claude/current"; \
         printf 'toolset:%s\\n' "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; \
+        for d in "$HOME/.agents-server/tools"/*/; do c="$d/current"; [ -f "$c/ok" ] && \
+        printf 'toolset.%s:%s\\n' "$(basename "$d")" "$(basename "$(readlink "$c")")"; done; \
         ${SHELL:-/bin/sh} -lc 'command -v npx >/dev/null 2>&1 && echo npx:yes || echo npx:no; \
         [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none' 2>/dev/null </dev/null; \
         [ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none
@@ -82,6 +84,8 @@ public struct ServerInstaller: Sendable {
             case "libc": facts.libc = Libc(lddFirstLine: value)
             case "fetch": facts.downloader = value == "none" || value.isEmpty ? nil : (value as NSString).lastPathComponent
             case "toolset": facts.toolsetID = value == "none" || value.isEmpty ? nil : value
+            case let key where key.hasPrefix("toolset."):
+                if !value.isEmpty { facts.toolsetIDs[String(key.dropFirst("toolset.".count))] = value }
             case "npx": facts.hasNpx = value == "yes"
             case "signin": if value == "env" || value == "file" { facts.hasOwnClaudeSignIn = true }
             default: continue

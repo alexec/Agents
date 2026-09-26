@@ -108,6 +108,9 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     public var downloader: String?
     /// The Claude toolset `current` points at, when it is whole (`ok` is there).
     public var toolsetID: String?
+    /// Every app toolset the server has whole, by runtime (047): Claude's here too, and
+    /// Codex's beside it. Empty in facts probed before 047.
+    public var toolsetIDs: [String: String] = [:]
     /// The person's own `npx` on their login PATH (037's way to run Claude).
     public var hasNpx: Bool = false
     /// The server has a Claude sign-in of its own: `~/.claude/.credentials.json`, or a
@@ -150,9 +153,19 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
         hasNpx = try c.decodeIfPresent(Bool.self, forKey: .hasNpx) ?? false
         hasOwnClaudeSignIn = try c.decodeIfPresent(Bool.self, forKey: .hasOwnClaudeSignIn) ?? false
+        toolsetIDs = (try? c.decodeIfPresent([String: String].self, forKey: .toolsetIDs)) ?? [:]
+    }
+
+    /// The whole toolset `current` points at for `runtimeID`, if any. Claude's also from
+    /// the line 043 wrote, so facts from before 047 still say.
+    public func toolsetID(for runtimeID: String) -> String? {
+        toolsetIDs[runtimeID] ?? (runtimeID == "claude" ? toolsetID : nil)
     }
 
     /// Node's official Linux builds need glibc 2.28 or later; musl has none (043, R2).
+    /// The same for every toolset: each carries that Node (047).
+    public var canInstallToolset: Bool { canInstallClaude }
+
     public var canInstallClaude: Bool {
         if case .glibc(let major, let minor) = libc { return (major, minor) >= (2, 28) }
         return false
