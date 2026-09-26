@@ -32,8 +32,10 @@ In every column:
   runtime's sign-in. The sheet says one of **Signed in and ready**, **Installed, and
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
-- **On a server**: an agent in a server project is offered only the runtimes installed
-  on that server.
+- **On a server**: an agent in a server project is offered only the runtimes on that
+  server. Claude is the exception: with a Claude token in **Settings ▸ Servers**, Agents
+  installs Claude on the server itself and signs it in with that token. See
+  [Add a Linux server](../how-to/add-a-linux-server.md).
 
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that
