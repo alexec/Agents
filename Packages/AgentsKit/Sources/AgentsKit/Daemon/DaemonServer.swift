@@ -196,11 +196,29 @@ public final class DaemonServer: @unchecked Sendable {
         if role != .control {
             DaemonLog.shared.write("socket: pid \(peer.map(String.init) ?? "?") connected as \(role.rawValue)")
         }
-        let transport = FDTransport(socket: fd)
         // Everything that reaches this socket is a window on this Mac, until the bridge
         // exists to say otherwise: helpers and probes that connect here never report
         // presence, and a window that does is the Mac.
-        let identity = ConnectionIdentity(peer: peer, role: role)
+        serve(FDTransport(socket: fd), identity: ConnectionIdentity(peer: peer, role: role))
+    }
+
+    /// A channel the control plane opened on this host's uplink (058, R3): one virtual
+    /// connection, the same in every respect as one accepted on the socket. An
+    /// operator's is a window's; a device's is bound to that device before a line of it
+    /// is read, exactly as the bridge binds one today. Nothing else can make one, and
+    /// nothing on the channel can raise it.
+    ///
+    /// `ended` is called once the connection is gone, from either end.
+    public func acceptVirtual(_ transport: any LineTransport, grant: Grant, device: UUID?,
+                              ended: @escaping @Sendable () -> Void = {}) {
+        let identity = ConnectionIdentity(peer: nil, role: .control)
+        if grant == .device { _ = identity.bindDevice(device) }
+        DaemonLog.shared.write("uplink: a channel opened for \(grant == .device ? "device \(device?.uuidString ?? "?")" : "an operator")")
+        serve(transport, identity: identity, ended: ended)
+    }
+
+    private func serve(_ transport: any LineTransport, identity: ConnectionIdentity,
+                       ended: @escaping @Sendable () -> Void = {}) {
         let handler = self.handler
         let connection = JSONRPCConnection(transport: transport) { method, params in
             // Refused by the server, before the daemon hears of it: a helper asking for
@@ -263,6 +281,7 @@ public final class DaemonServer: @unchecked Sendable {
             self.connections.remove(connection)
             self.onConnectionCountChanged(self.connections.count)
             self.onDisconnected(identity.id)
+            ended()
         }
     }
 

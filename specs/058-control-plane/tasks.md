@@ -21,27 +21,27 @@ or on Alex's paired devices.
 ## Phase 1: Setup
 
 - [ ] T001 Rename the `agents-bridge` target to `agents-control` in `project.yml`. Keep its bundle, CloudKit entitlement and `Contents/Helpers` embedding in `Agents.app`. Move `Bridge/` to `Control/`. Then run `xcodegen` and build both schemes one after the other, with plugin validation skipped.
-- [ ] T002 [P] Create the empty module folder `Packages/AgentsKit/Sources/AgentsKitCore/Control/` and the test folder `Packages/AgentsKit/Tests/AgentsKitTests/Control/`. Check `swift build` still passes on the Linux gate. Nothing in `Control/` may import Network, CryptoKit or CloudKit.
+- [x] T002 [P] Create the empty module folder `Packages/AgentsKit/Sources/AgentsKitCore/Control/` and the test folder `Packages/AgentsKit/Tests/AgentsKitTests/Control/`. Check `swift build` still passes on the Linux gate. Nothing in `Control/` may import Network, CryptoKit or CloudKit.
 - [x] T003 [P] Add the failures `hostOffline` (-32070), `noSuchHost` (-32071) and `lastOperator` (-32072) (-32040 to -32042 are taken) to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, with messages in the style of the existing ones.
 
 ---
 
 ## Phase 2: Foundational (the router core; blocks every story)
 
-- [ ] T004 [P] Write `ControlWire` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlWire.swift` (contracts/wire.md):
+- [x] T004 [P] Write `ControlWire` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlWire.swift` (contracts/wire.md):
   - Client frames `{h?, m}`. Host frames `{c, m}`, `{c, open:{grant, client, device?}}` and `{c, close:true}`.
   - `isLegacy(line)` is true for an object with `jsonrpc` at top level.
   - Read only `m.method` for grant checks.
   - Keep `m`'s bytes as they arrived, never re-encoded, so a message passes through untouched.
-- [ ] T005 [P] Write `Grant`, `ClientRecord`, `HostRecord`, `HostReach`, `HostState` and `PairingCode` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`, as in data-model.md:
+- [x] T005 [P] Write `Grant`, `ClientRecord`, `HostRecord`, `HostReach`, `HostState` and `PairingCode` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/Grant.swift`, as in data-model.md:
   - `ClientRecord.kind` is `mac | iphone | ipad`. `grant` is `operator | device`.
   - `HostRecord.id` is `mac` for the migrated home host, and 8 random chars otherwise.
   - `reach` is `dialOut | ssh(destination, hostKeyFingerprint)`.
   - `HostState` is `online · offline(since) · connecting · needsUpdate(from,to) · failed(reason)`.
-- [ ] T006 Write `GrantStore` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/GrantStore.swift`. It reads and writes `clients.json`, `hosts.json` and `control.json` atomically under the control root.
+- [x] T006 Write `GrantStore` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/GrantStore.swift`. It reads and writes `clients.json`, `hosts.json` and `control.json` atomically under the control root.
   - `setGrant` and `forget` refuse to leave no operator (`lastOperator`, FR-009).
   - It reads a legacy `devices.json` as `device` clients.
-- [ ] T007 Write the `ControlRouter` actor in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift` (R3, R4):
+- [x] T007 Write the `ControlRouter` actor in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRouter.swift` (R3, R4):
   - It keeps `ClientSession`s and `HostSession`s. Channel numbers are per uplink and never reused.
   - Opening a client opens a channel to every online host, and a host coming online opens channels to every client.
   - It checks each request's grant against `ConnectionRole.control` / `.device` `.allows` and answers `notPermitted` itself, with `h` set.
@@ -49,15 +49,15 @@ or on Alex's paired devices.
   - Replies and notifications get `h` added on the way to the client.
   - A legacy line with no `h` goes to the control plane's own handler for its methods, and to `homeHost` otherwise. Replies to it go back unwrapped.
   - It emits `control/hostChanged` when a host's state changes.
-- [ ] T008 Write the control plane's own handler in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift` for every row of contracts/control-api.md except `hosts/install`, `hosts/update` and `hosts/checkAgain`, which are pluggable closures supplied by the executable (US3):
+- [x] T008 Write the control plane's own handler in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlMethods.swift` for every row of contracts/control-api.md except `hosts/install`, `hosts/update` and `hosts/checkAgain`, which are pluggable closures supplied by the executable (US3):
   - The `devices/*` aliases.
   - `clients/forget`, which closes the client's session and its channels at once.
   - The `control/clientChanged` and `control/pairingChanged` notifications, sent to operators only.
-- [ ] T009 Write `ControlLink` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlLink.swift`. It is a `DaemonLink` that owns one physical `LineTransport` and hands out a `HostLink(host)` per `HostID`.
+- [x] T009 Write `ControlLink` in `Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlLink.swift`. It is a `DaemonLink` that owns one physical `LineTransport` and hands out a `HostLink(host)` per `HostID`.
   - Each `HostLink` is a `LineTransport` that wraps outgoing lines with `h` and yields only lines for its host.
   - Control-plane messages with no `h` go to a `controlClient: DaemonClient`.
   - A host's link ends when `control/hostChanged` says it is offline, so `DaemonClient`'s reconnect runs as today.
-- [ ] T010 [P] Router tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlRouterTests.swift` over `PairedTransport.pair()`:
+- [x] T010 [P] Router tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlRouterTests.swift` over `PairedTransport.pair()`:
   - request and reply pass through unchanged, byte for byte
   - notifications reach each client once, tagged with `h`
   - `credentialWanted`, lend and retry stay on one channel
@@ -65,17 +65,17 @@ or on Alex's paired devices.
   - the legacy line goes to the home host
   - forget closes the client's channels
   - channel numbers are never reused
-- [ ] T011 [P] Grant tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlGrantTests.swift` (SC-005): for **every** `DaemonAPI.Method` that `ConnectionRole.device` refuses, a device client's request is refused by the router and never reaches the host transport. Also: the last operator cannot be demoted or forgotten.
-- [ ] T012 [P] `GrantStore` tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/GrantStoreTests.swift`: round trip, atomic write, `devices.json` read as `device` clients, and the `lastOperator` refusals.
-- [ ] T013 Host side: add the `.controlPlane` role to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/ConnectionRole.swift`. It allows channel frames and channel-0 methods only (`host/hello`, `hosts/announce`, `attention/need`, `control/ping`), no `hearsNotifications`, and can never be raised.
-- [ ] T014 Virtual connections: in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift`, add `acceptVirtual(transport:role:device:)`. It builds a connection exactly like an accepted socket connection (identity, role, lent credentials, surface, broadcast subscription), with `device` channels bound as `connection/bindDevice` does. `open` is the only thing that sets its role, and only to `control` or `device`.
-- [ ] T015 Write `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink.swift`:
+- [x] T011 [P] Grant tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlGrantTests.swift` (SC-005): for **every** `DaemonAPI.Method` that `ConnectionRole.device` refuses, a device client's request is refused by the router and never reaches the host transport. Also: the last operator cannot be demoted or forgotten.
+- [x] T012 [P] `GrantStore` tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/GrantStoreTests.swift`: round trip, atomic write, `devices.json` read as `device` clients, and the `lastOperator` refusals.
+- [x] T013 (Not needed: the uplink dials out and never reaches `DaemonServer`'s dispatch, so it needs no role. Only its channels do, and they are `control` or `device`.) Host side: add the `.controlPlane` role to `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/ConnectionRole.swift`. It allows channel frames and channel-0 methods only (`host/hello`, `hosts/announce`, `attention/need`, `control/ping`), no `hearsNotifications`, and can never be raised.
+- [x] T014 Virtual connections: in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonServer.swift`, add `acceptVirtual(transport:role:device:)`. It builds a connection exactly like an accepted socket connection (identity, role, lent credentials, surface, broadcast subscription), with `device` channels bound as `connection/bindDevice` does. `open` is the only thing that sets its role, and only to `control` or `device`.
+- [x] T015 Write `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink.swift`:
   - It demuxes `{c,…}` frames from one `LineTransport`. `open` calls `acceptVirtual`, and `close` or the uplink ending closes that channel's connection.
   - It answers channel 0.
   - It redials with backoff 1 s → 30 s, and at once on a network change.
   - Agents keep running while it is down (FR-011).
   - The dial function is injected, so tests use `PairedTransport` and macOS uses TLS-PSK.
-- [ ] T016 [P] Uplink tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlUplinkTests.swift`:
+- [x] T016 [P] Uplink tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/ControlUplinkTests.swift`:
   - an operator channel may call `credentials/lend`, and a device channel is refused **at the host** (defence in depth)
   - two channels each get their own notifications
   - a lent credential dies with its channel

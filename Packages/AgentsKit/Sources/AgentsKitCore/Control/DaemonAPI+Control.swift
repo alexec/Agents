@@ -78,12 +78,17 @@ public extension DaemonAPI {
 
     /// `host/hello`, on every connect of an uplink.
     struct HostHello: Codable, Sendable, Hashable {
+        /// Which host this is. Said only on the control plane's local socket, where the
+        /// uid and the code signature are the door; over TLS the key says it, and this
+        /// is ignored.
+        public var host: HostID?
         public var version: String
         public var platform: String
         public var machineID: String
         public var name: String?
 
-        public init(version: String, platform: String, machineID: String, name: String? = nil) {
+        public init(host: HostID? = nil, version: String, platform: String, machineID: String, name: String? = nil) {
+            self.host = host
             self.version = version
             self.platform = platform
             self.machineID = machineID
