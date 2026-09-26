@@ -64,8 +64,8 @@ struct LivePage: View {
     /// for the newer one's.
     @State private var saving = 0
 
-    /// The caret's beat: `PageFollower.typingStep` characters every tick, fifty a
-    /// second.
+    /// The caret's beat: `PageFollower.typingStep` characters every tick, a
+    /// hundred a second.
     private static let typingTick: Duration = .milliseconds(40)
 
     /// How long a mark stays before it starts to fade, and how long the fade takes.

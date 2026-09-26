@@ -21,9 +21,6 @@ public struct CredentialCheck: Sendable {
     /// header, never the URL, so no proxy log can keep it.
     public static let geminiEndpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")!
 
-    /// OpenAI's list of models: free, and 200 for a key that works, 401 for one that does not.
-    public static let openAIEndpoint = URL(string: "https://api.openai.com/v1/models")!
-
     let session: URLSession
     let timeout: TimeInterval
 
@@ -36,7 +33,6 @@ public struct CredentialCheck: Sendable {
         let request = Self.request(for: secret, timeout: timeout)
         let provider = switch secret.kind {
         case .geminiAPIKey: "Google"
-        case .openAIAPIKey: "OpenAI"
         case .oauthToken, .apiKey: "Anthropic"
         }
         do {
@@ -69,10 +65,6 @@ public struct CredentialCheck: Sendable {
         case .geminiAPIKey:
             var request = URLRequest(url: geminiEndpoint, timeoutInterval: timeout)
             request.setValue(secret.reveal(), forHTTPHeaderField: "x-goog-api-key")
-            return request
-        case .openAIAPIKey:
-            var request = URLRequest(url: openAIEndpoint, timeoutInterval: timeout)
-            request.setValue("Bearer \(secret.reveal())", forHTTPHeaderField: "Authorization")
             return request
         }
     }

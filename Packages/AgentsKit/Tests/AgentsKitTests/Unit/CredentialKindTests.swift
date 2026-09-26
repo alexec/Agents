@@ -62,31 +62,17 @@ struct GeminiKeyKindTests {
     }
 }
 
-/// Codex's OpenAI key (047): for servers only, never printed, and never mistaken for Claude's.
-@Suite("An OpenAI key")
-struct OpenAIKeyKindTests {
-    @Test func projectAndOlderKeysAreOpenAIKeys() throws {
-        for text in ["sk-" + "proj-FAKEFAKEFAKEFAKEFAKEFAKE1234", "sk-" + "FAKEFAKEFAKEFAKEFAKE5678"] {
-            let secret = try #require(Secret(text))
-            #expect(secret.kind == .openAIAPIKey)
-            #expect(secret.kind.runtimeID == "codex")
-            #expect(secret.kind.environmentVariable == "CODEX_API_KEY")
-            #expect(!secret.kind.isLentOnTheMac, "Codex on the Mac uses ChatGPT")
-            #expect(!"\(secret)".contains(text.dropLast(4)))
-            #expect(secret.mask.hasPrefix("key …"))
-        }
+/// Codex takes no key (047): a server's Codex signs in through the Mac's ChatGPT sign-in.
+@Suite("No OpenAI key")
+struct NoOpenAIKeyTests {
+    @Test func anOpenAIKeyIsNobodys() {
+        #expect(Secret("sk-" + "proj-FAKEFAKEFAKEFAKEFAKEFAKE1234") == nil)
+        #expect(Secret("sk-" + "FAKEFAKEFAKEFAKEFAKE5678") == nil)
+        #expect(CredentialKind.kinds(for: "codex").isEmpty)
     }
 
     @Test func claudesKeysStayClaudes() throws {
         #expect(try #require(Secret("sk-ant-api03-abcdefghijkl-9x9z")).kind == .apiKey)
         #expect(try #require(Secret("sk-ant-oat01-abcdefghijkl-a3f9")).kind == .oauthToken)
-    }
-
-    @Test func settingsSaysWhatItIs() {
-        #expect(CredentialKind.kinds(for: "codex") == [.openAIAPIKey])
-        #expect(CredentialKind.variables(for: "codex") == ["CODEX_API_KEY", "OPENAI_API_KEY"])
-        #expect(CredentialKind.noun(for: "codex") == "key")
-        #expect(CredentialKind.whereToGet(for: "codex").contains("platform.openai.com"))
-        #expect(CredentialKind.pasteRefusal(for: "codex").contains("OpenAI"))
     }
 }
