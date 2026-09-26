@@ -36,3 +36,4 @@
 - Four open choices were taken as defaults D1–D4 rather than left as markers; Alex can overturn any.
 - Claims were checked against the docs on main (e.g. "keeps the Mac awake" is only while a turn is in
   flight; a Mac restart stops agents and they resume on next open).
+- Revised 2026-09-25 at Alex's prompt: leases, events and workflows promoted to a headline pillar (US3, FR-004/004a, SC-007) and 042's missing docs pulled into scope (FR-016, SC-008). Every event name the example uses (pull_request.checks_failed/checks_passed, custom.*) is raised on main.

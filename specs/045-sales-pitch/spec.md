@@ -31,17 +31,34 @@ is built around several agents working at once, while the person is often somewh
   the Mac restarts, the agents that were working pick up where they stopped when you next open Agents.
 - **You can follow them from anywhere.** On the iPhone and iPad you can read, answer, start, stop and
   attach, and a notification goes to the device you are using.
-- **They don't get in each other's way.** Each agent can have its own worktree. They take turns with
-  the screen, a browser or a simulator by leasing it.
-- **Things happen on their own.** Workflows start agents on a schedule or on events. An agent can watch
-  a pull request until it is merged. An agent can start, brief and stop other agents. Agents can wait for
-  an event and be woken when it happens.
+- **They work together, and they work on their own.** An IDE's assistant does what you ask, while you
+  watch. Here, agents coordinate, and work starts without you:
+  - **Leases**: agents take turns with anything only one of them should use at a time, such as the
+    screen, a browser or a simulator. An agent that is in line ends its turn and costs nothing. It is
+    started again when its turn comes. You can see who holds what and end a lease.
+  - **Events and waiting**: an agent can wait for something to happen, such as checks passing on a
+    pull request, another agent finishing, a branch moving or the Mac waking. It ends its turn, and it
+    is woken with what happened. Agents can publish events of their own for each other. The Mac keeps a
+    log of events, and the phone and iPad can read it.
+  - **Workflows**: a Markdown file in the project starts an agent on a schedule or on an event, for
+    example every weekday at nine, when an agent finishes, or when a pull request's checks fail. The
+    file lives with the code.
+  - **Pull requests watched to the end**: an agent fixes failing checks, answers review comments and
+    resolves conflicts on your open pull requests.
+  - **Agents that manage agents**: an agent can start up to three others, brief them, wait for them and
+    stop them. Each can have a worktree of its own, so they do not edit the same files.
 - **The work runs on your machines.** The work stays on your Mac, or on Linux servers you own, reached
   over SSH. There is no cloud service of ours in between.
 - **One figure for spending**, across every runtime and server.
 
 This feature writes that case down once, honestly, on the public site. It also says where an editor or
 a cloud agent is still the better choice.
+
+**Gap to close first.** Events and waiting (042) are on main, but the docs site says nothing about
+them. 042 was specified before specs had a Docs section. There is no page listing the events. The
+workflow reference lists only the old nine trigger names, and the tools reference has no
+`wait_for_event`, `cancel_wait` or `publish_event`. The pitch cannot claim what the docs do not show
+(FR-008), so this feature also writes those pages (FR-016).
 
 ## Clarifications
 
@@ -122,7 +139,41 @@ behaviour. Walk the behaviour once on the current build and confirm it happens.
 
 ---
 
-### User Story 3 - A reader who uses an agent in the terminal or the cloud finds their own comparison (Priority: P2)
+### User Story 3 - A reader who already runs several agents sees how they coordinate and run on their own (Priority: P1)
+
+A developer already has three terminal tabs of Claude Code open, and has had two of them fight over the
+simulator. On "Why Agents" they reach one section, "Agents that work together, and on their own". It
+opens with one example, told from start to finish. A workflow starts an agent when a pull request's
+checks fail. The agent leases the simulator to reproduce the failure, pushes a fix, and waits for the
+checks to pass without spending anything while it waits. Once they pass, it publishes an event that
+another agent was waiting for. After the example, the section has one short paragraph each on leases,
+events and waiting, workflows, pull requests, and agents managing agents. Each paragraph links to its
+docs page.
+
+**Why this priority**: These are what no IDE offers at all. For a reader who already runs several
+agents, they are the reason to switch. Without them the pitch would read as a nicer list of agents.
+
+**Independent Test**: A developer who runs several agents reads only this section. They can then say in
+their own words how two agents avoid using the simulator at once, and how an agent waits for checks
+without anyone checking on it.
+
+**Acceptance Scenarios**:
+
+1. **Given** the page, **When** a reader scans its headings, **Then** leases, events and workflows are
+   grouped under one heading, and that heading comes before the servers and spending sections.
+2. **Given** that section, **When** read, **Then** it opens with one concrete example that uses at least
+   a workflow, a lease and a wait, and every step of the example is something main does today.
+3. **Given** each of leases, events and waiting, workflows, pull requests and agents managing agents,
+   **When** the reader follows its link, **Then** they reach a docs page that describes it, including
+   the list of events an agent can wait for.
+4. **Given** the limits of this section (Copilot agents cannot lease, wait or publish; Claude and Cursor
+   ask permission before these tools; a scheduled run missed while the app is closed is not run later),
+   **When** the section claims these capabilities, **Then** it states the limits or links to where
+   they are stated.
+
+---
+
+### User Story 4 - A reader who uses an agent in the terminal or the cloud finds their own comparison (Priority: P2)
 
 A developer runs Claude Code in a terminal, or sends tasks to a cloud agent. They skip the editor
 comparison and find a short section for their kind of tool. For a terminal agent, the section says
@@ -145,7 +196,7 @@ thirty seconds, and it names at least two things Agents adds and one thing they 
 
 ---
 
-### User Story 4 - The pitch stays true as the app changes (Priority: P3)
+### User Story 5 - The pitch stays true as the app changes (Priority: P3)
 
 Six features later, one of them changes something the pitch claims, for example the phone gains reach
 off the local network, or a runtime is added or dropped. The spec for that feature lists "Why Agents"
@@ -176,6 +227,9 @@ that the review steps flag it. Separately, check that the spec template's guidan
   its kind may need a look.
 - **A feature is built but not merged** (043 zero-setup servers, 042's phone look). The pitch describes
   only what is on main. Coming features are not mentioned.
+- **An event 042 describes but does not raise.** For example, the `server.*` events are not raised,
+  because the server connection lives in the app. The reference lists only the events main raises
+  today, and the pitch claims only those.
 - **The reader is on a phone.** The page reads well on a narrow screen: no wide tables that must be
   scrolled sideways to read the main points.
 
@@ -189,10 +243,19 @@ that the review steps flag it. Separately, check that the spec template's guidan
   without scrolling on a laptop screen.
 - **FR-003**: The page MUST say plainly that Agents is not an editor and that the reader keeps the
   editor they use.
-- **FR-004**: The page MUST give the reasons in the order a reader cares about them. The first reasons
-  are the ones that follow from running several agents at once: using the agents you have, seeing who
-  needs you, their running without you, and following them from the phone. Workflows, worktrees, leases,
-  servers and spending come after.
+- **FR-004**: The page MUST give the reasons in this order:
+  1. It runs the agents you already have.
+  2. It shows which of many agents needs you.
+  3. Agents work together and on their own: leases, events and waiting, workflows, pull requests, and
+     agents managing agents.
+  4. Agents keep working without you, and you can follow them from the phone and iPad.
+
+  Servers and spending come after these.
+- **FR-004a**: The section on agents working together and on their own MUST open with one concrete
+  example, told from start to finish. The example MUST use at least a workflow, a lease and a wait for
+  an event, and every step of it MUST be something main does today. The section MUST then give one
+  short paragraph, with a link, to each of: leases, events and waiting (including events that agents
+  publish themselves), workflows, pull requests, and agents managing agents.
 - **FR-005**: The page MUST compare Agents with each kind of tool: an agent in an editor, an agent in a
   terminal, an agent in someone's cloud, and another app that runs several agents. For each kind it MUST
   say what the reader keeps, what Agents adds and what they give up (D2).
@@ -216,6 +279,14 @@ that the review steps flag it. Separately, check that the spec template's guidan
   removes or changes something the page claims.
 - **FR-015**: The page MUST NOT describe Agents as open source or state any licence terms while the
   repository carries no licence.
+- **FR-016**: Before the pitch claims them, the docs site MUST describe events and waiting as they are on
+  main. This means:
+  - a reference page listing every event, what raises it and what it carries, including events an agent
+    publishes and the old trigger names that are still accepted;
+  - a how-to guide on having an agent wait for something;
+  - the workflow reference's new dotted triggers and filters;
+  - `wait_for_event`, `cancel_wait` and `publish_event` added to the list of tools;
+  - the events log on the Mac and on the phone and iPad.
 
 ### Key Entities
 
@@ -238,11 +309,24 @@ that the review steps flag it. Separately, check that the spec template's guidan
   without scrolling.
 - **SC-005**: The whole page takes under five minutes to read (roughly 1,000 words or fewer).
 - **SC-006**: The docs check passes with the page in place, with no new warnings.
+- **SC-007**: After reading only the coordination section, a developer who runs several agents can
+  explain how two agents avoid using the simulator at once, and how an agent waits for checks without
+  anyone checking on it.
+- **SC-008**: Every event an agent can wait for on main is on the events reference page, with none
+  missing when the page is compared against the app's list of events.
 
 ## Docs *(mandatory)*
 
 - `docs/explanation/why-agents.md`: add. The pitch itself (D1).
 - `docs/explanation/index.md`: change. List the new page first.
+- `docs/reference/events.md`: add. Every event, what raises it and what it carries, plus `custom.*`
+  events and the old trigger names (FR-016).
+- `docs/how-to/wait-for-something.md`: add. Have an agent wait for checks, another agent or the Mac
+  waking, and cancel the wait (FR-016).
+- `docs/reference/workflows.md`: change. Dotted triggers and filters beside the old names.
+- `docs/reference/agent-tools.md`: change. Add `wait_for_event`, `cancel_wait` and `publish_event`.
+- `docs/reference/statuses.md`, `docs/explanation/phone-and-ipad.md`: change if needed. Waiting on an
+  event, and the events log on the phone and iPad.
 - `docs/index.md`: change. Open with the two-line case and the link to it (FR-011).
 - `mkdocs.yml`: change. Put the page in the nav, first under Explanation.
 - `README.md`: change. Two-line case and link at the top, above the build notes (FR-011).
