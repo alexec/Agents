@@ -24,15 +24,19 @@ public struct RuntimeInstaller: RuntimeInstalling {
     /// as in `swift run` or a build without its resources; those runtimes then get their
     /// page and no button.
     public var toolsets: [String: MacToolsetInstaller]
+    /// The app's pinned vendor archives, by runtime id (049): Antigravity.
+    public var archives: [String: MacArchiveInstaller]
     public var environment: [String: String]
     public var timeout: Duration
 
     public init(discovery: RuntimeDiscovery,
                 toolsets: [String: MacToolsetInstaller] = [:],
+                archives: [String: MacArchiveInstaller] = [:],
                 environment: [String: String] = LoginShellPath.installEnvironment(),
                 timeout: Duration = .seconds(300)) {
         self.discovery = discovery
         self.toolsets = toolsets
+        self.archives = archives
         self.environment = environment
         self.timeout = timeout
     }
@@ -43,11 +47,17 @@ public struct RuntimeInstaller: RuntimeInstalling {
     /// Old toolsets out, at the daemon's start (see `MacToolsetInstaller.tidy`).
     public func tidy() {
         for toolset in toolsets.values { toolset.tidy() }
+        for archive in archives.values { archive.tidy() }
     }
 
     public func recipe(for runtime: Runtime) -> RuntimeInstall? {
         switch runtime.install {
         case .toolset(let runtimeID):
+            if let archive = archives[runtimeID] {
+                // An archive Google publishes nothing for, or one known not to work, is
+                // offered as its page and the reason, not a button that can only fail.
+                return (try? archive.available.get()) == nil ? nil : runtime.install
+            }
             return toolsets[runtimeID]?.toolset.macNode == nil ? nil : runtime.install
         case .npmGlobal:
             return npm == nil ? nil : runtime.install
@@ -62,6 +72,8 @@ public struct RuntimeInstaller: RuntimeInstalling {
         }
         do {
             switch recipe {
+            case .toolset(let runtimeID) where archives[runtimeID] != nil:
+                try await archives[runtimeID]!.install(progress: progress)
             case .toolset(let runtimeID):
                 guard let toolset = toolsets[runtimeID] else {
                     return .installFailed(reason: "The app can’t install \(runtime.name) itself.")

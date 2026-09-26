@@ -453,6 +453,7 @@ private struct StateLine: View {
             case .stoppedByAgent: return "The agent that started it stopped it"
             case .processDied: return "The runtime crashed"
             case .signInRefused: return "Its sign-in was refused"
+            case .runtimeError: return "The runtime reported an error"
             case .daemonGone: return "Stopped when the daemon did"
             case .maxTokens: return "Ran out of room"
             case .maxTurnRequests: return "Hit its limit"

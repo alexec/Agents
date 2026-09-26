@@ -1115,6 +1115,12 @@ public struct ProcessSessionLauncher: SessionLauncher {
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
+        // A runtime's own home under the daemon's root (049's `GEMINI_HOME`), made private
+        // before it starts: one that is missing may be made world-readable by the runtime.
+        for folder in RuntimeLaunchCatalog.launch(for: runtime.id).folders(root: locations.root.path) {
+            try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+        }
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                      arguments: runtime.arguments + policy.launchArguments
                                          + RuntimePolicyFiles(locations: locations).arguments(for: policy),
@@ -1123,6 +1129,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                                                    onto: LoginShellPath.environment(),
                                                                    onServer: onServer),
                                      capabilities: Self.capabilities(for: policy),
+                                     launch: RuntimeLaunchCatalog.launch(for: runtime.id),
                                      authMethodBeforeContinuing: policy.authMethodBeforeContinuing)
     }
 
@@ -1134,12 +1141,15 @@ public struct ProcessSessionLauncher: SessionLauncher {
         return capabilities
     }
 
-    /// What a runtime is started with: `base` with anything lent (043), the policy's files
-    /// (Grok) and its variables (Codex's `CODEX_CONFIG`, 047), the policy's word last.
+    /// What a runtime is started with: `base` with the runtime's own launch variables
+    /// (049: Antigravity's home, and any stray key removed), then anything lent (043) on
+    /// top of those, the policy's files (Grok) and its variables (Codex's `CODEX_CONFIG`,
+    /// 047), the policy's word last.
     static func environment(for policy: ToolPolicy, locations: StoreLocations,
                             onto base: [String: String], onServer: Bool = false) -> [String: String] {
+        let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path)
         var environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LentEnvironment.applied(to: base))
+            .environment(for: policy, onto: LentEnvironment.applied(to: own))
             .merging(policy.launchEnvironment) { _, policy in policy }
         guard onServer else { return environment }
         environment.merge(policy.serverEnvironment) { _, server in server }

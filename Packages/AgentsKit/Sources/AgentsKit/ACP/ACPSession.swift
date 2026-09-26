@@ -36,11 +36,16 @@ public struct TurnResult: Sendable {
     /// What this turn consumed, where the runtime reported it. The Claude adapter and
     /// Copilot do; Grok does not, and then this is nil rather than zero.
     public var usage: TurnUsage?
+    /// The turn's own words said it failed, for a runtime that says so in words and then
+    /// ends the turn normally (049). Nil for every other turn.
+    public var runtimeError: RuntimeLaunch.TurnError?
 
-    public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil) {
+    public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
+                runtimeError: RuntimeLaunch.TurnError? = nil) {
         self.reason = reason
         self.rawStopReason = rawStopReason
         self.usage = usage
+        self.runtimeError = runtimeError
     }
 }
 
@@ -85,6 +90,13 @@ public actor ACPSession {
     /// True while a `session/load` replay is arriving. The replayed conversation is
     /// confirmation, not content: we already have the transcript, and recording it
     /// again would double every line.
+    /// What the runtime needs beyond its command (049), for reading a turn that fails
+    /// in words.
+    private let launch: RuntimeLaunch?
+    /// The agent's words in the turn under way, only while `launch` has a
+    /// `turnErrorPrefix` to look for in them, and only the start of them.
+    private var turnText = ""
+
     private var isReplaying = false
 
     /// Except when the conversation is one we never had. Adopting a session from the
@@ -118,9 +130,11 @@ public actor ACPSession {
     public init(transport: any LineTransport,
                 process: RuntimeProcess? = nil,
                 capabilities: ACP.ClientCapabilities = .none,
+                launch: RuntimeLaunch? = nil,
                 authMethodBeforeContinuing: String? = nil) {
         let box = self.box
         self.capabilities = capabilities
+        self.launch = launch
         self.authMethodBeforeContinuing = authMethodBeforeContinuing
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -387,12 +401,14 @@ public actor ACPSession {
             "sessionId": .string(sessionID),
             "prompt": blocks.wire,
         ]
+        turnText = ""
         let result = try await connection.call(ACP.Method.prompt, params)
         let decoded = try? result.decode(ACP.PromptResult.self)
         let raw = decoded?.stopReason
         return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
                           rawStopReason: raw,
-                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]))
+                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
+                          runtimeError: launch?.turnError(in: turnText))
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -608,6 +624,10 @@ public actor ACPSession {
         switch SessionUpdate.decode(update) {
         case .entry(let kind):
             guard !isReplaying || recordsReplay else { return }
+            if !isReplaying, launch?.turnErrorPrefix != nil, turnText.count < 4096,
+               case .agentMessage(_, let text, _) = kind {
+                turnText += text
+            }
             eventsContinuation.yield(.entry(kind))
         case .options(let options):
             self.options = options
@@ -691,13 +711,19 @@ public actor ACPSession {
             return .failure(JSONRPCError(code: JSONRPCError.authRequired, message: refusal))
         }
         // A write is a change, so it goes through the same question any other change
-        // goes through, with the change itself in the question.
-        let request = PermissionRequest(agentID: UUID(),
-                                        toolCall: fileService.writeToolCall(path: path, contents: contents),
-                                        options: PermissionOption.allowOrReject)
-        let chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-            pendingPermissions[request.id] = continuation
-            eventsContinuation.yield(.permissionRequested(request))
+        // goes through, with the change itself in the question — unless the person has
+        // just answered that question on the runtime's own card for this file.
+        let chosen: String?
+        if takeAllowedEdit(path) {
+            chosen = "allow"
+        } else {
+            let request = PermissionRequest(agentID: UUID(),
+                                            toolCall: fileService.writeToolCall(path: path, contents: contents),
+                                            options: PermissionOption.allowOrReject)
+            chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+                pendingPermissions[request.id] = continuation
+                eventsContinuation.yield(.permissionRequested(request))
+            }
         }
         guard let chosen, chosen.hasPrefix("allow") else {
             eventsContinuation.yield(.served(ServedRequest(kind: .writeFile(path: path, byteCount: contents.utf8.count),
@@ -779,7 +805,37 @@ public actor ACPSession {
         guard let chosen else {
             return .success(["outcome": ["outcome": "cancelled"]])
         }
+        noteAllowedEdit(request, chosen: chosen)
         return .success(["outcome": ["outcome": "selected", "optionId": .string(chosen)]])
+    }
+
+    /// An edit the person just allowed on the runtime's own card, by the file it names
+    /// (049, T025a). Antigravity asks "Run client_create_file?" with the diff, and then
+    /// writes through `fs/write_text_file`; asking again there is the same question twice.
+    /// Only an edit, only with a diff or location naming the file, and only once.
+    private var allowedEdits: [String: ContinuousClock.Instant] = [:]
+    static let allowedEditWindow: Duration = .seconds(60)
+
+    private func noteAllowedEdit(_ request: PermissionRequest, chosen: String) {
+        let kind = request.options.first { $0.optionID == chosen }?.kind
+        guard kind == .allowOnce || kind == .allowAlways || (kind == nil && chosen.hasPrefix("allow")) else { return }
+        let diffs = request.toolCall.content.compactMap { content -> String? in
+            if case .diff(let diff) = content { return diff.path } else { return nil }
+        }
+        let named = request.toolCall.kind == "edit" ? diffs + request.toolCall.locations.map(\.path) : diffs
+        for path in named { allowedEdits[Self.samePath(path)] = .now }
+    }
+
+    /// Whether this write was already allowed on the runtime's own card, which it then uses up.
+    private func takeAllowedEdit(_ path: String) -> Bool {
+        let key = Self.samePath(path)
+        guard let at = allowedEdits.removeValue(forKey: key) else { return false }
+        return ContinuousClock.now - at < Self.allowedEditWindow
+    }
+
+    /// `/tmp/x` and `/private/tmp/x` are one file.
+    static func samePath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     public var outstandingElicitationIDs: [UUID] { Array(pendingElicitations.keys) }

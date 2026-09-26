@@ -35,14 +35,17 @@ public final class Daemon: @unchecked Sendable {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
             #if canImport(CryptoKit)
             let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
+            let archives = toolsetsFolder.map(ArchiveToolset.loadAll(from:)) ?? [:]
             #else
             // Only a Mac installs its own toolsets, and only a Mac can hash them (043).
             let toolsets: [String: Toolset] = [:]
+            let archives: [String: ArchiveToolset] = [:]
             #endif
-            discovery.bundledToolsetIDs = toolsets.mapValues(\.id)
+            discovery.bundledToolsetIDs = toolsets.mapValues(\.id).merging(archives.mapValues(\.id)) { node, _ in node }
             installer = RuntimeInstaller(
                 discovery: discovery,
-                toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
+                toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) },
+                archives: archives.mapValues { MacArchiveInstaller(toolset: $0, tools: locations.tools) })
         }
         #endif
         // A server's runtimes get their policy's server environment (047: Codex never

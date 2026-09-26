@@ -23,7 +23,7 @@ extension DaemonCore {
     /// stopping and archiving agents (028), so it is never offered what the daemon
     /// would refuse it.
     func appServer(token: String, managesAgents: Bool = true) -> MCPServer {
-        MCPServer(name: "agents",
+        MCPServer(name: AppTool.serverName,
                   transport: .stdio(command: Self.helperPath,
                                     args: ["mcp", token] + (managesAgents ? [] : [Self.noAgentToolsFlag]),
                                     env: [StoreLocations.rootVariable: locations.root.path]))

@@ -22,7 +22,23 @@ RUNTIMES = {
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
     # Never a gemini on the PATH (046, D1): the app's own toolset's shim.
     "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
+    # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
+    # AGENTS_ANTIGRAVITY_SHIM, e.g. <root>/tools/antigravity/current/bin/agy_acp_server.
+    "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
 }
+
+# What a runtime needs in its environment to run at all, scoped or not (049): Antigravity
+# keeps everything under GEMINI_HOME, which must never be the person's ~/.gemini here, and
+# signs in only with a key it is told to use (AGENTS_ANTIGRAVITY_KEY, optional).
+import tempfile as _tempfile
+RUNTIME_ENV = {
+    "antigravity": {"GEMINI_HOME": _tempfile.mkdtemp(prefix="agents-agy-home-"),
+                    "AGY_ACP_DISABLE_WORKSPACE_TRUST": "1",
+                    **({"GEMINI_API_KEY": os.environ["AGENTS_ANTIGRAVITY_KEY"]}
+                       if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {})},
+}
+# Signed in with before any session, when the key above is given.
+RUNTIME_AUTH = {"antigravity": "gemini-api-key"} if os.environ.get("AGENTS_ANTIGRAVITY_KEY") else {}
 
 # What the app advertises today. Kept beside ACP.ClientCapabilities.app on purpose:
 # if these drift, the report is about a client we are not shipping.
@@ -39,7 +55,7 @@ CLIENT = {
 HANDLED = {
     "loadSession": "picking an agent back up",
     "promptCapabilities.image": "attaching a picture to a prompt",
-    "promptCapabilities.audio": "not offered: the composer attaches pictures and files, not sound (Gemini advertises it, 046)",
+    "promptCapabilities.audio": "not offered: the composer attaches pictures and files, not sound (Gemini 046 and Antigravity 049 advertise it)",
     "promptCapabilities.embeddedContext": "attaching a file's contents",
     "sessionCapabilities.list": "finding conversations the app did not start",
     "sessionCapabilities.delete": "deleting a conversation, with a confirmation",
@@ -64,7 +80,8 @@ env["PATH"] = path
 def handshake(name, command):
     try:
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, text=True, bufsize=1, env=env)
+                                   stderr=subprocess.DEVNULL, text=True, bufsize=1,
+                                   env={**env, **RUNTIME_ENV.get(name, {})})
     except FileNotFoundError:
         return None
     out = queue.Queue()
