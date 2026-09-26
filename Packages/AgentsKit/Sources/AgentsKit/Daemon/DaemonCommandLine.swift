@@ -1,3 +1,4 @@
+import AgentsKitCore
 import Foundation
 
 /// What `agentsd` was asked to be (037).
@@ -15,6 +16,13 @@ public struct DaemonCommandLine: Sendable {
 
     public static let serveFlag = "--serve"
     public static let detachFlag = "--detach"
+    /// `--control <socket>`: a host of the control plane listening there (058). It
+    /// dials out to it and stays up with nobody connected, as `--serve` does, but is
+    /// otherwise the Mac's daemon it always was.
+    public static let controlFlag = "--control"
+    /// `--host-id <id>`: which host this is, said on the control plane's local socket.
+    /// `mac` unless told otherwise, so a set-up moved across keeps its host id (R7).
+    public static let hostIDFlag = "--host-id"
 
     public let arguments: [String]
     public let mode: Mode
@@ -27,6 +35,18 @@ public struct DaemonCommandLine: Sendable {
             let rest = arguments.dropFirst()
             mode = .daemon(serve: rest.contains(Self.serveFlag), detach: rest.contains(Self.detachFlag))
         }
+    }
+
+    /// The control plane's host socket, when this daemon is one of its hosts.
+    public var controlSocket: String? { value(after: Self.controlFlag) }
+
+    public var hostID: HostID {
+        value(after: Self.hostIDFlag).map(HostID.init(rawValue:)) ?? .mac
+    }
+
+    private func value(after flag: String) -> String? {
+        guard let at = arguments.firstIndex(of: flag), arguments.indices.contains(at + 1) else { return nil }
+        return arguments[at + 1]
     }
 
     /// What the detached copy is started with.

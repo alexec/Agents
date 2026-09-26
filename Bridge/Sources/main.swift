@@ -213,6 +213,27 @@ enum Relays {
     static var open: [Relay] = []
 }
 
+// The control plane (058), when given a root: this Mac's window and this Mac's host
+// meet here, and the window reaches its host through it. Devices keep the way below,
+// straight to the host's socket, until they move onto the router (US4).
+let controlPlane: ControlPlane? = ControlPlane.chosenRoot().map { root in
+    try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    DaemonLog.shared.setDestination(root.appendingPathComponent("control.log"))
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    return ControlPlane(root: root, version: version)
+}
+if let controlPlane {
+    Task {
+        do {
+            try await controlPlane.start()
+            log("control plane at \(controlPlane.root.path)")
+        } catch {
+            log("the control plane could not start: \(error)")
+            exit(1)
+        }
+    }
+}
+
 let directLink = DirectLink(port: port)
 directLink.start()
 

@@ -8,6 +8,19 @@ public final class Daemon: @unchecked Sendable {
     private let lock: DaemonLock
     private let core: DaemonCore
     private var server: DaemonServer?
+    /// The control plane this daemon is a host of, if any (058).
+    private let control: Control?
+    private var uplink: ControlUplink?
+
+    /// Where a host's control plane is, and which host it is there.
+    public struct Control: Sendable {
+        public var socket: URL
+        public var host: HostID
+        public init(socket: URL, host: HostID) {
+            self.socket = socket
+            self.host = host
+        }
+    }
 
     public enum StartError: Error, Sendable {
         /// Another daemon holds the lock. Not a failure: the caller connects to that
@@ -19,8 +32,10 @@ public final class Daemon: @unchecked Sendable {
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
+                control: Control? = nil,
                 toolsetsFolder: URL? = nil) throws {
         self.locations = locations
+        self.control = control
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
         self.lock = lock
@@ -64,7 +79,9 @@ public final class Daemon: @unchecked Sendable {
         // Endings are about to be discovered, and no workflow has been read yet. Hold
         // what they raise rather than firing it into a layer that cannot act — see
         // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
-        await core.setExitsWhenIdle(!serve)
+        // A host of a control plane is kept running by launchd, not by a window being
+        // there, so it never leaves for being idle (058, R5).
+        await core.setExitsWhenIdle(!serve && control == nil)
         await core.holdWorkflowEventsUntilStarted()
         // Whatever a previous daemon was cloning when it went is half a repository.
         // It was never in the home folder, so this is the whole of cleaning up (027).
@@ -129,6 +146,18 @@ public final class Daemon: @unchecked Sendable {
         await core.watchPullRequests()
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
+        if let control {
+            let socket = control.socket.path
+            let uplink = ControlUplink(
+                server: server,
+                hello: DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
+                                           machineID: MachineID.current, name: Host.current().localizedName)) {
+                FDTransport(socket: try connectUnixSocket(path: socket))
+            }
+            self.uplink = uplink
+            uplink.start()
+            DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
+        }
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it
         // a prompt, and both of those belong in front of a window that can watch them
         // rather than behind a socket nobody can reach yet.
@@ -156,9 +185,27 @@ public final class Daemon: @unchecked Sendable {
 
     public func shutDown() async {
         DaemonLog.shared.write("shutting down")
+        uplink?.stop()
         server?.stop()
         await core.shutDown()
         lock.release()
+    }
+
+    static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    }
+
+    static var platform: String {
+        #if os(macOS)
+        let os = "macOS"
+        #else
+        let os = "Linux"
+        #endif
+        #if arch(arm64)
+        return os + " arm64"
+        #else
+        return os + " x86-64"
+        #endif
     }
 
     /// For tests, which drive the core directly rather than over a socket.

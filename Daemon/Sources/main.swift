@@ -196,7 +196,10 @@ let toolsetsFolder: URL? = {
 
 let daemon: Daemon
 do {
-    daemon = try Daemon(serve: serve, toolsetsFolder: toolsetsFolder)
+    let control = commandLine.controlSocket.map {
+        Daemon.Control(socket: URL(fileURLWithPath: $0), host: commandLine.hostID)
+    }
+    daemon = try Daemon(serve: serve, control: control, toolsetsFolder: toolsetsFolder)
 } catch Daemon.StartError.alreadyRunning {
     // Another daemon holds the lock. That is the ordinary case when two windows open
     // at once, and there is nothing to say about it.

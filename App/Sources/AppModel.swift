@@ -387,7 +387,8 @@ final class AppModel {
     private var draftOptionsGeneration = 0
     private var draftID: UUID?
 
-    private let client = DaemonClient()
+    /// This Mac's host: through the control plane when the window has one (058).
+    private let client = ControlConfig.macClient()
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
