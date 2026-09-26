@@ -5,15 +5,22 @@ import SwiftUI
 /// brings, and one in detail with its `SKILL.md` as the agent reads it.
 struct SharedSkillsPage: View {
     let snapshot: DaemonAPI.SharedSnapshot
+    /// Read the snapshot again, after a skill was added (059).
+    var refresh: () async -> Void = {}
     @State private var filter = ""
     @State private var chosenID: String?
+    @State private var adding = false
 
     var body: some View {
         HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Filter skills", text: $filter)
-                        .textFieldStyle(.roundedBorder)
+                    HStack(spacing: 8) {
+                        TextField("Filter skills", text: $filter)
+                            .textFieldStyle(.roundedBorder)
+                        // 059, frame A: search a catalogue and add to ~/.agents.
+                        Button("Add skill…") { adding = true }.buttonStyle(.paperProminent)
+                    }
                     if !yours.isEmpty {
                         SharedSectionLabel("Yours · ~/.agents/skills")
                         ForEach(yours) { row($0) }
@@ -38,6 +45,11 @@ struct SharedSkillsPage: View {
             } else {
                 Text("Choose a skill").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .sheet(isPresented: $adding) {
+            AddSkillSheet(destination: .personal, runtimes: snapshot.runtimes,
+                          installed: Set(yours.map(\.name)),
+                          onAdded: { Task { await refresh() } })
         }
     }
 
@@ -64,6 +76,7 @@ struct SharedSkillsPage: View {
                 Text(skill.name).fontWeight(.semibold).lineLimit(1).fixedSize()
                 if skill.clash != nil { SharedChip(text: "clash", tone: .attention) }
                 if case .plugin(let plugin) = skill.source { SharedChip(text: plugin, tone: .source) }
+                if skill.managed != nil { SharedChip(text: "skills.sh", tone: .source) }
                 Text(skill.clash.map { "Also in \(SharedFiles.tilde($0))" } ?? skill.description ?? "")
                     .foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
@@ -85,6 +98,13 @@ private struct SkillDetail: View {
     let runtimes: [DaemonAPI.RuntimeName]
     @State private var text = ""
 
+    static func takenAt(_ managed: DaemonAPI.ManagedSkill) -> String {
+        guard let commit = managed.commit else { return "not recorded" }
+        let short = String(commit.prefix(7))
+        guard let at = managed.committedAt else { return short }
+        return "\(short) · \(at.formatted(.relative(presentation: .named)))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(skill.name).appText(.reading).fontWeight(.semibold)
@@ -92,6 +112,11 @@ private struct SkillDetail: View {
                 SharedFact(label: "Folder", value: SharedFiles.tilde(skill.path), code: true)
                 if case .plugin(let plugin) = skill.source { SharedFact(label: "Plugin", value: plugin) }
                 if let clash = skill.clash { SharedFact(label: "Also in", value: SharedFiles.tilde(clash), code: true) }
+                // 059: where a lock says it came from, and the commit it was taken at.
+                if let managed = skill.managed {
+                    SharedFact(label: "From", value: "skills.sh · \(managed.source)")
+                    SharedFact(label: "Taken at", value: Self.takenAt(managed), code: managed.commit != nil)
+                }
             }
             SharedReachList(runtimes: runtimes, reach: skill.reach)
             ScrollView {

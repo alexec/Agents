@@ -11,6 +11,8 @@ import SwiftUI
 struct SharedSettingsView: View {
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var page: SharedPage
+    /// Read the snapshot again, after something was added from a catalogue (059).
+    var refresh: () async -> Void = {}
 
     var body: some View {
         Group {
@@ -34,7 +36,7 @@ struct SharedSettingsView: View {
         switch page {
         case .overview: SharedOverviewPage(snapshot: snapshot, page: $page)
         case .instructions: SharedInstructionsPage(snapshot: snapshot)
-        case .skills: SharedSkillsPage(snapshot: snapshot)
+        case .skills: SharedSkillsPage(snapshot: snapshot, refresh: refresh)
         case .mcp: SharedServersPage(snapshot: snapshot)
         case .plugins: SharedPluginsPage(snapshot: snapshot)
         case .other: SharedOtherFilesPage(snapshot: snapshot)

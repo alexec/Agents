@@ -1523,6 +1523,59 @@ final class AppModel {
         return snapshot
     }
 
+    // MARK: The catalogue (059)
+
+    /// What a catalogue call said, or why it could not: the sheet shows either, so these
+    /// do not go through `attempt`, which would put a failure in the window's banner too.
+    func catalogSearch(_ query: String) async -> DaemonAPI.CatalogSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch, DaemonAPI.CatalogSearchRequest(query: query),
+                                         returning: DaemonAPI.CatalogSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.catalogError(error))
+        }
+    }
+
+    func catalogPreview(_ result: DaemonAPI.CatalogResult,
+                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogPreview,
+                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
+                                         returning: DaemonAPI.CatalogPreviewAnswer.self)
+        } catch {
+            return .init(preview: nil, error: Self.catalogError(error))
+        }
+    }
+
+    func catalogDestinationState(_ previewID: UUID,
+                                 for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.DestinationState? {
+        try? await client.call(DaemonAPI.Method.catalogDestinationState,
+                               DaemonAPI.DestinationStateRequest(previewID: previewID, destination: destination),
+                               returning: DaemonAPI.DestinationStateAnswer.self).destinationState
+    }
+
+    func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                  replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.skillsAdd,
+                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
+                                                                         replace: replace),
+                                               returning: DaemonAPI.SkillAddAnswer.self)
+            return .success(answer.skill)
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
+    private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.CatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
+    }
+
     func refreshRuntimes() async {
         let listed = await attempt {
             self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,
