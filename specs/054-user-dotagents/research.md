@@ -143,3 +143,68 @@ points at nothing is never wanted, and removing it is always safe.
 
 **Decision:** out of scope for this feature's build; the same reconcile runs on a Linux
 `agentsd` later, on its own home. Recorded in the spec's Assumptions.
+
+## R9 — The MCP and plugin probe, over ACP (FR-022)
+
+**Method.** R1's scratch home, plus `run.sh setup-mcp`: a plugin in
+`~/.agents/plugins/heron-plugin` (one skill, one command, one stdio MCP server, a
+`.claude-plugin/plugin.json` and a `gemini-extension.json`), and a server named `shared` in each
+runtime's own MCP config (`~/.claude.json`, `~/.codex/config.toml`, `~/.cursor/mcp.json`,
+`~/.copilot/mcp-config.json`, `~/.gemini/settings.json`). Unlike R1, each runtime was started
+**as the app starts it, over ACP** ([probe/acp.py](probe/acp.py), the `RuntimeCatalog` command
+lines), and given in `session/new` three servers: `heron-mcp` (stdio), `egret-mcp` (http, served
+by the probe) and `shared` (stdio, tagged as the request's copy). Claude and Grok were also given
+the plugin the way the app hands over project plugins (`_meta.claudeCode.options.plugins`,
+`_meta.pluginDirs`). **The evidence is the probe servers' own log**
+([probe/mcp-server.py](probe/mcp-server.py)): a server that logged `tools/list` was offered to the
+runtime. The model's own list was asked for too, and is not trusted: Grok and Codex both answered
+"MCP: NONE" while their servers had logged `tools/list` (both load MCP tools lazily).
+
+Versions as R1; Gemini is the app's toolset, 0.61.0.
+
+| Runtime | `mcpCapabilities` | stdio from the app | http from the app | `shared` in both | Personal plugin |
+|---|---|---|---|---|---|
+| Claude | http, sse | yes | yes | the request's copy only | **yes**, by `_meta.claudeCode.options.plugins`: skill, command (offered as a skill) and its MCP server |
+| Codex | http only (`sse: false`) | yes | yes | **its own config's**; the request's never started | **yes, after one `codex plugin add`**, see below: skill, command and MCP server |
+| Grok | http, sse | yes | yes | the request's copy only | **partly**, by `_meta.pluginDirs`: skill and command, but the plugin's MCP server never started |
+| Cursor | http, sse | yes | yes | **both started**; the model named the request's | **no**: not from `~/.cursor/plugins/local`, as a link or as a real copy |
+| Copilot | http, sse | **no**: its log says `Rejecting non-http/sse MCP server "heron-mcp" from client` | yes | its own config's (the request's was stdio, so refused) | **no over ACP**; its CLI does load it, see below |
+| Gemini | http, sse | unprobed | unprobed | — | its MCP server started from a `~/.gemini/extensions` link before `session/new` failed |
+
+Gemini has no sign-in on this Mac ("Gemini API key is missing"), so no session opened; its
+`initialize` and extension loading were seen, nothing after.
+
+**Codex plugins.** Codex finds `~/.agents/plugins/marketplace.json` by itself and treats the
+**home folder** as that marketplace's root, so a source must read `./.agents/plugins/<name>`
+(`./plugins/<name>` fails with "missing plugin.json"). The plugin is then not loaded until
+`codex plugin add <name>@<marketplace>`, which **copies** it into
+`~/.codex/plugins/cache/<marketplace>/<name>/<version>`: an edit in `~/.agents` does not reach
+Codex until the plugin is added again (or its version changes).
+
+**Copilot plugins.** `copilot plugin marketplace add ~` (with `~/.claude-plugin/marketplace.json`
+linked to the same index) and `copilot plugin install heron-plugin@personal` load it live, with
+no copy, recorded in `~/.copilot/settings.json` as `extraKnownMarketplaces` and
+`enabledPlugins`. `copilot -p` then offers the plugin's skill and command; `copilot --acp`
+offers neither, and its log does not mention the plugin.
+
+**What this settles for the spec.**
+
+1. **FR-019 holds and matters**: Codex says `sse: false`, so an sse server must be left out for
+   Codex.
+2. **Copilot takes no stdio server from the app.** That is personal stdio servers and the
+   app's own `agents` server too, which is why 036 saw Copilot agents with no app tools. FR-018
+   (never write a runtime's config) and Story 6 ("every runtime") cannot both hold for Copilot.
+   The ways out are: write `~/.copilot/mcp-config.json`, run stdio servers behind a local http
+   endpoint the app serves, or accept the gap. **This is Alex's call, for the plan.**
+3. **The clash rule (FR-020) only orders what the app sends.** When the same name is in the
+   runtime's own config, Codex and Copilot keep their own, Claude and Grok take the request's,
+   and Cursor runs both. Settings should say which copy each runtime ends up with, not promise
+   one order.
+4. **Plugins reach three runtimes without writing their config**: Claude and Grok through
+   session `_meta` (the app's existing project mechanism, pointed at `~/.agents/plugins`), and
+   Gemini through a `~/.gemini/extensions/<name>` link. Grok does not start a plugin's MCP
+   server, so a plugin's server should also go out in `mcpServers` for Grok. Codex needs a
+   one-time `plugin add`, which writes its config and copies the plugin, so the app must add it
+   again on every change. Cursor and Copilot-over-ACP are not reachable today.
+5. **Only the log shows what a runtime got**, so the Settings view (FR-024) should report
+   what the app sent and what each runtime is known to do with it, not ask the model.
