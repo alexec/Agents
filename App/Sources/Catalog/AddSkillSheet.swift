@@ -178,7 +178,7 @@ struct AddToPicker: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("Add to").foregroundStyle(.secondary)
+            Text("Add to").foregroundStyle(.secondary).fixedSize()
             Picker("Add to", selection: $addTo) {
                 Text("You").tag(DaemonAPI.SkillDestination.personal)
                 if let projectFolder, let projectName {

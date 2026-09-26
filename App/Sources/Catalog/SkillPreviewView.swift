@@ -26,7 +26,7 @@ struct SkillPreviewView: View {
             HStack(spacing: 10) {
                 Button("‹ Results", action: back).buttonStyle(.link)
                 Text(preview.name).appText(.title).lineLimit(1)
-                Spacer()
+                Spacer(minLength: 12)
                 AddToPicker(addTo: $addTo, projectName: projectName, projectFolder: projectFolder)
             }
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 10)
@@ -62,6 +62,7 @@ struct SkillPreviewView: View {
             .padding(.horizontal, 18).padding(.vertical, 10)
             .background(Paper.wash)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: addTo) {
             // The preview came with the state for where Add pointed when it was opened;
             // a change of Add to asks again, with nothing fetched a second time.
@@ -105,7 +106,8 @@ struct SkillPreviewView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
         }
-        .frame(maxHeight: 150)
+        // Tall enough for every file of a small skill, then it scrolls.
+        .frame(height: min(CGFloat(preview.files.count) * 19 + 22, 150))
         .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paper.rule, lineWidth: 1))
         .accessibilityLabel("\(preview.files.count) files")

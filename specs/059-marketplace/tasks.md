@@ -58,20 +58,20 @@ any.
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the folders `Src/Catalog/`, `Tests/Catalog/`, `Tests/Catalog/Fixtures/`, `App/Catalog/` and `specs/059-marketplace/walk/`; run `xcodegen generate` and confirm the app scheme still builds (`xcodebuild -scheme Agents -skipPackagePluginValidation build`)
-- [ ] T002 [P] Make three fixture skill folders under `Tests/Catalog/Fixtures/skills/`:
+- [X] T001 Create the folders `Src/Catalog/`, `Tests/Catalog/`, `Tests/Catalog/Fixtures/`, `App/Catalog/` and `specs/059-marketplace/walk/`; run `xcodegen generate` and confirm the app scheme still builds (`xcodebuild -scheme Agents -skipPackagePluginValidation build`)
+- [X] T002 [P] Make three fixture skill folders under `Tests/Catalog/Fixtures/skills/`:
   - `plain/`: SKILL.md plus `notes.md`;
   - `mixed/`: SKILL.md, `README.md`, `a_b.md`, `a-b.md`, `Zeta.md`, `alpha.md`;
   - `nested/`: SKILL.md, `scripts/lint.sh` (mode 755, `#!/bin/sh`), `assets/logo.png` (binary), `references/x.md`.
-- [ ] T003 [P] Write `specs/059-marketplace/walk/golden.mjs`. It copies `computeSkillFolderHash` from the `skills` CLI 1.7.0 verbatim and prints each fixture's hash. Record the output in `Tests/Catalog/Fixtures/golden.json` as `computedHash`.
-- [ ] T004 [P] Add each fixture to a temporary git repo, run `git write-tree`, and record the output of `git rev-parse <tree>:<folder>`, plus every file's `git hash-object`, in `Tests/Catalog/Fixtures/golden.json` as `treeSHA` and `blobs`. Add the real skill measured in research R3: `avdlee/swiftui-agent-skill`, folder `skills/swiftui-expert-skill`, tree `4b58ee6b6270e512f22054e0eb7e0d719b43128d`.
-- [ ] T005 [P] Record trimmed real responses as fixtures in `Tests/Catalog/Fixtures/http/`:
+- [X] T003 [P] Write `specs/059-marketplace/walk/golden.mjs`. It copies `computeSkillFolderHash` from the `skills` CLI 1.7.0 verbatim and prints each fixture's hash. Record the output in `Tests/Catalog/Fixtures/golden.json` as `computedHash`.
+- [X] T004 [P] Add each fixture to a temporary git repo, run `git write-tree`, and record the output of `git rev-parse <tree>:<folder>`, plus every file's `git hash-object`, in `Tests/Catalog/Fixtures/golden.json` as `treeSHA` and `blobs`. Add the real skill measured in research R3: `avdlee/swiftui-agent-skill`, folder `skills/swiftui-expert-skill`, tree `4b58ee6b6270e512f22054e0eb7e0d719b43128d`.
+- [X] T005 [P] Record trimmed real responses as fixtures in `Tests/Catalog/Fixtures/http/`:
   - skills.sh search (`search-swiftui.json`);
   - download (`download-swiftui-expert-skill.json`, trimmed to 3 files);
   - the git ref list (`info-refs.txt`);
   - a tree (`tree.json`);
   - an api.github.com 403 with `x-ratelimit-remaining: 0` (`rate-limited.json`).
-- [ ] T006 Write the `URLProtocol` stub in `Tests/Support/CatalogStub.swift`. It answers per host and path from `Tests/Catalog/Fixtures/http/`, records every request, and can be switched to "down" (503) or "rate-limited".
+- [X] T006 Write the `URLProtocol` stub in `Tests/Support/CatalogStub.swift`. It answers per host and path from `Tests/Catalog/Fixtures/http/`, records every request, and can be switched to "down" (503) or "rate-limited".
 
 ---
 
@@ -81,63 +81,63 @@ any.
 
 ### Tests first
 
-- [ ] T007 [P] Write `Tests/Catalog/SkillHashesTests.swift`:
+- [X] T007 [P] Write `Tests/Catalog/SkillHashesTests.swift`:
   - `computedHash` of each fixture equals `golden.json`;
   - `treeSHA` equals `golden.json`;
   - `blobSHA` of every fixture file equals `golden.json`;
   - the two orders differ on `mixed/` (git order versus `localeCompare` order), so a wrong comparator fails the test.
-- [ ] T008 [P] Write `Tests/Catalog/SkillLocksTests.swift`, covering:
+- [X] T008 [P] Write `Tests/Catalog/SkillLocksTests.swift`, covering:
   - a personal lock with `dismissed`, `lastSelectedAgents` and an unknown top-level key, and three skills, round-trips byte-identical except for the one entry written;
   - `installedAt` is kept on replace and `updatedAt` is set to now, in ISO 8601 with milliseconds and `Z`;
   - the file is written with two-space indentation and **no trailing newline** (personal);
   - the project lock has sorted keys, 2-space indentation, a **trailing newline**, and only `version` and `skills`;
   - `version` 2 or unparseable JSON throws `lockUnreadable` and the file is unchanged;
   - `XDG_STATE_HOME` moves the personal path to `$XDG_STATE_HOME/skills/.skill-lock.json`.
-- [ ] T009 [P] Write `Tests/Catalog/CatalogSidecarTests.swift`: the key is `"<destinationKey>/<name>"`; an entry whose lock entry is gone is dropped at the next write; a missing file reads as empty.
-- [ ] T010 [P] Write `Tests/Catalog/DestinationTests.swift`:
+- [X] T009 [P] Write `Tests/Catalog/CatalogSidecarTests.swift`: the key is `"<destinationKey>/<name>"`; an entry whose lock entry is gone is dropped at the next write; a missing file reads as empty.
+- [X] T010 [P] Write `Tests/Catalog/DestinationTests.swift`:
   - `personal` resolves to `<personalHome>/.agents/skills` and to **nil** when `StoreLocations.personalHome` is nil;
   - `project` resolves to `<folder>/.agents/skills` for a known project or a worktree of one;
   - `project` is refused for an unknown folder or a server project (R10);
   - the Trash is `<root>/trash/` whenever the root is not the standard root or `AGENTS_PERSONAL_HOME` is set (R9).
-- [ ] T011 [P] Write `Tests/Catalog/GitHubSourceTests.swift` against `CatalogStub` and `FakeGitHub`:
+- [X] T011 [P] Write `Tests/Catalog/GitHubSourceTests.swift` against `CatalogStub` and `FakeGitHub`:
   - HEAD and the default branch are parsed from `info-refs.txt`;
   - the tree goes through `gh api` when `FakeGitHub` is signed in, and anonymously when it is not;
   - raw is fetched at the commit, never at the branch;
   - rate-limited goes to the tarball fallback, which extracts only the skill folder and is refused over 50 MB;
   - `AGENTS_TEST_GITHUB_URL` sends all three hosts to the stub.
-- [ ] T012 [P] Write `Tests/Catalog/SkillsCatalogTests.swift`:
+- [X] T012 [P] Write `Tests/Catalog/SkillsCatalogTests.swift`:
   - results come back in skills.sh's order;
   - non-GitHub `source` rows are dropped (R1);
   - a query shorter than 2 characters makes no request;
   - `known` is true only for owners in `KnownOwners`, compared case-insensitively (R11);
   - down gives `unreachable("skills.sh")`, never an empty list;
   - `AGENTS_TEST_CATALOG_URL` is honoured.
-- [ ] T013 [P] Write `Tests/Catalog/CatalogRolesTests.swift`: every `catalog/*` and `skills/*` method is refused for `.device`, `.agent`, `.pairing` and `.stranger`, and allowed for `.control` (quickstart §3 step 14).
+- [ ] T013 (open: the daemon-level role test was stopped by a safety check, 2026-09-26; Alex chose to skip it for now) [P] Write `Tests/Catalog/CatalogRolesTests.swift`: every `catalog/*` and `skills/*` method is refused for `.device`, `.agent`, `.pairing` and `.stranger`, and allowed for `.control` (quickstart §3 step 14).
 
 ### Implementation
 
-- [ ] T014 [P] Write `Src/Catalog/SkillHashes.swift`:
+- [X] T014 [P] Write `Src/Catalog/SkillHashes.swift`:
   - `blobSHA(Data)`: SHA-1 of `"blob <len>\0" + data`;
   - `treeSHA(folder:)`: git tree objects with mode `100644`, `100755` and `40000`, sorted by git's rule (a folder's name is compared as if it ended in `/`), with symbolic links refused;
   - `computedHash(folder:)`: SHA-256 over each file's relative path (UTF-8, `/` separators) then its bytes, in the `localeCompare`-equivalent order T007 pins down, skipping `.git` and `node_modules`.
 
   Use CryptoKit on macOS and swift-crypto only if it is already a dependency, otherwise CommonCrypto behind `#if canImport`. Make T007 pass.
-- [ ] T015 [P] Write `Src/Catalog/SkillLocks.swift`:
+- [X] T015 [P] Write `Src/Catalog/SkillLocks.swift`:
   - `PersonalLock` (version 3) and `ProjectLock` (version 1) are read as `JSONValue`, so unknown keys survive;
   - `upsert(name:entry:)` and `remove(name:)`;
   - entries are exactly the fields in contracts/lock-files.md;
   - writes are atomic (temp file then rename).
 
   Make T008 pass.
-- [ ] T016 [P] Write `Src/Catalog/CatalogSidecar.swift` for `<root>/catalog-skills.json` (contracts/lock-files.md). Make T009 pass.
-- [ ] T017 [P] Write `Src/Catalog/KnownOwners.swift` with the R11 list verbatim: `anthropics, openai, google, google-gemini, github, microsoft, vercel, vercel-labs, apple, expo, figma, stripe, supabase, cloudflare`.
-- [ ] T018 Write the wire types in `Core/Daemon/DaemonAPI+Catalog.swift`, exactly as in contracts/catalog-methods.md and data-model.md:
+- [X] T016 [P] Write `Src/Catalog/CatalogSidecar.swift` for `<root>/catalog-skills.json` (contracts/lock-files.md). Make T009 pass.
+- [X] T017 [P] Write `Src/Catalog/KnownOwners.swift` with the R11 list verbatim: `anthropics, openai, google, google-gemini, github, microsoft, vercel, vercel-labs, apple, expo, figma, stripe, supabase, cloudflare`.
+- [X] T018 Write the wire types in `Core/Daemon/DaemonAPI+Catalog.swift`, exactly as in contracts/catalog-methods.md and data-model.md:
   - the method names `catalog/search`, `catalog/preview`, `catalog/destination-state`, `skills/add`, `skills/list`, `skills/check-updates`, `skills/update-preview` and `skills/remove`;
   - the types `Destination`, `CatalogResult`, `SkillPreview`, `PreviewFile`, `PreviewProblem`, `DestinationState`, `ManagedSkill`, `UpdateState`, `ListedSkill` and `CatalogError` (`unreachable(host)`, `rateLimited(retryAfter)`, `unmanaged(path)`, `lockUnreadable(path)`, `noPersonalHome`, `previewExpired`).
 
   `SharedSnapshot.Skill` gains `managed: ManagedSkill?`, decoded when present so older snapshots still decode.
-- [ ] T019 Write `Src/Catalog/Destination.swift`, which resolves a `Destination` to its skills folder, its lock file and its Trash from `StoreLocations` and the project records. Make T010 pass.
-- [ ] T020 [P] Write `Src/Catalog/GitHubSource.swift`:
+- [X] T019 Write `Src/Catalog/Destination.swift`, which resolves a `Destination` to its skills folder, its lock file and its Trash from `StoreLocations` and the project records. Make T010 pass.
+- [X] T020 [P] Write `Src/Catalog/GitHubSource.swift`:
   - `head(owner:repo:)` via the smart-HTTP ref list;
   - `tree(owner:repo:commit:)` via `GitHubCLI` `api` when signed in, else anonymous `URLSession`;
   - `raw(owner:repo:commit:path:)`;
@@ -145,8 +145,8 @@ any.
   - `tarballFolder(owner:repo:commit:folder:into:)` via codeload and `/usr/bin/tar`, capped at 50 MB.
 
   Every request has a 10 s timeout and a test-overridable base (`AGENTS_TEST_GITHUB_URL`). Make T011 pass.
-- [ ] T021 [P] Write `Src/Catalog/SkillsCatalog.swift`: `search(query:)` and `snapshot(owner:repo:skillID:)` against `AGENTS_TEST_CATALOG_URL` or `https://skills.sh`. Make T012 pass.
-- [ ] T022 Add the new methods to the dispatch table in `Src/Daemon/DaemonCore+Dispatch.swift` as `notImplemented` stubs, not in `deviceMethods` or `agentMethods`. Make T013 pass.
+- [X] T021 [P] Write `Src/Catalog/SkillsCatalog.swift`: `search(query:)` and `snapshot(owner:repo:skillID:)` against `AGENTS_TEST_CATALOG_URL` or `https://skills.sh`. Make T012 pass.
+- [X] T022 Add the new methods to the dispatch table in `Src/Daemon/DaemonCore+Dispatch.swift` as `notImplemented` stubs, not in `deviceMethods` or `agentMethods`. Make T013 pass.
 
 **Checkpoint**: `swift test --filter Catalog` is green and the golden values match. Commit.
 
@@ -160,7 +160,7 @@ any.
 
 ### Tests first
 
-- [ ] T023 [P] [US1] Write `Tests/Catalog/SkillPreviewerTests.swift`:
+- [X] T023 [P] [US1] Write `Tests/Catalog/SkillPreviewerTests.swift`:
   - the folder is found by folder name, then by the front-matter `name` put through `toSkillSlug`; `notFoundInRepo` when neither matches;
   - snapshot files whose blob SHA matches are used; mismatched and missing files (the PNG) are fetched raw, with `via` recorded;
   - `runnable` is true for mode `100755`, under `scripts/`, or starting with `#!`;
@@ -169,39 +169,39 @@ any.
   - `noSkillFile` is raised when SKILL.md or its `name`/`description` is missing;
   - staging is `<root>/catalog-staging/<previewID>/`, and nothing is written elsewhere;
   - `treeSHA` and `computedHash` of the staged folder equal the tree's.
-- [ ] T024 [P] [US1] Write `Tests/Catalog/SkillInstallerAddTests.swift` (personal):
+- [X] T024 [P] [US1] Write `Tests/Catalog/SkillInstallerAddTests.swift` (personal):
   - `add` renames the staged folder to `<home>/.agents/skills/<name>`, then writes the personal lock entry, then the sidecar;
   - a second `add` of the same preview fails with `previewExpired`;
   - `destinationState` is `free`, then `sameSkill(update:false)` after adding;
   - `noPersonalHome` when the root has no personal home.
-- [ ] T025 [P] [US1] Write `Tests/Integration/CatalogAddIntegrationTests.swift`: through a `DaemonCore` with a temporary root and home, call `catalog/search`, `catalog/preview` and `skills/add`. Then `personal/shared` lists the skill with `managed.source`. Then a `FakeACPAgent` session start runs `reconcile`, which places the Claude link `<home>/.claude/skills/<name>`.
+- [ ] T025 (open: skipped for now, as T013; the scratch walk covered search → preview → add → Shared → Claude link) [P] [US1] Write `Tests/Integration/CatalogAddIntegrationTests.swift`: through a `DaemonCore` with a temporary root and home, call `catalog/search`, `catalog/preview` and `skills/add`. Then `personal/shared` lists the skill with `managed.source`. Then a `FakeACPAgent` session start runs `reconcile`, which places the Claude link `<home>/.claude/skills/<name>`.
 
 ### Implementation
 
-- [ ] T026 [US1] Write `Src/Catalog/SkillPreviewer.swift`: the steps from research R2 and R3 into a staging folder, filling in `SkillPreview` (data-model.md). Keep at most 8 previews and sweep them after 30 minutes, oldest first. Make T023 pass.
-- [ ] T027 [US1] Write `Src/Catalog/SkillInstaller.swift`, with `add(previewID:destination:replace:)` for the personal destination only. Follow the order in contracts/catalog-methods.md: move the old folder to the Trash if present, rename the staged folder, write the lock, write the sidecar, putting things back if a step fails. Make T024 pass.
-- [ ] T028 [US1] Write `Src/Daemon/DaemonCore+Catalog.swift` and implement `catalog/search`, `catalog/preview`, `catalog/destination-state` and `skills/add`. Log the lines from contracts/catalog-methods.md only.
-- [ ] T029 [US1] Fill in `managed` for each personal skill in `Src/Projects/PersonalDotAgents+Snapshot.swift`, from the personal lock and the sidecar. Make T025 pass.
-- [ ] T030 [US1] Add `search`, `preview`, `destinationState` and `addSkill` to `App/Catalog/AppModel+Catalog.swift` (an `extension AppModel`, as `App/Hosts/Lending.swift` does), calling the new methods through `client.call`. Hold the sheet's state: query, results, the chosen preview and the destination.
-- [ ] T031 [US1] Write `App/Catalog/AddSkillSheet.swift` as frame B:
+- [X] T026 [US1] Write `Src/Catalog/SkillPreviewer.swift`: the steps from research R2 and R3 into a staging folder, filling in `SkillPreview` (data-model.md). Keep at most 8 previews and sweep them after 30 minutes, oldest first. Make T023 pass.
+- [X] T027 [US1] Write `Src/Catalog/SkillInstaller.swift`, with `add(previewID:destination:replace:)` for the personal destination only. Follow the order in contracts/catalog-methods.md: move the old folder to the Trash if present, rename the staged folder, write the lock, write the sidecar, putting things back if a step fails. Make T024 pass.
+- [X] T028 [US1] Write `Src/Daemon/DaemonCore+Catalog.swift` and implement `catalog/search`, `catalog/preview`, `catalog/destination-state` and `skills/add`. Log the lines from contracts/catalog-methods.md only.
+- [X] T029 [US1] Fill in `managed` for each personal skill in `Src/Projects/PersonalDotAgents+Snapshot.swift`, from the personal lock and the sidecar. Make T025 pass.
+- [X] T030 [US1] Add `search`, `preview`, `destinationState` and `addSkill` to `App/Catalog/AppModel+Catalog.swift` (an `extension AppModel`, as `App/Hosts/Lending.swift` does), calling the new methods through `client.call`. Hold the sheet's state: query, results, the chosen preview and the destination.
+- [X] T031 [US1] Write `App/Catalog/AddSkillSheet.swift` as frame B:
   - title "Add a skill", then the **Add to** segmented control (You / `<project>`), then the search field (300 ms after the last keystroke);
   - one card per result: name, `owner/repo` in monospace, install count on the right, `known` chip, `added` chip;
   - footer "From skills.sh. Choose one to see what is in it before adding." and Cancel.
 
   Each card is a Button, following the memory note on SwiftUI card taps.
-- [ ] T032 [US1] Write `App/Catalog/SkillPreviewView.swift` as frame C:
+- [X] T032 [US1] Write `App/Catalog/SkillPreviewView.swift` as frame C:
   - "‹ Results" and the skill's name;
   - Owner, Repo, Commit (with the date only when present), Installs and Goes to;
   - the file list, with runnable files marked `script`;
   - the orange script warning;
   - the `ReachDots` for the destination, and the SKILL.md reader;
   - footer "Taken from github.com/<o>/<r> at <commit7>." with Cancel and **Add to ~/.agents** / **Add to <project>**.
-- [ ] T033 [US1] Change `App/Settings/Shared/SharedSkillsPage.swift` to match frame A:
+- [X] T033 [US1] Change `App/Settings/Shared/SharedSkillsPage.swift` to match frame A:
   - **Add skill…** (the prominent style) in the bar after Reveal in Finder, opening `AddSkillSheet` set to You;
   - a `skills.sh` chip on managed rows;
   - the detail gains **From** (skills.sh · linked `owner/repo`) and **Taken at** (`<commit7> · <age>`, or "not recorded");
   - hand-made skills keep exactly today's buttons.
-- [ ] T034 [US1] Walk it (quickstart §2, §3 steps 1–5, §4 frames A–C) on a scratch app with the fixture server from T052. Put screenshots beside each frame in `specs/059-marketplace/walk/us1/` and fix any difference from the frames.
+- [X] T034 [US1] Walk it (quickstart §2, §3 steps 1–5, §4 frames A–C) on a scratch app with the fixture server from T052. Put screenshots beside each frame in `specs/059-marketplace/walk/us1/` and fix any difference from the frames.
 
 **Checkpoint**: a skill found in the app reaches a Claude agent's next start. Commit. This is the MVP.
 
@@ -291,7 +291,7 @@ any.
   - a failure injected after the rename (the test seam `AGENTS_TEST_CATALOG_PAUSE=afterRename`, or a closure passed into the installer) leaves no folder and no lock entry, and the old folder comes back from the Trash (SC-003);
   - an unreadable personal lock refuses the add before anything moves.
 - [ ] T051 [US4] Implement the failure paths in `Src/Catalog/SkillInstaller.swift`, putting things back on each step and honouring the pause seam only when the environment variable is set, and make T050 pass.
-- [ ] T052 [P] [US4] Write `specs/059-marketplace/walk/fixture-server.py` as quickstart §1 describes. It serves search, download, the ref list, the tree, commits and raw from a fixture git repo it makes under `/tmp`, plus `POST /_advance` and `POST /_down`. **Also needed by T034, so build it before the US1 walk.**
+- [X] T052 [P] [US4] Write `specs/059-marketplace/walk/fixture-server.py` as quickstart §1 describes. It serves search, download, the ref list, the tree, commits and raw from a fixture git repo it makes under `/tmp`, plus `POST /_advance` and `POST /_down`. **Also needed by T034, so build it before the US1 walk.**
 - [ ] T053 [US4] Build frame E's states in `App/Catalog/SkillPreviewView.swift` and `AddSkillSheet.swift`:
   - **unmanaged**: the orange box "You already have a skill called <name> in <folder>. You made it (it didn't come from here), so the app won't replace it…", the blue note when the other destination is free, and Reveal yours plus Cancel;
   - **managedOther**: Replace, with a confirmation;
