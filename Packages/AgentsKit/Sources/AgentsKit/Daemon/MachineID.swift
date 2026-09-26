@@ -5,6 +5,9 @@ import Foundation
 /// the one whose folders it may open in Finder.
 public enum MachineID {
     public static let current: String = {
+        // A second host on this Mac standing in for another machine, in a walk or a test
+        // (US7's independent test).
+        if let given = ProcessInfo.processInfo.environment["AGENTS_MACHINE_ID"], !given.isEmpty { return given }
         #if canImport(Darwin)
         var uuid = [UInt8](repeating: 0, count: 16)
         var wait = timespec(tv_sec: 0, tv_nsec: 0)

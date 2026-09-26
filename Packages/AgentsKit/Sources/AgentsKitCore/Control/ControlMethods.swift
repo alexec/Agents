@@ -52,7 +52,14 @@ public actor ControlMethods: ControlHandling {
     private var hosts: [HostID: HostRecord]
     private weak var router: ControlRouter?
 
-    public init(store: GrantStore, settings: ControlSettings, version: String, hooks: Hooks = Hooks()) {
+    private let startedAt = Date()
+    private let port: Int?
+    private let awayFromHome: Bool
+
+    public init(store: GrantStore, settings: ControlSettings, version: String, hooks: Hooks = Hooks(),
+                port: Int? = nil, awayFromHome: Bool = false) {
+        self.port = port
+        self.awayFromHome = awayFromHome
         self.store = store
         self.settings = settings
         self.version = version
@@ -131,8 +138,12 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.ping:
             return [:]
         case DaemonAPI.Method.controlStatus:
-            return try JSONValue.encoding(DaemonAPI.ControlStatus(name: settings.name, version: version,
-                                                                  homeHost: settings.homeHost, machineID: settings.machineID))
+            var status = DaemonAPI.ControlStatus(name: settings.name, version: version,
+                                                                  homeHost: settings.homeHost, machineID: settings.machineID,
+                                                                  startedAt: startedAt, port: port,
+                                                                  awayFromHome: awayFromHome)
+            status.you = caller.client
+            return try JSONValue.encoding(status)
         case DaemonAPI.Method.hostsList:
             return try JSONValue.encoding(await hostList())
         case DaemonAPI.Method.clientsList, DaemonAPI.Method.devicesList:

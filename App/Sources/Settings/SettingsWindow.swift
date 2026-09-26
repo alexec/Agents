@@ -14,12 +14,17 @@ struct SettingsWindow: View {
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
+    @State private var controlPage: ControlPage = .overview
+    /// Settings ▸ Control plane's own view of the control plane, while the window has one
+    /// (058). Without one, Devices and Servers are listed as they always were.
+    @State private var control: ControlSettingsModel? = ControlConfig.root.map { ControlSettingsModel(root: $0) }
 
     static let size = CGSize(width: 1_000, height: 640)
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: $pane, sharedPage: $sharedPage, snapshot: sharedSnapshot)
+            SettingsRail(pane: $pane, sharedPage: $sharedPage, snapshot: sharedSnapshot,
+                         controlPage: $controlPage, control: control)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -28,6 +33,8 @@ struct SettingsWindow: View {
         .background(Paper.ground)
         .navigationTitle(pane.title)
         .task { await refreshShared() }
+        .task { await control?.start() }
+        .onDisappear { control?.stop() }
         // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
@@ -53,6 +60,8 @@ struct SettingsWindow: View {
         case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
         case .servers: FormColumn { ServersSettingsView() }
+        case .controlPlane:
+            if let control { ControlSettingsView(control: control, page: $controlPage) }
         }
     }
 
@@ -62,7 +71,7 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: Hashable, CaseIterable {
-    case general, agents, runtimes, shared, spending, pool, devices, servers
+    case general, agents, runtimes, shared, spending, pool, devices, servers, controlPlane
 
     var title: String {
         switch self {
@@ -74,6 +83,7 @@ enum SettingsPane: Hashable, CaseIterable {
         case .pool: "Pool"
         case .devices: "Devices"
         case .servers: "Servers"
+        case .controlPlane: "Control plane"
         }
     }
 
@@ -87,12 +97,19 @@ enum SettingsPane: Hashable, CaseIterable {
         case .pool: "arrow.triangle.swap"
         case .devices: "iphone"
         case .servers: "server.rack"
+        case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
 
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.general], [.agents, .runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+    ///
+    /// With a control plane, Devices and Servers fold into its one group (058, frame D):
+    /// its hosts are the servers and its clients the devices.
+    static var groups: [[SettingsPane]] {
+        let ways: [SettingsPane] = ControlConfig.root == nil ? [.devices, .servers] : [.controlPlane]
+        return [[.general], [.agents, .runtimes, .spending, .pool], [.shared], ways]
+    }
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
@@ -113,13 +130,21 @@ private struct SettingsRail: View {
     @Binding var pane: SettingsPane
     @Binding var sharedPage: SharedPage
     let snapshot: DaemonAPI.SharedSnapshot?
+    @Binding var controlPage: ControlPage
+    let control: ControlSettingsModel?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
                 if index > 0 { Spacer().frame(height: 10) }
                 ForEach(group, id: \.self) { each in
-                    if each == .shared { sharedGroup } else { paneItem(each) }
+                    if each == .shared {
+                        sharedGroup
+                    } else if each == .controlPlane {
+                        controlGroup
+                    } else {
+                        paneItem(each)
+                    }
                 }
             }
             Spacer()
@@ -175,6 +200,43 @@ private struct SettingsRail: View {
                  warns: snapshot.warns(.mcp))
             page("Plugins", .plugins, count: snapshot.plugins.count, warns: snapshot.warns(.plugins))
             page("Other files", .other, count: snapshot.otherFiles.count, warns: false)
+        }
+    }
+
+    /// The control plane, drawn as Shared is: a heading always open over its pages (058).
+    @ViewBuilder
+    private var controlGroup: some View {
+        heading(.controlPlane)
+        controlItem(.overview, count: nil)
+        controlItem(.hosts, count: control?.hosts.count)
+        controlItem(.clients, count: control.map { $0.clients.count })
+    }
+
+    private func heading(_ each: SettingsPane) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: each.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(each.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func controlItem(_ target: ControlPage, count: Int?) -> some View {
+        let chosen = pane == .controlPlane && controlPage == target
+        return RailButton(lit: chosen, label: target.title + (count.map { ", \($0)" } ?? ""),
+                          selected: chosen, action: { pane = .controlPlane; controlPage = target }) {
+            HStack(spacing: 6) {
+                Text(target.title)
+                Spacer()
+                if let count { Text("\(count)").monospacedDigit()
+                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
+            }
+            .padding(.leading, 28)
         }
     }
 

@@ -37,12 +37,24 @@ public extension DaemonAPI {
         public var version: String
         public var homeHost: HostID?
         public var machineID: String
+        /// When this run of the control plane started (frame D).
+        public var startedAt: Date?
+        /// The port clients and hosts reach it on over the network, if it listens on one.
+        public var port: Int?
+        /// Whether devices reach it through iCloud when away from home (R6).
+        public var awayFromHome: Bool?
+        /// The asking client's own record, so a window can mark itself "you".
+        public var you: UUID?
 
-        public init(name: String, version: String, homeHost: HostID?, machineID: String) {
+        public init(name: String, version: String, homeHost: HostID?, machineID: String,
+                    startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
             self.name = name
             self.version = version
             self.homeHost = homeHost
             self.machineID = machineID
+            self.startedAt = startedAt
+            self.port = port
+            self.awayFromHome = awayFromHome
         }
     }
 

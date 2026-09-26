@@ -46,13 +46,14 @@ public final class ControlPlane: @unchecked Sendable {
     /// The name the window's record has, so every launch of it is one client.
     public static let windowName = "This Mac"
 
-    public init(root: URL, version: String) {
+    public init(root: URL, version: String, port: Int? = nil, awayFromHome: Bool = false) {
         self.root = root
         let store = GrantStore(root: root)
         let settings = store.loadSettings()
             ?? ControlSettings(name: Host.current().localizedName ?? "This Mac", machineID: MachineID.current)
         try? store.saveSettings(settings)
-        let methods = ControlMethods(store: store, settings: settings, version: version)
+        let methods = ControlMethods(store: store, settings: settings, version: version,
+                                     port: port, awayFromHome: awayFromHome)
         self.methods = methods
         self.router = ControlRouter(handler: methods, knownHosts: store.loadHosts().map(\.id),
                                     homeHost: settings.homeHost)

@@ -46,6 +46,10 @@ public struct DaemonCommandLine: Sendable {
         return arguments.contains(Self.controlHomeFlag) ? ControlPlane.hostSocket(root: ControlPlane.defaultRoot).path : nil
     }
 
+    /// `--host-name <name>`: what the control plane lists this host as, when not this
+    /// machine's own name.
+    public var hostName: String? { value(after: "--host-name") }
+
     public var hostID: HostID {
         value(after: Self.hostIDFlag).map(HostID.init(rawValue:)) ?? .mac
     }

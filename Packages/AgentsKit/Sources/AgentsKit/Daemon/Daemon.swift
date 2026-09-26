@@ -16,9 +16,11 @@ public final class Daemon: @unchecked Sendable {
     public struct Control: Sendable {
         public var socket: URL
         public var host: HostID
-        public init(socket: URL, host: HostID) {
+        public var name: String?
+        public init(socket: URL, host: HostID, name: String? = nil) {
             self.socket = socket
             self.host = host
+            self.name = name
         }
     }
 
@@ -152,7 +154,7 @@ public final class Daemon: @unchecked Sendable {
             let uplink = ControlUplink(
                 server: server,
                 hello: DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
-                                           machineID: MachineID.current, name: Host.current().localizedName)) {
+                                           machineID: MachineID.current, name: control.name ?? Host.current().localizedName)) {
                 FDTransport(socket: try connectUnixSocket(path: socket))
             }
             self.uplink = uplink

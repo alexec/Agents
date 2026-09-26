@@ -220,7 +220,8 @@ let controlPlane: ControlPlane? = ControlPlane.chosenRoot().map { root in
     try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     DaemonLog.shared.setDestination(root.appendingPathComponent("control.log"))
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
-    return ControlPlane(root: root, version: version)
+    return ControlPlane(root: root, version: version, port: Int(port.rawValue),
+                        awayFromHome: ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil)
 }
 if let controlPlane {
     Task {

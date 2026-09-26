@@ -55,6 +55,12 @@ struct LocalServices {
         }
     }
 
+    /// Restart the control plane: launchd stops it and starts it again at once. Every
+    /// client and host reconnects by itself (frame D's Restart).
+    func restartControlPlane() async -> Bool {
+        await Self.launchctl(["kickstart", "-k", "gui/\(getuid())/\(controlLabel)"]) == 0
+    }
+
     private func registerWithSystem() -> Approval {
         var needsApproval = false
         for name in [Self.controlPlist, Self.hostPlist] {
