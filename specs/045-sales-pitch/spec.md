@@ -47,8 +47,12 @@ a cloud agent is still the better choice.
 
 ### Session 2026-09-25
 
-Defaults taken while the questions were open. Each is marked where it is used, and any of them can be
-overturned:
+- Q: Where should the pitch live? → A: A "Why Agents" page in Explanation, with two lines on the home page
+  and README linking to it (D1).
+- Q: How should the pitch treat other tools? → A: By kind, with products named only as examples (D2).
+- Q: Should the pitch say where another tool is better? → A: Yes, in its own section (D3).
+
+Alex confirmed D1–D3 as written below. D4 is a default:
 
 - **D1 (where it lives)**: one page on the docs site, "Why Agents", in the Explanation section,
   because Diataxis's Explanation section is for why. The home page and the README each open with a two-line
