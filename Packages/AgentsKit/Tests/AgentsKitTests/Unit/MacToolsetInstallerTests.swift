@@ -5,7 +5,7 @@ import Testing
 
 /// Claude on a Mac with no Node: the app's pinned toolset, installed in the daemon's own
 /// folder (048).
-@Suite("Installing Claude's toolset on this Mac", .timeLimit(.minutes(1)))
+@Suite("Installing a toolset on this Mac", .timeLimit(.minutes(1)))
 struct MacToolsetInstallerTests {
     @Test func aWholeInstallIsCurrentMarkedOkAndHasAnExecutableShim() async throws {
         let fake = try FakeMacToolset()
@@ -27,6 +27,33 @@ struct MacToolsetInstallerTests {
         var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
         discovery.macToolsHome = fake.tools.path
         #expect(discovery.locate(RuntimeCatalog.claude) == .available(path: "\(current.path)/bin/npx", supportsResume: false))
+    }
+
+    /// A second runtime's toolset (047) lands in its own folder, with its own shim, and says
+    /// its own name when it fails.
+    @Test func anotherRuntimesToolsetInstallsBesideClaudesUnderItsOwnName() async throws {
+        let claude = try FakeMacToolset()
+        defer { claude.remove() }
+        let codex = try FakeMacToolset(runtimeID: "codex", package: "@agentclientprotocol/codex-acp")
+        defer { codex.remove() }
+        let installer = MacToolsetInstaller(toolset: codex.toolset, tools: claude.tools, nodeDist: codex.dist,
+                                            architecture: FakeMacToolset.architecture,
+                                            environment: ["PATH": "/usr/bin:/bin"])
+        _ = try await claude.installer().install()
+        let shim = try await installer.install()
+
+        let current = claude.tools.appendingPathComponent("codex/current")
+        #expect(shim.hasPrefix(MacToolsetInstaller.realPath(claude.tools.appendingPathComponent("codex")).path))
+        #expect(shim.hasSuffix("/bin/\(codex.toolset.shimName)"))
+        #expect(FileManager.default.isExecutableFile(atPath: shim))
+        #expect(FileManager.default.fileExists(atPath: current.appendingPathComponent(
+            "lib/node_modules/@agentclientprotocol/codex-acp/dist/index.js").path))
+        #expect(FileManager.default.fileExists(atPath: claude.tools.appendingPathComponent("claude/current/ok").path),
+                "Claude's is untouched")
+        #expect(installer.runtimeName == (RuntimeCatalog.runtime(id: "codex")?.name ?? "codex"))
+        #expect(MacToolsetInstaller.Failure.noInternet("").sentence(for: "Codex")
+                == "Couldn’t reach the internet to download Codex.")
+        #expect(MacToolsetInstaller.Failure.npm("E500").sentence(for: "Claude") == "Installing Claude failed: E500")
     }
 
     @Test func aChecksumMismatchInstallsNothing() async throws {
@@ -88,7 +115,7 @@ struct MacToolsetInstallerTests {
         facts.downloader = "curl"
         let script = ToolsetInstaller.installScript(toolset, facts)
         #expect(script.contains(#"npm ci --ignore-scripts --omit=dev --no-audit --no-fund --prefix "$P/lib""#))
-        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents (043): not npx."))
+        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents: runs the @agentclientprotocol/claude-agent-acp this toolset was installed with.'"))
         #expect(script.contains(#"exec "$d/node/bin/node" "$d/lib/node_modules/@agentclientprotocol/claude-agent-acp/"#))
     }
 }

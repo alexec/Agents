@@ -2,12 +2,13 @@ import AgentsKitCore
 import CryptoKit
 import Foundation
 
-/// Claude for somebody with no Node (048): the server toolset of 043, installed on this Mac.
+/// A runtime the app installs itself (048): the server toolset of 043, installed on this Mac.
+/// Claude, for somebody with no Node; Codex always (047).
 ///
 /// The same shape as `ToolsetInstaller`'s script, in Swift rather than sh. Node is
 /// downloaded from nodejs.org and checked against the SHA-256 in `mac-node.json`, the
-/// adapter is installed with `npm ci` against the app's lock, and `bin/npx` is the same
-/// shim. It is built in `<tools>/claude/.part-<id>`, removed on any failure, marked whole
+/// package is installed with `npm ci` against the app's lock, and `bin/<shimName>` is the
+/// same shim. It is built in `<tools>/<runtime>/.part-<id>`, removed on any failure, marked whole
 /// with `ok` last, then moved into place and made `current`. No Homebrew, no admin
 /// password, and nothing of the person's — PATH, profile, npm — is touched.
 public struct MacToolsetInstaller: Sendable {
@@ -42,20 +43,26 @@ public struct MacToolsetInstaller: Sendable {
         case noSpace
         case other(String)
 
-        public var sentence: String {
+        /// Said about the runtime being installed, by its name.
+        public func sentence(for name: String) -> String {
             switch self {
             case .noMacPin: "This build of the app carries no Node.js for this Mac."
-            case .noInternet: "Couldn’t reach the internet to download Claude."
+            case .noInternet: "Couldn’t reach the internet to download \(name)."
             case .download(let detail): "Couldn’t download Node.js: \(detail)"
             case .checksum: "The download didn’t match its checksum, so nothing was installed."
-            case .npm(let detail): "Installing the Claude adapter failed: \(detail)"
-            case .noSpace: "There isn’t room on this Mac to install Claude."
-            case .other(let detail): "Installing Claude failed: \(detail)"
+            case .npm(let detail): "Installing \(name) failed: \(detail)"
+            case .noSpace: "There isn’t room on this Mac to install \(name)."
+            case .other(let detail): "Installing \(name) failed: \(detail)"
             }
         }
     }
 
     public var folder: URL { tools.appendingPathComponent(toolset.manifest.runtimeID, isDirectory: true) }
+
+    /// What the person calls it: the catalog's name for the toolset's runtime.
+    public var runtimeName: String {
+        RuntimeCatalog.runtime(id: toolset.manifest.runtimeID)?.name ?? toolset.manifest.runtimeID
+    }
 
     /// Install, make it `current`, and remove any other. Returns the shim's path.
     @discardableResult
@@ -85,7 +92,7 @@ public struct MacToolsetInstaller: Sendable {
         }
         try point(currentAt: id)
         removeOthers(except: id)
-        return finished.appendingPathComponent("bin/npx").path
+        return finished.appendingPathComponent("bin/\(toolset.shimName)").path
     }
 
     private func build(in part: URL, node: Toolset.MacNode, sha: String,
@@ -116,7 +123,7 @@ public struct MacToolsetInstaller: Sendable {
         guard untar.status == 0 else { throw Self.problem(untar.output, else: .download(untar.lastLine)) }
         try fm.removeItem(at: tarball)
 
-        progress("Installing the Claude adapter")
+        progress("Installing \(runtimeName)")
         var npmEnvironment = environment
         npmEnvironment["PATH"] = nodeFolder.appendingPathComponent("bin").path + ":" + (environment["PATH"] ?? "")
         let npm = try await InstallStep(
@@ -133,7 +140,7 @@ public struct MacToolsetInstaller: Sendable {
 
         let bin = part.appendingPathComponent("bin", isDirectory: true)
         try fm.createDirectory(at: bin, withIntermediateDirectories: true)
-        let shim = bin.appendingPathComponent("npx")
+        let shim = bin.appendingPathComponent(toolset.shimName)
         try Data((toolset.shimLines.joined(separator: "\n") + "\n").utf8).write(to: shim)
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shim.path)
         // Last: a toolset without this is never used.

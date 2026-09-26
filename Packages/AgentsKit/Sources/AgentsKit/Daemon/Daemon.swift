@@ -19,7 +19,7 @@ public final class Daemon: @unchecked Sendable {
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
                 serve: Bool = false,
-                toolsetFolder: URL? = nil) throws {
+                toolsetsFolder: URL? = nil) throws {
         self.locations = locations
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
@@ -32,10 +32,10 @@ public final class Daemon: @unchecked Sendable {
         var installer: RuntimeInstaller?
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
-            let toolset = toolsetFolder.flatMap { try? Toolset.load(from: $0) }
+            let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
             installer = RuntimeInstaller(
                 discovery: discovery,
-                toolset: toolset.map { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
+                toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
         }
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
                                installer: installer, launcher: launcher)

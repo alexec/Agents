@@ -53,4 +53,49 @@ struct AppToolsetDiscoveryTests {
         defer { try? FileManager.default.removeItem(at: tools) }
         #expect(discovery(tools: tools, npxOnPath: false).locate(RuntimeCatalog.grok) == .missing(lookedIn: ["/person/bin"]))
     }
+
+    /// A runtime that is only ever the app's own copy (047): Codex. Made up here, so the
+    /// rule is tested apart from whether the catalog lists Codex yet.
+    private let appCopyOnly = Runtime(id: "only", name: "Only", executable: "only-acp", arguments: [],
+                                      install: .toolset(runtimeID: "only"), usesAppCopyOnly: true)
+
+    private func onlyTools(whole: Bool) throws -> URL {
+        let tools = FileManager.default.temporaryDirectory.appendingPathComponent("tools-\(UUID().uuidString)")
+        let set = tools.appendingPathComponent("only/abc123", isDirectory: true)
+        try FileManager.default.createDirectory(at: set.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: set.appendingPathComponent("bin/only-acp").path,
+                                       contents: Data("#!/bin/sh\n".utf8), attributes: [.posixPermissions: 0o700])
+        if whole { FileManager.default.createFile(atPath: set.appendingPathComponent("ok").path, contents: Data()) }
+        try FileManager.default.createSymbolicLink(atPath: tools.appendingPathComponent("only/current").path,
+                                                   withDestinationPath: "abc123")
+        return tools
+    }
+
+    @Test func anAppCopyOnlyRuntimeIgnoresTheSameNameOnThePath() throws {
+        var d = RuntimeDiscovery(searchPaths: ["/person/bin"]) { $0 == "/person/bin/only-acp" || $0 == "/person/bin/npx" }
+        d.macToolsHome = "/nowhere"
+        #expect(d.locate(appCopyOnly) == .missing(lookedIn: ["/nowhere/only/current/bin"]))
+    }
+
+    @Test func anAppCopyOnlyRuntimeIsItsWholeToolset() throws {
+        let tools = try onlyTools(whole: true)
+        defer { try? FileManager.default.removeItem(at: tools) }
+        var d = RuntimeDiscovery(searchPaths: ["/person/bin"]) { $0 == "/person/bin/only-acp" || FileManager.default.isExecutableFile(atPath: $0) }
+        d.macToolsHome = tools.path
+        #expect(d.locate(appCopyOnly) == .available(path: "\(tools.path)/only/current/bin/only-acp", supportsResume: false))
+    }
+
+    @Test func anAppCopyOnlyRuntimeIsNotAHalfInstalledToolset() throws {
+        let tools = try onlyTools(whole: false)
+        defer { try? FileManager.default.removeItem(at: tools) }
+        var d = RuntimeDiscovery(searchPaths: []) { FileManager.default.isExecutableFile(atPath: $0) }
+        d.macToolsHome = tools.path
+        #expect(!d.locate(appCopyOnly).isAvailable)
+    }
+
+    @Test func aRuntimeFromAnOlderDaemonIsNotAppCopyOnly() throws {
+        let json = #"{"id":"claude","name":"Claude","executable":"npx","arguments":[]}"#
+        let runtime = try JSONDecoder().decode(Runtime.self, from: Data(json.utf8))
+        #expect(runtime.usesAppCopyOnly == false)
+    }
 }

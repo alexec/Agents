@@ -31,7 +31,7 @@ Codex still lacks.** Never build a second version of the same thing.
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge current `main` into this branch, and confirm that `swift test` in `Kit/` passes and both Xcode schemes build before any change. Record the failing-test baseline (main's known flakes) in `specs/047-codex-runtime/walk/baseline.md`.
+- [X] T001 Merge current `main` into this branch, and confirm that `swift test` in `Kit/` passes and both Xcode schemes build before any change. Record the failing-test baseline (main's known flakes) in `specs/047-codex-runtime/walk/baseline.md`.
 - [X] T002 Make `scripts/update-toolset.sh <runtime> <node-version> <package> <version> [--min-free-bytes N] [--platform-package-pattern P]` from `scripts/update-claude-toolset.sh`. It writes `App/Resources/toolsets/<runtime>/{manifest.json,package.json,package-lock.json,mac-node.json}` in exactly the formats Claude's use today, and fails unless the lock holds a package matching the pattern for `linux-x64`, `linux-arm64`, `darwin-x64` and `darwin-arm64`. Reduce `scripts/update-claude-toolset.sh` to one call of it (pattern `claude-agent-sdk-`). Re-run it for Claude, and check `App/Resources/toolsets/claude/` is byte-identical. If 046 has already added `scripts/update-gemini-toolset.sh`, fold it into the same generic script.
 - [X] T003 Run `scripts/update-toolset.sh codex v24.21.0 @agentclientprotocol/codex-acp 1.13.1 --min-free-bytes 1073741824 --platform-package-pattern 'codex-'`. Commit `App/Resources/toolsets/codex/`. Check that `project.yml` copies the whole `toolsets/` folder into the app bundle, and add `codex/` if Claude's folder is listed by name.
 - [X] T004 [P] Add `"codex": [<toolset shim>]` to `RUNTIMES` in `scripts/acp-handshake.sh`, taking the shim path from `AGENTS_CODEX_SHIM` (no PATH lookup), and Codex's tool names to `scripts/runtime-tools.sh`.
@@ -44,7 +44,7 @@ Codex still lacks.** Never build a second version of the same thing.
 toolset already `npm ci`'d in `/tmp/codex-lock` with Node from the pinned tarball, or
 rebuild it from T003.
 
-- [ ] T005 Ask Alex (AskUserQuestion) for a moment when he can sign Codex in with ChatGPT in the browser, and for an OpenAI API key for the server half. The key goes only in `/tmp` and the scratch root's launch environment, never in a repo file.
+- [X] T005 Ask Alex (AskUserQuestion) for a moment when he can sign Codex in with ChatGPT in the browser, and for an OpenAI API key for the server half. The key goes only in `/tmp` and the scratch root's launch environment, never in a repo file.
 - [ ] T006 In the real home, with Alex present: run the adapter, call `authenticate {methodId:"chat-gpt"}`, and let Alex finish in the browser. Record in research R4 whether it completed over ACP and wrote `~/.codex/auth.json`, and whether the toolset's own `codex login status` agrees. If it did not complete, repeat with `chat-gpt-device-code` and record that. Take `shasum ~/.codex/config.toml` before and after (the file may be absent).
 - [ ] T007 Signed in, run a real turn with the app's MCP server in `mcpServers` and `CODEX_CONFIG` from contracts/runtime-launch.md. Record in research:
   - R2: the app's MCP tools reach the model.
@@ -66,23 +66,23 @@ rebuild it from T003.
 ## Phase 3: Foundational (blocks every story; shared with 046's T009–T017)
 
 - [ ] T009 [P] Add `usesAppCopyOnly: Bool` to `Runtime` in `Core/Model/Runtime.swift`: default `false`, decoded leniently, absent reads as `false`.
-- [ ] T010 [P] In `Core/Runtimes/Toolset.swift`, make `shimLines` name no runtime in its comment, and add `shimName(for executable:)` so the shim is `bin/<runtime.executable>`. (046's `forwardsArguments` is not needed by Codex, but must not break it.)
-- [ ] T011 [P] Tests in `Tests/Unit/ToolsetTests.swift`:
+- [X] T010 [P] In `Core/Runtimes/Toolset.swift`, make `shimLines` name no runtime in its comment, and add `shimName(for executable:)` so the shim is `bin/<runtime.executable>`. (046's `forwardsArguments` is not needed by Codex, but must not break it.)
+- [X] T011 [P] Tests in `Tests/Unit/ToolsetTests.swift`:
   - Claude's manifest and shim are unchanged byte for byte;
   - Codex's manifest decodes, with `entry` `dist/index.js` and `minFreeBytes` 1073741824;
   - both toolset ids are stable.
-- [ ] T012 In `Daemon-side/Runtimes/RuntimeDiscovery.swift`, make `RuntimeDiscovery.locate` skip the PATH loop and the `executable.contains("/")` branch when `runtime.usesAppCopyOnly`, going from the server toolset straight to `appToolset(for:)`.
-- [ ] T013 [P] Tests in `Tests/Unit/AppToolsetDiscoveryTests.swift`:
+- [X] T012 In `Daemon-side/Runtimes/RuntimeDiscovery.swift`, make `RuntimeDiscovery.locate` skip the PATH loop and the `executable.contains("/")` branch when `runtime.usesAppCopyOnly`, going from the server toolset straight to `appToolset(for:)`.
+- [X] T013 [P] Tests in `Tests/Unit/AppToolsetDiscoveryTests.swift`:
   - a `codex-acp` (and an `npx`) on a search path is ignored for an app-copy-only runtime, and the row reads `.missing`;
   - the app's whole toolset is found;
   - a toolset without `ok` is not.
-- [ ] T014 In `Daemon-side/Runtimes/RuntimeInstaller.swift`, replace `RuntimeInstaller.toolset: MacToolsetInstaller?` with `toolsets: [String: MacToolsetInstaller]`, keyed by runtime id. `recipe(for:)` for `.toolset(runtimeID:)` looks up that id.
-- [ ] T015 In `Daemon-side/Daemon/Daemon.swift`, load every folder under the bundle's `toolsets/` that has a `manifest.json` into that map (the `toolsetsFolder:` parameter). In `Daemon/Sources/main.swift`, pass `Resources/toolsets`, not `Resources/toolsets/claude`. Update tests that pass one folder.
-- [ ] T016 Make `MacToolsetInstaller` runtime-neutral, in `Daemon-side/Runtimes/MacToolsetInstaller.swift`:
+- [X] T014 In `Daemon-side/Runtimes/RuntimeInstaller.swift`, replace `RuntimeInstaller.toolset: MacToolsetInstaller?` with `toolsets: [String: MacToolsetInstaller]`, keyed by runtime id. `recipe(for:)` for `.toolset(runtimeID:)` looks up that id.
+- [X] T015 In `Daemon-side/Daemon/Daemon.swift`, load every folder under the bundle's `toolsets/` that has a `manifest.json` into that map (the `toolsetsFolder:` parameter). In `Daemon/Sources/main.swift`, pass `Resources/toolsets`, not `Resources/toolsets/claude`. Update tests that pass one folder.
+- [X] T016 Make `MacToolsetInstaller` runtime-neutral, in `Daemon-side/Runtimes/MacToolsetInstaller.swift`:
   - take the runtime's display name, and use it in every `Failure.sentence` and progress step ("Installing Codex", "Couldn’t reach the internet to download Codex");
   - write the shim as `bin/<executable>` (T010) and return that path;
   - its `npm ci` must install only the host's `@openai/codex-darwin-*` package (verify with the test below).
-- [ ] T017 [P] Extend `Tests/Unit/MacToolsetInstallerTests.swift` and `Tests/Unit/RuntimeInstallerTests.swift` for a second toolset, with a `file://` Node dist and a tiny fake package:
+- [X] T017 [P] Extend `Tests/Unit/MacToolsetInstallerTests.swift` and `Tests/Unit/RuntimeInstallerTests.swift` for a second toolset, with a `file://` Node dist and a tiny fake package:
   - it installs into `tools/codex/`, and the shim `bin/codex-acp` is executable;
   - Claude's install and wording are unchanged.
 

@@ -2,7 +2,8 @@ import Foundation
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// A Claude toolset for this Mac small enough to install in a test (048).
+/// A toolset for this Mac small enough to install in a test (048): Claude's by default,
+/// or another runtime's (047).
 ///
 /// `dist` is a `file://` stand-in for nodejs.org holding a Node "tarball" whose `npm` lays
 /// down the adapter's folder, or fails the way `FAKE_NPM_FAIL` says. `mac-node.json`
@@ -15,7 +16,8 @@ struct FakeMacToolset {
     static let nodeVersion = "v24.0.0-fake"
     static let architecture = "arm64"
 
-    init(wrongChecksum: Bool = false) throws {
+    init(wrongChecksum: Bool = false, runtimeID: String = "claude",
+         package: String = "@agentclientprotocol/claude-agent-acp") throws {
         let fm = FileManager.default
         root = fm.temporaryDirectory.appendingPathComponent("mac-toolset-\(UUID().uuidString)", isDirectory: true)
         dist = root.appendingPathComponent("dist", isDirectory: true)
@@ -44,7 +46,7 @@ struct FakeMacToolset {
             # path went through a symlink (/tmp, /var on a Mac). Refuse the same way.
             [ "$prefix" = "$(cd "$prefix" && pwd -P)" ] || { echo "npm error code EUSAGE" >&2
                 echo "npm error Missing: lib@ from lock file" >&2; exit 1; }
-            d="$prefix/node_modules/@agentclientprotocol/claude-agent-acp/dist"
+            d="$prefix/node_modules/\(package)/dist"
             mkdir -p "$d" && echo "// fake adapter" > "$d/index.js"
             """)
         let tarball = dist.appendingPathComponent("\(Self.nodeVersion)/\(name).tar.gz")
@@ -52,8 +54,8 @@ struct FakeMacToolset {
         let sha = wrongChecksum ? String(repeating: "0", count: 64) : try MacToolsetInstaller.sha256(of: tarball)
 
         let manifest = Toolset.Manifest(
-            runtimeID: "claude", node: .init(version: Self.nodeVersion, sha256: [:]),
-            package: "@agentclientprotocol/claude-agent-acp", packageVersion: "0.0.0-fake",
+            runtimeID: runtimeID, node: .init(version: Self.nodeVersion, sha256: [:]),
+            package: package, packageVersion: "0.0.0-fake",
             entry: "dist/index.js", minFreeBytes: 1024)
         try JSONEncoder().encode(manifest).write(to: bundle.appendingPathComponent(Toolset.manifestFile))
         try Data(#"{"lockfileVersion":3,"packages":{}}"#.utf8).write(to: bundle.appendingPathComponent(Toolset.lockFile))

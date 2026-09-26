@@ -17,25 +17,32 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     /// The vendor's own instructions. Always there, because an install that fails has to
     /// leave the person somewhere better than an error.
     public var installPage: URL
+    /// Started only from the app's own toolset, never from anything on the person's PATH
+    /// (047, 046). Claude goes through the person's `npx` when there is one; Codex and
+    /// Gemini do not, because what runs has to be the exact pinned lock, and because the
+    /// person's own `codex-acp` or `gemini` on the PATH would otherwise win.
+    public var usesAppCopyOnly: Bool
 
     /// Where a runtime with no page of its own sends people: the protocol's list of agents.
     public static let genericInstallPage = URL(string: "https://agentclientprotocol.com/overview/agents")!
 
     public init(id: String, name: String, executable: String, arguments: [String],
-                install: RuntimeInstall? = nil, installPage: URL? = nil) {
+                install: RuntimeInstall? = nil, installPage: URL? = nil, usesAppCopyOnly: Bool = false) {
         self.id = id
         self.name = name
         self.executable = executable
         self.arguments = arguments
         self.install = install
         self.installPage = installPage ?? Self.genericInstallPage
+        self.usesAppCopyOnly = usesAppCopyOnly
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, executable, arguments, install, installPage
+        case id, name, executable, arguments, install, installPage, usesAppCopyOnly
     }
 
-    /// Lenient about the two recipe fields, which a daemon from before 048 never sends.
+    /// Lenient about the recipe fields, which a daemon from before 048 (or 047, for
+    /// `usesAppCopyOnly`) never sends.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -45,6 +52,7 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         install = try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)
         installPage = (try? c.decodeIfPresent(URL.self, forKey: .installPage))
             ?? RuntimeCatalog.runtime(id: id)?.installPage ?? Self.genericInstallPage
+        usesAppCopyOnly = (try? c.decodeIfPresent(Bool.self, forKey: .usesAppCopyOnly)) ?? false
     }
 }
 
