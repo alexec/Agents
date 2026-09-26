@@ -36,7 +36,7 @@ a pull request's checks and then carry on.
 
 3. Check that it is waiting. Above the prompt, the chat shows a capsule such as
    **◷ Waiting for pull_request.checks_passed #41 · since 14:02 · until 18:00**. On the
-   project page, the agent is under **Blocked** with the same line under its report.
+   project page, the agent is under **Waiting** with the same line under its report.
 
 4. Leave it. When the checks pass, the agent is started again with a message saying what
    happened and when, and it carries on with the release notes. If the time limit passes
@@ -84,5 +84,5 @@ The publishing agent is told who it woke. A workflow can start on the same event
 ## See also
 
 - [Events](../reference/events.md), for every name and its details
-- [Statuses and groups](../reference/statuses.md), for **Blocked**
+- [Statuses and groups](../reference/statuses.md), for **Waiting** and **Blocked**
 - [Set up a workflow](set-up-a-workflow.md), to start a new agent when something happens

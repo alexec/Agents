@@ -7,8 +7,12 @@ import Foundation
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case needsAttention
-    /// Its turn ended waiting on something other than the person (039).
+    /// Its turn ended blocked on something the app cannot watch, so only the person can
+    /// clear it (039).
     case blocked
+    /// Waiting on something the app watches — agents, a time, events — and will carry
+    /// on by itself when it comes. Nobody has to do anything.
+    case waiting
     case running
     case finished
     case stopped
@@ -21,6 +25,7 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         switch self {
         case .needsAttention: return "Needs attention"
         case .blocked: return "Blocked"
+        case .waiting: return "Waiting"
         case .running: return "Working"
         case .finished: return "Complete"
         case .stopped: return "Stopped"
@@ -31,11 +36,12 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
 
     /// The ones the panel shows when they have anybody in them, in the order it shows
     /// them. `archived` is not here because it is only drawn when the user asks for it.
-    /// Blocked sits under Needs attention and above Working: nearer the top than
-    /// Working, because it is waiting, but below the one group that wants you (039).
+    /// Blocked sits under Needs attention, because only the person can clear it, and
+    /// Waiting under Blocked and above Working: nearer the top than Working, because it
+    /// is waiting, but below the two that need you to act (039).
     /// Parked is last, below Stopped, so every window draws its heading in the same
     /// place (040).
-    public static let live: [AgentGroup] = [.needsAttention, .blocked, .running, .finished, .stopped, .parked]
+    public static let live: [AgentGroup] = [.needsAttention, .blocked, .waiting, .running, .finished, .stopped, .parked]
 
     /// One state in, exactly one group out.
     ///
@@ -91,9 +97,10 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// answers ends `finished` with the flag still up, which is the unaccounted ending
     /// 014 already draws (FR-017).
     ///
-    /// A blocked report (039) is the one report that is neither: nobody has to act,
-    /// and the work is not settled. It gets Blocked, under the same arms — settled, or
-    /// answering the app — and loses to anything that wants a person.
+    /// A blocked report (039) is the one report that is neither settled nor, quite, a
+    /// person's: it gets Waiting when the app will resume it by itself and Blocked when
+    /// nothing will but the person, under the same arms — settled, or answering the
+    /// app — and loses to anything that wants a person.
     ///
     /// `parked` is the person saying "later" (040). It outranks every ending and every
     /// arm above, because the person has seen the chat and chosen not to look at it now
@@ -106,8 +113,9 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// Still total over `(AgentState, Bool, WorkReport?, Bool, Bool)`, so an agent is in
     /// exactly one group and never in none.
     ///
-    /// `waitingOnEvents` is an open wait on events (042): Blocked like a block, and under
-    /// the same arms — settled, and outranked by wanting a person.
+    /// `waitingOnEvents` is an open wait on events (042): Waiting, since an event is
+    /// something the app watches, and under the same arms — settled, and outranked by
+    /// wanting a person.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
                 parked: Bool, waitingOnEvents: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
@@ -131,14 +139,17 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// Where a settled agent goes: Needs attention if somebody has to act, Blocked if
-    /// it is waiting on something that is not a person (039), and Complete otherwise.
-    /// Wanting a person outranks being blocked — an agent that asked to be looked at is
-    /// asking you, whatever else it is waiting on.
+    /// Where a settled agent goes: Needs attention if somebody has to act, Waiting if
+    /// the app will carry it on by itself, Blocked if it is blocked on something only
+    /// the person can clear (039), and Complete otherwise. Wanting a person outranks
+    /// both — an agent that asked to be looked at is asking you, whatever else it is
+    /// waiting on — and waiting outranks blocked, because something is still coming
+    /// that will wake it.
     private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?,
                                 waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
-        if report?.isOpenBlock == true || waitingOnEvents { return .blocked }
+        if report?.resumesByItself == true || waitingOnEvents { return .waiting }
+        if report?.isOpenBlock == true { return .blocked }
         return .finished
     }
 }
@@ -204,6 +215,12 @@ public extension Agent {
     /// the person the same way, because to them they are the same news.
     var needsAPerson: Bool {
         state == .waitingOnUser || (state == .finished && report?.outcome.needsAPerson == true)
+    }
+
+    /// Whether the app will carry this agent on by itself: an open wait on events, or a
+    /// block naming agents or a time. What tells Waiting from Blocked.
+    var isWaiting: Bool {
+        eventWait?.isOpen == true || report?.resumesByItself == true
     }
 
     /// Whether the person has looked at this conversation since its report landed.

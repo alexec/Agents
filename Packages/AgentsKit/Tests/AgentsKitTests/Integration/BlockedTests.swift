@@ -122,8 +122,8 @@ struct BlockedTests {
 
         let note = try await finish(core, leadToken, "blocked", "Waiting on both helpers.",
                                     waitingOn: [first.uuidString, "update the tests"])
-        #expect(note.contains("Blocked"))
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .blocked)
+        #expect(note.contains("under \"Waiting\""))
+        #expect(await core.agent(lead)?.group(wantsEyes: false) == .waiting)
         try await finish(core, firstToken, "done", "Ported.")
         firstGate.open()
 
@@ -364,6 +364,7 @@ struct BlockedTests {
         await settled(core, lead)
         let note = try await finish(core, leadToken, "blocked", "Waiting on a review.")
         #expect(note.contains("until the person carries you on"))
+        #expect(note.contains("under \"Blocked\""))
         await core.tickWorkflows(now: Date().addingTimeInterval(86_400 * 2))
         try await quiet()
         #expect(try await resumes(core, lead).isEmpty)

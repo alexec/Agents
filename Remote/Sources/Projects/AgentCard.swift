@@ -24,6 +24,7 @@ struct AgentCard: View {
             HStack(alignment: .top, spacing: 12) {
                 StatusIcon(state: agent.state, isComingBack: isComingBack,
                            outcome: agent.report?.outcome,
+                           isWaiting: agent.isWaiting,
                            isParked: agent.parking?.isParked == true)
                     .padding(.top, 1)
 
@@ -132,6 +133,7 @@ struct AgentCard: View {
         var words = isComingBack
             ? AgentsModel.comingBackDescription
             : StatusIcon.words(for: agent.state, outcome: agent.report?.outcome,
+                               isWaiting: agent.isWaiting,
                                isUnaccountedFor: agent.endingIsUnaccountedFor)
         if agent.state == .stopped, let why = agent.endedReason?.summary { words = why }
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
@@ -150,11 +152,13 @@ struct StatusIcon: View {
     var isComingBack = false
     /// What the agent said about the work, where it said anything.
     var outcome: WorkOutcome?
+    /// The app will carry it on by itself (`Agent.isWaiting`): Waiting, not Blocked.
+    var isWaiting = false
     /// Parked (040): the shape, but not orange. See the Mac's `StatusIcon`.
     var isParked = false
 
     private var shape: StatusShape {
-        StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
+        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack)
     }
 
     var body: some View {
@@ -176,8 +180,11 @@ struct StatusIcon: View {
 
     /// The words a screen reader hears. An outcome's come from `WorkOutcome.heading`,
     /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
-    static func words(for state: AgentState, outcome: WorkOutcome? = nil,
+    static func words(for state: AgentState, outcome: WorkOutcome? = nil, isWaiting: Bool = false,
                       isUnaccountedFor: Bool = false) -> String {
+        if StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: false) == .waiting {
+            return StatusShape.waitingLabel
+        }
         if state == .finished, let outcome { return outcome.heading }
         if state == .finished, isUnaccountedFor { return "Finished without saying how it went" }
         switch state {

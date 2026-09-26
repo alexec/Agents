@@ -27,8 +27,9 @@ They do not all do the same things; [Runtimes](../reference/runtimes.md) lists e
 
 ## It shows which agent needs you
 
-Every agent sits in one group: **Needs attention**, **Blocked**, **Working**,
-**Complete**, **Stopped** or **Parked**. When an agent ends its turn, it says in one
+Every agent sits in one group: **Needs attention**, **Blocked**, **Waiting**,
+**Working**, **Complete**, **Stopped** or **Parked**. **Blocked** waits for you to carry
+it on; **Waiting** carries on by itself. When an agent ends its turn, it says in one
 sentence how it went. You can read the list and know what to open without reading any
 conversation. See [Statuses and groups](../reference/statuses.md).
 

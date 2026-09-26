@@ -56,6 +56,7 @@ struct AgentRow: View {
         HStack(alignment: .top, spacing: 12) {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,
+                       isWaiting: agent.isWaiting,
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
                        isParked: agent.parking?.isParked == true,
@@ -282,6 +283,8 @@ struct StatusIcon: View {
     var isComingBack = false
     /// What the agent said about the work, where it said anything.
     var outcome: WorkOutcome?
+    /// The app will carry it on by itself (`Agent.isWaiting`): Waiting, not Blocked.
+    var isWaiting = false
     /// A turn that ended cleanly, was asked how it went, and still said nothing.
     var isUnaccountedFor = false
     /// Why it stopped, where it did, in `EndedReason`'s words.
@@ -294,7 +297,7 @@ struct StatusIcon: View {
     var isWaitingForAllowance = false
 
     private var shape: StatusShape {
-        StatusShape(state: state, outcome: outcome, isComingBack: isComingBack)
+        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack)
     }
 
     var body: some View {
@@ -327,6 +330,7 @@ struct StatusIcon: View {
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
         if isWaitingForAllowance { return "Waiting for an allowance" }
+        if shape == .waiting { return StatusShape.waitingLabel }
         if let settledOutcome { return settledOutcome.heading }
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
         switch state {
