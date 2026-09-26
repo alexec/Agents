@@ -34,10 +34,10 @@ that come US1 (the MVP), US2, US3, US5, US4, US6 and US7.
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge `main` into `agents/write-spec-spec-only` in this worktree. Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge output. Conflicts should only be in `specs/`.
-- [ ] T002 Record the baseline: run `swift test` in `Pkg/` twice and write down in `specs/051-retire-archived-agents/walk/README.md` which tests fail before any change. The suite is flaky under load, so a later failure is this lane's only if it is new, and only after six runs on both commits.
-- [ ] T003 [P] Capture a fixture of a real-sized archived record: copy one `agent.json` from a scratch Claude agent (not the real store) into `Pkg/Tests/AgentsKitTests/Fixtures/archived-agent.json`, with its `advertisedOptions` and `availableCommands` intact and its title and paths replaced with neutral ones.
-- [ ] T004 [P] Write `scripts/seed-archived.swift`, a `swift` script. Flags: `--root`, `--count N`, `--archived-days-ago D`, `--transcript-bytes B`, `--legacy` (no `archivedAt`), `--live` (state `finished`, not archived), `--project <folder>`. It writes `agents/<id>/agent.json` from the T003 fixture with a fresh id and dates, and a `transcript.jsonl` of B bytes of valid entries. It prints the ids. It refuses any `--root` under `~/Library`.
+- [X] T001 Merge `main` into `agents/write-spec-spec-only` in this worktree. Verify with `git merge-base --is-ancestor main HEAD`, not by trusting the merge output. Conflicts should only be in `specs/`.
+- [X] T002 Record the baseline: run `swift test` in `Pkg/` twice and write down in `specs/051-retire-archived-agents/walk/README.md` which tests fail before any change. The suite is flaky under load, so a later failure is this lane's only if it is new, and only after six runs on both commits.
+- [X] T003 [P] Capture a fixture of a real-sized archived record: copy one `agent.json` from a scratch Claude agent (not the real store) into `Pkg/Tests/AgentsKitTests/Fixtures/archived-agent.json`, with its `advertisedOptions` and `availableCommands` intact and its title and paths replaced with neutral ones.
+- [X] T004 [P] Write `scripts/seed-archived.swift`, a `swift` script. Flags: `--root`, `--count N`, `--archived-days-ago D`, `--transcript-bytes B`, `--legacy` (no `archivedAt`), `--live` (state `finished`, not archived), `--project <folder>`. It writes `agents/<id>/agent.json` from the T003 fixture with a fresh id and dates, and a `transcript.jsonl` of B bytes of valid entries. It prints the ids. It refuses any `--root` under `~/Library`.
 
 ---
 
