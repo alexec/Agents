@@ -66,6 +66,8 @@ struct ChatView: View {
             open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
+            canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
             showEdit: { [frame, states, agent] diff, toolCallID in
                 guard let agent else { return }

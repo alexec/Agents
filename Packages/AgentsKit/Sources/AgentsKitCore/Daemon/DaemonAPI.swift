@@ -109,6 +109,9 @@ public enum DaemonAPI {
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
+        /// A queued prompt sent into the running turn rather than after it, where the
+        /// runtime advertises steering. Takes an `UnqueueRequest`: the same two ids.
+        public static let agentsSendNow = "agents/sendNow"
         /// Files under an agent's folders matching what follows an `@`, found on the
         /// Mac, so a phone can name them too (033).
         public static let filesMention = "files/mention"

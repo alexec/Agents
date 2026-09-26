@@ -1800,6 +1800,14 @@ final class AppModel {
         }
     }
 
+    /// Send a queued prompt into the turn that is running, where the runtime takes one.
+    func sendNow(_ prompt: QueuedPrompt, to agentID: UUID) async {
+        await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSendNow,
+                                       DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        }
+    }
+
     /// What the runtime behind the current agent, or the draft, says it will take.
     /// Nothing is refused on a guess: this is what the runtime advertised.
     var promptCapabilities: ACP.PromptCapabilities {

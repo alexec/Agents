@@ -11,6 +11,7 @@ import SwiftUI
 /// Everything it needs from the app it is told. It reads no model, so both apps can
 /// hand it theirs.
 struct ChatTranscript: View {
+    @Environment(\.chatActions) private var actions
     let agent: Agent
     let items: [TranscriptItem]
     /// Whether there is more of the conversation before the first page in hand.
@@ -60,6 +61,12 @@ struct ChatTranscript: View {
     /// end of something already wholly on screen.
     @State private var canScroll = false
 
+    /// Send now is for a turn that is running, on a runtime that said it takes words
+    /// mid-turn. Starting is not running: there is no turn yet to send them into.
+    private var canSendNow: Bool {
+        (agent.state == .running || agent.state == .waitingOnUser) && actions.canSendNow(agent.runtimeID)
+    }
+
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
@@ -80,7 +87,8 @@ struct ChatTranscript: View {
                     }
                     .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
-                        QueuedPromptRow(prompt: queued, agentID: agent.id)
+                        QueuedPromptRow(prompt: queued, agentID: agent.id,
+                                        canSendNow: canSendNow)
                     }
                     // Live, and so at the foot rather than in the record: the chat
                     // itself says what the row in the list says, and it stops saying
