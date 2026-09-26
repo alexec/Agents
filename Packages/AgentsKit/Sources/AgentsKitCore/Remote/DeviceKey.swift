@@ -29,10 +29,15 @@ public struct DeviceKey: Sendable {
     /// The device's key, made on first use and found in the keychain after that.
     /// `accessGroup` is the shared group on a device and `nil` on a Mac or in a test,
     /// where there is no entitlement to name one.
-    public static func load(account: String = "device-key", accessGroup: String? = nil) throws -> DeviceKey {
+    ///
+    /// `enclave: false` keeps the key in the keychain as a software key even where there is
+    /// a Secure Enclave: the Mac's relay key (046) belongs to a helper with no window, which
+    /// must not lose its key to a locked screen.
+    public static func load(account: String = "device-key", accessGroup: String? = nil,
+                            enclave: Bool = true) throws -> DeviceKey {
         let keychain = Keychain(accessGroup: accessGroup)
         if let stored = try keychain.read(account: account) {
-            if SecureEnclave.isAvailable,
+            if enclave, SecureEnclave.isAvailable,
                let key = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: stored) {
                 return DeviceKey(publicKey: key.publicKey.x963Representation,
                                  holder: .enclave(key))
@@ -42,7 +47,7 @@ public struct DeviceKey: Sendable {
                                  holder: .software(key))
             }
         }
-        let made = try make()
+        let made = enclave ? try make() : ephemeral()
         try keychain.write(made.representation, account: account)
         return made
     }
@@ -83,6 +88,17 @@ public struct DeviceKey: Sendable {
         }
     }
 
+    /// Keep a public key someone else gave this device, beside its own: the Mac's relay
+    /// key, learnt at pairing (046). `nil` forgets it.
+    public static func keepPublicKey(_ key: Data?, account: String, accessGroup: String? = nil) throws {
+        let keychain = Keychain(accessGroup: accessGroup)
+        if let key { try keychain.write(key, account: account) } else { keychain.delete(account: account) }
+    }
+
+    public static func publicKey(account: String, accessGroup: String? = nil) -> Data? {
+        try? Keychain(accessGroup: accessGroup).read(account: account)
+    }
+
     /// The device's keychain, and nothing else: one generic-password item per account.
     struct Keychain {
         var accessGroup: String?
@@ -105,6 +121,10 @@ public struct DeviceKey: Sendable {
             return item as? Data
         }
 
+        func delete(account: String) {
+            SecItemDelete(base(account) as CFDictionary)
+        }
+
         func write(_ data: Data, account: String) throws {
             let query = base(account)
             SecItemDelete(query as CFDictionary)
@@ -118,6 +138,24 @@ public struct DeviceKey: Sendable {
 
     public enum Failure: Error, Sendable {
         case keychain(OSStatus)
+    }
+}
+
+/// The device's key seals and opens relayed frames as itself (046), with whichever half
+/// it holds: the enclave's or the keychain's.
+extension DeviceKey: RelayKey {
+    public func seal(_ plain: Data, to recipient: Data, associatedData: Data) throws -> Data {
+        switch holder {
+        case .enclave(let key): try RelaySealing.seal(plain, to: recipient, associatedData: associatedData, as: key)
+        case .software(let key): try RelaySealing.seal(plain, to: recipient, associatedData: associatedData, as: key)
+        }
+    }
+
+    public func open(_ sealed: Data, from sender: Data, associatedData: Data) throws -> Data {
+        switch holder {
+        case .enclave(let key): try RelaySealing.open(sealed, from: sender, associatedData: associatedData, as: key)
+        case .software(let key): try RelaySealing.open(sealed, from: sender, associatedData: associatedData, as: key)
+        }
     }
 }
 #endif

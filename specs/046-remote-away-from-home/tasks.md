@@ -23,9 +23,9 @@ look phase. US4 builds to that mock.
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge current `main` into `agents/ios-works-when-not`, resolve any conflicts, and confirm both schemes (`Agents`, `Remote`) and `agents-bridge` build with `-skipPackagePluginValidation`, one after another
-- [ ] T002 Record the baseline: three full `swift test --package-path Packages/AgentsKit` runs on this merge, listing the failures that are main's own flakes, in `specs/046-remote-away-from-home/walk/baseline.md`
-- [ ] T003 [P] Create the empty folder `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/`, with every file in it under `#if canImport(CloudKit)` (and `canImport(CryptoKit)` where it seals), so the Linux `agentsd` build is untouched. Check with the Linux gate build 037 uses
+- [X] T001 Merge current `main` into `agents/ios-works-when-not`, resolve any conflicts, and confirm both schemes (`Agents`, `Remote`) and `agents-bridge` build with `-skipPackagePluginValidation`, one after another
+- [X] T002 Record the baseline: three full `swift test --package-path Packages/AgentsKit` runs on this merge, listing the failures that are main's own flakes, in `specs/046-remote-away-from-home/walk/baseline.md`
+- [X] T003 [P] Create the empty folder `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/`, with every file in it under `#if canImport(CloudKit)` (and `canImport(CryptoKit)` where it seals), so the Linux `agentsd` build is untouched. Check with the Linux gate build 037 uses
 
 ---
 
@@ -42,23 +42,23 @@ pairing that every relayed frame needs (US5's pairing half lives here because no
 
 ### Frames and sealing
 
-- [ ] T007 [P] Write `Frame` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/Frame.swift`: `session: UUID`, `direction: .toMac | .toDevice`, `seq: Int64`, `lines: [String]`, `end: Bool`. Add `seal(to recipient: Data, from sender: some HPKEDiffieHellmanPrivateKey) -> Data` and `open(_:with: some HPKEDiffieHellmanPrivateKey, from senderPublic: Data, session:direction:seq:)`, exactly per contracts/relay.md § Sealing: info `"com.alexecollins.agents.relay.v1"`, aad = session(16) ‖ direction(1 byte: 0 toMac, 1 toDevice) ‖ seq(8, big-endian), plain = zlib(JSON {lines, end}), sealed = encapsulatedKey(65) ‖ ciphertext. Reuse `Envelope.suite`
-- [ ] T008 [P] Write `FrameSealingTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FrameSealingTests.swift`: a round trip; the wrong recipient key fails; the wrong claimed sender fails; a changed `seq`, `session` or `direction` fails; the sealed bytes contain none of the plaintext lines (SC-005); compression shrinks a 1 MB `agents/list`-shaped JSON
-- [ ] T009 [P] Write `FrameOrder` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/FrameOrder.swift`: `accept(_ frame) -> [Frame]` returns frames in `seq` order, drops a `seq` below the next expected one, holds higher ones, and reports `gapExpired` when a held gap is older than **10 s** (injected clock)
-- [ ] T010 [P] Write `FrameOrderTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FrameOrderTests.swift`: in order, reversed, duplicated, gap filled late, gap expiring at 10 s
-- [ ] T011 [P] Write `LineBatcher` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/LineBatcher.swift`: it emits a batch **400 ms** after the first waiting line, or when the waiting lines reach **256 KB**, whichever is first. It has an injected clock and a `flush()`
-- [ ] T012 [P] Write `LineBatcherTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/LineBatcherTests.swift`: one line waits 400 ms; a burst makes one batch; 300 KB splits at 256 KB; flush
+- [X] T007 [P] Write `Frame` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/Frame.swift`: `session: UUID`, `direction: .toMac | .toDevice`, `seq: Int64`, `lines: [String]`, `end: Bool`. Add `seal(to recipient: Data, from sender: some HPKEDiffieHellmanPrivateKey) -> Data` and `open(_:with: some HPKEDiffieHellmanPrivateKey, from senderPublic: Data, session:direction:seq:)`, exactly per contracts/relay.md § Sealing: info `"com.alexecollins.agents.relay.v1"`, aad = session(16) ‖ direction(1 byte: 0 toMac, 1 toDevice) ‖ seq(8, big-endian), plain = zlib(JSON {lines, end}), sealed = encapsulatedKey(65) ‖ ciphertext. Reuse `Envelope.suite`
+- [X] T008 [P] Write `FrameSealingTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FrameSealingTests.swift`: a round trip; the wrong recipient key fails; the wrong claimed sender fails; a changed `seq`, `session` or `direction` fails; the sealed bytes contain none of the plaintext lines (SC-005); compression shrinks a 1 MB `agents/list`-shaped JSON
+- [X] T009 [P] Write `FrameOrder` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/FrameOrder.swift`: `accept(_ frame) -> [Frame]` returns frames in `seq` order, drops a `seq` below the next expected one, holds higher ones, and reports `gapExpired` when a held gap is older than **10 s** (injected clock)
+- [X] T010 [P] Write `FrameOrderTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/FrameOrderTests.swift`: in order, reversed, duplicated, gap filled late, gap expiring at 10 s
+- [X] T011 [P] Write `LineBatcher` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/LineBatcher.swift`: it emits a batch **400 ms** after the first waiting line, or when the waiting lines reach **256 KB**, whichever is first. It has an injected clock and a `flush()`
+- [X] T012 [P] Write `LineBatcherTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/LineBatcherTests.swift`: one line waits 400 ms; a burst makes one batch; 300 KB splits at 256 KB; flush
 
 ### Channel
 
-- [ ] T013 Write the `RelayChannel` protocol and `FakeRelayChannel` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/RelayChannel.swift`. The protocol has `ensureZone(device:)`, `post(device:, record: FrameRecord)`, `fetchChanges(device:) -> [FrameRecord]`, `changedDevices() -> [UUID]`, `delete(device:, names:)`, `deleteZone(device:)` and `sweep(olderThan:)`. `FrameRecord` has the data-model fields (`session`, `direction`, `seq`, `sealed`, `asset` over **700 KB**, `sentAt`; name `<session>/<direction>/<seq>`). The fake can be told to reorder, duplicate, delay, throw a retry-after of N seconds, or report a zone gone
-- [ ] T014 Write `CloudKitRelayChannel` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/CloudKitRelayChannel.swift`, over `CKContainer(identifier: CloudKitMailbox.containerID).privateCloudDatabase`:
+- [X] T013 Write the `RelayChannel` protocol and `FakeRelayChannel` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/RelayChannel.swift`. The protocol has `ensureZone(device:)`, `post(device:, record: FrameRecord)`, `fetchChanges(device:) -> [FrameRecord]`, `changedDevices() -> [UUID]`, `delete(device:, names:)`, `deleteZone(device:)` and `sweep(olderThan:)`. `FrameRecord` has the data-model fields (`session`, `direction`, `seq`, `sealed`, `asset` over **700 KB**, `sentAt`; name `<session>/<direction>/<seq>`). The fake can be told to reorder, duplicate, delay, throw a retry-after of N seconds, or report a zone gone
+- [X] T014 Write `CloudKitRelayChannel` in `Packages/AgentsKit/Sources/AgentsKitCore/Remote/Relay/CloudKitRelayChannel.swift`, over `CKContainer(identifier: CloudKitMailbox.containerID).privateCloudDatabase`:
   - zones are `relay-<UUID uppercase>`, and records are type `Frame`, saved with `savePolicy: .allKeys`;
   - a frame over 700 KB is written to a temp file as a `CKAsset`;
   - changes come from `CKFetchDatabaseChangesOperation` and `CKFetchRecordZoneChangesOperation`, with server change tokens kept in `UserDefaults` scoped by root/device;
   - `CKError.retryAfterSeconds` is surfaced as `RelayChannelError.slowDown(seconds)`, `zoneNotFound`/`userDeletedZone` as `.zoneGone`, and `quotaExceeded` as `.full`;
   - deletes go in batches of ≤ 400.
-- [ ] T015 [P] Write `RelayChannelContractTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RelayChannelContractTests.swift`, pinning `FakeRelayChannel` to the rules the real channel must keep: a same-name post replaces rather than adds; fetch returns only new records; delete; sweep by `sentAt`
+- [X] T015 [P] Write `RelayChannelContractTests` in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/RelayChannelContractTests.swift`, pinning `FakeRelayChannel` to the rules the real channel must keep: a same-name post replaces rather than adds; fetch returns only new records; delete; sweep by `sentAt`
 
 ### The Mac key and pairing (contracts/daemon.md)
 
