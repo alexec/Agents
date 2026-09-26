@@ -1018,7 +1018,7 @@ public actor AppService {
             person's list of agents, marked as started by you. The person can open it, \
             talk to it, stop it or archive it at any time.
 
-            At most three agents started by agents can exist in this project at once, \
+            At most five agents started by agents can exist in this project at once, \
             counting every agent here, and stopped or finished ones still count. \
             Archiving one with archive_agent frees its place. Use list_my_agents to see \
             yours and how many places are in use.

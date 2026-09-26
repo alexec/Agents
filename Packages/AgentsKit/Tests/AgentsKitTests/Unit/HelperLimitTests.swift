@@ -24,8 +24,8 @@ struct HelperLimitTests {
         #expect(HelperLimit.placesInUse(in: root, agents: [inWorktree]) == 0)
     }
 
-    @Test func threeIsTheLimit() {
-        #expect(HelperLimit.perProject == 3)
+    @Test func fiveIsTheLimit() {
+        #expect(HelperLimit.perProject == 5)
     }
 
     @Test func stoppedAndFinishedHelpersStillHoldTheirPlace() {

@@ -129,7 +129,7 @@ struct AgentToolsServiceTests {
     @Test func theStartDescriptionCarriesTheLimits() {
         let description = AppService.startAgentTool["description"]?.stringValue ?? ""
         #expect(description.contains("this project"))
-        #expect(description.contains("three"))
+        #expect(description.contains("five"))
         #expect(description.contains("frees its place"))
         #expect(description.contains("alongside the rest"))
     }

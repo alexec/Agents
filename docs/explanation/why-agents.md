@@ -83,7 +83,7 @@ Each part can be used on its own:
   or on an event, such as an agent finishing or a check failing. It is a file beside your
   code, reviewed like code.
   See [Set up a workflow](../how-to/set-up-a-workflow.md).
-- **Agents that manage agents.** An agent can start up to three others, brief them, wait
+- **Agents that manage agents.** An agent can start up to five others, brief them, wait
   for them and stop them. Each can work in a [worktree](../how-to/start-in-a-worktree.md)
   of its own, so they never edit the same files.
   See [Tools the app gives agents](../reference/agent-tools.md).
