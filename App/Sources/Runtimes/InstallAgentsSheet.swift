@@ -84,6 +84,7 @@ struct RuntimeInstallRow: View {
         case .missing:
             if status.runtime.install != nil {
                 Button("Install") { install() }
+                    .help("Install \(status.runtime.name) on this Mac")
             } else {
                 pageButton
             }
@@ -92,6 +93,7 @@ struct RuntimeInstallRow: View {
                 pageButton
                 if status.runtime.install != nil {
                     Button("Retry") { install() }
+                        .help("Try installing \(status.runtime.name) again")
                 }
             }
         default:

@@ -35,6 +35,9 @@ public struct RuntimeInstaller: RuntimeInstalling {
         self.timeout = timeout
     }
 
+    /// Debug builds only: every vendor script is this URL instead (048's walk).
+    public static let testScriptVariable = "AGENTS_TEST_INSTALL_SCRIPT"
+
     public func recipe(for runtime: Runtime) -> RuntimeInstall? {
         switch runtime.install {
         case .toolset:
@@ -55,7 +58,12 @@ public struct RuntimeInstaller: RuntimeInstalling {
             case .toolset:
                 guard let toolset else { return .installFailed(reason: "The app can’t install \(runtime.name) itself.") }
                 try await toolset.install(progress: progress)
-            case .script(let url, let shell):
+            case .script(var url, let shell):
+                #if DEBUG
+                // A vendor's script installs into the real home folder, however scratch the
+                // daemon's root is: a walk points every one of them at a script of its own.
+                if let override = environment[Self.testScriptVariable].flatMap(URL.init(string:)) { url = override }
+                #endif
                 progress("Running \(url.host() ?? "the vendor")’s installer")
                 try await runScript(url, shell: shell, for: runtime)
             case .npmGlobal(let package):

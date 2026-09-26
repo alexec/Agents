@@ -63,10 +63,14 @@ public struct MacToolsetInstaller: Sendable {
         guard let node = toolset.macNode, let sha = node.sha256[architecture] else { throw Failure.noMacPin }
         let fm = FileManager.default
         let id = toolset.id
+        try fm.createDirectory(at: self.folder, withIntermediateDirectories: true,
+                               attributes: [.posixPermissions: 0o700])
+        // Through any symlink, because npm resolves `--prefix` and then finds no package
+        // called by the folder's name in the lock: `/tmp` is `/private/tmp` on a Mac.
+        // realpath(3), not `resolvingSymlinksInPath`, which puts `/private` back.
+        let folder = Self.realPath(self.folder)
         let finished = folder.appendingPathComponent(id, isDirectory: true)
         if !fm.fileExists(atPath: finished.appendingPathComponent("ok").path) {
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true,
-                                   attributes: [.posixPermissions: 0o700])
             let part = folder.appendingPathComponent(".part-\(id)", isDirectory: true)
             try? fm.removeItem(at: part)
             do {
@@ -179,6 +183,12 @@ public struct MacToolsetInstaller: Sendable {
         }
     }
 
+    static func realPath(_ url: URL) -> URL {
+        guard let resolved = realpath(url.path, nil) else { return url }
+        defer { free(resolved) }
+        return URL(filePath: String(cString: resolved), directoryHint: .isDirectory)
+    }
+
     static func sha256(of file: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: file)
         defer { try? handle.close() }
@@ -191,7 +201,7 @@ public struct MacToolsetInstaller: Sendable {
 
     /// The same reading of npm's output as `ToolsetInstaller.problem`'s exit 23.
     static func npmProblem(_ output: String) -> Failure {
-        let last = InstallStep.Outcome(status: 1, timedOut: false, output: output).lastLine
+        let last = npmReason(output)
         if output.contains("No space left on device") || output.contains("ENOSPC") { return .noSpace }
         if output.contains("EINTEGRITY") { return .checksum }
         if output.contains("ENOTFOUND") || output.contains("EAI_AGAIN") || output.contains("ECONNREFUSED")
@@ -199,6 +209,23 @@ public struct MacToolsetInstaller: Sendable {
             return .noInternet(last)
         }
         return .npm(last)
+    }
+
+    /// What npm said was wrong: the line after its `code`, without the `npm error` it
+    /// starts every line with, and never the "complete log" line it ends on.
+    static func npmReason(_ output: String) -> String {
+        let lines = output.split(whereSeparator: \.isNewline).map { line -> String in
+            var text = line.trimmingCharacters(in: .whitespaces)
+            for prefix in ["npm error", "npm ERR!"] where text.hasPrefix(prefix) {
+                text = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+            }
+            return text
+        }
+        .filter { !$0.isEmpty && !$0.hasPrefix("A complete log of this run") }
+        if let code = lines.firstIndex(where: { $0.hasPrefix("code ") }), code + 1 < lines.count {
+            return lines[code + 1]
+        }
+        return lines.last ?? ""
     }
 
     private static func problem(_ output: String, else fallback: Failure) -> Failure {

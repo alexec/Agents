@@ -23,9 +23,10 @@ public enum LoginShellPath {
         if let cached = cache.value { return cached }
         #if DEBUG
         // A scratch run that needs every agent to look missing (048's walk) points this at
-        // an empty folder. Debug builds only: a shipped app searches where the shell does.
+        // an empty folder. The system's own folders stay, as they would on any PATH: none
+        // holds an agent, and the toolset's shim needs `dirname`. Debug builds only.
         if let override = ProcessInfo.processInfo.environment[testSearchPathsVariable] {
-            let directories = override.split(separator: ":").map(String.init)
+            let directories = override.split(separator: ":").map(String.init) + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
             cache.value = directories
             return directories
         }

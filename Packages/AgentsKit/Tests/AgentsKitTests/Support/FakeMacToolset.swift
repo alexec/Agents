@@ -35,10 +35,15 @@ struct FakeMacToolset {
             case "$FAKE_NPM_FAIL" in
                 "") ;;
                 integrity) echo "npm ERR! code EINTEGRITY" >&2; exit 1 ;;
-                *) echo "npm ERR! code E500" >&2
-                   echo "npm ERR! the registry said no" >&2; exit 1 ;;
+                *) echo "npm error code E500" >&2
+                   echo "npm error the registry said no" >&2
+                   echo "npm error A complete log of this run can be found in: /x.log" >&2; exit 1 ;;
             esac
             [ -f "$prefix/package-lock.json" ] || { echo "no lock in $prefix" >&2; exit 1; }
+            # Real npm resolves the prefix and then misses the lock's root package when the
+            # path went through a symlink (/tmp, /var on a Mac). Refuse the same way.
+            [ "$prefix" = "$(cd "$prefix" && pwd -P)" ] || { echo "npm error code EUSAGE" >&2
+                echo "npm error Missing: lib@ from lock file" >&2; exit 1; }
             d="$prefix/node_modules/@agentclientprotocol/claude-agent-acp/dist"
             mkdir -p "$d" && echo "// fake adapter" > "$d/index.js"
             """)

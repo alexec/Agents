@@ -40,7 +40,7 @@ struct MacToolsetInstallerTests {
     @Test func npmFailingSaysWhatNpmSaid() async throws {
         let fake = try FakeMacToolset()
         defer { fake.remove() }
-        await #expect(throws: MacToolsetInstaller.Failure.npm("npm ERR! the registry said no")) {
+        await #expect(throws: MacToolsetInstaller.Failure.npm("the registry said no")) {
             try await fake.installer(npmFail: "registry").install()
         }
         await #expect(throws: MacToolsetInstaller.Failure.checksum) {

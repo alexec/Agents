@@ -225,6 +225,7 @@ private struct EmptyProjectList: View {
                     .appText(.reading).fontWeight(.semibold)
                 Text("Agents runs the coding CLIs on this Mac. Install one here, or from its own page.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 ForEach(model.runtimes) { status in
                     RuntimeMissingLine(status: status)
                 }
