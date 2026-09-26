@@ -53,7 +53,7 @@ asks.
 Gemini works the same way, with a Gemini API key instead of a token.
 
 1. Get a key at aistudio.google.com/apikey.
-2. Paste it under **Gemini** in **Settings ▸ Agents** or under **Runtime credentials** in
+2. Paste it under **Gemini** in **Settings ▸ Agent Runtimes** or under **Runtime credentials** in
    **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
 
 With a key saved, Agents installs Gemini on a server as it connects, and each server's

@@ -223,7 +223,7 @@ struct RuntimeInstallDispatchTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let error = try #require(await startGemini(core, in: root))
         #expect(error.code == DaemonAPI.Failure.runtimeNotFound)
-        #expect(error.message == "Gemini isn’t on this Mac. Install it from Settings ▸ Agents.")
+        #expect(error.message == "Gemini isn’t on this Mac. Install it from Settings ▸ Agent Runtimes.")
     }
 
     @Test func startingOneBeingInstalledSaysSo() async throws {

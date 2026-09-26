@@ -259,7 +259,7 @@ struct LendTests {
         } else {
             guard case .failure(let error) = result else { Issue.record("started with no key"); return }
             #expect(error.code == DaemonAPI.Failure.credentialWanted)
-            #expect(error.message == "Gemini needs an API key. Add one in Settings ▸ Agents.")
+            #expect(error.message == "Gemini needs an API key. Add one in Settings ▸ Agent Runtimes.")
             #expect(wanted(result)?.runtime == "gemini")
         }
     }
