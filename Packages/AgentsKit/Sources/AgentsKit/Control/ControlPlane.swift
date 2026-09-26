@@ -57,10 +57,40 @@ public final class ControlPlane: @unchecked Sendable {
         self.methods = methods
         self.router = ControlRouter(handler: methods, knownHosts: store.loadHosts().map(\.id),
                                     homeHost: settings.homeHost)
+        self.name = settings.name
+        #if canImport(Network) && canImport(CryptoKit)
+        if let port {
+            do {
+                net = try ControlNet(root: root, port: UInt16(clamping: port),
+                                     advertise: ProcessInfo.processInfo.environment["AGENTS_CONTROL_NO_BONJOUR"] == nil)
+            } catch {
+                DaemonLog.shared.write("control: no key, so nothing can connect over the network: \(error)")
+            }
+        }
+        #endif
     }
+
+    private let name: String
+    #if canImport(Network) && canImport(CryptoKit)
+    /// The control plane on the network, when it was given a port.
+    public private(set) var net: ControlNet?
+    #endif
 
     public func start() async throws {
         await methods.attach(router)
+        #if canImport(Network) && canImport(CryptoKit)
+        if let net {
+            await net.attach(methods: methods, plane: self)
+            let name = self.name
+            await methods.setHooks(ControlMethods.Hooks(
+                startPairing: { grant in try JSONValue.encoding(await net.startCode(.client(grant), name: name)) },
+                stopPairing: { await net.stopCodes() },
+                startEnroll: { try JSONValue.encoding(await net.startCode(.host, name: name)) },
+                clientsChanged: { _ in await net.relisten() },
+                hostsChanged: { await net.relisten() }))
+            await net.start()
+        }
+        #endif
         let roles = RolePolicy.forControl(root: root)
         DaemonLog.shared.write("control: \(roles.summary)")
         let clients = UnixSocketListener(url: Self.clientSocket(root: root), roles: roles) { [weak self] transport, role, peer in
@@ -100,12 +130,19 @@ public final class ControlPlane: @unchecked Sendable {
             transport.close()
             return
         }
+        await hostArrived(transport, as: nil)
+    }
+
+    /// A host's uplink, from the local socket (which host it is, it says) or from the
+    /// network (its key has said already, and `known` is that host: what it says is
+    /// not heard).
+    func hostArrived(_ transport: any LineTransport, as known: HostID?) async {
         let rest = Remainder(transport)
         guard let first = await rest.first(),
               case .message(0, let message)? = try? ControlWire.readHost(first),
               case .request(let id, DaemonAPI.Method.hostHello, let params)? = try? JSONRPCCodec.decode(line: message),
               let hello = try? params?.decode(DaemonAPI.HostHello.self),
-              let host = hello.host, ControlWire.isHostID(host.rawValue) else {
+              let host = known ?? hello.host, ControlWire.isHostID(host.rawValue) else {
             DaemonLog.shared.write("control: a host connected without saying which it is; closing it")
             transport.close()
             return

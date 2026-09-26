@@ -21,6 +21,8 @@ public actor ControlMethods: ControlHandling {
         public var need: @Sendable (HostID, JSONValue?) async -> Void
         /// A client was forgotten: its key must stop working on every listener.
         public var clientsChanged: @Sendable ([ClientRecord]) async -> Void
+        /// A host enrolled or removed: its key starts or stops working.
+        public var hostsChanged: @Sendable () async -> Void
 
         public init(startPairing: @escaping @Sendable (Grant) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -29,7 +31,9 @@ public actor ControlMethods: ControlHandling {
                     update: @escaping @Sendable (HostID) async throws -> Void = { _ in throw ControlMethods.notHere },
                     checkAgain: @escaping @Sendable (HostID) async throws -> Void = { _ in },
                     need: @escaping @Sendable (HostID, JSONValue?) async -> Void = { _, _ in },
-                    clientsChanged: @escaping @Sendable ([ClientRecord]) async -> Void = { _ in }) {
+                    clientsChanged: @escaping @Sendable ([ClientRecord]) async -> Void = { _ in },
+                    hostsChanged: @escaping @Sendable () async -> Void = {}) {
+            self.hostsChanged = hostsChanged
             self.startPairing = startPairing
             self.stopPairing = stopPairing
             self.startEnroll = startEnroll
@@ -46,7 +50,7 @@ public actor ControlMethods: ControlHandling {
 
     private let store: GrantStore
     private let version: String
-    private let hooks: Hooks
+    private var hooks: Hooks
     private var settings: ControlSettings
     private var clients: [ClientRecord]
     private var hosts: [HostID: HostRecord]
@@ -70,8 +74,13 @@ public actor ControlMethods: ControlHandling {
 
     public func attach(_ router: ControlRouter) { self.router = router }
 
+    /// The executable's part, handed in once it exists (the network listener needs the
+    /// records, and the records need the listener's hooks).
+    public func setHooks(_ hooks: Hooks) { self.hooks = hooks }
+
     public var knownHosts: [HostID] { Array(hosts.keys) }
     public var allClients: [ClientRecord] { clients }
+    public var allHosts: [HostRecord] { Array(hosts.values) }
     public func client(_ id: UUID) -> ClientRecord? { clients.first { $0.id == id } }
     public func host(_ id: HostID) -> HostRecord? { hosts[id] }
     public var controlSettings: ControlSettings { settings }
@@ -192,6 +201,7 @@ public actor ControlMethods: ControlHandling {
             }
             try store.saveHosts(Array(hosts.values))
             await router?.forgetHost(request.host)
+            await hooks.hostsChanged()
             return [:]
         default:
             throw JSONRPCError.methodNotFound(method)
