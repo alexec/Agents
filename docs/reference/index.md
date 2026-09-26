@@ -18,4 +18,6 @@ something up, not for reading through.
   need.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
+- [Events](events.md): everything the app records, for waits, workflow triggers and the
+  Events page.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.

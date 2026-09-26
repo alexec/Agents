@@ -32,6 +32,13 @@ struct ChatView: View {
                                 OfflineStrip(host: agent.host)
                                 actions(for: agent)
                             }
+                            // On the page's own paper, across the whole pane: the
+                            // transcript scrolls under this strip, and without a ground
+                            // of its own its words showed through between the buttons.
+                            // Kept to the strip's own bounds: a colour's background fills
+                            // the safe area too by default, which here is the transcript.
+                            .frame(maxWidth: .infinity)
+                            .background(Paper.ground, ignoresSafeAreaEdges: [])
                         }
                     form
                 }
@@ -86,7 +93,6 @@ struct ChatView: View {
                 Spacer(minLength: 0)
                 // Beside Archive, and unlike it the page stays: someone who stops a chat
                 // that has gone the wrong way wants to keep reading it and say what next.
-                // ⌘. lives on the button, so it exists exactly when the button does.
                 // A blocked chat (039): what the card's Carry on does, where the chat's
                 // own controls are.
                 if model.isBlocked(agent) {
@@ -107,8 +113,9 @@ struct ChatView: View {
                     }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                    .keyboardShortcut(".", modifiers: .command)
-                    .help("Stop this agent and stay on the chat")
+                    // ⌘. is Session ▸ Stop, in the menu bar, so it works whether or not
+                    // this button is on screen.
+                    .help("Stop this agent and stay on the chat (⌘.)")
                 }
                 // Between Stop and Archive (040). Park goes back to the project, as
                 // Archive does: the person has said they are done with it for now.

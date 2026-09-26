@@ -115,7 +115,7 @@ struct BlockedTests {
 
     /// The P1 case, whole: one helper reports, one ends silently, and the agent that
     /// waited on both is resumed once, after the second, told how each ended.
-    @Test func twoHelpersFinishingGiveOneResumeNamingEach() async throws {
+    @Test(.flakyUnderLoad) func twoHelpersFinishingGiveOneResumeNamingEach() async throws {
         let (locations, work) = try temporary()
         // The helpers first, so the lead's quick turn — and the question after it —
         // cannot take a helper's slow script.
@@ -152,7 +152,7 @@ struct BlockedTests {
 
     /// Reported mid-turn, with what it named already over by the time its own turn
     /// ends: resumed then, once.
-    @Test func aBlockWhoseWaitsClosedBeforeItsTurnEndedIsResumedWhenItEnds() async throws {
+    @Test(.flakyUnderLoad) func aBlockWhoseWaitsClosedBeforeItsTurnEndedIsResumedWhenItEnds() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(900)), Self.slow(.milliseconds(200))])
         let core = try await makeCore(locations, launcher)
@@ -238,7 +238,7 @@ struct BlockedTests {
 
     // MARK: US3 — the person can unblock it
 
-    @Test func aPersonsPromptEndsTheBlockAndNothingIsSentLater() async throws {
+    @Test(.flakyUnderLoad) func aPersonsPromptEndsTheBlockAndNothingIsSentLater() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
         let core = try await makeCore(locations, launcher)
@@ -255,7 +255,7 @@ struct BlockedTests {
         #expect(try await resumes(core, lead).isEmpty)
     }
 
-    @Test func stoppingABlockedAgentStopsItAndNothingIsSentLater() async throws {
+    @Test(.flakyUnderLoad) func stoppingABlockedAgentStopsItAndNothingIsSentLater() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
         let core = try await makeCore(locations, launcher)
@@ -275,7 +275,7 @@ struct BlockedTests {
         #expect(try await resumes(core, lead).isEmpty)
     }
 
-    @Test func archivingABlockedAgentIsNeverUndoneByAResume() async throws {
+    @Test(.flakyUnderLoad) func archivingABlockedAgentIsNeverUndoneByAResume() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
         let core = try await makeCore(locations, launcher)

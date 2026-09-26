@@ -41,14 +41,35 @@ Check the build and say whether it is green.
 | `on:` `pull-request-checks-failed` | No settings | Runs when checks fail on one of your open pull requests in this project's GitHub repository. |
 | `on:` `pull-request-review-comments` | No settings | Runs when one of your open pull requests gets review comments from someone with write access to the repository. |
 | `on:` `pull-request-conflicts` | No settings | Runs when one of your open pull requests conflicts with its base branch. |
+| `on:` an event name, such as `pull_request.merged` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `pull_request.*`, for all of its events. Under the name, list details to narrow it, such as `number: 41`; a detail the event does not carry is an error in the file. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
-| `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. A schedule has no such agent, so it does not run. |
+| `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
 | `permission-mode:` | One of the runtime's own modes, such as a read-only or plan mode | The mode the agent runs in. A workflow runs with nobody watching, so this is how to say it must not change anything. |
 | `runtime:` | `claude`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. |
 | `model:` | One of the runtime's models | The model the agent uses. Without it, the runtime's own default. |
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
+
+For example, to start a new agent whenever pull request 41 is merged, or another agent
+publishes `custom.build_green`:
+
+```markdown
+---
+name: After the build
+on:
+  - pull_request.merged:
+      number: 41
+  - custom.build_green
+agent: new
+---
+
+Deploy the docs, then say what you deployed.
+```
+
+The older hyphenated names still work, and each answers to the events listed under
+[Older trigger names](events.md#older-trigger-names). On a workflow's page, its latest run
+shows the event that caused it, with a link to it on the Events page.
 
 A setting the runtime does not offer stops the workflow running, rather than falling back
 to a default. The workflow's page shows which values the runtime offers once it has been
@@ -58,6 +79,11 @@ A workflow does not run, and its page says why, when:
 
 - a run of it is still going;
 - it is archived;
+- its file is new, or has changed since you approved it, and you have not approved it.
+  Its row and page say **waiting for your OK** and offer **Approve**. Approval is of the
+  file as you saw it: a file that changes afterwards waits again. Changes made on the
+  workflow's page in Agents count as approved unless the workflow was already waiting,
+  and workflows that existed before this version were approved as they stood;
 - it is not one of the first three workflows in its project that are not archived, taken
   in order of file name, or not one of the first ten of those across every project.
   Archiving one makes room;
@@ -74,8 +100,9 @@ A workflow does not run, and its page says why, when:
 
 Pull requests are checked every five minutes.
 
-On the Mac, each workflow on the project page has **Open**, **Run now**, **Archive**
-(**Restore** once archived) and **Show in Finder**.
+On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
+while it is waiting for your OK), **Archive** (**Restore** once archived) and **Show in
+Finder**.
 
 ## See also
 

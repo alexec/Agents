@@ -148,14 +148,22 @@ struct WorkflowPage: View {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paperProminent)
             } else {
-                // Offered even on a workflow that cannot fire on its own. Being able to
-                // try one is what makes writing one worth doing, and a refusal says why
-                // rather than nothing happening.
-                Button(summary.isRunning ? "Running…" : "Run now") {
-                    Task { await model.runWorkflow(summary) }
+                if summary.awaitingApproval != nil {
+                    // This page is where the file is read, so this is where approving it
+                    // means most. Run now comes back once it is approved.
+                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                        .buttonStyle(.paperProminent)
+                        .help("Let this workflow run as its file now reads")
+                } else {
+                    // Offered even on a workflow that cannot fire on its own. Being able to
+                    // try one is what makes writing one worth doing, and a refusal says why
+                    // rather than nothing happening.
+                    Button(summary.isRunning ? "Running…" : "Run now") {
+                        Task { await model.runWorkflow(summary) }
+                    }
+                    .buttonStyle(.paperProminent)
+                    .disabled(summary.isRunning)
                 }
-                .buttonStyle(.paperProminent)
-                .disabled(summary.isRunning)
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.
@@ -530,6 +538,11 @@ struct WorkflowPage: View {
         var parts: [String] = []
         if summary.isArchived {
             parts.append("Archived — it will not run until it is restored")
+        } else if let waiting = summary.awaitingApproval {
+            // What waits on the person is the file, and it is on this page to be read.
+            parts.append((waiting.isNew ? "New" : "Changed since you approved it")
+                         + " — read it below, then Approve to let it run")
+            return parts.joined()
         } else if let limit = summary.overLimit {
             parts.append("\(limit.sentence). \(limit.remedy)")
         } else if let next = summary.nextFireAt {

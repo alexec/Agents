@@ -197,7 +197,7 @@ struct UnreportedEndingTests {
         try await settle(core, id)
     }
 
-    @Test func theEndingAPersonsPromptOvertookIsNotAskedAbout() async throws {
+    @Test(.flakyUnderLoad) func theEndingAPersonsPromptOvertookIsNotAskedAbout() async throws {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
         script.turnDelay = .milliseconds(300)

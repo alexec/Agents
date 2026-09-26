@@ -64,7 +64,11 @@ struct WorkflowRow: View {
             if summary.isArchived {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
-                Button("Run now") { Task { await model.runWorkflow(summary) } }
+                if summary.awaitingApproval != nil {
+                    Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                } else {
+                    Button("Run now") { Task { await model.runWorkflow(summary) } }
+                }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
             Divider()
@@ -158,6 +162,13 @@ struct WorkflowRow: View {
                 Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paper)
                     .appText(.fine)
+            } else if summary.awaitingApproval != nil {
+                // The one thing to do with a file nobody has looked at. Open it first —
+                // the row itself opens it — and approve what you read.
+                Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help("Let this workflow run as its file now reads")
             } else {
                 if summary.isRunning {
                     Text("Running…")
@@ -181,7 +192,7 @@ struct WorkflowRow: View {
     }
 
     private var nextText: String? {
-        guard !summary.isArchived, summary.overLimit == nil else { return nil }
+        guard !summary.isArchived, summary.overLimit == nil, summary.awaitingApproval == nil else { return nil }
         if let next = summary.nextFireAt {
             return "Next \(next.formatted(.relative(presentation: .named)))"
         }
@@ -210,6 +221,11 @@ struct WorkflowRow: View {
     /// instead, because it is the more useful fact about it.
     private var outcomeText: String? {
         if summary.isArchived { return "Archived — it will not run" }
+        // Ahead of everything else: nothing about it matters until somebody has read it.
+        if let waiting = summary.awaitingApproval {
+            // The mode it would run in is on the line above, where every row says it.
+            return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK"
+        }
         // Ahead of the pause, because unpausing it would change nothing: what has to
         // happen is that something else goes.
         if let limit = summary.overLimit {
@@ -240,6 +256,7 @@ private struct WorkflowStatusIcon: View {
 
     private var name: String {
         if summary.isArchived { return "archivebox" }
+        if summary.awaitingApproval != nil { return "hand.raised" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
         if !summary.workflow.canFire { return "circle.dashed" }
@@ -248,6 +265,7 @@ private struct WorkflowStatusIcon: View {
 
     private var label: String {
         if summary.isArchived { return "Archived" }
+        if summary.awaitingApproval != nil { return "Waiting for your OK" }
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }
         if summary.isRunning { return "Running" }

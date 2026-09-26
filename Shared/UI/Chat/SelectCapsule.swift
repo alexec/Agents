@@ -61,6 +61,8 @@ struct SelectCapsule<Content: View>: View {
 struct BooleanCapsule: View {
     let name: String
     let isOn: Bool
+    /// "Fast mode: On" rather than a mark alone, where there is room to say it.
+    var saysState = false
     let set: (Bool) -> Void
 
     var body: some View {
@@ -72,7 +74,7 @@ struct BooleanCapsule: View {
                     // Decorative: a glyph in a capsule, not text (FR-015).
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                Text(name)
+                Text(saysState ? "\(name): \(isOn ? "On" : "Off")" : name)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, TouchTarget.capsuleVertical)
