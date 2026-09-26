@@ -260,6 +260,14 @@ public enum ToolPolicyCatalog {
     /// takes the tool out of the model's list, not only refuses it: measured on a real
     /// turn, `invoke_agent` is listed without the file and gone with it (R13). So nothing
     /// here is residue.
+    ///
+    /// Beside it, system defaults named by `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, the one
+    /// settings file below the person's own: Gemini reads `GEMINI.md` and, from these,
+    /// `AGENTS.md` too — the project's, and `~/.gemini/AGENTS.md`, which links to
+    /// `~/.agents/AGENTS.md` (054). `GEMINI.md` stays first because Gemini's memory tool
+    /// writes to the first name, and it must not append to the file every agent shares. A
+    /// `context.fileName` of the person's own replaces this one, as it should. Read off
+    /// Gemini CLI 0.61.0's code (`getAllGeminiMdFilenames`, `getGlobalMemoryPaths`).
     public static let gemini: ToolPolicy = {
         let removed = [
             RemovedTool(name: "invoke_agent", category: .agents),
@@ -277,6 +285,8 @@ public enum ToolPolicyCatalog {
             environmentFiles: [
                 EnvironmentFile(name: "gemini-policy.toml", contents: geminiPolicy(removing: removed),
                                 argument: "--policy"),
+                EnvironmentFile(name: "gemini-system-defaults.json", contents: geminiSystemDefaults,
+                                variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"),
             ],
             readsFilesItself: true,
             authMethodBeforeContinuing: "gemini-api-key")
@@ -285,6 +295,16 @@ public enum ToolPolicyCatalog {
     // `ask_user` out of its tool list (`if (!interactive || isAcpMode)
     // extraExcludes.push(ASK_USER_TOOL_NAME)`), and its ACP code has no elicitation. A
     // question ends the turn and arrives as needs_answer, exactly as Grok's does. R6.
+
+    /// Gemini's system defaults: its own context file name, then the one every agent reads.
+    static let geminiSystemDefaults = """
+        {
+          "context": {
+            "fileName": ["GEMINI.md", "AGENTS.md"]
+          }
+        }
+
+        """
 
     /// Gemini's policy file: one deny rule per category, whose refusal says what to use.
     static func geminiPolicy(removing removed: [RemovedTool]) -> String {

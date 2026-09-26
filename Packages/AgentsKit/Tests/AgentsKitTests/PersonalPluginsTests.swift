@@ -140,6 +140,143 @@ struct PersonalPluginsTests {
         #expect(record.links[".gemini/extensions/mine"] == nil)
     }
 
+    // MARK: Gemini, a project's plugins
+
+    private func linkForGemini(_ home: URL, cwd: URL, record: inout PersonalDotAgents.Record) {
+        PersonalDotAgents.linkGeminiProjectExtensions(home: home, cwd: cwd, record: &record)
+    }
+
+    private func enablement(_ home: URL) -> [String: Any] {
+        DotAgents.json(at: home.appending(path: ".gemini/extensions/extension-enablement.json")) ?? [:]
+    }
+
+    private func overrides(_ home: URL, _ name: String) -> [String]? {
+        (enablement(home)[name] as? [String: Any])?["overrides"] as? [String]
+    }
+
+    @Test func aProjectsPluginIsLinkedForGeminiAndOnOnlyInThatProject() throws {
+        let (_, home, work) = try folders()
+        let plugin = try plugin("proj", under: work)
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        linkForGemini(home, cwd: work, record: &record)
+
+        let link = home.appending(path: ".gemini/extensions/proj")
+        #expect(try fileManager.destinationOfSymbolicLink(atPath: link.path) == plugin.path)
+        #expect(record.links[link.path] == plugin.path)
+        #expect(overrides(home, "proj") == ["!/*", work.path + "/*"])
+        // Starting again changes nothing.
+        let before = record
+        linkForGemini(home, cwd: work, record: &record)
+        #expect(record == before)
+        // And the personal sweep of the same folder keeps it: it is not a personal plugin.
+        reconcile(home, installed: ["gemini"], record: &record)
+        #expect(record.links[link.path] == plugin.path)
+        #expect(DotAgents.exists(link))
+    }
+
+    @Test func anAgentInAWorktreeGetsItsProjectsPlugins() throws {
+        let (_, home, work) = try folders()
+        let plugin = try plugin("proj", under: work)
+        let worktree = work.appending(path: "\(WorktreeName.folder)/lane")
+        try fileManager.createDirectory(at: worktree, withIntermediateDirectories: true)
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        linkForGemini(home, cwd: worktree, record: &record)
+
+        #expect(try fileManager.destinationOfSymbolicLink(atPath: home.appending(path: ".gemini/extensions/proj").path)
+                == plugin.path)
+        #expect(overrides(home, "proj") == ["!/*", work.path + "/*"])
+    }
+
+    @Test func aTakenNameIsLeftToWhoeverHasIt() throws {
+        let (_, home, work) = try folders()
+        try plugin("mine", under: home)
+        try plugin("mine", under: work)
+        var record = PersonalDotAgents.Record(home: home.path)
+        reconcile(home, installed: ["gemini"], record: &record)
+
+        linkForGemini(home, cwd: work, record: &record)
+
+        // Still the personal plugin's, and no second extension of that name anywhere.
+        #expect(try fileManager.destinationOfSymbolicLink(atPath: home.appending(path: ".gemini/extensions/mine").path)
+                == "../../.agents/plugins/mine")
+        #expect(PersonalDotAgents.geminiNames(in: home.appending(path: ".gemini/extensions"))["mine"] == ["mine"])
+        #expect(overrides(home, "mine") == nil)
+    }
+
+    @Test func aPluginThatGoesTakesItsProjectLinkAndRuleWithIt() throws {
+        let (_, home, work) = try folders()
+        let plugin = try plugin("proj", under: work)
+        var record = PersonalDotAgents.Record(home: home.path)
+        linkForGemini(home, cwd: work, record: &record)
+
+        try fileManager.removeItem(at: plugin)
+        linkForGemini(home, cwd: work, record: &record)
+
+        let link = home.appending(path: ".gemini/extensions/proj")
+        #expect(!DotAgents.exists(link))
+        #expect(record.links[link.path] == nil)
+        #expect(overrides(home, "proj") == nil)
+    }
+
+    @Test func aProjectLinkThePersonDeletedStaysGone() throws {
+        let (_, home, work) = try folders()
+        try plugin("proj", under: work)
+        var record = PersonalDotAgents.Record(home: home.path)
+        linkForGemini(home, cwd: work, record: &record)
+
+        let link = home.appending(path: ".gemini/extensions/proj")
+        try fileManager.removeItem(at: link)
+        linkForGemini(home, cwd: work, record: &record)
+
+        #expect(!DotAgents.exists(link))
+    }
+
+    @Test func theEnablementRulesThePersonHasAreKept() throws {
+        let (_, home, work) = try folders()
+        try plugin("proj", under: work)
+        let extensions = home.appending(path: ".gemini/extensions")
+        try fileManager.createDirectory(at: extensions, withIntermediateDirectories: true)
+        try #"{"theirs":{"overrides":["!/Users/x/*"]}}"#.write(to: extensions.appending(path: "extension-enablement.json"),
+                                                                 atomically: true, encoding: .utf8)
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        linkForGemini(home, cwd: work, record: &record)
+
+        #expect(overrides(home, "theirs") == ["!/Users/x/*"])
+        #expect(overrides(home, "proj") == ["!/*", work.path + "/*"])
+    }
+
+    @Test func anUnreadableEnablementFileMeansNoLink() throws {
+        let (_, home, work) = try folders()
+        try plugin("proj", under: work)
+        let extensions = home.appending(path: ".gemini/extensions")
+        try fileManager.createDirectory(at: extensions, withIntermediateDirectories: true)
+        let file = extensions.appending(path: "extension-enablement.json")
+        try "{ not json".write(to: file, atomically: true, encoding: .utf8)
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        linkForGemini(home, cwd: work, record: &record)
+
+        // Unscoped it would be on in every project, so it is not linked at all.
+        #expect(!DotAgents.exists(extensions.appending(path: "proj")))
+        #expect(try String(contentsOf: file, encoding: .utf8) == "{ not json")
+    }
+
+    @Test func onlyAGeminiStartLinksTheProjectsPluginsAndTheLinkIsRecorded() async throws {
+        let (locations, home, work) = try folders()
+        let plugin = try plugin("proj", under: work)
+        let core = try core(locations)
+        let link = home.appending(path: ".gemini/extensions/proj")
+
+        await core.linkGeminiProjectPlugins(runtimeID: "claude", cwd: work)
+        #expect(!DotAgents.exists(link))
+        await core.linkGeminiProjectPlugins(runtimeID: "gemini", cwd: work)
+        #expect(DotAgents.exists(link))
+        #expect(PersonalDotAgents.Record.load(from: locations.personalLayout, home: home).links[link.path] == plugin.path)
+    }
+
     @Test func theGeminiManifestIsWrittenOnceAndNeverOverwritten() throws {
         let (_, home, _) = try folders()
         let written = try plugin("mine", under: home, server: "plover-mcp")
