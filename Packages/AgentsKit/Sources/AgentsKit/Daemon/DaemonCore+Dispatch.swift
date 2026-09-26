@@ -217,6 +217,11 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(
                     try await setProvider(runtimeID: request.runtimeID, providerID: request.providerID)))
 
+            case DaemonAPI.Method.runtimeDisableProvider:
+                let request = try require(params, as: DaemonAPI.SetProviderRequest.self)
+                return .success(try JSONValue.encoding(
+                    try await disableProvider(runtimeID: request.runtimeID, providerID: request.providerID)))
+
             case DaemonAPI.Method.sessionsList:
                 let request = try require(params, as: DaemonAPI.SessionsListRequest.self)
                 return .success(try JSONValue.encoding(
@@ -303,6 +308,11 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsUnqueue:
                 let request = try require(params, as: DaemonAPI.UnqueueRequest.self)
                 try await unqueue(request)
+                return .success([:])
+
+            case DaemonAPI.Method.agentsSendNow:
+                let request = try require(params, as: DaemonAPI.UnqueueRequest.self)
+                try await sendNow(request)
                 return .success([:])
 
             case DaemonAPI.Method.filesMention:

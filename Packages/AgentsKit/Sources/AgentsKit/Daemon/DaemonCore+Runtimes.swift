@@ -57,6 +57,7 @@ extension DaemonCore {
         let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
         defer { Task { await session.end(gracePeriod: .seconds(2)) } }
         try await session.logOut()
+        accounts[runtimeID]?.signedInAs = nil
         markNeedsSignIn(runtimeID: runtimeID)
         return stopped
     }
@@ -67,6 +68,29 @@ extension DaemonCore {
         try await session.setProvider(id: providerID)
         var account = account(for: runtimeID)
         account.currentProviderID = providerID
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+        return account
+    }
+
+    /// Turn a provider off. The list is asked for again afterwards rather than edited
+    /// here, because what the runtime routes to next is its decision, not ours.
+    public func disableProvider(runtimeID: String, providerID: String) async throws -> RuntimeAccount {
+        let (session, _) = try await handshakeOnly(runtimeID: runtimeID)
+        defer { Task { await session.end(gracePeriod: .seconds(2)) } }
+        if let provider = account(for: runtimeID).providers.first(where: { $0.id == providerID }),
+           !provider.canBeDisabled {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "\(provider.name ?? providerID) is required by this runtime and cannot be turned off.")
+        }
+        try await session.disableProvider(id: providerID)
+        var account = account(for: runtimeID)
+        if let providers = try? await session.providers() {
+            account.providers = providers.providers ?? []
+            account.currentProviderID = providers.currentProviderId
+        } else if account.currentProviderID == providerID {
+            account.currentProviderID = nil
+        }
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
         return account
@@ -235,6 +259,7 @@ extension DaemonCore {
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
         }
+        await hearAuthStatus(from: session, runtimeID: runtimeID)
         do {
             let handshake = try await session.initialize()
             noteAccount(runtimeID: runtimeID, from: handshake)

@@ -333,23 +333,49 @@ struct ACPSessionTests {
     }
 
     @Test func aNotificationUnderAMethodWeDoNotKnowIsReportedRatherThanDropped() async throws {
-        // Cursor sends three of these, under `cursor/`. Before this they returned at the
-        // guard in `receive` and left nothing behind at all, so an agent could be quietly
-        // poorer for what it was sent and nobody could tell.
+        // Before this they returned at the guard in `receive` and left nothing behind at
+        // all, so an agent could be quietly poorer for what it was sent and nobody could
+        // tell. `_auth/status_update` from a runtime that never advertised it is one.
         let (session, agent) = pair()
         let events = try await collect(session, until: hasUsage) {
             try await session.initialize()
             try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
-            await agent.emitNotification("cursor/update_todos", ["todos": ["one", "two"]])
+            await agent.emitNotification("_auth/status_update", ["authStatus": ["kind": "none"]])
             await agent.emitNotification("something/inventedNextYear")
             await agent.emit(["sessionUpdate": "usage_update", "used": 10, "size": 100])
         }
         let unknown = events.compactMap {
             if case .unknownNotification(let m) = $0 { return m } else { return nil }
         }
-        #expect(unknown == ["cursor/update_todos", "something/inventedNextYear"])
+        #expect(unknown == ["_auth/status_update", "something/inventedNextYear"])
         // The known traffic either side of it is untouched.
         #expect(events.contains { if case .usageChanged = $0 { return true } else { return false } })
+    }
+
+    @Test func aRequestUnderAMethodWeDoNotKnowIsDeclinedAndReported() async throws {
+        // What Cursor actually sends: `cursor/task` and `cursor/generate_image` are
+        // requests with an id, not notifications, and until this the `-32601` they got
+        // back was the only trace of them.
+        let (session, agent) = pair()
+        var answers: [Result<JSONValue, JSONRPCError>] = []
+        let events = try await collect(session, until: hasUsage) {
+            try await session.initialize()
+            try await session.newSession(cwd: URL(fileURLWithPath: "/tmp"))
+            answers.append(await agent.emitRequest("cursor/task", ["toolCallId": "t1", "description": "look"]))
+            answers.append(await agent.emitRequest("something/inventedNextYear"))
+            await agent.emit(["sessionUpdate": "usage_update", "used": 10, "size": 100])
+        }
+        let unknown = events.compactMap {
+            if case .unknownRequest(let m) = $0 { return m } else { return nil }
+        }
+        #expect(unknown == ["cursor/task", "something/inventedNextYear"])
+        for answer in answers {
+            guard case .failure(let error) = answer else {
+                Issue.record("an unknown request was answered as if it were known")
+                continue
+            }
+            #expect(error.code == -32601, "declined as the protocol asks, so the runtime falls back")
+        }
     }
 
     @Test func anUnknownIncomingMethodIsDeclinedLoudly() async throws {

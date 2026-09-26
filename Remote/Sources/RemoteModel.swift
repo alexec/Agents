@@ -684,6 +684,11 @@ final class RemoteModel {
         runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
     }
 
+    /// Whether this runtime said it takes words in the middle of a turn.
+    func canSteer(_ runtimeID: String?) -> Bool {
+        runtimeID.flatMap { accounts[$0]?.canSteer } ?? false
+    }
+
     /// A project's counts from the same grouping its page uses, so the list and the
     /// page cannot disagree about what needs attention.
     func counts(in folder: URL?) -> [AgentGroup: Int] { work.counts(in: folder) }
@@ -1629,6 +1634,20 @@ final class RemoteModel {
         }
         do {
             try await client.call(DaemonAPI.Method.agentsUnqueue,
+                                  DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// Send a queued prompt into the turn that is running, where the runtime takes one.
+    func sendNow(_ prompt: QueuedPrompt, to agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsSendNow,
                                   DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
         } catch {
             problem = "That did not reach your Mac."

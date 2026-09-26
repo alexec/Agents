@@ -70,7 +70,7 @@ extension DaemonCore {
     func notStartable(_ runtime: Runtime, lookedIn: [String]) -> JSONRPCError {
         let recipe = installer?.recipe(for: runtime)
         let message = notYetInstalled(runtime)
-            ?? (recipe != nil ? "\(runtime.name) isn’t on this Mac. Install it from Settings ▸ Agents."
+            ?? (recipe != nil ? "\(runtime.name) isn’t on this Mac. Install it from Settings ▸ Agent Runtimes."
                               : "\(runtime.name) is not installed, or is not where we looked.")
         return JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound, message: message,
                             data: ["lookedIn": .array(lookedIn.map(JSONValue.string))])

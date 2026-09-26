@@ -835,9 +835,12 @@ struct PromptBar: View {
         return "Reach: " + parts.joined(separator: " · ")
     }
 
-    /// Said in the runtime list, so a runtime that cannot be used says why there.
+    /// Said in the runtime list, so a runtime that cannot be used says why there, and
+    /// one that says which account it is using says that ("Claude Max", "Anthropic API key").
     private func signInNote(_ runtimeID: String) -> String? {
-        model.accounts[runtimeID]?.state == .needsSignIn ? "Needs signing in" : nil
+        let account = model.accounts[runtimeID]
+        if account?.state == .needsSignIn { return "Needs signing in" }
+        return account?.signedInAs?.label
     }
 
     private func runtimeName(_ id: String) -> String {

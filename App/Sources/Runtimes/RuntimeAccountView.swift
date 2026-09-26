@@ -83,19 +83,32 @@ struct RuntimeAccountView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Who answers").appText(.reading)
                     ForEach(account.providers, id: \.id) { provider in
-                        Button {
-                            Task { await model.setProvider(runtimeID: runtimeID, providerID: provider.id) }
-                        } label: {
-                            HStack {
-                                Text(provider.id == account.currentProviderID ? "✓" : " ")
-                                    .appText(.code)
-                                Text(provider.name ?? provider.id)
-                                if let wire = provider.protocol {
-                                    Text(wire).appText(.fine).foregroundStyle(.tertiary)
+                        HStack {
+                            Button {
+                                Task { await model.setProvider(runtimeID: runtimeID, providerID: provider.id) }
+                            } label: {
+                                HStack {
+                                    Text(provider.id == account.currentProviderID ? "✓" : " ")
+                                        .appText(.code)
+                                    Text(provider.name ?? provider.id)
+                                    if let wire = provider.protocol {
+                                        Text(wire).appText(.fine).foregroundStyle(.tertiary)
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            // Only where the runtime can take it: one it marks required
+                            // stays on, and one it has not configured has nothing to stop.
+                            if provider.canBeDisabled, provider.configured != false {
+                                Button("Turn off") {
+                                    Task { await model.disableProvider(runtimeID: runtimeID, providerID: provider.id) }
+                                }
+                                .buttonStyle(.plain)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -128,7 +141,10 @@ struct RuntimeAccountView: View {
 
     private var state: String {
         switch account.state {
-        case .ready: return "Signed in and ready"
+        case .ready:
+            // The runtime's own word for the account, where it says (`_auth/status_update`).
+            guard let signedInAs = account.signedInAs else { return "Signed in and ready" }
+            return "Signed in with \(signedInAs.label), and ready"
         case .needsSignIn: return "Installed, and needs signing in"
         case .unknown: return "Not asked yet"
         }

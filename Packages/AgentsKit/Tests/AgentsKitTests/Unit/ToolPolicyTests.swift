@@ -329,8 +329,9 @@ struct ToolPolicyTests {
 
     // MARK: A file named by an argument (046)
 
-    /// Gemini: nothing in `_meta`, no flags of its own, and one file whose path follows
-    /// `--policy`. One deny rule per category, each saying what to use instead.
+    /// Gemini: nothing in `_meta`, no flags of its own, and a policy file whose path follows
+    /// `--policy`, beside its system defaults. One deny rule per category, each saying what
+    /// to use instead.
     @Test func geminiIsSentAPolicyFile() throws {
         let policy = ToolPolicyCatalog.gemini
         #expect(policy.lever == .file)
@@ -338,7 +339,7 @@ struct ToolPolicyTests {
         #expect(policy.launchArguments.isEmpty)
         #expect(policy.escalationTool == nil)
         let file = try #require(policy.environmentFiles.first)
-        #expect(policy.environmentFiles.count == 1)
+        #expect(policy.environmentFiles.map(\.name) == ["gemini-policy.toml", "gemini-system-defaults.json"])
         #expect(file.argument == "--policy" && file.variable == nil)
         #expect(file.contents == """
             # Written by the Agents app. Do not edit: rebuilt on every launch.
@@ -358,6 +359,14 @@ struct ToolPolicyTests {
             """)
     }
 
+    @Test func geminiReadsAgentsMDAfterItsOwnName() throws {
+        let file = try #require(ToolPolicyCatalog.gemini.environmentFiles.first { $0.variable == "GEMINI_CLI_SYSTEM_DEFAULTS_PATH" })
+        let settings = try #require(try JSONSerialization.jsonObject(with: Data(file.contents.utf8)) as? [String: Any])
+        // GEMINI.md first: Gemini's memory tool writes to the first name, and must not write
+        // into the ~/.agents/AGENTS.md every agent shares.
+        #expect((settings["context"] as? [String: Any])?["fileName"] as? [String] == ["GEMINI.md", "AGENTS.md"])
+    }
+
     @Test func aFileNamedByAnArgumentIsWrittenAndPassed() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("agents-policy-\(UUID().uuidString)", isDirectory: true)
@@ -367,8 +376,10 @@ struct ToolPolicyTests {
         let path = root.appendingPathComponent("runtimes/gemini-policy.toml").path
         #expect(files.arguments(for: ToolPolicyCatalog.gemini) == ["--policy", path])
         #expect(try String(contentsOfFile: path, encoding: .utf8) == ToolPolicyCatalog.gemini.environmentFiles[0].contents)
-        // And it is not also put in the environment, which is Grok's way, not Gemini's.
-        #expect(files.environment(for: ToolPolicyCatalog.gemini, onto: ["PATH": "/usr/bin"]) == ["PATH": "/usr/bin"])
+        // The policy is not also put in the environment; only the system defaults are.
+        let defaults = root.appendingPathComponent("runtimes/gemini-system-defaults.json").path
+        #expect(files.environment(for: ToolPolicyCatalog.gemini, onto: ["PATH": "/usr/bin"])
+                == ["PATH": "/usr/bin", "GEMINI_CLI_SYSTEM_DEFAULTS_PATH": defaults])
         // Nor does Grok's file turn into an argument.
         #expect(files.arguments(for: ToolPolicyCatalog.grok).isEmpty)
         #expect(files.arguments(for: ToolPolicyCatalog.claude).isEmpty)

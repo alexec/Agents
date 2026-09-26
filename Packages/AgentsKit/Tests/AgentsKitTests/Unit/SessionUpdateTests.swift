@@ -239,6 +239,40 @@ struct SessionUpdateTests {
         #expect(summary.plainText == "We did three things.")
     }
 
+    // MARK: Notices
+
+    @Test func aNoticeIsShownInTheChat() {
+        let update = SessionUpdate.decode(["sessionUpdate": "notice", "severity": "warning",
+                                           "title": "Nearing your usage limit",
+                                           "description": "About 10% left this window."])
+        guard case .entry(.notice(let notice)) = update else {
+            Issue.record("expected a notice")
+            return
+        }
+        #expect(notice.title == "Nearing your usage limit")
+        #expect(notice.detail == "About 10% left this window.")
+        #expect(notice.isWarning)
+    }
+
+    @Test func aNoticeWithoutATitleIsNotOne() {
+        guard case .ignored = SessionUpdate.decode(["sessionUpdate": "notice", "severity": "info"]) else {
+            Issue.record("expected it skipped")
+            return
+        }
+    }
+
+    @Test func anUnknownSeverityIsKeptAsSent() {
+        guard case .entry(.notice(let notice)) = SessionUpdate.decode(
+            ["sessionUpdate": "notice", "severity": "_x.ai/billing", "title": "t", "description": .null])
+        else {
+            Issue.record("expected a notice")
+            return
+        }
+        #expect(notice.severity == "_x.ai/billing")
+        #expect(!notice.isError && !notice.isWarning)
+        #expect(notice.detail == nil)
+    }
+
     // MARK: The rest
 
     @Test func anUpdateWeDoNotKnowIsReportedAndSkipped() {

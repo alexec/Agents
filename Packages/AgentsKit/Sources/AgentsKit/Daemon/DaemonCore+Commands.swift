@@ -393,6 +393,7 @@ extension DaemonCore {
         layOutOnce(cwd)
         // And the person's own `~/.agents`, so a skill added since the last start is here (054).
         reconcileHome()
+        linkGeminiProjectPlugins(runtimeID: runtimeID, cwd: cwd)
         await syncCodexPlugins(before: runtimeID)
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw notStartable(runtime, lookedIn: discovery.searchPaths)
@@ -406,6 +407,7 @@ extension DaemonCore {
                 try launcher.launch(runtime: runtime, path: path, cwd: cwd)
             }
             launched = session
+            await hearAuthStatus(from: session, runtimeID: runtimeID)
             let handshake = try await session.initialize()
             // Recorded here rather than after the session is made, because the reason
             // to have it is the case where making the session fails: what comes back
@@ -547,6 +549,70 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         agent.queuedPrompts.removeAll { $0.id == request.promptID }
+        changed(agent)
+    }
+
+    /// Sending one queued prompt now, into the turn that is running, rather than after it.
+    ///
+    /// Only where the runtime advertised `_session/steering`; the row offers it nowhere
+    /// else. Asked with `idleBehavior: promptRequired`, so a turn that ended before the
+    /// words reached it hands them back and they go as an ordinary prompt, first in the
+    /// queue. A permission card waiting on the person is left alone: the Claude adapter
+    /// delivers the words `later` then, once the card is answered, rather than cancel it.
+    ///
+    /// No turn of ours in flight — starting, or already over — is the ordinary path:
+    /// the words go to the front of the queue and out, which is what "now" means then.
+    public func sendNow(_ request: DaemonAPI.UnqueueRequest) async throws {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        // Gone already: it went out as the turn ended, or was taken back.
+        guard let index = agent.queuedPrompts.firstIndex(where: { $0.id == request.promptID }) else { return }
+        let queued = agent.queuedPrompts.remove(at: index)
+        guard turnTasks[agent.id] != nil, let session = live[agent.id] else {
+            agent.queuedPrompts.insert(queued, at: 0)
+            changed(agent)
+            try await sendNextQueued(to: agent.id)
+            return
+        }
+        guard await session.initializeResult?.supportsSteering == true else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
+                               message: "This agent's runtime cannot take words in the middle of a turn.")
+        }
+        // Off the queue before the wait, so the turn ending in it does not send the
+        // same words a second time behind this.
+        changed(agent)
+        var outgoing = queued.blocks
+        if let preface = queued.preface { outgoing.insert(.text(preface), at: 0) }
+        let outcome: ACP.SteeringOutcome
+        do {
+            outcome = try await session.steer(outgoing)
+        } catch {
+            await putBack(queued, on: request.agentID)
+            await record(.runtimeNote("Could not send that now: \(reason(error)) It is still waiting."),
+                         for: request.agentID)
+            return
+        }
+        switch outcome {
+        case .injected, .startedNewTurn:
+            // `startedNewTurn` is codex-acp, which does not know `promptRequired`, in the
+            // moment a turn ended under the words. They were said either way.
+            await record(.userMessage(queued.text, blocks: queued.blocks.count > 1 ? queued.blocks : [],
+                                      from: queued.from),
+                         for: request.agentID)
+        case .promptRequired:
+            await putBack(queued, on: request.agentID)
+            try await sendNextQueued(to: request.agentID)
+        case .failed:
+            await putBack(queued, on: request.agentID)
+            await record(.runtimeNote("Could not send that now. It is still waiting."), for: request.agentID)
+        }
+    }
+
+    /// Words that did not go into the turn, back where they will go next.
+    private func putBack(_ queued: QueuedPrompt, on agentID: UUID) async {
+        guard var agent = agents[agentID] else { return }
+        agent.queuedPrompts.insert(queued, at: 0)
         changed(agent)
     }
 
@@ -816,9 +882,11 @@ extension DaemonCore {
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
         // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
         await syncCodexPlugins(before: agent.runtimeID)
+        linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         }
+        await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
             return try await connect(session, runtime: runtime, for: agent)
         } catch {

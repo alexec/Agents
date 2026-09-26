@@ -50,7 +50,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// What the Remote calls, and only that. Anything not here is refused to a device,
     /// so a method added later stays the Mac's until somebody decides the phone needs
     /// it. Left out on purpose: `credentials/*`, `runtimes/authenticate`, `logout`,
-    /// `install` and `setProvider`, `files/browse` and `files/write`, `daemon/quit`,
+    /// `install`, `setProvider` and `disableProvider`, `files/browse` and `files/write`, `daemon/quit`,
     /// `hosts/*`, `devices/list` and `forget`, `relay/register`, `mailbox/carry`,
     /// `workflows/approve`, `projects/add` and `clone`, `sessions/*`, and every agent
     /// tool.
@@ -61,6 +61,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsStart,
         DaemonAPI.Method.agentsPrompt,
         DaemonAPI.Method.agentsUnqueue,
+        DaemonAPI.Method.agentsSendNow,
         DaemonAPI.Method.agentsStop,
         DaemonAPI.Method.agentsMove,
         DaemonAPI.Method.agentsArchive,

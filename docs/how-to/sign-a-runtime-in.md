@@ -45,12 +45,12 @@ Gemini signs in with a Gemini API key, not from the sheet: Google's own sign-in 
 works for individuals in Gemini CLI.
 
 1. Get a key at aistudio.google.com/apikey. It starts `AIza` or `AQ.`.
-2. In **Settings ▸ Agents**, paste it into the field under Gemini and click **Save**. The
+2. In **Settings ▸ Agent Runtimes**, paste it into the field under Gemini and click **Save**. The
    app checks it with Google and says **Works** or **Refused**.
 
 It is kept in this Mac's Keychain and handed to Gemini agents on this Mac and on servers.
 A `GEMINI_API_KEY` already in your shell profile is used when Settings has none. Starting a
-Gemini agent with neither says **Gemini needs an API key. Add one in Settings ▸ Agents.**
+Gemini agent with neither says **Gemini needs an API key. Add one in Settings ▸ Agent Runtimes.**
 
 **Choose who answers**
 

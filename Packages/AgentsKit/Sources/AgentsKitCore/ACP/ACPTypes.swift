@@ -3,9 +3,17 @@ import Foundation
 /// The wire shapes we use, and the names of everything either side can call.
 ///
 /// Deliberately thin. Everything a runtime sends that is not listed here stays a
-/// `JSONValue` and is either kept whole or ignored, including every `_meta` block:
-/// Grok's `x.ai/hooks`, Claude's `jetbrains`, `steering` and `goal`. Reading any of
-/// them is how one code path becomes three.
+/// `JSONValue` and is either kept whole or ignored.
+///
+/// `_meta` is read in a few named places and nowhere else: `authMethods[]._meta.terminal-auth`
+/// (the command that signs in), `PromptResponse._meta.quota` (Gemini's tokens),
+/// `initialize`'s `_meta.steering.supported` (the marker for `_session/steering`) and
+/// `agentCapabilities._meta.authStatus` (the marker for `_auth/status_update`). It is
+/// written on `session/new`, `load`, `resume` and `fork` for tool scoping and plugins,
+/// by runtime through the catalogs (`ToolPolicyCatalog`, `DotAgents`). What is not
+/// read: vendor `_meta` on updates, and the rest of the handshake's — Grok's
+/// `x.ai/hooks`, Claude's `jetbrains` and `goal`. Reading those is how one code path
+/// becomes three.
 public enum ACP {
     public static let protocolVersion = 1
 
@@ -31,12 +39,20 @@ public enum ACP {
         /// 2026-09-18. `session/setConfigOption` and `session/set_option` are both
         /// method-not-found; this spelling is the one that exists.
         public static let setConfigOption = "session/set_config_option"
+        /// The older way to set a mode or a model, for a runtime that advertises
+        /// `modes` and `models` but no `configOptions`. Gemini CLI is one (046).
+        /// `set_config_option` is used wherever the runtime offers it.
+        public static let setSessionMode = "session/set_mode"
+        public static let setSessionModel = "session/set_model"
+        /// A vendor extension shared by the Claude adapter and codex-acp: words put into
+        /// the turn that is running rather than queued behind it. Advertised by
+        /// `initialize`'s root `_meta.steering.supported`, and only used where it is.
+        public static let steering = "_session/steering"
     }
 
     /// Named so that "we chose not to" and "we forgot" stay different things. Each of
     /// these is in the spec's Out of Scope section with the reason.
     public enum UnusedMethod {
-        public static let setSessionMode = "session/set_mode"
         public static let mcpMessage = "mcp/message"
         public static let cancelRequest = "$/cancel_request"
         public static let nesPrefix = "nes/"
@@ -74,6 +90,7 @@ public enum ACP {
         public var terminalAuth: Bool
         public var elicitationForm: Bool
         public var elicitationURL: Bool
+        public var notices: Bool
         /// JetBrains' AIR session-failure extension (052, R1). Asked for only where every
         /// kind of typed failure is read: once asked, Claude and Codex end a refused turn
         /// with `end_turn` and the failure under `_meta`, and a client that does not read
@@ -89,6 +106,7 @@ public enum ACP {
                     terminalAuth: Bool = false,
                     elicitationForm: Bool = false,
                     elicitationURL: Bool = false,
+                    notices: Bool = false,
                     sessionFailures: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
@@ -99,6 +117,7 @@ public enum ACP {
             self.terminalAuth = terminalAuth
             self.elicitationForm = elicitationForm
             self.elicitationURL = elicitationURL
+            self.notices = notices
             self.sessionFailures = sessionFailures
         }
 
@@ -125,6 +144,7 @@ public enum ACP {
             terminalAuth: true,
             elicitationForm: true,
             elicitationURL: true,
+            notices: true,
             sessionFailures: true)
 
         public var wire: JSONValue {
@@ -135,6 +155,7 @@ public enum ACP {
             var session: [String: JSONValue] = [:]
             if booleanConfigOptions { session["configOptions"] = ["boolean": .object([:])] }
             if compaction { session["compaction"] = .object([:]) }
+            if notices { session["notices"] = .object([:]) }
             if !session.isEmpty { caps["session"] = .object(session) }
             if plan { caps["plan"] = .object([:]) }
             if terminalAuth { caps["auth"] = ["terminal": .bool(true)] }
@@ -156,6 +177,8 @@ public enum ACP {
         public var agentCapabilities: AgentCapabilities?
         public var agentInfo: AgentInfo?
         public var authMethods: [AuthMethod]?
+        /// Vendor extensions the agent advertises beside its capabilities, not in them.
+        public var _meta: JSONValue?
 
         /// Whether the version the agent answered with is one we speak. An agent that
         /// omits it is taken at its word, which is what every runtime here does.
@@ -172,6 +195,11 @@ public enum ACP {
         }
         public var supportsLogout: Bool { agentCapabilities?.auth?.logout != nil }
         public var supportsProviders: Bool { agentCapabilities?.providers != nil }
+        /// The runtime pushes `_auth/status_update` whenever its account changes.
+        public var pushesAuthStatus: Bool { agentCapabilities?._meta?["authStatus"] != nil }
+        /// Whether words can be put into a running turn (`_session/steering`). Read off
+        /// what the agent said, never off which runtime it is.
+        public var supportsSteering: Bool { _meta?["steering"]?["supported"]?.boolValue ?? false }
 
         public var accepts: PromptCapabilities { agentCapabilities?.promptCapabilities ?? PromptCapabilities() }
     }
@@ -183,6 +211,7 @@ public enum ACP {
         public var sessionCapabilities: SessionCapabilities?
         public var auth: AgentAuthCapabilities?
         public var providers: JSONValue?
+        public var _meta: JSONValue?
     }
 
     /// The protocol's own rule: text and resource links are baseline, everything else
@@ -298,6 +327,17 @@ public enum ACP {
         public var stopReason: String?
     }
 
+    /// What `_session/steering` did with the words. The Claude adapter answers
+    /// `promptRequired` when asked to and no turn is running; codex-acp does not know
+    /// that ask and starts a turn of its own instead, or answers `failed`.
+    public enum SteeringOutcome: String, Decodable, Sendable {
+        case injected, startedNewTurn, promptRequired, failed
+    }
+
+    public struct SteeringResult: Decodable, Sendable {
+        public var outcome: SteeringOutcome
+    }
+
     public struct SessionListResult: Decodable, Sendable {
         public var sessions: [SessionSummary]?
         public var nextCursor: String?
@@ -342,6 +382,36 @@ public enum ACP {
         public var name: String?
         public var `protocol`: String?
         public var configured: Bool?
+        /// Mandatory: the runtime says it cannot be turned off, so `providers/disable`
+        /// is never offered for it.
+        public var required: Bool?
+
+        public init(id: String, name: String? = nil, protocol: String? = nil,
+                    configured: Bool? = nil, required: Bool? = nil) {
+            self.id = id
+            self.name = name
+            self.protocol = `protocol`
+            self.configured = configured
+            self.required = required
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, providerId, name, `protocol`, configured, required
+        }
+
+        /// `id` is the shape this was first written against; the schema now says
+        /// `providerId`. Either is read, so a runtime on either side still lists.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(String.self, forKey: .id)
+                ?? c.decode(String.self, forKey: .providerId)
+            name = try? c.decodeIfPresent(String.self, forKey: .name)
+            `protocol` = try? c.decodeIfPresent(String.self, forKey: .protocol)
+            configured = try? c.decodeIfPresent(Bool.self, forKey: .configured)
+            required = try? c.decodeIfPresent(Bool.self, forKey: .required)
+        }
+
+        public var canBeDisabled: Bool { required != true }
     }
 
     static func timestamp(from string: String) -> Date? {

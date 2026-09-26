@@ -76,8 +76,9 @@ actor FakeACPAgent {
         /// uses the file methods and none sends an elicitation form.
         var clientRequests: [(method: String, params: JSONValue)] = []
         /// Notifications under a method of the runtime's own invention, sent during the
-        /// turn. A real one is Cursor's `cursor/update_todos`. Nothing is expected back,
-        /// which is exactly why they used to vanish without trace.
+        /// turn. A real one is `_auth/status_update`. Nothing is expected back, which is
+        /// exactly why they used to vanish without trace. (Cursor's `cursor/*` methods
+        /// look like these and are requests: put those in `clientRequests`.)
         var extensionNotifications: [(method: String, params: JSONValue)] = []
         /// How long the handshake takes. Zero for almost every test; a real duration
         /// for the ones about what the daemon is doing while a runtime is still
@@ -98,6 +99,9 @@ actor FakeACPAgent {
         var sessions: [JSONValue] = []
         /// What `initialize` offers as ways to sign in.
         var authMethods: [JSONValue] = []
+        /// Advertise `_meta.steering.supported`, and answer `_session/steering` with
+        /// this outcome. Nil advertises nothing, and the method is not found.
+        var steering: String?
     }
 
     private var script: Script
@@ -118,6 +122,9 @@ actor FakeACPAgent {
     private(set) var prompts: [JSONValue] = []
     private var promptsFailed = 0
     private(set) var deletedSessions: [String] = []
+    private(set) var disabledProviders: [String] = []
+    /// Every `_session/steering` request, as it arrived.
+    private(set) var steers: [JSONValue] = []
     /// What `session/new` was asked for, so a test can see what we attached to a
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
@@ -149,12 +156,18 @@ actor FakeACPAgent {
             // What every runtime the app starts says, unless a test says otherwise.
             if capabilities["mcpCapabilities"] == nil { capabilities["mcpCapabilities"] = ["http": true, "sse": true] }
             capabilities["sessionCapabilities"] = .object(sessionCapabilities)
-            return .success([
+            var result: [String: JSONValue] = [
                 "protocolVersion": .int(script.protocolVersion),
                 "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
                 "authMethods": .array(script.authMethods),
-            ])
+            ]
+            if script.steering != nil { result["_meta"] = ["steering": ["supported": true]] }
+            return .success(.object(result))
+
+        case ACP.Method.steering where script.steering != nil:
+            steers.append(params ?? .null)
+            return .success(["outcome": .string(script.steering ?? "")])
 
         case ACP.Method.newSession:
             newSessionParams = params
@@ -176,6 +189,10 @@ actor FakeACPAgent {
 
         case ACP.Method.list:
             return .success(["sessions": .array(script.sessions)])
+
+        case ACP.Method.disableProvider:
+            if let id = params?["providerId"]?.stringValue { disabledProviders.append(id) }
+            return .success([:])
 
         case ACP.Method.deleteSession:
             if let id = params?["sessionId"]?.stringValue { deletedSessions.append(id) }
@@ -304,6 +321,23 @@ actor FakeACPAgent {
     /// What the client answered one method with, for a test that cares.
     func answer(to method: String) -> Result<JSONValue, JSONRPCError>? {
         clientAnswers.first { $0.method == method }?.result
+    }
+
+    /// Every answer to one method, in order, for a test that sends it more than once.
+    func answers(to method: String) -> [Result<JSONValue, JSONRPCError>] {
+        clientAnswers.filter { $0.method == method }.map(\.result)
+    }
+
+    /// Make a request of the client outside a turn and say what came back, the way a
+    /// runtime calling a method of its own invention does.
+    func emitRequest(_ method: String, _ params: JSONValue = [:]) async -> Result<JSONValue, JSONRPCError> {
+        do {
+            return .success(try await connection.call(method, params))
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(.internalError("\(error)"))
+        }
     }
 
     static func chunk(_ text: String, messageID: String? = nil) -> JSONValue {

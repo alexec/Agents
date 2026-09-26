@@ -214,7 +214,9 @@ struct RemoteChatView: View {
             adjustSwitch: { [model] record in
                 model.continuing = RemoteContinue(agentID: record.agentID, runtimeID: record.to.runtimeID, adjust: true)
             },
-            showPool: { [model] in model.isShowingPool = true })
+            showPool: { [model] in model.isShowingPool = true },
+            sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
+            canSendNow: { [model] runtimeID in model.canSteer(runtimeID) })
     }
 }
 

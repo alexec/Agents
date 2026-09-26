@@ -100,6 +100,9 @@ private struct EntryRow: View {
                 }
             }
 
+        case .notice(let notice):
+            NoticeLine(notice: notice)
+
         case .permissionAsked(let request):
             Text("Asked: \(request.toolCall.title)")
                 .appText(.supporting)
@@ -144,6 +147,29 @@ private struct EntryRow: View {
     }
 }
 
+/// Something the runtime wanted said beside the reply: a limit coming up, a model it
+/// fell back to. Drawn like the app's own notes, because it is not the agent talking.
+/// An error is the one worth a colour; a warning gets its title in medium weight.
+private struct NoticeLine: View {
+    let notice: SessionNotice
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(notice.title)
+                .appText(.supporting)
+                .fontWeight(notice.isError || notice.isWarning ? .medium : .regular)
+                .foregroundStyle((notice.isError ? StateTint.failure : .none).style(or: .secondary))
+            if let detail = notice.detail {
+                Text(detail)
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// The agent's own account of how the work went, at the foot of the conversation.
 ///
 /// Drawn in the manner of the other state-change lines rather than as a message from
@@ -178,13 +204,32 @@ struct QueuedPromptRow: View {
     @Environment(\.chatActions) private var actions
     let prompt: QueuedPrompt
     let agentID: UUID
+    /// A turn is running and its runtime takes words mid-turn (`_session/steering`).
+    var canSendNow = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Waiting its turn")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Waiting its turn")
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                    Spacer(minLength: 8)
+                    if canSendNow {
+                        Button {
+                            Task { await actions.sendNow(prompt, agentID) }
+                        } label: {
+                            Label("Send now", systemImage: "arrow.up")
+                                .appText(.fine)
+                                #if os(iOS)
+                                .frame(minHeight: 44)
+                                .contentShape(.rect)
+                                #endif
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Send this into the turn that is running, without waiting for it to end")
+                    }
+                }
                 BlocksView(blocks: prompt.blocks)
                     .appText(.reading)
                     .foregroundStyle(.secondary)

@@ -56,6 +56,9 @@ extension TranscriptEntry.Kind {
         case "compaction":
             return .compaction(status: payload["status"]?.stringValue ?? "",
                                summary: [ContentBlock](wire: payload["summary"]))
+        case "notice":
+            guard let notice = try? payload["_0"]?.decode(SessionNotice.self) else { return nil }
+            return .notice(notice)
         case "permissionAsked":
             guard let request = try? payload["_0"]?.decode(PermissionRequest.self) else { return nil }
             return .permissionAsked(request)
@@ -126,6 +129,8 @@ extension TranscriptEntry.Kind {
             return ["elicitationAnswered": ["id": .string(id.uuidString), "summary": .string(summary)]]
         case .compaction(let status, let summary):
             return ["compaction": ["status": .string(status), "summary": summary.wire]]
+        case .notice(let notice):
+            return ["notice": ["_0": (try? JSONValue.encoding(notice)) ?? .null]]
         case .permissionAsked(let request):
             return ["permissionAsked": ["_0": (try? JSONValue.encoding(request)) ?? .null]]
         case .permissionAnswered(let optionID, let optionName):
