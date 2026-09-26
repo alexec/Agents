@@ -49,7 +49,12 @@ public struct CredentialStore: Sendable {
         guard let data = try? Data(contentsOf: file) else { return [:] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode([String: Record].self, from: data)) ?? [:]
+        // One at a time, so a kind this version no longer takes (047's OpenAI key) drops
+        // only itself, not every other runtime's record with it.
+        guard let entries = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return entries.compactMapValues { entry in
+            (try? JSONSerialization.data(withJSONObject: entry)).flatMap { try? decoder.decode(Record.self, from: $0) }
+        }
     }
 
     public func record(for runtimeID: String) -> Record? { records()[runtimeID] }

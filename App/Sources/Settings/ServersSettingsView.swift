@@ -79,9 +79,10 @@ private struct ServerLine: View {
             Text(subtitle).appText(.fine).foregroundStyle(.secondary)
             Text(model.hosts.claudeLine(host.id, hasCredential: model.credentials.record("claude") != nil))
                 .appText(.fine).foregroundStyle(.secondary)
-            ForEach(ServerCredentials.runtimes.filter { $0 != RuntimeCatalog.claude.id }, id: \.self) { runtimeID in
+            ForEach(ServerBinaries.serverRuntimes.filter { $0 != RuntimeCatalog.claude.id }, id: \.self) { runtimeID in
                 Text(model.hosts.toolsetLine(host.id, runtimeID: runtimeID,
-                                             hasCredential: model.credentials.record(runtimeID) != nil))
+                                             hasCredential: model.credentials.record(runtimeID) != nil
+                                                 || SignInRelays.canRelay(runtimeID)))
                     .appText(.fine).foregroundStyle(.secondary)
             }
             if isChosen {

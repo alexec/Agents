@@ -45,6 +45,20 @@ struct CredentialStoreTests {
         }
     }
 
+    /// A record of a kind this version no longer takes (047's OpenAI key) drops alone.
+    @Test func aRecordOfAKindNoLongerTakenLeavesTheOthers() throws {
+        try withStore { store in
+            try FileManager.default.createDirectory(at: store.file.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try Data(#"""
+            {"codex":{"kind":"openAIAPIKey","lastFour":"1234","addedAt":"2026-09-25T10:00:00Z"},
+             "gemini":{"kind":"geminiAPIKey","lastFour":"abcd","addedAt":"2026-09-25T10:00:00Z"}}
+            """#.utf8).write(to: store.file)
+            #expect(store.record(for: "codex") == nil)
+            #expect(store.record(for: "gemini")?.kind == .geminiAPIKey)
+        }
+    }
+
     @Test func removingLeavesNeitherSecretNorRecord() throws {
         try withStore { store in
             try store.save(Self.token, for: "claude")

@@ -341,9 +341,12 @@ final class HostSet {
         default: break
         }
         let noun = CredentialKind.noun(for: runtimeID)
+        // Codex takes nothing from Settings: this Mac's ChatGPT sign-in is relayed (047).
+        let relayed = ToolPolicyCatalog.policy(for: runtimeID).relay != nil
         let signIn = host.ownSignInOnly ? " · its own sign-in only"
-            : hasCredential ? " · signs in with the \(noun) in Settings"
-            : facts.hasOwnSignIn(runtimeID) ? " · its own sign-in" : " · needs a \(noun)"
+            : hasCredential ? (relayed ? " · signs in through this Mac" : " · signs in with the \(noun) in Settings")
+            : facts.hasOwnSignIn(runtimeID) ? " · its own sign-in"
+            : relayed ? " · needs this Mac signed in to it" : " · needs a \(noun)"
         if facts.toolsetID(for: runtimeID) != nil { return "\(name): ready (installed by Agents)" + signIn }
         if !facts.canInstallToolsets {
             return "\(name) can’t be installed here: it uses \(facts.libc.display)."
@@ -351,6 +354,7 @@ final class HostSet {
         if facts.downloader == nil { return "\(name) can’t be installed here: it has neither curl nor wget." }
         return hasCredential && !host.ownSignInOnly
             ? "\(name): installed when \(host.label) next connects"
+            : relayed ? "\(name): installed when this Mac is signed in to it"
             : "\(name): installed when there is a \(noun) for it in Settings"
     }
 
@@ -513,13 +517,19 @@ enum ServerBinaries {
         return ServerBinary(file: file, sha256: sha.trimmingCharacters(in: .whitespacesAndNewlines), version: version)
     }
 
-    /// Every other pinned toolset a server may be given, for the runtimes Settings takes a
-    /// credential for (046: Gemini, 047: Codex).
+    /// The runtimes the app installs on a server, in the catalog's order: those that sign
+    /// in there with a credential from Settings (043: Claude, 046: Gemini), or through a
+    /// sign-in this Mac relays (047: Codex).
+    nonisolated static let serverRuntimes = RuntimeCatalog.builtIn.map(\.id).filter {
+        !CredentialKind.kinds(for: $0).isEmpty || ToolPolicyCatalog.policy(for: $0).relay != nil
+    }
+
+    /// Every other pinned toolset a server may be given, for `serverRuntimes`.
     nonisolated static let otherToolsets: [Toolset] = {
         guard let folder = Bundle.main.url(forResource: "toolsets", withExtension: nil) else { return [] }
-        let lendable = Set(CredentialKind.allCases.map(\.runtimeID))
+        let installable = Set(ServerBinaries.serverRuntimes)
         return Toolset.loadAll(from: folder).values
-            .filter { $0.manifest.runtimeID != RuntimeCatalog.claude.id && lendable.contains($0.manifest.runtimeID) }
+            .filter { $0.manifest.runtimeID != RuntimeCatalog.claude.id && installable.contains($0.manifest.runtimeID) }
             .sorted { $0.manifest.runtimeID < $1.manifest.runtimeID }
     }()
 
