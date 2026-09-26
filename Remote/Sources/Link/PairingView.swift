@@ -63,7 +63,7 @@ struct PairingView: View {
         case .failed(let why):
             Text(why)
                 .appText(.fine)
-                .foregroundStyle(.red)
+                .tinted(.failure)
                 .multilineTextAlignment(.center)
         }
     }

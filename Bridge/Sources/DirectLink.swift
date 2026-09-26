@@ -116,7 +116,11 @@ final class DirectLink {
             // The listener before this one may not have let go of the port yet.
             parameters.allowLocalEndpointReuse = true
             let made = try NWListener(using: parameters, on: port)
-            made.service = NWListener.Service(name: DirectLink.name, type: NetworkLink.serviceType)
+            // A walk's bridge on a scratch root stays off Bonjour, where the person's own
+            // phone would otherwise find it and try it before the real one.
+            if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_BONJOUR"] == nil {
+                made.service = NWListener.Service(name: DirectLink.name, type: NetworkLink.serviceType)
+            }
             made.newConnectionHandler = { [chosen] connection in
                 Task { @MainActor in
                     let relay = Relay(device: connection, chosen: chosen)
