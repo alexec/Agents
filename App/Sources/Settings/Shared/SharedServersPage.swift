@@ -81,7 +81,7 @@ private struct ProblemBanner: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(StateTint.attention.color ?? .orange)
+            Image(systemName: "exclamationmark.triangle").tinted(.attention)
             VStack(alignment: .leading, spacing: 4) {
                 Text("mcp.json can’t be read" + (problem.line.map { ", line \($0)" } ?? "") + ": " + problem.message)
                     .fontWeight(.semibold)
@@ -92,7 +92,7 @@ private struct ProblemBanner: View {
             Button("Edit mcp.json") { SharedFiles.open(file) }.buttonStyle(.paper)
         }
         .padding(12)
-        .background((StateTint.attention.color ?? .orange).opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
+        .background(SharedInk.attention.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .contain)
     }
 }

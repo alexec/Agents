@@ -40,11 +40,12 @@ struct ReachDots: View {
 
         var body: some View {
             Text(letter)
+                // Decorative: a runtime's letter in its dot, sized to the dot; the row says it in words.
                 .font(.system(size: 10, weight: .semibold, design: .serif))
                 .strikethrough(isNo)
-                .foregroundStyle(isGets ? Color.accentColor : .secondary)
+                .foregroundStyle(isGets ? SharedInk.reach : .secondary)
                 .frame(width: 18, height: 18)
-                .background(isGets ? Color.accentColor.opacity(0.14) : (isNo ? Paper.wash : .clear), in: Circle())
+                .background(isGets ? SharedInk.reach.opacity(0.14) : (isNo ? Paper.wash : .clear), in: Circle())
                 .overlay {
                     if isUnchecked {
                         Circle().strokeBorder(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))

@@ -66,6 +66,8 @@ struct ConsistencyTests {
          why: "the person's caret flag on a live page, in the colour the system draws their own insertion point"),
         (file: "Shared/UI/Page/CursorFlag.swift", contains: "color: .accentColor",
          why: "the same flag on a phone, where the accent is the colour of the person's own insertion point (034)"),
+        (file: "App/Sources/Settings/Shared/SharedSettingsView.swift", contains: "static let reach = Color.accentColor",
+         why: "Settings ▸ Shared draws what a runtime gets, and the chosen row, in the accent, as its approved frames do (054)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() throws {

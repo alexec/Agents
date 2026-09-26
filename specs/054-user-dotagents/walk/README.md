@@ -139,3 +139,35 @@ again, as it should.
 Afterwards `probe/run.sh clean` was run and `/tmp/run-054d` removed.
 
 ## 6. Settings ▸ Shared
+
+Not walked yet: the screen was locked when the tab was built (f545b2c). The walk needs the
+screen, and is next when Alex is away and the Mac unlocked.
+
+## The whole suite, six times (T052)
+
+2026-09-26, 865282b plus the design-rule fix, after main (582c107) was merged in. `swift test`
+ran six times: 2,424 tests in 282 suites.
+
+- Three failed in every run, and all three were ours: ConsistencyTests' `noViewNamesAFontItself`,
+  `noTextIsPinnedToAPointSize` and `noCallSiteNamesAStateColourItself`, caught on the new Shared
+  tab's views. They are fixed in the same commit as these notes. The tab's two colours now go
+  through `SharedInk`, one allow-listed line with its reason. Its fixed sizes are only on glyphs
+  marked `// Decorative:`. All 11 ConsistencyTests pass.
+- `run` fails in all six, as it does in the baseline.
+- Run 5 was slow (64 s against about 35 s) and had 49 issues. Every other failure in the six
+  runs is in the baseline, except three that failed only in run 5:
+  `archivingAProjectWithdrawsItsNeeds`, `aWorkflowOnMacWakeFiresOnceAndTheEventSaysSo` and
+  `onlyAWindowHearsWhatTheDaemonSays`. Run alone, all three pass: load, as the memory note
+  says.
+
+## Builds and the Linux gate (T053)
+
+- `Agents` (macOS) and `Remote` (generic iOS Simulator) both build.
+- `scripts/build-linux-agentsd.sh --check` fails, **on main's code, not 054's**: 26 errors in
+  `Runtimes/MacArchiveInstaller.swift`, which came from 049 (819ff22) and uses Mac-only APIs
+  with no `#if`. Before merging main, 054 had two Linux errors of its own
+  (`abbreviatingWithTildeInPath`), fixed in 865282b. With those fixed, no 054 file has an
+  error. `MCPBridge` is compiled out on Linux by its `#if canImport(Network)`.
+- Nothing of the probes is left: no `/tmp/dotagents-probe`, `/tmp/agy-probe` or scratch root,
+  and no borrowed sign-in.
+

@@ -57,6 +57,15 @@ struct SharedSettingsView: View {
     }
 }
 
+/// The two colours the tab draws in. What a runtime gets, and the chosen row, are in the
+/// accent, as the approved frames have them (look/): not a state, so not a `StateTint`,
+/// and the one line ConsistencyTests allows here. Everything that needs a look is
+/// `StateTint.attention`.
+enum SharedInk {
+    static let reach = Color.accentColor
+    static var attention: Color { StateTint.attention.color ?? .secondary }
+}
+
 enum SharedPage: Hashable {
     case overview, instructions, skills, mcp, plugins, other
 
@@ -124,14 +133,14 @@ private struct SharedSidebar: View {
                 Spacer()
                 if warns {
                     Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(chosen ? .white : StateTint.attention.color ?? .orange)
+                        .foregroundStyle(chosen ? .white : SharedInk.attention)
                 }
                 if let count { Text("\(count)").monospacedDigit() }
             }
             .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(chosen ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 7))
+            .background(chosen ? SharedInk.reach : .clear, in: RoundedRectangle(cornerRadius: 7))
             .contentShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
@@ -149,6 +158,7 @@ private struct SharedEmptyState: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            // Decorative: the tab's own symbol, large, above the words that say it all.
             Image(systemName: "square.on.square").font(.system(size: 34)).foregroundStyle(.secondary)
             Text("Nothing shared yet").appText(.title)
             Text("Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · mcp.json for MCP servers · plugins/")
@@ -164,6 +174,7 @@ private struct SharedEmptyState: View {
 private struct SharedOffState: View {
     var body: some View {
         VStack(spacing: 10) {
+            // Decorative: the tab's own symbol, large, above the words that say it all.
             Image(systemName: "square.on.square").font(.system(size: 34)).foregroundStyle(.secondary)
             Text("The shared folder is off for this copy of the app").appText(.reading)
             Text("It lays out and reports on ~/.agents only for the app’s own daemon, so a copy being tried out leaves your home folder alone.")
@@ -238,16 +249,16 @@ struct SharedChip: View {
     private var foreground: Color {
         switch tone {
         case .plain: .secondary
-        case .attention: StateTint.attention.color ?? .orange
-        case .source: .accentColor
+        case .attention: SharedInk.attention
+        case .source: SharedInk.reach
         }
     }
 
     private var background: Color {
         switch tone {
         case .plain: Paper.wash
-        case .attention: (StateTint.attention.color ?? .orange).opacity(0.14)
-        case .source: Color.accentColor.opacity(0.12)
+        case .attention: SharedInk.attention.opacity(0.14)
+        case .source: SharedInk.reach.opacity(0.12)
         }
     }
 }
@@ -268,7 +279,7 @@ struct SharedRow<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
                 .overlay(RoundedRectangle(cornerRadius: 9)
-                    .strokeBorder(chosen ? Color.accentColor : Paper.rule, lineWidth: chosen ? 2 : 1))
+                    .strokeBorder(chosen ? SharedInk.reach : Paper.rule, lineWidth: chosen ? 2 : 1))
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
@@ -288,7 +299,7 @@ struct SharedFact: View {
         GridRow(alignment: .firstTextBaseline) {
             Text(label).foregroundStyle(.secondary)
             Text(value)
-                .font(code ? TextStep.code.font : nil)
+                .appText(code ? .code : .reading)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }

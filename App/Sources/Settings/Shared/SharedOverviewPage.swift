@@ -106,8 +106,8 @@ struct SharedOverviewPage: View {
 
     private var legend: some View {
         HStack(spacing: 18) {
-            Text("\(Text("✓ / n").foregroundStyle(Color.accentColor)) gets it")
-            Text("\(Text("2 of 3").foregroundStyle(StateTint.attention.color ?? .orange)) some left out, see why")
+            Text("\(Text("✓ / n").foregroundStyle(SharedInk.reach)) gets it")
+            Text("\(Text("2 of 3").foregroundStyle(SharedInk.attention)) some left out, see why")
             Text("— has no way to take it")
             Text("? not checked yet")
         }
@@ -137,8 +137,7 @@ extension SharedOverviewPage.Cell: View {
     var body: some View {
         Text(text)
             .fontWeight(tone == .gets ? .semibold : .regular)
-            .foregroundStyle(tone == .gets ? Color.accentColor
-                             : tone == .attention ? (StateTint.attention.color ?? .orange) : .secondary)
+            .foregroundStyle(tone == .gets ? SharedInk.reach : tone == .attention ? SharedInk.attention : .secondary)
             .monospacedDigit()
     }
 }

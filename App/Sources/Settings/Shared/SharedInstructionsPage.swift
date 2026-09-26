@@ -35,7 +35,7 @@ struct SharedInstructionsPage: View {
                             Text(runtime.name)
                             Text(Self.reads(reach)).appText(.code).foregroundStyle(.secondary)
                             Text(Self.mark(reach))
-                                .foregroundStyle(reach?.gets == true ? Color.accentColor : .secondary)
+                                .foregroundStyle(reach?.gets == true ? SharedInk.reach : .secondary)
                         }
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(runtime.name): \(Self.reads(reach)). \(SharedReachList.line(reach ?? .unchecked(nil)))")
