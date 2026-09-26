@@ -28,6 +28,8 @@ extension Trait where Self == ConditionTrait {
     ///   aChainShortOfTheCeilingCarriesOnFromTheRestoredDepth — the next link neither
     ///   runs nor is refused within 10 s. Worth a look: it may be more than slowness.
     /// - BigContentTests.aMegabyteDiffIsReadQuickly — a 500 ms budget.
+    /// - DaemonTests.theRestartWordsGoAheadOfWhatWasQueued — on the GitHub runner, both
+    ///   prompts had not gone within `eventually`'s wait (2026-09-26); green on a Mac.
     /// - LeaseTests.aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack —
     ///   the next in line is never started with the news (1 of 3 runs under CI=1).
     static var flakyUnderLoad: Self {

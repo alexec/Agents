@@ -21,9 +21,11 @@ public enum LoginShellPath {
     /// answer does not change while the app is running.
     public static func directories() -> [String] {
         if let cached = cache.value { return cached }
-        var directories = readFromLoginShell() ?? []
-        for fallback in fallbacks where !directories.contains(fallback) {
-            directories.append(fallback)
+        // First place wins, as it does for the shell. A login PATH often names a
+        // directory twice (a profile that prepends what path_helper already put there).
+        var directories: [String] = []
+        for directory in (readFromLoginShell() ?? []) + fallbacks where !directories.contains(directory) {
+            directories.append(directory)
         }
         cache.value = directories
         return directories
