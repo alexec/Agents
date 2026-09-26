@@ -1,14 +1,15 @@
 ---
 diataxis: reference
 devices: [mac, server]
-description: The four coding agents the app can start, what it runs for each, and what each can do in the app.
+description: The coding agents the app can start, what it runs for each, and what each can do in the app.
 ---
 
 # Runtimes
 
 A runtime is the coding agent that does the work in a conversation. This page lists the
-four the app knows how to start. You install and sign in to each one yourself; the app
-finds it on your Mac, or on a server when the project is on a server.
+ones the app knows how to start. You install and sign in to most of them yourself, and the
+app finds them on your Mac, or on a server when the project is on a server. Codex is the
+exception: the app installs its own copy from the set-up page, and needs nothing of yours.
 
 What a runtime can do in the app is decided by what it says about itself when it starts,
 not by its name. The columns for pictures and signing in are what each runtime said when
@@ -21,6 +22,7 @@ newer version.
 | **Grok** | `grok agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. |
 | **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | None | Its conversations get none of the app's tools, including the one it uses to say how a turn went, so its turns end without a report. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. |
+| **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agents** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agent tools (`spawn_agent` and five others) cannot be turned off. |
 
 In every column:
 

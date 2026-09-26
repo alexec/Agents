@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Sign a runtime such as Claude Code, Copilot, Cursor or Grok in or out, from the app.
+description: Sign a runtime such as Claude Code, Codex, Copilot, Cursor or Grok in or out, from the app.
 ---
 
 # Sign a runtime in
@@ -27,7 +27,9 @@ signing in** beside it, and you can sign it in from there.
 3. If it needs signing in, click the way you want to sign in. The buttons are the
    runtime's own, with its own advice under each.
    - Most runtimes then sign in by themselves, often by opening a page in your browser.
-     Finish there.
+     Finish there. Codex offers **ChatGPT** first: your browser opens OpenAI's sign-in, and
+     once you finish, Codex in Terminal is signed in too. **ChatGPT (device code)** shows a
+     code to enter on OpenAI's page instead, and **API Key** uses an OpenAI API key.
    - Some hand you a command to run instead, and the sheet says, for example, **Copilot
      signs in from a terminal. Run this:** with the command under it. Click **Open
      Terminal** (it also copies the command), paste it and follow what it asks. **Copy**

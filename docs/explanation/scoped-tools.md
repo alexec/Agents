@@ -69,6 +69,12 @@ each one has.
   and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
   agent's briefing names them and says what to use instead.
+- **Codex** takes feature switches in a variable set only for the sessions the app starts.
+  It loses its sleep tool, its long-running goals, its automations, its memories and its
+  ChatGPT connectors. Its six sub-agent tools (`spawn_agent`, `send_message` and the rest)
+  come with the model and cannot be switched off, so the briefing names them and says to
+  start helpers with the app's own tool instead. Its question tool stays, and its questions
+  reach you as a card.
 
 Where a tool can only be named in the briefing, the agent is being asked, not stopped.
 That is weaker, and the app says so rather than pretending otherwise.
