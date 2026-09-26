@@ -245,6 +245,12 @@ public actor DaemonCore {
     var slimSweep: Task<Void, Never>?
     /// A monotonic origin for `RetentionClock`, taken when the daemon was made.
     let uptimeOrigin = ContinuousClock.now
+    /// How an agent's folder is measured. The tests swap it, so a cap can be crossed
+    /// without writing gigabytes.
+    var measureFolder: @Sendable (URL) -> Int = { ArchiveIndex.sizeOnDisk($0) }
+    /// The last time an archive asked for a check, so a busy archiving day asks at most
+    /// once a minute.
+    var lastArchiveCheck: Date?
 
     // MARK: Events (042)
 

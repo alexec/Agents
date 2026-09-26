@@ -179,4 +179,53 @@ struct RetirementTests {
                                         params: try JSONValue.encoding(DaemonAPI.AgentRequest(agentID: UUID())))
         if case .failure(let error) = unknown { #expect(error.code == DaemonAPI.Failure.noSuchAgent) }
     }
+
+    // MARK: US2
+
+    /// Sizes from a table rather than the disk: a cap is crossed without writing gigabytes.
+    private func sized(_ core: DaemonCore, _ sizes: [UUID: Int]) async {
+        await core.setMeasureFolder { folder in
+            sizes[UUID(uuidString: folder.lastPathComponent) ?? UUID()] ?? 0
+        }
+    }
+
+    @Test func overTheCapTheOldestGoFirstAndNoneOnItsFirstDay() async throws {
+        let (locations, work) = try temporary()
+        let mb = 1_000_000
+        let a = archived(work, daysAgo: 10), b = archived(work, daysAgo: 9)
+        let c = archived(work, daysAgo: 8), fresh = archived(work, daysAgo: 0.5)
+        let core = try await core(locations, seeded: [a, b, c, fresh],
+                                  settings: RetentionSettings(keepFor: .days30, cap: .gb1))
+        await sized(core, [a.id: 400 * mb, b.id: 400 * mb, c.id: 400 * mb, fresh.id: 400 * mb])
+        await core.checkRetention()
+        #expect(await core.agent(a.id) == nil)
+        #expect(await core.agent(b.id) == nil)
+        #expect(await core.agent(c.id) != nil)
+        #expect(await core.agent(fresh.id) != nil)
+        #expect(await core.retiredTombstones(.init(ids: [a.id])).first?.retiredBecause == .cap)
+    }
+
+    @Test func overTheCapWithNothingThatCanGoSaysSoAndWhy() async throws {
+        let (locations, work) = try temporary()
+        let fresh = archived(work, daysAgo: 0.2), fresher = archived(work, daysAgo: 0.1)
+        let core = try await core(locations, seeded: [fresh, fresher],
+                                  settings: RetentionSettings(keepFor: .days30, cap: .gb1))
+        await sized(core, [fresh.id: 800_000_000, fresher.id: 800_000_000])
+        await core.checkRetention()
+        #expect(await core.agent(fresh.id) != nil)
+        let state = await core.retentionState()
+        #expect(state.overCap == OverCap(bytesOver: 600_000_000, holding: [.firstDay: 2]))
+    }
+
+    @Test func liveAgentsNeverCountTowardTheCap() async throws {
+        let (locations, work) = try temporary()
+        let live = Agent(runtimeID: "claude", cwd: work, title: "live", state: .finished, endedReason: .endTurn)
+        let small = archived(work, daysAgo: 5)
+        let core = try await core(locations, seeded: [live, small],
+                                  settings: RetentionSettings(keepFor: .days30, cap: .gb1))
+        await sized(core, [live.id: 5_000_000_000, small.id: 1_000])
+        await core.checkRetention()
+        #expect(await core.agent(small.id) != nil)
+        #expect(await core.retentionState().archivedBytes == 1_000)
+    }
 }

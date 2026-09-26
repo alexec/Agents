@@ -42,3 +42,11 @@ Settings on Alex's screen at 22:57:43. It was quit at once. Exact menu titles ar
 `/tmp/ax-exact.swift` from now on.
 
 Alex approved the look as is (AskUserQuestion, 2026-09-25).
+
+## US1 checkpoint on a scratch daemon, 2026-09-25
+
+`/tmp/run-051`, seeded with 3 agents archived 31 days ago (2 MB transcripts), 2 at 29 days and
+2 live. The branch's `agentsd` was started on it, with a held connection. At the first check,
+30 s after start, `daemon.log` said "retiring … (age)" three times. `retired.jsonl` held exactly
+the three seeded 31-day ids, and their folders were gone. `agents/list` still had the two 29-day
+agents and the two live ones. `retention/state` said 2 archived (4 MB) and 3 retired.

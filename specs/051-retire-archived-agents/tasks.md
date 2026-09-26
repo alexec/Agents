@@ -226,12 +226,12 @@ nothing else is touched.
 
 **Independent test**: quickstart §2, the Cap bullet.
 
-- [ ] T035 [P] [US2] Add to `RetirementTests.swift`, with the cap set to 10 MB and seeded 4 MB agents archived at 10, 9, 8 and 0.5 days:
+- [X] T035 [P] [US2] Add to `RetirementTests.swift`, with the cap set to 10 MB and seeded 4 MB agents archived at 10, 9, 8 and 0.5 days:
   - The 10- and 9-day agents are retired, and the 8-day and half-day agents are kept.
   - With every agent under a day old and over the cap, nothing is retired, and `retention/state.overCap` names `firstDay` (FR-013).
   - Live agents' sizes never count.
-- [ ] T036 [US2] Measure `sizeOnDisk` for each candidate in `checkRetention` with `ArchiveIndex.sizeOnDisk`, off the actor in a detached task. T039 caches it in the index. Pass the cap to `RetentionPlan`. Make T035 pass.
-- [ ] T037 [US2] Run a check straight after `archive` when the cap is set and the new total may cross it, debounced to at most once a minute, so a heavy archive day does not wait an hour.
+- [X] T036 [US2] Measure `sizeOnDisk` for each candidate in `checkRetention` with `ArchiveIndex.sizeOnDisk`, off the actor in a detached task. T039 caches it in the index. Pass the cap to `RetentionPlan`. Make T035 pass.
+- [X] T037 [US2] Run a check straight after `archive` when the cap is set and the new total may cross it, debounced to at most once a minute, so a heavy archive day does not wait an hour.
 
 ---
 

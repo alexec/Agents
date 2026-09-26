@@ -9,6 +9,12 @@ import AgentsKitCore
 /// names it. The rules are `RetentionPlan`'s; this is the daemon gathering the facts,
 /// acting on the answer and telling the windows.
 extension DaemonCore {
+    /// For the tests: measure folders some other way.
+    func setMeasureFolder(_ measure: @escaping @Sendable (URL) -> Int) {
+        measureFolder = measure
+        archiveIndex = [:]
+    }
+
     // MARK: Loading
 
     /// The settings and the tombstones, read once. Before the agents, so a start can
@@ -37,7 +43,7 @@ extension DaemonCore {
     /// when it does not.
     func size(of id: UUID) -> Int {
         if let entry = archiveIndex[id] { return entry.sizeOnDisk }
-        let size = ArchiveIndex.sizeOnDisk(locations.agent(id))
+        let size = measureFolder(locations.agent(id))
         if let agent = agents[id], agent.state == .archived,
            let modified = ArchiveIndex.modifiedAt(locations.record(id)) {
             archiveIndex[id] = ArchiveIndex.Entry(agent: agent, sizeOnDisk: size, fileModifiedAt: modified)
@@ -128,6 +134,17 @@ extension DaemonCore {
         saveArchiveIndex()
         let after = retentionState()
         if after != before { broadcast(DaemonAPI.Notification.retentionChanged, after) }
+    }
+
+    /// A heavy archiving day can cross the cap well before the hourly check, so an
+    /// archive asks for one, at most once a minute and only when there is a cap to
+    /// cross. Never for the agent just archived: it is on its first day.
+    func checkSoonAfterArchiving() {
+        loadRetentionIfNeeded()
+        guard retention.settings.cap.bytes != nil else { return }
+        if let last = lastArchiveCheck, now().timeIntervalSince(last) < 60 { return }
+        lastArchiveCheck = now()
+        Task { [weak self] in await self?.checkRetention() }
     }
 
     /// Every archived agent, as the rules see it.

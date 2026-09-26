@@ -1335,6 +1335,7 @@ extension DaemonCore {
             await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
+        checkSoonAfterArchiving()
     }
 
     /// The line an agent that archived itself leaves in its transcript.
