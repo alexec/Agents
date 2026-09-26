@@ -77,7 +77,7 @@ struct BriefingTests {
     /// searching the MCP catalogue for it and guessed anyway. Worse than saying nothing,
     /// which is what FR-008 is about.
     @Test func andNamesNothingWhereThereIsNoChannel() {
-        for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.cursor] {
+        for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.cursor, ToolPolicyCatalog.gemini] {
             #expect(policy.escalationTool == nil, "\(policy.runtimeID)")
             #expect(Briefing.text(for: policy).contains("your question or form tool"))
             #expect(!Briefing.text(for: policy).contains("Yours is called"))

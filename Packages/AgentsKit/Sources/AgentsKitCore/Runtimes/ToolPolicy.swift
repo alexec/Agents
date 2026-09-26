@@ -13,8 +13,10 @@ import Foundation
 //
 // It is a table rather than a run of conditionals because of the rule the README sets
 // for the whole app: no code in the app asks which runtime it is talking to. `Lever` is
-// four ways of *asking* — a deny list in the session, an allow list in the session,
-// flags at launch, or nothing at all — and the runtime id appears exactly once, as the
+// six ways of *asking* — a deny list in the session, an allow list in the session,
+// flags at launch, JSON in a variable, a file the runtime is pointed at, or nothing at
+// all — and the runtime
+// id appears exactly once, as the
 // key this table is looked up by.
 //
 // Nothing in here was read out of documentation. Every name, every key path and every
@@ -110,25 +112,39 @@ public struct ResidualTool: Codable, Hashable, Sendable {
 /// Config the app writes for a runtime that will read policy only from a file.
 ///
 /// Nothing reads it back. It is an argument that happens to need a path: written whole
-/// before the process starts, pointed at by an environment variable, and rebuilt every
-/// launch from the policy above it (Research R11).
+/// before the process starts, pointed at by an environment variable or by a launch
+/// argument, and rebuilt every launch from the policy above it (Research R11).
+///
+/// Grok reads its switches only from a file named by `GROK_CONFIG_PATH`. Gemini reads
+/// extra policy from `--policy <path>`, which adds to the person's own policies where a
+/// settings file named by a variable would replace theirs key by key (046, R5).
 public struct EnvironmentFile: Codable, Hashable, Sendable {
     /// The file's name under `<root>/runtimes/`.
     public var name: String
     public var contents: String
-    /// The environment variable pointed at it.
-    public var variable: String
+    /// The environment variable pointed at it, or nil when an argument is.
+    public var variable: String?
+    /// The launch flag its path follows, or nil when a variable points at it.
+    public var argument: String?
 
     public init(name: String, contents: String, variable: String) {
         self.name = name
         self.contents = contents
         self.variable = variable
+        self.argument = nil
+    }
+
+    public init(name: String, contents: String, argument: String) {
+        self.name = name
+        self.contents = contents
+        self.variable = nil
+        self.argument = argument
     }
 }
 
 /// How a removal is asked for.
 ///
-/// Four ways of asking, not four runtimes. Nothing downstream switches on a runtime id:
+/// Six ways of asking, not six runtimes. Nothing downstream switches on a runtime id:
 /// the daemon asks the policy for a `_meta` object, a list of launch arguments and a set
 /// of environment files, and sends whatever comes back.
 ///
@@ -150,6 +166,10 @@ public enum Lever: Hashable, Sendable {
     /// feature switches take the removed tools away). The removed names are for the
     /// briefing; the switches that remove them are in `value`.
     case environmentJSON(variable: String, value: JSONValue)
+    /// The removed names are written into one of the policy's `environmentFiles`, which the
+    /// runtime is pointed at; nothing rides on the session or the command line besides the
+    /// file's own path (046: Gemini's `--policy`).
+    case file
     /// No mechanism at all. Everything conflicting is residue.
     case words
 }
@@ -188,6 +208,17 @@ public struct ToolPolicy: Hashable, Sendable {
     /// Codex puts ChatGPT before an API key, D1). Methods not named keep their order after
     /// these. Empty keeps the rule for everyone else: the first one without a terminal.
     public var preferredAuthMethods: [String]
+    /// Not offered the client's file reading, so the runtime reads from disk itself; writes
+    /// still come through the app (046). Gemini's `write_file` reads first and treats only
+    /// an error carrying code `ENOENT` as "a new file", which a JSON-RPC error over ACP can
+    /// never carry: every new file it tried to write through the app failed (walk,
+    /// 2026-09-25).
+    public var readsFilesItself: Bool
+    /// The sign-in method to call `authenticate` with when picking a conversation back up is
+    /// refused as not signed in, before trying once more (046: Gemini's `gemini-api-key`,
+    /// which reads the key from its environment and records that choice in Gemini's own
+    /// settings — so only when needed).
+    public var authMethodBeforeContinuing: String?
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -196,7 +227,9 @@ public struct ToolPolicy: Hashable, Sendable {
                 lever: Lever,
                 environmentFiles: [EnvironmentFile] = [],
                 escalationTool: String? = nil,
-                preferredAuthMethods: [String] = []) {
+                preferredAuthMethods: [String] = [],
+                readsFilesItself: Bool = false,
+                authMethodBeforeContinuing: String? = nil) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -205,6 +238,8 @@ public struct ToolPolicy: Hashable, Sendable {
         self.environmentFiles = environmentFiles
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods
+        self.readsFilesItself = readsFilesItself
+        self.authMethodBeforeContinuing = authMethodBeforeContinuing
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.
@@ -219,7 +254,7 @@ public struct ToolPolicy: Hashable, Sendable {
             Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: [:])
         case .sessionMetaAllowList(let path, let keep, let extra):
             Self.nesting(.array(keep.map(JSONValue.string)), at: path, beside: extra)
-        case .launchArguments, .environmentJSON, .words:
+        case .launchArguments, .environmentJSON, .file, .words:
             nil
         }
     }

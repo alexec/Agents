@@ -66,3 +66,22 @@ struct CredentialCheckTests {
     }
 }
 #endif
+
+/// Gemini's key is checked with Google, in a header (046, contracts/credentials.md).
+@Suite("Checking a Gemini key")
+struct GeminiCredentialCheckTests {
+    @Test func theKeyGoesInAHeaderAndNeverTheURL() throws {
+        let key = "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"
+        let request = CredentialCheck.request(for: try #require(Secret(key)))
+        #expect(request.url == CredentialCheck.geminiEndpoint)
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == key)
+        #expect(!(request.url?.absoluteString.contains(key) ?? true))
+        #expect(request.value(forHTTPHeaderField: "x-api-key") == nil)
+    }
+
+    @Test func googlesWordForAnUnknownKeyIsARefusal() {
+        let body = Data(#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"#.utf8)
+        #expect(CredentialCheck.isInvalidKey(body))
+        #expect(CredentialCheck.message(body) == "API key not valid. Please pass a valid API key.")
+    }
+}

@@ -64,6 +64,18 @@ extension DaemonCore {
         return status
     }
 
+    /// Why an agent cannot start on `runtime` right now, said the way its set-up row says
+    /// it (046, FR-003): being installed, failed to install, or not here with the place to
+    /// install it. The error the start and pick-up paths throw instead of launching.
+    func notStartable(_ runtime: Runtime, lookedIn: [String]) -> JSONRPCError {
+        let recipe = installer?.recipe(for: runtime)
+        let message = notYetInstalled(runtime)
+            ?? (recipe != nil ? "\(runtime.name) isn’t on this Mac. Install it from Settings ▸ Agents."
+                              : "\(runtime.name) is not installed, or is not where we looked.")
+        return JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound, message: message,
+                            data: ["lookedIn": .array(lookedIn.map(JSONValue.string))])
+    }
+
     /// Wait for an install under way to end. For tests; the app listens instead.
     func waitForInstall(_ runtimeID: String) async {
         await installs[runtimeID]?.value

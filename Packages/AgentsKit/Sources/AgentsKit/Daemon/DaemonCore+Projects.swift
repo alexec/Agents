@@ -157,11 +157,36 @@ extension DaemonCore {
         // the one made here keeps the age the derived project already had.
         let oldest = agents.values.filter { $0.projectFolder == standardized }.map(\.createdAt).min()
         var record = records[standardized] ?? Project(folder: standardized, addedAt: oldest ?? Date())
-        guard record.laidOutAt == nil else { return }
-        DotAgents.apply(to: standardized)
-        record.laidOutAt = Date()
+        // Once for each step: a project laid out by an older layout gets only what
+        // was added since, never the steps it already had back.
+        let from = record.laidOutAt == nil ? 0 : record.layoutVersion ?? 1
+        guard from < DotAgents.version else { return }
+        DotAgents.apply(to: standardized, from: from)
+        record.laidOutAt = record.laidOutAt ?? Date()
+        record.layoutVersion = DotAgents.version
         records[standardized] = record
         saveProjectRecords(records)
+    }
+
+    /// The `_meta` a session in `cwd` is made with: the runtime's tool scoping, and the
+    /// project's plugins for a runtime that takes them that way. Worked out on every
+    /// session, so a plugin added to `.agents/plugins` is there from the next one — and
+    /// so is its line in the project's marketplace index, for the runtimes that load
+    /// plugins only from one.
+    func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
+        DotAgents.refreshPlugins(for: cwd)
+        return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
+                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd)))
+    }
+
+    /// Two `_meta` objects as one, key by key and all the way down, because Claude's
+    /// scoping and its plugins both live in `claudeCode.options`.
+    static func merging(_ base: JSONValue?, _ added: JSONValue?) -> JSONValue? {
+        guard let base else { return added }
+        guard let added else { return base }
+        guard case .object(var merged) = base, case .object(let more) = added else { return added }
+        for (key, value) in more { merged[key] = merging(merged[key], value) }
+        return .object(merged)
     }
 
     /// Put a project away.

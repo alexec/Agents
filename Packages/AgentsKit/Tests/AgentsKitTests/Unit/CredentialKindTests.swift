@@ -32,3 +32,32 @@ struct CredentialKindTests {
         #expect(!dumped.contains("SECRET"))
     }
 }
+
+/// Gemini's key (046): two shapes, one kind, never printed.
+@Suite("A Gemini key")
+struct GeminiKeyKindTests {
+    @Test func bothShapesAreGeminiKeys() throws {
+        for text in ["AIzaSyFAKEFAKEFAKEFAKEFAKEFAKEFAKE1234", "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"] {
+            let secret = try #require(Secret(text))
+            #expect(secret.kind == .geminiAPIKey)
+            #expect(secret.kind.runtimeID == "gemini")
+            #expect(secret.kind.environmentVariable == "GEMINI_API_KEY")
+            #expect(secret.kind.isLentOnTheMac)
+            #expect(!"\(secret)".contains(text.dropLast(4)))
+            #expect(secret.mask.hasPrefix("key …"))
+        }
+    }
+
+    @Test func tooShortOrOtherwiseIsNotOne() {
+        #expect(Secret("AIza12") == nil)
+        #expect(Secret("AQ.123") == nil)
+        #expect(Secret("sk-live-something-long-enough") == nil)
+    }
+
+    @Test func claudesKindsAreUnchanged() {
+        #expect(CredentialKind.kinds(for: "claude") == [.oauthToken, .apiKey])
+        #expect(!CredentialKind.oauthToken.isLentOnTheMac && !CredentialKind.apiKey.isLentOnTheMac)
+        #expect(CredentialKind.allVariables == ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"])
+        #expect(CredentialKind.variables(for: "gemini") == ["GEMINI_API_KEY", "GOOGLE_API_KEY"])
+    }
+}
