@@ -35,7 +35,7 @@
    skills.sh, GitHub. They are the feature's subject (where a skill goes, which catalogue it
    comes from), as in 054's spec, not a choice of how to build it. No language, framework or
    code structure is named.
-2. Three questions are left for the look gate rather than marked for clarification: where Add
+2. Three questions were settled at the look gate rather than marked for clarification: where Add
    sits, the known-owner mark, and whether the project section shows MCP servers and plugins
    greyed out ([look/README.md](../look/README.md)).
-3. Plan is blocked on the look gate, per the "settle the UX before building depth" rule.
+3. Look gate approved 2026-09-26 as drawn; ready for `/speckit-plan`.

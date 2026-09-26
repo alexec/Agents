@@ -1,7 +1,6 @@
 # 059 · Wireframes: search a catalogue and add a skill
 
-**Waiting for Alex's approval.** This is the look gate for 059, and nothing gets built until it is
-approved. Feasibility: [install-from-catalogues.md](../../../.agents/research/install-from-catalogues.md)
+**Approved by Alex, 2026-09-26, as drawn.** This is the look gate for 059. Feasibility: [install-from-catalogues.md](../../../.agents/research/install-from-catalogues.md)
 (in the main checkout, not committed).
 
 **What this adds.** The person can search a public catalogue from inside the app, look at what
@@ -72,10 +71,9 @@ like any other file an agent writes.
 - **Offline:** if skills.sh can't be reached, the sheet says so, keeps the search text and offers
   Try again.
 
-## To decide at this gate
+## Decided at this gate
 
-1. **Where Add sits.** In the bar (A) and in the project section's heading (D), or in a single
-   place such as a toolbar button on the main window.
-2. **The known-owner mark.** Keep it, or drop it and show only install counts.
-3. **The project section.** Skills only for now, or lay out the whole "what this project gives
-   agents" section at once, with MCP servers and plugins greyed out until their slices land.
+1. **Add sits where drawn:** in Shared ▸ Skills' bar (A) and in the project section's heading (D).
+2. **Keep the known-owner mark.** It is a mark, not a gate.
+3. **The project section is Skills only.** MCP servers and plugins get their own sections when
+   their slices land.

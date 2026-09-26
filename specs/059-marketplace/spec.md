@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-26
 
-**Status**: Draft. Look gate first: [look/](look/README.md), frames A–E
+**Status**: Draft. Look gate approved by Alex 2026-09-26, as drawn: [look/](look/README.md), frames A–E
 
 **Input**: User description: "I'd like the user to be able to search and install skills, plugins, and MCPs." Clarified the same day: "we're searching marketplaces and allowing the user to add these to their project or user config." The feasibility note is `.agents/research/install-from-catalogues.md`. This spec covers the first slice, **skills**. MCP servers and plugins come in later slices through the same sheet (see Scope).
 
@@ -332,4 +332,5 @@ named `review` to You. Then stop the fixture server and search.
   already settled. This feature changes neither.
 - This slice never offers MCP servers or plugins. The sheet and records are designed so those
   slices can reuse them.
-- Alex approves the layout (look gate) before any of this is built, as with 054 and 055.
+- The layout was approved as drawn (look gate, 2026-09-26): Add in Shared's bar and the project
+  section's heading, the known-owner mark kept, and the project section showing skills only.
