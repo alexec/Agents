@@ -45,7 +45,12 @@ extension DaemonCore {
         if let session = live[pending.agentID] {
             await session.answerElicitation(id: pending.request.id, outcome: outcome)
         }
-        await record(.elicitationAnswered(id: pending.request.id, summary: outcome.summary),
+        var answers: [ElicitationAnswer] = []
+        if case .accept(let content) = outcome, case .form(let schema) = pending.request.mode {
+            answers = schema.answers(content, message: pending.request.message)
+        }
+        await record(.elicitationAnswered(id: pending.request.id, summary: outcome.summary,
+                                          answers: answers),
                      for: pending.agentID)
         await move(pending.agentID, on: .permissionAnswered)
         broadcast(DaemonAPI.Notification.agentElicitation,

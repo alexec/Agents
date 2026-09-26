@@ -52,7 +52,8 @@ extension TranscriptEntry.Kind {
             return .elicitationAsked(request)
         case "elicitationAnswered":
             guard let id = payload["id"]?.stringValue.flatMap(UUID.init(uuidString:)) else { return nil }
-            return .elicitationAnswered(id: id, summary: payload["summary"]?.stringValue ?? "")
+            return .elicitationAnswered(id: id, summary: payload["summary"]?.stringValue ?? "",
+                                        answers: (try? payload["answers"]?.decode([ElicitationAnswer].self)) ?? [])
         case "compaction":
             return .compaction(status: payload["status"]?.stringValue ?? "",
                                summary: [ContentBlock](wire: payload["summary"]))
@@ -128,8 +129,10 @@ extension TranscriptEntry.Kind {
             return ["servedRequest": ["_0": (try? JSONValue.encoding(request)) ?? .null]]
         case .elicitationAsked(let request):
             return ["elicitationAsked": ["_0": (try? JSONValue.encoding(request)) ?? .null]]
-        case .elicitationAnswered(let id, let summary):
-            return ["elicitationAnswered": ["id": .string(id.uuidString), "summary": .string(summary)]]
+        case .elicitationAnswered(let id, let summary, let answers):
+            var payload: [String: JSONValue] = ["id": .string(id.uuidString), "summary": .string(summary)]
+            if !answers.isEmpty { payload["answers"] = (try? JSONValue.encoding(answers)) ?? .null }
+            return ["elicitationAnswered": .object(payload)]
         case .compaction(let status, let summary):
             return ["compaction": ["status": .string(status), "summary": summary.wire]]
         case .notice(let notice):

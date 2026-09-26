@@ -86,8 +86,24 @@ private struct EntryRow: View {
         case .elicitationAsked(let request):
             Text("Asked: \(request.title)").appText(.supporting).foregroundStyle(.secondary)
 
-        case .elicitationAnswered(_, let summary):
-            Text(summary).appText(.supporting).foregroundStyle(.secondary)
+        case .elicitationAnswered(_, let summary, let answers):
+            if answers.isEmpty {
+                Text(summary).appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                // What they said is theirs, so it sits in their bubble, each answer
+                // under the question it answers: the card that asked is gone.
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(answers.enumerated()), id: \.offset) { _, answer in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(answer.question).appText(.supporting).foregroundStyle(.secondary)
+                            Text(answer.answer).appText(.reading).textSelection(.enabled)
+                        }
+                    }
+                }
+                .padding(12)
+                .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
         case .compaction(let status, let summary):
             VStack(alignment: .leading, spacing: 6) {

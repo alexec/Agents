@@ -135,6 +135,15 @@ struct ElicitationTests {
         #expect(result["action"]?.stringValue == "accept")
         #expect(result["content"]?["question_0"]?.stringValue == "Keep them")
         #expect(result["content"]?["question_1"]?.arrayValue?.first?.stringValue == "Update CLAUDE.md")
+
+        // The card goes; what they said stays in the conversation, question by question.
+        let entries = try await core.transcript(.init(agentID: request.agentID, before: nil, limit: 200)).entries
+        let answered = entries.compactMap { entry -> [ElicitationAnswer]? in
+            guard case .elicitationAnswered(_, _, let answers) = entry.kind else { return nil }
+            return answers
+        }
+        #expect(answered == [[ElicitationAnswer(question: "Thinking blocks", answer: "Keep them"),
+                              ElicitationAnswer(question: "Also do", answer: "Update CLAUDE.md")]])
     }
 
     @Test func anAnswerThatDoesNotFitIsNotSent() async throws {

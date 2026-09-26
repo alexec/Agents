@@ -258,4 +258,43 @@ struct ElicitationSchemaTests {
         ])))
         #expect(schema.pages.count == 1)
     }
+
+    /// An answer is kept in the words the card drew: a choice's title, the box beside
+    /// it joined on, the form's message standing in for an untitled lone question.
+    @Test func answersReadAsTheCardDrewThem() throws {
+        let schema = try #require(ElicitationSchema(wire: .object([
+            "properties": [
+                "question_0": ["type": "string", "title": "Colour",
+                               "oneOf": [["const": "r", "title": "Red"]]],
+                "question_0_custom": ["type": "string", "title": "Other"],
+                "question_1": ["type": "array", "title": "Also",
+                               "items": ["anyOf": [["const": "x", "title": "Ex"], ["const": "y", "title": "Why"]]]],
+                "question_2": ["type": "boolean", "title": "Sure"],
+            ],
+            "propertyOrder": ["question_0", "question_0_custom", "question_1", "question_2"],
+        ])))
+        let answers = schema.answers(["question_0": "r", "question_0_custom": "but darker",
+                                      "question_1": .array(["y", "x"]), "question_2": .bool(false)])
+        #expect(answers == [ElicitationAnswer(question: "Colour", answer: "Red, but darker"),
+                            ElicitationAnswer(question: "Also", answer: "Why, Ex"),
+                            ElicitationAnswer(question: "Sure", answer: "No")])
+
+        let lone = try #require(ElicitationSchema(wire: .object([
+            "properties": ["answer": ["type": "string"]],
+        ])))
+        #expect(lone.answers(["answer": "tomorrow"], message: "When?")
+                == [ElicitationAnswer(question: "When?", answer: "tomorrow")])
+        #expect(lone.answers([:], message: "When?").isEmpty)
+    }
+
+    /// The answers survive the record, and an entry without them reads as before.
+    @Test func answersSurviveTheRecord() throws {
+        let entry = TranscriptEntry(kind: .elicitationAnswered(
+            id: UUID(), summary: "You answered the agent's form",
+            answers: [ElicitationAnswer(question: "Colour", answer: "Red")]))
+        let back = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(entry))
+        #expect(back == entry)
+        let bare = TranscriptEntry(kind: .elicitationAnswered(id: UUID(), summary: "The form was closed"))
+        #expect(try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(bare)) == bare)
+    }
 }
