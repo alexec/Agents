@@ -48,6 +48,13 @@ Yes, with two limits the person should know about up front:
 - Q: Where does the person look at the state of the pool? → A: On a Pool page of its own. It is
   a row in the sidebar's Activity section, beside Events, Resources and Spending, and it is on
   the phone too. The pool is still edited in Settings, and the page links there.
+- Q: How does the person say which settings a chat should have on the new runtime? → A: In two
+  places. A **Continue with** sheet shows every setting side by side, old runtime and new, filled
+  in with the app's best mapping, and the person can change any of them before the chat moves.
+  A **Matching models** section on the Pool page keeps the mappings to use next time. Each row
+  there is a level the person names (say "Strongest" or "Cheap and fast") with one model and
+  effort per runtime in the pool. An automatic switch uses those rows. Its note in the chat can
+  open the same sheet afterwards to correct what it chose.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -181,24 +188,104 @@ check the chat stops with the note, then resumes on the one that comes back firs
 
 ---
 
-### User Story 5 - Moving a chat by hand (Priority: P3)
+### User Story 5 - Continue with another runtime, saying what it should be (Priority: P2)
 
-The person wants to move a chat to another runtime themselves: to save one allowance for later, or
-because another runtime is better at this kind of task. They pick "Continue with…" on the chat and
-choose a runtime. The chat moves the same way as an automatic switch, without re-sending anything.
+The person wants to move a chat to another runtime themselves. They might want to save one
+allowance for later, or another runtime might be better at this kind of task. They pick
+**Continue with…** on the chat and choose a runtime. A sheet opens with two columns: the settings
+the chat has now, and what it will have on the new runtime. There is a row each for model, effort,
+mode and any other option the new runtime offers. Each value on the right is filled in with the
+app's best mapping:
+- from the Matching models rows (Story 6), if the chat's current model is in one;
+- otherwise by the rules in FR-015.
 
-**Why this priority**: It reuses the whole of Story 1 and is useful on its own, but nobody is
-blocked without it.
+Each filled-in value says where it came from ("from Strongest", "same value", "runtime default").
+The person can change any of them. Mode can only be set as loose as the chat's current mode, or
+stricter. Settings that will not carry over are listed under the columns, in plain words: extra
+command-line arguments, "always allow" answers, queued slash commands the new runtime lacks.
 
-**Independent Test**: On an idle chat, choose Continue with another runtime; check the note, the
-new runtime in the controls, and that the next prompt goes to it with the history.
+Under the columns is a switch: **Remember this for next time**. With it on, the chosen model and
+effort are added to a Matching models row, or a new row is made, so the next switch between
+these runtimes needs no correcting. The person confirms, and the chat moves without re-sending
+anything.
+
+The same sheet opens from an automatic switch's note in the chat, as **Change what it carried on
+with**. There it changes the new runtime's settings from the next turn on. It does not undo the
+turn already under way.
+
+**Why this priority**: Only the person knows which model on one vendor stands in for which on
+another. Without this, every switch lands on a default and has to be corrected by hand, chat by
+chat.
+
+**Independent Test**:
+1. On an idle chat, open Continue with and pick a second runtime.
+2. Check every row is filled in and each says where its value came from.
+3. Change the model, turn on Remember, and confirm.
+4. Check the chat is on the new runtime with that model, and the next prompt goes to it with the
+   history.
+5. Check a Matching models row now holds both models.
+6. Open Continue with on another chat on the first runtime, with the same model, and check the
+   new runtime's model is filled in from that row.
 
 **Acceptance Scenarios**:
 
-1. **Given** an idle chat on A, **When** the person continues it with B, **Then** the chat is on B
-   and its next prompt goes to B with the conversation so far.
+1. **Given** an idle chat on A, **When** the person continues it with B and confirms, **Then** the
+   chat is on B with exactly the settings shown on the sheet, and its next prompt goes to B with
+   the conversation so far.
 2. **Given** a chat with a turn in flight, **When** the person picks Continue with, **Then** they
    are asked to stop the turn first.
+3. **Given** the sheet, **When** the person tries to pick a mode looser than the chat's current
+   one, **Then** it is not offered.
+4. **Given** the sheet with Remember on, **When** the person confirms, **Then** the model and
+   effort pair is saved as a Matching models row, or added to the row the old model was already
+   in.
+5. **Given** a chat that switched by itself, **When** the person opens Change what it carried on
+   with from its note and picks another model, **Then** the next turn runs on that model, and the
+   chat records the change.
+
+---
+
+### User Story 6 - Matching models, set up ahead of time (Priority: P2)
+
+The person would rather settle the mapping once than correct it after every switch. The Pool page
+has a **Matching models** section. It is a grid: one column for each runtime in the pool, and
+one row for each level the person names. Each cell is a model, and an effort where the runtime
+offers one, picked from what that runtime offers. A cell can be left empty. For example (the
+model names are only illustrations):
+
+| Level | Claude | Codex | Copilot |
+|-------|--------|-------|---------|
+| Strongest | Opus, high effort | gpt-5-codex, high | Claude Opus (via Copilot) |
+| Everyday | Sonnet | gpt-5-codex, medium | GPT-5 |
+
+When a chat switches, its current model is looked up in the grid. If that model is in a row, the
+new runtime gets that row's cell. If the model is in no row, or the cell is empty, the pool
+entry's model or the FR-015 rules decide, and the switch note says the grid had no answer.
+
+The lists of models come from what each runtime says it offers, and the app asks for them without
+starting a chat. If a cell names a model that a runtime has since stopped offering, the cell is
+shown as gone and is not used.
+
+**Why this priority**: It turns a correction that happens after every switch into one decision.
+It builds on Story 5's sheet, which fills in the same rows.
+
+**Independent Test**:
+1. With a pool of two, add a row mapping a model on each.
+2. Start a chat on the first runtime with that model.
+3. Force a switch, and check the new runtime started on the row's model and the note says so.
+4. Change the first runtime's model to one that is in no row, force a switch again, and check
+   the note says the grid had no answer.
+
+**Acceptance Scenarios**:
+
+1. **Given** a row mapping model X on A to model Y on B, **When** a chat on A with X switches to
+   B, **Then** it starts on Y, and the note says "from <row name>".
+2. **Given** a chat on a model that is in no row, **When** it switches, **Then** the pool entry's
+   model or the runtime's default is used, and the note says the grid had no answer.
+3. **Given** a runtime that no longer offers a model named in a cell, **When** the person opens
+   the page, **Then** that cell is shown as gone, and switches skip it.
+4. **Given** a runtime is added to the pool, **When** the person opens the page, **Then** the grid
+   gains an empty column for it.
 
 ### Edge Cases
 
@@ -281,15 +368,17 @@ new runtime in the controls, and that the next prompt goes to it with the histor
     - *Mode:* the new runtime's loosest mode that is no looser than the chat's current mode,
       judged on the same scale as a helper agent's mode (028). If the current mode has no place
       on that scale, the chat MUST get the new runtime's strictest mode.
-    - *Model:* the model named on the pool entry, else the model last chosen for that runtime,
-      else the runtime's default. A model is never matched by name across vendors.
+    - *Model and effort:* the Matching models row that holds the chat's current model, if that
+      row has a cell for the new runtime. Otherwise the model named on the pool entry, else the
+      model last chosen for that runtime, else the runtime's default. A model is never matched
+      by name across vendors.
     - *Effort and any other option:* the same value if the new runtime offers that value under
       the same kind of option; otherwise the runtime's default.
     - *Extra command-line arguments:* dropped.
   - **Runtime-private state, not carried:** the runtime's own session, its compaction of the
     chat, its "always allow" answers and its slash commands.
-- **FR-015a**: The switch note MUST say which mode and model the new runtime started in, and name
-  any setting that could not be carried over.
+- **FR-015a**: The switch note MUST say which mode and model the new runtime started in, where each
+  came from, and any setting that could not be carried over.
 
 **Pool page**
 
@@ -318,7 +407,29 @@ new runtime in the controls, and that the next prompt goes to it with the histor
 **By hand**
 
 - **FR-018**: The person MUST be able to continue an idle chat with any usable runtime, from the
-  Mac and from the phone, with the same carry-over as an automatic switch and nothing re-sent.
+  Mac and from the phone, with nothing re-sent.
+- **FR-026**: Continue with MUST show every setting the chat has now beside the value it will have
+  on the new runtime. Each value MUST be filled in by the FR-015 rules and say where it came from,
+  and the person MUST be able to change it before confirming. The settings that will not carry
+  over MUST be listed.
+- **FR-027**: The sheet MUST NOT offer a mode looser than the chat's current mode.
+- **FR-028**: The sheet MUST offer to remember the chosen model and effort as a Matching models
+  row.
+- **FR-029**: An automatic switch's note MUST open the same sheet. Changes made there MUST apply
+  from the chat's next turn, and MUST be recorded in the chat.
+
+**Matching models**
+
+- **FR-030**: The Pool page MUST have a Matching models grid: one column for each pool runtime and
+  one row for each level the person names. Each cell holds a model, and an effort where the
+  runtime offers one, chosen from what that runtime offers. A cell may be empty.
+- **FR-031**: The model lists MUST come from what each runtime says it offers, fetched without
+  starting a chat. A cell whose model is no longer offered MUST be shown as gone, and MUST NOT be
+  used.
+- **FR-032**: A model MUST appear in at most one row for each runtime, so that looking a model up
+  gives one answer.
+- **FR-033**: The grid MUST survive restarts, and MUST gain an empty column when a runtime is
+  added to the pool.
 
 ### Key Entities
 
@@ -326,6 +437,8 @@ new runtime in the controls, and that the next prompt goes to it with the histor
   optional model. App-wide.
 - **Runtime allowance state**: per runtime (and per host, for servers), available or out; when it
   ran out; when it is expected back, if known; how the app learned it.
+- **Matching row**: a level the person names, with at most one model, and effort, per runtime.
+  Rows are ordered and app-wide.
 - **Switch**: one move of one chat from one runtime to another: when, from, to, why (spent
   allowance, everyone out then resumed, or by hand), and the prompt it carried.
 
@@ -349,10 +462,14 @@ new runtime in the controls, and that the next prompt goes to it with the histor
   opening anything, and with one click can see which ones are out, until when, and every chat
   that moved in the last 30 days.
 
+- **SC-008**: Once the person has set up Matching models rows for their usual models, 9 of 10
+  automatic switches start on the model the person would have picked, with no correction
+  afterwards.
+
 ## Docs *(mandatory)*
 
 - `docs/how-to/keep-going-when-a-runtime-runs-out.md` — add: setting up the pool, what a switch
-  looks like, reading the Pool page, marking a runtime available again, continuing a chat with another runtime by hand.
+  looks like, reading the Pool page, filling in Matching models, using Continue with and its sheet, marking a runtime available again, continuing a chat with another runtime by hand.
 - `docs/reference/settings.md` — change: the pool, its switch, the per-chat opt-out.
 - `docs/reference/runtimes.md` — change: for each runtime, whether its spent allowance is
   recognised and whether it states a return time.
