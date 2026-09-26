@@ -130,8 +130,17 @@ public struct LineSplitter {
     /// Bytes handed to the newline search, over the splitter's life. At most every
     /// byte once; the tests hold it to that.
     private(set) var examined = 0
+    /// The longest line it will wait for, or nil for no limit.
+    public let maximumLine: Int?
+    /// A line ran past `maximumLine` without ending. Nothing after it can be trusted to
+    /// start where a line starts, so the reader should give up on the connection.
+    public private(set) var overflowed = false
 
-    public init() {}
+    /// `maximumLine` is for a reader whose other end is not ours to trust: without it,
+    /// a peer that never sends a newline is kept, byte by byte, for as long as it likes.
+    public init(maximumLine: Int? = nil) {
+        self.maximumLine = maximumLine
+    }
 
     public mutating func append(_ data: Data) {
         data.withUnsafeBytes { append($0.bindMemory(to: UInt8.self)) }
@@ -145,7 +154,22 @@ public struct LineSplitter {
             searched -= start
             start = 0
         }
+        guard !overflowed else { return }
         pending.append(contentsOf: bytes)
+        if let maximumLine, pending.count - start > maximumLine, !hasNewline(from: searched) {
+            overflowed = true
+            pending = []
+            start = 0
+            searched = 0
+        }
+    }
+
+    /// Whether a line ends somewhere past `from`. Not counted in `examined`: `next`
+    /// searches the same bytes again, and only a splitter over its limit asks.
+    private func hasNewline(from: Int) -> Bool {
+        pending.withUnsafeBufferPointer { all in
+            from < all.count && memchr(all.baseAddress! + from, Int32(UInt8(ascii: "\n")), all.count - from) != nil
+        }
     }
 
     public mutating func next() -> String? {
