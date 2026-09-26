@@ -67,6 +67,19 @@ struct FilesPane: View {
             if let openFile = state.openFile { reloadFile(openFile) }
         }
         .onChange(of: model.entries.count) { refreshTouched() }
+        // The agent moved to another folder (053): the pane goes with it, from the top,
+        // and stops watching the one it left.
+        .onChange(of: agent.cwd) { old, new in
+            guard old != new else { return }
+            if let server { Task { await server.unwatch(agentID: agent.id, folder: old) } }
+            state.folder = new
+            state.openFile = nil
+            state.openLine = nil
+            loaded = nil
+            probe = nil
+            reloadListing()
+            startWatching()
+        }
         // The agent can open a file here as well as the user (`show_file`), and when
         // it does, this pane is already on screen and has already run its task.
         .onChange(of: state.openFile) { _, url in

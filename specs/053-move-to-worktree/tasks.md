@@ -350,12 +350,12 @@ of the turn, with Cancel.
   - Wire `agentsMove` in `DaemonCore+Dispatch.swift`.
 
   Make T030 pass.
-- [ ] T032 [US3] In `App/Sources/AppModel.swift`:
+- [X] T032 [US3] In `App/Sources/AppModel.swift`:
   - Add `func worktrees(forAgent:)`, which loads `worktrees/list` for the agent's `projectFolder`
     and caches it like `draftWorktrees`.
   - Add `func move(_ agent: Agent, to target: MoveTarget?)`, which sends `agents/move` and shows
     the answer's message on failure the way other agent actions do.
-- [ ] T033 [US3] In `App/Sources/Chat/PromptBar.swift`, show the Worktree capsule on an agent's
+- [X] T033 [US3] In `App/Sources/Chat/PromptBar.swift`, show the Worktree capsule on an agent's
   page when the agent is on this host and its project is a repository (contracts/move.md §4):
   - The title is `Project folder`, the worktree's name, or `Moving to <name>…` while
     `pendingMove` is set.
@@ -365,11 +365,11 @@ of the turn, with Cancel.
     on a branch".
   - Keep the ContentView modifier chain in AgentsApp unchanged (memory: scratch app opens no
     window).
-- [ ] T034 [US3] In `App/Sources/Sidebar/FilesPane.swift`, add `.onChange(of: agent.cwd)`: unwatch
+- [X] T034 [US3] In `App/Sources/Sidebar/FilesPane.swift`, add `.onChange(of: agent.cwd)`: unwatch
   the old folder (server or `FolderWatch`), reset `state.folder`, and watch the new one.
-- [ ] T035 [US3] Check that the Changes pane (`App/Sources/Sidebar/ChangesPane.swift`) refreshes
+- [X] T035 [US3] Check that the Changes pane (`App/Sources/Sidebar/ChangesPane.swift`) refreshes
   when `agent.cwd` changes. If it doesn't, key its load on `agent.cwd` in the same way.
-- [ ] T036 [US3] **Gate**: take run-app screenshots of the capsule idle in the project folder, in
+- [X] T036 [US3] **Gate**: take run-app screenshots of the capsule idle in the project folder, in
   a worktree, and with a move waiting during a turn.
   - Save them to `specs/053-move-to-worktree/walk/`.
   - Show Alex and settle the layout before T037.

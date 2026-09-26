@@ -199,10 +199,12 @@ struct PromptBar: View {
                              waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
                              waitHint: agent.eventWait.map(EventWords.hint) ?? "",
                              openWait: { model.showEvents(at: .waitingNow) },
-                             cancelWait: { Task { await model.cancelWait(of: agent.id) } }) {
+                             cancelWait: { Task { await model.cancelWait(of: agent.id) } },
+                             place: agentPlace(agent)) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
+                .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
@@ -889,6 +891,84 @@ struct PromptBar: View {
                 }
             }
         }
+    }
+
+    // MARK: Moving an agent that is already working (053)
+
+    /// The Worktree choice on an agent's page, where the header names its place: where it
+    /// works now, and every other place in the project it could move to. Only for an agent
+    /// on this Mac, in a repository; anywhere else the header keeps its label.
+    private func agentPlace(_ agent: Agent) -> AnyView? {
+        guard agent.host == .mac, agent.state != .archived,
+              let listed = model.agentWorktrees[agent.projectFolder], listed.isRepository else { return nil }
+        let here = agent.worktree?.root.resolvingSymlinksInPath().path
+        let waiting = agent.pendingMove
+        return AnyView(VStack(alignment: .leading, spacing: 4) {
+            SelectCapsule(name: "Worktree", title: placeTitle(agent, listed)) { dismiss in
+                SelectChoice(title: "Project folder",
+                             description: listed.projectFolderDescription,
+                             isChosen: waiting == nil ? here == nil : waiting?.target == .projectFolder) {
+                    Task { await model.move(agent, to: .projectFolder) }
+                    dismiss()
+                }
+                SelectChoice(title: "New worktree",
+                             description: listed.canMakeNew ? "A new branch from the last commit where it is now"
+                                                            : listed.whyNot,
+                             isChosen: { if case .newWorktree = waiting?.target { return true }; return false }()) {
+                    Task { await model.move(agent, to: .newWorktree(name: nil)) }
+                    dismiss()
+                }
+                .disabled(!listed.canMakeNew)
+                let others = listed.worktrees.filter { !$0.isProjectFolder }
+                if !others.isEmpty {
+                    Divider().padding(.vertical, 4)
+                    ScrollingChoices {
+                        ForEach(others) { worktree in
+                            SelectChoice(title: worktree.name,
+                                         description: worktreeDescription(worktree),
+                                         isChosen: waiting == nil
+                                            ? worktree.root.resolvingSymlinksInPath().path == here
+                                            : waiting?.target == .existing(worktree.root)) {
+                                Task { await model.move(agent, to: .existing(worktree.root)) }
+                                dismiss()
+                            }
+                            .disabled(!worktree.exists)
+                        }
+                    }
+                }
+                if waiting != nil {
+                    Divider().padding(.vertical, 4)
+                    SelectChoice(title: "Cancel move",
+                                 description: "Stay where it is when this turn ends",
+                                 isChosen: false) {
+                        Task { await model.move(agent, to: nil) }
+                        dismiss()
+                    }
+                }
+            }
+            .help(waiting == nil ? agent.cwd.path(percentEncoded: false)
+                                 : "Moves when this turn ends. \(agent.cwd.path(percentEncoded: false))")
+            if let problem = model.moveProblems[agent.id] {
+                Text(problem)
+                    .appText(.fine)
+                    .foregroundStyle(.red)
+                    .lineLimit(3)
+                    .frame(maxWidth: 360, alignment: .leading)
+            }
+        })
+    }
+
+    /// Where it works, or where it is going once this turn is over.
+    private func placeTitle(_ agent: Agent, _ listed: DaemonAPI.WorktreesListResponse) -> String {
+        if let waiting = agent.pendingMove {
+            switch waiting.target {
+            case .projectFolder: return "Moving to project folder…"
+            case .newWorktree(let name): return "Moving to \(name ?? "a new worktree")…"
+            case .existing(let root): return "Moving to \(root.lastPathComponent)…"
+            }
+        }
+        if let worktree = agent.worktree { return worktree.name }
+        return listed.projectFolderBranch ?? "Project folder"
     }
 
     private var chosenBranch: String? {

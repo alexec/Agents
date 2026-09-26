@@ -310,6 +310,12 @@ final class AppModel {
     /// The branch each project folder is on, for the chat's folder chip. Missing until
     /// asked, and for a folder in no repository.
     private(set) var projectFolderBranches: [URL: String] = [:]
+    /// Each open agent's project's worktrees, for the Worktree choice on its page (053).
+    /// Asked when the page opens and after each move, never polled.
+    private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
+    /// Why the last move asked for an agent was refused, shown under its choice until
+    /// the next one. A move that fails later, when it is made, says so in the chat.
+    private(set) var moveProblems: [UUID: String] = [:]
     private(set) var draftOptions: [ConfigOption] = []
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
@@ -1406,6 +1412,32 @@ final class AppModel {
             ?? .notARepository
         guard generation == draftWorktreesGeneration else { return }
         draftWorktrees = answer
+    }
+
+    /// What the open agent's project has, for the Worktree choice on its page (053).
+    func loadAgentWorktrees(of agent: Agent) async {
+        let folder = agent.projectFolder
+        let answer = (try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
+                                                                DaemonAPI.WorktreesListRequest(folder: folder),
+                                                                returning: DaemonAPI.WorktreesListResponse.self))
+            ?? .notARepository
+        agentWorktrees[folder] = answer
+    }
+
+    /// Move an agent, or with no target take back the move that is waiting (053). Made
+    /// at once when it is between turns; otherwise when its turn ends.
+    func move(_ agent: Agent, to target: MoveTarget?) async {
+        moveProblems[agent.id] = nil
+        do {
+            _ = try await client(forAgent: agent.id).call(DaemonAPI.Method.agentsMove,
+                                                          DaemonAPI.MoveRequest(agentID: agent.id, target: target),
+                                                          returning: DaemonAPI.MoveAnswer.self)
+        } catch let error as JSONRPCError {
+            moveProblems[agent.id] = error.message
+        } catch {
+            moveProblems[agent.id] = "Could not move: \(error.localizedDescription)"
+        }
+        await loadAgentWorktrees(of: agent)
     }
 
     /// Ask which branch an agent's project folder is on. Asked when its chat opens and
