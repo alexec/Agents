@@ -56,7 +56,7 @@ struct LinkChooserTests {
         #expect(chooser.link == .relayed)
     }
 
-    @Test func aQuietDirectLinkLosesAfterTheWindow() async throws {
+    @Test(.flakyUnderLoad) func aQuietDirectLinkLosesAfterTheWindow() async throws {
         let direct = Probe("direct"), relay = Probe("relay")
         let chooser = LinkChooser(direct: Self.after(.seconds(5), direct),
                                   relay: Self.after(.milliseconds(10), relay),

@@ -93,7 +93,9 @@ struct CloseOnExecTests {
         // Reading a socket whose every writer has closed gives end of file. If the
         // shell inherited it there is still a writer, and this waits out its timeout
         // and comes back empty-handed instead.
-        var timeout = timeval(tv_sec: 2, tv_usec: 0)
+        // Two seconds, or `Eventually`'s longer wait on CI, where the server's close can
+        // take that long to land. An inherited descriptor fails either way, only later.
+        var timeout = timeval(tv_sec: max(2, Int(Eventually.timeout.components.seconds)), tv_usec: 0)
         setsockopt(mine, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
         var byte: UInt8 = 0
         let read = Darwin.read(mine, &byte, 1)

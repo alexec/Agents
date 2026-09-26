@@ -34,7 +34,10 @@ struct ConnectionRoleTests {
     private func ask(_ fd: Int32, _ method: String) -> [String: Any]? {
         let line = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\(method)\",\"params\":{}}\n"
         _ = line.withCString { Darwin.write(fd, $0, strlen($0)) }
-        return readLine(fd, deadline: Date().addingTimeInterval(5))
+        // Five seconds, or `Eventually`'s longer wait on CI: a busy runner can take that
+        // long to answer, and no answer reads as "not refused".
+        let wait = max(5, Double(Eventually.timeout.components.seconds))
+        return readLine(fd, deadline: Date().addingTimeInterval(wait))
     }
 
     private func readLine(_ fd: Int32, deadline: Date) -> [String: Any]? {
