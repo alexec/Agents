@@ -26,6 +26,9 @@ is built around several agents working at once, while the person is often somewh
 - **Many agents, sorted by who needs you.** Every agent is in one of these groups: Needs attention,
   Blocked, Working, Complete, Stopped or Parked. Each one ends its turn with a sentence saying how it went,
   so you can see what needs doing without reading the conversations.
+- **You see the work, not just the chat.** A document an agent writes opens beside the conversation
+  and fills in as it writes, and you can type on it, on the Mac, the iPhone or the iPad. Code changes
+  are coloured down to the word.
 - **They work together, and they work on their own.** An IDE's assistant does what you ask, while you
   watch. Here, agents coordinate, and work starts without you:
   - **Leases**: agents take turns with anything only one of them should use at a time, such as the
@@ -249,9 +252,11 @@ that the review steps flag it. Separately, check that the spec template's guidan
   editor they use.
 - **FR-004**: The page MUST give the reasons in this order:
   1. It runs the agents you already have.
-  2. It shows which of many agents needs you.
-  3. Agents work together and on their own: leases, events and waiting, workflows, pull requests, and
-     agents managing agents.
+  2. It shows which of many agents needs you, and the work itself: live documents that fill in
+     beside the conversation and that you can type on, and changes coloured to the word.
+  3. Agents work together and on their own: pull requests watched until they merge, leases, events
+     and waiting, workflows, and agents managing agents. Pull request watching comes first in that
+     list, because it is the most common reason for agents to work on their own.
   4. Agents keep working without you, and you can follow them from the phone and iPad.
 
   Servers and spending come after these.
@@ -292,6 +297,9 @@ that the review steps flag it. Separately, check that the spec template's guidan
   - the workflow reference's new dotted triggers and filters;
   - `wait_for_event`, `cancel_wait` and `publish_event` added to the list of tools;
   - the events log on the Mac and on the phone and iPad.
+- **FR-018**: The docs site MUST have a how-to guide on following a live document: what opens, how
+  changes are marked, typing on it, diagrams as pictures, and doing the same on the phone and iPad. No
+  page describes this today; only one line on the phone page and the `show_file` row mention it.
 - **FR-017**: Before the pitch claims zero-setup servers, the server docs MUST match 043. Today "Add a
   Linux server" still says to install and sign in to a runtime on the server by hand.
 
@@ -314,7 +322,7 @@ that the review steps flag it. Separately, check that the spec template's guidan
   true on main by one walk before publishing.
 - **SC-004**: The page's opening lines fit on the first screen of a 13-inch laptop and of an iPhone
   without scrolling.
-- **SC-005**: The whole page takes under five minutes to read (roughly 1,000 words or fewer).
+- **SC-005**: The whole page takes under five minutes to read (roughly 1,200 words or fewer).
 - **SC-006**: The docs check passes with the page in place, with no new warnings.
 - **SC-007**: After reading only the coordination section, a developer who runs several agents can
   explain how two agents avoid using the simulator at once, and how an agent waits for checks without
@@ -336,6 +344,7 @@ that the review steps flag it. Separately, check that the spec template's guidan
   event, and the events log on the phone and iPad.
 - `docs/how-to/add-a-linux-server.md`, `docs/reference/runtimes.md`, `docs/reference/settings.md`:
   change. Claude installed on the server by Agents, and the token in Mac Settings (FR-017).
+- `docs/how-to/follow-a-live-document.md`: add. Live documents on the Mac, iPhone and iPad (FR-018).
 - `docs/index.md`: change. Open with the two-line case and the link to it (FR-011).
 - `mkdocs.yml`: change. Put the page in the nav, first under Explanation.
 - `README.md`: change. Two-line case and link at the top in place of the stale "lead" paragraph

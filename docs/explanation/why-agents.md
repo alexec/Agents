@@ -31,13 +31,24 @@ Every agent sits in one group: **Needs attention**, **Blocked**, **Working**,
 sentence how it went. You can read the list and know what to open without reading any
 conversation. See [Statuses and groups](../reference/statuses.md).
 
+## You see the work, not just the chat
+
+When an agent writes a document for you, such as a plan, a spec or a review, it opens
+beside the conversation and fills in as the agent writes. Each change is marked, and the
+page moves to it. You can type on the page yourself while it is being written, on the Mac,
+the iPhone or the iPad. Diagrams arrive as pictures in the page, not as text to imagine.
+See [Follow a live document](../how-to/follow-a-live-document.md).
+
+When it changes code, the **Changes** pane lists every file it touched, with each edit
+coloured down to the word. See [Read an agent's changes](../how-to/read-an-agents-changes.md).
+
 ## Agents that work together, and on their own
 
 Agents take turns with what they share, wait for things to happen, and start when
 something happens, without you.
 
-Here is one afternoon. A pull request's checks fail, and a
-[workflow](../reference/workflows.md), a Markdown file kept in the repository, starts an
+Here is one afternoon. You asked Agents to watch your pull request. Its checks fail, and
+a [workflow](../reference/workflows.md), a Markdown file kept in the repository, starts an
 agent in that pull request's worktree. The agent needs the iOS simulator to reproduce the
 failure, but another agent is using it. So it asks for a [lease](leases.md), gets in line
 and ends its turn. It spends nothing while it waits, and it is started again when the
@@ -53,6 +64,11 @@ You were not asked for anything. The list shows each step as it happens.
 
 Each part can be used on its own:
 
+- **Pull requests, watched until they merge.** The project page lists your open pull
+  requests on GitHub. With one click, an agent steps in whenever one needs something: it
+  fixes a failing check, answers review comments and resolves conflicts, in the pull
+  request's own worktree, and pushes as you. It never force-pushes.
+  See [Have an agent watch a pull request](../how-to/watch-a-pull-request.md).
 - **Leases.** Agents take turns with anything only one of them should use at a time: a
   simulator, a browser, the screen, or anything an agent names. The Mac's Resources page
   shows who holds what, and you can end a lease.
@@ -65,9 +81,6 @@ Each part can be used on its own:
   or on an event, such as an agent finishing or a check failing. It is a file beside your
   code, reviewed like code.
   See [Set up a workflow](../how-to/set-up-a-workflow.md).
-- **Pull requests.** An agent can watch your open pull requests on GitHub. It fixes failing
-  checks, answers review comments and resolves conflicts, as you.
-  See [Have an agent watch a pull request](../how-to/watch-a-pull-request.md).
 - **Agents that manage agents.** An agent can start up to three others, brief them, wait
   for them and stop them. Each can work in a [worktree](../how-to/start-in-a-worktree.md)
   of its own, so they never edit the same files.
@@ -99,7 +112,8 @@ You can set a limit per agent and per day. See [Settings](../reference/settings.
 ## Compared with what you use now
 
 **An agent in your editor** (Cursor, VS Code with Copilot, Windsurf, Zed).
-You keep your editor. Agents adds many agents at once and everything above. You give up
+You keep your editor. Agents adds many agents at once, live documents, watched pull
+requests and everything above. You give up
 editing and chatting in one window.
 
 **An agent in a terminal** (Claude Code, Grok, Cursor's agent).
