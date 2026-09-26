@@ -14,7 +14,8 @@ struct AddSkillSheet: View {
     let destination: DaemonAPI.SkillDestination
     /// The runtimes the reach dots are drawn for.
     let runtimes: [DaemonAPI.RuntimeName]
-    /// The skills already where Add points when the sheet opens, for the **added** marks.
+    /// The skills a catalogue already added where Add points, for the **added** marks. A
+    /// same-named skill of the person's own is not this one, so it is not marked.
     var installed: Set<String> = []
     /// Called after a skill was added, so the page behind can read itself again.
     var onAdded: () -> Void = {}
@@ -58,10 +59,10 @@ struct AddSkillSheet: View {
             switch addTo {
             case .personal:
                 if let snapshot = await model.sharedSnapshot() {
-                    added = Set(snapshot.skills.filter { $0.source == .personal }.map(\.name))
+                    added = Set(snapshot.skills.filter { $0.source == .personal && $0.managed != nil }.map(\.name))
                 }
             case .project(let folder):
-                if let listed = await model.projectSkills(URL(filePath: folder)) { added = Set(listed.map(\.name)) }
+                if let listed = await model.projectSkills(URL(filePath: folder)) { added = Set(listed.filter { $0.managed != nil }.map(\.name)) }
             }
         }
     }

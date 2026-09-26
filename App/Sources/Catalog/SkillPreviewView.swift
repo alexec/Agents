@@ -43,6 +43,8 @@ struct SkillPreviewView: View {
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 10)
 
             HStack(alignment: .top, spacing: 14) {
+                // Scrolls when the notes run long, rather than cutting them to one line.
+                ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     facts
                     if let update { changes(update.changes) } else { files }
@@ -53,7 +55,8 @@ struct SkillPreviewView: View {
                         Text(addTo == .personal ? "every agent you start" : "every agent in this project")
                             .appText(.fine).foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .frame(width: 300, alignment: .topLeading)
                 reader
@@ -165,6 +168,7 @@ struct SkillPreviewView: View {
         return Text(n == 1 ? "This skill brings a script. An agent may run it when the skill is in use, with the same permissions as the agent."
                            : "This skill brings \(n) scripts. An agent may run them when the skill is in use, with the same permissions as the agent.")
             .appText(.supporting)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(SharedInk.attention.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
@@ -208,6 +212,7 @@ struct SkillPreviewView: View {
     private func note(_ text: String, attention: Bool) -> some View {
         Text(text)
             .appText(.supporting)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background((attention ? SharedInk.attention : SharedInk.reach).opacity(0.12), in: RoundedRectangle(cornerRadius: 8))

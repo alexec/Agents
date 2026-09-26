@@ -49,7 +49,7 @@ struct ProjectSkillsSection: View {
                 }
                 .sheet(isPresented: $adding) {
                     AddSkillSheet(destination: .project(folder: folder.path), runtimes: runtimes,
-                                  installed: Set(skills.map(\.name)),
+                                  installed: Set(skills.filter { $0.managed != nil }.map(\.name)),
                                   onAdded: { Task { await load(folder) } })
                 }
         }

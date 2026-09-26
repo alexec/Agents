@@ -285,19 +285,19 @@ any.
 
 **Independent test**: quickstart §3 steps 7, 12 and 13.
 
-- [ ] T050 [P] [US4] Write `Tests/Catalog/SkillInstallerFailureTests.swift`:
+- [X] T050 [P] [US4] Write `Tests/Catalog/SkillInstallerFailureTests.swift`:
   - `unmanaged` refuses `add` and the folder's hash is unchanged;
   - `managedOther` needs `replace:true`;
   - a failure injected after the rename (the test seam `AGENTS_TEST_CATALOG_PAUSE=afterRename`, or a closure passed into the installer) leaves no folder and no lock entry, and the old folder comes back from the Trash (SC-003);
   - an unreadable personal lock refuses the add before anything moves.
-- [ ] T051 [US4] Implement the failure paths in `Src/Catalog/SkillInstaller.swift`, putting things back on each step and honouring the pause seam only when the environment variable is set, and make T050 pass.
+- [X] T051 [US4] Implement the failure paths in `Src/Catalog/SkillInstaller.swift`, putting things back on each step and honouring the pause seam only when the environment variable is set, and make T050 pass.
 - [X] T052 [P] [US4] Write `specs/059-marketplace/walk/fixture-server.py` as quickstart §1 describes. It serves search, download, the ref list, the tree, commits and raw from a fixture git repo it makes under `/tmp`, plus `POST /_advance` and `POST /_down`. **Also needed by T034, so build it before the US1 walk.**
-- [ ] T053 [US4] Build frame E's states in `App/Catalog/SkillPreviewView.swift` and `AddSkillSheet.swift`:
+- [X] T053 [US4] Build frame E's states in `App/Catalog/SkillPreviewView.swift` and `AddSkillSheet.swift`:
   - **unmanaged**: the orange box "You already have a skill called <name> in <folder>. You made it (it didn't come from here), so the app won't replace it…", the blue note when the other destination is free, and Reveal yours plus Cancel;
   - **managedOther**: Replace, with a confirmation;
   - **unreachable**: "Can't reach skills.sh", the explanation line, and Try again, keeping the query;
   - **rateLimited**, **tooLarge**, **noSkillFile** and **notFoundInRepo**: one line each, with Add withheld.
-- [ ] T054 [US4] Walk quickstart §3 steps 7, 12 and 13, and frame E on screen. Screenshots go in `specs/059-marketplace/walk/us4/`.
+- [X] T054 [US4] Walk quickstart §3 steps 7, 12 and 13, and frame E on screen. Screenshots go in `specs/059-marketplace/walk/us4/`.
 
 ---
 

@@ -63,7 +63,7 @@ struct SharedSkillsPage: View {
         }
         .sheet(isPresented: $adding) {
             AddSkillSheet(destination: .personal, runtimes: snapshot.runtimes,
-                          installed: Set(yours.map(\.name)),
+                          installed: Set(yours.filter { $0.managed != nil }.map(\.name)),
                           onAdded: { Task { await refresh() } })
         }
     }
