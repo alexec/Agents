@@ -261,14 +261,14 @@ and the settings reach every server.
 
 **Independent test**: quickstart §2, the Holds bullet.
 
-- [ ] T042 [P] [US5] Add to `RetirementTests.swift`, using real `git` repos in the temp root, as `WorktreeTests` do:
+- [X] T042 [P] [US5] Add to `RetirementTests.swift`, using real `git` repos in the temp root, as `WorktreeTests` do:
   - An archived 40-day agent whose app-made worktree has an uncommitted file is kept, with note `.held(.worktreeHasWork)`. The same is true with commits that are not merged.
   - After commit, merge and removal, it is retired at the next check.
   - A worktree shared with a live agent is not a hold. The agent is retired and the worktree left.
   - A worktree the person made is never removed.
   - A run in `workflowRuns` with this `agentID` holds the agent until the run ends.
   - A presence with `watching == id` holds it.
-- [ ] T043 [US5] Implement `holds(for candidates:) async -> [UUID: Hold]` in `DaemonCore+Retention.swift`, per research R7:
+- [X] T043 [US5] Implement `holds(for candidates:) async -> [UUID: Hold]` in `DaemonCore+Retention.swift`, per research R7:
   - `removalFacts` off the actor, only for candidates.
   - `workflowRuns.values` matched by `agentID` or `triggeringAgentID`.
   - `presences.values` matched by `watching`.

@@ -82,8 +82,7 @@ extension DaemonCore {
         loadRetentionIfNeeded()
         if !request.confirmed {
             let archived = candidates()
-            let preview = RetentionPlan.decide(archived: archived, holds: await holds(for: archived),
-                                               settings: request.settings, saneNow: now())
+            let preview = await decideWithHolds(archived, settings: request.settings, saneNow: now())
             if !preview.retire.isEmpty {
                 let sizes = Dictionary(archived.map { ($0.id, $0.sizeOnDisk) }, uniquingKeysWith: { a, _ in a })
                 let bytes = preview.retire.reduce(0) { $0 + (sizes[$1.id] ?? 0) }
@@ -99,9 +98,47 @@ extension DaemonCore {
         return DaemonAPI.RetentionSetResult(applied: true, state: state)
     }
 
-    /// What keeps each of these agents past its time (051, FR-007). Nothing yet: the
-    /// holds come with US5.
-    func holds(for candidates: [RetentionPlan.Candidate]) async -> [UUID: Hold] { [:] }
+    /// What keeps each of these agents past its time (051, FR-007, research R7): a window
+    /// reading it, a workflow run it belongs to, or work in its worktree. Asked in that
+    /// order, cheapest first; git is only asked when nothing else holds it.
+    func holds(for candidates: [RetentionPlan.Candidate]) async -> [UUID: Hold] {
+        var holds: [UUID: Hold] = [:]
+        let watched = Set(presences.values.compactMap(\.watching))
+        let inRuns = Set(workflowRuns.values.flatMap { [$0.agentID, $0.triggeringAgentID].compactMap { $0 } })
+        for candidate in candidates {
+            let id = candidate.id
+            if watched.contains(id) || (lastWhole[id].map { now().timeIntervalSince($0) < Self.letGoAfter } ?? false) {
+                holds[id] = .openInWindow
+            } else if inRuns.contains(id) {
+                holds[id] = .workflowRunning
+            } else if await worktreeHoldsWork(of: id) {
+                holds[id] = .worktreeHasWork
+            }
+        }
+        return holds
+    }
+
+    /// How long an archived agent stays whole after it was last read (FR-025).
+    static let letGoAfter: TimeInterval = 10 * 60
+
+    /// The rules, with holds asked only of the agents the rules would pick. Asking every
+    /// archived agent's worktree every hour would run git hundreds of times for nothing.
+    /// A held agent can leave room under the cap for one that was not picked before, so
+    /// this goes round until nothing new is picked.
+    func decideWithHolds(_ archived: [RetentionPlan.Candidate], settings: RetentionSettings,
+                         saneNow: Date) async -> RetentionPlan.Decision {
+        var holds: [UUID: Hold] = [:]
+        var asked = Set<UUID>()
+        while true {
+            let decision = RetentionPlan.decide(archived: archived, holds: holds, settings: settings, saneNow: saneNow)
+            let fresh = archived.filter { candidate in
+                !asked.contains(candidate.id) && decision.retire.contains { $0.id == candidate.id }
+            }
+            if fresh.isEmpty { return decision }
+            asked.formUnion(fresh.map(\.id))
+            holds.merge(await self.holds(for: fresh)) { $1 }
+        }
+    }
 
     func saveRetention() {
         do { try retentionStore.save(retention) } catch {
@@ -137,8 +174,7 @@ extension DaemonCore {
         let saneNow = retention.clock.tick(now: now(), uptime: uptime)
         let before = retentionState()
         let archived = candidates()
-        let decision = RetentionPlan.decide(archived: archived, holds: await holds(for: archived),
-                                            settings: retention.settings, saneNow: saneNow)
+        let decision = await decideWithHolds(archived, settings: retention.settings, saneNow: saneNow)
         for retiring in decision.retire {
             do {
                 try await retire(retiring.id, because: retiring.because)

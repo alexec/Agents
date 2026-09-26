@@ -286,4 +286,105 @@ struct RetirementTests {
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.retentionState))
         #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsRetired))
     }
+
+    // MARK: US5
+
+    private func git(_ arguments: [String], in folder: URL) async throws {
+        let outcome = try await GitProcess(arguments, in: folder).run()
+        guard outcome.succeeded else {
+            throw GitWorktrees.Failure(message: "git \(arguments.joined(separator: " ")): \(outcome.errors)")
+        }
+    }
+
+    /// A repository with one commit on main, and an app-made worktree on `agents/<name>`.
+    private func repositoryWithWorktree(_ name: String) async throws -> (StoreLocations, URL, AgentWorktree) {
+        let (locations, work) = try temporary()
+        try await git(["init", "-q", "-b", "main"], in: work)
+        try await git(["config", "user.email", "test@example.com"], in: work)
+        try await git(["config", "user.name", "Test"], in: work)
+        try "hello\n".write(to: work.appending(path: "README"), atomically: true, encoding: .utf8)
+        try await git(["add", "."], in: work)
+        try await git(["commit", "-q", "-m", "first"], in: work)
+        // Where the app makes its own, which is what makes one the app's to hold or remove.
+        let root = work.appending(path: "\(WorktreeName.folder)/\(name)")
+        try await git(["worktree", "add", "-q", "-b", "agents/\(name)", root.path], in: work)
+        let worktree = AgentWorktree(name: name, root: Project.standardize(root), branch: "agents/\(name)",
+                                     project: work, base: "main", madeByApp: true)
+        return (locations, work, worktree)
+    }
+
+    private func archived(in worktree: AgentWorktree, daysAgo: Double) -> Agent {
+        var agent = archived(worktree.project, daysAgo: daysAgo)
+        agent.cwd = worktree.root
+        agent.worktree = worktree
+        return agent
+    }
+
+    @Test func workInItsWorktreeKeepsItUntilThatWorkIsMerged() async throws {
+        let (locations, work, worktree) = try await repositoryWithWorktree("held")
+        try "draft\n".write(to: worktree.root.appending(path: "draft.txt"), atomically: true, encoding: .utf8)
+        let agent = archived(in: worktree, daysAgo: 40)
+        let core = try await core(locations, seeded: [agent])
+
+        await core.checkRetention()
+        #expect(await core.agent(agent.id)?.retirement == .held(.worktreeHasWork))
+
+        // Committed but not merged is still work only this agent explains.
+        try await git(["add", "."], in: worktree.root)
+        try await git(["commit", "-q", "-m", "draft"], in: worktree.root)
+        await core.checkRetention()
+        #expect(await core.agent(agent.id) != nil)
+
+        // Merged: nothing is lost with it, and it goes, taking its clean worktree.
+        try await git(["merge", "-q", "agents/held"], in: work)
+        await core.checkRetention()
+        #expect(await core.agent(agent.id) == nil)
+        #expect(!FileManager.default.fileExists(atPath: worktree.root.path))
+    }
+
+    @Test func aWorktreeSharedWithALiveAgentIsNotAHoldAndIsLeftForIt() async throws {
+        let (locations, _, worktree) = try await repositoryWithWorktree("shared")
+        try "draft\n".write(to: worktree.root.appending(path: "draft.txt"), atomically: true, encoding: .utf8)
+        let old = archived(in: worktree, daysAgo: 40)
+        var live = Agent(runtimeID: "claude", cwd: worktree.root, title: "branch of it", state: .finished,
+                         endedReason: .endTurn)
+        live.worktree = worktree
+        let core = try await core(locations, seeded: [old, live])
+        await core.checkRetention()
+        #expect(await core.agent(old.id) == nil)
+        #expect(FileManager.default.fileExists(atPath: worktree.root.appending(path: "draft.txt").path))
+    }
+
+    @Test func aWorktreeThePersonMadeIsNeverTouched() async throws {
+        let (locations, _, made) = try await repositoryWithWorktree("mine")
+        var theirs = made
+        theirs.madeByApp = false
+        let agent = archived(in: theirs, daysAgo: 40)
+        let core = try await core(locations, seeded: [agent])
+        await core.checkRetention()
+        #expect(await core.agent(agent.id) == nil)
+        #expect(FileManager.default.fileExists(atPath: made.root.path))
+    }
+
+    @Test func aRunningWorkflowAndAWatchingWindowEachHoldAnAgent() async throws {
+        let (locations, work) = try temporary()
+        let inRun = archived(work, daysAgo: 40), watched = archived(work, daysAgo: 40)
+        let core = try await core(locations, seeded: [inRun, watched])
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished, agentID: inRun.id))
+        try await core.reportPresence(.init(watching: watched.id, active: true), from: .mac, connection: UUID())
+        await core.checkRetention()
+        #expect(await core.agent(inRun.id)?.retirement == .held(.workflowRunning))
+        #expect(await core.agent(watched.id)?.retirement == .held(.openInWindow))
+
+        await core.clearRuns()
+        await core.checkRetention()
+        #expect(await core.agent(inRun.id) == nil)
+        #expect(await core.agent(watched.id) != nil)
+    }
+}
+
+extension DaemonCore {
+    /// For the tests: a workflow run in flight, and none.
+    func putRun(_ run: WorkflowRun) { workflowRuns["test-\(run.id)"] = run }
+    func clearRuns() { workflowRuns.removeAll() }
 }
