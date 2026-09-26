@@ -20,7 +20,8 @@ editor of its own. Open the same folder in yours whenever you like.
 
 Agents starts the coding tools already on your Mac, which are Claude, Grok, Copilot and
 Cursor, each signed in with your own account and plan. It brings no model and no bill of
-its own. You can choose a different runtime, model and permission mode for each agent.
+its own, and it is open source under the
+[MIT licence](https://github.com/alexec/Agents/blob/main/LICENSE). You can choose a different runtime, model and permission mode for each agent.
 
 They do not all do the same things; [Runtimes](../reference/runtimes.md) lists each.
 

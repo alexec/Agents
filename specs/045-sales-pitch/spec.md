@@ -272,14 +272,15 @@ that the review steps flag it. Separately, check that the spec template's guidan
   feature-by-feature claims about a named product (D2).
 - **FR-007**: The page MUST have a "When something else is better" section. It MUST cover at least:
   Mac only, built from source with no download, not an editor, the phone and iPad only on the same
-  network, and runtimes differ in what they can do (D3).
+  network, and runtimes differ in what they can do (D3). The same-network limit is being removed by
+  separate work. The pitch keeps stating it until that work is on main, and then drops it in the same
+  change (FR-009, US5).
 - **FR-008**: Every capability the page claims MUST link to the docs page that describes it, and MUST be
   true of main when the page is published.
 - **FR-009**: The page MUST NOT mention features that are not on main.
 - **FR-010**: The page MUST end with one clearly marked link to the first tutorial.
 - **FR-011**: The docs home page and the README MUST each open with a two-line version of the case that
-  links to the page. The README's paragraph about each project having a "lead" agent is no longer true,
-  and MUST be replaced by it.
+  links to the page. (Main's `4bbafd9` already replaced the README's stale "lead" paragraph.)
 - **FR-012**: The page MUST follow the site's existing voice: plain words, short sentences, no
   superlatives or marketing adjectives ("revolutionary", "seamless", "blazing"), no claims about other
   tools' quality.
@@ -287,8 +288,8 @@ that the review steps flag it. Separately, check that the spec template's guidan
   read well on a phone-width screen.
 - **FR-014**: The spec template's Docs guidance MUST say to list "Why Agents" when a feature adds,
   removes or changes something the page claims.
-- **FR-015**: The page MUST NOT describe Agents as open source or state any licence terms while the
-  repository carries no licence.
+- **FR-015**: The page MUST say Agents is open source under the MIT licence (added on main in `0c5ae6f`)
+  and link to the licence.
 - **FR-016**: Before the pitch claims them, the docs site MUST describe events and waiting as they are on
   main. This means:
   - a reference page listing every event, what raises it and what it carries, including events an agent
@@ -347,8 +348,7 @@ that the review steps flag it. Separately, check that the spec template's guidan
 - `docs/how-to/follow-a-live-document.md`: add. Live documents on the Mac, iPhone and iPad (FR-018).
 - `docs/index.md`: change. Open with the two-line case and the link to it (FR-011).
 - `mkdocs.yml`: change. Put the page in the nav, first under Explanation.
-- `README.md`: change. Two-line case and link at the top in place of the stale "lead" paragraph
-  (FR-011).
+- `README.md`: change. Two-line case and link at the top (FR-011).
 - `.specify/templates/spec-template.md`: change. The Docs guidance names "Why Agents" (FR-014).
 
 ## Assumptions
@@ -357,8 +357,8 @@ that the review steps flag it. Separately, check that the spec template's guidan
 - The claims are taken from what main does at `075d9f9` (2026-09-25), including 037 (servers), 038 (pull
   requests), 042 (events and waiting, with the events list on the phone and iPad) and 043 (zero-setup
   servers).
-- The only way to get the app is to build it from source, as the first tutorial says. There is no
-  download, price or licence to state.
+- The only way to get the app is to build it from source, as the first tutorial says. It is free and
+  MIT-licensed; there is no download or price to state.
 - The site's voice follows the existing docs pages. The pitch is persuasive by being specific, not by
   its adjectives.
 - No screenshots are required. Where one helps, such as the list of agents grouped by who needs you,
