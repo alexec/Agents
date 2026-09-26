@@ -203,7 +203,7 @@ struct WorkflowRestartTests {
     /// deep whose agent finishes after a restart makes a fourth link — which is refused.
     /// Were the depth lost, the fourth would run, and a loop would have one more lap in
     /// it every time the daemon restarted.
-    @Test(.flakyUnderLoad) func theDepthCeilingCountsFromTheRestoredRun() async throws {
+    @Test func theDepthCeilingCountsFromTheRestoredRun() async throws {
         let (locations, root) = try temporary()
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)
@@ -229,7 +229,7 @@ struct WorkflowRestartTests {
     }
 
     /// The other half of the ceiling: one link short of it, the chain still runs.
-    @Test(.flakyUnderLoad) func aChainShortOfTheCeilingCarriesOnFromTheRestoredDepth() async throws {
+    @Test func aChainShortOfTheCeilingCarriesOnFromTheRestoredDepth() async throws {
         let (locations, root) = try temporary()
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)

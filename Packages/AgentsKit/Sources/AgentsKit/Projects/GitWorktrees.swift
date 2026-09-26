@@ -284,7 +284,17 @@ public enum GitWorktrees {
     static func git(_ arguments: [String], in folder: URL) async throws -> String {
         let outcome: GitProcess.Outcome
         do {
-            outcome = try await GitProcess(arguments, in: folder).run()
+            // Changing a repository's worktrees is one at a time per folder. Two agents
+            // started from the same words at once both ran `git worktree add`, and git
+            // takes its own locks as it goes: under load one of the two came back
+            // refused, and its agent was never made. Reading is not held up.
+            if arguments.first == "worktree", arguments.dropFirst().first != "list" {
+                outcome = try await changingWorktrees.run(folder.standardizedFileURL.path) {
+                    try await GitProcess(arguments, in: folder).run()
+                }
+            } else {
+                outcome = try await GitProcess(arguments, in: folder).run()
+            }
         } catch GitProcess.LaunchError.notInstalled {
             throw Failure(message: "Git is not installed on this Mac.")
         }
@@ -294,4 +304,23 @@ public enum GitWorktrees {
         }
         return outcome.output.trimmingCharacters(in: .newlines)
     }
+}
+
+/// Runs work one piece at a time for each key, in the order it was asked for.
+actor OneAtATime {
+    private var tails: [String: Task<Void, Never>] = [:]
+
+    func run<T: Sendable>(_ key: String, _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        let before = tails[key]
+        let task = Task<Result<T, any Error>, Never> {
+            await before?.value
+            do { return .success(try await work()) } catch { return .failure(error) }
+        }
+        tails[key] = Task { _ = await task.value }
+        return try await task.value.get()
+    }
+}
+
+extension GitWorktrees {
+    static let changingWorktrees = OneAtATime()
 }

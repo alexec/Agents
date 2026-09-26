@@ -60,10 +60,6 @@ public final class PTY: @unchecked Sendable {
     /// does not come. It does not wait for the child: `finish` is the one place the
     /// child is ever reaped, and two reapers race each other to ECHILD.
     private var exitWatcher: (any DispatchSourceProtocol)?
-    var debugTotal = 0
-    let debugStart = Date()
-    var debugArgs = ""
-    var debugFirstReadable: Int = -1
 
     public private(set) var rows: Int
     public private(set) var cols: Int
@@ -192,8 +188,6 @@ public final class PTY: @unchecked Sendable {
             throw Failure.couldNotStart(String(cString: strerror(result)))
         }
         pid = spawned
-        debugArgs = arguments.joined(separator: " ").prefix(40).replacingOccurrences(of: " ", with: "_")
-        FileHandle.standardError.write(Data("PTYDEBUG spawn pid=\(spawned) master=\(master) slave=\(slave) ms=\(Int(Date().timeIntervalSince(debugStart)*1000)) args=\(debugArgs)\n".utf8))
         // The slave stays open here. See the note on the property: letting go of it
         // now is what makes the child's exit the tty's last close, and the kernel
         // discards anything still queued at a last close.
@@ -218,13 +212,6 @@ public final class PTY: @unchecked Sendable {
             guard let self else { return }
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = read(self.master, &buffer, buffer.count)
-            if count <= 0 {
-                _ = agents_output_queued(self.master)
-                FileHandle.standardError.write(Data("PTYDEBUG eof pid=\(self.pid) count=\(count) slave=\(self.slave) totalRead=\(self.debugTotal) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
-            } else {
-                self.debugTotal += count
-                FileHandle.standardError.write(Data("PTYDEBUG read pid=\(self.pid) n=\(count) ms=\(Int(Date().timeIntervalSince(self.debugStart)*1000)) args=\(self.debugArgs)\n".utf8))
-            }
             if count > 0 {
                 self.pending.append(contentsOf: buffer[0..<count])
                 self.gathered()
@@ -259,7 +246,6 @@ public final class PTY: @unchecked Sendable {
         let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            FileHandle.standardError.write(Data("PTYDEBUG childexit pid=\(self.pid) totalRead=\(self.debugTotal) sinceSpawnMs=\(Int(Date().timeIntervalSince(self.debugStart)*1000))\n".utf8))
             self.releaseSlave()
         }
         exitWatcher = source
@@ -371,7 +357,6 @@ public final class PTY: @unchecked Sendable {
             reaped = waitpid(pid, &status, 0)
         }
         let code = reaped == pid ? exitCode(from: status) : Self.unknownExitCode
-        FileHandle.standardError.write(Data("PTYDEBUG done pid=\(pid) code=\(code) reaped=\(reaped) total=\(debugTotal) args=\(debugArgs)\n".utf8))
         onExit(code)
     }
 

@@ -579,7 +579,24 @@ extension DaemonCore {
         // words have gone to two runtimes. The guard above is checked and this is set
         // without an await between them, which on an actor is the whole of the lock.
         sending.insert(agentID)
-        defer { sending.remove(agentID) }
+        do {
+            try await sendClaimed(next, to: agent)
+        } catch {
+            sending.remove(agentID)
+            throw error
+        }
+        sending.remove(agentID)
+        // A block that cleared while this send held the agent was refused then, since
+        // `sending` is one of the things that says "busy" (039). The commonest case is
+        // the app's own question, withdrawn by a report while the runtime was starting
+        // to take it: this send then ends having sent nothing, and nothing else would
+        // ever look at the block again. So it is looked at here, once the agent is free.
+        await resumeIfCleared(agentID)
+    }
+
+    /// The part of `sendNextQueued` done while `sending` holds the agent.
+    private func sendClaimed(_ next: QueuedPrompt, to agent: Agent) async throws {
+        let agentID = agent.id
         let stopsBefore = stops[agentID, default: 0]
         let session = try await liveSession(for: agent)
         // Stopped or archived while the runtime was starting. `stop` found nothing

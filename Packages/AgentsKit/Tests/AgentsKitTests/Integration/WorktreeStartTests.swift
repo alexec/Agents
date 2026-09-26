@@ -198,8 +198,11 @@ struct WorktreeStartTests {
         let launcher = FakeLauncher(script: resuming)
         let core = try await makeCore(repo, launcher)
         let id = try await startNew(core, repo)
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await settled(core, id, "the turn ended, and the question about it")
         await eventually("its runtime was handed back") { await core.live[id] == nil }
+        // One runtime, or two when the question about the silent ending came after the
+        // first was handed back. Either way, none from here on.
+        let launchesBefore = launcher.launchCount
 
         let root = try #require(await core.agent(id)?.worktree?.root)
         try FileManager.default.removeItem(at: root)
@@ -207,7 +210,7 @@ struct WorktreeStartTests {
         let error = await failure { try await core.prompt(.init(agentID: id, text: "carry on")) }
         #expect(error?.code == DaemonAPI.Failure.worktreeMissing)
         #expect(error?.message == "The worktree fix-login-redirect-safari is gone, so this agent cannot be picked up where it was.")
-        #expect(launcher.launchCount == 1, "never started again, in the project folder or anywhere")
+        #expect(launcher.launchCount == launchesBefore, "never started again, in the project folder or anywhere")
     }
 
     /// A branch of the conversation carries on where it was: same worktree, same project.
@@ -362,10 +365,6 @@ struct WorktreeStartTests {
 
     /// Finished. The app's question to a silent agent (a fake one never says how it
     /// went) may still be on its way, and archiving has to win over it.
-    private func settled(_ core: DaemonCore, _ id: UUID) async {
-        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
-    }
-
     private func removal(_ repo: Repo, _ root: URL, confirmed: Bool = false) -> DaemonAPI.WorktreeRemovalRequest {
         .init(project: repo.project, root: root, confirmed: confirmed)
     }
@@ -602,10 +601,12 @@ struct WorktreeStartTests {
         #expect(names.filter { $0 == "feature/login" }.count == 1, "origin's copy is not listed twice")
     }
 
-    @Test(.flakyUnderLoad) func anAgentCanStartInANewWorktreeOnALocalBranch() async throws {
+    @Test func anAgentCanStartInANewWorktreeOnALocalBranch() async throws {
         let repo = try await repository()
         try await withBranches(repo)
-        let launcher = FakeLauncher()
+        // Held working, so no question about a silent ending starts a second runtime
+        // before the launches are counted.
+        let launcher = FakeLauncher(script: .init(gate: TurnGate()))
         let core = try await makeCore(repo, launcher)
         let id = try await core.start(.init(runtimeID: "claude", cwd: repo.project, prompt: "look at it",
                                             worktree: .branch("feature/login")))

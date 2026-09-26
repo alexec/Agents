@@ -79,7 +79,7 @@ struct BranchEventTests {
         await core.watchBranches(in: work)
         try await Task.sleep(for: .milliseconds(300))
         try await commit("watched", in: work)
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        let deadline = ContinuousClock.now.advanced(by: max(.seconds(15), Eventually.timeout))
         while ContinuousClock.now < deadline, await moved(core).isEmpty { try await Task.sleep(for: .milliseconds(100)) }
         #expect(await moved(core).count == 1)
         await core.stopWatchingAllBranches()

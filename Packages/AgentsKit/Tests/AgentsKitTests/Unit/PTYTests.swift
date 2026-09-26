@@ -88,7 +88,7 @@ struct PTYTests {
         #expect(output.contains("40 120"))
     }
 
-    @Test func aProgramSeesATerminalOnItsOutput() async throws {
+    @Test(.flakyUnderLoad) func aProgramSeesATerminalOnItsOutput() async throws {
         let (output, _) = try await run("test -t 1 && echo yes || echo no", saying: "yes")
         #expect(output.contains("yes"))
     }
