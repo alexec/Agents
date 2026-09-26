@@ -60,9 +60,24 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
+      # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
+      # a whole Swift build inside the test run, holding a test thread for minutes,
+      # which on a shared runner stalls everything else. Built here instead.
+      - name: Build agentsd for the tests
+        run: swift build --package-path Daemon --product agentsd
+
+      # How long the runner's login shell takes to say its PATH. The app reads it
+      # once per process, synchronously, the first time anything looks a runtime up.
+      - name: Time the login shell
+        run: time zsh -lc 'printf %s "$PATH"' > /dev/null
+
       - name: Test CodeText
         run: swift test --package-path Packages/CodeText
 
+      # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
+      # past the question about a silent ending (`settled`), and `eventually` waits
+      # 45 s where CI is set rather than 10, since a test on a three-core runner can
+      # wait that long for its first turn on the pool.
       - name: Test AgentsKit
         run: swift test --package-path Packages/AgentsKit
 

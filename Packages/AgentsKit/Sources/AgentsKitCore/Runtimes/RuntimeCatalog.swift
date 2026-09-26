@@ -17,6 +17,12 @@ import Foundation
 /// `npm install -g`, because it needs no Node of the person's and no write access to
 /// npm's global folder.
 ///
+/// Codex (047) is only ever the app's own toolset, never the person's `npx` as Claude
+/// may be: its adapter pulls in `@openai/codex` by a caret range, so what `npx` fetched
+/// would drift from the pinned lock, and the 330 MB fetch would happen silently inside a
+/// first turn instead of on the set-up page. `codex-acp` is the shim's name in that
+/// toolset, and nothing of that name on the PATH is ever run.
+///
 /// Gemini (046) is the one that is only ever the app's own copy: a pinned Gemini CLI on
 /// a pinned Node, installed from the set-up page like Claude's toolset, and never a
 /// `gemini` found on the PATH, because its ACP surface moves between releases. It speaks
@@ -55,6 +61,15 @@ public enum RuntimeCatalog {
         install: .script(url: URL(string: "https://cursor.com/install")!),
         installPage: URL(string: "https://cursor.com/docs/cli/installation")!)
 
+    public static let codex = Runtime(
+        id: "codex",
+        name: "Codex",
+        executable: "codex-acp",
+        arguments: [],
+        install: .toolset(runtimeID: "codex"),
+        installPage: URL(string: "https://github.com/agentclientprotocol/codex-acp")!,
+        usesAppCopyOnly: true)
+
     public static let gemini = Runtime(
         id: "gemini",
         name: "Gemini",
@@ -67,7 +82,7 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
         usesAppCopyOnly: true)
 
-    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, gemini]
+    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini]
 
     public static func runtime(id: String) -> Runtime? {
         builtIn.first { $0.id == id }

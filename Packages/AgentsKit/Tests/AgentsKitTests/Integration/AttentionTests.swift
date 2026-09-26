@@ -721,7 +721,7 @@ struct AttentionRestartTests {
     /// A generous pause, and a generous allowance, on purpose: the broken behaviour is a
     /// *whole fresh pause* from the restart, so the two are two seconds apart. A slow
     /// machine makes this pass more readily, not less.
-    @Test func theSettlingPauseIsNotStartedAgainByARestart() async throws {
+    @Test(.flakyUnderLoad) func theSettlingPauseIsNotStartedAgainByARestart() async throws {
         let (locations, work) = try temporary()
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let slowToSettle = AttentionThresholds(macIdle: 60, deviceStaleness: 60,

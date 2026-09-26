@@ -17,18 +17,17 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     /// The vendor's own instructions. Always there, because an install that fails has to
     /// leave the person somewhere better than an error.
     public var installPage: URL
-    /// Run only from the copy the app installed, never one found on the PATH (046). For a
-    /// runtime whose protocol moves between releases, so an agent always gets the version
-    /// the app was built against, and a copy the person keeps for their terminal is left
-    /// to their terminal. Its set-up row reads "not on this Mac" until the app's is there.
+    /// Started only from the app's own toolset, never from anything on the person's PATH
+    /// (047, 046). Claude goes through the person's `npx` when there is one; Codex and
+    /// Gemini do not, because what runs has to be the exact pinned lock, and because the
+    /// person's own `codex-acp` or `gemini` on the PATH would otherwise win.
     public var usesAppCopyOnly: Bool
 
     /// Where a runtime with no page of its own sends people: the protocol's list of agents.
     public static let genericInstallPage = URL(string: "https://agentclientprotocol.com/overview/agents")!
 
     public init(id: String, name: String, executable: String, arguments: [String],
-                install: RuntimeInstall? = nil, installPage: URL? = nil,
-                usesAppCopyOnly: Bool = false) {
+                install: RuntimeInstall? = nil, installPage: URL? = nil, usesAppCopyOnly: Bool = false) {
         self.id = id
         self.name = name
         self.executable = executable
@@ -42,7 +41,8 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         case id, name, executable, arguments, install, installPage, usesAppCopyOnly
     }
 
-    /// Lenient about the two recipe fields, which a daemon from before 048 never sends.
+    /// Lenient about the recipe fields, which a daemon from before 048 (or 047, for
+    /// `usesAppCopyOnly`) never sends.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -52,7 +52,6 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         install = try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)
         installPage = (try? c.decodeIfPresent(URL.self, forKey: .installPage))
             ?? RuntimeCatalog.runtime(id: id)?.installPage ?? Self.genericInstallPage
-        // Absent from a daemon before 046, which never had such a runtime.
         usesAppCopyOnly = (try? c.decodeIfPresent(Bool.self, forKey: .usesAppCopyOnly)) ?? false
     }
 }
@@ -166,6 +165,9 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     public var runtime: Runtime
     public var availability: RuntimeAvailability
     public var checkedAt: Date
+    /// Available, from the app's own toolset, but not the one this app carries: an update
+    /// named a newer pin, and the row offers **Update** (047, 046).
+    public var outdated: Bool
 
     public var id: String { runtime.id }
 
@@ -188,9 +190,24 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
         }
     }
 
-    public init(runtime: Runtime, availability: RuntimeAvailability, checkedAt: Date = Date()) {
+    public init(runtime: Runtime, availability: RuntimeAvailability, checkedAt: Date = Date(),
+                outdated: Bool = false) {
         self.runtime = runtime
         self.availability = availability
         self.checkedAt = checkedAt
+        self.outdated = outdated
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case runtime, availability, checkedAt, outdated
+    }
+
+    /// Lenient about `outdated`, which a daemon from before 047 never sends.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        runtime = try c.decode(Runtime.self, forKey: .runtime)
+        availability = try c.decode(RuntimeAvailability.self, forKey: .availability)
+        checkedAt = try c.decode(Date.self, forKey: .checkedAt)
+        outdated = (try? c.decodeIfPresent(Bool.self, forKey: .outdated)) ?? false
     }
 }

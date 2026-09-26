@@ -1,0 +1,5 @@
+{
+  "name": "agents-codex-toolset",
+  "private": true,
+  "dependencies": { "@agentclientprotocol/codex-acp": "1.13.1" }
+}

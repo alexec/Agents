@@ -2,12 +2,12 @@ import AgentsKitCore
 import CryptoKit
 import Foundation
 
-/// A toolset runtime for somebody with no Node (048): the server toolset of 043, installed
-/// on this Mac. Claude's adapter, or Gemini CLI (046).
+/// A runtime the app installs itself (048): the server toolset of 043, installed on this Mac.
+/// Claude, for somebody with no Node; Codex always (047).
 ///
 /// The same shape as `ToolsetInstaller`'s script, in Swift rather than sh. Node is
 /// downloaded from nodejs.org and checked against the SHA-256 in `mac-node.json`, the
-/// package is installed with `npm ci` against the app's lock, and `bin/<executable>` is the
+/// package is installed with `npm ci` against the app's lock, and `bin/<shimName>` is the
 /// same shim. It is built in `<tools>/<runtime>/.part-<id>`, removed on any failure, marked whole
 /// with `ok` last, then moved into place and made `current`. No Homebrew, no admin
 /// password, and nothing of the person's — PATH, profile, npm — is touched.
@@ -32,8 +32,8 @@ public struct MacToolsetInstaller: Sendable {
         self.environment = environment
     }
 
-    /// Why it cannot be installed. The same kinds as a server's (`ToolsetInstaller.problem`),
-    /// said about this Mac, in a sentence that names the runtime.
+    /// Why it cannot be installed, in a sentence. The same kinds as a server's
+    /// (`ToolsetInstaller.problem`), said about this Mac.
     public enum Failure: Error, Equatable, Sendable {
         case noMacPin
         case noInternet(String)
@@ -43,6 +43,7 @@ public struct MacToolsetInstaller: Sendable {
         case noSpace
         case other(String)
 
+        /// Said about the runtime being installed, by its name.
         public func sentence(for name: String) -> String {
             switch self {
             case .noMacPin: "This build of the app carries no Node.js for this Mac."
@@ -63,7 +64,12 @@ public struct MacToolsetInstaller: Sendable {
         RuntimeCatalog.runtime(id: toolset.manifest.runtimeID)?.name ?? toolset.manifest.runtimeID
     }
 
-    /// Install, make it `current`, and remove any other. Returns the shim's path.
+    /// Install, and make it `current`. Returns the shim's path.
+    ///
+    /// An older toolset beside it is left where it is: an agent started from it before the
+    /// swap is still running from that folder (the shim resolves `current` once, when it
+    /// starts), and Node reads its modules lazily. `tidy()` removes old ones at the next
+    /// daemon start, when nothing can be running from them.
     @discardableResult
     public func install(progress: @Sendable (String) -> Void = { _ in }) async throws -> String {
         guard let node = toolset.macNode, let sha = node.sha256[architecture] else { throw Failure.noMacPin }
@@ -90,7 +96,6 @@ public struct MacToolsetInstaller: Sendable {
             }
         }
         try point(currentAt: id)
-        removeOthers(except: id)
         return finished.appendingPathComponent("bin/\(toolset.shimName)").path
     }
 
@@ -181,10 +186,18 @@ public struct MacToolsetInstaller: Sendable {
     }
 
     /// Every other toolset and half-built one. About half a gigabyte each.
-    private func removeOthers(except id: String) {
+    /// The id `current` points at, if there is one.
+    public var currentID: String? {
+        try? FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("current").path)
+    }
+
+    /// Remove every toolset but the current one, and anything half-built. Only when no
+    /// agent can be running from them: at the daemon's start, before any is picked up.
+    public func tidy() {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
-        for name in names where name != id && name != "current" {
+        let keep = currentID
+        for name in names where name != "current" && name != keep && !name.hasPrefix(".current-") {
             try? fm.removeItem(at: folder.appendingPathComponent(name))
         }
     }

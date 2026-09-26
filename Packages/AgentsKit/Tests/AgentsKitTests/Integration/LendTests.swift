@@ -227,9 +227,15 @@ struct LendTests {
         let window = UUID()
         guard case .success = await lendGemini(setup, on: window) else { Issue.record("refused"); return }
         guard case .success = await startGemini(setup, on: window) else { Issue.record("did not start"); return }
-        #expect(setup.launcher.lent.last == ["GEMINI_API_KEY": Self.geminiKey])
-        _ = await start(setup, on: window)
-        #expect(setup.launcher.lent.last?.isEmpty == true, "Claude on the Mac is lent nothing")
+        guard case .success = await start(setup, on: window) else { Issue.record("Claude did not start"); return }
+        // Paired by launch, since a background check may start a runtime of its own too.
+        let pairs = zip(setup.launcher.launches.map(\.runtime), setup.launcher.lent)
+        #expect(pairs.contains { $0.0 == "gemini" })
+        #expect(pairs.contains { $0.0 == "claude" })
+        for (runtime, lent) in pairs {
+            #expect(lent == (runtime == "gemini" ? ["GEMINI_API_KEY": Self.geminiKey] : [:]),
+                    "\(runtime) was lent \(lent.keys.sorted())")
+        }
     }
 
     @Test func itOutlivesTheWindowThatLentIt() async throws {

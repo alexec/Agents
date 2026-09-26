@@ -122,11 +122,11 @@ struct LeaseTests {
         }
     }
 
-    /// Until something is true, or twenty seconds pass. Long for a quiet machine, and
-    /// needed on a busy one: under the whole suite, starting a woken agent's fake
-    /// runtime has taken longer than eight.
+    /// Until something is true, or twenty seconds pass (longer on CI, as `Eventually`
+    /// is). Long for a quiet machine, and needed on a busy one: under the whole suite,
+    /// starting a woken agent's fake runtime has taken longer than eight.
     private func eventually(_ what: String, _ check: () async throws -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+        let deadline = ContinuousClock.now.advanced(by: max(.seconds(20), Eventually.timeout))
         while ContinuousClock.now < deadline {
             if try await check() { return }
             try await Task.sleep(for: .milliseconds(20))
@@ -437,7 +437,7 @@ struct LeaseTests {
         #expect(await again.isHoldingAgents, "a line keeps the daemon up")
     }
 
-    @Test(.flakyUnderLoad) func aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack() async throws {
+    @Test func aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack() async throws {
         let clock = Clock()
         let (locations, work) = try temporary()
         let core = try await makeCore(locations, clock: clock, waitLimit: .milliseconds(100))
@@ -445,6 +445,9 @@ struct LeaseTests {
         let (b, second) = try await agent(core, in: work, "Second")
         _ = try await lease(core, first, minutes: 10)
         _ = try await lease(core, second)
+        // Both quiet before the daemon goes, so the one coming back finds them finished
+        // rather than cut off mid-way through the question about a silent turn.
+        for token in [first, second] { if let id = callers[token] { await settled(core, id) } }
 
         clock.advance(minutes: 11)
         let again = try await makeCore(locations, clock: clock)

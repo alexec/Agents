@@ -577,7 +577,24 @@ extension DaemonCore {
         // words have gone to two runtimes. The guard above is checked and this is set
         // without an await between them, which on an actor is the whole of the lock.
         sending.insert(agentID)
-        defer { sending.remove(agentID) }
+        do {
+            try await sendClaimed(next, to: agent)
+        } catch {
+            sending.remove(agentID)
+            throw error
+        }
+        sending.remove(agentID)
+        // A block that cleared while this send held the agent was refused then, since
+        // `sending` is one of the things that says "busy" (039). The commonest case is
+        // the app's own question, withdrawn by a report while the runtime was starting
+        // to take it: this send then ends having sent nothing, and nothing else would
+        // ever look at the block again. So it is looked at here, once the agent is free.
+        await resumeIfCleared(agentID)
+    }
+
+    /// The part of `sendNextQueued` done while `sending` holds the agent.
+    private func sendClaimed(_ next: QueuedPrompt, to agent: Agent) async throws {
+        let agentID = agent.id
         let stopsBefore = stops[agentID, default: 0]
         let session = try await liveSession(for: agent)
         // Stopped or archived while the runtime was starting. `stop` found nothing
@@ -745,7 +762,7 @@ extension DaemonCore {
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: "\(runtime.name) is not installed any more.")
+                               message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed any more.")
         }
         // Its worktree gone is said, not worked around: starting it in the project
         // folder instead would put its work somewhere nobody asked for (FR-017).
@@ -985,6 +1002,10 @@ extension DaemonCore {
             }
         }
         await move(agentID, on: .turnEnded(reason))
+        // Taken whatever happens next, so an ask to be archived never outlives the turn
+        // it was made in. `move` has already dropped it for any ending but the asked-for
+        // one.
+        let archiveAsked = takeArchiveAsk(agentID)
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
@@ -992,6 +1013,14 @@ extension DaemonCore {
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
         guard stops[agentID, default: 0] == stopsBefore else { return }
+        // The agent asked to be archived once this turn was over, and it is over as it
+        // said. Not when something was queued while the runtime was let go: the person
+        // has moved the work on, and the ask is dropped.
+        if archiveAsked, agents[agentID]?.state == .finished,
+           agents[agentID]?.queuedPrompts.isEmpty == true {
+            try? await archive(agentID, by: .itself)
+            return
+        }
         // A turn that crossed its limit leaves its queue exactly where it is, whatever
         // the limit says by the time the runtime has gone. Letting the agent go on is
         // the reader's second act (FR-018), and a ceiling raised in the seconds the
@@ -1182,6 +1211,9 @@ extension DaemonCore {
     public enum StopCause: Sendable, Equatable {
         case person
         case agent(UUID)
+        /// The agent itself, as it asked on the call that ended its turn. Only ever an
+        /// archive, of an agent whose turn is already over.
+        case itself
 
         /// The agent that asked, when one did.
         public var starter: UUID? {
@@ -1265,12 +1297,14 @@ extension DaemonCore {
                 // it happened: who stopped it, then that it stopped.
                 await record(.runtimeNote("\(starterName(starter)) stopped this agent."), for: agentID)
                 await move(agentID, on: .stoppedByAgent)
+            case .itself:
+                await move(agentID, on: .stoppedByAgent)
             }
         }
         // Only when there was in fact a pick-up to withdraw. An ordinary stop should
         // not gain a line about something that was never going to happen.
         if hadPickUpPending {
-            let who = cause.starter.map(starterName) ?? "You"
+            let who = cause == .itself ? "It" : cause.starter.map(starterName) ?? "You"
             await record(.runtimeNote("\(who) stopped this agent before it was picked back up."),
                          for: agentID)
             DaemonLog.shared.write("withdrew the pick-up for agent \(agentID): stopped first")
@@ -1310,8 +1344,31 @@ extension DaemonCore {
         case .agent(let starter):
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
+        case .itself:
+            await record(.runtimeNote(Self.archivedItself), for: agentID)
+            await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
+    }
+
+    /// The line an agent that archived itself leaves in its transcript.
+    static let archivedItself = "This agent archived itself, as it asked."
+
+    /// Read and clear an agent's ask to be archived once its turn is over. Whether it
+    /// asked, as the ask stood when the turn ended.
+    private func takeArchiveAsk(_ agentID: UUID) -> Bool {
+        guard var agent = agents[agentID], let after = agent.afterTurn else { return false }
+        agent.afterTurn = nil
+        changed(agent)
+        return after == .archive
+    }
+
+    /// Drop an agent's ask to be put away once its turn is over. The person has sent
+    /// something, so the work has moved on from the turn the ask was about.
+    func dropAfterTurnAsk(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.afterTurn != nil else { return }
+        agent.afterTurn = nil
+        changed(agent)
     }
 
     /// What an agent that started others is called in their transcripts: its title

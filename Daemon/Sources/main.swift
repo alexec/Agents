@@ -45,7 +45,8 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                     DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                 message: message, prompts: prompts,
                                                 title: title, waitingOn: words.waitingOn,
-                                                checkAgainInMinutes: words.checkAgainInMinutes),
+                                                checkAgainInMinutes: words.checkAgainInMinutes,
+                                                afterwards: words.afterwards?.rawValue),
                     fallback: "Noted.")
     }) { prompts in
         await relay(DaemonAPI.Method.agentsSuggestPrompts,
@@ -172,7 +173,7 @@ if detach {
     }
 }
 
-// The app's pinned toolsets (043, 048, 046), when this is the agentsd inside Agents.app:
+// The app's pinned toolsets (043, 048, 047), when this is the agentsd inside Agents.app:
 // Contents/Helpers/agentsd beside Contents/Resources/toolsets/<runtime>/.
 let toolsetsFolder: URL? = {
     let me = URL(filePath: Bundle.main.executablePath ?? CommandLine.arguments[0]).resolvingSymlinksInPath()

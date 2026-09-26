@@ -12,16 +12,31 @@ import Network
 // straight through in both directions. It parses none of them, which is what keeps it
 // small enough to read in one sitting.
 //
-// **Started by hand, deliberately.** There is no pairing and no encryption here yet,
-// so anything on this network that can find the service can drive the daemon. Until
-// `Envelope` and the paired-device list exist, the safety is that this only runs while
-// somebody has decided it should, and stops when they close the terminal. Nothing
-// spawns it and nothing keeps it alive.
+// **Started by hand, deliberately.** The LAN listener below has no pairing and no
+// encryption, so anything on this network that can find the service can drive the
+// daemon. The safety is that this only runs while somebody has decided it should, and
+// stops when they close the terminal. Nothing spawns it and nothing keeps it alive.
+//
+// The relay (046) is different: everything it carries is sealed to one paired device and
+// the Mac's own key, and nothing from any other device is opened. See `RelayHost`.
 
 // `--spike` is 021's T056, the gate the whole of Slice C hangs on: can *this bundle*,
 // nested and signed the way it is, read and write a record in the CloudKit private
 // database? It answers by doing it and prints the answer, and it exists so that the
 // question is settled by running something rather than by reading Apple's forum.
+if CommandLine.arguments.contains("--spike-relay") {
+    Task {
+        do {
+            try await RelaySpike.run()
+            exit(0)
+        } catch {
+            log("relay spike failed: \(error)")
+            exit(2)
+        }
+    }
+    dispatchMain()
+}
+
 if CommandLine.arguments.contains("--spike") || CommandLine.arguments.contains("--peek") {
     Task {
         do {
@@ -170,8 +185,11 @@ listener.start(queue: .main)
 // The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
 // the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.
 let mailboxTransport = MailboxTransport()
+// And the relay (046), switched off by the same flag: both need iCloud.
+let relayHost = RelayHost()
 if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil {
     mailboxTransport.start()
+    relayHost.start()
 }
 
 dispatchMain()

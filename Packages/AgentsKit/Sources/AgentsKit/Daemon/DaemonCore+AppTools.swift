@@ -121,14 +121,29 @@ extension DaemonCore {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
                                         message: request.message, waitingOn: request.waitingOn,
                                         checkAgainInMinutes: request.checkAgainInMinutes)
+        // Checked after the report's own refusals, so an agent that got the outcome
+        // wrong hears about that first; and before either write, so a refused ask
+        // leaves nothing behind (the whole call is refused).
+        var afterwards: AfterTurn?
+        if let written = request.afterwards {
+            guard let after = AfterTurn(wire: written) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: AfterTurn.unknown)
+            }
+            guard after.goes(with: checked.report.outcome) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
+            }
+            afterwards = after
+        }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
         // the record. No title — the goal has not changed, or a helper from an older
         // binary sent none — leaves the name as it was.
         let title = request.title.flatMap(Agent.cleanedTitle)
         let noted = await land(checked.report, prompts: prompts, title: title,
+                               afterwards: afterwards,
                                on: checked.agent, id: checked.agentID)
-        return prompts.isEmpty ? noted : noted + " " + Self.shownNote
+        let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
+        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked
     }
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the
@@ -186,12 +201,19 @@ extension DaemonCore {
 
     /// Put a report on the agent — and a row of chips, where the call carried one —
     /// and say what became of it.
+    ///
+    /// `afterwards` is written whatever it is, so a later call without one — by either
+    /// door, the older of which cannot ask — clears an earlier ask: the last call in a
+    /// turn is its whole account (FR-005), and an ask left under a later `stuck` would
+    /// put away work that needs somebody.
     private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, title: String? = nil,
+                      afterwards: AfterTurn? = nil,
                       on agent: Agent, id agentID: UUID) async -> String {
         var agent = agent
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
         if let prompts { agent.suggestedPrompts = prompts }
+        agent.afterTurn = afterwards
         // Said in front of the person, so already seen: no banner for what they watched.
         if isWatched(agentID) { agent.reportSeenAt = report.at }
         // In the same write as the report, so no window ever sees the new account of
@@ -231,6 +253,15 @@ extension DaemonCore {
     /// What an agent is told about its suggestion, by either door. There is only
     /// ever one to tell it about (031), whatever it sent.
     static let shownNote = "Shown in the person's empty prompt. They may take it, edit it, or ignore it."
+
+    /// What an agent is told about its ask to be put away. "Once this turn ends",
+    /// because nothing happens yet, and the person can still move the work on.
+    static func afterTurnNote(_ after: AfterTurn) -> String {
+        switch after {
+        case .park: return "Once this turn ends, this conversation will be parked."
+        case .archive: return "Once this turn ends, this conversation will be archived."
+        }
+    }
 
     /// An agent has asked that a file be put in front of the user.
     ///

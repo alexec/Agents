@@ -404,7 +404,10 @@ struct WorkflowFiringTests {
         let work = try project(root)
         try write(everyHalfHour("Check the build."), as: "nightly", in: work)
 
-        let core = try await core(locations)
+        // The run's agent kept working until it has reported, so its token is still
+        // bound when it does.
+        let turn = TurnGate()
+        let core = try await core(locations, script: .init(gate: turn))
         await core.rescanWorkflows(in: work)
         let summary = try await core.runWorkflow(
             DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
@@ -419,6 +422,7 @@ struct WorkflowFiringTests {
         } ?? ""
         _ = try await core.reportOutcome(.init(token: token, outcome: "stuck",
                                                message: "The build machine is unreachable."))
+        turn.open()
 
         // What the row reads: the agent the run names, and what it said.
         let agent = try #require(await core.agent(agentID))

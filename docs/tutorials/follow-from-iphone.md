@@ -96,6 +96,21 @@ to say next. On the Mac, the same agent shows the same conversation.
 
 ![The second agent's finished conversation on the phone](images/follow-from-iphone-04.png){ width="300" }
 
+## 6. Take it with you
+
+Leave your Mac's Wi‑Fi: turn Wi‑Fi off on the phone, or walk out of range, and keep the
+conversation open. Within a few seconds a line appears at the top:
+
+> **Away** — slower, through iCloud
+
+The conversation carries on. Send another prompt and it arrives, only a little later than
+at home, and a question the agent asks can be answered from here. Tap **Terminal**
+and it says **Needs the same network as your Mac**; it opens by itself when you are back.
+Turn Wi‑Fi on again and the line goes.
+
+This works because the phone paired with your Mac the first time it connected at home, in
+step 3. Your Mac needs to stay awake with the bridge running.
+
 ## Where next
 
 - [Answer a question or a permission request](../how-to/answer-a-question.md), including from a

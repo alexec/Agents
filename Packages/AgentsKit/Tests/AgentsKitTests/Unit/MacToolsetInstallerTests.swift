@@ -5,7 +5,7 @@ import Testing
 
 /// Claude on a Mac with no Node: the app's pinned toolset, installed in the daemon's own
 /// folder (048).
-@Suite("Installing Claude's toolset on this Mac", .timeLimit(.minutes(1)))
+@Suite("Installing a toolset on this Mac", .timeLimit(.minutes(1)))
 struct MacToolsetInstallerTests {
     @Test func aWholeInstallIsCurrentMarkedOkAndHasAnExecutableShim() async throws {
         let fake = try FakeMacToolset()
@@ -27,6 +27,73 @@ struct MacToolsetInstallerTests {
         var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
         discovery.macToolsHome = fake.tools.path
         #expect(discovery.locate(RuntimeCatalog.claude) == .available(path: "\(current.path)/bin/npx", supportsResume: false))
+    }
+
+    /// A second runtime's toolset (047) lands in its own folder, with its own shim, and says
+    /// its own name when it fails.
+    @Test func anotherRuntimesToolsetInstallsBesideClaudesUnderItsOwnName() async throws {
+        let claude = try FakeMacToolset()
+        defer { claude.remove() }
+        let codex = try FakeMacToolset(runtimeID: "codex", package: "@agentclientprotocol/codex-acp")
+        defer { codex.remove() }
+        let installer = MacToolsetInstaller(toolset: codex.toolset, tools: claude.tools, nodeDist: codex.dist,
+                                            architecture: FakeMacToolset.architecture,
+                                            environment: ["PATH": "/usr/bin:/bin"])
+        _ = try await claude.installer().install()
+        let shim = try await installer.install()
+
+        let current = claude.tools.appendingPathComponent("codex/current")
+        #expect(shim.hasPrefix(MacToolsetInstaller.realPath(claude.tools.appendingPathComponent("codex")).path))
+        #expect(shim.hasSuffix("/bin/\(codex.toolset.shimName)"))
+        #expect(FileManager.default.isExecutableFile(atPath: shim))
+        #expect(FileManager.default.fileExists(atPath: current.appendingPathComponent(
+            "lib/node_modules/@agentclientprotocol/codex-acp/dist/index.js").path))
+        #expect(FileManager.default.fileExists(atPath: claude.tools.appendingPathComponent("claude/current/ok").path),
+                "Claude's is untouched")
+        #expect(installer.runtimeName == (RuntimeCatalog.runtime(id: "codex")?.name ?? "codex"))
+        #expect(MacToolsetInstaller.Failure.noInternet("").sentence(for: "Codex")
+                == "Couldn’t reach the internet to download Codex.")
+        #expect(MacToolsetInstaller.Failure.npm("E500").sentence(for: "Claude") == "Installing Claude failed: E500")
+    }
+
+    /// A newer pin (047's D5): installed beside the old, made current, and the old folder
+    /// kept, because an agent may still be running from it, until `tidy` at the next start.
+    @Test func aNewerPinInstallsBesideTheOldWhichStaysUntilTidy() async throws {
+        let old = try FakeMacToolset()
+        defer { old.remove() }
+        let new = try FakeMacToolset(packageVersion: "0.0.1-fake")
+        defer { new.remove() }
+        #expect(old.toolset.id != new.toolset.id)
+        _ = try await old.installer().install()
+        let updater = MacToolsetInstaller(toolset: new.toolset, tools: old.tools, nodeDist: new.dist,
+                                          architecture: FakeMacToolset.architecture,
+                                          environment: ["PATH": "/usr/bin:/bin"])
+
+        var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
+        discovery.macToolsHome = old.tools.path
+        discovery.bundledToolsetIDs = ["claude": new.toolset.id]
+        #expect(discovery.isOutdated(RuntimeCatalog.claude))
+
+        _ = try await updater.install()
+        let folder = old.tools.appendingPathComponent("claude")
+        #expect(updater.currentID == new.toolset.id)
+        #expect(!discovery.isOutdated(RuntimeCatalog.claude))
+        #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(old.toolset.id)/ok").path),
+                "an agent may still be running from the old one")
+
+        updater.tidy()
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+                == [new.toolset.id, "current"].sorted())
+    }
+
+    @Test func aPersonsOwnNpxIsNeverOutdated() async throws {
+        let fake = try FakeMacToolset()
+        defer { fake.remove() }
+        _ = try await fake.installer().install()
+        var discovery = RuntimeDiscovery(searchPaths: ["/person/bin"]) { $0 == "/person/bin/npx" }
+        discovery.macToolsHome = fake.tools.path
+        discovery.bundledToolsetIDs = ["claude": "something-newer"]
+        #expect(!discovery.isOutdated(RuntimeCatalog.claude), "Claude runs from the person's npx, not the toolset")
     }
 
     @Test func aChecksumMismatchInstallsNothing() async throws {
@@ -88,31 +155,7 @@ struct MacToolsetInstallerTests {
         facts.downloader = "curl"
         let script = ToolsetInstaller.installScript(toolset, facts)
         #expect(script.contains(#"npm ci --ignore-scripts --omit=dev --no-audit --no-fund --prefix "$P/lib""#))
-        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents: not the npx on a PATH."))
-        #expect(script.contains(#"> "$P/bin/npx""#))
+        #expect(script.contains("printf '%s\\n' '#!/bin/sh' '# Agents: runs the @agentclientprotocol/claude-agent-acp this toolset was installed with.'"))
         #expect(script.contains(#"exec "$d/node/bin/node" "$d/lib/node_modules/@agentclientprotocol/claude-agent-acp/"#))
-    }
-
-    // MARK: A second toolset (046)
-
-    @Test func geminisToolsetInstallsBesideClaudesWithItsOwnShim() async throws {
-        let fake = try FakeMacToolset(runtimeID: "gemini")
-        defer { fake.remove() }
-        let shim = try await fake.installer().install()
-
-        let current = fake.tools.appendingPathComponent("gemini/current")
-        #expect(shim.hasSuffix("/bin/gemini"))
-        #expect(FileManager.default.isExecutableFile(atPath: shim))
-        #expect(try String(contentsOfFile: shim, encoding: .utf8).contains(#"bundle/gemini.js" "$@""#))
-        #expect(!FileManager.default.fileExists(atPath: fake.tools.appendingPathComponent("claude").path))
-
-        var discovery = RuntimeDiscovery(searchPaths: ["/nowhere"])
-        discovery.macToolsHome = fake.tools.path
-        #expect(discovery.locate(RuntimeCatalog.gemini) == .available(path: "\(current.path)/bin/gemini", supportsResume: false))
-    }
-
-    @Test func aFailureNamesTheRuntimeBeingInstalled() {
-        #expect(MacToolsetInstaller.Failure.noSpace.sentence(for: "Gemini") == "There isn’t room on this Mac to install Gemini.")
-        #expect(MacToolsetInstaller.Failure.npm("E500").sentence(for: "Claude") == "Installing Claude failed: E500")
     }
 }

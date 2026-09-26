@@ -37,29 +37,52 @@ struct ToolsetTests {
         #expect(id.allSatisfy { $0.isHexDigit })
     }
 
-    // MARK: A second toolset (046)
+    /// Every toolset the app carries, beside Claude's (047).
+    static let allBundled = bundled.deletingLastPathComponent()
 
-    static var bundledGemini: URL {
-        bundled.deletingLastPathComponent().appendingPathComponent("gemini", isDirectory: true)
+    @Test func everyBundledToolsetIsLoadedByTheRuntimeItsManifestNames() {
+        let toolsets = Toolset.loadAll(from: Self.allBundled)
+        #expect(toolsets["claude"]?.manifest.package == "@agentclientprotocol/claude-agent-acp")
+        #expect(toolsets["codex"]?.manifest.package == "@agentclientprotocol/codex-acp")
+        for (runtimeID, toolset) in toolsets { #expect(toolset.manifest.runtimeID == runtimeID) }
     }
 
-    @Test func claudesShimTakesNoArgumentsAsBefore() throws {
-        let toolset = try Toolset.load(from: Self.bundled)
-        #expect(!toolset.manifest.forwardsArguments)
+    @Test func codexsToolsetPinsItsAdapterAndCarriesCodexForEveryPlatform() throws {
+        let folder = Self.allBundled.appendingPathComponent("codex", isDirectory: true)
+        let toolset = try Toolset.load(from: folder)
+        #expect(toolset.manifest.entry == "dist/index.js")
+        #expect(toolset.manifest.minFreeBytes == 1_073_741_824)
+        #expect(toolset.manifest.forwardsArguments == nil)
+        #expect(toolset.macNode?.sha256.keys.sorted() == ["arm64", "x64"])
+        let lock = try String(contentsOf: folder.appendingPathComponent(Toolset.lockFile), encoding: .utf8)
+        for platform in ["linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"] {
+            #expect(lock.contains("\"node_modules/@openai/codex-\(platform)\""))
+        }
+    }
+
+    @Test func theShimRunsThePinnedPackageAndForwardsArgumentsOnlyWhenAsked() throws {
+        var toolset = try Toolset.load(from: Self.bundled)
         #expect(toolset.shimName == "npx")
-        #expect(!toolset.shimLines.joined().contains(#""$@""#))
-        #expect(toolset.shimLines.last?.hasSuffix(toolset.manifest.entryPath + #"""#) == true)
+        #expect(toolset.shimLines.count == 4)
+        #expect(toolset.shimLines[1] == "# Agents: runs the @agentclientprotocol/claude-agent-acp this toolset was installed with.")
+        #expect(toolset.shimLines[3].hasSuffix(#"/claude-agent-acp/dist/index.js""#))
+        #expect(!toolset.shimLines.joined().contains("'"))
+        toolset.manifest.forwardsArguments = true
+        #expect(toolset.shimLines[3].hasSuffix(#"dist/index.js" "$@""#))
     }
 
-    @Test func geminisShimHandsOnItsArguments() throws {
+    // MARK: Gemini's (046)
+
+    static var bundledGemini: URL { allBundled.appendingPathComponent("gemini", isDirectory: true) }
+
+    @Test func geminisToolsetIsLoadedAndItsShimHandsOnItsArguments() throws {
         let toolset = try Toolset.load(from: Self.bundledGemini)
-        #expect(toolset.manifest.runtimeID == "gemini")
-        #expect(toolset.manifest.forwardsArguments)
+        #expect(Toolset.loadAll(from: Self.allBundled)["gemini"]?.id == toolset.id)
+        #expect(toolset.manifest.package == "@google/gemini-cli")
+        #expect(toolset.manifest.forwardsArguments == true)
+        #expect(toolset.shimName == "gemini")
         #expect(toolset.manifest.entryPath == "lib/node_modules/@google/gemini-cli/bundle/gemini.js")
         #expect(toolset.shimLines.last?.hasSuffix(#"bundle/gemini.js" "$@""#) == true)
-        #expect(toolset.shimLines.allSatisfy { !$0.contains("'") })
-        #expect(toolset.macNode?.sha256.count == 2)
-        #expect(toolset.id.count == 16)
-        #expect(toolset.id != (try Toolset.load(from: Self.bundled)).id)
+        #expect(toolset.macNode?.sha256.keys.sorted() == ["arm64", "x64"])
     }
 }

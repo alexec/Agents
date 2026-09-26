@@ -25,7 +25,13 @@ enum Eventually {
     /// How long to keep looking before giving up. Generous on purpose: it costs
     /// nothing when the condition holds and is only paid by a test that was going to
     /// fail.
-    static let timeout = Duration.seconds(10)
+    ///
+    /// Longer where `CI` is set. A shared runner starts all two thousand tests at
+    /// once on three cores, and a test can wait many seconds for its first turn on the
+    /// pool while this clock runs; ten seconds there timed out a different dozen
+    /// passing tests each run (2026-09-26). Still inside the suites' one-minute limit.
+    static let timeout: Duration = ProcessInfo.processInfo.environment["CI"] != nil
+        ? .seconds(45) : .seconds(10)
 
     /// How often to look. Short enough to feel instant, long enough not to spin.
     static let interval = Duration.milliseconds(10)

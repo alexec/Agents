@@ -12,21 +12,22 @@ public protocol RuntimeInstalling: Sendable {
 }
 
 /// Installs the runtimes in `RuntimeCatalog` on this Mac, each its own way: Claude and
-/// Gemini from the app's pinned toolsets, the rest with the vendor's own script or npm.
+/// Codex from the app's pinned toolsets, the rest with the vendor's own script or npm.
 ///
 /// Whatever the recipe, the result is decided by looking again with the same discovery
 /// the app uses: a script that exits 0 and leaves nothing where the app looks is a
 /// failure, said as one, not a success nobody can start.
 public struct RuntimeInstaller: RuntimeInstalling {
     public var discovery: RuntimeDiscovery
-    /// One per toolset the app's bundle carries, by runtime id. Empty in `swift run` or a
-    /// build without its resources; a toolset runtime then gets its page and no button.
+    /// The app's pinned toolsets, by runtime id. Empty when the app's bundle carries none,
+    /// as in `swift run` or a build without its resources; those runtimes then get their
+    /// page and no button.
     public var toolsets: [String: MacToolsetInstaller]
     public var environment: [String: String]
     public var timeout: Duration
 
     public init(discovery: RuntimeDiscovery,
-                toolsets: [String: MacToolsetInstaller],
+                toolsets: [String: MacToolsetInstaller] = [:],
                 environment: [String: String] = LoginShellPath.installEnvironment(),
                 timeout: Duration = .seconds(300)) {
         self.discovery = discovery
@@ -37,6 +38,11 @@ public struct RuntimeInstaller: RuntimeInstalling {
 
     /// Debug builds only: every vendor script is this URL instead (048's walk).
     public static let testScriptVariable = "AGENTS_TEST_INSTALL_SCRIPT"
+
+    /// Old toolsets out, at the daemon's start (see `MacToolsetInstaller.tidy`).
+    public func tidy() {
+        for toolset in toolsets.values { toolset.tidy() }
+    }
 
     public func recipe(for runtime: Runtime) -> RuntimeInstall? {
         switch runtime.install {
