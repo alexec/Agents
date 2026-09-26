@@ -67,13 +67,19 @@ extension DaemonCore {
             let status = await Self.run(codex, ["plugin", "add", "\(name)@\(marketplace)"], home: home)
             DaemonLog.shared.write("personal plugins: codex plugin add \(name): " + (status == 0 ? "added" : "failed (\(status))"))
             guard status == 0 else { continue }
-            updateRecord(home: home) { $0.codexPlugins[name] = print }
+            updateRecord(home: home) {
+                $0.codexPlugins[name] = print
+                $0.codexAddedAt = ($0.codexAddedAt ?? [:]).merging([name: Date()]) { $1 }
+            }
         }
         for name in changes.remove {
             let status = await Self.run(codex, ["plugin", "remove", "\(name)@\(marketplace)"], home: home)
             DaemonLog.shared.write("personal plugins: codex plugin remove \(name): " + (status == 0 ? "removed" : "failed (\(status))"))
             guard status == 0 else { continue }
-            updateRecord(home: home) { $0.codexPlugins.removeValue(forKey: name) }
+            updateRecord(home: home) {
+                $0.codexPlugins.removeValue(forKey: name)
+                $0.codexAddedAt?.removeValue(forKey: name)
+            }
         }
     }
 
@@ -129,5 +135,15 @@ extension DaemonCore {
                 done.resume(returning: -1)
             }
         }
+    }
+}
+
+extension DaemonCore {
+    /// Settings ▸ Shared's read of `~/.agents` (054, R13). A window's only: a phone or a
+    /// helper is refused before it gets here, by its role.
+    func sharedSnapshot() -> DaemonAPI.SharedSnapshot {
+        guard let home = locations.personalHome else { return PersonalDotAgents.snapshot(home: nil, installed: [], record: .init(home: "")) }
+        return PersonalDotAgents.snapshot(home: home, installed: installedRuntimeIDs(),
+                                          record: .load(from: locations.personalLayout, home: home))
     }
 }

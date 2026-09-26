@@ -92,6 +92,8 @@ public enum PersonalDotAgents {
         public var links: [String: String] = [:]
         /// The last fingerprint of each plugin added to Codex (R12).
         public var codexPlugins: [String: String] = [:]
+        /// When each was last added, for the Shared tab.
+        public var codexAddedAt: [String: Date]?
 
         public init(home: String) { self.home = home }
 

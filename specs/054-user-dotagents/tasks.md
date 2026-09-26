@@ -261,7 +261,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Tests for User Story 5
 
-- [ ] T038 [P] [US5] In `Tests/PersonalSnapshotTests.swift`, test the snapshot against a temporary home with each kind of thing in it. Check every rule in contracts/personal-shared.md:
+- [X] T038 [P] [US5] In `Tests/PersonalSnapshotTests.swift`, test the snapshot against a temporary home with each kind of thing in it. Check every rule in contracts/personal-shared.md:
   - `reach` keys cover installed runtimes only;
   - a skill clash names both paths;
   - a plugin's skills have `source: {plugin}`;
@@ -271,12 +271,12 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - `needsALook` holds each clash, left-out and problem;
   - a sentinel secret in env, headers, args (`--token=…` and a long token) and the URL query appears nowhere in the encoded result;
   - `laidOut: false` with everything else empty when there is no personal home.
-- [ ] T039 [P] [US5] In `Tests/Integration/PersonalSharedMethodTests.swift`, test that `personal/shared` answers a window connection and refuses a phone-role connection, as `runtimes/list` does.
+- [X] T039 [P] [US5] In `Tests/Integration/PersonalSharedMethodTests.swift`, test that `personal/shared` answers a window connection and refuses a phone-role connection, as `runtimes/list` does.
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Add `personal/shared` and the `SharedSnapshot` types (`Reach` as an enum with `gets`, `ownCopy`, `leftOut`, `noWay`, `unchecked`) to `Core/Daemon/DaemonAPI.swift`, and route the method in the daemon's dispatch for the Mac window role only.
-- [ ] T041 [US5] Create `Src/Projects/PersonalDotAgents+Snapshot.swift`: build the snapshot from the rule table, the discovery results, the record, `mcp.json`, the plugin info and the name scans of runtime configs, as R13 describes. It never holds or returns a value from `mcp.json`.
+- [X] T040 [US5] Add `personal/shared` and the `SharedSnapshot` types (`Reach` as an enum with `gets`, `ownCopy`, `leftOut`, `noWay`, `unchecked`) to `Core/Daemon/DaemonAPI.swift`, and route the method in the daemon's dispatch for the Mac window role only.
+- [X] T041 [US5] Create `Src/Projects/PersonalDotAgents+Snapshot.swift`: build the snapshot from the rule table, the discovery results, the record, `mcp.json`, the plugin info and the name scans of runtime configs, as R13 describes. It never holds or returns a value from `mcp.json`.
 - [ ] T042 [US5] Create `App/Sources/Settings/Shared/SharedSettingsView.swift`: the sidebar (Overview; In ~/.agents: Instructions, Skills, MCP servers, Plugins, Other files, with counts and ⚠) and the page area. It fetches on appear and on `NSApplication.didBecomeActiveNotification`, and shows the "off for this copy" state when `laidOut` is false. Add `Tab("Shared", systemImage: "square.on.square")` after Agents in `App/Sources/AgentsApp.swift`. Keep the modifier chain on `ContentView()` identical (see memory: a changed chain renames the saved window).
 - [ ] T043 [P] [US5] Create `App/Sources/Settings/Shared/ReachDots.swift`: six dots in catalog order with the states gets, no (struck through) and unchecked (dashed). The row carries one accessibility label only, never a label over child texts (stacked labels crash AppKit).
 - [ ] T044 [P] [US5] Create `App/Sources/Settings/Shared/SharedOverviewPage.swift` (frame A): the grid of kinds × runtimes, the legend, and Needs a look rows that open their page.
