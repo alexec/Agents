@@ -1,9 +1,10 @@
 import Foundation
 import Observation
 
-/// A window's or a phone's end of an agent's shell.
+/// A window's or a phone's end of one of an agent's shells.
 ///
-/// One per agent per client. It talks to the daemon, which owns the shell; this holds
+/// One per shell per client. The phone only ever has shell 0; the Mac has one for each
+/// terminal tab (055). It talks to the daemon, which owns the shell; this holds
 /// nothing but a way to reach it and the state it was last told about. Closing the
 /// window, or putting the phone away, takes this with it and leaves the shell running
 /// (FR-026).
@@ -15,6 +16,8 @@ import Observation
 @Observable
 public final class ShellClient {
     public let agentID: UUID
+    /// Which of the agent's shells. Zero is the one every agent has.
+    public let shell: Int
     public private(set) var state: ShellState = .live
     public private(set) var isAttached = false
     public private(set) var problem: String?
@@ -32,9 +35,10 @@ public final class ShellClient {
     @ObservationIgnored private var rows = 0
     @ObservationIgnored private var cols = 0
 
-    public init(agentID: UUID, client: DaemonClient,
+    public init(agentID: UUID, shell: Int = 0, client: DaemonClient,
                 describe: @escaping @MainActor (any Error) -> String) {
         self.agentID = agentID
+        self.shell = shell
         self.client = client
         self.describe = describe
     }
@@ -45,7 +49,7 @@ public final class ShellClient {
         do {
             let response = try await client.call(
                 DaemonAPI.Method.shellAttach,
-                DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
+                DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell, rows: rows, cols: cols),
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = response.dropped
@@ -65,7 +69,14 @@ public final class ShellClient {
     public func detach() async {
         guard isAttached else { return }
         isAttached = false
-        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.AgentRequest(agentID: agentID))
+        try? await client.call(DaemonAPI.Method.shellDetach, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
+    }
+
+    /// End this shell for good: its tab was closed (055).
+    public func close() async {
+        isAttached = false
+        onOutput = nil
+        try? await client.call(DaemonAPI.Method.shellClose, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
     }
 
     /// The connection went: whatever the daemon knew of this screen went with it. The
@@ -77,7 +88,7 @@ public final class ShellClient {
     public func send(_ data: Data) async {
         guard state.isLive else { return }
         try? await client.call(DaemonAPI.Method.shellInput,
-                               DaemonAPI.ShellInputRequest(agentID: agentID, bytes: data,
+                               DaemonAPI.ShellInputRequest(agentID: agentID, shell: shell, bytes: data,
                                                            rows: rows > 0 ? rows : nil,
                                                            cols: cols > 0 ? cols : nil))
     }
@@ -86,7 +97,7 @@ public final class ShellClient {
         guard state.isLive, rows > 0, cols > 0 else { return }
         remember(rows: rows, cols: cols)
         try? await client.call(DaemonAPI.Method.shellResize,
-                               DaemonAPI.ShellResizeRequest(agentID: agentID, rows: rows, cols: cols))
+                               DaemonAPI.ShellResizeRequest(agentID: agentID, shell: shell, rows: rows, cols: cols))
     }
 
     /// A new shell, once this one is over (FR-024).
@@ -95,7 +106,7 @@ public final class ShellClient {
         do {
             let response = try await client.call(
                 DaemonAPI.Method.shellRestart,
-                DaemonAPI.ShellAttachRequest(agentID: agentID, rows: rows, cols: cols),
+                DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell, rows: rows, cols: cols),
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = 0

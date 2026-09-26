@@ -373,10 +373,16 @@ final class AppModel {
     private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }
     private var listening: Task<Void, Never>?
 
-    /// The panes listening for shell output, one per agent in this window. Shell
-    /// notifications are broadcast to every window, so each one keeps only the agents
-    /// it is actually showing and ignores the rest.
-    @ObservationIgnored private var shellClients: [UUID: ShellClient] = [:]
+    /// The panes listening for shell output, one per shell in this window: an agent
+    /// has one per terminal tab (055). Shell notifications are broadcast to every
+    /// window, so each one keeps only the shells it is actually showing and ignores
+    /// the rest.
+    @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
+
+    struct ShellKey: Hashable {
+        var agentID: UUID
+        var shell: Int
+    }
 
     /// What each agent had already spent when this window first laid eyes on it.
     ///
@@ -1052,11 +1058,11 @@ final class AppModel {
             // the general path would re-encode every byte of it here on the main
             // actor before decoding it again. See `ShellOutputNotification`.
             guard let params, let notification = DaemonAPI.ShellOutputNotification(params: params) else { return }
-            shellClients[notification.agentID]?.received(notification.bytes)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.bytes)
 
         case DaemonAPI.Notification.shellStateChanged:
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
-            shellClients[notification.agentID]?.received(notification.state)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.state)
 
         case DaemonAPI.Notification.draftOptions:
             guard let notification = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -1844,13 +1850,31 @@ final class AppModel {
 
     // MARK: The user's shells
 
-    /// The pane's end of one agent's shell, made once per agent per window.
-    func shellClient(for agentID: UUID) -> ShellClient {
-        if let existing = shellClients[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, client: client(forAgent: agentID),
+    /// The pane's end of one of an agent's shells, made once per shell per window.
+    func shellClient(for agentID: UUID, shell: Int = 0) -> ShellClient {
+        let key = ShellKey(agentID: agentID, shell: shell)
+        if let existing = shellClients[key] { return existing }
+        let fresh = ShellClient(agentID: agentID, shell: shell, client: client(forAgent: agentID),
                                 describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
-        shellClients[agentID] = fresh
+        shellClients[key] = fresh
         return fresh
+    }
+
+    /// The shells the daemon holds for an agent, so the pane opens with the tabs it
+    /// had (055). Nil from a daemon too old to hold more than one — a server not yet
+    /// updated — and the pane then offers only the one.
+    func shellNumbers(for agentID: UUID) async -> [Int]? {
+        let response = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.shellList, DaemonAPI.AgentRequest(agentID: agentID),
+            returning: DaemonAPI.ShellListResponse.self)
+        return response?.shells
+    }
+
+    /// The user closed a terminal tab: the shell ends, and this window forgets it.
+    func closeShell(agentID: UUID, shell: Int) async {
+        let client = shellClient(for: agentID, shell: shell)
+        shellClients[ShellKey(agentID: agentID, shell: shell)] = nil
+        await client.close()
     }
 
     /// What the person typed on a live page, sent to the daemon to put on disk (022).
