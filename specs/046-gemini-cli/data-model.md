@@ -9,11 +9,13 @@ kind and one toolset.
 |---|---|
 | `id` | `gemini` |
 | `name` | `Gemini` |
-| `executable` | the installer's Node for Gemini's entry (resolved at start, not stored) |
-| `arguments` | `["<installed package>/bundle/gemini.js", "--acp"]` |
+| `executable` | `gemini` (the toolset's shim `bin/gemini`) |
+| `arguments` | `["--acp"]` (the policy file's `--policy <path>` is appended at launch) |
+| `install` | `.toolset(runtimeID: "gemini")` |
+| `installPage` | `https://github.com/google-gemini/gemini-cli#-installation` |
+| `usesAppCopyOnly` (new) | `true`: the PATH is never searched |
 
-The recipe names the installer entry (`gemini`) and the entry script; the paths come from the
-installer when an agent starts and are kept by that agent until it ends (FR-003a).
+An agent keeps the shim path it started with until it ends (FR-003a).
 
 `builtIn` becomes `[claude, grok, copilot, cursor, gemini]`. The version string is the same
 one as `toolsets/gemini/manifest.json` `packageVersion`; a unit test says so.
@@ -65,13 +67,14 @@ shape change. Settings lists one row per runtime that has a bundled toolset.
 
 ```json
 { "runtimeID": "gemini",
-  "node": { "version": "v24.21.0", "sha256": { "x86_64": "…", "aarch64": "…",
-                                                 "darwin-arm64": "…", "darwin-x64": "…" } },
+  "node": { "version": "v24.21.0", "sha256": { "x86_64": "…", "aarch64": "…" } },
   "package": "@google/gemini-cli", "packageVersion": "0.61.0",
-  "entry": "bundle/gemini.js", "minFreeBytes": 419430400 }
+  "entry": "bundle/gemini.js", "forwardsArguments": true, "minFreeBytes": 419430400 }
 ```
 
-On a server: `~/.agents-server/tools/gemini/<id>/` with `current` and `ok`, as Claude's.
+Beside it, 048's `mac-node.json` (Node's darwin tarball checksums). `forwardsArguments` is new, false for Claude.
+
+On the Mac: `<root>/tools/gemini/<id>/` (048). On a server: `~/.agents-server/tools/gemini/<id>/` with `current` and `ok`, as Claude's.
 The server's runtime recipe is `node <toolset>/node_modules/@google/gemini-cli/bundle/gemini.js --acp`.
 
 ## Turn usage (existing, from `PromptResult`)
@@ -81,14 +84,9 @@ The server's runtime recipe is `node <toolset>/node_modules/@google/gemini-cli/b
 existing usage (tokens, no cost). When `modelUsage` names one model and it differs from the
 session's current model id, the agent's shown model follows it.
 
-## Installed program (interface to the start-up installer, another lane)
+## Set-up row (existing, 048)
 
-What this lane needs from the installer, per program id (`gemini`):
-
-| State | Carries | Gemini agent shows |
-|---|---|---|
-| `ready` | Node path, package folder, version | starts |
-| `installing` | progress, if the installer has it | "Gemini is still being installed" and starts when ready |
-| `failed` | the installer's sentence | that sentence; no start |
-
-Defined here as a protocol with a test double; implemented by the installer lane.
+Nothing new stored. `RuntimeStatus` for Gemini comes from `RuntimeDiscovery.locate`, which for
+a runtime with `usesAppCopyOnly` looks only in the app's toolset (`<root>/tools/gemini/current`,
+`ok` + `bin/gemini`). One new derived fact: **outdated**, when `current/manifest.json`'s
+toolset id differs from the bundle's; shown as **Update** beside the tick.

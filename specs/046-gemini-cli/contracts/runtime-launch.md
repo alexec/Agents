@@ -3,11 +3,11 @@
 ## On the Mac
 
 ```text
-<installed node> <installed package>/bundle/gemini.js --acp --policy <root>/runtimes/gemini-policy.toml
+<root>/tools/gemini/current/bin/gemini --acp --policy <root>/runtimes/gemini-policy.toml
 ```
 
-Both paths come from the start-up installer's `gemini` entry when the agent starts. Nothing is
-looked up on the PATH, so a person's own `gemini` is never used.
+`bin/gemini` is the toolset's shim: `exec <toolset>/node/bin/node <toolset>/lib/node_modules/@google/gemini-cli/bundle/gemini.js "$@"`.
+Nothing is looked up on the PATH, so a person's own `gemini` is never used (D1).
 
 - cwd: the agent's folder (or worktree), as for every runtime.
 - Environment: the login shell's (`LoginShellPath.environment()`), unchanged. Gemini's own
@@ -43,7 +43,7 @@ effect outside them. (Exact priority band confirmed in the spike against Gemini'
 ## On a server
 
 ```text
-<toolset>/node/bin/node <toolset>/node_modules/@google/gemini-cli/bundle/gemini.js --acp --policy <server root>/runtimes/gemini-policy.toml
+~/.agents-server/tools/gemini/current/bin/gemini --acp --policy <server root>/runtimes/gemini-policy.toml
 ```
 
 - Environment: the server's, with `GEMINI_API_KEY` set to the lent key and `GOOGLE_API_KEY`
@@ -56,6 +56,7 @@ effect outside them. (Exact priority band confirmed in the spike against Gemini'
 |---|---|
 | `session/new` error `-32000` | **Needs signing in** + sheet (existing path) |
 | process exits before `initialize` answers, stderr names an unknown argument | "Gemini <version> did not start in a mode the app can talk to." |
-| installer says `installing` | "Gemini is still being installed." (starts when ready) |
-| installer says `failed` | the installer's sentence |
+| status `missing` | "Gemini isn't on this Mac." with the row's **Install** |
+| status `installing` | "Gemini is being installed." with its step |
+| status `installFailed` | 048's sentence, with **Retry** and **Open install page** |
 | prompt error / refusal carrying `RESOURCE_EXHAUSTED` or 429 | "Gemini's quota ran out: <Gemini's sentence>." (shape settled in the spike) |

@@ -225,8 +225,7 @@ is a sentence and not a stack.
     `ServerFacts.canInstallClaude`
 - **Overlap with 047 (Codex)**, planned in another lane: it needs the same generalisation.
   Whichever lands first does it once, as its own phase (Phase 2 here), and the other merges
-  it. Both also depend on the start-up installer lane for the Mac (D1); the servers half of
-  this plan does not.
+  it. Both also build on 048's Mac toolset install (R12), which is merged.
 
 ## R11. Nothing on the person's PATH changes
 
@@ -277,7 +276,7 @@ and Update run the same `install`. Shared with Claude; small, and it lives in 04
 
 **Keeping a running agent's build (FR-003a).** `MacToolsetInstaller.removeOthers` deletes every
 other toolset folder at the end of an install. Gemini's bundle loads its chunks lazily (the
-`bundle/` holds ~80 `chunk-*.js` files), so deleting a folder under a running agent would break
+`bundle/` holds 72 `.js` files, mostly `chunk-*.js`), so deleting a folder under a running agent would break
 it mid-turn. **Decision**: the daemon passes the ids in use (agents holding the runtime record
 the toolset path they started from) and `removeOthers` skips them; the next install, or the
 next daemon start, removes them once unused.

@@ -1,7 +1,6 @@
 # Quickstart: proving Gemini works
 
-Prerequisites: until the start-up installer lands, a Gemini toolset placed by hand
-(`scripts/update-gemini-toolset.sh --install-here <dir>`); a Gemini API key (AI Studio) for the live steps, kept in
+Prerequisites: nothing installed for Gemini (the set-up page installs it); a Gemini API key (AI Studio) for the live steps, kept in
 the scratch root's environment only, never in the real app's.
 
 ## 1. Handshake (no key)
@@ -23,7 +22,14 @@ The catalog-totality test lists five runtimes; the policy file test writes
 `gemini-policy.toml` and passes `--policy <path>`; the quota test maps `_meta.quota` to tokens
 with no cost.
 
-## 3. A real turn on the Mac (scratch root)
+## 3. The set-up page (scratch root)
+
+Launch a scratch copy with the run-app skill. Expect the **Install your agents** sheet listing
+Gemini as **Not on this Mac** with **Install**, even with a `gemini` on the PATH. Press it:
+progress steps on the row, then a tick with `<root>/tools/gemini/current/bin/gemini`. Nothing
+is written outside `<root>`.
+
+## 3a. A real turn on the Mac (scratch root)
 
 Use the run-app skill with `GEMINI_API_KEY` in the scratch launch environment. Start a Gemini
 agent in a scratch project and ask: "create hello.txt with one line, run ls, then finish".
