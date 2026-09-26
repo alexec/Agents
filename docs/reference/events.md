@@ -91,6 +91,8 @@ These belong to the Mac, not to a project. Any agent can wait for them.
 | `person.away` | why | You locked the screen or stepped away for 5 minutes. |
 | `person.back` | why | You unlocked the screen or came back. |
 | `cost.limit_reached` | limit, agent | A spending limit was reached. See [Settings](settings.md). |
+| `server.offline` | server | A server's connection dropped. Raised once, while the Agents window is open. |
+| `server.online` | server | A server that was offline is back. Raised once, while the Agents window is open. |
 
 ## Custom events
 
