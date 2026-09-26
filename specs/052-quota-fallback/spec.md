@@ -55,6 +55,35 @@ Yes, with two limits the person should know about up front:
   there is a level the person names (say "Strongest" or "Cheap and fast") with one model and
   effort per runtime in the pool. An automatic switch uses those rows. Its note in the chat can
   open the same sheet afterwards to correct what it chose.
+- Q: Is a pool entry a runtime, or a runtime with a particular way of paying for it? → A: A
+  runtime with its credential. The same runtime can be an allowance in one place and billed by
+  the token in another. Codex on the Mac uses a ChatGPT plan, but on a server it is lent an
+  OpenAI API key (047). Gemini only ever runs on a key (046). Antigravity uses a Google account on
+  the Mac (the 049 Antigravity lane), and OpenCode and Goose use whatever provider the person has
+  signed them in to. An API key is pay-as-you-go by nature, so falling back to one is exactly the
+  pay-by-the-token carrying-on this feature exists to avoid. Each entry therefore shows how it is
+  paid for: **allowance** (a plan or account sign-in: ChatGPT, Google account, Copilot, a Claude
+  subscription, a subscription provider) or **billed per token** (an API key). Keyed entries can
+  be added, but only by the person choosing them, marked as billed, and never offered by default.
+  The same runtime can appear as two entries with different credentials, and on a server the
+  entry is judged by the credential that host would actually use.
+- Q: Does every "limit" refusal mean the runtime is out? → A: No. A spent allowance (a daily or
+  monthly quota, a used-up plan window, credit gone) is told apart from a short rate limit (too
+  many requests just now). Only a spent allowance marks the runtime out and moves the chat. A rate
+  limit leaves the chat on its runtime, which is tried again after a short wait, and it switches
+  only if the limit keeps coming back. The 046 Gemini lane's `usageLimit` recognition is the
+  starting point. Today it treats a JSON-RPC 429, "quota", "rate limit" or "RESOURCE_EXHAUSTED" as
+  one thing and ends the turn as a plain refusal with the provider's sentence. 052 splits that into
+  the two kinds, per runtime. Gemini's spent free tier ("You have exhausted your daily quota on
+  this model.") is the first captured example.
+- Q: How is a spent allowance recorded, given that other lanes are changing the same list of
+  endings? → A: As an ending of its own, beside the others in `EndedReason`, never folded into
+  `refusal`. The Antigravity lane, uncommitted as of 2026-09-25, adds a `runtimeError` ending to the
+  same enum, so whichever lane merges second takes the other's cases and re-runs the tests over
+  every ending. The two stay distinct: `runtimeError` is a runtime reporting a failure in words,
+  which FR-006 says never switches, and a spent allowance is one that has been positively
+  recognised. The plan checks main for `runtimeError` and Gemini's `usageLimit` before adding
+  anything.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -326,8 +355,12 @@ It builds on Story 5's sheet, which fills in the same rows.
 
 **Pool**
 
-- **FR-001**: The person MUST be able to keep one ordered pool of runtimes, each optionally with a
-  model, and add, remove and reorder its entries in Settings.
+- **FR-001**: The person MUST be able to keep one ordered pool of runtimes, each with its
+  credential and optionally a model, and add, remove and reorder its entries in Settings.
+- **FR-001a**: Each entry MUST show whether it is an **allowance** (a plan or account sign-in) or
+  **billed per token** (an API key). Keyed entries MUST NOT be suggested or added by default. A
+  keyed entry the person adds MUST stay marked as billed on the Pool page and in every switch note.
+  On a server, an entry MUST be judged by the credential that host would use.
 - **FR-002**: Only installed, signed-in runtimes MUST be addable; entries that stop being usable
   MUST stay in the pool, shown as unavailable, and be skipped.
 - **FR-003**: Switching MUST be off until the pool holds at least two runtimes, and the person
@@ -339,7 +372,12 @@ It builds on Story 5's sheet, which fills in the same rows.
 - **FR-005**: The app MUST tell a spent allowance apart from every other way a turn ends, for each
   runtime it knows, and MUST record which one it was.
 - **FR-006**: The app MUST NOT switch on any ending it does not positively recognise as a spent
-  allowance, including crashes, refused sign-ins, the person's cost limits and context limits.
+  allowance, including crashes, refused sign-ins, the person's cost limits, context limits, short
+  rate limits and a runtime's own error in words.
+- **FR-006a**: A short rate limit MUST NOT mark a runtime out. The app MUST retry the turn on the
+  same runtime after a short wait, and MUST treat the runtime as out only if the rate limit keeps
+  coming back. A spent allowance MUST be recorded as an ending of its own, never as a plain
+  refusal.
 - **FR-007**: When a runtime offers to continue at usage-based prices, the app MUST decline the
   offer and treat the runtime as out. It MUST never accept such an offer on the person's behalf.
 - **FR-008**: The app MUST keep, per runtime, whether it is out, since when, and until when if the
@@ -433,8 +471,8 @@ It builds on Story 5's sheet, which fills in the same rows.
 
 ### Key Entities
 
-- **Pool**: the person's ordered list of acceptable runtimes; each entry is a runtime and an
-  optional model. App-wide.
+- **Pool**: the person's ordered list of acceptable runtimes; each entry is a runtime, the
+  credential it runs on (allowance or billed per token), and an optional model. App-wide.
 - **Runtime allowance state**: per runtime (and per host, for servers), available or out; when it
   ran out; when it is expected back, if known; how the app learned it.
 - **Matching row**: a level the person names, with at most one model, and effort, per runtime.
@@ -489,6 +527,9 @@ It builds on Story 5's sheet, which fills in the same rows.
 - The one-hour retry for runtimes that give no return time is a default, not a setting, in this
   version.
 - Mixing runtimes inside one chat is acceptable to the person; the chat does not try to hide it.
-- Depends on: runtime sign-in status (043/048) to know which runtimes are usable; events (042);
+- The short wait and the number of repeats before a rate limit counts as out are defaults set in
+  the plan, not settings, in this version.
+- Depends on: the per-runtime credential kinds from 046/047 to tell an allowance from a key;
+  Gemini's `usageLimit` (046) as the first recogniser; runtime sign-in status (043/048) to know which runtimes are usable; events (042);
   the blocked-and-check-again machinery (039) for the everyone-out wait; servers (037) for
   per-host pools.
