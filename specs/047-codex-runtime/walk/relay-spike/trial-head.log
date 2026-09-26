@@ -1,0 +1,20 @@
+authMethods: ['api-key']
+session/new: ok
+Warning: Falling back from WebSockets to HTTPS transport. stream disconnected before completion: WebSocket protocol error: No "Connection: upgrade" header
+
+I’ll run `uname -a`.
+
+  tool: uname -a
+
+  tool: uname -a
+
+  tool: Guardian Review
+Linux 6cf224fd8030 6.8.0-117-generic #117-Ubuntu SMP PREEMPT_DYNAMIC Thu May 7 17:26:37 UTC 2026 aarch64 GNU/Linux
+prompt: {"jsonrpc": "2.0", "id": 3, "result": {"stopReason": "end_turn", "usage": {"totalTokens": 14335, "inputTokens": 332, "cachedReadTokens": 13952, "outputTokens": 51, "thoughtTokens": 0}, "_meta": {"quota": {"token_count": {"totalTokens": 14335, "inputTokens": 332, "cachedInputTokens": 13952, "outputTokens": 51, "reasoningOutputTokens": 0}, "model_usage": [{"model": "gpt-6-astra", "token_count": {"to
+--- relay log
+22:32:12 GET /backend-api/ps/plugins/suggested/codex -> 200
+22:32:13 GET /backend-api/wham/accounts/check -> 200
+22:32:13 GET /backend-api/plugins/featured -> 200
+22:32:13 GET /backend-api/ps/plugins/installed -> 200
+22:32:13 GET /backend-api/ps/plugins/list -> 200
+22:32:13 GET /backend-api/ps/plugins/installed -> 200

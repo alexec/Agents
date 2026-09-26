@@ -328,3 +328,62 @@ into the adapter's environment and never on a command line.
 - **Key check (FR-017)**: `GET https://api.openai.com/v1/models` answered 200 for that key even
   with no credit, so "Works" in Settings means the key is valid, not that it has credit. The
   quota ending says the rest.
+
+## R12. Option 2: a server's Codex signed in through this Mac's ChatGPT sign-in (spike, 2026-09-25)
+
+Alex asked for the Mac's ChatGPT sign-in to be usable on servers. A plain copy fails, because
+Codex rotates the refresh token and two copies sign each other out. So this spike tried a
+**relay**: the sign-in stays on the Mac, and the server's Codex sends its ChatGPT traffic
+back to the Mac, which adds the Mac's current token. Alex allowed the Mac's `auth.json` to be
+read for this. Files: `walk/relay-spike/` (`relay.py`, `run-trial.sh`, the relay's log, the
+start of the trial log; there are no tokens in any of them).
+
+**How it was wired**:
+- On the box, Codex ran with its own `CODEX_HOME`, holding two files:
+  - `auth.json`: a stand-in with `auth_mode: chatgpt`, JWTs whose signature is `standin`, the
+    real account id (not secret), and `refresh_token: relay-standin-no-refresh`;
+  - `config.toml`: `chatgpt_base_url = "https://127.0.0.1:18765/<secret>/backend-api/"`.
+- `CODEX_CA_CERTIFICATE` pointed at a throwaway CA's public certificate.
+- The relay on the Mac listened on 127.0.0.1:18765 with a server certificate from that CA,
+  and was reached through `ssh -R 18765:127.0.0.1:18765`. It forwarded to
+  `https://chatgpt.com`, replacing `Authorization` with the Mac's access token and setting
+  `ChatGPT-Account-Id`.
+
+**Measured**:
+1. **It works.** The session opened, and a real turn ran `uname -a` on the box and returned
+   `Linux 6cf224fd8030 6.8.0-117-generic … aarch64`, with usage (14 335 tokens,
+   `gpt-6-astra`). The relay saw account and plugin checks, `ps/mcp`, analytics and
+   `codex/responses`, all 200.
+2. **Nothing of the real sign-in reached the box.** The last 24 characters of each real
+   token (access, refresh, id) were searched for across `/tmp/codex-relay` and
+   `/home/agents`, and none was found.
+3. **Codex insists on HTTPS** ("workspace backend must use an HTTPS origin without
+   credentials"). `CODEX_CA_CERTIFICATE` works, but the certificate must be a CA-signed
+   server certificate (serverAuth, IP SAN). A self-signed certificate that is its own CA is
+   refused by rustls without a word: nothing reached the relay.
+4. **The secret path does not survive.** `chatgpt_base_url`'s path is kept for account and
+   plugin calls, but workspace routing keeps only the origin, so `codex/responses` came to
+   `https://127.0.0.1:18765/backend-api/codex/responses` without the secret. The spike let
+   `/backend-api/` through. A real design needs another guard, because any process on the
+   server that can reach that loopback port could use Alex's ChatGPT plan.
+5. **WebSockets first**: Codex opens `wss://…/codex/responses` (101), then falls back to
+   HTTPS POST when the relay does not carry the upgrade. It works either way; carrying the
+   WebSocket would be the faster path.
+6. **The Mac's token can go stale.** At the first try the Mac's access token had been
+   invalidated ("token_invalidated", maybe when credits were bought). One Codex request on
+   the Mac renewed it (`last_refresh` moved), and after that everything passed. The relay
+   must deal with this: a 401 from chatgpt.com has to lead to a renewal, done by Codex on the
+   Mac (so only one party ever rotates the refresh token), and then a retry.
+
+**What a product version needs**:
+- The relay built into the Mac's daemon, carried over the existing server link rather than a
+  separate `ssh -R`.
+- A guard on the server end: the server's agentsd listens on loopback and checks that the
+  peer socket belongs to the same uid (`/proc/net/tcp` → inode → uid), or an equivalent.
+- Its own CA, made per install and kept in the Mac's Keychain; only the public certificate
+  goes to the server.
+- Renewal on 401 through the Mac's Codex.
+- The stand-in `auth.json` and `config.toml` written into the app-owned `CODEX_HOME` on the
+  server. They hold no secret.
+- A check that this use of a ChatGPT plan (one person, their own machines) is fine by
+  OpenAI's terms.
