@@ -124,7 +124,7 @@ should see", and ends in Complete.
 
   Take the wording from specs 029, 033 and 034 and the Remote app's source, and leave picture placeholders named
   `follow-from-iphone-NN.png`, listed at the end of the task notes.
-- [ ] T014 [US1] Ask Alex (AskUserQuestion) for the iPhone screenshots for T013 against the scratch root, with the
+- [X] T014 [US1] Ask Alex (AskUserQuestion) for the iPhone screenshots for T013 against the scratch root, with the
   list of shots. Save them in `docs/tutorials/images/`. Until then, the page uses Mac pictures where they apply
   and states which steps have no picture yet.
 - [X] T015 [US1] Fill in `docs/tutorials/index.md` and the Tutorials section of `nav:` in `mkdocs.yml`, then run

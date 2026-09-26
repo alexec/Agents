@@ -1,7 +1,7 @@
 ---
 diataxis: tutorial
 devices: [mac, iphone]
-description: Put Agents on your iPhone, see the agents on your Mac, answer one, and start another.
+description: Put Agents on your iPhone, see the agents on your Mac, and start another from the phone.
 ---
 
 # Follow your agents from your iPhone
@@ -10,8 +10,10 @@ In this tutorial you put Agents on your iPhone, find the agent you started in
 [Your first agent](first-agent.md), and start a second one from the phone. It takes about
 ten minutes. The same steps work on an iPad.
 
-**What you'll have at the end:** your Mac's projects and agents on your phone, one agent
-started from it, and a question from an agent answered without going back to the Mac.
+**What you'll have at the end:** your Mac's projects and agents on your phone, and a second
+agent started and finished from the phone without going back to the Mac.
+
+![The project on the phone, with two finished agents under Complete](images/follow-from-iphone-05.png){ width="300" }
 
 ## Before you start
 
@@ -55,13 +57,19 @@ in the first tutorial.
 
 Tap your project.
 
-You should see the agent from the first tutorial, in the **Complete** group, with the
-first words of what you asked it. Tap it to read the whole conversation, exactly as it
-is on the Mac.
+You should see the agent from the first tutorial in the **Complete** group, with its
+summary under its name.
+
+![The weather-app project on the phone, with the first agent under Complete](images/follow-from-iphone-01.png){ width="300" }
+
+Tap it to read the whole conversation, exactly as it is on the Mac: the summary, the
+agent's explanation, and the fix it suggests you commit next.
+
+![The finished conversation on the phone](images/follow-from-iphone-02.png){ width="300" }
 
 ## 4. Start an agent from the phone
 
-1. Go back to the project and tap **New agent**.
+1. Go back to the project and tap **+** at the top right, for a new agent.
 2. Leave **Runtime** as it is. It is the runtime your Mac has set up.
 3. In **What should it do?**, type:
 
@@ -69,18 +77,24 @@ is on the Mac.
     Add a test for the low temperature in Celsius, and run the tests.
     ```
 
-4. Tap **Start agent**.
+4. Tap the arrow to start it.
+
+![The new agent form: Runtime, Worktree, Mode, Model and Effort, above the prompt](images/follow-from-iphone-03.png){ width="300" }
 
 You should see the new agent appear under **Working**, and its conversation fill in as it
 reads the code.
 
-## 5. Answer it from the phone
+## 5. Watch it finish, and answer it if it asks
 
-Before it changes a file, the agent asks for permission, just as it did on the Mac.
+Whether the agent stops to ask before it changes a file depends on **Mode** on the form.
+With **Auto**, as in the picture above, Claude goes ahead with changes inside the project
+without asking. With a mode that asks, a card appears in its conversation naming what it
+wants to do, and you tap **Yes**, just as you clicked it on the Mac.
 
-You should see the agent move to **Needs attention**, and a card in its conversation
-naming what it wants to do. Tap **Yes**. The agent carries on, and ends in
-**Complete**. On the Mac, the same agent shows the same answer.
+You should see the agent end in **Complete**, with what it added and a suggestion of what
+to say next. On the Mac, the same agent shows the same conversation.
+
+![The second agent's finished conversation on the phone](images/follow-from-iphone-04.png){ width="300" }
 
 ## Where next
 
