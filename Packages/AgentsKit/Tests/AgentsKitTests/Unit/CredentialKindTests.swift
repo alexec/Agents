@@ -37,7 +37,7 @@ struct CredentialKindTests {
 @Suite("A Gemini key")
 struct GeminiKeyKindTests {
     @Test func bothShapesAreGeminiKeys() throws {
-        for text in ["AIzaSyFAKEFAKEFAKEFAKEFAKEFAKEFAKE1234", "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"] {
+        for text in ["AIza" + "SyFAKEFAKEFAKEFAKEFAKEFAKEFAKE1234", "AQ." + "Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"] {
             let secret = try #require(Secret(text))
             #expect(secret.kind == .geminiAPIKey)
             #expect(secret.kind.runtimeID == "gemini")

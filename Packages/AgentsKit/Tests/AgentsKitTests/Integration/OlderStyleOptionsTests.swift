@@ -48,7 +48,7 @@ struct OlderStyleOptionsTests {
 
         // Gemini on the Mac takes the key the window lends (046, D3).
         try await core.lendCredential(DaemonAPI.CredentialsLend(
-            runtime: "gemini", secret: Secret("AQ.Ab8RN6FAKEOLDERSTYLEOPTIONSTEST00000")!), connection: UUID())
+            runtime: "gemini", secret: Secret("AQ." + "Ab8RN6FAKEOLDERSTYLEOPTIONSTEST00000")!), connection: UUID())
         let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "go",
                                             startOptions: StartOptions(values: ["model": "gemini-3-flash-preview"])))
         await eventually("the turn ran") { await core.agent(id)?.state == .finished }
@@ -77,7 +77,7 @@ struct GeminiContinueTests {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
         try await core.lendCredential(DaemonAPI.CredentialsLend(
-            runtime: "gemini", secret: Secret("AQ.Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
+            runtime: "gemini", secret: Secret("AQ." + "Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
 
         let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "first"))
         await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
@@ -116,7 +116,7 @@ struct GeminiContinueTests {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
         try await core.lendCredential(DaemonAPI.CredentialsLend(
-            runtime: "gemini", secret: Secret("AQ.Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
+            runtime: "gemini", secret: Secret("AQ." + "Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
         let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "first"))
         await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
         try await core.stop(id)

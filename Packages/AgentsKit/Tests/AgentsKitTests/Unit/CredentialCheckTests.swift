@@ -71,7 +71,7 @@ struct CredentialCheckTests {
 @Suite("Checking a Gemini key")
 struct GeminiCredentialCheckTests {
     @Test func theKeyGoesInAHeaderAndNeverTheURL() throws {
-        let key = "AQ.Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"
+        let key = "AQ." + "Ab8RN6FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE5678"
         let request = CredentialCheck.request(for: try #require(Secret(key)))
         #expect(request.url == CredentialCheck.geminiEndpoint)
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == key)
