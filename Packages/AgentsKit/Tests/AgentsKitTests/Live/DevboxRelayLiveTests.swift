@@ -53,9 +53,11 @@ struct DevboxRelayLiveTests {
                                    certificates: RelayCertificates(folder: folder.appendingPathComponent("relay")),
                                    log: { log.add($0) })
         let port = try await relay.start()
+        let standIn = MacSignInRelay.freshClaudeStandIn()
+        relay.expectClientBearer(standIn)
         let grant = ServerConnection.RelayGrant(runtime: "claude", localPort: port,
                                                 caCertificate: try relay.certificates.caPEM(),
-                                                standIn: try signIn.standIn())
+                                                standIn: standIn)
         let server = ServerConnection(
             hostID: HostID(rawValue: "devbox56"), ssh: try ssh(in: folder), socket: folder.appendingPathComponent("d.sock"),
             installedBy: "DevboxRelayLiveTests",

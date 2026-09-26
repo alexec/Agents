@@ -15,6 +15,11 @@ import Security
 /// runtime on the Mac; a 401 asks the source to renew, once (Codex's by the same exchange
 /// Codex makes, Claude's by the Mac's own Claude), and the request is asked again.
 ///
+/// The loopback TLS port is reachable by every account on this Mac (Network.framework cannot
+/// listen on a Unix socket here), so a request is answered with this Mac's token only when
+/// it carries the stand-in bearer that was handed to the server with the grant — a per-relay
+/// secret, not the fixed Claude string that shipped in source (security review S4).
+///
 /// Logs say what was asked and how it was answered: a method, a path and a status. Never a
 /// header or a body.
 public final class MacSignInRelay: @unchecked Sendable {
@@ -26,6 +31,14 @@ public final class MacSignInRelay: @unchecked Sendable {
     private let session: URLSession
     private let log: @Sendable (String) -> Void
     public private(set) var port: UInt16 = 0
+    /// The stand-in's access token: the only `Authorization` that may draw this Mac's
+    /// real token. Set when the grant is made; empty means nothing is lent yet.
+    private let bearerLock = NSLock()
+    private var _clientBearer = ""
+    public var clientBearer: String {
+        bearerLock.lock(); defer { bearerLock.unlock() }
+        return _clientBearer
+    }
 
     public init(relay: SignInRelay, signIn: any MacSignInSource, certificates: RelayCertificates,
                 log: @escaping @Sendable (String) -> Void = { _ in }) {
@@ -67,6 +80,41 @@ public final class MacSignInRelay: @unchecked Sendable {
         self.listener = listener
         port = ready
         return ready
+    }
+
+    /// Remember the stand-in bearer that was given to a server with this grant. Only a
+    /// request carrying that bearer draws this Mac's sign-in (S4).
+    public func expectClientBearer(_ bearer: String) {
+        bearerLock.lock()
+        _clientBearer = bearer
+        bearerLock.unlock()
+    }
+
+    /// A fresh stand-in token for Claude: shaped like a subscription token, unique per
+    /// grant, so the fixed string in source is never enough to draw this Mac's sign-in.
+    public static func freshClaudeStandIn() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        precondition(SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess)
+        return "sk-ant-oat01-agents-relay-" + bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The access token a runtime will send as `Authorization: Bearer …`: Codex's from its
+    /// stand-in JSON, Claude's the stand-in string itself.
+    public static func clientBearer(fromStandIn standIn: String) -> String {
+        guard let data = standIn.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tokens = object["tokens"] as? [String: Any],
+              let access = tokens["access_token"] as? String else { return standIn }
+        return access
+    }
+
+    /// The Authorization header's bearer value, or nil when there is none.
+    static func bearer(in request: HTTPRequest) -> String? {
+        guard let value = request.headers.first(where: { $0.name.lowercased() == "authorization" })?.value
+        else { return nil }
+        let prefix = "Bearer "
+        if value.hasPrefix(prefix) { return String(value.dropFirst(prefix.count)) }
+        return value
     }
 
     public func stop() {
@@ -153,6 +201,14 @@ public final class MacSignInRelay: @unchecked Sendable {
         guard let url = Self.upstreamURL(host: relay.upstreamHost, target: request.target) else {
             log("relay: \(request.method) -> 400 (the request target is not a path)")
             send(connection, head: "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
+            return
+        }
+        // Loopback TLS is every local account's to dial. Only the stand-in handed to the
+        // server with the grant may draw this Mac's token (S4).
+        let expected = clientBearer
+        guard !expected.isEmpty, Self.bearer(in: request) == expected else {
+            log("relay: \(request.method) \(request.pathOnly) -> 403 (not the stand-in)")
+            send(connection, head: "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
             return
         }
         guard let token = try? signIn.current() else {
