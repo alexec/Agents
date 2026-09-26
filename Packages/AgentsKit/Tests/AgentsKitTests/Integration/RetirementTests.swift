@@ -24,7 +24,8 @@ struct RetirementTests {
     }
 
     private func core(_ locations: StoreLocations, seeded: [Agent] = [], at time: Date? = nil,
-                      settings: RetentionSettings? = nil) async throws -> DaemonCore {
+                      settings: RetentionSettings? = nil,
+                      launcher: FakeLauncher = FakeLauncher(script: .init())) async throws -> DaemonCore {
         let store = try AgentStore(locations: locations)
         for agent in seeded {
             try await store.save(agent)
@@ -33,7 +34,7 @@ struct RetirementTests {
         if let settings { try RetentionStore(locations: locations).save(.init(settings: settings)) }
         let clock = time ?? now
         let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything,
-                              launcher: FakeLauncher(script: .init()), now: { clock })
+                              launcher: launcher, now: { clock })
         await core.loadFromDisk()
         return core
     }
@@ -380,6 +381,48 @@ struct RetirementTests {
         await core.checkRetention()
         #expect(await core.agent(inRun.id) == nil)
         #expect(await core.agent(watched.id) != nil)
+    }
+
+    // MARK: US4
+
+    @Test func aRetirementWithinAWeekIsOnItsRow() async throws {
+        let (locations, work) = try temporary()
+        let soon = archived(work, daysAgo: 27)
+        let core = try await core(locations, seeded: [soon])
+        await core.checkRetention()
+        #expect(await core.agent(soon.id)?.retirement == .at(soon.archivedAt!.addingTimeInterval(30 * day)))
+    }
+
+    @Test func unarchivingBringsItBackWholeAndWithoutANote() async throws {
+        let (locations, work) = try temporary()
+        var soon = archived(work, daysAgo: 27)
+        soon.availableCommands = [SlashCommand(name: "review", description: "Review the code")]
+        let core = try await core(locations, seeded: [soon])
+        await core.checkRetention()
+        try await core.unarchive(soon.id)
+        let back = await core.agent(soon.id)
+        #expect(back?.retirement == nil && back?.archivedAt == nil)
+        #expect(back?.availableCommands.map(\.name) == ["review"])
+        #expect(try await core.transcript(.init(agentID: soon.id)).entries.isEmpty == false)
+    }
+
+    @Test func aBranchKeepsItsOwnConversationWhenTheOriginalIsRetired() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.sessionCapabilities = ["close": [:], "list": [:], "fork": [:]]
+        var original = archived(work, daysAgo: 40)
+        original.runtimeSessionID = "session-1"
+        let core = try await core(locations, seeded: [original],
+                                  settings: RetentionSettings(keepFor: .forever, cap: .none),
+                                  launcher: FakeLauncher(script: script))
+        let branch = try await core.fork(agentID: original.id)
+        let before = try await core.transcript(.init(agentID: branch)).entries.count
+        #expect(before > 0)
+
+        _ = await core.setRetention(.init(settings: RetentionSettings(), confirmed: true))
+        #expect(await core.agent(original.id) == nil)
+        #expect(await core.agent(branch) != nil)
+        #expect(try await core.transcript(.init(agentID: branch)).entries.count >= before)
     }
 }
 

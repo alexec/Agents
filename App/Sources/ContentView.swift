@@ -92,6 +92,12 @@ struct ContentView: View {
             RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()
         } else if model.selection != nil {
             chat(inWindowOf: width)
+                // Every route to an agent by id comes here — a workflow's run, a pull
+                // request's agent, a menu. One the window has no agent for may have been
+                // retired (051): asked once, and the page above shows when it has been.
+                .task(id: model.selection) {
+                    if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
+                }
         } else {
             // The project on its own: a new session, its pull requests, workflows and
             // worktrees. Its sessions are the middle column's.

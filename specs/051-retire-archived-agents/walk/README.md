@@ -50,3 +50,22 @@ Alex approved the look as is (AskUserQuestion, 2026-09-25).
 30 s after start, `daemon.log` said "retiring … (age)" three times. `retired.jsonl` held exactly
 the three seeded 31-day ids, and their folders were gone. `agents/list` still had the two 29-day
 agents and the two live ones. `retention/state` said 2 archived (4 MB) and 3 retired.
+
+## Routes to a retired agent (T045, SC-005)
+
+Every route to an agent by id ends in one of two places, and both reach the retired page:
+
+- `AppModel.openAgent(_:)` asks `agents/retired` for an id it has no agent for, and opens the
+  tombstone's project. Used by the Events page (a consequence's link, the Waiting now strip), the
+  Resources page, and the Go menu's next and previous. Seen on screen: `look/retired-page.png`.
+- Routes that set `selection` directly: a workflow's row and page (Recent runs), a pull request
+  row's agent and worktree, and the middle column. `ContentView` asks for the tombstone when the
+  chat has a selection with no agent, and shows the retired page once it has one. Built; not yet
+  clicked through.
+- "Started by" on a live agent's row names a retired starter from its tombstone and adds
+  "(retired)". This is the icon's help text on the Mac; `AgentsModelTests` checks it.
+- The phone: `RemoteRoute.agent` shows `RetiredAgentPage` when it has no agent but has a
+  tombstone, and asks for one otherwise. This covers a notification tap, the events list and
+  project rows. The look on the phone is Alex's (T062).
+- Limitation: the Mac asks its own daemon (`host: .mac`). A retired agent on a server is reached
+  only where the route knows the server, which today none of these do.

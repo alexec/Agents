@@ -284,11 +284,11 @@ and the settings reach every server.
 
 **Independent test**: the story's own test in spec.md, on a scratch daemon.
 
-- [ ] T044 [P] [US4] Add to `RetirementTests.swift`:
+- [X] T044 [P] [US4] Add to `RetirementTests.swift`:
   - An archived 27-day agent has `retirement == .at(archivedAt + 30 days)`.
   - Unarchiving clears it and returns the agent whole, with its commands, transcript and options.
   - Branching from an archived agent gives a new agent with its own transcript copy, and retiring the original leaves the branch whole (Story 4, scenarios 3 and 4).
-- [ ] T045 [US4] Check every place the Mac and the phone lead to an agent by id and make sure each reaches the retired page for a retired id:
+- [X] T045 [US4] Check every place the Mac and the phone lead to an agent by id and make sure each reaches the retired page for a retired id:
   - the event row's ›
   - the event detail
   - "Started by"
