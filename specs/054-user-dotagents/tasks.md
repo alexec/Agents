@@ -104,8 +104,8 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 **Goal**: `~/.agents/AGENTS.md` is every runtime's personal instructions.
 **Independent test**: quickstart step 2 (OSPREY-3 x1 on all but Cursor).
 
-- [ ] T014 [P] [US2] In `Tests/PersonalDotAgentsTests.swift`, test US2 scenarios 1 to 3: the Claude, Codex, Grok and Copilot instruction links exist and are relative; Cursor gets none; with no instructions anywhere, a short `~/.agents/AGENTS.md` saying what it is for is written, and the links point at it.
-- [ ] T015 [US2] In `Src/Projects/PersonalDotAgents.swift`, make the instructions step: follow the same table, with `AGENTS.md` as the target, for every installed runtime that has an `instructionsFile`. Wire it into `reconcileHome()`.
+- [X] T014 [P] [US2] In `Tests/PersonalDotAgentsTests.swift`, test US2 scenarios 1 to 3: the Claude, Codex, Grok and Copilot instruction links exist and are relative; Cursor gets none; with no instructions anywhere, a short `~/.agents/AGENTS.md` saying what it is for is written, and the links point at it.
+- [X] T015 [US2] In `Src/Projects/PersonalDotAgents.swift`, make the instructions step: follow the same table, with `AGENTS.md` as the target, for every installed runtime that has an `instructionsFile`. Wire it into `reconcileHome()`.
 
 ---
 
@@ -114,11 +114,11 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 **Goal**: Claude's real skills and `CLAUDE.md` are adopted into `~/.agents` and linked back.
 **Independent test**: quickstart step 4.
 
-- [ ] T016 [P] [US3] In `Tests/PersonalDotAgentsTests.swift`, test US3 scenarios 1 to 4:
+- [X] T016 [P] [US3] In `Tests/PersonalDotAgentsTests.swift`, test US3 scenarios 1 to 4:
   - move and link back only when the name is free, with contents byte-for-byte unchanged (a hash before and after);
   - a clash leaves both copies exactly as they are;
   - only the first real instructions file found moves, in the order Claude, Codex, Copilot, Grok (FR-006).
-- [ ] T017 [US3] In `Src/Projects/PersonalDotAgents.swift`, make the adopt step, run before the link steps: for each real folder in `~/.claude/skills` that is not managed, move it with `FileManager.moveItem` when `~/.agents/skills/<name>` is free. Then move the first real instructions file when `~/.agents/AGENTS.md` is missing. A failed move leaves the original where it was (spec, Edge Cases).
+- [X] T017 [US3] In `Src/Projects/PersonalDotAgents.swift`, make the adopt step, run before the link steps: for each real folder in `~/.claude/skills` that is not managed, move it with `FileManager.moveItem` when `~/.agents/skills/<name>` is free. Then move the first real instructions file when `~/.agents/AGENTS.md` is missing. A failed move leaves the original where it was (spec, Edge Cases).
 
 ---
 
@@ -127,12 +127,12 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 **Goal**: links the app placed and the person removed stay removed; dangling links into `~/.agents/skills` go; nothing else changes.
 **Independent test**: quickstart step 4, second half.
 
-- [ ] T018 [P] [US4] In `Tests/PersonalDotAgentsTests.swift`, test US4 scenarios 1 to 4:
+- [X] T018 [P] [US4] In `Tests/PersonalDotAgentsTests.swift`, test US4 scenarios 1 to 4:
   - a link the `skills` installer made is left alone;
   - a link the app placed that the person deleted is not placed again (FR-009);
   - a skill removed from `~/.agents/skills` has its dangling links removed, including ones the installer made, and no other link (FR-008);
   - a second reconcile changes nothing: compare `lstat` and `mtime` of every entry (FR-011, SC-004).
-- [ ] T019 [US4] In `Src/Projects/PersonalDotAgents.swift`, make the record use and the dangling-link sweep (R5, R7):
+- [X] T019 [US4] In `Src/Projects/PersonalDotAgents.swift`, make the record use and the dangling-link sweep (R5, R7):
   - record each link placed;
   - never place a recorded path that is gone from disk;
   - drop a record entry once its skill is gone;
