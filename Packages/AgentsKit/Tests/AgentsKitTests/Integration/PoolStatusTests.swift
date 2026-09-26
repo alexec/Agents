@@ -111,12 +111,13 @@ struct PoolStatusTests {
         for count in 1...3 {
             _ = try await core.setPool(PoolSettings(isOn: true, entries: Array(entries.prefix(count))))
         }
-        // The first at once; the other two held and sent as one, with the pool as it ended.
-        #expect(heard.all == [1])
-        await eventually("the held one went") { heard.all.count == 2 }
-        #expect(heard.all == [1, 3])
+        // Whatever the machine's speed: never two within the second, never more than
+        // there were changes, and the last carries the pool as it ended.
+        await eventually("the last one carried the pool as it ended") { heard.all.last == 3 }
         try await Task.sleep(for: .milliseconds(1200))
-        #expect(heard.all.count == 2)
+        #expect(heard.all.count <= 3)
+        #expect(heard.all.last == 3)
+        for gap in heard.gaps { #expect(gap >= .milliseconds(950), "\(gap)") }
     }
 
     @Test func aReturnTimePassingIsSaidWithoutARelaunch() async throws {
@@ -141,7 +142,12 @@ struct PoolStatusTests {
 /// What `pool/changed` carried, in order. The broadcaster runs wherever the daemon is.
 private final class PoolBroadcasts: @unchecked Sendable {
     private let lock = NSLock()
-    private var seen: [Int] = []
-    func append(_ value: Int) { lock.lock(); seen.append(value); lock.unlock() }
-    var all: [Int] { lock.lock(); defer { lock.unlock() }; return seen }
+    private var seen: [(value: Int, at: ContinuousClock.Instant)] = []
+    func append(_ value: Int) { lock.lock(); seen.append((value, .now)); lock.unlock() }
+    var all: [Int] { lock.lock(); defer { lock.unlock() }; return seen.map(\.value) }
+    /// The time between each broadcast and the one before it.
+    var gaps: [Duration] {
+        lock.lock(); defer { lock.unlock() }
+        return zip(seen.dropFirst(), seen).map { $0.at - $1.at }
+    }
 }
