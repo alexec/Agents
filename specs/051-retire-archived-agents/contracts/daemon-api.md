@@ -42,6 +42,11 @@ The app sends `confirmed: true` to each server after its own Mac daemon has appl
   message is the reason, as `RetirementWords.refusal(hold)` says it: for example, "Its worktree
   still has work in it that is not committed or merged."
 - It fails with **`-32050 agentRetired`** when the agent is already retired.
+- *As built*: "open in a window" does not hold Retire now. The person asking is usually the one
+  looking at the chat, and the menu is their explicit choice; work in the worktree and a running
+  workflow still refuse it. On the Mac, Retire Now… is always in an archived row's menu, and asks
+  first: a refusal comes back as an alert with the reason rather than as a disabled item with a
+  tooltip, since a context menu cannot wait on the daemon while it opens.
 
 ### `agents/retired` { `folder`?, `ids`?, `limit`? } → `[Tombstone]`
 

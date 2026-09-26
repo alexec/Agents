@@ -341,6 +341,35 @@ extension DaemonCore {
 
     // MARK: Retiring
 
+    /// `agents/retire`: the person retiring one archived agent now (051, US7). Unconfirmed,
+    /// it says how much that frees. Refused for an agent that is not archived, or whose
+    /// work or workflow still holds it; not for one that is open, since the person asking
+    /// is usually the one looking at it.
+    public func retireNow(_ request: DaemonAPI.RetireRequest) async throws -> DaemonAPI.RetirePreview {
+        loadRetentionIfNeeded()
+        let id = request.agentID
+        if agents[id] == nil, let tombstone = retired[id] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired, message: RetirementWords.retiredSentence(tombstone))
+        }
+        guard let agent = agents[id] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        guard agent.state == .archived else {
+            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.notArchived)
+        }
+        let candidate = RetentionPlan.Candidate(id: id, archivedAt: agent.archivedAt ?? now(),
+                                                lastActivityAt: agent.lastActivityAt, sizeOnDisk: size(of: id))
+        if let hold = await holds(for: [candidate])[id], hold != .openInWindow {
+            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.refusal(hold))
+        }
+        let preview = DaemonAPI.RetirePreview(count: 1, bytes: candidate.sizeOnDisk)
+        guard request.confirmed else { return preview }
+        try await retire(id, because: .person)
+        let state = retentionState()
+        broadcast(DaemonAPI.Notification.retentionChanged, state)
+        return preview
+    }
+
     /// The one path every retire takes: the check, a change of setting, and Retire now.
     ///
     /// The tombstone is written and synced first, and nothing is deleted if it cannot

@@ -769,6 +769,22 @@ final class AppModel {
         }
     }
 
+    /// Retire one archived agent now (051, US7). Unconfirmed, the size it frees, or why it
+    /// cannot go yet; confirmed, it is retired and leaves the list by `agent/removed`.
+    func retireNow(_ agentID: UUID, confirmed: Bool) async -> Result<DaemonAPI.RetirePreview, JSONRPCError> {
+        do {
+            let preview = try await client(for: work.agent(agentID)?.host ?? .mac).call(
+                DaemonAPI.Method.agentsRetire, DaemonAPI.RetireRequest(agentID: agentID, confirmed: confirmed),
+                returning: DaemonAPI.RetirePreview.self)
+            if confirmed, selection == agentID { selection = nil }
+            return .success(preview)
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(JSONRPCError(code: -1, message: error.localizedDescription))
+        }
+    }
+
     /// What is left of a retired agent, asked of the daemon once and then remembered.
     func tombstone(for agentID: UUID, on host: HostID = .mac) async -> Tombstone? {
         if let known = work.tombstones[agentID] { return known }

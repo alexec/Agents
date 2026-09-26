@@ -426,6 +426,55 @@ struct RetirementTests {
         #expect(await core.agent(branch) != nil)
         #expect(try await core.transcript(.init(agentID: branch)).entries.count >= before)
     }
+
+    // MARK: US7
+
+    @Test func retireNowSaysWhatItFreesThenRetiresWhenConfirmed() async throws {
+        let (locations, work) = try temporary()
+        let recent = archived(work, daysAgo: 0.1)
+        let core = try await core(locations, seeded: [recent])
+        await sized(core, [recent.id: 5_400_000])
+        let asked = try await core.retireNow(.init(agentID: recent.id, confirmed: false))
+        #expect(asked == DaemonAPI.RetirePreview(count: 1, bytes: 5_400_000))
+        #expect(await core.agent(recent.id) != nil)
+        _ = try await core.retireNow(.init(agentID: recent.id, confirmed: true))
+        #expect(await core.agent(recent.id) == nil)
+        #expect(await core.retiredTombstones(.init(ids: [recent.id])).first?.retiredBecause == .person)
+    }
+
+    @Test func retireNowIsRefusedForALiveAgentAHeldOneAndARetiredOne() async throws {
+        let (locations, work) = try temporary()
+        let live = Agent(runtimeID: "claude", cwd: work, title: "live", state: .finished, endedReason: .endTurn)
+        let held = archived(work, daysAgo: 3)
+        let core = try await core(locations, seeded: [live, held])
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished, agentID: held.id))
+
+        await #expect(throws: JSONRPCError.self) { _ = try await core.retireNow(.init(agentID: live.id, confirmed: true)) }
+        do {
+            _ = try await core.retireNow(.init(agentID: held.id, confirmed: true))
+            Issue.record("a held agent was retired")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.retireRefused)
+            #expect(error.message == RetirementWords.refusal(.workflowRunning))
+        }
+        await core.clearRuns()
+        _ = try await core.retireNow(.init(agentID: held.id, confirmed: true))
+        do {
+            _ = try await core.retireNow(.init(agentID: held.id, confirmed: true))
+            Issue.record("retired twice")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.agentRetired)
+        }
+    }
+
+    @Test func retireNowIsNotStoppedByTheWindowThatAsked() async throws {
+        let (locations, work) = try temporary()
+        let open = archived(work, daysAgo: 3)
+        let core = try await core(locations, seeded: [open])
+        try await core.reportPresence(.init(watching: open.id, active: true), from: .mac, connection: UUID())
+        _ = try await core.retireNow(.init(agentID: open.id, confirmed: true))
+        #expect(await core.agent(open.id) == nil)
+    }
 }
 
 extension DaemonCore {

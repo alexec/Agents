@@ -33,6 +33,22 @@ struct AgentRow: View {
         rowContent
             // Last known, not current: its server is not answering (037).
             .opacity(model.hosts.isOffline(agent.host) ? 0.55 : 1)
+            .confirmationDialog("Retire this agent?",
+                                isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
+                                presenting: retiring) { preview in
+                Button("Retire", role: .destructive) {
+                    Task { _ = await model.retireNow(agent.id, confirmed: true) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { preview in
+                Text(RetirementWords.confirmRetire(title: agent.title, bytes: preview.bytes))
+            }
+            .alert("This agent cannot be retired yet",
+                   isPresented: Binding(get: { cannotRetire != nil }, set: { if !$0 { cannotRetire = nil } })) {
+                Button("OK") {}
+            } message: {
+                Text(cannotRetire ?? "")
+            }
     }
 
     @ViewBuilder
@@ -152,6 +168,16 @@ struct AgentRow: View {
             }
             if agent.state == .archived {
                 Button("Bring back") { Task { await model.unarchive(agent.id) } }
+                // Now rather than when its time comes (051, US7). Asked first: the daemon
+                // says how much goes, or why it cannot yet.
+                Button("Retire Now…") {
+                    Task {
+                        switch await model.retireNow(agent.id, confirmed: false) {
+                        case .success(let preview): retiring = preview
+                        case .failure(let refusal): cannotRetire = refusal.message
+                        }
+                    }
+                }
             } else {
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
@@ -169,6 +195,9 @@ struct AgentRow: View {
             }
         }
     }
+
+    @State private var retiring: DaemonAPI.RetirePreview?
+    @State private var cannotRetire: String?
 
     private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
         FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))

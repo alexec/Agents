@@ -368,6 +368,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RetentionSetRequest.self)
                 return .success(try JSONValue.encoding(await setRetention(request)))
 
+            case DaemonAPI.Method.agentsRetire:
+                let request = try require(params, as: DaemonAPI.RetireRequest.self)
+                return .success(try JSONValue.encoding(try await retireNow(request)))
+
             case DaemonAPI.Method.agentsRetired:
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
                 return .success(try JSONValue.encoding(await retiredTombstones(request)))

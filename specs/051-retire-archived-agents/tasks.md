@@ -348,13 +348,13 @@ state on archive.
 
 **Independent test**: quickstart §2, the Retire now bullet.
 
-- [ ] T054 [P] [US7] Add to `RetirementTests.swift`:
+- [X] T054 [P] [US7] Add to `RetirementTests.swift`:
   - `agents/retire` unconfirmed returns the size.
   - Confirmed on a 2-hour-old archived agent, it retires it, with `because: person`. The one-day floor applies only to the automatic rules; FR-006 is about the check, and the person asked.
   - On a live agent it fails with `-32051`, as it does on a held agent, with the hold's reason as the message.
   - On a retired agent it fails with `-32050`.
-- [ ] T055 [US7] Implement `agents/retire` in `DaemonCore+Retention.swift` through `retire(_:because: .person)`, after checking `holds(for: [id])`. Make T054 pass.
-- [ ] T056 [US7] Add **Retire Now…** to the archived agent's context menu in `App/Sources/AgentList/AgentRow.swift`, and nowhere for agents that are not archived. When the menu opens, it asks for holds through `agents/retire { confirmed: false }`. A `-32051` answer disables the item with the message as its help text. Otherwise it confirms with `RetirementWords.confirmRetire`, using a destructive button, then sends `confirmed: true`. Not on the phone (FR-028).
+- [X] T055 [US7] Implement `agents/retire` in `DaemonCore+Retention.swift` through `retire(_:because: .person)`, after checking `holds(for: [id])`. Make T054 pass.
+- [X] T056 [US7] Add **Retire Now…** to the archived agent's context menu in `App/Sources/AgentList/AgentRow.swift`, and nowhere for agents that are not archived. When the menu opens, it asks for holds through `agents/retire { confirmed: false }`. A `-32051` answer disables the item with the message as its help text. Otherwise it confirms with `RetirementWords.confirmRetire`, using a destructive button, then sends `confirmed: true`. Not on the phone (FR-028).
 
 ---
 

@@ -85,7 +85,7 @@ Each daemon was started five times, timed from launch to an answer, and measured
 | branch, 10 agents | 133 ms | 7.9 MB | 177 ms | 6.0 MB |
 | main, 10 agents | 135 ms | 7.9 MB | | |
 
-- **SC-004 (within 20 MB of the store with none): met**, with 19.1 MB to spare nothing: 27 MB against 7.9 MB.
+- **SC-004 (within 20 MB of the store with none): met**, just: 27 MB against 7.9 MB is 19.1 MB more.
 - **SC-003 (start within 10% of the store with none): not met as written.** Readiness is about 100 ms
   slower (280 against 177 ms, by ping), which is decoding the index's 1,000 slim records. Against
   main the same store starts 14 times faster and holds a sixth of the memory. Whether 100 ms is
