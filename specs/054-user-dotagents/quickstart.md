@@ -50,9 +50,40 @@ Lay out. Expected: `mine` moved to `~/.agents/skills/mine` and linked back; `her
 clash) left as a real folder in both places; `synced` untouched. Delete the `mine` link and lay
 out again: it is not put back. Remove `~/.agents/skills/mine`: the record entry is dropped.
 
-## 5. Settings ▸ Agents
+## 5. MCP servers and plugins reach each runtime (Stories 6, 7)
 
-On the scratch copy from step 3, open Settings ▸ Agents and screenshot it. Expected: "Your
-skills" matches the approved wireframe. `heron-probe` is listed with its runtimes and the clash
-named, and Reveal in Finder opens the skill's folder. On a scratch root without
-`AGENTS_PERSONAL_HOME`, the section says the layout is off for this copy.
+Automated: `swift test --filter 'SessionServers|MCPBridge|PersonalPlugins'` covers R10's order,
+drops and capability filter, the bridge against a fixture stdio server (overlapping calls, 404
+on a wrong bearer, route end kills the process), and the Codex fingerprint (unchanged → no add;
+changed → add; gone → remove), with a fake `codex` on `PATH`.
+
+Live, on the probe home laid out by the built code (step 2), plus `probe/run.sh setup-mcp` for
+the plugin and servers. Put `heron-mcp` (stdio) and `egret-mcp` (http, served by
+`probe/mcp-server.py egret-mcp --http 8799`) in `$H/.agents/mcp.json`. Then, on a scratch copy of
+the app with `AGENTS_PERSONAL_HOME=$H`, start one agent per runtime and send
+`probe/ask.txt`'s MCP question. Read `/tmp/dotagents-probe/log/mcp.log`, not the model's answer.
+Expected:
+
+- `heron-mcp` and `egret-mcp` logged `tools/list` for Claude, Codex, Grok, Cursor **and
+  Copilot** (through the bridge);
+- the plugin's `plover-mcp` logged for Claude, Codex (after the app's own `codex plugin add`)
+  and Grok (sent in `mcpServers`);
+- on Copilot, `finish_turn` ends the turn with an outcome: the app's own tools now reach
+  Copilot through the bridge;
+- after touching a file in the plugin, the next Codex start adds it again (`daemon.log`), and a
+  second start with nothing changed does not.
+
+Break `mcp.json` (remove a comma): an agent still starts on each runtime, without the personal
+servers, and `daemon.log` names the problem without any value from the file.
+
+## 6. Settings ▸ Shared
+
+Gate first: Alex approves the wireframes in [look/](look/README.md) before any view code.
+
+On the scratch copy from step 5, open Settings ▸ Shared and screenshot each page (overview,
+Instructions, Skills, MCP servers, Plugins, Other files), then again with `mcp.json` broken. Expected:
+each page matches its approved frame, with reach from the rule table: Copilot shows "through
+the bridge" for stdio servers, Cursor and Copilot "no way in" for plugins, and Gemini "not
+checked yet". No env or header value appears anywhere. Reveal in Finder and Edit open the right
+file. On a scratch root without `AGENTS_PERSONAL_HOME`, the tab says the shared folder is off for
+this copy of the app.

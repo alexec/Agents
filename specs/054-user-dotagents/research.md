@@ -211,3 +211,131 @@ offers neither, and its log does not mention the plugin.
    folder changes**, and the Plugins page says so. Cursor and Copilot-over-ACP are not reachable today.
 5. **Only the log shows what a runtime got**, so the Settings view (FR-024) should report
    what the app sent and what each runtime is known to do with it, not ask the model.
+
+## R10 — Where personal servers join a session (FR-018, FR-019, FR-020)
+
+**Decision:** one daemon function, `sessionServers(runtimeID:chosen:token:managesAgents:cwd:capabilities:)`,
+builds the final `mcpServers` for **both** places a session is made — `freshSession` (new
+agents, drafts, workflow starts) and the pick-up path (`session/load`, or `session/new` when the
+runtime has lost the conversation). In order:
+
+1. the app's own `agents` server, then the agent's chosen servers, then the personal servers from
+   `~/.agents/mcp.json`, then (Grok only) the servers inside personal plugins (R12);
+2. the first of each name is kept and every later one is dropped and logged by name (FR-020);
+3. an `http` or `sse` server the handshake's `mcpCapabilities` does not advertise is dropped and
+   logged (FR-019): today that means an sse server for Codex;
+4. for a runtime whose rule says it refuses stdio (Copilot), every stdio server left is swapped
+   for its bridge route (R11).
+
+`mcp.json` is read from disk each time; there is no cache or watcher (the file is small and is
+read once per session). Personal servers are **never stored** in `Agent.mcpServers`, which keeps
+only what the person chose for that agent. So an edit reaches a resumed agent, and no secret is
+saved in the agent record, the store or anything the phone gets (FR-023). A draft session made
+before `mcp.json` changed is not used: a draft keeps the file's modification date and size, and
+`startAgent` treats a mismatch like a draft made with different servers.
+
+**Rationale:** both paths already append `appServer(...)` by hand; one function puts the order,
+the filter and the bridge in a single place that tests can reach. **Alternatives:** merging in
+`ACPSession.newSession` (rejected: it knows nothing about runtimes' rules or the bridge); storing
+personal servers on the agent (rejected: stale on resume, and secrets end up in the store).
+
+## R11 — The Copilot bridge: stdio servers over loopback http (FR-018, Alex 2026-09-26)
+
+**Decision:** an `MCPBridge` actor inside `agentsd` (macOS only, `#if canImport(Network)`),
+started the first time a session needs it:
+
+- **Listener:** one `NWListener` on `127.0.0.1`, port chosen by the system, kept for the daemon's
+  lifetime. It speaks the smallest piece of MCP streamable HTTP the probe showed Copilot needs:
+  `POST` with a `Content-Length` JSON-RPC body, answered as `application/json` (or `202` for a
+  notification). `GET` gets `405`, as the probe server did and Copilot accepted. `DELETE` ends
+  the route. Keep-alive is supported, since Copilot's client reuses the connection; a chunked
+  request body gets `411`.
+- **Routes:** one per (session, stdio server): `http://127.0.0.1:<port>/mcp/<route id>`, with a
+  random 32-byte key sent as `Authorization: Bearer <key>` in the server's `headers`. A request
+  without the route's key gets `404`, whether or not the route exists. Routes belong to the
+  session's app token, so `dropAppTokens` (the agent ended, was replaced or archived) ends them,
+  and a draft that is let go ends its own.
+- **Processes:** a route's stdio server is started on its first `POST` (as the runtime would
+  start it), with the given command, args and env, in the session's folder. JSON-RPC lines go to
+  its stdin, and each response is matched to the waiting `POST` by `id`. There is no timeout:
+  `wait_for_event` and long tools hold a call open by design. Anything the server sends first
+  (notifications, or requests such as `roots/list` or sampling) is not passed on in v1: a
+  notification is dropped with a count in the log, and a request is answered by the bridge with
+  `-32601`. The app's own helper sends neither (checked: it only answers). A route's process gets
+  `SIGTERM`, then `SIGKILL` after 2 s, when its route ends, and every process ends when the
+  daemon does.
+- **What goes through it:** every stdio server in Copilot's list after R10 step 3, the app's own
+  included. So Copilot agents get `finish_turn`, `show_file` and the rest for the first time
+  (036 had found they got none).
+- **Logging (FR-023):** route id, server name and lifecycle events only; never command lines,
+  args, env, headers or bodies.
+
+**Rationale:** Alex's call. The alternatives either write Copilot's config (breaks FR-018) or
+leave the gap. Keeping it in the daemon means no new process to install or find, and the
+lifetime follows the agent the way `appTokens` already does. **Alternatives:** a helper process
+per server that listens itself (rejected: something has to start it before the session and pass
+back a port); full streamable HTTP with SSE (deferred: nothing we send needs messages the server
+starts); a Unix socket (rejected: Copilot takes a URL). **Risk, spiked first in tasks:** a real
+Copilot agent calls `finish_turn` through the bridge, and a probe stdio server's tool through the
+bridge, end to end.
+
+## R12 — Handing over personal plugins, per runtime (FR-021)
+
+**Decision**, from R9:
+
+| Runtime | Means | Written outside `~/.agents` |
+|---|---|---|
+| Claude | personal plugin folders added to `_meta.claudeCode.options.plugins`, after the project's own | nothing |
+| Grok | personal folders added to `_meta.pluginDirs`; **and** each plugin's `.mcp.json` servers sent in `mcpServers` (R10), since Grok does not start them | nothing |
+| Codex | `~/.agents/plugins/marketplace.json`, written by the app (marker as for the project index), marketplace `agents-personal`, sources `./.agents/plugins/<name>` (Codex takes the home folder as its root); then `codex plugin add <name>@agents-personal` whenever the plugin's fingerprint changes, and `codex plugin remove` when it is gone | Codex's own config and cache, by Codex's own command |
+| Gemini | link `~/.gemini/extensions/<name> -> ../../.agents/plugins/<name>`, placed and recorded like skill links, plus `gemini-extension.json` written once when missing (reusing `DotAgents.writeGeminiManifest`) | the link |
+| Cursor | none; the Shared tab says "no way in from the app" | — |
+| Copilot | none over ACP; the tab says "not in agents the app starts" | — |
+
+The Codex **fingerprint** is a hash of each file's relative path, size and modification date in
+the plugin folder, kept in `personal-layout.json` under `codexPlugins`. The add runs in the
+reconcile before a Codex session and at daemon start, and only for a plugin whose fingerprint
+changed, so an unchanged start costs one directory walk. The `codex` binary is the app's toolset
+copy (`usesAppCopyOnly`), run with the personal home as `HOME`. A failed add is logged and
+reported in the tab, and never stops the agent (FR-012).
+
+A plugin's skills are listed in the tab under "From plugins", and its MCP servers under the
+plugin, not among the personal servers.
+
+**Rationale:** each is the least-writing means R9 found to work. **Alternatives:** a Codex
+marketplace at `~/.agents` itself (rejected: Codex only finds `~/.agents/plugins/marketplace.json`
+automatically, and then resolves sources against the home folder); `~/.cursor/plugins/local`
+(rejected: R9 showed Cursor ignores it over ACP, as a link and as a copy).
+
+## R13 — The Shared tab's read model (FR-016, FR-024)
+
+**Decision:** one daemon method, `personal/shared`, which replaces the planned `personal/skills`.
+It is read-only, computed from disk on each call, and answers for the Mac window only
+([contracts/personal-shared.md](contracts/personal-shared.md)). The window calls it when the tab
+appears and when the app becomes active. There is no push, because nothing else is watching the
+files either (R6).
+
+Reach per runtime comes from the rule table (R1, R9, R12) plus what is installed. It is not
+observed from sessions, so the wireframe's "Last start · 26 tools" line is **dropped** (nothing
+records it, and it would need a session). A server "only in one agent's own config", or the
+same name there as in `mcp.json`, is found by reading the names (and only the names) from
+`~/.claude.json` `mcpServers`, `~/.codex/config.toml` `[mcp_servers.<name>]` headers (a line
+match, not a TOML parser), `~/.cursor/mcp.json`, `~/.copilot/mcp-config.json` and
+`~/.gemini/settings.json`. What each runtime then does with a clash is R9's finding: Claude and
+Grok take ours, Codex and Copilot keep theirs, and Cursor runs both.
+
+Env and header **values** never leave the daemon: the result carries names only. Other files are
+everything in `~/.agents` not already covered, classed as `persona` (under `personas/`), `git`
+(`.git`), `managed` (`.skill-lock.json`) or `unused`.
+
+**Rationale:** the wireframes' pages all read from one snapshot, so one call keeps them
+consistent. **Alternative:** a method per page (rejected: more surface, and the overview needs
+all of it anyway).
+
+## R14 — Gemini
+
+Still unprobed: no Gemini sign-in on this Mac. R9 saw it load a plugin's MCP server from a
+`~/.gemini/extensions` link before `session/new` failed. The tasks include running the R9 probe
+once Alex's Gemini key is in Settings (046's key row). Until then Gemini gets the extension link
+and `mcpServers` (both harmless if unused), no instruction or skill links (R1), and shows as
+"not checked yet" in the tab.

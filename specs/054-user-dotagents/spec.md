@@ -133,24 +133,25 @@ check each outcome below.
 
 ---
 
-### User Story 5 - The person can see which agents share which skills (Priority: P3)
+### User Story 5 - The person can see what every agent shares (Priority: P3)
 
-In Settings ▸ Agents, a "Your skills" section lists the person's skills and says, for each,
-which runtimes can use it, and names any skill left out because of a clash. It is read-only,
-with Reveal in Finder.
+A Settings ▸ Shared tab ([look/](look/README.md)) shows everything in `~/.agents` —
+instructions, skills, MCP servers, plugins and other files — and, for each, which runtimes get
+it, which are left out and why, and any clash. It is read-only, with Reveal in Finder and Edit
+(open the file in the person's editor).
 
 **Why this priority**: Useful, but the layout works without it. Its look is drawn and approved
 before it is built.
 
-**Independent Test**: Open Settings ▸ Agents on a scratch root with a clash on disk; the list
-shows every skill and names the clash.
+**Independent Test**: Open Settings ▸ Shared on a scratch root with a clash on disk; the Skills
+page shows every skill and names the clash.
 
 **Acceptance Scenarios**:
 
 1. **Given** skills in `~/.agents/skills` and a clash in `~/.claude/skills`, **When** the person
-   opens Settings ▸ Agents, **Then** a "Your skills" section lists every skill in `~/.agents/skills` with the runtimes that
-   can use it, and the clashing skill is named with where each copy is.
-2. **Given** the section, **When** the person chooses Reveal in Finder on a skill, **Then**
+   opens Settings ▸ Shared, **Then** its Skills page lists every skill in `~/.agents/skills` with
+   the runtimes that can use it, and the clashing skill is named with where each copy is.
+2. **Given** the Skills page, **When** the person chooses Reveal in Finder on a skill, **Then**
    Finder opens on that skill's folder in `~/.agents/skills`.
 
 ---
@@ -245,7 +246,15 @@ than servers, so it can follow the MCP half.
 - Q: Real skills already in `~/.claude/skills`? → A: Moved into `~/.agents/skills` when the name
   is free, and linked back; clashes left alone.
 - Q: Should the app show the shared skills? → A: Yes, a read-only "Your skills" section in
-  Settings ▸ Agents.
+  Settings ▸ Agents. (Widened 2026-09-26 to a Settings ▸ Shared tab for everything in
+  `~/.agents`, from the wireframes in look/.)
+
+### Session 2026-09-26
+
+- Q: Copilot refuses stdio MCP servers from the app. How do they reach it? → A: A local http
+  bridge the app serves, which also gives Copilot the app's own tools.
+- Q: Codex copies a plugin when it is added. Who keeps it current? → A: The app re-adds it
+  whenever the plugin's folder changes.
 - Q: MCP servers and plugins — this spec or a new one? → A: This one.
 - Q: Should personal MCP servers reach only agents the app starts, or also each runtime's CLI
   run by hand? → A: Only agents the app starts: the app passes them in each session's request,
@@ -292,16 +301,20 @@ than servers, so it can follow the MCP half.
   MUST stay: project layout and home layout never act on the same folder.
 - **FR-015**: A scratch root or test run MUST only ever lay out the home folder it was given,
   never the real one.
-- **FR-016**: Settings ▸ Agents MUST show a read-only "Your skills" section: each skill in
-  `~/.agents/skills`, the runtimes that can use it, any clash left alone and where both copies
-  are, and Reveal in Finder for each skill.
+- **FR-016**: A read-only Settings ▸ Shared tab MUST show each skill in `~/.agents/skills` (and
+  each a personal plugin brings), the runtimes that can use it, any clash left alone and where
+  both copies are, and Reveal in Finder for each skill. Its look is the approved wireframes in
+  [look/](look/README.md).
 - **FR-017**: `~/.agents/mcp.json` MUST be the one real list of the person's MCP servers, in the
   common `{"mcpServers": {"<name>": {…}}}` shape: `command`, `args`, `env` for stdio; `type`
   (`http` or `sse`), `url`, `headers` for the others. The app MUST NOT create it with any servers
   in it.
 - **FR-018**: The app MUST read `~/.agents/mcp.json` before each `session/new` and `session/load`
   it sends, on every runtime, and add its servers to that request's `mcpServers`. It MUST NOT
-  write any runtime's own MCP config.
+  write any runtime's own MCP config. A runtime that refuses stdio servers from the client
+  (Copilot, research R9) MUST get every stdio server the app sends — personal, chosen and the
+  app's own — as an http server the app serves on the loopback interface and runs itself (Alex,
+  2026-09-26).
 - **FR-019**: An http or sse server MUST be sent only to a runtime whose `initialize` reply
   advertises that transport in `mcpCapabilities`; one left out MUST be logged with the reason.
   This applies to every server the app sends, not only personal ones.
@@ -310,15 +323,19 @@ than servers, so it can follow the MCP half.
 - **FR-021**: `~/.agents/plugins/<name>/` MUST be the one real copy of the person's plugins. For
   each runtime, the app MUST hand them over by the means the probe (FR-004) settles — session
   metadata where the runtime takes it, a link or an index file in the runtime's own personal
-  plugin place where it does not — and MUST NOT copy a plugin's files.
+  plugin place where it does not — and MUST NOT copy a plugin's files. Codex, which loads a
+  plugin only once it is added and then keeps its own copy (research R9), MUST have each personal
+  plugin added through its own `codex plugin add`, and added again whenever the plugin's folder
+  changes (Alex, 2026-09-26); a plugin gone from `~/.agents/plugins` MUST be removed from it.
 - **FR-022**: The probe (FR-004) MUST also settle, for each supported runtime: that it uses MCP
   servers passed in `mcpServers`, which transports it takes, what it does with a server named
   in both the request and its own config, and how, if at all, it loads a personal plugin.
 - **FR-023**: `mcp.json` values MUST NOT be written to any log, event, the phone bridge or a
   server.
-- **FR-024**: The "Your skills" section (FR-016) MUST also list the personal MCP servers and
-  plugins, with the runtimes that get each, any left out and why, and any problem reading
-  `mcp.json`.
+- **FR-024**: The Shared tab (FR-016) MUST also list the instructions file, the personal MCP
+  servers (with env and header names only, never values), the app's own server, servers set up
+  only in one runtime's own config, the plugins, and every other file in `~/.agents`, with the
+  runtimes that get each, any left out and why, and any problem reading `mcp.json`.
 
 ### Key Entities
 
@@ -360,7 +377,7 @@ than servers, so it can follow the MCP half.
   (delete its link).
 - `docs/explanation/projects-hosts-worktrees.md` — change: name the personal layout beside the
   project layout, and which one wins (the project's, as each runtime already does).
-- `docs/reference/settings.md` — change: the "Your skills" section in Settings ▸ Agents.
+- `docs/reference/settings.md` — change: the Settings ▸ Shared tab.
 - `docs/reference/runtimes.md` — change: for each runtime, where it reads personal skills,
   instructions and plugins, which links the app makes, and which MCP transports it takes.
 - `docs/how-to/share-mcp-servers-and-plugins.md` — add: list MCP servers once in
