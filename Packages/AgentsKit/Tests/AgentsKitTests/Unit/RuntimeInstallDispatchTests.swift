@@ -130,6 +130,26 @@ struct RuntimeInstallDispatchTests {
         #expect(gated.count == 1, "Update installs even though Claude is here")
     }
 
+    /// Starting a runtime while it is installed, or after its install failed, says which
+    /// (047, FR-003), not "not installed".
+    @Test func startingDuringOrAfterAnInstallSaysSo() async throws {
+        let gated = Gated(result: .installFailed(reason: "Couldn’t reach the internet to download Grok."))
+        let (core, root) = try core(installer: gated)
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(await core.notYetInstalled(RuntimeCatalog.grok) == nil)
+        _ = await install(core, "grok")
+        do {
+            _ = try await core.handshakeOnly(runtimeID: "grok")
+            Issue.record("started")
+        } catch let error as JSONRPCError {
+            #expect(error.message == "Grok is still being installed. Try again when it is.")
+        }
+        gated.open()
+        await core.waitForInstall("grok")
+        #expect(await core.notYetInstalled(RuntimeCatalog.grok)
+                == "Grok isn’t installed: Couldn’t reach the internet to download Grok.")
+    }
+
     @Test func aStatusFromAnOlderDaemonIsNotOutdated() throws {
         let status = RuntimeStatus(runtime: RuntimeCatalog.claude, availability: .missing(lookedIn: []))
         var json = try JSONEncoder().encode(status)

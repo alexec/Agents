@@ -149,6 +149,48 @@ struct ToolPolicyTests {
         #expect(policy.removed.isEmpty)
     }
 
+    /// Codex (047): no `_meta` and no flags, one variable holding the feature switches as
+    /// JSON, the same text every launch, and ChatGPT offered first.
+    @Test func codexSendsItsFeatureSwitchesInCodexConfig() throws {
+        let policy = ToolPolicyCatalog.codex
+        #expect(policy.sessionMeta == nil)
+        #expect(policy.launchArguments.isEmpty)
+        #expect(policy.environmentFiles.isEmpty)
+        #expect(policy.launchEnvironment == ["CODEX_CONFIG":
+            #"{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"memories":false,"multi_agent":false}}"#])
+        #expect(policy.escalationTool == "request_user_input")
+        #expect(policy.kept.map(\.name) == ["request_user_input"])
+        #expect(policy.preferredAuthMethods == ["chat-gpt", "chat-gpt-device-code", "api-key"])
+        #expect(ToolPolicyCatalog.claude.launchEnvironment.isEmpty)
+    }
+
+    @Test func codexsVariableReachesItsLaunchAndNobodyElses() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("policy-env-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        let base = ["PATH": "/usr/bin", "CODEX_CONFIG": "the person's own"]
+        let codex = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.codex, locations: locations, onto: base)
+        #expect(codex["CODEX_CONFIG"]?.hasPrefix(#"{"features":"#) == true, "the app's switches win for its own agents")
+        #expect(codex["PATH"] == "/usr/bin")
+        let claude = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude, locations: locations, onto: base)
+        #expect(claude["CODEX_CONFIG"] == "the person's own", "and nobody else's launch is touched")
+    }
+
+    /// Codex's methods as its handshake sent them (research R2), offered ChatGPT first;
+    /// a runtime with no order keeps the old rule.
+    @Test func signInMethodsFollowTheRuntimesOwnOrder() throws {
+        let sent = try JSONDecoder().decode([ACP.AuthMethod].self, from: Data(#"""
+            [{"id":"api-key","name":"API Key"},{"id":"chat-gpt","name":"ChatGPT"},
+             {"id":"chat-gpt-device-code","name":"ChatGPT (device code)"},{"id":"gateway"}]
+            """#.utf8))
+        let codex = RuntimeAccount(runtimeID: "codex", authMethods: sent)
+        #expect(codex.orderedAuthMethods.map(\.id) == ["chat-gpt", "chat-gpt-device-code", "api-key", "gateway"])
+        #expect(codex.preferredMethod?.id == "chat-gpt")
+        let other = RuntimeAccount(runtimeID: "grok", authMethods: sent)
+        #expect(other.orderedAuthMethods.map(\.id) == sent.map(\.id))
+        #expect(other.preferredMethod?.id == "api-key")
+    }
+
     /// A flag that repeats per name, which no runtime needs today and which the shape
     /// exists to allow. Worth holding, because the alternative is finding out on the
     /// day a runtime does.

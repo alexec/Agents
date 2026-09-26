@@ -382,7 +382,7 @@ extension DaemonCore {
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: "\(runtime.name) is not installed, or is not where we looked.",
+                               message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed, or is not where we looked.",
                                data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
         }
         // Before anything starts, and outside the catch below: wanting a credential is not
@@ -747,7 +747,7 @@ extension DaemonCore {
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: "\(runtime.name) is not installed any more.")
+                               message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed any more.")
         }
         // Its worktree gone is said, not worked around: starting it in the project
         // folder instead would put its work somewhere nobody asked for (FR-017).

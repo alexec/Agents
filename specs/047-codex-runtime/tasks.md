@@ -97,20 +97,20 @@ place, and a Codex agent then works like any runtime.
 
 **Independent test**: a scratch root with an `npx` and a `codex-acp` on its PATH: the sheet lists Codex as not on this Mac. Press **Install** and wait for the tick. Then start an agent, create a file, run `ls`, stop, resume, and attach a picture (quickstart §2–§3).
 
-- [ ] T018 [US1] Add `RuntimeCatalog.codex` in `Core/Runtimes/RuntimeCatalog.swift`: id `codex`, name `Codex`, executable `codex-acp`, arguments `[]`, `install: .toolset(runtimeID: "codex")`, `installPage` `https://github.com/agentclientprotocol/codex-acp`, `usesAppCopyOnly: true`. Append it to `builtIn`, and extend the file's doc comment (why Codex is never the person's npx: R1). Same commit as T019.
-- [ ] T019 [US1] Add `ToolPolicyCatalog.codex` in `Core/Runtimes/ToolPolicyCatalog.swift`, and append it to `builtIn`:
+- [X] T018 [US1] Add `RuntimeCatalog.codex` in `Core/Runtimes/RuntimeCatalog.swift`: id `codex`, name `Codex`, executable `codex-acp`, arguments `[]`, `install: .toolset(runtimeID: "codex")`, `installPage` `https://github.com/agentclientprotocol/codex-acp`, `usesAppCopyOnly: true`. Append it to `builtIn`, and extend the file's doc comment (why Codex is never the person's npx: R1). Same commit as T019.
+- [X] T019 [US1] Add `ToolPolicyCatalog.codex` in `Core/Runtimes/ToolPolicyCatalog.swift`, and append it to `builtIn`:
   - `removed`: `spawn_agent`, `send_input`, `wait` and `close_agent` (`.agents`); `memories` (`.artefacts`); `apps` (`.artefacts`); `goals` (`.standingArrangements`). Adjust the names to the list T007 recorded.
   - `kept`: `request_user_input`, with the because-sentence in data-model.md.
   - `residue`: whatever T007 found still listed.
   - `escalationTool`: `"request_user_input"`.
   - `lever`: `.environmentJSON(variable: "CODEX_CONFIG", value:)`, with the value in contracts/runtime-launch.md.
-- [ ] T020 [US1] Add `Lever.environmentJSON(variable: String, value: JSONValue)` in `Core/Runtimes/ToolPolicy.swift`, with `ToolPolicy.launchEnvironment: [String: String]`: the value serialised with sorted keys, and empty for every other lever. `sessionMeta` returns `nil` for it, and `launchArguments` returns `[]`. Merge `policy.launchEnvironment` into the environment in `ProcessSessionLauncher.launch` in `Daemon-side/Daemon/DaemonCore.swift`, after `LentEnvironment.applied` and `RuntimePolicyFiles`.
-- [ ] T021 [P] [US1] Tests:
+- [X] T020 [US1] Add `Lever.environmentJSON(variable: String, value: JSONValue)` in `Core/Runtimes/ToolPolicy.swift`, with `ToolPolicy.launchEnvironment: [String: String]`: the value serialised with sorted keys, and empty for every other lever. `sessionMeta` returns `nil` for it, and `launchArguments` returns `[]`. Merge `policy.launchEnvironment` into the environment in `ProcessSessionLauncher.launch` in `Daemon-side/Daemon/DaemonCore.swift`, after `LentEnvironment.applied` and `RuntimePolicyFiles`.
+- [X] T021 [P] [US1] Tests:
   - the catalog-totality test in `Tests/Unit/ToolPolicyTests.swift` lists Codex;
   - `CODEX_CONFIG`'s text equals contracts/runtime-launch.md's JSON;
   - `Tests/Integration/ToolScopingTests.swift` sees `CODEX_CONFIG` in a `FakeLauncher` launch of Codex and not in Claude's;
   - a new test checks that every `.toolset` runtime has `App/Resources/toolsets/<id>/manifest.json` with a matching `runtimeID` and `packageVersion`.
-- [ ] T022 [US1] Starting an agent on a runtime whose status is `.missing`, `.installing` or `.installFailed` must answer with that status's sentence and the row's action instead of launching (FR-003). Check the existing start path in `Daemon-side/Daemon/DaemonCore+Commands.swift` and the start form already do this for 048's rows, and fix only what does not. Add a `Tests/Integration/StartResilienceTests.swift` case for an installing Codex.
+- [X] T022 [US1] Starting an agent on a runtime whose status is `.missing`, `.installing` or `.installFailed` must answer with that status's sentence and the row's action instead of launching (FR-003). Check the existing start path in `Daemon-side/Daemon/DaemonCore+Commands.swift` and the start form already do this for 048's rows, and fix only what does not. Add a `Tests/Integration/StartResilienceTests.swift` case for an installing Codex.
 - [ ] T023 [US1] **Look gate**:
   - build, and launch a scratch root (run-app skill, clean env, dummy `npx` and `codex-acp` on the scratch PATH);
   - screenshot the set-up sheet listing Codex as **Not on this Mac**;

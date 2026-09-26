@@ -1064,12 +1064,20 @@ public struct ProcessSessionLauncher: SessionLauncher {
 
     public func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
-        let environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LentEnvironment.applied(to: LoginShellPath.environment()))
         return try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                      arguments: runtime.arguments + policy.launchArguments,
                                      cwd: cwd,
-                                     environment: environment,
+                                     environment: Self.environment(for: policy, locations: locations,
+                                                                   onto: LoginShellPath.environment()),
                                      capabilities: .app)
+    }
+
+    /// What a runtime is started with: `base` with anything lent (043), the policy's files
+    /// (Grok) and its variables (Codex's `CODEX_CONFIG`, 047), the policy's word last.
+    static func environment(for policy: ToolPolicy, locations: StoreLocations,
+                            onto base: [String: String]) -> [String: String] {
+        RuntimePolicyFiles(locations: locations)
+            .environment(for: policy, onto: LentEnvironment.applied(to: base))
+            .merging(policy.launchEnvironment) { _, policy in policy }
     }
 }
