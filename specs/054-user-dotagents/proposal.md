@@ -98,5 +98,10 @@ home; copying the Mac's `~/.agents` to a server is a separate, later question.
    alone.
 3. **Next: spec it**, with the runtime probe on a scratch `HOME` as part of the work.
 
+4. **MCP servers and plugins too, in this spec** (widened later the same day).
+   `~/.agents/mcp.json` is handed to every agent the app starts in its session request — no
+   runtime's own config is written, so a CLI run by hand does not get them. Plugins live in
+   `~/.agents/plugins`, handed to each runtime the way the probe finds it takes them.
+
 Still open: whether Settings ▸ Agents shows a "Your skills" list naming which agent sees
 which skill — settle that UX before the machinery.

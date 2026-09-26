@@ -1,4 +1,4 @@
-# Feature Specification: One Set of Skills and Instructions for Every Agent
+# Feature Specification: One Set of Skills, Instructions, MCP Servers and Plugins for Every Agent
 
 **Feature Branch**: `agents/consider-how-might-have`
 
@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Consider how we might have a shared user config for all agents. E.g. ~/.agents/skills and replicate this for ~/.claude/skills. Similar to how projects work, but for the user." Worked up in [proposal.md](proposal.md), whose Decided section holds Alex's calls.
+**Input**: User description: "Consider how we might have a shared user config for all agents. E.g. ~/.agents/skills and replicate this for ~/.claude/skills. Similar to how projects work, but for the user." Widened the same day: "I'd like to be able to configure my MCP servers and plugins once, in ~/.agents and have every agent runtime use them, so I manage them all in one place. Adding a new agent automatically adds the MCPs (and plugins) to that agent." Worked up in [proposal.md](proposal.md), whose Decided section holds Alex's calls.
 
 ## Why this feature exists
 
@@ -20,9 +20,15 @@ project live in a different folder for each runtime: `~/.claude/skills` for Clau
 this Mac today, four skills sit in `~/.agents/skills` (put there by the community `skills`
 installer), Grok sees them through links that installer made, and Claude sees none of them.
 
+MCP servers and plugins are worse off. Each runtime keeps its own list of MCP servers in its
+own file and format (`~/.claude.json`, `~/.codex/config.toml`, `~/.cursor/mcp.json`, …), and its
+own plugin folder or marketplace, so a server or plugin set up for one agent has to be set up
+again, by hand, for every other one — and again for each agent added later.
+
 This feature gives the home folder the same layout: `~/.agents` holds the person's skills,
-personas and instructions once, and every runtime the app starts finds them there, directly or
-through a link the app keeps in place.
+personas, instructions, MCP servers and plugins once, and every runtime the app starts finds
+them there — directly, through a link the app keeps in place, or handed to it by the app when
+its session is made.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -149,6 +155,60 @@ shows every skill and names the clash.
 
 ---
 
+### User Story 6 - MCP servers set up once reach every agent (Priority: P1)
+
+The person lists their MCP servers once, in `~/.agents/mcp.json`. Every agent the app starts,
+on every runtime — including a runtime added to the app later — has those servers, with no
+per-runtime setup.
+
+**Why this priority**: Alex asked for it by name: MCP servers managed in one place, and a new
+agent getting them without anyone adding them.
+
+**Independent Test**: On a scratch home, put one stdio server in `~/.agents/mcp.json`, start an
+agent on each runtime through the app, and ask it to list its MCP tools: the server's tools are
+there on each.
+
+**Acceptance Scenarios**:
+
+1. **Given** a server in `~/.agents/mcp.json`, **When** an agent starts on any runtime, **Then**
+   the server is in the `mcpServers` the app sends with that session's `session/new`, beside the
+   app's own servers and any the person chose for that agent.
+2. **Given** a server added to `~/.agents/mcp.json` while the app is running, **When** the next
+   agent starts, or a stopped one is resumed, **Then** it has the server, without restarting the
+   app.
+3. **Given** an http or sse server and a runtime that does not say it supports that transport,
+   **When** an agent starts on it, **Then** the server is left out for that agent, the reason is
+   logged, and every other server still goes.
+4. **Given** `~/.agents/mcp.json` that is not valid, **When** an agent starts, **Then** it starts
+   without the personal servers and the problem is shown to the person, not swallowed.
+5. **Given** a runtime the app did not support when `~/.agents/mcp.json` was written, **When** it
+   is added and an agent started on it, **Then** that agent has the servers too.
+
+---
+
+### User Story 7 - Plugins installed once reach every agent (Priority: P2)
+
+The person puts a plugin folder in `~/.agents/plugins`. Every agent the app starts, on each
+runtime that can load a plugin of that shape, has it.
+
+**Why this priority**: Asked for alongside MCP, but runtimes load plugins in more different ways
+than servers, so it can follow the MCP half.
+
+**Independent Test**: On a scratch home, put a plugin holding one command in
+`~/.agents/plugins/<name>`, start an agent on each runtime, and ask whether it has that command.
+
+**Acceptance Scenarios**:
+
+1. **Given** a plugin in `~/.agents/plugins/<name>` with a `.claude-plugin/plugin.json`, **When**
+   an agent starts on Claude, Grok, Codex, Cursor or Copilot, **Then** that runtime loads it, by
+   whichever means the probe settled for it (FR-021).
+2. **Given** a runtime with no known way to load a personal plugin, **When** an agent starts on
+   it, **Then** it starts without the plugins, and Settings says that runtime does not get them.
+3. **Given** a plugin removed from `~/.agents/plugins`, **When** the next agent starts, **Then** no
+   runtime is given it, and any link the app made for it is gone.
+
+---
+
 ### Edge Cases
 
 - **The runtime is not installed.** Its folder (`~/.codex`, `~/.grok`, …) does not exist: no
@@ -166,6 +226,16 @@ shows every skill and names the clash.
   folder they lay out is the one they were given.
 - **Servers (037)**: a Linux server gets the same layout on its own home, from its own agentsd;
   the Mac's `~/.agents` is not copied there.
+- **An MCP server with the same name as one the app adds** (its own tools server) or one chosen
+  for that agent: the agent's own choice wins over the personal one, the app's own always wins,
+  and the one dropped is logged.
+- **The same MCP server also set up in a runtime's own config** (`~/.claude.json`, say): the
+  runtime may then have it twice. The app does not edit the runtime's config; what the runtime
+  does with the duplicate is recorded by the probe, and Settings names the duplicate.
+- **Secrets in `mcp.json`** (tokens in `env` or `headers`): passed to the runtime as written,
+  never logged, never sent to the phone or a server.
+- **An agent run outside the app** (the runtime's own CLI in a terminal) does not get the
+  personal MCP servers or plugins; they reach only agents the app starts.
 
 ## Clarifications
 
@@ -176,6 +246,10 @@ shows every skill and names the clash.
   is free, and linked back; clashes left alone.
 - Q: Should the app show the shared skills? → A: Yes, a read-only "Your skills" section in
   Settings ▸ Agents.
+- Q: MCP servers and plugins — this spec or a new one? → A: This one.
+- Q: Should personal MCP servers reach only agents the app starts, or also each runtime's CLI
+  run by hand? → A: Only agents the app starts: the app passes them in each session's request,
+  and no runtime's own config file is written.
 
 ## Requirements *(mandatory)*
 
@@ -221,6 +295,30 @@ shows every skill and names the clash.
 - **FR-016**: Settings ▸ Agents MUST show a read-only "Your skills" section: each skill in
   `~/.agents/skills`, the runtimes that can use it, any clash left alone and where both copies
   are, and Reveal in Finder for each skill.
+- **FR-017**: `~/.agents/mcp.json` MUST be the one real list of the person's MCP servers, in the
+  common `{"mcpServers": {"<name>": {…}}}` shape: `command`, `args`, `env` for stdio; `type`
+  (`http` or `sse`), `url`, `headers` for the others. The app MUST NOT create it with any servers
+  in it.
+- **FR-018**: The app MUST read `~/.agents/mcp.json` before each `session/new` and `session/load`
+  it sends, on every runtime, and add its servers to that request's `mcpServers`. It MUST NOT
+  write any runtime's own MCP config.
+- **FR-019**: An http or sse server MUST be sent only to a runtime whose `initialize` reply
+  advertises that transport in `mcpCapabilities`; one left out MUST be logged with the reason.
+  This applies to every server the app sends, not only personal ones.
+- **FR-020**: When names clash, the app's own servers MUST win, then the servers chosen for that
+  agent, then the personal ones; each server dropped MUST be logged.
+- **FR-021**: `~/.agents/plugins/<name>/` MUST be the one real copy of the person's plugins. For
+  each runtime, the app MUST hand them over by the means the probe (FR-004) settles — session
+  metadata where the runtime takes it, a link or an index file in the runtime's own personal
+  plugin place where it does not — and MUST NOT copy a plugin's files.
+- **FR-022**: The probe (FR-004) MUST also settle, for each supported runtime: that it uses MCP
+  servers passed in `mcpServers`, which transports it takes, what it does with a server named
+  in both the request and its own config, and how, if at all, it loads a personal plugin.
+- **FR-023**: `mcp.json` values MUST NOT be written to any log, event, the phone bridge or a
+  server.
+- **FR-024**: The "Your skills" section (FR-016) MUST also list the personal MCP servers and
+  plugins, with the runtimes that get each, any left out and why, and any problem reading
+  `mcp.json`.
 
 ### Key Entities
 
@@ -229,6 +327,9 @@ shows every skill and names the clash.
   file it reads, and so which links it needs. Settled by the probe (FR-004).
 - **Placed link record**: the links the app has placed, so one the person removed is not put
   back (FR-009).
+- **Personal MCP server**: one entry in `~/.agents/mcp.json` — a name and how to reach it.
+- **Personal plugin**: one folder in `~/.agents/plugins`, and for each runtime, how it is handed
+  over (FR-021).
 
 ## Success Criteria *(mandatory)*
 
@@ -246,6 +347,11 @@ shows every skill and names the clash.
   session adds under 50 ms with 100 skills on disk.
 - **SC-006**: The whole suite of layout tests runs against scratch homes only; the real home
   folder is unchanged by a test run.
+- **SC-007**: An MCP server added to `~/.agents/mcp.json` is usable by an agent on every
+  supported runtime the next time one is started, and by an agent on a runtime added later, with
+  no step by the person beyond editing that file.
+- **SC-008**: A plugin added to `~/.agents/plugins` is loaded by every runtime the probe found a
+  way for, the next time an agent starts on it.
 
 ## Docs *(mandatory)*
 
@@ -255,8 +361,11 @@ shows every skill and names the clash.
 - `docs/explanation/projects-hosts-worktrees.md` — change: name the personal layout beside the
   project layout, and which one wins (the project's, as each runtime already does).
 - `docs/reference/settings.md` — change: the "Your skills" section in Settings ▸ Agents.
-- `docs/reference/runtimes.md` — change: for each runtime, where it reads personal skills and
-  instructions, and which links the app makes.
+- `docs/reference/runtimes.md` — change: for each runtime, where it reads personal skills,
+  instructions and plugins, which links the app makes, and which MCP transports it takes.
+- `docs/how-to/share-mcp-servers-and-plugins.md` — add: list MCP servers once in
+  `~/.agents/mcp.json` and put plugins in `~/.agents/plugins`; they reach agents the app starts,
+  not a runtime's CLI run by hand; what happens to a server also in a runtime's own config.
 
 ## Assumptions
 
@@ -271,3 +380,10 @@ shows every skill and names the clash.
 - A clash is left for the person to sort out; the app does not merge, rename or pick a winner.
 - Servers are laid out on their own home by their own daemon; syncing the Mac's `~/.agents` to
   them is out of scope.
+- MCP servers already set up in a runtime's own config are not imported into `~/.agents/mcp.json`;
+  the person copies across the ones they want shared. Importing is a later question, once the
+  probe shows how runtimes treat a server listed in both places.
+- `.claude-plugin/plugin.json` is the plugin shape the app expects, because Claude, Grok, Codex,
+  Cursor and Copilot all read it; Gemini's extensions are a different shape and not covered.
+- Personal MCP servers and plugins, like skills, sit below the project's own: a project's
+  `.mcp.json` or plugin of the same name is the runtime's to prefer.
