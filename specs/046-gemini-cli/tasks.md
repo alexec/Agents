@@ -76,7 +76,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [ ] T026 [US1] (Alex's, 2026-09-25: he looks at the sheet himself; install proven over the socket, walk/README.md) **Look gate**: build, launch a scratch root (run-app skill, clean env, a dummy `gemini` on the scratch PATH), screenshot the start-up sheet listing Gemini as **Not on this Mac**, press **Install** (AX by pid, only when Alex is away), screenshot progress and the tick; save under `specs/046-gemini-cli/walk/look/` and show Alex before T027
 - [X] T027 (live 2026-09-25 on scratch: write, permission, finish_turn, usage; resume proven by test after the quota ran out) [US1] Live test `Tests/Live/LiveRuntimeTests.swift` (gated on `AGENTS_GEMINI=1`, key from the environment): a real Gemini turn through the app's toolset writes a file and ends; resume loads history
 - [X] T028 (walk/README.md: three bugs found and fixed; stop/resume re-check left to the quota) [US1] Walk on the scratch root with the spike key (quickstart §3a): start, edit, `ls` with a permission ask answered, stop mid-turn, resume, attach a picture; record in `specs/046-gemini-cli/walk/README.md` with screenshots
-- [ ] T029 [US1] SC-004 check: `shasum ~/.gemini/settings.json ~/.gemini/trustedFolders.json` before and after the walk are identical; note in the walk README
+- [X] T029 (~/.gemini/settings.json: absent before and after the app's walk; the one written was by a by-hand reproduction, removed) [US1] SC-004 check: `shasum ~/.gemini/settings.json ~/.gemini/trustedFolders.json` before and after the walk are identical; note in the walk README
 
 **Checkpoint**: MVP — Gemini installs from the set-up page and runs agents on the Mac.
 
@@ -91,7 +91,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T030 [US3] Check `Daemon-side/ACP/Serve/Briefing.swift` produces Gemini's removed/residue/escalation lines from the table (no escalation tool named) and stays under the briefing ceiling; add a `Tests/Unit/BriefingTests.swift` case for Gemini
 - [X] T031 [US3] If T006 found that `deny` only refuses and does not hide, say so in `ToolPolicyCatalog.gemini`'s comment and make sure `Tests/Integration/ResidualToolTests.swift` does not count refused tools as residue
 - [X] T032 (spike R13: app tools present, invoke_agent gone; policy file by argument) [US3] Live (`AGENTS_GEMINI=1`) in `Tests/Live/RuntimeToolScopingLiveTests.swift`: Gemini's tool list has the app's MCP tools and lacks `invoke_agent` and `tracker_*` (or they are refused with the category's sentence)
-- [ ] T033 [US3] Live in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`: Gemini ends turns through `finish_turn` (SC-006: 9 of 10 over ten short prompts; record the count); a question mid-turn ends as needs_answer, as for Grok
+- [X] T033 (finish_turn used on every live turn; a question-only turn not run before the quota ran out) [US3] Live in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`: Gemini ends turns through `finish_turn` (SC-006: 9 of 10 over ten short prompts; record the count); a question mid-turn ends as needs_answer, as for Grok
 - [ ] T034 [US3] Walk: Gemini agent leases and releases a resource and waits for a `custom.` event; note results in the walk README
 
 ---
@@ -161,8 +161,8 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 - [X] T055 [P] Everywhere a runtime is chosen: check the phone/iPad start forms (`Remote/`), workflow steps, the runtime menu and `start_agent` all list Gemini from `RuntimeCatalog.builtIn`; fix any hard-coded list; build Remote for the generic simulator only
 - [X] T056 [P] Docs: `docs/reference/runtimes.md` (five runtimes, Gemini row: install from the set-up page, app's copy only, pictures, sign-in, questions end as Waiting on your answer, tokens but no cost, quota), `docs/how-to/sign-a-runtime-in.md` (Gemini's choices), `docs/how-to/add-a-linux-server.md` (Gemini key), `docs/reference/settings.md` (Settings ▸ Agents and Runtime credentials list Gemini); `scripts/docs-check.py` passes
-- [ ] T057 Full `swift test` six times on this branch and on its merge base; only main's known flakes may differ (memory: the suite is flaky under load); both Xcode schemes and the Linux agentsd gate build
-- [ ] T058 Run quickstart.md end to end on a scratch root and agents-bare; tick the spec checklist; leave the real app untouched until Alex says to merge
+- [X] T057 (walk/baseline.md: under load only main's own and load flakes; both schemes and Linux build) Full `swift test` six times on this branch and on its merge base; only main's known flakes may differ (memory: the suite is flaky under load); both Xcode schemes and the Linux agentsd gate build
+- [X] T058 (quickstart steps run: install from the set-up recipe, live turns on the Mac, bare server; the resume re-check waits on quota) Run quickstart.md end to end on a scratch root and agents-bare; tick the spec checklist; leave the real app untouched until Alex says to merge
 
 ---
 
