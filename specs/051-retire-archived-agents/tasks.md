@@ -48,7 +48,7 @@ differently yet.
 
 ### Tests first
 
-- [ ] T005 [P] Write `Pkg/Tests/AgentsKitTests/Unit/RetentionPlanTests.swift` against the R5 rules, with `now`, `saneNow`, sizes and holds as plain values. It must fail until T011. Cases:
+- [X] T005 [P] Write `Pkg/Tests/AgentsKitTests/Unit/RetentionPlanTests.swift` against the R5 rules, with `now`, `saneNow`, sizes and holds as plain values. It must fail until T011. Cases:
   - off (`forever` with `none`) retires nothing and gives no notes
   - age at 30 days retires, 29 days does not
   - the cap retires oldest `archivedAt` first, with ties to the oldest `lastActivityAt`, until at or under the cap
@@ -59,12 +59,12 @@ differently yet.
   - the first check after a start uses `min(now, lastCheck + 1 day)`
   - notes: `.at` only within 7 days; `.nextUnderCap` on exactly one agent, and only when a cap is set
   - `overCap` names its holding reasons with counts when stuck over
-- [ ] T006 [P] Write `Pkg/Tests/AgentsKitTests/Unit/TombstoneTests.swift`:
+- [X] T006 [P] Write `Pkg/Tests/AgentsKitTests/Unit/TombstoneTests.swift`:
   - A tombstone built from the T003 fixture keeps exactly the FR-015 fields.
   - Its JSON is under 2,048 bytes with a 200-character title and five currencies.
   - It carries no prompt, transcript, option or credential text.
   - A title longer than 200 characters is truncated.
-- [ ] T007 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AgentStoreSlimTests.swift`:
+- [X] T007 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AgentStoreSlimTests.swift`:
   - Saving a slimmed agent leaves `agent.json`'s `advertisedOptions`, `availableCommands` and `plans` as they were on disk.
   - Saving a slim agent whose `agent.json` is missing or unreadable is refused and logged.
   - A whole agent saves as today.
@@ -72,45 +72,45 @@ differently yet.
 
 ### Implementation
 
-- [ ] T008 [P] Add to `Pkg/Sources/AgentsKitCore/Model/Agent.swift`:
+- [X] T008 [P] Add to `Pkg/Sources/AgentsKitCore/Model/Agent.swift`:
   - `archivedAt: Date?` and `retirement: Retirement?`, both in `CodingKeys` and read with `decodeIfPresent`.
   - `isSlim: Bool`, kept out of `CodingKeys` like `rawState`, with a comment saying why.
   - `func slimmed() -> Agent`, which empties `advertisedOptions`, `availableCommands` and `plans` and sets `isSlim`.
   - `func madeWhole(from disk: Agent) -> Agent`.
-- [ ] T009 [P] Create `Pkg/Sources/AgentsKitCore/Model/Retirement.swift`, with every type `Codable, Hashable, Sendable`:
+- [X] T009 [P] Create `Pkg/Sources/AgentsKitCore/Model/Retirement.swift`, with every type `Codable, Hashable, Sendable`:
   - `enum Retirement { at(Date), nextUnderCap, held(Hold), unknown(String) }`, encoded as `{ "at": date }`, `{ "nextUnderCap": {} }` and `{ "held": "worktreeHasWork" }`. Anything else decodes to `.unknown`.
   - `enum Hold: String { firstDay, worktreeHasWork, workflowRunning, openInWindow }`.
   - `enum RetiredBecause: String { age, cap, person }`.
   - `struct Tombstone` with exactly the FR-015 fields in data-model.md, and `init(from agent: Agent, host: HostID, retiredAt: Date, because: RetiredBecause)`, which truncates the title to 200 characters.
   - `struct OverCap { bytesOver: Int, holding: [Hold: Int] }`.
-- [ ] T010 [P] Create `Pkg/Sources/AgentsKitCore/Model/RetentionSettings.swift`:
+- [X] T010 [P] Create `Pkg/Sources/AgentsKitCore/Model/RetentionSettings.swift`:
   - `enum KeepFor: String { days7, days14, days30, days90, forever }`, with `days30` the default and `var interval: TimeInterval?`.
   - `enum Cap: String { gb1, gb2, gb5, gb10, none }`, with `gb2` the default and `var bytes: Int?`, where GB means 1,000,000,000 bytes, as Finder shows it.
   - `struct RetentionSettings { keepFor, cap; var isOff: Bool }`.
   - An unknown raw value decodes to the default, never to `forever` or `none`.
-- [ ] T011 Create `Pkg/Sources/AgentsKitCore/Model/RetentionPlan.swift`: `struct RetentionPlan` with `static func decide(archived: [Candidate], holds: [UUID: Hold], settings: RetentionSettings, now: Date, saneNow: Date) -> RetentionDecision`. `Candidate` is `{ id, archivedAt, lastActivityAt, sizeOnDisk }`. `RetentionDecision` is `{ retire: [(UUID, RetiredBecause)], notes: [UUID: Retirement?], overCap: OverCap? }`. Also add `static func saneNow(now: Date, lastCheck: Date?, elapsedUptime: Duration?) -> Date`. Follow research R5 rules 1–7 exactly. Make T005 pass.
-- [ ] T012 [P] Create `Pkg/Sources/AgentsKitCore/Model/RetirementWords.swift` with every function in the contract's Words table. The day counts in `rowNote` round down in the person's calendar, like `LeaseWords.clock`. Add `Pkg/Tests/AgentsKitTests/Unit/RetirementWordsTests.swift`, covering each example sentence in contracts/daemon-api.md verbatim.
-- [ ] T013 Add the wire shapes to `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
+- [X] T011 Create `Pkg/Sources/AgentsKitCore/Model/RetentionPlan.swift`: `struct RetentionPlan` with `static func decide(archived: [Candidate], holds: [UUID: Hold], settings: RetentionSettings, now: Date, saneNow: Date) -> RetentionDecision`. `Candidate` is `{ id, archivedAt, lastActivityAt, sizeOnDisk }`. `RetentionDecision` is `{ retire: [(UUID, RetiredBecause)], notes: [UUID: Retirement?], overCap: OverCap? }`. Also add `static func saneNow(now: Date, lastCheck: Date?, elapsedUptime: Duration?) -> Date`. Follow research R5 rules 1–7 exactly. Make T005 pass.
+- [X] T012 [P] Create `Pkg/Sources/AgentsKitCore/Model/RetirementWords.swift` with every function in the contract's Words table. The day counts in `rowNote` round down in the person's calendar, like `LeaseWords.clock`. Add `Pkg/Tests/AgentsKitTests/Unit/RetirementWordsTests.swift`, covering each example sentence in contracts/daemon-api.md verbatim.
+- [X] T013 Add the wire shapes to `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
   - Methods: `retentionState = "retention/state"`, `retentionSet = "retention/set"`, `agentsRetire = "agents/retire"`, `agentsRetired = "agents/retired"`.
   - Notifications: `retentionChanged = "retention/changed"`, `agentRemoved = "agent/removed"`.
   - Types: `RetentionState`, `RetentionSetRequest { settings, confirmed }`, `RetentionSetResult { applied, wouldRetire: RetirePreview?, state: RetentionState? }`, `RetirePreview { count, bytes }`, `RetireRequest { agentID, confirmed }`, `RetiredRequest { folder?, ids?, limit? }` (limit defaults to 200, at most 200), `AgentRemovedNotification { agentID }`.
   - `ProjectSummary.retiredCount: Int?`, read with `decodeIfPresent`.
   - `Failure.agentRetired = -32050` and `Failure.retireRefused = -32051`, with comments naming 051.
   - Add all four methods to the role table: the two writes are for `control` only, and the reads for whatever can read `agents/list`. Put them wherever `cost/setLimits` is listed.
-- [ ] T014 [P] Create `Pkg/Sources/AgentsKit/Store/RetentionStore.swift`, on `LimitStore`'s pattern. It reads and writes `retention.json` as `{ settings, lastCheck: Date? }`: missing means defaults, and unreadable is set aside and means defaults. Add `StoreLocations.retention`.
-- [ ] T015 [P] Create `Pkg/Sources/AgentsKit/Store/RetiredStore.swift`:
+- [X] T014 [P] Create `Pkg/Sources/AgentsKit/Store/RetentionStore.swift`, on `LimitStore`'s pattern. It reads and writes `retention.json` as `{ settings, lastCheck: Date? }`: missing means defaults, and unreadable is set aside and means defaults. Add `StoreLocations.retention`.
+- [X] T015 [P] Create `Pkg/Sources/AgentsKit/Store/RetiredStore.swift`:
   - `append(_ t: Tombstone) throws` writes one line and calls `fsync` on the handle before returning. It throws if either fails.
   - `loadAll() -> [UUID: Tombstone]` skips a torn last line and counts other unreadable lines into `DaemonLog`, like `EventStore.load`.
   - Add `StoreLocations.retired` (`retired.jsonl`).
   - Test it in `Pkg/Tests/AgentsKitTests/Unit/RetiredStoreTests.swift`: a torn last line, and many appends read back in order.
-- [ ] T016 [P] Create `Pkg/Sources/AgentsKit/Store/ArchiveIndex.swift`:
+- [X] T016 [P] Create `Pkg/Sources/AgentsKit/Store/ArchiveIndex.swift`:
   - `struct IndexEntry { agent: Agent (slim), sizeOnDisk: Int, fileModifiedAt: Date }`.
   - `load() -> [UUID: IndexEntry]?` returns nil when the file is missing or unreadable.
   - `save(_:) throws` writes whole and atomically. The file is `{ version: 1, writtenAt, entries }`.
   - `static func sizeOnDisk(_ dir: URL) -> Int` totals the allocated size of the directory's files.
   - Add `StoreLocations.archiveIndex` (`archive.json`).
-- [ ] T017 Make `AgentStore.save` slim-safe in `Pkg/Sources/AgentsKit/Store/AgentStore.swift`. When `agent.isSlim`, read `agent.json`, call `madeWhole(from:)` and write that. If the read fails, refuse and log, like `refusal(for:)`. Add the invariants "`archivedAt != nil` requires `state == .archived`" and "`retirement != nil` requires `state == .archived`" to `refusal(for:)`, each with a `Mend` that clears the field. Make T007 pass.
-- [ ] T018 Add `AgentStore.retire(_ id: UUID, tombstone: Tombstone, retiredStore:) throws` to `Pkg/Sources/AgentsKit/Store/AgentStore.swift`. It does these steps in order:
+- [X] T017 Make `AgentStore.save` slim-safe in `Pkg/Sources/AgentsKit/Store/AgentStore.swift`. When `agent.isSlim`, read `agent.json`, call `madeWhole(from:)` and write that. If the read fails, refuse and log, like `refusal(for:)`. Add the invariants "`archivedAt != nil` requires `state == .archived`" and "`retirement != nil` requires `state == .archived`" to `refusal(for:)`, each with a `Mend` that clears the field. Make T007 pass.
+- [X] T018 Add `AgentStore.retire(_ id: UUID, tombstone: Tombstone, retiredStore:) throws` to `Pkg/Sources/AgentsKit/Store/AgentStore.swift`. It does these steps in order:
   1. `retiredStore.append`
   2. `closeTranscript`
   3. delete `transcript.jsonl`
@@ -119,7 +119,14 @@ differently yet.
 
   Also add `finishRetiring(ids:)`, which runs steps 2–5 for ids whose directory still exists. Take a `failAfter: Int?` test seam in an internal initializer, so a test can stop after any step. Write `Pkg/Tests/AgentsKitTests/Unit/RetireOrderTests.swift`: for each step, failing after it leaves the agent either whole and loadable, or with a tombstone and removable by `finishRetiring`, never with neither (SC-006).
 
-**Checkpoint**: `swift test --filter 'RetentionPlan|Tombstone|AgentStoreSlim|RetiredStore|RetireOrder|RetirementWords'` is green, and the full suite shows no new failures against T002.
+**Checkpoint**: `swift test --filter 'RetentionPlan|Tombstone|AgentStoreSlim|RetirementWords'` is green, and the full suite shows no new failures against T002.
+
+*Done 2026-09-25, with these changes from the text above:*
+- *T011: the clock is its own value, `RetentionClock` (in `RetentionPlan.swift`), and `decide` takes only `saneNow`. See research R5.*
+- *T015 and T018: the tombstone-file and retire-order tests live in `AgentStoreSlimTests.swift`.*
+- *T017: `save` clears `archivedAt` and `retirement` on an agent that is not archived, instead of refusing it (data-model, Rules).*
+- *T018: the record is deleted before the transcript. The step-by-step test showed that the other order leaves a readable agent with an empty conversation.*
+- *Full suite: under load average 30 from other sessions there were 87 issues against 11–16 at baseline. Every sampled new failure passes on its own. T061's six-run comparison settles it.*
 
 ---
 

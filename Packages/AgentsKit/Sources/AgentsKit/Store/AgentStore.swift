@@ -35,6 +35,8 @@ public actor AgentStore {
         case stoppedWithNoReason(UUID)
         case finishedWithoutEndTurn(UUID, EndedReason?)
         case startingWithAnEnding(UUID)
+        /// A slim agent whose record could not be read to put its lists back (051).
+        case slimWithoutRecord(UUID)
 
         /// For the log line, which is the only evidence a refusal leaves.
         var summary: String {
@@ -47,6 +49,8 @@ public actor AgentStore {
                 return "refused to save agent \(id): finished, but ended \(reason.map(String.init(describing:)) ?? "nothing")"
             case .startingWithAnEnding(let id):
                 return "refused to save agent \(id): starting, but carrying an ending"
+            case .slimWithoutRecord(let id):
+                return "refused to save agent \(id): slim, and its record could not be read to fill it in"
             }
         }
     }
@@ -120,7 +124,9 @@ public actor AgentStore {
             fixed.endedReason = .daemonGone
             fixed.archivedReason = nil
             return (fixed, .startingWithAnEnding)
-        case nil:
+        // Never a refusal on the way in: it is about how a copy is saved, not what a
+        // record says.
+        case .slimWithoutRecord, nil:
             return nil
         }
     }
@@ -140,6 +146,26 @@ public actor AgentStore {
         if let refusal = Self.refusal(for: agent) {
             DaemonLog.shared.write(refusal.summary)
             throw refusal
+        }
+        var agent = agent
+        // Retirement's two fields mean something only on an archived agent (051). A
+        // path that forgets to clear them on the way out of archived is put right here
+        // rather than refused: nothing else in the record depends on them.
+        if agent.state != .archived {
+            agent.archivedAt = nil
+            agent.retirement = nil
+        }
+        // A slim copy never reaches the disk (051, research R2). Its lists are read back
+        // from the record first, and without a record to read them from, the save is
+        // refused: writing it as it is would throw them away for good.
+        if agent.isSlim {
+            do {
+                let disk = try StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: locations.record(agent.id)))
+                agent = agent.madeWhole(from: disk)
+            } catch {
+                DaemonLog.shared.write("refused to save agent \(agent.id): slim, and its record could not be read to fill it in")
+                throw RecordRefused.slimWithoutRecord(agent.id)
+            }
         }
         try FileManager.default.createDirectory(at: locations.agent(agent.id), withIntermediateDirectories: true)
         let data = try StoreCoding.encoder.encode(agent)
@@ -224,6 +250,60 @@ public actor AgentStore {
     /// Let go of an agent's handle: it is finished, or archived, or the daemon is going.
     public func closeTranscript(for agentID: UUID) {
         try? appendHandles.removeValue(forKey: agentID)?.close()
+    }
+
+    // MARK: Retiring (051)
+
+    /// The steps of retiring an agent, after the tombstone, in the order they run. A
+    /// daemon stopped between any two leaves either the whole agent or its tombstone,
+    /// and `finishRetiring` completes the rest (FR-017).
+    enum RetireStep: Int, CaseIterable {
+        case tombstone, closeTranscript, deleteRecord, deleteTranscript, removeFolder
+    }
+
+    /// For the tests: stop after this step, as a kill would.
+    var failAfter: RetireStep?
+    func stop(after step: RetireStep?) { failAfter = step }
+    struct Stopped: Error {}
+
+    /// Retire one agent: write its tombstone and sync it, then delete what the app kept
+    /// for it. Nothing is deleted if the tombstone cannot be written.
+    public func retire(_ tombstone: Tombstone, into retired: RetiredStore) throws {
+        try retired.append(tombstone)
+        try check(.tombstone)
+        try deleteRetired(tombstone.id)
+    }
+
+    /// Finish what a stopped retire began: for each of these ids that still has a
+    /// folder, the tombstone is already written, so what is left is deleting.
+    public func finishRetiring(_ ids: some Sequence<UUID>) {
+        for id in ids where FileManager.default.fileExists(atPath: locations.agent(id).path) {
+            DaemonLog.shared.write("finishing the retirement of \(id), cut off last time")
+            try? deleteRetired(id)
+        }
+    }
+
+    /// The record first, then the transcript, then the folder: a folder with no record
+    /// is one `loadAll` cannot read, so a half-deleted agent is never listed as whole.
+    private func deleteRetired(_ id: UUID) throws {
+        closeTranscript(for: id)
+        lineIndexes.removeValue(forKey: id)
+        try check(.closeTranscript)
+        try removeIfThere(locations.record(id))
+        try check(.deleteRecord)
+        try removeIfThere(locations.transcript(id))
+        try check(.deleteTranscript)
+        try removeIfThere(locations.agent(id))
+        try check(.removeFolder)
+    }
+
+    private func check(_ step: RetireStep) throws {
+        if failAfter == step { throw Stopped() }
+    }
+
+    private func removeIfThere(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     public func closeAll() {

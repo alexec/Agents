@@ -11,11 +11,13 @@
 `Agent.slimmed()` returns a copy with `advertisedOptions`, `availableCommands` and `plans`
 emptied and `isSlim = true`. `Agent.madeWhole(from disk: Agent)` puts them back.
 
-**Invariants**, added to `AgentStore.refusal(for:)`:
+**Rules**, kept by `AgentStore.save`:
 
-- `archivedAt != nil` requires `state == .archived`.
-- `retirement != nil` requires `state == .archived`.
-- A slim agent is never encoded to `agent.json`. `save` merges from disk or refuses.
+- `archivedAt` and `retirement` mean something only on an archived agent. `save` clears them on
+  any other agent, rather than refusing it: a refusal would also print a mend note into the
+  person's transcript, which is too much for two fields nothing else depends on.
+- A slim agent is never encoded to `agent.json`. `save` fills the lists back in from disk, or
+  refuses with `RecordRefused.slimWithoutRecord`.
 
 ## Retirement (new, AgentsKitCore/Model/Retirement.swift)
 
@@ -44,7 +46,7 @@ largest realistic one and checks that.
 | `title` | `String?` | record, truncated to 200 characters |
 | `project` | `URL` | `projectFolder` |
 | `runtimeID` | `String` | record |
-| `host` | `HostID` | the daemon's own host id (`.mac` on the Mac) |
+| `host` | `HostID` | not coded: stamped by the window that hears of it, like `Agent.host`, because the daemon does not know its own name |
 | `createdAt`, `lastActivityAt`, `archivedAt`, `retiredAt` | `Date` | record, and now |
 | `endedReason` | `EndedReason?` | record |
 | `archivedReason` | `ArchivedReason` | record |
@@ -75,7 +77,7 @@ retirement off by accident. "Off" is only ever what the person chose.
 |---|---|---|---|
 | `archive.json` | whole, atomically, on archive, unarchive, retire, and any check that changes a slim field, size or note | at start | `{ version: 1, writtenAt, entries: [{ agent: slim Agent, sizeOnDisk: Int, fileModifiedAt: Date }] }`. A cache: rebuilt if missing or unreadable (R3). |
 | `retired.jsonl` | one tombstone appended per retirement, then `fsync` | at start, whole | One `Tombstone` per line. Never rewritten. A torn last line is skipped, like `events.jsonl`. |
-| `retention.json` | whole, on `retention/set` and after each check | at start | `{ settings, lastCheck: Date?, lastCheckUptime: Duration? }`. The uptime is meaningful only within one daemon run; a new start treats it as absent (R5). |
+| `retention.json` | whole, on `retention/set` and after each check | at start | `{ settings, clock: { lastWall, lastSane } }`. `RetentionClock` keeps its uptime reading and distrust in memory only, since they mean nothing to the next run (R5). |
 
 `sizeOnDisk` is the total allocated size of the agent's directory. It is measured on archive,
 at every check for agents it changed in since, and whenever an index entry is added.
@@ -154,7 +156,7 @@ retired ── nothing. It is terminal: only its tombstone remains.
    `archiveIndex` and `lastWhole`.
 3. If an app-made worktree exists, is clean and merged, and no agent that is not archived uses
    it, remove it and its merged app branch, by `removeWorktreeIfDone`'s rule.
-4. Delete `transcript.jsonl`, then `agent.json`, then the directory.
+4. Delete `agent.json`, then `transcript.jsonl`, then the directory. The record goes first, so a half-deleted folder is unreadable rather than an agent with no conversation.
 5. Write `archive.json`. Broadcast `agent/removed` (new, below) and `project/changed`, and
    raise the `agent.retired` event.
 

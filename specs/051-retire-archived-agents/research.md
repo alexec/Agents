@@ -84,8 +84,10 @@ each is what makes start slow. On the other side, the daemon can crash between w
 - At start, any id in both `retired` and `agents/` has its directory deleted before the table
   is filled. Retiring is then finished, and the agent is never listed live next to its own
   tombstone.
-- Deleting removes `transcript.jsonl`, then `agent.json`, then the directory, so a half-deleted
+- Deleting removes `agent.json`, then `transcript.jsonl`, then the directory, so a half-deleted
   directory is never read as an agent: without `agent.json` it is unreadable, and it is skipped.
+  (The first draft had the transcript first; the step-by-step test showed that leaves a readable
+  agent with an empty conversation.)
 
 **Rationale**: FR-017 and SC-006 want no moment when the agent has neither a record nor a
 tombstone. Writing the tombstone first gives that. Using one file keeps retired agents out of
@@ -100,13 +102,13 @@ tombstone. Writing the tombstone first gives that. Using one file keeps retired 
 
 ## R5. The retention rules, as one pure function
 
-**Decision**: `RetentionPlan.decide(archived:holds:settings:now:saneNow:) -> RetentionDecision`
+**Decision**: `RetentionPlan.decide(archived:holds:settings:saneNow:) -> RetentionPlan.Decision`
 lives in Core. It answers with the ids to retire in order, the `Retirement` note for each
 archived agent, and `overCap: OverCap?`. The rules are:
 
 1. **Off**: when `keepFor == .forever` and `cap == .none`, nothing is retired and every note is
    nil (FR-010).
-2. **Floor**: an agent with `archivedAt > now − 24 h` is never picked (FR-006).
+2. **Floor**: an agent archived less than 24 h before `saneNow` is never picked (FR-006).
 3. **Held**: an agent with a hold is never picked. Its note is `.held(hold)` (FR-007).
 4. **Age**: every other agent whose `archivedAt ≤ saneNow − keepFor` is picked (FR-002).
 5. **Cap**: after age, while the total of `sizeOnDisk` over archived agents still kept is above
@@ -122,15 +124,23 @@ archived agent, and `overCap: OverCap?`. The rules are:
    how much, and names the reasons still holding agents: "on its first day", "worktree has
    work in it", "a workflow run is going" and "open in a window" (FR-013).
 
-**Clock sanity**: `retention.json` keeps `lastCheck` (wall clock) and `lastCheckUptime`
-(`ContinuousClock`). At each check, `elapsedWall − elapsedUptime` is the jump.
+**Clock sanity**: `RetentionClock` (in `RetentionPlan.swift`) turns the wall clock into the time
+the rules count from. It writes `lastWall` and `lastSane` to `retention.json`, and keeps its uptime
+reading in memory for the run.
 
-- A forward jump of more than a day sets `saneNow = lastCheck + elapsedUptime`, so age counts
-  only real time, until a day of real time has passed since the jump (edge case).
-- An `archivedAt` in the future counts as now.
-- Across a restart there is no uptime to compare. `saneNow` is `min(now, lastCheck + 1 day)`
-  for the first check after a start, so a clock wound forward while the daemon was down retires
-  nothing by age that day.
+- Within a run, if the wall clock moved more than a day further than uptime did, only real time
+  counts (`lastSane + elapsed uptime`) until a day of real time has passed since the jump. Then the
+  wall clock is believed again (edge case).
+- On the first check of a run there is no uptime to compare. If the wall clock is more than a day
+  past `lastWall`, nothing tells a jump from time the daemon was not running, so the clock stays
+  at `lastSane` until a day of uptime has passed. A Mac off for a long weekend therefore retires
+  nothing by age for a day after it starts. That is conservative on purpose. The cap still
+  applies.
+- A clock set back is simply now: it can only make agents look younger.
+- An `archivedAt` in the future counts as now: `decide` clamps each age at zero.
+
+`decide(archived:holds:settings:saneNow:)` takes only the sane time: the floor, age and notes all
+count from it.
 
 **Legacy**: a record with `state == .archived` and no `archivedAt` gets `archivedAt` set to the
 start time when it is first indexed. It is written to the record and the index once (FR-008).

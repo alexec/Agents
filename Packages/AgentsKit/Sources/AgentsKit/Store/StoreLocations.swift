@@ -144,6 +144,13 @@ public struct StoreLocations: Sendable {
     /// What happened (042): one event, consequence or repeat per line, appended, and
     /// rewritten only when the oldest are dropped.
     public var events: URL { root.appendingPathComponent("events.jsonl") }
+    /// How long archived agents are kept and the clock that counts it (051).
+    public var retention: URL { root.appendingPathComponent("retention.json") }
+    /// What is left of retired agents, one per line, never rewritten (051).
+    public var retired: URL { root.appendingPathComponent("retired.jsonl") }
+    /// Every archived agent, slim, with its size: what start reads instead of each
+    /// record (051). A cache, rebuilt when it is missing or unreadable.
+    public var archiveIndex: URL { root.appendingPathComponent("archive.json") }
     /// The little the event sources remember between runs (042): the next position,
     /// branch tips, pull requests as last seen, publish counts, cost crossings.
     public var eventState: URL { root.appendingPathComponent("events-state.json") }
