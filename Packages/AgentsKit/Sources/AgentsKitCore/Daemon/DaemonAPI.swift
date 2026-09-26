@@ -279,6 +279,10 @@ public enum DaemonAPI {
         // limit is not stopped.
         public static let costState = "cost/state"
         public static let costSetLimits = "cost/setLimits"
+        /// The pool of runtimes a chat can carry on with, and each one's state (052).
+        public static let poolState = "pool/state"
+        public static let poolSet = "pool/set"
+        public static let poolMarkAvailable = "pool/markAvailable"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -364,6 +368,8 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+        /// The pool, its states or its switches changed (052). Debounced to one a second.
+        public static let poolChanged = "pool/changed"
         /// The retention settings, or what the archive holds, changed (051). A
         /// `RetentionState`.
         public static let retentionChanged = "retention/changed"
@@ -1005,6 +1011,18 @@ public enum DaemonAPI {
     /// Each field is a double optional and the distinction is the whole point:
     /// **absent** means "leave it as it is", **present and null** means "no limit".
     /// A limit of zero is a limit; clearing one requires an explicit null.
+    /// `pool/markAvailable`: the person says an entry's credential is back (FR-023).
+    public struct PoolMarkAvailable: Codable, Sendable {
+        public var entryID: UUID
+        public init(entryID: UUID) { self.entryID = entryID }
+    }
+
+    /// `pool/state`: the last day of switches unless `days` asks for more (052, FR-025).
+    public struct PoolStateRequest: Codable, Sendable {
+        public var days: Int?
+        public init(days: Int? = nil) { self.days = days }
+    }
+
     public struct SetLimitsRequest: Codable, Sendable {
         public var perAgent: Cost??
         public var daily: Cost??

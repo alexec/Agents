@@ -26,3 +26,30 @@
   and `aPhoneThatComesStraightBackIsKnownAgain`. That test now retries nothing.
 - T005 (the stand-in runtime executable) is deferred to the look gate, where it is first
   needed; nothing before it runs outside `swift test`.
+
+## Look gate (T024–T032), 2026-09-26
+
+Built against `scripts/seed-pool.py` on `/tmp/run-052-look` (the wireframes' moment, seeded as
+files; the real Codex toolset linked in read-only so discovery finds it). Screenshots in
+`walk/look/`:
+
+1. `1-pool-page.png`: the sidebar's Pool row with its dot and count line; runtimes in order
+   with payment capsules and state lines; Mark available on the two that are out; the prepaid
+   key's "≈ $3.20 of $10.00 used"; Matching models; recent switches linking to their chats.
+2. `2-chat-switch-note.png`: the tinted switch note (headline with return time, model and
+   mode with where each came from, what was handed over, what was not carried, the two links)
+   and the folded handoff.
+3. `3-continue-with-menu.png`: the prompt bar's runtime control, with the per-chat tick, the
+   pool's runtimes with their states, and Grok "not in the pool".
+4. `4-continue-with-sheet.png`: the sheet's four columns and Won't carry over. Its right-hand
+   column is a placeholder ("Claude's default") until the carry rules land in US1/US5, and
+   Continue is disabled.
+
+Not captured: Settings ▸ Pool and the Add credit sheet. Pressing a Settings tab through the
+accessibility tree walks every menu and took over 40 s, so it was stopped. Both build and are
+there to open by hand. Found and fixed on the way: times came out on a 12-hour clock with no
+AM/PM (now the Mac's own setting); the switch note did not draw from seeded data, because a
+record inside a transcript entry keeps dates as numbers, which the seed now does too; the shared
+switch note used a macOS-only link style (the Remote now builds too).
+
+Still to do from T026: the "⇄ Carried on from …" line on the agent row.

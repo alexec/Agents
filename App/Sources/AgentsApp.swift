@@ -42,6 +42,7 @@ struct AgentsApp: App {
                 Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
                 Tab("Agents", systemImage: "cpu") { AgentsSettingsView() }
                 Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
+                Tab("Pool", systemImage: "arrow.triangle.swap") { PoolSettingsView() }
                 Tab("Devices", systemImage: "iphone") { DevicesPane() }
                 Tab("Servers", systemImage: "server.rack") { ServersSettingsView() }
             }

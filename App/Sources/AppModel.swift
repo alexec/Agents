@@ -68,6 +68,7 @@ final class AppModel {
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
+    var poolStatus: PoolStatus? { work.poolStatus }
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -113,6 +114,7 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
             showsEvents = false
+            showsPool = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -130,6 +132,7 @@ final class AppModel {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
             showsEvents = false
+            showsPool = false
             selection = nil
             openWorkflow = nil
         }
@@ -142,6 +145,25 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsResources = false
+            showsPool = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// The switch whose settings the person is changing from its note (052, FR-029).
+    var adjustingSwitch: SwitchRecord?
+    /// A chat the person is moving to another runtime by hand (052, US5).
+    var continuingWith: ContinueWith?
+
+    /// Whether the window is showing the Pool page (052). A page like Resources, and not
+    /// persisted for the same reason.
+    var showsPool = false {
+        didSet {
+            guard showsPool, showsPool != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
@@ -183,6 +205,7 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsPool = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         } else if let gone = work.tombstones[agentID] {
@@ -208,7 +231,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsEvents ? .events : showsResources ? .resources
+            showsPool ? .pool : showsEvents ? .events : showsResources ? .resources
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -219,10 +242,13 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
+            case .pool:
+                showsPool = true
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
+                showsPool = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -252,6 +278,7 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsPool = false
         select(key)
         selection = nil
         openWorkflow = nil
@@ -754,6 +781,34 @@ final class AppModel {
     /// The reader setting or clearing a limit. Theirs alone: nothing an agent or a
     /// workflow can reach calls this.
     // MARK: Retiring archived agents (051)
+
+    /// The pool and each credential's state (052).
+    func refreshPoolStatus(days: Int? = nil) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
+
+    /// Keep a new pool. Returns the daemon's sentence when it will not (FR-001a, FR-032).
+    func setPool(_ pool: PoolSettings) async -> String? {
+        do {
+            let status = try await client.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
+            work.replacePoolStatus(status)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "\(error)"
+        }
+    }
+
+    /// The person says a runtime is back: bought more credit, a new month began (FR-023).
+    func markPoolEntryAvailable(_ entryID: UUID) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,
+                                                  DaemonAPI.PoolMarkAvailable(entryID: entryID),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
 
     func refreshRetentionState() async {
         guard let state = try? await client.call(DaemonAPI.Method.retentionState,
@@ -1264,6 +1319,7 @@ final class AppModel {
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
+        async let pool: Void = refreshPoolStatus()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
@@ -1272,7 +1328,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, cloning, wake, leases, events, modes,
-                   transcript)
+                   transcript, pool)
         #if DEBUG
         openFromLaunchArguments()
         #endif

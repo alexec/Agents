@@ -41,6 +41,7 @@ extension DaemonCore {
         allowances[state.credentialKey] = state
         do {
             try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+            broadcastPool()
         } catch {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
@@ -173,6 +174,70 @@ extension DaemonCore {
         } catch {
             await record(.runtimeNote("Could not try again: \(reason(error))"), for: agentID)
         }
+    }
+
+    // MARK: The Pool page
+
+    /// What the Pool page draws (US3). An entry nobody has used yet is available.
+    public func poolStatus(days: Int? = nil) -> PoolStatus {
+        let at = now()
+        let live = agents.values.filter { $0.state != .archived }
+        let rows = pool.entries.map { entry -> PoolStatus.Row in
+            let key = AllowanceState.credentialKey(for: entry)
+            var state = allowances[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
+            state.settle(now: at)
+            let chats = live.filter { AllowanceState.credentialKey(for: poolEntry(for: $0)) == key }.count
+            return PoolStatus.Row(entry: entry, state: state, chats: chats, unusable: unusable(entry))
+        }
+        let since = at.addingTimeInterval(-Double(min(max(days ?? 1, 1), 30)) * 86400)
+        let switches = poolStore.switches(since: since).sorted { $0.at > $1.at }
+        let titles = Dictionary(switches.compactMap { record in
+            agents[record.agentID].map { (record.agentID, $0.title ?? "Untitled") }
+        }, uniquingKeysWith: { first, _ in first })
+        return PoolStatus(settings: pool, rows: rows, switches: switches, titles: titles, at: at)
+    }
+
+    /// Keep a new pool, whole (contracts/daemon-api.md). Refused, with the sentence the
+    /// Settings page shows, when it breaks a rule: a key as an allowance, an amount of
+    /// nothing, a model in two levels.
+    public func setPool(_ next: PoolSettings) throws -> PoolStatus {
+        do {
+            try next.validate()
+        } catch {
+            throw JSONRPCError(code: -32602, message: error.sentence)
+        }
+        pool = next
+        try poolStore.save(next)
+        broadcastPool()
+        return poolStatus()
+    }
+
+    /// The person says a credential is back (FR-023). Idempotent; open to paired devices.
+    public func markPoolEntryAvailable(_ entryID: UUID) -> PoolStatus {
+        if let entry = pool.entry(entryID) {
+            var state = allowanceState(for: entry)
+            state.markAvailable(now: now())
+            setAllowanceState(state)
+            broadcastPool()
+        }
+        return poolStatus()
+    }
+
+    /// Tell every window the pool changed.
+    func broadcastPool() {
+        broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+    }
+
+    /// Why an entry cannot be used at all, in the page's words.
+    func unusable(_ entry: PoolEntry) -> String? {
+        guard let runtime = RuntimeCatalog.runtime(id: entry.runtimeID) else { return "not a runtime this app knows" }
+        switch discovery.locate(runtime) {
+        case .missing, .installFailed: return "not installed"
+        case .needsSignIn: return "not signed in"
+        default: break
+        }
+        if accounts[entry.runtimeID]?.state == .needsSignIn { return "not signed in" }
+        return nil
     }
 
     /// Every credential's state, for the Pool page and for tests.

@@ -392,6 +392,18 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
                 return .success(try JSONValue.encoding(await retiredTombstones(request)))
 
+            case DaemonAPI.Method.poolState:
+                let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
+                return .success(try JSONValue.encoding(await poolStatus(days: request.days)))
+
+            case DaemonAPI.Method.poolSet:
+                let pool = try require(params, as: PoolSettings.self)
+                return .success(try JSONValue.encoding(try await setPool(pool)))
+
+            case DaemonAPI.Method.poolMarkAvailable:
+                let request = try require(params, as: DaemonAPI.PoolMarkAvailable.self)
+                return .success(try JSONValue.encoding(await markPoolEntryAvailable(request.entryID)))
+
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)
                 return .success(try JSONValue.encoding(await setLimits(request)))

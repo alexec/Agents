@@ -70,6 +70,12 @@ extension TranscriptEntry.Kind {
             return .stateChanged(state, reason: try? payload["reason"]?.decode(EndedReason.self))
         case "runtimeNote":
             return .runtimeNote(payload["_0"]?.stringValue ?? "")
+        case "poolSwitch", "settingsChanged":
+            guard let record = try? payload["_0"]?.decode(SwitchRecord.self) else { return nil }
+            return name == "poolSwitch" ? .poolSwitch(record) : .settingsChanged(record)
+        case "handoff":
+            return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
+                            characters: payload["characters"]?.intValue ?? 0)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -136,6 +142,12 @@ extension TranscriptEntry.Kind {
             return ["runtimeNote": ["_0": .string(text)]]
         case .workReported(let report):
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
+        case .poolSwitch(let record):
+            return ["poolSwitch": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .settingsChanged(let record):
+            return ["settingsChanged": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .handoff(let markdown, let characters):
+            return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.

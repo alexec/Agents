@@ -59,6 +59,17 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// across the gaps where there is no agent process at all.
         case runtimeNote(String)
 
+        /// A chat carried on with another runtime (052): drawn as the tinted note, with
+        /// what it carried and what it did not. An older build reads it as unrecognised.
+        case poolSwitch(SwitchRecord)
+
+        /// What the new runtime was handed, built from this record (052, R4). Drawn
+        /// folded under the switch note, never as the person's words.
+        case handoff(markdown: String, characters: Int)
+
+        /// The settings a switch chose, changed afterwards from its note (052, FR-029).
+        case settingsChanged(SwitchRecord)
+
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a
         /// kind that did not exist when this build was made.

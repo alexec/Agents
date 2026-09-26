@@ -126,6 +126,17 @@ private struct EntryRow: View {
         case .runtimeNote(let text):
             Text(text).appText(.fine).foregroundStyle(.secondary)
 
+        case .poolSwitch(let record):
+            SwitchNote(record: record)
+
+        case .settingsChanged(let record):
+            Text("Changed what it carried on with: "
+                 + record.carried.compactMap { s in s.to?.stringValue.map { "\(s.name) \($0)" } }.joined(separator: ", "))
+                .appText(.fine).foregroundStyle(.secondary)
+
+        case .handoff(let markdown, let characters):
+            HandoffLine(markdown: markdown, characters: characters)
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
@@ -454,6 +465,8 @@ private struct StateLine: View {
             case .processDied: return "The runtime crashed"
             case .signInRefused: return "Its sign-in was refused"
             case .runtimeError: return "The runtime reported an error"
+            case .allowanceSpent: return "Its allowance ran out"
+            case .rateLimited: return "Rate limited, and still limited after retrying"
             case .daemonGone: return "Stopped when the daemon did"
             case .maxTokens: return "Ran out of room"
             case .maxTurnRequests: return "Hit its limit"

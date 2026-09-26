@@ -203,6 +203,8 @@ struct PromptBar: View {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
+                Spacer(minLength: 8)
+                ContinueWithMenu(agent: agent)
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {
