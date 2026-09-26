@@ -25,6 +25,8 @@ extension DaemonCore {
         pruneWorkflowRuns()
         // After adoption, so every file already here is what gets approved as it stands.
         beginWorkflowApprovalsIfNeeded()
+        // And the projects' plugins, on the same terms (security review, S2).
+        beginPluginApprovalsIfNeeded()
         startWorkflowTicker()
         workflowsAreStarted = true
         // Whatever happened while this layer could not act, now, and in the order it

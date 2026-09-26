@@ -120,6 +120,10 @@ public struct StoreLocations: Sendable {
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
+    /// Which project plugins the person has approved, by the digest of their folders
+    /// (security review, S2). Outside the project for the reason `workflows` is: a thing
+    /// an agent can write to the project must not be able to approve itself.
+    public var pluginApprovals: URL { root.appendingPathComponent("plugin-approvals.json") }
     /// What the app remembers about the person's pull requests (038): which changes
     /// have fired, the babysitting counts, and the last good list for each project.
     public var pullRequests: URL { root.appendingPathComponent("pull-requests.json") }

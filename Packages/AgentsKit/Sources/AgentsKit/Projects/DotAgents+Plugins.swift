@@ -38,11 +38,18 @@ extension DotAgents {
 
     /// Bring the index and the Gemini manifests up to date with `.agents/plugins`.
     /// Cheap when nothing changed: nothing is written unless its contents would differ.
-    public static func refreshPlugins(for cwd: URL) {
+    ///
+    /// The index lists only `approved`, when given: a plugin waiting for the person's OK
+    /// is not offered to the runtimes that load it from there (security review, S2).
+    public static func refreshPlugins(for cwd: URL, approved: [URL]? = nil) {
         let project = projectFolder(for: cwd)
         let folderURL = project.appending(path: "\(folder)/\(plugins)", directoryHint: .isDirectory)
         guard isLayable(project), isDirectory(folderURL) else { return }
-        let found = pluginFolders(in: folderURL)
+        var found = pluginFolders(in: folderURL)
+        if let approved {
+            let keys = Set(approved.map(\.standardizedFileURL.path))
+            found = found.filter { keys.contains($0.standardizedFileURL.path) }
+        }
         for plugin in found {
             attempt("write \(geminiManifest) for \(plugin.lastPathComponent)") { try writeGeminiManifest(for: plugin) }
         }

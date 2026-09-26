@@ -24,14 +24,26 @@ import Foundation
 extension PersonalDotAgents {
     static let geminiEnablement = "extension-enablement.json"
 
-    static func linkGeminiProjectExtensions(home: URL, cwd: URL, record: inout Record) {
+    ///
+    /// Only `approved` is linked, when given, and a link this app made to one of the
+    /// project's plugins that is no longer approved is taken away with its scope: Gemini
+    /// reads a linked extension in place, so a plugin changed since its approval must not
+    /// stay loaded (security review, S2). Taken away, it is linked again once approved.
+    static func linkGeminiProjectExtensions(home: URL, cwd: URL, approved: [URL]? = nil, record: inout Record) {
         let fileManager = FileManager.default
         let extensions = home.appending(path: geminiExtensions, directoryHint: .isDirectory)
         if (try? fileManager.destinationOfSymbolicLink(atPath: extensions.path)) != nil { return }
         sweepGeminiProjectLinks(in: extensions, record: &record)
         let project = DotAgents.projectFolder(for: cwd)
         guard DotAgents.isLayable(project) else { return }
-        for plugin in DotAgents.pluginFolders(for: cwd) {
+        var plugins = DotAgents.pluginFolders(for: cwd)
+        if let approved {
+            let keys = Set(approved.map(\.path))
+            let waiting = Set(plugins.map(\.path)).subtracting(keys)
+            unlinkGeminiProjectExtensions(waiting, in: extensions, record: &record)
+            plugins = plugins.filter { keys.contains($0.path) }
+        }
+        for plugin in plugins {
             attempt("write \(DotAgents.geminiManifest) for \(plugin.lastPathComponent)") {
                 try DotAgents.writeGeminiManifest(for: plugin)
             }
@@ -61,6 +73,22 @@ extension PersonalDotAgents {
                 record.links[link.path] = target
             }
             if record.links[link.path] != target { unscopeGeminiExtension(name, in: extensions) }
+        }
+    }
+
+    /// The links this app made to `targets`, removed with their scopes and their records.
+    /// A link the person has since pointed elsewhere is theirs, and left.
+    static func unlinkGeminiProjectExtensions(_ targets: Set<String>, in extensions: URL, record: inout Record) {
+        let fileManager = FileManager.default
+        for (path, target) in record.links where targets.contains(target) && path.hasPrefix(extensions.path + "/") {
+            let link = URL(filePath: path)
+            if (try? fileManager.destinationOfSymbolicLink(atPath: path)) == target {
+                attempt("take away \(geminiExtensions)/\(link.lastPathComponent) until it is approved") {
+                    try fileManager.removeItem(at: link)
+                }
+                unscopeGeminiExtension(link.lastPathComponent, in: extensions)
+            }
+            record.links.removeValue(forKey: path)
         }
     }
 

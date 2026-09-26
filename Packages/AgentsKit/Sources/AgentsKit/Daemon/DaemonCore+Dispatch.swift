@@ -178,6 +178,15 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))
 
+            case DaemonAPI.Method.pluginsList:
+                let request = try require(params, as: DaemonAPI.PluginsListRequest.self)
+                return .success(try JSONValue.encoding(
+                    DaemonAPI.PluginsList(folder: request.folder, plugins: projectPlugins(in: request.folder))))
+
+            case DaemonAPI.Method.pluginsApprove:
+                let request = try require(params, as: DaemonAPI.PluginApproveRequest.self)
+                return .success(try JSONValue.encoding(try approvePlugin(request)))
+
             case DaemonAPI.Method.workflowsApprove:
                 let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)
                 return .success(try JSONValue.encoding(try approveWorkflow(request)))
