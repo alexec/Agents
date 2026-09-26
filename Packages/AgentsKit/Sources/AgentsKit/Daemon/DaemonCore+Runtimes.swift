@@ -166,7 +166,7 @@ extension DaemonCore {
         try await session.continueSession(id: sessionID, cwd: agent.cwd)
         let forked = try await session.forkSession(cwd: agent.cwd,
                                                    additionalDirectories: agent.additionalDirectories,
-                                                   meta: ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta)
+                                                   meta: sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd))
 
         // A new agent carrying the conversation, not a copy of the record. What the
         // original was doing, owes, has queued or was started by is the original's: a
@@ -227,10 +227,14 @@ extension DaemonCore {
                                message: "There is no runtime called \(runtimeID).")
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed, or is not where we looked.")
+            throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
-        let session = try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
+        // Lent what an agent would be, where there is something (Gemini's key on this Mac);
+        // a check that finds none is answered by the runtime's own refusal, as before.
+        let lent = (try? launchEnvironment(for: runtime.id)) ?? [:]
+        let session = try LentEnvironment.$value.withValue(lent) {
+            try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
+        }
         do {
             let handshake = try await session.initialize()
             noteAccount(runtimeID: runtimeID, from: handshake)

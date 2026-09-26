@@ -12,13 +12,16 @@ import Network
 // straight through in both directions. It parses none of them, which is what keeps it
 // small enough to read in one sitting.
 //
-// **Started by hand, deliberately.** The LAN listener below has no pairing and no
-// encryption, so anything on this network that can find the service can drive the
-// daemon. The safety is that this only runs while somebody has decided it should, and
-// stops when they close the terminal. Nothing spawns it and nothing keeps it alive.
+// **Locked since the security review's Phase 3.** The listener takes TLS with a key per
+// paired device and nothing else (`DirectLink`), so a connection without one fails in
+// the handshake, before a line of it reaches here. Which device it is comes from the
+// key, and the daemon connection it is carried on is that device's, with a device's
+// rights. A phone pairing with the code on the Mac's screen gets a connection that may
+// announce itself and do nothing more.
 //
-// The relay (046) is different: everything it carries is sealed to one paired device and
-// the Mac's own key, and nothing from any other device is opened. See `RelayHost`.
+// The relay (046) is the same seen from away: everything it carries is sealed to one
+// paired device and the Mac's own key, and nothing from any other device is opened.
+// See `RelayHost`.
 
 // `--spike` is 021's T056, the gate the whole of Slice C hangs on: can *this bundle*,
 // nested and signed the way it is, read and write a record in the CloudKit private
@@ -83,16 +86,18 @@ final class Relay {
     private var unsent = 0
     private static let unsentLimit = 16 * 1024 * 1024
     private var stopped = false
+    private let chosen: ChosenIdentities
 
-    init(device: NWConnection) {
+    init(device: NWConnection, chosen: ChosenIdentities) {
         self.device = device
+        self.chosen = chosen
     }
 
     func start() {
         device.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
-                Task { @MainActor in await self?.openTheDaemon() }
+                Task { @MainActor in self?.admit() }
             case .failed, .cancelled:
                 Task { @MainActor in self?.stop() }
             default:
@@ -102,16 +107,39 @@ final class Relay {
         device.start(queue: .main)
     }
 
-    private func openTheDaemon() async {
+    /// Who the handshake says this is, before anything of theirs is carried: the key
+    /// it was locked with names a paired device or the pairing code, and the suite has
+    /// to be the one asked for rather than a weaker one agreed beside it.
+    private func admit() {
+        guard LinkTLS.agreedTheSuite(device) else {
+            log("a device agreed a weaker TLS suite; closing it")
+            stop()
+            return
+        }
+        guard let identity = chosen.take(for: device) else {
+            log("a device's key could not be told; closing it")
+            stop()
+            return
+        }
+        if let id = LinkKey.device(fromIdentity: identity) {
+            Task { await openTheDaemon(device: id, pairing: false) }
+        } else if LinkKey.isPairing(identity) {
+            Task { await openTheDaemon(device: nil, pairing: true) }
+        } else {
+            stop()
+        }
+    }
+
+    private func openTheDaemon(device id: UUID?, pairing: Bool) async {
         do {
             // A device's connection, not a window's: the daemon hears nothing from the
-            // device until it has agreed. Which device it is, the device says once;
-            // until this link has keys of its own, that is the best there is.
-            let transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: nil)
+            // device until it has agreed, and then only as that device.
+            let transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: id,
+                                                        pairing: pairing)
             // The device can go while the daemon is being reached.
             guard !stopped else { transport.close(); return }
             daemon = transport
-            log("a device connected")
+            log(pairing ? "a device connected to pair" : "a device connected")
             Task { @MainActor in
                 do {
                     for try await line in transport.lines() { send(line) }
@@ -185,36 +213,8 @@ enum Relays {
     static var open: [Relay] = []
 }
 
-let parameters = NWParameters.tcp
-// So the iPad can find this without anybody typing an address.
-parameters.includePeerToPeer = true
-
-let listener = try NWListener(using: parameters, on: port)
-listener.service = NWListener.Service(name: Host.current().localizedName ?? "This Mac",
-                                      type: NetworkLink.serviceType)
-
-listener.newConnectionHandler = { connection in
-    Task { @MainActor in
-        let relay = Relay(device: connection)
-        Relays.open.append(relay)
-        relay.start()
-    }
-}
-
-listener.stateUpdateHandler = { state in
-    switch state {
-    case .ready:
-        log("listening on port \(port), advertised as \(NetworkLink.serviceType)")
-        log("this has no pairing and no encryption. Stop it when you are done.")
-    case .failed(let error):
-        log("could not listen: \(error)")
-        exit(1)
-    default:
-        break
-    }
-}
-
-listener.start(queue: .main)
+let directLink = DirectLink(port: port)
+directLink.start()
 
 // The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
 // the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.

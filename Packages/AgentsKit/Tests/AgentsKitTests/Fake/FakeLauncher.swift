@@ -35,7 +35,8 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
         lock.unlock()
 
         let (mine, theirs) = PairedTransport.pair()
-        let session = ACPSession(transport: mine, capabilities: capabilities)
+        let session = ACPSession(transport: mine, capabilities: capabilities,
+                                 authMethodBeforeContinuing: ToolPolicyCatalog.policy(for: runtime.id).authMethodBeforeContinuing)
         let agent = FakeACPAgent(script: script, transport: theirs)
         lock.lock()
         agents.append(agent)
@@ -70,6 +71,21 @@ final class FakeLauncher: SessionLauncher, @unchecked Sendable {
 extension RuntimeDiscovery {
     /// A discovery that finds everything, for tests that are not about discovery.
     static var findsEverything: RuntimeDiscovery {
-        RuntimeDiscovery(searchPaths: ["/fake/bin"], fileExists: { _ in true })
+        var discovery = RuntimeDiscovery(searchPaths: ["/fake/bin"], fileExists: { _ in true })
+        // A runtime that runs only the app's own copy (046) is found in the app's tools,
+        // never on a PATH: give it a whole one there.
+        discovery.macToolsHome = appTools
+        return discovery
     }
+
+    /// One `tools/` folder for every test, with a whole toolset for each app-only runtime.
+    private static let appTools: String = {
+        let tools = FileManager.default.temporaryDirectory.appendingPathComponent("fake-app-tools", isDirectory: true)
+        for runtime in RuntimeCatalog.builtIn where runtime.usesAppCopyOnly {
+            let current = tools.appendingPathComponent("\(runtime.id)/current", isDirectory: true)
+            try? FileManager.default.createDirectory(at: current.appendingPathComponent("bin"), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: current.appendingPathComponent("ok").path, contents: Data())
+        }
+        return tools.path
+    }()
 }

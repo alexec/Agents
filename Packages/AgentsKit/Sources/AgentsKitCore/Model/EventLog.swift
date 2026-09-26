@@ -148,3 +148,25 @@ public struct EventLog: Codable, Hashable, Sendable {
         return nil
     }
 }
+
+/// What the Events page is narrowed to: one scope or all, some kinds or all (042).
+///
+/// The window asks the daemon for pages already narrowed, so a quiet project is not
+/// hidden behind two hundred events from the busy ones, and takes a live event only
+/// when it passes the same test.
+public struct EventFilter: Hashable, Sendable {
+    /// Nil: every project and the Mac.
+    public var scope: EventScope?
+    /// Empty: every kind.
+    public var groups: Set<EventGroup>
+
+    public init(scope: EventScope? = nil, groups: Set<EventGroup> = []) {
+        self.scope = scope
+        self.groups = groups
+    }
+
+    public func matches(_ event: Event) -> Bool {
+        (scope == nil || event.scope == scope)
+            && (groups.isEmpty || (event.subject.map { groups.contains($0.group) } ?? false))
+    }
+}

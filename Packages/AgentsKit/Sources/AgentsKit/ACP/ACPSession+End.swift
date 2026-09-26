@@ -29,7 +29,8 @@ extension ACPSession {
                               arguments: [String],
                               cwd: URL,
                               environment: [String: String] = RuntimeEnvironment.forRuntimes(),
-                              capabilities: ACP.ClientCapabilities = .none) throws -> ACPSession {
+                              capabilities: ACP.ClientCapabilities = .none,
+                              authMethodBeforeContinuing: String? = nil) throws -> ACPSession {
         let relay = ExitRelay()
         let process = try RuntimeProcess(
             executable: executable,
@@ -39,7 +40,8 @@ extension ACPSession {
             onStandardError: { relay.errored($0) },
             onExit: { relay.exited($0) })
         let session = ACPSession(transport: process.transport, process: process,
-                                 capabilities: capabilities)
+                                 capabilities: capabilities,
+                                 authMethodBeforeContinuing: authMethodBeforeContinuing)
         relay.setHandlers(
             exit: { status in Task { await session.noteExit(status: status) } },
             error: { text in Task { await session.note(standardError: text) } })

@@ -22,6 +22,12 @@ import Foundation
 /// would drift from the pinned lock, and the 330 MB fetch would happen silently inside a
 /// first turn instead of on the set-up page. `codex-acp` is the shim's name in that
 /// toolset, and nothing of that name on the PATH is ever run.
+///
+/// Gemini (046) is the one that is only ever the app's own copy: a pinned Gemini CLI on
+/// a pinned Node, installed from the set-up page like Claude's toolset, and never a
+/// `gemini` found on the PATH, because its ACP surface moves between releases. It speaks
+/// ACP itself with `--acp`. The version is `App/Resources/toolsets/gemini/manifest.json`'s
+/// (0.61.0 when this was written), and a test holds the two together.
 public enum RuntimeCatalog {
     public static let claude = Runtime(
         id: "claude",
@@ -64,7 +70,19 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://github.com/agentclientprotocol/codex-acp")!,
         usesAppCopyOnly: true)
 
-    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex]
+    public static let gemini = Runtime(
+        id: "gemini",
+        name: "Gemini",
+        executable: "gemini",
+        // `--skip-trust`: Gemini starts no stdio MCP server in a folder it does not trust,
+        // and the app's own tools are one. Trusted for this session only; nothing is
+        // written to Gemini's `trustedFolders.json` (Alex, 2026-09-25; research R13).
+        arguments: ["--acp", "--skip-trust"],
+        install: .toolset(runtimeID: "gemini"),
+        installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
+        usesAppCopyOnly: true)
+
+    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini]
 
     public static func runtime(id: String) -> Runtime? {
         builtIn.first { $0.id == id }

@@ -146,7 +146,7 @@ exactly as they were.
 - **SC-001**: From a copied URL to a selected project ready for a prompt takes one click, one paste, and one confirmation, with no terminal and no folder picker.
 - **SC-002**: A small repository (under 10 MB) becomes a project within 15 seconds on an ordinary connection.
 - **SC-003**: In every failure case listed in User Story 2 and Edge Cases, zero projects are added and zero files outside the clone's own folder are created, changed, or removed.
-- **SC-004**: Pasting the URL of a repository already cloned into the home folder selects it as the project in under 2 seconds, with the checkout byte-for-byte unchanged.
+- **SC-004**: Pasting the URL of a repository already cloned into the home folder selects it as the project in under 2 seconds, with the checkout's branch and working changes unchanged (the only addition is the dotagents layout every added project gets).
 - **SC-005**: Every failure shows a message a person can act on without reading a log.
 
 ## Assumptions

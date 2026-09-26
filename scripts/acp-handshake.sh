@@ -20,6 +20,8 @@ RUNTIMES = {
     # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
     # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
+    # Never a gemini on the PATH (046, D1): the app's own toolset's shim.
+    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
 }
 
 # What the app advertises today. Kept beside ACP.ClientCapabilities.app on purpose:
@@ -37,7 +39,7 @@ CLIENT = {
 HANDLED = {
     "loadSession": "picking an agent back up",
     "promptCapabilities.image": "attaching a picture to a prompt",
-    "promptCapabilities.audio": "NOT HANDLED (no runtime advertises it)",
+    "promptCapabilities.audio": "not offered: the composer attaches pictures and files, not sound (Gemini advertises it, 046)",
     "promptCapabilities.embeddedContext": "attaching a file's contents",
     "sessionCapabilities.list": "finding conversations the app did not start",
     "sessionCapabilities.delete": "deleting a conversation, with a confirmation",
