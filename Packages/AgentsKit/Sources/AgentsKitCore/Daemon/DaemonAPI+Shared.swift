@@ -99,6 +99,9 @@ extension DaemonAPI {
         /// The other copy of a skill of this name, left where it was.
         public var clash: String?
         public var reach: [String: Reach]
+        /// Where a lock says it came from, when one does (059): a skill the app or
+        /// `npx skills` added, which may be updated and removed. Nil for the person's own.
+        public var managed: DaemonAPI.ManagedSkill?
 
         public var id: String {
             switch source {
@@ -108,13 +111,14 @@ extension DaemonAPI {
         }
 
         public init(name: String, path: String, description: String?, source: Source, clash: String?,
-                    reach: [String: Reach]) {
+                    reach: [String: Reach], managed: DaemonAPI.ManagedSkill? = nil) {
             self.name = name
             self.path = path
             self.description = description
             self.source = source
             self.clash = clash
             self.reach = reach
+            self.managed = managed
         }
     }
 

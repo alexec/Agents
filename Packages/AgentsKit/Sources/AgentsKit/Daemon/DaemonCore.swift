@@ -397,6 +397,19 @@ public actor DaemonCore {
     var pullRequestSweep: Task<Void, Never>?
     /// The person's `gh`. A test gives it a fake.
     var gitHubCLI = GitHubCLI()
+    #if canImport(CryptoKit)
+    /// What searching a catalogue and adding a skill talk to (059). A test gives it a
+    /// session that reaches only its stand-in, and endpoints to match.
+    var catalogSession: URLSession = .shared
+    var catalogEndpoints = CatalogEndpoints.from(environment: ProcessInfo.processInfo.environment)
+    /// Previews fetched and not yet added, in `<root>/catalog-staging`.
+    lazy var catalogStaging = SkillStaging(root: locations.root.appending(path: "catalog-staging"))
+    /// When each source was last asked whether it has moved on, and what it said (FR-018).
+    var catalogUpdateChecks: [String: (at: Date, head: String)] = [:]
+    /// Between an add's rename and its lock write, for the test that an add stopped there
+    /// leaves nothing behind. Nil everywhere else.
+    var catalogAfterRename: (@Sendable () throws -> Void)?
+    #endif
     /// Projects due a look sooner than their five minutes, because a pull request's run
     /// just ended there (FR-014), and from when.
     var pullRequestsDueAt: [URL: Date] = [:]

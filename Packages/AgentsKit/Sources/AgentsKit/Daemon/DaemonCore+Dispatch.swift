@@ -194,7 +194,33 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
             case DaemonAPI.Method.personalShared:
+                #if canImport(CryptoKit)
+                return .success(try JSONValue.encoding(withManagedSkills(sharedSnapshot())))
+                #else
                 return .success(try JSONValue.encoding(sharedSnapshot()))
+                #endif
+
+            #if canImport(CryptoKit)
+            case DaemonAPI.Method.catalogSearch:
+                let request = try require(params, as: DaemonAPI.CatalogSearchRequest.self)
+                return .success(try JSONValue.encoding(await catalogSearch(request)))
+
+            case DaemonAPI.Method.catalogPreview:
+                let request = try require(params, as: DaemonAPI.CatalogPreviewRequest.self)
+                return .success(try JSONValue.encoding(await catalogPreview(request)))
+
+            case DaemonAPI.Method.catalogDestinationState:
+                let request = try require(params, as: DaemonAPI.DestinationStateRequest.self)
+                return .success(try JSONValue.encoding(try await catalogDestinationState(request)))
+
+            case DaemonAPI.Method.skillsAdd:
+                let request = try require(params, as: DaemonAPI.SkillAddRequest.self)
+                return .success(try JSONValue.encoding(try await skillsAdd(request)))
+
+            case DaemonAPI.Method.skillsList:
+                let request = try require(params, as: DaemonAPI.SkillsListRequest.self)
+                return .success(try JSONValue.encoding(try skillsList(request)))
+            #endif
 
             case DaemonAPI.Method.runtimesInstall:
                 let request = try require(params, as: DaemonAPI.RuntimeRequest.self)
