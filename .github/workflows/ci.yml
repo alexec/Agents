@@ -1,0 +1,81 @@
+# Builds both apps and runs the package tests, on every push to main and every pull
+# request. The same steps work on a Mac by hand; see the run notes in the report.
+#
+# Tests that need something a runner has not got are gated by their own switches and
+# stay off here: AGENTS_LIVE (+ AGENTS_MCP_HELPER) for real runtimes, AGENTS_BARE for
+# the bare ssh container. Tests that only fail under load are marked `.flakyUnderLoad`
+# (Packages/*/Tests/**/FlakyUnderLoad.swift lists each and why); GitHub sets CI, so the
+# main runs skip them and a last step runs them alone, allowed to fail.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # The project targets the macOS and iOS 27 SDKs, which only this image has.
+    # A preview image while macOS 27 is new; move to macos-27 when it is GA.
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Tools
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+
+      - name: Generate the project
+        run: xcodegen generate
+
+      # The Linux agentsd folder is a build output and gitignored, and the app copies
+      # it. Empty is what a Mac without scripts/build-linux-agentsd.sh has.
+      - name: Make room for the Linux agentsd
+        run: mkdir -p App/Resources/servers
+
+      # One scheme after the other, and with plug-in validation skipped: without it
+      # SwiftTerm's plug-in fails and says nothing. No signing on a runner.
+      - name: Build Agents (macOS)
+        run: >
+          xcodebuild build -project Agents.xcodeproj -scheme Agents
+          -destination 'platform=macOS' -derivedDataPath build/DD
+          -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+
+      - name: Build Remote (iOS Simulator)
+        run: >
+          xcodebuild build -project Agents.xcodeproj -scheme Remote
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
+          -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+
+      - name: Test CodeText
+        run: swift test --package-path Packages/CodeText
+
+      - name: Test AgentsKit
+        run: swift test --package-path Packages/AgentsKit
+
+      # The quarantined tests, alone and with the machine quieter than in a full run.
+      # A failure here is reported and does not fail the build.
+      - name: Quarantined tests (allowed to fail)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          AGENTS_RUN_FLAKY: "1"
+        run: |
+          status=0
+          for package in Packages/CodeText Packages/AgentsKit; do
+            filter=$(scripts/flaky-tests.sh "$package")
+            [ -n "$filter" ] || continue
+            swift test --package-path "$package" --filter "$filter" || status=1
+          done
+          exit $status

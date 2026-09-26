@@ -15,7 +15,7 @@ struct BigContentTests {
         return String(repeating: line, count: repeats)
     }
 
-    @Test func aMegabyteDiffIsReadQuickly() throws {
+    @Test(.flakyUnderLoad) func aMegabyteDiffIsReadQuickly() throws {
         let old = megabyte(of: "let value = 1\n")
         let new = megabyte(of: "let value = 2\n")
         let wire: JSONValue = ["type": "diff", "path": "/tmp/big.swift",
