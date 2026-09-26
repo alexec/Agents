@@ -94,6 +94,10 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         }
     }
 
+    /// A plan's sign-in, the same on the Mac and on every server that relays it (047,
+    /// 056): what one learns about it, the other needs to know. A key keeps its own.
+    public var isShared: Bool { credentialKey.hasSuffix(":sign-in") }
+
     public var returnsAt: Date? {
         switch status {
         case .available: return nil

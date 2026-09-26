@@ -416,6 +416,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ContinueWithRequest.self)
                 return .success(try JSONValue.encoding(try await continueWith(request)))
 
+            case DaemonAPI.Method.poolApplyAllowances:
+                let request = try require(params, as: DaemonAPI.ApplyAllowances.self)
+                return .success(try JSONValue.encoding(applyAllowances(request.states)))
+
             case DaemonAPI.Method.poolModels:
                 let request = try require(params, as: DaemonAPI.PoolModelsRequest.self)
                 return .success(try JSONValue.encoding(await poolModels(request.runtimeIDs)))

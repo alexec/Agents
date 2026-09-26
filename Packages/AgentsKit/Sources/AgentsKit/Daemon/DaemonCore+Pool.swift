@@ -343,6 +343,44 @@ extension DaemonCore {
         return false
     }
 
+    // MARK: Servers (R6, T069)
+
+    /// What another daemon learned about a shared allowance: a plan's sign-in, which a
+    /// server spends through the Mac's relay. The newer word wins (by `since`); a key is
+    /// never taken from elsewhere. Returns whether anything changed, which is also what
+    /// stops the Mac and a server passing the same state back and forth.
+    @discardableResult
+    public func applyAllowances(_ incoming: [AllowanceState]) -> Bool {
+        var changed = false
+        for var state in incoming where state.isShared {
+            if let mine = allowances[state.credentialKey], mine.since >= state.since { continue }
+            // The entry id is this daemon's own, for the same credential.
+            if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
+                state.entryID = entry.id
+            }
+            let wasOut = allowances[state.credentialKey]?.isOut ?? false
+            allowances[state.credentialKey] = state
+            changed = true
+            if let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == state.credentialKey }) {
+                if !wasOut, state.isOut { raiseAllowanceOut(entry, state: state, reason: "learned from another host") }
+                if wasOut, !state.isOut { raiseAllowanceBack(entry, how: "another host") }
+            }
+        }
+        guard changed else { return false }
+        do {
+            try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+        } catch {
+            DaemonLog.shared.write("allowances could not be written: \(error)")
+        }
+        broadcastPool()
+        return true
+    }
+
+    /// The shared allowances as this daemon knows them, for carrying to another.
+    public func sharedAllowances() -> [AllowanceState] {
+        allowances.values.filter(\.isShared).sorted { $0.credentialKey < $1.credentialKey }
+    }
+
     // MARK: Matching models (US6)
 
     /// The model and effort options each runtime offers: what it last said in any folder,
@@ -640,7 +678,9 @@ extension DaemonCore {
         }.sorted { $0.resumeAt < $1.resumeAt }
         var named = titles
         for wait in waiting { named[wait.agentID] = agents[wait.agentID]?.title ?? "Untitled" }
-        return PoolStatus(settings: pool, rows: rows, waiting: waiting, switches: switches, titles: named, at: at)
+        var status = PoolStatus(settings: pool, rows: rows, waiting: waiting, switches: switches, titles: named, at: at)
+        status.shared = sharedAllowances()
+        return status
     }
 
     /// Keep a new pool, whole (contracts/daemon-api.md). Refused, with the sentence the

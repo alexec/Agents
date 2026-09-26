@@ -303,6 +303,9 @@ public enum DaemonAPI {
         public static let agentsSetSwitching = "agents/setSwitching"
         /// The model and effort options each runtime offers, for Matching models (US6).
         public static let poolModels = "pool/models"
+        /// What another daemon learned about a shared allowance (052, R6): the Mac's
+        /// window carries it between the Mac and each server.
+        public static let poolApplyAllowances = "pool/applyAllowances"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -1101,6 +1104,11 @@ public enum DaemonAPI {
             self.options = options
             self.agent = agent
         }
+    }
+
+    public struct ApplyAllowances: Codable, Sendable {
+        public var states: [AllowanceState]
+        public init(states: [AllowanceState]) { self.states = states }
     }
 
     public struct PoolModelsRequest: Codable, Sendable {

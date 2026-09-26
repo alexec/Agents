@@ -878,6 +878,16 @@ final class AppModel {
                                    returning: Agent?.self)
     }
 
+    /// The Mac's word on the plans it relays, to every connected server (052, R6).
+    private func sendSharedAllowances(_ status: PoolStatus) async {
+        let shared = status.shared ?? []
+        guard !shared.isEmpty else { return }
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.poolApplyAllowances,
+                                                     DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+        }
+    }
+
     /// A chat stops waiting for an allowance (052, US4).
     func stopWaiting(_ agentID: UUID) async {
         guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
@@ -1176,6 +1186,9 @@ final class AppModel {
         if let update {
             work.apply(update)
             if case .projectChanged = update { settleProjectSelection() }
+            // And the other way: every server hears what the Mac learned about a plan it
+            // relays (052, R6). Only a newer word changes anything there.
+            if case .poolChanged(let status) = update { await sendSharedAllowances(status) }
             if case .attention(let change) = update { await notifier.apply(change) }
             return
         }
@@ -1313,6 +1326,18 @@ final class AppModel {
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged:
             return
+        case DaemonAPI.Notification.poolChanged:
+            // A server's pool page is not this window's. What it learned about a plan the
+            // Mac relays to it is the Mac's to know too (052, R6): its Codex spends the
+            // Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
+            if let status = try? params?.decode(PoolStatus.self) {
+                let shared = status.shared ?? []
+                if !shared.isEmpty {
+                    _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
+                                               DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+                }
+            }
+            return
         default:
             break
         }
@@ -1362,9 +1387,15 @@ final class AppModel {
                                        DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                                        returning: DaemonAPI.RetentionSetResult.self)
         }
-        // And the pool, so a server chat carries on as a Mac one does (052, R6).
-        if let pool = work.poolStatus?.settings {
-            _ = try? await server.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
+        // And the pool, so a server chat carries on as a Mac one does (052, R6), with
+        // what the Mac knows of the plans it relays.
+        if let status = work.poolStatus {
+            _ = try? await server.call(DaemonAPI.Method.poolSet, status.settings, returning: PoolStatus.self)
+            let shared = status.shared ?? []
+            if !shared.isEmpty {
+                _ = try? await server.call(DaemonAPI.Method.poolApplyAllowances,
+                                           DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+            }
         }
         // The Mac's limits hold on every server too; each keeps to them on its own.
         if let limits = work.costState?.limits {

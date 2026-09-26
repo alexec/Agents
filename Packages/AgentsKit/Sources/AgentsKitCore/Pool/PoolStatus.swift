@@ -12,6 +12,11 @@ public struct PoolStatus: Codable, Hashable, Sendable {
     /// The chats the switches name, for their titles.
     public var titles: [UUID: String]
     public var at: Date
+    /// The shared allowances (a plan's sign-in) as this daemon has actually recorded
+    /// them: what the Mac's window carries to the other daemons (R6). Not the rows,
+    /// which show an entry nobody has used as available as of now. Nil from a daemon
+    /// older than it.
+    public var shared: [AllowanceState]?
 
     public init(settings: PoolSettings, rows: [Row], waiting: [Waiting] = [], switches: [SwitchRecord] = [],
                 titles: [UUID: String] = [:], at: Date) {
