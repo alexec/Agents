@@ -1,49 +1,64 @@
 // Not on Linux: the server build of agentsd has no Network and no use for this (037).
 #if canImport(Network)
+import CryptoKit
 import Foundation
 import Network
 
 /// A way to reach the daemon over the local network.
 ///
-/// This is FR-004 — the direct connection, which the plan scheduled last and which is
-/// the only channel that can exist before the mailbox does. It is the short way to see
-/// the Mac's real agents on a real iPad: both are on the same WiFi, Bonjour finds the
-/// Mac without an address being typed, and `JSONRPCConnection` does not know or care
+/// This is FR-004 — the direct connection. Both ends are on the same WiFi, Bonjour finds
+/// the Mac without an address being typed, and `JSONRPCConnection` does not know or care
 /// that the bytes crossed a network rather than a pipe.
 ///
-/// **It is not the channel this feature ships.** There is no pairing and no
-/// encryption: anything on the same network that can find the service can drive the
-/// daemon. That is why the Mac side is a process the user starts by hand rather than
-/// anything that runs on its own, and why `Envelope` and `Mailbox` still have to be
-/// built. Read this as scaffolding that happens to be the right shape.
+/// Locked with TLS and a pre-shared key since the security review's Phase 3: the key is
+/// what this device's key and the Mac's share, or, once, the pairing code's (`LinkTLS`).
+/// A Mac that cannot finish the handshake is not this device's Mac, whatever it calls
+/// itself on Bonjour.
 public final class NetworkLink: DaemonLink {
     /// The Bonjour service the Mac advertises.
     public static let serviceType = "_agents._tcp"
 
-    private let howLongToLook: Duration
+    /// The identity and key to lock the connection with, asked for as it is made so a
+    /// Mac key learnt a moment ago is used.
+    public typealias Lock = @Sendable () throws -> (identity: String, key: SymmetricKey)
 
-    public init(howLongToLook: Duration = .seconds(10)) {
+    private let howLongToLook: Duration
+    private let lock: Lock
+    private let name: String?
+
+    /// `name` is the Mac the pairing code named; with it, other Macs on the network, and
+    /// a scratch bridge beside the real one, are passed over.
+    public init(howLongToLook: Duration = .seconds(10), name: String? = nil, lock: @escaping Lock) {
         self.howLongToLook = howLongToLook
+        self.name = name
+        self.lock = lock
     }
 
     public func transport() async throws -> any LineTransport {
+        let (identity, key) = try lock()
         let endpoint = try await findTheMac()
-        let connection = NWConnection(to: endpoint, using: .tcp)
+        let connection = NWConnection(to: endpoint, using: LinkTLS.client(identity: identity, key: key))
         let transport = NWTransport(connection: connection)
         try await transport.waitUntilReady()
         return transport
     }
 
-    /// The first Mac that answers. One person's own network, so the first is the one.
+    /// The Mac the pairing code named, or with no name the first that answers.
     private func findTheMac() async throws -> NWEndpoint {
         let browser = NWBrowser(for: .bonjour(type: Self.serviceType, domain: nil),
                                 using: .tcp)
         defer { browser.cancel() }
         return try await withCheckedThrowingContinuation { continuation in
             let answered = ManagedAtomicFlag()
+            let name = self.name
             browser.browseResultsChangedHandler = { results, _ in
-                guard let first = results.first, answered.set() else { return }
-                continuation.resume(returning: first.endpoint)
+                let wanted = results.first { result in
+                    guard let name else { return true }
+                    if case .service(let found, _, _, _) = result.endpoint { return found == name }
+                    return false
+                }
+                guard let wanted, answered.set() else { return }
+                continuation.resume(returning: wanted.endpoint)
             }
             browser.stateUpdateHandler = { state in
                 if case .failed(let error) = state, answered.set() {

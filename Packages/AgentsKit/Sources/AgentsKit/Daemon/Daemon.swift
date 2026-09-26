@@ -93,7 +93,8 @@ public final class Daemon: @unchecked Sendable {
             roles: roles,
             handler: { context, method, params in
                 await core.handle(method: method, params: params,
-                                  from: context.surface, connection: context.id, peer: context.peer ?? -1)
+                                  from: context.surface, connection: context.id, peer: context.peer ?? -1,
+                                  role: context.role)
             })
         self.server = server
         await core.setBroadcaster { method, params in
@@ -101,6 +102,9 @@ public final class Daemon: @unchecked Sendable {
         }
         await core.setAddressedBroadcaster { method, params, wanted in
             server.broadcast(method, params, to: wanted)
+        }
+        await core.setConnectionCloser { wanted in
+            server.closeConnections(where: wanted)
         }
         // Shell output goes out the same door as every other notification.
         await core.connectShells()
