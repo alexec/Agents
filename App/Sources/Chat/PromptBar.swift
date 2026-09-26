@@ -692,14 +692,14 @@ struct PromptBar: View {
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
         }
     }
 
     @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
         ForEach(shown.filter { !$0.isAboutPermission }) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+            OptionMenu(option: option, chosen: binding(for: option), labelled: true)
         }
     }
 
@@ -804,11 +804,11 @@ struct PromptBar: View {
     private var reachTitle: String {
         let folders = model.draftFolders.count
         let servers = model.draftServers.count
-        if folders == 0 && servers == 0 { return "Reach" }
+        if folders == 0 && servers == 0 { return "Reach: this folder" }
         var parts: [String] = []
         if folders > 0 { parts.append("\(folders + 1) folders") }
         if servers > 0 { parts.append("\(servers) MCP") }
-        return parts.joined(separator: " · ")
+        return "Reach: " + parts.joined(separator: " · ")
     }
 
     /// Said in the runtime list, so a runtime that cannot be used says why there.
