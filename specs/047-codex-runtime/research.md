@@ -292,3 +292,39 @@ through `current`.
   `{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"in_app_local_automation":false,"memories":false,"multi_agent":false,"sleep_tool":false}}`.
   `scripts/runtime-tools.sh codex` then reports 5 of 5 removed, the kept tool present, the
   6 residue named, and 0 unexplained.
+
+## Measured on agents-bare (2026-09-25, T008): a server and an OpenAI key
+
+The pinned toolset was installed by hand into `/tmp/codex-spike`: Node linux-arm64 checked
+against the manifest's SHA-256, then `npm ci` of the lock in **4.2 s**, which pulled only
+`codex-linux-arm64`. ACP was then driven over ssh from this Mac, with the key sent on stdin
+into the adapter's environment and never on a command line.
+
+- **`NO_BROWSER=1`**: `authMethods` is `api-key`, `chat-gpt-device-code`. There is no
+  `chat-gpt` (FR-020).
+- **Key in the environment alone**: `session/new` gives `-32000` "Authentication required".
+  **With `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}`** the session opens.
+- **But the adapter's api-key sign-in saves the key**: it writes
+  `~/.codex/auth.json` = `{"auth_mode":"apikey","OPENAI_API_KEY":"sk-…"}` (0600), and later runs
+  reuse it, even with a different key in `CODEX_API_KEY`. That breaks FR-019. The file was
+  deleted from the box straight away.
+- `CODEX_CONFIG={"cli_auth_credentials_store":"ephemeral"}` does **not** help: it is thread
+  config, and the file is still written.
+- **`CODEX_HOME=<app-owned folder>` whose `config.toml` says
+  `cli_auth_credentials_store = "ephemeral"`** does: no `auth.json` is written, and a search of
+  that home for the key (its SQLite stores included) finds nothing. The session opens and
+  reaches OpenAI.
+- **Decision (servers, a key lent)**: start Codex with `CODEX_HOME=<server root>/runtimes/codex-home`
+  (0700; the app writes only its `config.toml`), `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}`,
+  `CODEX_API_KEY` = the lent key with `OPENAI_API_KEY` cleared, and `NO_BROWSER=1`. When the
+  server is "own sign-in only", none of that: Codex uses the server's own `~/.codex`.
+  D6's rule against `CODEX_HOME` is about the person's home on their Mac; the app's own folder
+  on a server signs nobody out.
+- **Plan limit (R7)**: with the key's account out of credit, `session/prompt` answered
+  `-32603` with `data: {"message":"Quota exceeded. Check your plan and billing details.",
+  "codexErrorInfo":"usageLimitExceeded"}`. OpenAI's own answer for that key was
+  `insufficient_quota` / `credit_balance_exhausted`. So a real server turn waits for Alex to
+  add credit to that account. Everything short of the model's reply is proven.
+- **Key check (FR-017)**: `GET https://api.openai.com/v1/models` answered 200 for that key even
+  with no credit, so "Works" in Settings means the key is valid, not that it has credit. The
+  quota ending says the rest.
