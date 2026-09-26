@@ -12,12 +12,11 @@ Gemini's.
 
 ## R1. Package, command and flag
 
-- **Decision (revised 2026-09-25)**: the start-up installer (another lane) installs
-  `@google/gemini-cli@0.61.0` and a pinned Node on the Mac; the app starts
-  `<installed node> <installed package>/bundle/gemini.js --acp`. id `gemini`, name `Gemini`.
-  Alex first chose npx, then moved Gemini to the installer, as he did for Codex (047). The
-  measurements below were taken through npx and hold for the installed package: same bundle,
-  same flag.
+- **Decision (revised twice on 2026-09-25)**: `Runtime(id: "gemini", name: "Gemini",
+  executable: "gemini", arguments: ["--acp"], install: .toolset(runtimeID: "gemini"))`, run only
+  from the app's own toolset (R12). Alex first chose npx, then "the start-up installer", which
+  turned out to be 048's set-up page (merged `ee64697`). The measurements below were taken
+  through npx and hold for the installed package: same bundle, same flag.
 - **Measured**: the package's only bin is `gemini` (`bundle/gemini.js`); `engines.node` is
   `>=20`; unpacked size 98 MB (95 MB on disk once fetched, ~100 MB with its three
   dependencies `@github`, `@lydell`, `node-pty`). `--help` lists `--acp` ("Starts the agent in
@@ -27,10 +26,9 @@ Gemini's.
 - **Pinned (D5)**: one version per app version, the same on the Mac and servers, moved by
   `scripts/update-gemini-toolset.sh`. The ACP surface moves between releases (R3–R6 are
   version-specific; `--experimental-acp` is already deprecated).
-- **One manifest for both places**: `App/Resources/toolsets/gemini/manifest.json` (043's
-  format) carries Node's checksums for `darwin-arm64` and `darwin-x64` as well as the two Linux
-  ones, so the installer and 043's server install read the same pin. Proposed to the installer
-  lane as its entry format; if it chooses another, the Gemini entry is written in that.
+- **One toolset folder for both places**: `App/Resources/toolsets/gemini/` in 043's format
+  (`manifest.json`, `package.json`, lock) plus 048's `mac-node.json` for the Mac's Node, so the
+  set-up page and 043's server install read the same pin, exactly as Claude's folder does.
 - **Alternatives**: npx through the person's Node (Alex's first answer, replaced); `@latest`
   (rejected, above); `--experimental-acp` (deprecated); a `gemini` on the PATH (never used, R11).
 
@@ -236,3 +234,50 @@ is a sentence and not a stack.
 untouched and unused (as for Claude and its adapter). A person who wants a different version
 uses it from their terminal. Recorded because Cursor/Grok taught that name collisions on PATH
 cost a day.
+
+## R12. 048's set-up page, and what Gemini needs from it
+
+Read on main at `ee64697`. 048 made "the start-up installer" concrete:
+
+- **The page**: `InstallAgentsSheet` at start-up, the same `RuntimeInstallRow` in Settings ▸
+  Agents and under an empty project list. Rows come from `runtimes/list`; **Install** calls
+  `runtimes/install`, which only a Mac window may do; progress and the ending arrive on
+  `runtime/changed` as `.installing(progress:)` / `.installFailed(reason:)`. The sheet is
+  offered once per *agent not yet offered* (`InstallOffer`), so adding Gemini makes it appear
+  once more for everyone, listing Gemini. **Nothing to build for that**: it follows from the
+  catalog entry.
+- **The recipe**: `RuntimeInstall.toolset(runtimeID:)` is Claude's: `MacToolsetInstaller`
+  downloads Node (checked against `mac-node.json`), runs `npm ci` against the app's lock into
+  `<root>/tools/<id>/<toolset id>/`, writes a shim, marks `ok`, points `current`. Gemini uses
+  the same recipe. `.npmGlobal("@google/gemini-cli")` was rejected: it needs the person's npm
+  and writes into their global folder, and its `gemini` would be the person's own (D1).
+
+What is Claude-only in 048's code, each becoming a per-toolset value:
+
+| Where | Today | For Gemini |
+|---|---|---|
+| `RuntimeInstaller.toolset: MacToolsetInstaller?` | one toolset | `toolsets: [runtimeID: MacToolsetInstaller]`, loaded from every `toolsets/*` folder in the bundle |
+| `MacToolsetInstaller.install` returns `bin/npx`; `Toolset.shimLines` | shim named `npx`, ignores its arguments | shim named `bin/<runtime.executable>` (`bin/gemini`); manifest gains `forwardsArguments` (Gemini true, Claude false), and the shim ends `"$@"` when true, so `--acp --policy <file>` arrive |
+| `MacToolsetInstaller.Failure.sentence`, progress "Installing the Claude adapter" | "Claude" in the words | the runtime's name from the catalog |
+| `ToolsetInstaller` (server) shim | `bin/npx` | same change as the Mac's, one `shimLines` for both |
+
+**App's copy only (Alex, 2026-09-25).** `RuntimeDiscovery.locate` looks in the server toolset,
+then the PATH, then the Mac toolset. For Gemini the PATH step is skipped: `Runtime` gains
+`usesAppCopyOnly: Bool` (default false; true for Gemini), and `locate` goes straight from the
+server toolset to `appToolset(for:)`. A person's `gemini` then neither ticks the row nor runs.
+Named for what it does, not for Gemini, so no runtime-id branch.
+
+**A newer pin.** 048's `installRuntime` returns early when `locate` finds anything, and
+`appToolset` accepts any whole `current`. So when an app update bumps Gemini's pin, the old
+build keeps running and nothing offers the new one: fine for Claude's adapter, not for D5. The
+toolset id is a hash of manifest + lock, and each installed folder keeps its `manifest.json`,
+so "outdated" is `current`'s id ≠ the bundle's id. **Decision**: discovery reports it as
+available (it still works), and the row gains **Update** beside the tick when outdated; Install
+and Update run the same `install`. Shared with Claude; small, and it lives in 048's files.
+
+**Keeping a running agent's build (FR-003a).** `MacToolsetInstaller.removeOthers` deletes every
+other toolset folder at the end of an install. Gemini's bundle loads its chunks lazily (the
+`bundle/` holds ~80 `chunk-*.js` files), so deleting a folder under a running agent would break
+it mid-turn. **Decision**: the daemon passes the ids in use (agents holding the runtime record
+the toolset path they started from) and `removeOthers` skips them; the next install, or the
+next daemon start, removes them once unused.
