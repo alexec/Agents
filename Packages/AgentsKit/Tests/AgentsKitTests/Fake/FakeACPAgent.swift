@@ -17,6 +17,10 @@ actor FakeACPAgent {
         /// How long a turn takes. Zero for almost every test; a real duration for the
         /// ones about what happens while the agent is still working.
         var turnDelay: Duration = .zero
+        /// Hold every turn until the test opens this. What a test about "while it is
+        /// still working" should use rather than `turnDelay`: the turn cannot end
+        /// early on a slow machine, and the test does not wait on a clock.
+        var gate: TurnGate?
         /// Send `updates` on the first turn only. A real runtime never sends the same
         /// tool call again on a later turn; one that replays its script does, and a
         /// test about tool calls then reads the replay as the call starting over (035).
@@ -223,6 +227,9 @@ actor FakeACPAgent {
         if let permission = script.permission {
             permissionOutcome = try? await connection.call(ACP.ClientMethod.requestPermission, permission)
         }
+        // Held after everything the turn does and before it ends: a test sees the turn
+        // at work, and it ends when the test says.
+        if let gate = script.gate { await gate.pass() }
         var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
         if let usage = script.usage { result["usage"] = usage }
         return .success(.object(result))

@@ -14,41 +14,6 @@ struct ContentView: View {
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
 
-    /// What is open on top of the project page: a conversation, or a workflow.
-    enum Page: Hashable {
-        case agent(UUID)
-        /// `Workflow.id` — the folder's path and the file's name, so two projects with
-        /// a workflow of the same name cannot collide.
-        case workflow(String)
-    }
-
-    /// What is being read, as a path of nothing or one.
-    ///
-    /// A chat is somewhere you go from the project and come back out of, rather than a
-    /// column sitting beside it, so it is a push and the back button is the way home.
-    /// A workflow is the same kind of thing — you open one to read it and you leave —
-    /// so it is the same kind of push, onto the same stack.
-    ///
-    /// **Read in `body`, not inside the binding's getter.** Observation registers what
-    /// a body actually reads while it runs, and a getter handed to `NavigationStack` is
-    /// run later and elsewhere. `selection` survived that because the body reads it in
-    /// three other places anyway; `openWorkflow` has nowhere else, so a getter was all
-    /// it had, and setting the field redrew nothing and opened nothing.
-    private var pages: [Page] {
-        if let id = model.openWorkflow { return [.workflow(id)] }
-        return model.selection.map { [.agent($0)] } ?? []
-    }
-
-    /// Where navigation writes back to. The only place either field is set from the
-    /// stack, which is what keeps the two exclusive: no path through here leaves both.
-    private func show(_ page: Page?) {
-        switch page {
-        case .agent(let id): model.selection = id; model.openWorkflow = nil
-        case .workflow(let id): model.openWorkflow = id; model.selection = nil
-        case nil: model.selection = nil; model.openWorkflow = nil
-        }
-    }
-
     /// Put the file the selected agent asked about in front of the user.
     ///
     /// Only for the agent on screen. An agent working in another conversation keeps
@@ -88,77 +53,86 @@ struct ContentView: View {
         }
     }
 
+    private var isShowingActivity: Bool {
+        model.showsEvents || model.showsResources || model.showsSpending
+    }
+
+    /// The projects column, the same in both layouts.
+    private var projects: some View {
+        @Bindable var model = model
+        return ProjectListView(selection: $model.sidebarItem)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            // A server asked for a credential there is none of (043).
+            .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+            // A known server with a new key: rebuilt, or not what it says (043).
+            .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
+                                 set: { model.hosts.rebuiltAsk = $0 })) { host in
+                RebuiltServerSheet(host: host).paperSheet()
+            }
+            // Agents missing at start-up, offered once each (048). Closed any way at
+            // all, what was missing counts as offered.
+            .sheet(isPresented: $model.isOfferingInstall,
+                   onDismiss: { model.rememberInstallOffer() }) {
+                InstallAgentsSheet().paperSheet()
+            }
+    }
+
+    /// What the right-hand column shows: a page about all the work, a workflow, the
+    /// chat picked in the middle column, or — with nothing picked — the project itself.
+    @ViewBuilder
+    private func detail(inPaneOf width: CGFloat) -> some View {
+        if model.showsEvents {
+            EventsView().paperGround()
+        } else if model.showsResources {
+            ResourcesView().paperGround()
+        } else if model.showsSpending {
+            SpendingView().paperGround()
+        } else if let id = model.openWorkflow {
+            // No files pane and no sidebar toggle: a workflow has no agent to have
+            // asked about a file, so there would be nothing for either to show.
+            WorkflowPage(workflowID: id).paperGround()
+        } else if model.selection != nil {
+            chat(inWindowOf: width)
+        } else {
+            // The project on its own: a new session, its pull requests, workflows and
+            // worktrees. Its sessions are the middle column's.
+            ProjectAgentsView(selection: Binding(get: { model.selection },
+                                                 set: { model.selection = $0 }))
+                .paperGround()
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
-        GeometryReader { window in
-            // Two columns: the projects, and the project.
-            NavigationSplitView(columnVisibility: $columns) {
-                ProjectListView(selection: $model.sidebarItem)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-                    // A server asked for a credential there is none of (043).
-                    .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
-                    // A known server with a new key: rebuilt, or not what it says (043).
-                    .sheet(item: Binding(get: { model.hosts.rebuiltAsk },
-                                         set: { model.hosts.rebuiltAsk = $0 })) { host in
-                        RebuiltServerSheet(host: host).paperSheet()
+        // Three columns, the way Mail and Notes are laid out: the projects, the
+        // sessions in the one picked, and what is being read. Picking a session shows
+        // its chat beside the list rather than pushing it over the project, so moving
+        // between two chats is one click, and the list stays in sight.
+        Group {
+            if isShowingActivity {
+                // Events, Resources and Spending are about all of the work, so the
+                // sessions of one project have no place beside them: two columns.
+                NavigationSplitView(columnVisibility: $columns) {
+                    projects
+                } detail: {
+                    detail(inPaneOf: 0)
+                }
+            } else {
+                NavigationSplitView(columnVisibility: $columns) {
+                    projects
+                } content: {
+                    SessionsColumn(selection: $model.selection)
+                        .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
+                } detail: {
+                    GeometryReader { pane in
+                        detail(inPaneOf: pane.size.width)
                     }
-                    // Agents missing at start-up, offered once each (048). Closed any way at
-                    // all, what was missing counts as offered.
-                    .sheet(isPresented: $model.isOfferingInstall,
-                           onDismiss: { model.rememberInstallOffer() }) {
-                        InstallAgentsSheet().paperSheet()
-                    }
-            } detail: {
-                // Spending is a page here rather than a window of its own, so closing
-                // it is picking a project again and the window keeps its place. It
-                // sits outside the conversation stack deliberately: a chat is pushed
-                // from a project and popped back to it, and the bill is not on that
-                // path.
-                if model.showsEvents {
-                    EventsView()
-                        .paperGround()
-                } else if model.showsResources {
-                    ResourcesView()
-                        .paperGround()
-                } else if model.showsSpending {
-                    SpendingView()
-                        .paperGround()
-                } else {
-                    // `pages` is read here, in the body, so that opening a workflow
-                    // invalidates it. See the note on `pages`.
-                    let path = pages
-                    // Written back only while this stack's project is still the one
-                    // picked: the stack being replaced (see `.id` below) pops itself on
-                    // the way out, and that pop would close the chat just opened.
-                    let key = model.selectedProjectKey
-                    NavigationStack(path: Binding(get: { path }, set: { pages in
-                        guard model.selectedProjectKey == key else { return }
-                        show(pages.last)
-                    })) {
-                        ProjectAgentsView(selection: $model.selection)
-                            .paperGround()
-                            .navigationDestination(for: Page.self) { page in
-                                switch page {
-                                case .agent:
-                                    chat(inWindowOf: window.size.width)
-                                // No files pane and no sidebar toggle: a workflow has
-                                // no agent to have asked about a file, so there would
-                                // be nothing for either to show.
-                                case .workflow(let id):
-                                    WorkflowPage(workflowID: id)
-                                        .paperGround()
-                                }
-                            }
-                    }
-                    // One stack per project. Opening a chat in another project (Go ▸
-                    // Next Needing Attention, a banner, Resources) changes the project and
-                    // the chat at once; a stack kept across that shows the new project's
-                    // page and never pushes the chat. A fresh one starts on the path.
-                    .id(model.selectedProjectKey)
+                    // The chat and the inspector share this column now, not the window,
+                    // so this is the width the inspector measures itself against.
+                    .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
                 }
             }
         }
-        .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)

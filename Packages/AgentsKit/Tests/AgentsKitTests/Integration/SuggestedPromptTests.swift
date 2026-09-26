@@ -38,7 +38,7 @@ struct SuggestedPromptTests {
     /// there rather than picking a new one up. A fixed sleep hits that window now and
     /// then, which is the worst kind of test: it passes alone and fails in a full run.
     private func settle(_ core: DaemonCore, _ id: UUID) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        let deadline = ContinuousClock.now.advanced(by: max(.seconds(5), Eventually.timeout))
         while ContinuousClock.now < deadline {
             if let agent = await core.agent(id),
                !agent.state.hasTurnInFlight, agent.queuedPrompts.isEmpty,

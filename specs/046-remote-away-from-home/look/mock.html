@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#e8e6e1;font-family:-apple-system,"SF Pro Text",sans-serif;display:flex;gap:36px;padding:28px;align-items:flex-start}
+.col{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap{font:600 15px -apple-system;color:#333;width:390px;text-align:center}
+.sub{font:13px -apple-system;color:#666;width:390px;text-align:center;margin-top:-6px}
+.phone{width:390px;height:844px;background:#f7f5f0;border-radius:48px;box-shadow:0 0 0 10px #1c1c1e,0 8px 30px rgba(0,0,0,.25);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.status{height:50px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 6px;font:600 16px -apple-system}
+.nav{display:flex;align-items:center;gap:10px;padding:6px 16px}
+.pill{background:#fff;border-radius:22px;height:44px;display:flex;align-items:center;padding:0 14px;box-shadow:0 1px 3px rgba(0,0,0,.08);font:600 16px -apple-system}
+.title{font:600 17px -apple-system;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner{display:flex;align-items:center;gap:8px;padding:8px 16px;font:13px -apple-system;color:#6d6a64;background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.06)}
+.banner b{color:#3d5a80;font-weight:600}
+.body{flex:1;padding:8px 22px;font:18px "Iowan Old Style",Georgia,serif;line-height:1.35;color:#1d1d1d;overflow:hidden}
+.body code{font:16px "SF Mono",Menlo,monospace}
+.muted{color:#8a877f;font-size:16px}
+.card{border:1px solid #d8d4cb;border-radius:14px;background:#fff;padding:12px 14px;margin:12px 0;font:15px -apple-system}
+.card .q{font-weight:600;margin-bottom:10px}
+.btns{display:flex;gap:8px}.btn{flex:1;text-align:center;padding:9px;border-radius:10px;background:#efece6;font-weight:600}.btn.p{background:#3d5a80;color:#fff}
+.composer{margin:8px 14px 6px;background:#fff;border-radius:22px;height:56px;display:flex;align-items:center;padding:0 10px 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.08);font:18px Georgia,serif;color:#aaa;gap:8px}
+.composer span{flex:1}.circ{width:40px;height:32px;border-radius:16px;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;color:#333;font-size:15px}
+.circ.off{opacity:.3}.send{background:#bbb;color:#fff;border:none}
+.chips{display:flex;gap:8px;padding:6px 14px 28px;font:14px -apple-system}.chip{background:#fff;border-radius:16px;padding:6px 12px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg{margin:8px 12px;background:#e9e6e0;border-radius:9px;display:flex;padding:2px;font:13px -apple-system}
+.seg div{flex:1;text-align:center;padding:6px}.seg .on{background:#fff;border-radius:7px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 44px;gap:10px;color:#6d6a64;margin-top:-80px}
+.empty .icon{font-size:38px;opacity:.6}
+.empty .h{font:600 17px -apple-system;color:#1d1d1d}
+.empty .t{font:15px -apple-system;line-height:1.4}
+hr{border:0;border-top:1px solid rgba(0,0,0,.08);margin:0}
+</style></head><body>
+
+<div class="col"><div class="cap">A · Chat, away</div><div class="sub">The mark sits where "Last heard…" sits today. Paperclip greyed; everything else works.</div>
+<div class="phone">
+ <div class="status"><span>17:25</span><span>▂▄▆ 5G ▭</span></div>
+ <div class="nav"><div class="pill">‹</div><div class="title">Low temperature…</div><div class="pill">▤ &nbsp;📄 &nbsp;⋯</div></div>
+ <div class="banner">☁︎ <b>Away</b> — slower, through iCloud</div>
+ <div class="body">
+  <p>I added <code>testLowInCelsius</code>, which checks that 50°F converts to 10°C, and both tests pass.</p>
+  <p class="muted">Bash — swift test</p>
+  <div class="card"><div class="q">Allow <code style="font-size:14px">git commit -m "Low in Celsius"</code>?</div>
+   <div class="btns"><div class="btn">Deny</div><div class="btn">Always</div><div class="btn p">Allow</div></div></div>
+ </div>
+ <div class="composer"><span>Say what next</span><div class="circ off">📎</div><div class="circ">🎙</div><div class="circ send">↑</div></div>
+ <div class="chips"><div class="chip">Auto ⌄</div><div class="chip">Default (recommended) ⌄</div></div>
+</div></div>
+
+<div class="col"><div class="cap">B · Terminal pane, away</div><div class="sub">Files, Terminal and Page stay in the switch; each says the same thing. Turns live by itself back home.</div>
+<div class="phone">
+ <div class="status"><span>17:26</span><span>▂▄▆ 5G ▭</span></div>
+ <div class="nav"><div class="pill">‹</div><div class="title" style="text-align:center">Terminal</div><div style="width:44px"></div></div>
+ <div class="banner">☁︎ <b>Away</b> — slower, through iCloud</div>
+ <div class="seg"><div>Files</div><div class="on">Terminal</div><div>Page</div></div><hr>
+ <div class="empty"><div class="icon">⌂</div><div class="h">Needs the same network as your Mac</div>
+  <div class="t">The terminal, the live page and files open here when your phone is on your Mac's Wi‑Fi. Chat, questions and starting agents work from anywhere.</div></div>
+</div></div>
+
+<div class="col"><div class="cap">C · Never paired, away</div><div class="sub">A device that has not yet been on the Mac's network. Nothing goes through iCloud.</div>
+<div class="phone">
+ <div class="status"><span>17:27</span><span>▂▄▆ 5G ▭</span></div>
+ <div class="nav"><div class="title" style="font-size:30px;font-weight:700;padding:8px 6px">Projects</div></div>
+ <div class="banner">📶 Not connected to your Mac yet</div>
+ <div class="empty"><div class="icon">⌂</div><div class="h">Open Agents once on your Mac's Wi‑Fi</div>
+  <div class="t">After that, your phone reaches your Mac from anywhere, through your iCloud.</div></div>
+</div></div>
+</body></html>

@@ -39,13 +39,15 @@ struct WorkflowToolTests {
         Check the dependencies for security advisories.
         """
 
-    /// A core with one agent in a project, and the token that speaks for it.
-    private func core(_ locations: StoreLocations, in project: URL)
+    /// A core with one agent in a project, and the token that speaks for it. The
+    /// agent's turn is held open unless `endingItsTurn`, so its token stays bound for as
+    /// long as the test is making calls with it.
+    private func core(_ locations: StoreLocations, in project: URL, endingItsTurn: Bool = false)
         async throws -> (DaemonCore, String, UUID) {
         let store = try AgentStore(locations: locations)
         let core = DaemonCore(store: store, locations: locations,
                               discovery: .findsEverything,
-                              launcher: FakeLauncher(script: FakeACPAgent.Script()))
+                              launcher: FakeLauncher(script: FakeACPAgent.Script(gate: endingItsTurn ? nil : TurnGate())))
         await core.loadFromDisk()
         let agentID = try await core.start(DaemonAPI.StartRequest(
             runtimeID: "claude", cwd: project, prompt: "Do a thing"))
@@ -131,7 +133,7 @@ struct WorkflowToolTests {
     @Test func writingAnEffortAndFastModeIsTakenAndAnUnofferedOneIsSaidAtOnce() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let (core, token, agentID) = try await core(locations, in: work)
+        let (core, token, agentID) = try await core(locations, in: work, endingItsTurn: true)
         await rememberClaude(core, in: work)
         // Its turn over and its runtime let go first, so the session ending cannot
         // drop the token between one write and the next.
