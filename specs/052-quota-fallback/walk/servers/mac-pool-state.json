@@ -1,0 +1,143 @@
+{
+  "at": 812139601.294446,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      "state": {
+        "credentialKey": "grok:sign-in",
+        "entryID": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812139593.156496,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812143193.156496,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    },
+    {
+      "chats": 1,
+      "entry": {
+        "id": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "learnedFrom": "person",
+        "rateLimitStreak": [],
+        "since": 812139601.294446,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "available": {}
+        }
+      }
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      {
+        "id": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "shared": [
+    {
+      "credentialKey": "grok:sign-in",
+      "entryID": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+      "learnedFrom": "typedFailure",
+      "rateLimitStreak": [],
+      "since": 812139593.156496,
+      "spent": {
+        "known": {}
+      },
+      "status": {
+        "out": {
+          "retryAfter": 812143193.156496,
+          "why": "allowanceSpent"
+        }
+      }
+    }
+  ],
+  "switches": [
+    {
+      "agentID": "00644021-5E9D-44D5-BDA7-79CCDF993950",
+      "at": 812139593.234,
+      "billing": {
+        "allowance": {}
+      },
+      "carried": [
+        {
+          "from": "grok-smart",
+          "name": "Model",
+          "optionID": "model",
+          "source": {
+            "runtimeDefault": {}
+          },
+          "to": "copilot-smart"
+        },
+        {
+          "from": "default",
+          "name": "Mode",
+          "optionID": "mode",
+          "source": {
+            "sameValue": {}
+          },
+          "to": "default"
+        }
+      ],
+      "dropped": [],
+      "from": {
+        "model": "grok-smart",
+        "runtimeID": "grok"
+      },
+      "fromReturnsAt": 812143193.156,
+      "id": "E75C2383-0EE5-4224-A016-F69BBA96D5EC",
+      "reason": "allowanceSpent",
+      "to": {
+        "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "mode": "default",
+        "runtimeID": "copilot"
+      }
+    }
+  ],
+  "titles": [
+    "00644021-5E9D-44D5-BDA7-79CCDF993950",
+    "Plan the fix."
+  ],
+  "waiting": []
+}

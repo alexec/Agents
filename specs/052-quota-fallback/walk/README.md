@@ -247,3 +247,44 @@ The rules behind it are covered by `MatchingModelsTests` and `PoolModelsTests`:
 Found on the way: the run-app launch opened a window that never started its daemon, after
 earlier scratch windows had been killed. Opening with `-ApplePersistenceIgnoreState YES` (the
 memory note's workaround) worked.
+
+## Servers: a plan out on one side is out on the other (T070), 2026-09-26
+
+The run was on the devbox (`agents@127.0.0.1:2222`, Linux aarch64), with this branch's Linux
+`agentsd` built by `scripts/build-linux-agentsd.sh`. It ran from its own path and root
+(`~/agentsd-052 --root ~/r052 --serve`), so the box's own install was left alone. It was
+reached over a real `ssh -L` socket forward. The stand-ins were on both sides: on the box in
+`~/.local/bin` (the server found them), and on the Mac through `AGENTS_TEST_SEARCH_PATHS` on a
+headless Mac daemon. Both pools were Grok (SuperGrok) then Copilot.
+
+The screen was locked, and a locked session exposes no window to accessibility (the tree comes
+back as the application repeated), so the window could not add the server. The window's part
+was played by hand with the same calls it makes: `pool/set` to the server as on connect, and
+`PoolStatus.shared` from one daemon to `pool/applyAllowances` on the other. The window's own
+relay code (`AppModel.receivedFromServer`, `sendSharedAllowances`) is not exercised here. It
+builds, and the daemon side is what `ServerAllowanceTests` covers.
+
+1. A server chat on Grok: "Tidy the README." It answered.
+2. A Mac chat on Grok was refused (`spent`). The Mac's Grok was out, and the chat moved to
+   Copilot. The Mac's `shared` was `[grok:sign-in out]` (`servers/mac-pool-state.json`).
+3. `pool/applyAllowances` on the server with it answered `true`, and again `false`: the same
+   word twice changes nothing. The server's rows were Grok out, Copilot available.
+4. The server chat was prompted: "Now make the change." It moved to Copilot **before** its turn,
+   with no Grok refusal in its transcript. Copilot answered, "I was handed the conversation so
+   far (516 characters). You said: Now make the change." (`servers/server-transcript.json`).
+5. The other way: Copilot was set `spent` on the box and the server chat prompted again. The
+   server's `shared` then held both plans out. Applied on the Mac, it answered `true`: the Mac's
+   rows were both out, with `cost.allowance_out` "learned from another host"
+   (`servers/server-pool-state.json`).
+
+Cleaned up afterwards: the forward, both daemons, `~/r052`, `~/agentsd-052` and the box's
+stand-ins.
+
+Found and fixed:
+- **`cost.allowance_out` gave the app's retry time as `until`.** It now gives `until` only for a
+  time the provider gave, and `retry_after` otherwise.
+- **A race that could lose a prompt.** Four places wrote an agent's record back after an await,
+  over whatever had changed meanwhile: starting a wait, the chat's switch, adjust, and the
+  switch itself. A prompt queued, or a Stop waiting, in that gap was undone. Each now writes
+  with no await between reading and writing. `AllowanceWaitTests` failed about one run in
+  three before the fix, and passed 18 runs out of 19 after it.

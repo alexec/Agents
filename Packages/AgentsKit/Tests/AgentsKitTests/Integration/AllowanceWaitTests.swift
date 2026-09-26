@@ -58,7 +58,8 @@ struct AllowanceWaitTests {
         clock.now = back.addingTimeInterval(-1800)
         let (core, work, launcher) = try await core([try spentUntilBack(), try spentNoTime()], clock: clock)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the redirect"))
-        await eventually("it is waiting") { await core.agent(id)?.allowanceWait != nil }
+        let waiting = await eventually("it is waiting") { await core.agent(id)?.allowanceWait != nil }
+        if !waiting { Issue.record("notes: \(try await notes(core, id))") }
         return (core, id, clock, launcher, work.deletingLastPathComponent())
     }
 

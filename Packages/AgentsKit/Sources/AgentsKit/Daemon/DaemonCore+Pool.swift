@@ -303,17 +303,19 @@ extension DaemonCore {
                                   fromReturnsAt: switchReason == .byHand ? nil
                                       : allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
 
+        // Everything awaited first, then the record read fresh and written back with no
+        // await between, so a prompt queued meanwhile is not written over.
+        let commands = await made.session.commands
         agent = agents[agentID] ?? agent
         agent.runtimeID = entry.runtimeID
         agent.runtimeSessionID = made.sessionID
         agent.poolEntryID = pool.entry(entry.id) == nil ? nil : entry.id
         agent.startOptions = StartOptions(values: carry.values, extraArguments: [])
         agent.advertisedOptions = options
-        agent.availableCommands = await made.session.commands
-        remember(OptionCache.Entry(options: options, commands: agent.availableCommands),
+        agent.availableCommands = commands
+        remember(OptionCache.Entry(options: options, commands: commands),
                  for: OptionCache.key(runtimeID: entry.runtimeID, cwd: agent.cwd, mcpServers: agent.mcpServers))
-        agents[agentID] = agent
-        try? await store.save(agent)
+        changed(agent)
         live[agentID] = made.session
         bindAppToken(made.appToken, to: agentID)
         needsBriefing.insert(agentID)
@@ -510,8 +512,6 @@ extension DaemonCore {
         }
         var changed = agent
         for (id, value) in request.choices { changed.startOptions.values[id] = value }
-        agents[agent.id] = changed
-        try? await store.save(changed)
         self.changed(changed)
         if let session = live[agent.id] { await session.apply(changed.startOptions) }
         let record = SwitchRecord(at: now(), agentID: agent.id,
@@ -531,8 +531,9 @@ extension DaemonCore {
         guard var agent = agents[agentID] else { return }
         agent.allowanceWait = AllowanceWait(resumeAt: back.at, entryID: back.entry.id, runtimeID: back.entry.runtimeID,
                                             text: prompt.text, blocks: prompt.blocks, from: prompt.from)
-        agents[agentID] = agent
-        try? await store.save(agent)
+        // Written and saved in one step (`changed` saves): an await between reading the
+        // record and writing it back would put back a stale copy over a prompt or a
+        // Stop waiting that landed meanwhile.
         changed(agent)
         await record(.runtimeNote(PoolWords.waiting(back.entry.runtimeID, until: back.at, now: now())), for: agentID)
         broadcastPool()
@@ -543,10 +544,7 @@ extension DaemonCore {
     func dropAllowanceWait(_ agentID: UUID) {
         guard var agent = agents[agentID], agent.allowanceWait != nil else { return }
         agent.allowanceWait = nil
-        agents[agentID] = agent
         changed(agent)
-        let saved = agent
-        Task { try? await self.store.save(saved) }
         broadcastPool()
     }
 
@@ -601,7 +599,6 @@ extension DaemonCore {
     func setSwitching(agentID: UUID, off: Bool) async {
         guard var agent = agents[agentID], agent.switchingOff != off else { return }
         agent.switchingOff = off
-        try? await store.save(agent)
         changed(agent)
     }
 
@@ -643,7 +640,11 @@ extension DaemonCore {
     /// An allowance just went out, on the Mac's event log (042).
     func raiseAllowanceOut(_ entry: PoolEntry, state: AllowanceState, reason: String) {
         var details = ["runtime": entry.runtimeID, "reason": reason]
-        if let until = state.returnsAt { details["until"] = ISO8601DateFormatter().string(from: until) }
+        // "until" only for a time the provider gave; the app's own retry is said as that.
+        if let until = state.knownReturn { details["until"] = ISO8601DateFormatter().string(from: until) }
+        if case .out(nil, let retry?, _) = state.status {
+            details["retry_after"] = ISO8601DateFormatter().string(from: retry)
+        }
         raise(EventDraft(name: "cost.allowance_out", at: now(), scope: .mac,
                          sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out.", details: details))
     }
