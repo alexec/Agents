@@ -32,5 +32,6 @@
 ## Notes
 
 - Names that look technical are the person's own world, not ours: `~/.codex` (the file SC-004 checks is unchanged), Node/npm (named only to say they are not needed), and the adapter's package name in Assumptions only, as the thing the plan must measure.
-- Alex settled D1 (ChatGPT sign-in on the Mac), D2 (Mac and servers), D3 (the app installs the Codex binary itself, 2026-09-25 follow-up) and D4 (servers take an OpenAI API key; a ChatGPT sign-in is never lent) on 2026-09-25. D5–D7 are defaults, marked where they are used.
+- Alex settled D1 (ChatGPT sign-in on the Mac), D2 (Mac and servers), D3 (the app installs the Codex binary itself, through the start-up installer another lane is planning; 2026-09-25 follow-ups) and D4 (servers take an OpenAI API key; a ChatGPT sign-in is never lent) on 2026-09-25. D5–D7 are defaults, marked where they are used.
 - Unknowns deferred to the plan's research (not markers): whether Codex can ask or sign out over ACP, whether it resumes, its tool names, and whether the app's tools can be exempted from its approval prompts. Each has a stated fallback in the spec.
+- Depends on the start-up installer (another lane, not yet specified when this was written): it owns download, checksum, update and progress on the Mac; this spec only adds Codex to its list and says what an agent shows before Codex is ready.
