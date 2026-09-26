@@ -419,7 +419,7 @@
   - `docs/reference/runtimes.md`: for each runtime, what is recognised, as in research R13, with Copilot, Cursor, Grok and Antigravity said plainly to be "not yet recognised";
   - `docs/reference/events.md`: the three events;
   - `docs/reference/statuses.md`: *Rate limited*, *Waiting for an allowance*, and the two new endings.
-- [ ] T073 Run quickstart §10: the read-only checks against the real Claude and Codex, which send no prompt, on a scratch root. Record in `research.md` R2 whether Codex forwards rate-limit `_meta`, and update R13 if it does.
+- [X] T073 *(Done 2026-09-26, see research R2. Codex's rate-limit `_meta` is still open without a prompt; R13 is unchanged.)* Run quickstart §10: the read-only checks against the real Claude and Codex, which send no prompt, on a scratch root. Record in `research.md` R2 whether Codex forwards rate-limit `_meta`, and update R13 if it does.
 - [X] T074 *(Done 2026-09-26, see `walk/README.md`. Nothing new of this lane's is left beyond two waits, lengthened.)* Run the whole suite six times on this branch and six times on `main`, and compare the failures with the T002 baseline. Only new failures are this lane's.
 - [ ] T075 Update the memory spec-queue line for 052 with the commits, what was walked, and what waits on Alex. Stop there: the merge happens only when Alex says it is this lane's turn.
 

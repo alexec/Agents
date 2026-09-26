@@ -109,6 +109,27 @@ otherwise:
   entry whose quota is spent is out until the next midnight in `America/Los_Angeles`. This comes
   from the entry's `ResetRule`, not from the error, which gives no time.
 
+**Checked against the real adapters, 2026-09-26 (T073, quickstart §10).** No prompt was sent.
+Claude was run through `npx -y @agentclientprotocol/claude-agent-acp` and Codex from the app's own
+copy, `@agentclientprotocol/codex-acp` 1.13.1. Each was given `initialize`, with the AIR
+`sessionFailure` capability, then `session/new`, then 15 s of listening. The handshakes are in
+`walk/real-runtimes/`, with the e-mail address taken out.
+
+- Both answered `initialize` and `session/new`.
+- **Neither sends a `usage_update` before a turn,** so neither sends rate-limit `_meta` then. Claude's
+  `_claude/rateLimit` arrives only with a turn's usage, as the SDK documents; that is what the
+  implementation reads. Whether Codex forwards `account/rateLimits/updated` as `_meta` on a turn is
+  **still open**: it cannot be settled without a prompt, which this check does not send. The
+  implementation reads `_meta` from Codex if it comes, then the title's "resets …", then uses the
+  one-hour rule. So R13's Codex row stands as written ("if forwarded, else title, else 1 h").
+- Both send `_auth/status_update` right away, naming the signed-in plan: Claude says `"label":
+  "Claude Max"` and Codex `"label": "ChatGPT Plus"`. Main reads this into the runtime's account
+  (a7a9656f). A pool entry's allowance label could be filled from it instead of typed. That is a
+  follow-up, not done here.
+- Neither lists the AIR extension among its capabilities. The adapters send typed failures only
+  when asked, and the app asks. The typed failures themselves are what `SessionFailureDecodingTests`
+  fixtures stand for; they need a real refusal to see live.
+
 **Alternatives.** Polling each provider's usage page was rejected: it needs credentials the app
 does not hold, and it breaks the rule that the app never polls on a tight cadence.
 
