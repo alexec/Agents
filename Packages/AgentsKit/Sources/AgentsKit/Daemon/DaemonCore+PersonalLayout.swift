@@ -20,6 +20,21 @@ extension DaemonCore {
         }
     }
 
+    /// Before a Gemini session: the project's plugins linked in as extensions switched on
+    /// only in that project, since Gemini has no project folder for them. Like the rest of
+    /// the home, nothing on a scratch root with no personal home.
+    func linkGeminiProjectPlugins(runtimeID: String, cwd: URL) {
+        guard PersonalDotAgents.rule(for: runtimeID)?.pluginHandover == .extensionLink,
+              let home = locations.personalHome else { return }
+        var record = PersonalDotAgents.Record.load(from: locations.personalLayout, home: home)
+        let before = record
+        PersonalDotAgents.linkGeminiProjectExtensions(home: home, cwd: cwd, record: &record)
+        guard record != before else { return }
+        PersonalDotAgents.attempt("save \(locations.personalLayout.lastPathComponent)") {
+            try record.save(to: locations.personalLayout)
+        }
+    }
+
     /// The homes the app gives runtimes of its own, from their launch environment's
     /// `<root>` value (Antigravity's `GEMINI_HOME`, 049's D7).
     func appHomes() -> [String: URL] {

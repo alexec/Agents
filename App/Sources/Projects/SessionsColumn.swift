@@ -80,17 +80,17 @@ struct SessionsColumn: View {
         // The window's title is this column's: whatever the right-hand side is reading.
         .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
-        .toolbar {
-            ToolbarItem {
-                Button {
+        // Over the list it adds to, not in the window's toolbar: up there it sat at the
+        // far right, over the chat, a long way from the sessions it starts.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if model.selectedProjectSummary != nil {
+                NewSessionRow {
                     selection = nil
                     requests.focusPrompt()
-                } label: {
-                    Label("New Session", systemImage: "square.and.pencil")
                 }
-                .help("Start a new session in this project (⌘N)")
-                .disabled(model.selectedProjectSummary == nil)
             }
+        }
+        .toolbar {
             // A search field of our own rather than `.searchable`, which pins its field
             // to the window's far right edge whatever the order: the chat's sidebar
             // toggle belongs to the right of the search, beside the sidebar it opens.
@@ -147,6 +147,31 @@ struct SessionsColumn: View {
         AgentGroup.allCases.contains {
             !matching(model.agents(in: model.selectedProjectKey, group: $0)).isEmpty
         }
+    }
+}
+
+/// The sessions column's first line: start a new session in this project, as ⌘N does.
+/// The whole row is the button, so it can be hit anywhere along it.
+private struct NewSessionRow: View {
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Label("New session", systemImage: "square.and.pencil")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .contentShape(.rect)
+                .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                            in: .rect(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help("Start a new session in this project (⌘N)")
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+        .background(Paper.ground)
     }
 }
 

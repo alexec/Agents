@@ -53,7 +53,7 @@ way it can take them. See [Share skills, instructions and servers with every age
 | **Grok** | reads `~/.agents/skills` | `~/.grok/AGENTS.md`, a link | sent at start | handed at start, with its servers sent as MCP servers |
 | **Cursor** | reads `~/.agents/skills` | none: User Rules are in Cursor's settings | sent at start; its own of the same name runs too | no way in |
 | **Copilot** | reads `~/.agents/skills` | `~/.copilot/copilot-instructions.md`, a link | through the app's local bridge for servers it would start; its own of the same name wins | no way in over the app |
-| **Gemini** | not checked yet | not checked yet | sent at start | a link in `~/.gemini/extensions` |
+| **Gemini** | reads `~/.agents/skills` | `~/.gemini/AGENTS.md`, a link, beside its own `GEMINI.md` | sent at start | a link in `~/.gemini/extensions`; a project's plugins are switched on only in that project |
 | **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
 
 For the conversations the app starts, each runtime's own tools for scheduling, starting

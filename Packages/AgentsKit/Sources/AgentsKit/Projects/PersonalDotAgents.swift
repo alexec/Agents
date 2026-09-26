@@ -60,8 +60,10 @@ public enum PersonalDotAgents {
         public var noInstructions: String? = nil
     }
 
-    /// Gemini has no skills or instructions rule until it is probed (R14), so it gets no
-    /// links: a runtime with nothing known about it is left alone.
+    /// Gemini's rule was read off Gemini CLI 0.61.0's own code, not probed: it scans
+    /// `~/.agents/skills` itself (`Storage.getUserAgentSkillsDir`), and reads
+    /// `~/.gemini/<name>` for each name in `context.fileName`, which the app's system
+    /// defaults set to include AGENTS.md (`ToolPolicyCatalog.gemini`).
     public static let rules: [Rule] = [
         Rule(runtimeID: "claude", configFolder: ".claude", readsSharedSkills: false,
              skillsFolder: ".claude/skills", instructionsFile: ".claude/CLAUDE.md",
@@ -79,8 +81,8 @@ public enum PersonalDotAgents {
         Rule(runtimeID: "copilot", configFolder: ".copilot", readsSharedSkills: true,
              skillsFolder: nil, instructionsFile: ".copilot/copilot-instructions.md",
              adopts: false, takesStdioServers: false, pluginHandover: .none),
-        Rule(runtimeID: "gemini", configFolder: ".gemini", readsSharedSkills: false,
-             skillsFolder: nil, instructionsFile: nil,
+        Rule(runtimeID: "gemini", configFolder: ".gemini", readsSharedSkills: true,
+             skillsFolder: nil, instructionsFile: ".gemini/AGENTS.md",
              adopts: false, takesStdioServers: true, pluginHandover: .extensionLink),
         // Its home is the app's, never `~/.gemini` (049's D7), so its skills are linked
         // in there. Over ACP it read no instructions file and no plugin folder (T055).
