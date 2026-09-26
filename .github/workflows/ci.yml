@@ -64,7 +64,9 @@ jobs:
         run: swift test --package-path Packages/CodeText
 
       - name: Test AgentsKit
-        run: swift test --package-path Packages/AgentsKit
+        # One test at a time. In parallel the runner's three cores stall and a dozen
+        # timing tests fail together, a different dozen each run (2026-09-26).
+        run: swift test --package-path Packages/AgentsKit --no-parallel
 
       # The quarantined tests, alone and with the machine quieter than in a full run.
       # A failure here is reported and does not fail the build.
