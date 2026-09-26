@@ -21,6 +21,23 @@ struct RelayGateTests {
         #expect(RelayGate.owner(of: 0x1234, connectedTo: 0x4B21, in: Self.table) == nil)
     }
 
+    @Test func aClientOnAnIPv6SocketIsFoundByItsMappedAddress() {
+        let table6 = """
+              sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+               0: 0000000000000000FFFF00000100007F:D4F4 0000000000000000FFFF00000100007F:4B21 01 00000000:00000000 00:00000000 00000000  1000        0 44444 1
+            """
+        #expect(RelayGate.owner(of: 0xD4F4, connectedTo: 0x4B21, in: table6) == 1000)
+        #expect(RelayGate.owner(of: 0xD4F4, connectedTo: 0x4B21, in: Self.table) == nil)
+    }
+
+    @Test func aLongFileIsReadToItsEnd() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("tcp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let text = String(repeating: "x", count: 20000) + "end"
+        try Data(text.utf8).write(to: file)
+        #expect(RelayGate.readToEnd(file.path) == text)
+    }
+
     @Test func onlyTheSameAccountIsLetThrough() {
         #expect(RelayGate.sameAccount(clientPort: 0xD4F0, gatePort: 0x4B21, table: Self.table, uid: 1000))
         #expect(!RelayGate.sameAccount(clientPort: 0xD4F2, gatePort: 0x4B21, table: Self.table, uid: 1000))

@@ -26,6 +26,7 @@ public final class RelayGate: @unchecked Sendable {
     private let listener: Int32
     private let target: String
     private let ownerCheck: @Sendable (_ clientPort: UInt16, _ gatePort: UInt16) -> Bool
+    private let describeOwner: @Sendable (_ clientPort: UInt16, _ gatePort: UInt16) -> String
     private let lock = NSLock()
     private var closed = false
 
@@ -35,6 +36,8 @@ public final class RelayGate: @unchecked Sendable {
                 ownerCheck: (@Sendable (UInt16, UInt16) -> Bool)? = nil) throws {
         self.target = target
         self.ownerCheck = ownerCheck ?? { client, gate in RelayGate.sameAccount(clientPort: client, gatePort: gate) }
+        self.describeOwner = { client, gate in
+            RelayGate.ownerOnServer(clientPort: client, gatePort: gate).map { "uid \($0)" } ?? "no socket found" }
         let fd = RelayGate.tcpSocket()
         guard fd >= 0 else { throw Failure.socket(errno) }
         var yes: Int32 = 1
@@ -93,7 +96,7 @@ public final class RelayGate: @unchecked Sendable {
             }
             let clientPort = UInt16(bigEndian: peer.sin_port)
             guard ownerCheck(clientPort, port) else {
-                DaemonLog.shared.write("relay gate: refused a connection from another account")
+                DaemonLog.shared.write("relay gate: refused a connection from port \(clientPort) (\(describeOwner(clientPort, port)), not uid \(getuid()))")
                 POSIX.close(client)
                 continue
             }
@@ -159,18 +162,48 @@ public final class RelayGate: @unchecked Sendable {
     /// a gate that cannot check lets nobody through.
     public static func sameAccount(clientPort: UInt16, gatePort: UInt16,
                                    table: String? = nil, uid: UInt32 = UInt32(getuid())) -> Bool {
-        guard let text = table ?? (try? String(contentsOfFile: "/proc/net/tcp", encoding: .utf8)) else { return false }
-        return owner(of: clientPort, connectedTo: gatePort, in: text) == uid
+        if let table { return owner(of: clientPort, connectedTo: gatePort, in: table) == uid }
+        return ownerOnServer(clientPort: clientPort, gatePort: gatePort) == uid
+    }
+
+    /// The owner from `/proc/net/tcp`, or from `/proc/net/tcp6` for a client that reached
+    /// 127.0.0.1 from an IPv6 socket (its ends then read as `::ffff:127.0.0.1`).
+    static func ownerOnServer(clientPort: UInt16, gatePort: UInt16) -> UInt32? {
+        for file in ["/proc/net/tcp", "/proc/net/tcp6"] {
+            guard let text = readToEnd(file) else { continue }
+            if let owner = owner(of: clientPort, connectedTo: gatePort, in: text) { return owner }
+        }
+        return nil
+    }
+
+    /// A `/proc` file read until the kernel says it is done. Its size reads as 0, and a
+    /// read by size stops after the first page: a busy server's table runs longer than that.
+    static func readToEnd(_ path: String) -> String? {
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { return nil }
+        defer { POSIX.close(fd) }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 16384)
+        while true {
+            let n = buffer.withUnsafeMutableBytes { POSIX.read(fd, $0.baseAddress, 16384) }
+            if n < 0 { return nil }
+            if n == 0 { break }
+            data.append(contentsOf: buffer[0..<n])
+        }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// The `uid` column of the entry whose local end is `127.0.0.1:clientPort` and whose
     /// remote end is `127.0.0.1:gatePort`, in `/proc/net/tcp`'s format.
     static func owner(of clientPort: UInt16, connectedTo gatePort: UInt16, in table: String) -> UInt32? {
+        // IPv4 `0100007F:PORT`, or IPv6 with a v4-mapped loopback, `…FFFF00000100007F:PORT`.
         let local = String(format: "0100007F:%04X", clientPort)
         let remote = String(format: "0100007F:%04X", gatePort)
         for line in table.split(separator: "\n").dropFirst() {
             let fields = line.split(separator: " ", omittingEmptySubsequences: true)
-            guard fields.count > 7, fields[1] == local, fields[2] == remote else { continue }
+            guard fields.count > 7, fields[1].hasSuffix(local), fields[2].hasSuffix(remote),
+                  fields[1].count == local.count || fields[1].hasSuffix("FFFF0000" + local) else { continue }
+            // A client that has already closed (TIME_WAIT) reads as uid 0 and is refused.
             return UInt32(fields[7])
         }
         return nil

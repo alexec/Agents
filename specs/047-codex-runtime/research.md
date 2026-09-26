@@ -387,3 +387,42 @@ start of the trial log; there are no tokens in any of them).
   server. They hold no secret.
 - A check that this use of a ChatGPT plan (one person, their own machines) is fine by
   OpenAI's terms.
+
+### Built into the app, walked on agents-bare (2026-09-26, scratch root /tmp/run-relay)
+
+What was built, in the order the list above gives it:
+- **The server link carries it.** The window's ssh master adds `-O forward -R
+  ~/.agents-server/relay-codex.sock:127.0.0.1:<Mac relay port>`, and sshd makes that socket
+  owner-only (`srw-------`). Then `relay/offer` tells the server's agentsd the socket, the CA
+  certificate and the stand-in sign-in. No separate ssh is needed.
+- **Guarded by uid.** `RelayGate` listens on the server's `127.0.0.1:0` and lets a connection
+  through only when `/proc/net/tcp` (or `tcp6`, v4-mapped) says its socket belongs to the
+  daemon's uid. It pipes bytes to the socket; TLS ends on the Mac.
+- **Its own CA, made per install**, in `<root>/hosts/relay/`. The keys are 0600 files and
+  are imported with `kSecImportToMemoryOnly`, not kept in the Keychain. Only `ca.pem` goes
+  to the server.
+- **Renewal on 401.** The Mac relay re-reads `~/.codex/auth.json`. If the token is
+  unchanged, it refreshes once through `auth.openai.com/oauth/token`, then retries. It
+  does not use the Mac's Codex for this, as planned above. It refreshes itself, and only
+  when nobody else has.
+- The server's `CODEX_HOME` is `<root>/runtimes/codex-relay-home`, holding `config.toml`
+  (`chatgpt_base_url` pointing at the gate) and a stand-in `auth.json` with no secret.
+
+**Walked.** A Codex agent on agents-bare ran `uname -a` and wrote `~/work/relay.txt`
+through the Mac's ChatGPT sign-in. `relay.log` shows only 200s: `codex/responses`,
+`analytics-events`, `ps/mcp`.
+
+**Found in the walk: the gate read only the first page of `/proc/net/tcp`.** Foundation reads
+a file by its size, and `/proc` files say 0, so it got 4096 of the table's 7200 bytes. Any
+connection listed further down was refused as "another account": ten in one turn. Codex
+retried them, so the turn still passed. Fixed by reading to EOF (`RelayGate.readToEnd`). In
+the next turn nothing was refused.
+
+**Another account is refused.** `docker exec -u nobody agents-bare curl -k
+https://127.0.0.1:<gate>/…` got its connection closed (curl exit 35). The daemon logged
+"relay gate: refused a connection from port 52742 (uid 65534, not uid 1000)". The same
+request as `agents` got 200.
+
+**Not done:** a search of the box for the Mac's real tokens. The attempt was stopped
+before it reached the box. The stand-in's absence of secrets is covered by
+`MacSignInRelayTests.theStandInHoldsNoSecretAndNoPersonalDetail`.
