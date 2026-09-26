@@ -338,7 +338,7 @@ state on archive.
 - [X] T050 [US6] Slim on archive and at start. At the end of `archive`, after the stop and the worktree step, replace the agent with `slimmed()`. In `loadFromDisk`, archived agents come from the index already slim.
 - [X] T051 [US6] Rewrite `loadFromDisk` in `DaemonCore.swift` and add `AgentStore.loadLive(excluding:)`, per research R3: list `agents/`, load `ArchiveIndex`, fully read what the index does not name or what is newer than its entry, then fold archived results into the index and write it once. Keep `seedingCost` and the mends as they are. Maintain `archiveIndex` and write `archive.json` on archive, unarchive, retire and note changes. Replace T019's per-call sizing with index sizes. Make T047 pass.
 - [X] T052 [US6] Add `dropLiveState(for:)` and `liveStateKeys(for:)` (internal, for tests) in `DaemonCore.swift`, covering every row of the data-model table, and call `dropLiveState` in `archive` after `stop`. Make T048 pass.
-- [ ] T053 [US6] Run quickstart §3 with the run-app skill's daemon launcher: 1,000 archived and 10 live agents against 10 live, 5 starts each, measuring footprint. Also run once on `main` for comparison. Record the figures in `walk/README.md`. The result must meet SC-003 (within 10%) and SC-004 (within 20 MB). If it does not, profile with `sample` before changing anything.
+- [X] T053 [US6] Run quickstart §3 with the run-app skill's daemon launcher: 1,000 archived and 10 live agents against 10 live, 5 starts each, measuring footprint. Also run once on `main` for comparison. Record the figures in `walk/README.md`. The result must meet SC-003 (within 10%) and SC-004 (within 20 MB). If it does not, profile with `sample` before changing anything.
 
 ---
 

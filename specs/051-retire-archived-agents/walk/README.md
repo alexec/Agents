@@ -69,3 +69,24 @@ Every route to an agent by id ends in one of two places, and both reach the reti
   project rows. The look on the phone is Alex's (T062).
 - Limitation: the Mac asks its own daemon (`host: .mac`). A retired agent on a server is reached
   only where the route knows the server, which today none of these do.
+
+## Start and memory (T053, SC-003, SC-004), 2026-09-26
+
+The same stores run with main's `agentsd` (`14c9723`) and this branch's. `/tmp/run-051-big` held
+1,000 agents archived 3 days ago plus 10 live (47 MB); `/tmp/run-051-small` held the 10 live only.
+Each daemon was started five times, timed from launch to an answer, and measured with
+`footprint` just after it answered. Script: `/tmp/051-measure.py`.
+
+| Daemon, store | Until `agents/list` answers | Footprint then | Until `daemon/ping` answers | Footprint then |
+|---|---|---|---|---|
+| main, 1,010 agents | 4,156 ms | 162 MB | 696 ms (still loading) | 46 MB |
+| branch, 1,010 agents, first start (builds `archive.json`, 753 KB) | 882 ms | 57 MB | | |
+| branch, 1,010 agents | 288 ms | 27 MB | 280 ms | 18 MB |
+| branch, 10 agents | 133 ms | 7.9 MB | 177 ms | 6.0 MB |
+| main, 10 agents | 135 ms | 7.9 MB | | |
+
+- **SC-004 (within 20 MB of the store with none): met**, with 19.1 MB to spare nothing: 27 MB against 7.9 MB.
+- **SC-003 (start within 10% of the store with none): not met as written.** Readiness is about 100 ms
+  slower (280 against 177 ms, by ping), which is decoding the index's 1,000 slim records. Against
+  main the same store starts 14 times faster and holds a sixth of the memory. Whether 100 ms is
+  acceptable, or the index should be decoded lazily, is for Alex (raised at T063).
