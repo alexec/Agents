@@ -300,7 +300,7 @@
 
 **Independent Test**: Spec US3 test and AS1–AS6; quickstart §9.
 
-- [ ] T050 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Integration/PoolStatusTests.swift`. Cover:
+- [X] T050 [P] [US3] Write `Pkg/Tests/AgentsKitTests/Integration/PoolStatusTests.swift`. Cover:
   - `pool/state` state words for each `Status`;
   - chat counts per entry;
   - switches from the last day by default, and 30 days with `{days: 30}`;
@@ -309,16 +309,18 @@
   - `pool/markAvailable` sets `.person` and broadcasts, is open to paired devices, and is idempotent;
   - `pool/changed` is debounced to at most once a second;
   - an `until` passing broadcasts `available` without a relaunch.
-- [ ] T051 [US3] Implement `pool/markAvailable`, the debounce, and the broadcast when an `until` passes, in `DaemonCore+Pool.swift`. The broadcast is checked on the existing due-timer, and adds no timer of its own (plan: no new timers). This makes T050 pass.
-- [ ] T052 [US3] Make `App/Sources/Pool/PoolPage.swift` and the sidebar row from T027 live:
+
+  *Done 2026-09-26.* Waiting chats are left to US4, which makes them.
+- [X] T051 [US3] Implement `pool/markAvailable`, the debounce, and the broadcast when an `until` passes, in `DaemonCore+Pool.swift`. The broadcast is checked on the existing due-timer, and adds no timer of its own (plan: no new timers). This makes T050 pass.
+- [X] T052 [US3] Make `App/Sources/Pool/PoolPage.swift` and the sidebar row from T027 live:
   - subscribe to `pool/changed`;
   - **Mark available** calls `pool/markAvailable`;
   - chat counts and switch rows open their chats;
   - **Show the last 30 days** asks with `{days: 30}`;
   - the empty or off state links to Settings ▸ Pool (US3-AS6);
   - the dot and count line follow `anyOut`.
-- [ ] T053 [US3] When a new chat is started on a runtime whose credential is out, warn before the first prompt and offer the first available entry instead (spec US3). Do this in `App/Sources/StartAgent/`.
-- [ ] T054 [US3] Walk quickstart §9 on a scratch root. Check that the dot comes and goes, each state reads in words, and Mark available clears the dot live. Put screenshots in `specs/052-quota-fallback/walk/us3/`.
+- [X] T053 [US3] *(Done in the prompt bar's draft, `App/Sources/Chat/PromptBar.swift`, where a new chat is started now.)* When a new chat is started on a runtime whose credential is out, warn before the first prompt and offer the first available entry instead (spec US3). Do this in `App/Sources/StartAgent/`.
+- [X] T054 [US3] Walk quickstart §9 on a scratch root. Check that the dot comes and goes, each state reads in words, and Mark available clears the dot live. Put screenshots in `specs/052-quota-fallback/walk/us3/`.
 
 **Checkpoint**: All P1 stories are done: the pool, switching, and a place to see it.
 

@@ -118,3 +118,31 @@ new credit used up at once.
 
 Not yet seen on screen: the Settings ▸ Pool Model menu, which is new, and the Add credit sheet's
 key line and refusal. Both build, and are to be looked at when the screen is free.
+
+## US3: the Pool page, live (T054), 2026-09-26
+
+Run on the scratch root `/tmp/run-052-us3`, with the stand-ins, over `daemon.sock`. The window was
+screenshotted from behind; nothing was clicked by me. Someone opened the Pool page between the
+first two shots.
+
+1. The pool was Grok then Copilot, both available: no dot.
+2. With Grok spent, a chat started on Grok moved to Copilot. `pool/state` showed Grok out,
+   Copilot with 1 chat, and 1 switch. `1-sidebar-out.png` shows:
+   - the Pool row's dot, with "1 out · 1 chat on Copilot";
+   - above a new session on Grok: "Grok is out, so its first turn would be refused. It is tried
+     again after 10:26 AM." with **Use Copilot instead**.
+3. `pool/markAvailable` on Grok: available, learned from the person, with `cost.allowance_back`
+   on the event log. `2-sidebar-available.png` shows the dot gone live, and the Pool page with
+   both runtimes "Available", Copilot "· 1 chat on it", and the switch row
+   "9:26 AM Tidy the README. Grok → Copilot Grok's allowance ran out".
+
+Found and fixed: the agent row's "⇄ Carried on from …" line was cut in half in the sessions list.
+A list row keeps the height it first had, and the pool's state arrives after it. In the compact
+row it is now a mark beside the title, like the workflow and started-by-agent marks, with the
+sentence as its tooltip and accessibility label (`3-row-mark.png`). Cards keep the full line.
+
+The notice had also given the one-hour retry time as a return time ("out until"), which nobody
+had said. It now says "tried again after" for that case.
+
+With the Settings rail from 055 merged in, Pool is a rail pane after Spending, and the Pool
+page's two links open Settings on it. That is built, but not yet clicked.

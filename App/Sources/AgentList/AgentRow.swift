@@ -85,6 +85,18 @@ struct AgentRow: View {
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
+                    // Moved to another runtime when its own ran out (052). In the
+                    // sessions list a mark, as the two above are: a list row keeps the
+                    // height it first had, and the pool's state arrives after it, so a
+                    // line added then is cut in half.
+                    if isCompact, let moved = carriedOn {
+                        let words = PoolWords.carriedOnFrom(moved, now: Date())
+                        Image(systemName: "arrow.triangle.swap")
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .help(words)
+                            .accessibilityLabel(words)
+                    }
                     // Working in a worktree (030): named, because with two agents in
                     // one project the worktree is how you tell whose changes are whose.
                     if let worktree = agent.worktree {
@@ -109,7 +121,7 @@ struct AgentRow: View {
 
                 // Moved to another runtime when its own ran out (052): from which, and
                 // when, while it is still on the one it moved to.
-                if let moved = carriedOn {
+                if !isCompact, let moved = carriedOn {
                     Text(PoolWords.carriedOnFrom(moved, now: Date()))
                         .appText(.fine)
                         .foregroundStyle(.secondary)
