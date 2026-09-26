@@ -16,20 +16,21 @@ ChatGPT plan. Right now they can only use it in a terminal or its own app next t
 none of that work shows up in the app's lists, on the phone, in workflows or in leases. 036
 recorded this plainly: "Codex isn't a runtime."
 
-Codex does not speak the agent protocol (ACP) on its own. Its ACP adapter is published on npm
-by the same project that publishes Claude's, so Codex can join the way Claude did: as a
-package run through the person's Node, with the adapter carrying Codex itself. The work is in
+Codex does not speak the agent protocol (ACP) on its own. Its ACP adapter, published by the
+same project that publishes Claude's, carries Codex inside it and ships as one program per
+platform. So the app can install that program itself, the way 043 installs Claude's tools on a
+server: the person needs nothing on their Mac beforehand, not even Node. The work is in
 the parts that differ between runtimes: how Codex signs in (a ChatGPT account, with a refresh
 token Codex keeps rotating), its own approval and sandbox presets, which of its tools overlap
 with the app's, how it asks questions, and how it gets onto a server.
 
-**This feature makes Codex a runtime like the others**, on the Mac and on servers. On the Mac
-it signs in with the person's ChatGPT account. Servers sign in with an OpenAI API key lent from
-the Mac.
+**This feature makes Codex a runtime like the others**, on the Mac and on servers, and the app
+installs it itself on both. On the Mac it signs in with the person's ChatGPT account. Servers
+sign in with an OpenAI API key lent from the Mac.
 
 ## Defaults taken *(Alex to confirm or overturn)*
 
-Alex settled D1, D2 and D4 on 2026-09-25. The rest are defaults so that the spec is complete,
+Alex settled D1, D2, D3 and D4 on 2026-09-25. The rest are defaults so that the spec is complete,
 and each is marked *(default Dn)* where it is used.
 
 - **D1. On the Mac, a ChatGPT account is the normal way in.** Codex's own sign-in in the
@@ -38,17 +39,22 @@ and each is marked *(default Dn)* where it is used.
 - **D2. On the Mac and on servers.** Servers get Codex the way 043 gives them Claude: a pinned
   toolset installed on demand, and a credential lent to each run and never written to the
   server's disk. *(Settled by Alex.)*
-- **D3. Started through npx, like Claude.** The app starts Codex from its ACP adapter's npm
-  package, using the person's Node. The adapter carries Codex, so there is nothing to install
-  beyond Node, and a separate `codex` on the Mac is neither needed nor in the way.
+- **D3. The app installs Codex itself.** The first time Codex is needed on the Mac, the app
+  downloads the pinned build of Codex's ACP adapter for the Mac's architecture from its official
+  release, checks it against checksums the app carries, and keeps it in the app's own folder.
+  There is no prerequisite: no Node, no npm, no `codex` on the PATH. The app puts nothing on the
+  PATH and never uses or replaces a `codex` the person installed themselves. Servers get the
+  same build for Linux in the same way (D2). *(Settled by Alex.)*
 - **D4. A server's credential is an OpenAI API key.** Settings takes an OpenAI API key for
   servers only. A ChatGPT sign-in is not copied to servers. It is a refresh token that Codex
   rotates as it uses it, so if the Mac and a server used it at once, each would sign the other
   out. Server turns are billed per token to the key's OpenAI account, not to the ChatGPT plan.
   *(Settled by Alex.)*
-- **D5. Not pinned on the Mac, pinned on servers.** As with Claude, npx on the Mac fetches the
-  version the app names. Servers get the exact version and the checksums in the app's toolset
-  manifest.
+- **D5. Pinned everywhere, moved on with the app.** Each app version names one Codex version,
+  with checksums for every platform, in its toolset manifest. When an app update names a newer
+  one, the new build is downloaded and swapped in whole the next time Codex starts with no Codex
+  agent running on that machine. Running agents keep the build they started on. The person is
+  never asked to update Codex by hand.
 - **D6. The person's own Codex settings are left alone.** The app does not edit
   `~/.codex/config.toml`, the sign-in in `~/.codex`, or any other file of Codex's in the
   person's home. It does not point Codex at a home of its own either, because that would sign
@@ -64,29 +70,30 @@ and each is marked *(default Dn)* where it is used.
 
 ### User Story 1 - Start a Codex agent on the Mac (Priority: P1)
 
-The person has Node and has signed Codex in with their ChatGPT account, or has never used Codex
-at all. In the start form, **Codex** is in the runtime list beside the others. They choose it
-and type a prompt. The first time, the agent says it is fetching Codex while npm downloads it,
-so a slow first start reads as progress and not as a hang. Then Codex works like any other
-runtime: it replies as it thinks, calls tools, asks permission where its preset says to, shows
+The person has never installed Codex, or has Codex of their own signed in with their ChatGPT
+account. In the start form, **Codex** is in the runtime list beside the others. They choose it
+and type a prompt. The first time, the agent says it is installing Codex, with the download's
+progress, so a slow first start reads as progress and not as a hang. Then Codex works like any
+other runtime: it replies as it thinks, calls tools, asks permission where its preset says to, shows
 the diffs of the files it changes, reports usage as far as Codex says it, can be stopped
 mid-turn, and can be resumed later with its history.
 
 **Why this priority**: It is the request. Without it the other stories have nothing to act on.
 
-**Independent Test**: On a Mac with Node and Codex signed in with a ChatGPT account, start a
-Codex agent in a project and ask it to create a file and run `ls`. The reply streams in, the
+**Independent Test**: On a Mac with no Codex, Node or npm installed, and a ChatGPT sign-in in
+`~/.codex`, start a Codex agent in a project and ask it to create a file and run `ls`. The reply streams in, the
 tool calls show, the file appears in the changes, and a later resume continues the conversation.
 
 **Acceptance Scenarios**:
 
 1. **Given** the start form, **When** the person opens the runtime list, **Then** Codex is listed with the other runtimes, and a new conversation can be started with it *(default D3)*.
-2. **Given** a Mac where Codex's adapter has never been fetched, **When** the person starts a Codex agent, **Then** the agent shows that Codex is being fetched, and the first reply follows without the person doing anything else.
-3. **Given** a running Codex agent, **When** it edits files, runs commands or asks permission, **Then** each shows in the conversation the way the same act from another runtime does, and a permission ask can be answered on the Mac or the phone.
-4. **Given** a Codex agent mid-turn, **When** the person stops it, **Then** the turn ends and the agent can be given a new prompt.
-5. **Given** a stopped or parked Codex agent, **When** the person resumes it, **Then** it continues the same conversation with its history if Codex supports loading a conversation. If it does not, the app says that resume starts afresh and does not claim otherwise.
-6. **Given** the modes menu for a Codex agent, **When** the person opens it, **Then** it lists Codex's own approval presets. The one picked applies from the next action, and it is remembered for the next Codex agent *(default D7)*.
-7. **Given** the model menu for a Codex agent, **When** the person opens it, **Then** it lists the models and reasoning levels Codex offers, as the adapter reports them.
+2. **Given** a Mac where Codex has never been installed, **When** the person starts a Codex agent, **Then** the agent shows that the app is installing Codex, with its progress, and the first reply follows without the person doing anything else *(default D3)*.
+3. **Given** Codex already installed by the app, **When** an app update names a newer Codex, **Then** the next Codex start with no Codex agent running installs the new one, and a running Codex agent is never interrupted for it *(default D5)*.
+4. **Given** a running Codex agent, **When** it edits files, runs commands or asks permission, **Then** each shows in the conversation the way the same act from another runtime does, and a permission ask can be answered on the Mac or the phone.
+5. **Given** a Codex agent mid-turn, **When** the person stops it, **Then** the turn ends and the agent can be given a new prompt.
+6. **Given** a stopped or parked Codex agent, **When** the person resumes it, **Then** it continues the same conversation with its history if Codex supports loading a conversation. If it does not, the app says that resume starts afresh and does not claim otherwise.
+7. **Given** the modes menu for a Codex agent, **When** the person opens it, **Then** it lists Codex's own approval presets. The one picked applies from the next action, and it is remembered for the next Codex agent *(default D7)*.
+8. **Given** the model menu for a Codex agent, **When** the person opens it, **Then** it lists the models and reasoning levels Codex offers, as the adapter reports them.
 
 ---
 
@@ -183,8 +190,11 @@ project it is offered when it is installed there, or can be installed there (Use
 
 ### Edge Cases
 
-- **No Node on the Mac.** Choosing Codex says Node is needed to run it, with where to get it, and does not try to start. It shares the check Claude uses.
-- **Offline on the first start.** npx cannot fetch Codex's adapter. The agent says it could not download Codex, and why, instead of "stopped answering". A later start tries again.
+- **Offline on the first start.** The app cannot download Codex. The agent says it could not install Codex, and why, instead of "stopped answering". A later start tries again, and a download cut off halfway is never used.
+- **A download that does not match.** A build whose checksum differs from the app's is thrown away and never run. The agent says the download did not match, which is not the same as being offline.
+- **Offline when an update is due.** The build already installed keeps working. The update is tried again at the next start.
+- **The person has their own Codex.** A `codex` the person installed, through npm, Homebrew or OpenAI's app, is left alone: not used, updated or removed. It shares only the sign-in in `~/.codex`, which is what lets a ChatGPT sign-in made in either place work in both *(default D3, D6)*.
+- **An unsupported Mac.** If the pinned release has no build for this Mac's architecture or macOS version, Codex is shown as unavailable, with the reason, and it is not offered in the start form.
 - **A Codex or adapter release changes how ACP starts, or drops it.** The agent says Codex did not start in a mode the app can talk to, and names the version. It does not hang. The plan's research records what was measured, and a check script can measure it again.
 - **The sign-in expires or is revoked mid-session.** Codex refreshes its own token. If that fails (for example, the person signed out elsewhere), the turn ends with a sentence saying Codex needs signing in again, and the sheet can be opened from there.
 - **A key in the environment.** On the Mac, `OPENAI_API_KEY` or `CODEX_API_KEY` in the environment the app was launched with is Codex's own business, and Codex decides which sign-in wins; the app neither adds nor strips one. On a server, the key from Settings replaces any key in the server's environment for that run (043 D1).
@@ -202,8 +212,9 @@ project it is offered when it is installed there, or can be installed there (Use
 **Starting Codex on the Mac**
 
 - **FR-001**: The app MUST list Codex among the runtimes it can start, everywhere a runtime is chosen: the Mac's start form and runtime menu, the phone and iPad start forms, workflow steps, and `start_agent`.
-- **FR-002**: The app MUST start Codex from its ACP adapter's npm package through the person's Node, with no other install needed, and MUST NOT depend on a `codex` command being on the Mac *(default D3)*.
-- **FR-003**: While Codex is being fetched on a first start, the agent MUST show that it is fetching and not appear stuck. A failed fetch MUST end with a sentence naming why.
+- **FR-002**: The app MUST install Codex on the Mac itself, on demand: the pinned build of its ACP adapter for the Mac's architecture, from official release sources, checked against checksums the app carries, kept in the app's own folder. It MUST need nothing installed beforehand (no Node, npm or `codex`), MUST put nothing on the PATH, and MUST NOT use, change or remove a Codex the person installed themselves *(default D3)*.
+- **FR-003**: While Codex is being installed, the agent MUST show that it is installing, with progress, and not appear stuck. A failed or mismatched download MUST end with a sentence naming why, and a partial or mismatched build MUST never be run.
+- **FR-003a**: When the app's pinned Codex version changes, the app MUST install the new build and swap it in whole at the next Codex start with no Codex agent running on that machine, keep the old build working until then (including while offline), and never ask the person to update Codex by hand *(default D5)*.
 - **FR-004**: A Codex agent MUST show replies, tool calls, permission asks, file changes, stop and resume the way the app shows them for other runtimes, limited only by what Codex reports over ACP.
 - **FR-005**: Token usage MUST be shown where Codex reports it. Cost MUST be shown only where Codex reports a cost, and left out (never shown as zero) where it does not.
 - **FR-006**: Codex's approval presets MUST show as the agent's modes, and its models as the model menu, both as the adapter reports them. The last mode picked MUST be remembered for Codex, and helpers MUST inherit it as they do for other runtimes *(default D7)*.
@@ -234,21 +245,21 @@ project it is offered when it is installed there, or can be installed there (Use
 
 **Failures**
 
-- **FR-022**: No Node, a failed fetch, a changed ACP mode, an expired sign-in, a plan or rate limit, and a refused key MUST each end with a sentence naming the cause, never an endless wait or "stopped answering".
+- **FR-022**: A failed or mismatched download, an unsupported Mac, a changed ACP mode, an expired sign-in, a plan or rate limit, and a refused key MUST each end with a sentence naming the cause, never an endless wait or "stopped answering".
 
 ### Key Entities
 
-- **Codex runtime**: an entry in the app's runtime list: its name, how it is started (the ACP adapter's npm package through Node), and what it says about itself when it starts (sign-in methods, modes, models, pictures, resume).
+- **Codex runtime**: an entry in the app's runtime list: its name, how it is started (the app-installed build of its ACP adapter), and what it says about itself when it starts (sign-in methods, modes, models, pictures, resume).
 - **Codex tool policy**: which of Codex's tools are removed for the app's agents, which remain as residue and why, how its questions reach the person, and whether the app's tools are exempt from its approval prompts.
 - **Codex server credential**: an OpenAI API key, for servers only, kept in the Mac's Keychain, masked when shown, with when it was added and when it last worked. This is 043's runtime credential, gaining another kind.
-- **Codex toolset**: Node and the pinned adapter package (with the Codex it carries) for a server's architecture, with versions and checksums, installed beside the other toolsets and replaced as a whole. This is 043's installed tools.
+- **Codex toolset**: the pinned build of the adapter (with the Codex it carries) for one machine's platform (macOS or Linux, x86-64 or ARM64), with its version and checksum, installed by the app in its own folder on the Mac and beside the other toolsets on a server, and replaced as a whole. It is 043's installed tools, now also on the Mac.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: On a Mac with Node and no Codex sign-in, a person who has never used Codex gets a Codex agent's first reply within 3 minutes of choosing it, counting the first fetch and the ChatGPT sign-in, having typed no command.
-- **SC-002**: A later Codex start, with the fetch cached, takes no more than 5 seconds longer to reach its first reply than a Claude start on the same Mac.
+- **SC-001**: On a Mac with no Codex, Node or npm and no Codex sign-in, a person who has never used Codex gets a Codex agent's first reply within 3 minutes of choosing it, counting the install and the ChatGPT sign-in, having typed no command and installed nothing.
+- **SC-002**: A later Codex start, with Codex installed, takes no more than 5 seconds longer to reach its first reply than a Claude start on the same Mac.
 - **SC-003**: Every failure in the edge cases above shows as a sentence naming its cause. None shows as an endless wait or as "stopped answering".
 - **SC-004**: After a day of Codex agents in the app, the person's `~/.codex/config.toml` is byte for byte what it was before, and Codex in Terminal is still signed in with the same account.
 - **SC-005**: From a bare Linux server, a person with an OpenAI key in Settings gets a Codex agent's first reply within 5 minutes, having run no command on the server. Afterwards, a search of the server's disk and the Mac's logs finds the key in neither, and finds no ChatGPT sign-in on the server.
@@ -256,7 +267,7 @@ project it is offered when it is installed there, or can be installed there (Use
 
 ## Docs *(mandatory)*
 
-- `docs/reference/runtimes.md` — change: the runtime count, plus a Codex row (command, pictures, sign-in, modes, app tools, notes on questions, plan limits and residue).
+- `docs/reference/runtimes.md` — change: the runtime count, plus a Codex row (installed by the app, nothing to set up; pictures, sign-in, modes, app tools, notes on questions, plan limits and residue).
 - `docs/how-to/sign-a-runtime-in.md` — change: name Codex among the runtimes, and add signing in with ChatGPT, or with an API key.
 - `docs/how-to/add-a-linux-server.md` — change: Codex installs on a server as Claude does, it takes an OpenAI API key from Settings, and why a ChatGPT sign-in stays on the Mac.
 - `docs/reference/settings.md` — change: the runtime credentials entry lists an OpenAI API key for Codex.
@@ -264,8 +275,8 @@ project it is offered when it is installed there, or can be installed there (Use
 
 ## Assumptions
 
-- Codex is run through its ACP adapter on npm (`@agentclientprotocol/codex-acp`, 1.13.1 on 2026-09-25), which carries Codex itself. The plan's research measures, against a real signed-in Codex rather than from this spec: the exact command, its sign-in methods over ACP, its modes and models, its tool names, whether it can ask a question or sign out over ACP, whether it loads a conversation, and how the app's MCP tools reach it. Codex is not installed on this Mac today, and Alex will sign it in with his ChatGPT account for the live proof.
-- The adapter runs on the Node versions Claude's adapter already needs, so the Mac's Node check and 043's server Node serve both, if the plan confirms that the adapter's Linux build covers x86-64 and ARM64.
+- Codex is run through its ACP adapter (published as `@agentclientprotocol/codex-acp`, 1.13.1 on 2026-09-25), which carries Codex itself and ships a self-contained build per platform. The plan's research measures, against a real signed-in Codex rather than from this spec: where the official per-platform builds and their checksums are published, whether a build runs without Node, whether the Mac build is signed so it runs without a Gatekeeper prompt, the exact command, its sign-in methods over ACP, its modes and models, its tool names, whether it can ask a question or sign out over ACP, whether it loads a conversation, and how the app's MCP tools reach it. Codex is not installed on this Mac today, and Alex will sign it in with his ChatGPT account for the live proof.
+- The adapter's release has builds for macOS (Apple silicon and Intel) and Linux (x86-64 and ARM64). If one turns out to need Node after all, the app installs a pinned Node alongside it for that machine, as 043 does on servers, and the person still installs nothing.
 - Codex accepts an OpenAI API key through its environment, so a server can be signed in by lending the key per run, as 043 does for Claude.
 - This builds on 043 (runtime credentials, server toolsets, "own sign-in only"), which is merged. It extends 043's D3 "Claude first" to Codex, as 046 does for Gemini. 046 and this spec both add a runtime, a policy entry and a toolset; whichever merges second takes the other's rows.
 - The phone and iPad start Codex agents through the Mac. Nothing Codex-specific runs on them.
