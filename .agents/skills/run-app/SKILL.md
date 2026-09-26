@@ -141,6 +141,29 @@ label to the nearest pressable ancestor. Typing is the weak spot: keystrokes go
 wherever focus is, so use `ui.swift set` on a field, or the socket, rather than
 `cliclick`-style synthetic keys.
 
+### When the screen is locked
+
+A locked Mac stops the looking, not the testing. With the lock screen up,
+`shot.sh` says "could not create image from window" (or captures only after the
+display is woken), `ui.swift dump` shows the menu bar and no window, and `press`
+matches nothing. Nothing unlocks it: macOS keeps synthetic keys off the lock
+screen, and no agent is given the password. Do not change the Mac's sleep or
+lock settings, and do not hold the display awake to stop it locking.
+
+Check before you plan a look — `1` is locked:
+
+```sh
+ioreg -n Root -d1 -a | grep -c CGSSessionScreenIsLocked
+```
+
+If it is locked, do everything the socket can prove first, then wait for the
+user to unlock with `wait_for_event` on `person.back` (its `why` is `locked` for
+an unlock) and do the look when you are started again. Check the lock once more
+before you shoot. Keep the scratch root with `stop.sh $ROOT --keep` if you
+stop meanwhile, so the look is quick to redo with `launch.sh --no-build`.
+A locked screen is a wait, not a failure: end the turn waiting and say what is
+already proved rather than reporting that you could not test.
+
 What you genuinely cannot do: tap iOS in the Simulator (there is no Simulator
 GUI on this Mac — boot and screenshot only), and judge anything about animation
 or feel. Those are the user's, and are worth asking for by name once the rest is
