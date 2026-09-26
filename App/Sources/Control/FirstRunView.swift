@@ -72,13 +72,16 @@ struct FirstRunView: View {
         .background(.background, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(usual ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: usual ? 2 : 1)
+                .strokeBorder(usual ? FirstRunView.usual : Color.secondary.opacity(0.25), lineWidth: usual ? 2 : 1)
         }
         // One element per card, so the accessibility tree is not a stack of labels over
         // labels; the button inside stays its own element.
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }
+
+    /// The usual choice is outlined in the accent, as frame A draws it (058).
+    static let usual = Color.accentColor
 
     private func runHere() {
         let setup = RunHereSetup(services: .forThisWindow)
@@ -239,7 +242,7 @@ struct RunHereProgress: View {
 
     @ViewBuilder private func icon(_ state: RunHereSetup.State) -> some View {
         switch state {
-        case .done: Image(systemName: "checkmark").foregroundStyle(.green)
+        case .done: Image(systemName: "checkmark").tinted(.vouched)
         case .working: ProgressView().controlSize(.small)
         case .waiting: Image(systemName: "circle").foregroundStyle(.secondary)
         case .failed: Image(systemName: "xmark").tinted(.failure)

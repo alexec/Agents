@@ -25,7 +25,7 @@ struct ConnectSheet: View {
                 } else {
                     ForEach(browser.found, id: \.self) { name in
                         HStack {
-                            Circle().fill(.green).frame(width: 8, height: 8)
+                            Circle().frame(width: 8, height: 8).tinted(.vouched)
                             Text(name).appText(.reading)
                             Spacer()
                             Button(chosen == name ? "Chosen" : "Choose") { chosen = name }
@@ -44,7 +44,7 @@ struct ConnectSheet: View {
             Text("CODE").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
             TextField("AGT-…", text: $code)
                 .textFieldStyle(.roundedBorder)
-                .font(.body.monospaced())
+                .appText(.code)
             Text("Paste the code, or its link. It works once, for five minutes.")
                 .appText(.supporting).foregroundStyle(.secondary)
             if let answer {
