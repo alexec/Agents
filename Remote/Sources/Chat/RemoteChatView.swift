@@ -43,7 +43,8 @@ struct RemoteChatView: View {
                                // The conversation is the only thing that knows how tall
                                // it is, and the page it asks for next should be sized to
                                // that (SC-007).
-                               onHeight: { model.measure(transcriptHeight: $0) })
+                               onHeight: { model.measure(transcriptHeight: $0) },
+                               onFollowing: { model.work.isFollowingEnd = $0 })
             }
             form
         }

@@ -73,7 +73,16 @@ func log(_ message: String) {
 final class Relay {
     private let device: NWConnection
     private var daemon: (any LineTransport)?
-    private var splitter = LineSplitter()
+    /// Nothing a device sends is this long: a phone's attachments stop at 900 KB and a
+    /// file written from elsewhere at 25 MB, both base64 in the line. Past it, the
+    /// other end is not one of ours, and nothing on this network is kept for it.
+    private var splitter = LineSplitter(maximumLine: 64 * 1024 * 1024)
+    /// Bytes handed to the device and not yet taken by the network. The daemon gives
+    /// up on a client that stops reading; this is the same for the device, which would
+    /// otherwise have every broadcast held here for it until it came back.
+    private var unsent = 0
+    private static let unsentLimit = 16 * 1024 * 1024
+    private var stopped = false
 
     init(device: NWConnection) {
         self.device = device
@@ -96,6 +105,8 @@ final class Relay {
     private func openTheDaemon() async {
         do {
             let transport = try await SocketLink().transport()
+            // The device can go while the daemon is being reached.
+            guard !stopped else { transport.close(); return }
             daemon = transport
             log("a device connected")
             Task { @MainActor in
@@ -120,7 +131,7 @@ final class Relay {
             Task { @MainActor in
                 guard let self else { return }
                 if let data, !data.isEmpty { self.forward(data) }
-                if isComplete || error != nil { self.stop(); return }
+                if isComplete || error != nil || self.stopped { self.stop(); return }
                 self.readFromDevice()
             }
         }
@@ -131,21 +142,41 @@ final class Relay {
     private func forward(_ data: Data) {
         splitter.append(data)
         while let line = splitter.next() { try? daemon?.write(line: line) }
+        if splitter.overflowed {
+            log("a device sent a line longer than any request; closing it")
+            stop()
+        }
     }
 
     private func send(_ line: String) {
-        device.send(content: Data((line + "\n").utf8), completion: .contentProcessed { _ in })
+        // Lines the daemon had already sent still arrive after a stop.
+        guard !stopped else { return }
+        let data = Data((line + "\n").utf8)
+        unsent += data.count
+        if unsent > Self.unsentLimit {
+            // Closing is what tells it to start again, and a device that comes back
+            // asks for everything afresh, so what it missed here is not lost.
+            log("a device stopped reading; closing it")
+            stop()
+            return
+        }
+        device.send(content: data, completion: .contentProcessed { [weak self] _ in
+            Task { @MainActor in self?.unsent -= data.count }
+        })
     }
 
     private func stop() {
+        guard !stopped else { return }
+        stopped = true
         daemon?.close()
         daemon = nil
         device.cancel()
+        Relays.open.removeAll { $0 === self }
     }
 }
 
-/// Held so a relay is not collected the moment it is made. They leave when the device
-/// does; a handful over an afternoon is not worth a sweep.
+/// Held so a relay is not collected the moment it is made. Each takes itself out when
+/// it stops; until 2026-09-25 none did, and every reconnect of a phone stayed here.
 @MainActor
 enum Relays {
     static var open: [Relay] = []
