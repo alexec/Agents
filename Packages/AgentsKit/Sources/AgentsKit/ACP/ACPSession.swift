@@ -46,9 +46,15 @@ public struct TurnResult: Sendable {
     /// from a `session_info_update` that came during the turn. An error-severity one
     /// means the turn did not do its work, whatever `reason` says.
     public var failure: SessionFailure?
+    /// The latest plan window the runtime reported during the turn (052, R2). Carried on
+    /// the result because the update that brought it and the turn's answer arrive by two
+    /// different roads, and the answer can get there first.
+    public var rateLimit: RateLimitInfo?
 
     public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
-                runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil) {
+                runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil,
+                rateLimit: RateLimitInfo? = nil) {
+        self.rateLimit = rateLimit
         self.reason = reason
         self.rawStopReason = rawStopReason
         self.usage = usage
@@ -108,6 +114,7 @@ public actor ACPSession {
     /// the turn rather than to the session at large (052).
     private var turnInFlight = false
     private var turnFailure: SessionFailure?
+    private var turnRateLimit: RateLimitInfo?
 
     private var isReplaying = false
 
@@ -415,6 +422,7 @@ public actor ACPSession {
         ]
         turnText = ""
         turnFailure = nil
+        turnRateLimit = nil
         turnInFlight = true
         defer { turnInFlight = false }
         let result = try await connection.call(ACP.Method.prompt, params)
@@ -428,7 +436,8 @@ public actor ACPSession {
                           rawStopReason: raw,
                           usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
                           runtimeError: launch?.turnError(in: turnText),
-                          failure: failure)
+                          failure: failure,
+                          rateLimit: turnRateLimit)
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -658,6 +667,7 @@ public actor ACPSession {
         case .modeChanged(let mode):
             eventsContinuation.yield(.entry(.optionChanged(id: "mode", value: .string(mode))))
         case .usage(let usage):
+            if turnInFlight, let window = usage.rateLimit { turnRateLimit = window }
             eventsContinuation.yield(.usageChanged(usage))
         case .plan(let plan):
             guard !isReplaying else { return }

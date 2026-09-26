@@ -291,6 +291,23 @@ public actor DaemonCore {
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
+
+    // MARK: The pool (052)
+
+    lazy var poolStore = PoolStore(locations: locations)
+    /// The person's pool, read once and kept in step with `pool.json`.
+    lazy var pool: PoolSettings = poolStore.load()
+    /// Each credential's state, keyed by `AllowanceState.credentialKey`.
+    lazy var allowances: [String: AllowanceState] = Dictionary(
+        poolStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
+    /// The prompt each agent's current turn was sent, for a retry or a carry-on.
+    var lastPrompts: [UUID: SentPrompt] = [:]
+    /// Rate-limit retries so far for each agent's current prompt (R7).
+    var rateLimitAttempts: [UUID: Int] = [:]
+    /// The latest plan window each agent's runtime reported (R2).
+    var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// How rate limits are retried. A test shortens the waits; nothing else changes it.
+    var rateLimitPolicy = RateLimitPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
     ///
     /// A runtime's cost is a **running total for its session**, not what the last turn
@@ -995,6 +1012,7 @@ public actor DaemonCore {
             changed(agent)
 
         case .usageChanged(let usage):
+            if let window = usage.rateLimit { notePlanWindow(window, agentID: agentID) }
             guard var agent = agents[agentID] else { return }
             agent.usage = usage
             // The only place a cost ever arrives. The turn's own reply carries tokens

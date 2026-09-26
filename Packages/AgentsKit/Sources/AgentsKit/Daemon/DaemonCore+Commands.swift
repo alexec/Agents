@@ -757,7 +757,7 @@ extension DaemonCore {
     ///
     /// This is picking an agent up: same agent, same folder, same conversation, with a
     /// new process behind it and possibly a new runtime session recorded against it.
-    private func liveSession(for agent: Agent) async throws -> ACPSession {
+    func liveSession(for agent: Agent) async throws -> ACPSession {
         if let existing = live[agent.id] { return existing }
         guard let runtime = RuntimeCatalog.runtime(id: agent.runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
@@ -867,7 +867,7 @@ extension DaemonCore {
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
                    from: PromptOrigin = .person, session: ACPSession,
                    unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil,
-                   preface: String? = nil) async {
+                   preface: String? = nil, recorded: Bool = true) async {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
@@ -875,10 +875,16 @@ extension DaemonCore {
         // Only by them. The app's own question is not an answer to a suggestion, and
         // taking the chips away would lose the person something they never acted on
         // over a turn they did not ask for (FR-031).
-        if from == .person { clearSuggestions(for: agentID) }
+        if from == .person, recorded { clearSuggestions(for: agentID) }
         // The text is kept beside the blocks so the record reads the way it always has.
-        await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
-                     for: agentID)
+        // A prompt sent again after a rate limit (052) is already on the record.
+        if recorded {
+            await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
+                         for: agentID)
+            rateLimitAttempts[agentID] = nil
+        }
+        lastPrompts[agentID] = SentPrompt(text: text, blocks: blocks, from: from, preface: preface,
+                                          costBefore: agents[agentID]?.costToDate ?? [:])
         // Stopped or archived while that was written. The move below would otherwise
         // take an archived agent straight back out of the archive — the app's own
         // question to a silent agent did, and started it in a worktree the archive had
@@ -1010,6 +1016,17 @@ extension DaemonCore {
                          for: agentID)
             reason = .unrecognised
         }
+        // What the ending says about the runtime's allowance (052): spent, rate limited,
+        // paid overage begun, or nothing. A turn that worked counts against credit.
+        let recognition = recognise(agentID: agentID, failure: result.failure,
+                                    runtimeError: result.runtimeError?.sentence, rateLimit: result.rateLimit)
+        var retrying = false
+        if case .none = recognition, reason == .endTurn {
+            await allowanceWorked(agentID: agentID)
+        } else {
+            retrying = await applyRecognition(recognition, agentID: agentID, reason: &reason)
+        }
+        _ = retrying
         if crossedItsLimit {
             // The limit is what this agent stopped for, whatever the turn's own
             // reason was. Said in the app's voice and with the figure it actually
@@ -1148,38 +1165,32 @@ extension DaemonCore {
         // person reading the conversation.
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
         let refused = credentialRefusal(agentID: agentID, error: error)
+        let limit = refused == nil ? recognise(agentID: agentID, error: error) : .none
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
                 ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
-        } else if let limit = Self.usageLimit(error) {
-            // Not "stopped answering" either: the provider said the quota or rate limit
-            // was reached, in a sentence of its own (046, FR-018; Gemini's free tier).
-            await record(.runtimeNote("\(runtimeName) hit its provider’s limit: \(limit)"), for: agentID)
+        } else if limit.moves || { if case .rateLimited = limit { return true } else { return false } }() {
+            // Not "stopped answering" either: the provider said the allowance is spent or
+            // the rate limit reached (046 FR-018, 052). `applyRecognition` below says which.
         } else {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        let limited = refused == nil && Self.usageLimit(error) != nil
-        await move(agentID, on: refused != nil ? .turnEnded(.signInRefused) : limited ? .turnEnded(.refusal) : .processDied)
+        var ending: AgentEvent = refused != nil ? .turnEnded(.signInRefused) : .processDied
+        var limitReason = EndedReason.refusal
+        if refused == nil, await applyRecognition(limit, agentID: agentID, reason: &limitReason) || limitReason != .refusal {
+            ending = .turnEnded(limitReason)
+        }
+        await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)
     }
 
-    /// The provider's own sentence when a turn was refused for a quota or rate limit: a
-    /// JSON-RPC 429, or an error that says so. Gemini answers a spent free tier with
-    /// `429 "You have exhausted your daily quota on this model."` (research R13).
-    static func usageLimit(_ error: any Error) -> String? {
-        guard let error = error as? JSONRPCError else { return nil }
-        let words = error.message.lowercased()
-        guard error.code == 429 || words.contains("quota") || words.contains("rate limit")
-                || words.contains("resource_exhausted") else { return nil }
-        return error.message
-    }
 
     /// Close every question this agent has open, because the runtime that asked them has
     /// gone and none of them can be answered now.

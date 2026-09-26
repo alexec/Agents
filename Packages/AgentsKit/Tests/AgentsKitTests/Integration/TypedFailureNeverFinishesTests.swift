@@ -37,11 +37,19 @@ struct TypedFailureNeverFinishesTests {
         let script = try failing(fixture)
         let title = try #require(SessionFailure.from(meta: script.promptResultMeta)).title
         let (core, work) = try core(script)
+        // No retries here: a rate limit's wait would outlive the test (slice 2 tests those).
+        await core.useRateLimitPolicy(RateLimitPolicy(delays: [3600], window: 600, persistsAfter: 1))
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         let agent = try #require(await core.agent(id))
         #expect(agent.state != .finished, "a refused turn is never done")
-        #expect(agent.endedReason == .runtimeError)
+        // A limit is recognised (slice 2); every other kind ends as an error.
+        let expected: EndedReason = switch fixture {
+        case "quota-exhausted": .allowanceSpent
+        case "rate-limited": .rateLimited
+        default: .runtimeError
+        }
+        #expect(agent.endedReason == expected)
         #expect(try await notes(core, id).contains("Claude: \(title)"))
     }
 
@@ -59,7 +67,7 @@ struct TypedFailureNeverFinishesTests {
         let (core, work) = try core(script)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
-        #expect(await core.agent(id)?.endedReason == .runtimeError)
+        #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(await core.agent(id)?.state != .finished)
     }
 

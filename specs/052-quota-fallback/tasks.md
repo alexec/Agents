@@ -104,7 +104,7 @@
 
 ## Phase 2b: Foundational — recognition and allowance state (plan slice 2)
 
-- [ ] T015 [P] Write `Pkg/Tests/AgentsKitTests/Unit/LimitRecognitionTests.swift`, with one test per row of both tables in `contracts/acp-session-failure.md`:
+- [X] T015 [P] Write `Pkg/Tests/AgentsKitTests/Unit/LimitRecognitionTests.swift`, with one test per row of both tables in `contracts/acp-session-failure.md`:
   - `limit`/`[]` → `.spent(resetsAt:)`, taking `resetsAt` from a `RateLimitInfo` with `status: rejected`;
   - `limit`/`["retry"]` → `.rateLimited`;
   - `limit`/`["new_session"]` → `.otherTyped`;
@@ -118,7 +118,7 @@
   - anything else → `.none`.
 
   Move the rows of `Pkg/Tests/AgentsKitTests/Unit/UsageLimitTests.swift` (046) into this file, and delete that file once they pass here.
-- [ ] T016 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AllowanceStateTests.swift`, covering every transition in `data-model.md` § AllowanceState, with an injected `now`:
+- [X] T016 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AllowanceStateTests.swift`, covering every transition in `data-model.md` § AllowanceState, with an injected `now`:
   - a rate limit is not out;
   - a third rate limit within 10 min becomes `out(retryAfter: +1h, .rateLimitPersisted)`;
   - `out(until:)` goes back to available when `until` passes;
@@ -126,7 +126,7 @@
   - a `.freeTier(.dailyAt(0, "America/Los_Angeles"))` entry is out until the next midnight Pacific, then available again, including across a DST change;
   - Mark available sets `learnedFrom: .person`;
   - two entries with the same `credentialKey` share one state.
-- [ ] T017 [P] Write `Pkg/Tests/AgentsKitTests/Unit/PoolSettingsTests.swift`, covering the validation in `data-model.md`:
+- [X] T017 [P] Write `Pkg/Tests/AgentsKitTests/Unit/PoolSettingsTests.swift`, covering the validation in `data-model.md`:
   - a keyed entry (`credentialRef != nil`) must be `.freeTier`, `.freeCredit` or `.prepaid`;
   - an API-key credential can never be `.allowance`;
   - a Gemini entry is never `.allowance`;
@@ -135,12 +135,12 @@
   - `isEffective` is `isOn && entries.count >= 2`;
   - decoding ignores unknown keys;
   - there is no way to express open-ended billing.
-- [ ] T018 Implement `Pkg/Sources/AgentsKitCore/Pool/LimitRecognition.swift`, with `classify(turnResult:error:runtimeID:payment:rateLimit:)` returning `Recognition` (`.spent`, `.creditGone`, `.rateLimited`, `.overage`, `.otherTyped` or `.none`), the per-runtime word lists, and `RateLimitPolicy` (retries at 30 s, then 120 s; three within 10 min counts as spent). Copy the SDK's prefix list in, naming its version. This makes T015 pass. Replace `DaemonCore.usageLimit(_:)` in `DaemonCore+Commands.swift` with a call to it, so that Gemini's behaviour is unchanged until the pool is on.
-- [ ] T019 Implement `Pkg/Sources/AgentsKitCore/Pool/PoolSettings.swift`, with `PoolEntry`, `Payment` (`.allowance(label:)`, `.freeTier(reset:)`, `.freeCredit(amount:expires:)` and `.prepaid(amount:expires:)`, and **no** unlimited case), `ResetRule`, `Level`, `Cell`, `PoolSettings` and `validate()`. This makes T017 pass.
-- [ ] T020 Implement `Pkg/Sources/AgentsKitCore/Pool/AllowanceState.swift`, with `AllowanceState`, `Status`, `OutReason`, `Source`, `Spent` and `credentialKey(for:account:)`. The key is the runtime's account id for a plan, and the lent credential's id for a key. This makes T016 pass.
-- [ ] T021 Add `pool.json`, `allowances.json` and `switches.jsonl` to `Pkg/Sources/AgentsKit/Store/StoreLocations.swift`. Add `Pkg/Sources/AgentsKit/Store/PoolStore.swift`, following `LimitStore.swift`: it loads and saves `PoolSettings` and `[AllowanceState]` atomically, appends `SwitchRecord` lines, and drops lines over 30 days old at load (FR-025). Write `Pkg/Tests/AgentsKitTests/Integration/PoolStoreTests.swift` covering a round trip, the trim, and a missing file that loads as defaults.
-- [ ] T022 Add `Pkg/Sources/AgentsKitCore/Pool/PoolWords.swift`. It holds every sentence the feature shows: state lines ("Out until 07:00", "Out since 02:14 · trying again after 03:14", "Rate limited · trying again at 02:21", "Credit used up", "Free credit expired", "Can't be used: not signed in"), switch-note lines, and capsules ("Allowance · ChatGPT plan", "Free tier · resets daily", "Prepaid credit · ≈ $3.20 of $10 used", "spending not known"). Test them in `Pkg/Tests/AgentsKitTests/Unit/PoolWordsTests.swift`, with times formatted in the person's time zone.
-- [ ] T023 In `DaemonCore+Commands.swift` and a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Pool.swift`, apply recognition with **no switching yet**. Make it work like this:
+- [X] T018 Implement `Pkg/Sources/AgentsKitCore/Pool/LimitRecognition.swift`, with `classify(turnResult:error:runtimeID:payment:rateLimit:)` returning `Recognition` (`.spent`, `.creditGone`, `.rateLimited`, `.overage`, `.otherTyped` or `.none`), the per-runtime word lists, and `RateLimitPolicy` (retries at 30 s, then 120 s; three within 10 min counts as spent). Copy the SDK's prefix list in, naming its version. This makes T015 pass. Replace `DaemonCore.usageLimit(_:)` in `DaemonCore+Commands.swift` with a call to it, so that Gemini's behaviour is unchanged until the pool is on.
+- [X] T019 Implement `Pkg/Sources/AgentsKitCore/Pool/PoolSettings.swift`, with `PoolEntry`, `Payment` (`.allowance(label:)`, `.freeTier(reset:)`, `.freeCredit(amount:expires:)` and `.prepaid(amount:expires:)`, and **no** unlimited case), `ResetRule`, `Level`, `Cell`, `PoolSettings` and `validate()`. This makes T017 pass.
+- [X] T020 Implement `Pkg/Sources/AgentsKitCore/Pool/AllowanceState.swift`, with `AllowanceState`, `Status`, `OutReason`, `Source`, `Spent` and `credentialKey(for:account:)`. The key is the runtime's account id for a plan, and the lent credential's id for a key. This makes T016 pass.
+- [X] T021 Add `pool.json`, `allowances.json` and `switches.jsonl` to `Pkg/Sources/AgentsKit/Store/StoreLocations.swift`. Add `Pkg/Sources/AgentsKit/Store/PoolStore.swift`, following `LimitStore.swift`: it loads and saves `PoolSettings` and `[AllowanceState]` atomically, appends `SwitchRecord` lines, and drops lines over 30 days old at load (FR-025). Write `Pkg/Tests/AgentsKitTests/Integration/PoolStoreTests.swift` covering a round trip, the trim, and a missing file that loads as defaults.
+- [X] T022 Add `Pkg/Sources/AgentsKitCore/Pool/PoolWords.swift`. It holds every sentence the feature shows: state lines ("Out until 07:00", "Out since 02:14 · trying again after 03:14", "Rate limited · trying again at 02:21", "Credit used up", "Free credit expired", "Can't be used: not signed in"), switch-note lines, and capsules ("Allowance · ChatGPT plan", "Free tier · resets daily", "Prepaid credit · ≈ $3.20 of $10 used", "spending not known"). Test them in `Pkg/Tests/AgentsKitTests/Unit/PoolWordsTests.swift`, with times formatted in the person's time zone.
+- [X] T023 In `DaemonCore+Commands.swift` and a new `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Pool.swift`, apply recognition with **no switching yet**. Make it work like this:
   - Spent: mark the credential out, end `.allowanceSpent`, and note "Claude's allowance ran out, until 07:00."
   - Rate limited: retry on the policy's schedule on the same runtime, and after three end `.rateLimited`.
   - Overage reported: mark out, and note that paid extra usage started.

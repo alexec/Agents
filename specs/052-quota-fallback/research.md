@@ -282,7 +282,7 @@ They sit in the existing `agent` and `cost` families, so workflows can already f
 | Gemini (046, on main) | words, daily quota | words, 429 | free tier: next midnight Pacific; credit: none | always a key: free tier, free credit or prepaid only (FR-001a) |
 | Codex on a server, relayed (047) | typed, as on the Mac | typed | as on the Mac; one state with the Mac's plan (R6) | as on the Mac |
 | Codex on a server, lent key (047) | `insufficient_quota` → credit gone | 429 | credit: none | key: free tier, free or prepaid credit only |
-| Antigravity (049) | **not yet**: its quota words arrive inside "Agent execution error: …" (`runtimeError`) and are still to be captured | not yet | — | Google account = allowance |
+| Antigravity (049) | via the rate-limit rule: its 429, "Resource has been exhausted (e.g. check quota).", captured in 049's `AntigravityTurnTests`, is retried and counts as spent after three in ten minutes (Google uses the same words for both) | "Resource has been exhausted" inside "Agent execution error: …" | 1 h | Google account = allowance |
 | Copilot, Cursor, Grok | **not yet**, and the docs say so | not yet | — | — |
 
 Copilot, Cursor and Grok are listed in `docs/reference/runtimes.md` as "not yet recognised". A
