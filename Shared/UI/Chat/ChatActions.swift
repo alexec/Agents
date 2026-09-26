@@ -15,6 +15,10 @@ struct ChatActions {
     var open: @MainActor (ToolCallLocation) -> Void = { _ in }
     var terminalOutput: @MainActor (String) -> String = { _ in "" }
     var unqueue: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
+    /// Send a queued prompt into the running turn, and whether this runtime can take one
+    /// there at all: what it advertised, by runtime id.
+    var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
+    var canSendNow: @MainActor (String?) -> Bool = { _ in false }
     /// Show an edit among the rest of what the agent changed (035): the Mac's Changes
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.

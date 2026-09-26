@@ -61,6 +61,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsStart,
         DaemonAPI.Method.agentsPrompt,
         DaemonAPI.Method.agentsUnqueue,
+        DaemonAPI.Method.agentsSendNow,
         DaemonAPI.Method.agentsStop,
         DaemonAPI.Method.agentsMove,
         DaemonAPI.Method.agentsArchive,

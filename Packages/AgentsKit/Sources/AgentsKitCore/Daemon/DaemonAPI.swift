@@ -106,6 +106,9 @@ public enum DaemonAPI {
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
+        /// A queued prompt sent into the running turn rather than after it, where the
+        /// runtime advertises steering. Takes an `UnqueueRequest`: the same two ids.
+        public static let agentsSendNow = "agents/sendNow"
         /// Files under an agent's folders matching what follows an `@`, found on the
         /// Mac, so a phone can name them too (033).
         public static let filesMention = "files/mention"

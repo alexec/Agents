@@ -200,7 +200,9 @@ struct RemoteChatView: View {
                 model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
             },
             terminalOutput: { [model] id in model.terminalOutput(id) },
-            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
+            canSendNow: { [model] runtimeID in model.canSteer(runtimeID) })
     }
 }
 
