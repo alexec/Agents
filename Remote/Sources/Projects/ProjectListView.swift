@@ -28,7 +28,14 @@ struct ProjectListView: View {
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         // Pinned under the projects, as on the Mac: it is about all of them, and the
         // foot of this column is where the money has always been.
-        .safeAreaInset(edge: .bottom, spacing: 0) { SpendingRow() }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Events above Spending, as on the Mac (042): about all of the projects,
+            // and read rather than acted on.
+            VStack(spacing: 0) {
+                EventsRow()
+                SpendingRow()
+            }
+        }
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }

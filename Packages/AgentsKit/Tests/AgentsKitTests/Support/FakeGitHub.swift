@@ -70,6 +70,12 @@ struct FakeGitHub {
         try json.write(to: folder.appending(path: "response.json"), atomically: true, encoding: .utf8)
     }
 
+    /// Answer every call that is not GraphQL — a REST call — with this (042: whether a
+    /// pull request that left the open list was merged).
+    func reply(_ json: String) throws {
+        try json.write(to: folder.appending(path: "reply.json"), atomically: true, encoding: .utf8)
+    }
+
     /// Every call so far, one line of arguments each.
     func calledWith() -> [String] {
         ((try? String(contentsOf: calls, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)

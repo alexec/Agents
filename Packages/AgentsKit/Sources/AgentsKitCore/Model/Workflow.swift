@@ -221,6 +221,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// What happened the last time it was asked to run. The only evidence a refused
     /// fire leaves, which is why it is here rather than derived.
     public var lastOutcome: WorkflowOutcome?
+    /// The event that caused `lastOutcome`, when an event did (042 FR-030): what the
+    /// row's "on pull_request.merged #41" links to.
+    public var causingEvent: EventPosition?
+    public var causingEventName: String?
     public var isRunning: Bool
 
     public var id: String { workflow.id }
@@ -237,11 +241,16 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
         lastOutcome = try c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)
         isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
+        causingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .causingEvent)
+        causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)
     }
 
     public init(workflow: Workflow, isArchived: Bool = false,
                 overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,
-                lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false) {
+                lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
+                causingEvent: EventPosition? = nil, causingEventName: String? = nil) {
+        self.causingEvent = causingEvent
+        self.causingEventName = causingEventName
         self.workflow = workflow
         self.isArchived = isArchived
         self.overLimit = overLimit

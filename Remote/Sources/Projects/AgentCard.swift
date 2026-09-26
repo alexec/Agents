@@ -68,6 +68,13 @@ struct AgentCard: View {
                     if let leases = model.work.leaseStatus(of: agent.id) {
                         LeaseMark(status: leases)
                     }
+                    // Waiting on events (042), as the Mac's row says it.
+                    if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
+                        Text(wait.mark)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     // Blocked (039): what it waits on and when it looks again, in the
                     // Mac row's words. Carry on is in the card's menu and the chat, not
                     // here: the whole card is the one control (see `AgentRow`).

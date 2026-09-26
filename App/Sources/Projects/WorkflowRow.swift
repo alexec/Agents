@@ -109,6 +109,15 @@ struct WorkflowRow: View {
             } else if let outcome = outcomeText {
                 Text(outcome)
             }
+            // What caused it, when an event did (042 FR-030): "on pull_request.merged #41",
+            // leading to that row on the Events page.
+            if let position = summary.causingEvent, let name = summary.causingEventName {
+                Button { model.showEvents(at: .event(position)) } label: {
+                    Text("on \(name)")
+                }
+                .buttonStyle(.link)
+                .help("Open this event on the Events page")
+            }
         }
         .appText(.fine)
         // Grey unless somebody is needed. The attention tint is `StateTint`'s to name,

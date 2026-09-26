@@ -33,6 +33,9 @@ public enum WorkflowTrigger: Hashable, Sendable {
     case pullRequestReviewComments
     /// One of my pull requests can no longer merge cleanly into its base.
     case pullRequestConflicts
+    /// Any event in the catalogue, a whole subject, or `custom.<name>`, narrowed by
+    /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
+    case event(EventPattern)
     /// Understood to be a trigger, and not one this version knows. Kept whole so that
     /// writing the file back does not quietly delete it.
     case unrecognised(name: String, keys: [String: JSONValue])
@@ -49,8 +52,32 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .pullRequestChecksFailed: return "pull-request-checks-failed"
         case .pullRequestReviewComments: return "pull-request-review-comments"
         case .pullRequestConflicts: return "pull-request-conflicts"
+        case .event(let pattern): return pattern.name
         case .unrecognised(let name, _): return name
         }
+    }
+
+    /// The events this trigger answers to, as patterns (042 FR-022). Today's names map
+    /// to their catalogue kinds — `agent-stopped` to both `agent.stopped` and
+    /// `agent.failed` — so the page and the log can say which events a workflow
+    /// watches in one vocabulary. A schedule is not an event, and answers to none.
+    public var patterns: [EventPattern] {
+        switch self {
+        case .event(let pattern): return [pattern]
+        case .schedule, .unrecognised: return []
+        case .workflowCompleted(let id):
+            return [EventPattern("workflow.completed", filters: id.map { ["workflow": $0] } ?? [:])]
+        default:
+            return EventCatalogue.kinds(forAlias: name).map { EventPattern($0.name) }
+        }
+    }
+
+    /// Whether an event fires this trigger. Only the `event` case: today's triggers keep
+    /// firing from where they always have (research R7, as built), so matching them here
+    /// as well would run them twice.
+    public func matches(_ event: Event) -> Bool {
+        if case .event(let pattern) = self { return pattern.matches(event) }
+        return false
     }
 
     /// Whether this version can act on it at all.
@@ -90,6 +117,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .pullRequestChecksFailed: return "When checks fail on one of my pull requests"
         case .pullRequestReviewComments: return "When one of my pull requests gets review comments"
         case .pullRequestConflicts: return "When one of my pull requests conflicts with its base"
+        case .event(let pattern): return "When " + Self.lowercasedFirst(pattern.summary)
         case .unrecognised(let name, _):
             return "Waits for \"\(name)\", which this version does not know about yet"
         }
@@ -104,6 +132,22 @@ public enum WorkflowTrigger: Hashable, Sendable {
         default:
             return false
         }
+    }
+}
+
+extension WorkflowTrigger {
+    static func lowercasedFirst(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        // "One of my …" reads on after "When"; a name or a code does not change.
+        return first.isUppercase && !text.hasPrefix("A ") ? first.lowercased() + text.dropFirst() : text
+    }
+
+    /// A filter value as the pattern keeps it: a string, whatever the file wrote.
+    static func scalar(_ value: JSONValue) -> String? {
+        if let text = value.stringValue { return text }
+        if let number = value.intValue { return String(number) }
+        if let flag = value.boolValue { return String(flag) }
+        return nil
     }
 }
 
@@ -132,8 +176,14 @@ extension WorkflowTrigger: Codable {
         case .agentStopped: self = .agentStopped
         case .workflowCompleted(let id): self = .workflowCompleted(id: id)
         case .unrecognised(let name, let keys):
-            self = Self.pullRequestTriggers.first { $0.name == name && keys.isEmpty }
-                ?? .unrecognised(name: name, keys: keys)
+            if let known = Self.pullRequestTriggers.first(where: { $0.name == name && keys.isEmpty }) {
+                self = known
+            } else if name.contains("."),
+                      case .success(let pattern) = EventPattern.parse(name, filters: keys.compactMapValues(Self.scalar)) {
+                self = .event(pattern)
+            } else {
+                self = .unrecognised(name: name, keys: keys)
+            }
         }
     }
 
@@ -148,6 +198,10 @@ extension WorkflowTrigger: Codable {
         case .workflowCompleted(let id): stored = .workflowCompleted(id: id)
         case .pullRequestChecksFailed, .pullRequestReviewComments, .pullRequestConflicts:
             stored = .unrecognised(name: name, keys: [:])
+        // As 038's did, and for the same reason (042 FR-025): an older Mac or phone
+        // reads it as a trigger it does not know yet, and lists it as inert.
+        case .event(let pattern):
+            stored = .unrecognised(name: pattern.name, keys: pattern.filters.mapValues(JSONValue.string))
         case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)
         }
         try stored.encode(to: encoder)

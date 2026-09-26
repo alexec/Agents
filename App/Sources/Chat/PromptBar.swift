@@ -182,7 +182,11 @@ struct PromptBar: View {
                 PromptHeader(agent: agent,
                              projectFolderBranch: model.projectFolderBranches[agent.projectFolder],
                              leaseStatus: model.work.leaseStatus(of: agent.id),
-                             openLease: { model.showResources(at: $0) }) {
+                             openLease: { model.showResources(at: $0) },
+                             waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
+                             waitHint: agent.eventWait.map(EventWords.hint) ?? "",
+                             openWait: { model.showEvents(at: .waitingNow) },
+                             cancelWait: { Task { await model.cancelWait(of: agent.id) } }) {
                     ContextMeter(agent: agent)
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }

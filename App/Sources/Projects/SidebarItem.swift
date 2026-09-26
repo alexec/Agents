@@ -12,4 +12,6 @@ enum SidebarItem: Hashable {
     case spending
     /// Every resource an agent can lease, and who holds and waits for each (036).
     case resources
+    /// What happened, and what came of it (042).
+    case events
 }

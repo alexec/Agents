@@ -78,6 +78,10 @@ struct ProjectListView: View {
                 // Above Spending (036): who holds the Mac's shared things. Always
                 // there, like Spending, so the page can be found before anything is
                 // leased; its count line is what comes and goes.
+                // Above Resources (042): what happened. Always there, so the page can
+                // be found before anything has; no count, because a record is read,
+                // not something asking for attention.
+                EventsRow(selection: $selection)
                 ResourcesRow(selection: $selection)
                 SpendingRow(selection: $selection)
             }
@@ -276,11 +280,6 @@ private struct SpendingRow: View {
                     if let today {
                         Text(today).monospacedDigit()
                     }
-                    // Beside this Mac's, never added in: each daemon keeps its own day
-                    // and its own limit (037).
-                    if let servers = Cost.total(of: model.serversToday) {
-                        Text("\(servers) on servers").monospacedDigit().appText(.fine)
-                    }
                     // Nothing when there is no limit: headroom that does not exist is
                     // not a thing to draw an empty gauge for.
                     if let state = model.costState, let left = state.dayHeadroom,
@@ -305,8 +304,12 @@ private struct SpendingRow: View {
               : "What every agent has cost today. Opens Spending.")
     }
 
+    /// This Mac's day and every server's, as one figure: what the work cost is the
+    /// question, not where it ran. Each daemon still keeps its own day and its own limit
+    /// (037); only the reading is added up.
     private var today: String? {
-        model.costState.flatMap { Cost.total(of: $0.today) }
+        guard let state = model.costState else { return nil }
+        return Cost.total(of: state.today.merging(model.serversToday, uniquingKeysWith: +))
     }
 
     /// Colour means the limit is about to bite. The app's existing threshold for a

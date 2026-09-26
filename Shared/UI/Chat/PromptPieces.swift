@@ -60,10 +60,19 @@ struct PromptHeader<Meter: View>: View {
     var leaseStatus: LeaseStatus? = nil
     /// What a lease capsule does when pressed. See `LeaseRow`.
     var openLease: ((ResourceName) -> Void)? = nil
+    /// What the agent waits for on events (042), drawn above this row. Nil draws nothing.
+    var waitStatus: WaitStatus? = nil
+    var waitHint: String = ""
+    /// What the wait capsule does when pressed, and its ✕. See `WaitCapsule`.
+    var openWait: (() -> Void)? = nil
+    var cancelWait: (() -> Void)? = nil
     @ViewBuilder let meter: () -> Meter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let waitStatus {
+                WaitCapsule(status: waitStatus, hint: waitHint, open: openWait, cancel: cancelWait)
+            }
             if let leaseStatus {
                 LeaseRow(status: leaseStatus, open: openLease)
             }

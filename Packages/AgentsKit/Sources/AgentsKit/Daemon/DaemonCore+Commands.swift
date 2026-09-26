@@ -479,8 +479,15 @@ extension DaemonCore {
         // Everything goes on the queue, even when it is going straight out again.
         // That is what keeps the order the order it was typed in: a prompt sent while
         // three are waiting joins the back of them rather than jumping the lot.
-        let queued = QueuedPrompt(text: request.text, attachments: request.attachments,
+        var queued = QueuedPrompt(text: request.text, attachments: request.attachments,
                                   from: request.from)
+        // The person's prompt takes the turn, and with it the agent's wait (042 FR-013).
+        // The agent is told in the same prompt, before the person's words and not in
+        // their bubble, so it can wait again if it still needs to.
+        if request.from == .person, let ended = endWait(request.agentID, by: .prompt) {
+            queued.preface = EventWords.cancelledByPrompt(ended)
+            agent = agents[request.agentID] ?? agent
+        }
         agent.queuedPrompts.insert(queued, at: first ? 0 : agent.queuedPrompts.endIndex)
         // The person moving the work on is what settles the turn before it. What the
         // agent said about that turn is now history, and so is any claim on the one
@@ -550,10 +557,12 @@ extension DaemonCore {
         // its own transcript saying so on every drain attempt.
         let limits = limitStore.load()
         if agent.isAtCostLimit(under: limits) {
+            raiseCostLimit("agent", agent: agent)
             await holdForCostLimit(agentID)
             return
         }
         if isDayLimitReached(under: limits) {
+            raiseCostLimit("day", agent: nil)
             if held.insert(agentID).inserted {
                 await record(.runtimeNote(
                     "What you sent is waiting: the day's spending limit has been reached. "
@@ -586,7 +595,7 @@ extension DaemonCore {
         changed(agent)
         await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks,
                         from: next.from, session: session, unlessStoppedSince: stopsBefore,
-                        requeue: next)
+                        requeue: next, preface: next.preface)
     }
 
     /// Whatever is waiting, now that a turn has ended of its own accord.
@@ -839,7 +848,8 @@ extension DaemonCore {
 
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
                    from: PromptOrigin = .person, session: ACPSession,
-                   unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil) async {
+                   unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil,
+                   preface: String? = nil) async {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
@@ -877,6 +887,8 @@ extension DaemonCore {
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
+        // What the app owes the agent about this prompt, and only the agent (042).
+        if let preface { outgoing.insert(.text(preface), at: 0) }
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
@@ -940,6 +952,8 @@ extension DaemonCore {
                 let limits = limitStore.load()
                 crossedItsLimit = agent.isAtCostLimit(under: limits)
                 changed(agent)
+                if crossedItsLimit { raiseCostLimit("agent", agent: agent) }
+                if isDayLimitReached(under: limits) { raiseCostLimit("day", agent: nil) }
                 if usage.cost != nil { broadcastCostState() }
             }
         }
@@ -1220,6 +1234,8 @@ extension DaemonCore {
         // is stopped on the one event that takes a finished agent to stopped.
         let wasBlocked = agents[agentID]?.report?.isOpenBlock == true
         dropBlock(agentID)
+        // And a wait on events (042): stopped is never started again for it.
+        endWait(agentID, by: .stopped)
         if wasBlocked, agents[agentID]?.state == .finished {
             if case .agent(let starter) = cause {
                 await record(.runtimeNote("\(starterName(starter)) stopped this agent."), for: agentID)
@@ -1264,8 +1280,10 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         stops[agentID, default: 0] += 1
-        // Archived is never resumed (FR-017): the block goes before anything is awaited.
+        // Archived is never resumed (FR-017): the block goes before anything is awaited,
+        // and so does a wait on events (042).
         dropBlock(agentID)
+        endWait(agentID, by: .archived)
         shownPlanFiles.removeValue(forKey: agentID)
         // Before the stop, which would give them back as "stopped": an archived
         // agent's transcript should say it let go because it was archived (036).

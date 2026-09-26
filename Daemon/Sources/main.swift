@@ -120,6 +120,25 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                                DaemonAPI.LeaseTokenRequest(token: token),
                                fallback: "Nothing to list.")
         }
+    } events: { call in
+        // A wait may be held up to the daemon's limit before it answers (042), as a
+        // lease call is.
+        switch call {
+        case .wait(let action, let events, let filters, let from, let untilMinutes, let limit):
+            return await relay(DaemonAPI.Method.eventsWait,
+                               DaemonAPI.EventWaitRequest(token: token, action: action, events: events,
+                                                          where: filters, from: from,
+                                                          untilMinutes: untilMinutes, limit: limit),
+                               fallback: "Waiting.")
+        case .cancel:
+            return await relay(DaemonAPI.Method.eventsCancel, DaemonAPI.EventTokenRequest(token: token),
+                               fallback: "Stopped waiting.")
+        case .publish(let name, let message, let details):
+            return await relay(DaemonAPI.Method.eventsPublish,
+                               DaemonAPI.EventPublishRequest(token: token, name: name, message: message,
+                                                             details: details),
+                               fallback: "Published.")
+        }
     }
     let task = Task {
         await service.run()

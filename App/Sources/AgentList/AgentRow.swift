@@ -93,6 +93,14 @@ struct AgentRow: View {
                     LeaseMark(status: leases)
                 }
 
+                // Waiting on events (042), on the same kind of line.
+                if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
+                    Text(wait.mark)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
                 // Blocked (039): what it waits on, one line an agent, and when it will
                 // look again — so the row says what it is waiting for without opening
                 // it (SC-005). Carry on is here because the person often knows the block

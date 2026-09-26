@@ -208,6 +208,13 @@ extension DaemonCore {
         // which is why this is the one place besides `move` that has to ask (021).
         reconsider()
         if report.outcome == .blocked {
+            // On the log, as a wait on events is (042).
+            let waitingOn = report.block.map { block in
+                block.waits.map { "\u{201C}\(self.waitName($0))\u{201D}" }.joined(separator: ", ")
+            } ?? ""
+            raiseAgentEvent("agent.blocked", agentID,
+                            sentence: waitingOn.isEmpty ? "is blocked." : "is waiting for \(waitingOn) to finish.",
+                            details: waitingOn.isEmpty ? [:] : ["waiting_on": waitingOn])
             // Reported after its turn had already ended, with everything it named
             // already over by then: nothing else will pass through `move` for it.
             await resumeIfCleared(agentID)

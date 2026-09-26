@@ -17,14 +17,19 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
     /// Whose prompt this is. The app queues one of its own after a turn that ended
     /// without saying how it went; everything else here is the person's.
     public var from: PromptOrigin
+    /// Words for the runtime only, sent before `text` and never recorded as said: what
+    /// the app owes the agent about this prompt, such as the wait it just cancelled
+    /// (042 FR-013). The person's bubble stays their own words.
+    public var preface: String?
 
     public init(id: UUID = UUID(), text: String, attachments: [Attachment] = [],
-                queuedAt: Date = Date(), from: PromptOrigin = .person) {
+                queuedAt: Date = Date(), from: PromptOrigin = .person, preface: String? = nil) {
         self.id = id
         self.text = text
         self.attachments = attachments
         self.queuedAt = queuedAt
         self.from = from
+        self.preface = preface
     }
 
     /// What goes to the runtime when its turn comes: the words, then what was
@@ -41,5 +46,6 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
         queuedAt = try c.decodeIfPresent(Date.self, forKey: .queuedAt) ?? Date()
         // New in 014. Absent is the person's, which every prompt queued before it was.
         from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
+        preface = try c.decodeIfPresent(String.self, forKey: .preface)
     }
 }

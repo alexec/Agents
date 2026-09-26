@@ -52,6 +52,20 @@ public enum AppTool {
     /// What can be leased on this Mac, and who holds what.
     public static let listResources = "list_resources"
 
+    // Three for waiting on what happens, and saying that something has (042). Offered
+    // to every agent, including one another agent started. None of the three names
+    // ends with another tool's name, which is how the app tells tools apart (see 036's
+    // release_resource).
+
+    /// Wait for an event, read the recent ones, or list what can be waited on.
+    public static let waitForEvent = "wait_for_event"
+
+    /// Stop waiting.
+    public static let cancelWait = "cancel_wait"
+
+    /// Say that something happened, as a `custom.` event.
+    public static let publishEvent = "publish_event"
+
     // Two that act on GitHub for a run a pull-request trigger started (038), and only
     // on that pull request: the daemon fixes the destination from the run.
 

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="720" viewBox="0 0 1120 720" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; } .s { fill:#6e6e73; } .q { fill:#aeaeb2; }
+    .rb { font-size:14px; font-weight:600; } .r { font-size:14px; } .sup { font-size:13px; } .f { font-size:12px; }
+    .m { font-size:11.5px; font-family: Menlo, monospace; }
+    .cap { fill:#fbfbfd; stroke:#d1d1d6; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .link { text-decoration: underline; }
+  </style>
+  <rect x="0.5" y="0.5" width="1119" height="719" rx="12" fill="#fff" stroke="#c7c7cc"/>
+
+  <!-- agent list -->
+  <rect x="0.5" y="0.5" width="360" height="719" rx="12" fill="#fbfbfd" stroke="#e5e5ea"/>
+  <text x="20" y="34" class="rb t">Agents</text>
+  <text x="20" y="62" class="f s">BLOCKED</text>
+
+  <rect x="10" y="72" width="340" height="80" rx="10" fill="#ececf0"/>
+  <circle cx="30" cy="94" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="44" y="99" class="rb t">Deploy docs</text>
+  <text x="44" y="119" class="sup s">Waiting for #44 to merge before deploying.</text>
+  <text x="44" y="142" class="f s">◷ Waiting for pull_request.merged #44</text>
+
+  <rect x="10" y="160" width="340" height="80" rx="10" fill="none"/>
+  <circle cx="30" cy="182" r="5" fill="none" stroke="#8e8e93" stroke-width="1.5"/>
+  <text x="44" y="187" class="rb t">Integrate helpers</text>
+  <text x="44" y="207" class="sup s">Waiting for two helpers to finish.</text>
+  <text x="44" y="230" class="f s">◷ Waiting for “Fix login” and 1 more to finish</text>
+
+  <text x="20" y="272" class="f s">WORKING</text>
+  <rect x="10" y="282" width="340" height="80" rx="10" fill="none"/>
+  <circle cx="30" cy="304" r="5" fill="#6e6e73"/>
+  <text x="44" y="309" class="rb t">Merge when green</text>
+  <text x="44" y="329" class="sup s">Woke on custom.build_green; merging #39.</text>
+
+  <text x="20" y="410" class="note">A wait puts the chat under Blocked (039).</text>
+  <text x="20" y="426" class="note">Row mark: same line 036 uses for leases,</text>
+  <text x="20" y="442" class="note">◷ + event + filter. finish_turn blocked on</text>
+  <text x="20" y="458" class="note">agents reads the same way (FR-012).</text>
+
+  <!-- chat -->
+  <text x="390" y="34" class="rb t">Deploy docs</text>
+
+  <!-- transcript -->
+  <rect x="740" y="56" width="350" height="46" rx="12" fill="#e5e5ea"/>
+  <text x="756" y="84" class="sup t">Deploy the docs once #44 is merged.</text>
+
+  <text x="390" y="132" class="sup t">#44 isn't merged yet. I'll wait for it rather than poll.</text>
+  <rect x="390" y="146" width="560" height="62" rx="8" fill="#f5f5f7"/>
+  <text x="404" y="166" class="m t">wait_for_event  pull_request.merged  pull_request: 44  until 09:00</text>
+  <text x="404" y="190" class="sup s">Still waiting. Your place is kept; you can end your turn.</text>
+  <text x="390" y="232" class="sup t">Waiting for #44 to merge before deploying.</text>
+
+  <text x="390" y="276" class="note">— later, what the wake looks like (shown on “Merge when green”) —</text>
+  <text x="390" y="302" class="f s">AGENTS ASKED · 03:10</text>
+  <rect x="390" y="310" width="700" height="66" rx="10" fill="none" stroke="#d1d1d6"/>
+  <text x="404" y="332" class="sup t">custom.build_green happened at 03:10, published by “Nightly build”:</text>
+  <text x="404" y="350" class="sup t">“All 1,517 tests green on main at 8f2c1d0.”  Position 4,790.</text>
+  <text x="404" y="368" class="sup s">No other matches arrived before you resumed.</text>
+  <text x="390" y="398" class="note">An app prompt, never in your bubble (as 036’s lease wake).</text>
+
+  <!-- status row -->
+  <rect x="390" y="540" width="700" height="1" fill="#e5e5ea"/>
+  <rect x="390" y="552" width="520" height="28" rx="14" class="cap"/>
+  <text x="404" y="571" class="sup s">◷ Waiting for pull_request.merged · #44 · since 06:58 · until 09:00</text>
+  <text x="890" y="571" class="sup s">✕</text>
+  <text x="920" y="571" class="note">✕ cancels</text>
+
+  <!-- prompt header -->
+  <text x="390" y="604" class="f s">~/Agents · ▮▮▮▯ 38% · Claude · Opus 5.5</text>
+  <text x="390" y="628" class="f s">Sending will cancel the wait on pull_request.merged.</text>
+  <rect x="390" y="638" width="700" height="56" rx="12" fill="#fbfbfd" stroke="#d1d1d6"/>
+  <text x="406" y="672" class="r q">Message Deploy docs…</text>
+
+  <text x="390" y="470" class="note">Status row is 036’s capsule row, above the header: leases and</text>
+  <text x="390" y="486" class="note">the wait side by side. Capsule opens Events at Waiting now.</text>
+  <text x="390" y="502" class="note">Hint line replaces a dialog: your prompt cancels the wait, and</text>
+  <text x="390" y="518" class="note">the agent is told so in that prompt (FR-013).</text>
+</svg>

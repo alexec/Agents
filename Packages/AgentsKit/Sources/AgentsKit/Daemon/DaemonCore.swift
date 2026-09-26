@@ -216,6 +216,36 @@ public actor DaemonCore {
     /// The local day the last tick saw, so the heartbeat can notice a rollover
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
+
+    // MARK: Events (042)
+
+    /// Where the log and the event sources' memory are kept between runs.
+    lazy var eventStore = EventStore(locations: locations)
+    /// Everything that happened, read from disk on first use and appended to after.
+    var eventLog = EventLog()
+    /// The next position, and what the sources remember between runs.
+    var eventState = EventState()
+    var eventLogIsLoaded = false
+    /// `wait_for_event` calls still open, by the agent that made them. One each at
+    /// most, as an agent has one wait at most (FR-007).
+    var openEventWaits: [UUID: CheckedContinuation<Result<String, JSONRPCError>, Never>] = [:]
+    var openEventWaitStarted: [UUID: Date] = [:]
+    /// The one timer for wait deadlines, aimed at the earliest.
+    var eventWaitTimer: Task<Void, Never>?
+    /// Drops the oldest events once an hour.
+    var eventPruner: Task<Void, Never>?
+    /// Events raised before the workflows were read, held for their new-style triggers
+    /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
+    var deferredEventsForWorkflows: [Event] = []
+    /// Each project's `.git`, watched for branch tips moving (042 R9).
+    var branchWatchers: [URL: FolderWatch] = [:]
+    /// The one pending look at each project's branch tips, so a rebase is one look.
+    var branchChecks: [URL: Task<Void, Never>] = [:]
+    /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
+    var machineWatch: (any MachineWatch)?
+    /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
+    /// is one number to measure against the runtimes (research R5). A test shortens it.
+    var eventHoldLimit: Duration = LeaseLimits.waitLimit
     /// Agents that have been told once that a limit is why their queue is not
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
@@ -314,7 +344,7 @@ public actor DaemonCore {
     ///
     /// So `move` always emits. Whether the emission can be acted on now, or has to
     /// wait a moment, is the workflow layer's business and not the funnel's (FR-014).
-    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int)] = []
+    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int, cause: EventPosition?)] = []
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -611,8 +641,13 @@ public actor DaemonCore {
         case .starting, .running, .waitingOnUser:
             break
         }
+        let wasStarting = agents[agentID]?.state == .starting
         changed(agent)
         await record(.stateChanged(next, reason: reasonThisEventSet), for: agentID)
+        // Its first turn has begun (042).
+        if wasStarting, next == .running {
+            raiseAgentEvent("agent.started", agentID, sentence: "started working.")
+        }
 
         // The whole of the lifecycle trigger surface, in the one place every state
         // change already passes through. `applying` returns nil for a transition that
@@ -651,9 +686,13 @@ public actor DaemonCore {
             // finished agent's depth unfindable, and a depth that quietly resets to
             // zero is a loop the limit never stops.
             let depth = workflowChainDepth(causedBy: agentID)
+            // The event first (042): it is what a waiting agent hears, and what the
+            // log keeps. Workflows still fire from the line below until US3 moves them.
+            let cause = raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
+                                         depth: depth)
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
-                             agentID: agentID, depth: depth)
+                             agentID: agentID, depth: depth, causingEvent: cause)
         // An agent that has started has neither finished nor stopped, so it fires
         // nothing. Named rather than folded in with `.running`, because it is not
         // running — it is about to be.
@@ -787,6 +826,12 @@ public actor DaemonCore {
             // Nothing to read, so nothing to keep: not written, not broadcast, and not
             // counted as the agent doing something.
             guard !kind.isInvisibleAgentText else { return }
+            // The runtime moving itself to another mode — Claude leaving plan mode —
+            // is the agent's mode now, and what an agent it starts inherits.
+            if case .optionChanged(let id, let value) = kind, var agent = agents[agentID] {
+                agent.startOptions.values[id] = value
+                changed(agent)
+            }
             await record(kind, for: agentID)
             notePlanning(kind, agentID: agentID)
 
@@ -851,7 +896,8 @@ public actor DaemonCore {
 
         case .elicitationRequested(let request):
             await holdElicitation(request, agentID: agentID)
-            workflowsRespond(to: .askedForm, agentID: agentID)
+            let cause = raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
+            workflowsRespond(to: .askedForm, agentID: agentID, causingEvent: cause)
 
         case .elicitationWithdrawn(let requestID):
             await withdrawElicitation(requestID, agentID: agentID)
@@ -887,7 +933,8 @@ public actor DaemonCore {
                       DaemonAPI.PermissionNotification(agentID: agentID, request: request))
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
-            workflowsRespond(to: .askedPermission, agentID: agentID)
+            let cause = raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
+            workflowsRespond(to: .askedPermission, agentID: agentID, causingEvent: cause)
             // The plan, as a page beside the question about it. Asked to approve
             // something is asked to read it first.
             if let plan = request.toolCall.planFile,
@@ -959,6 +1006,8 @@ public actor DaemonCore {
         for (_, task) in workflowRescans { task.cancel() }
         workflowRescans.removeAll()
         stopWatchingAllWorkflows()
+        machineWatch?.stop()
+        machineWatch = nil
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this

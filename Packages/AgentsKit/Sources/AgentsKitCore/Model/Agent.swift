@@ -142,6 +142,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// starter's run can end long before this agent does, and a depth read from it then
     /// would be zero — the loop the chain limit exists to stop, begun again.
     public var chainDepth: Int?
+    /// What it is waiting to happen, if anything (042). Made by a tool call mid-turn
+    /// and kept here, not on the report, so whatever the turn then reports leaves it be.
+    public var eventWait: EventWait?
     /// The worktree this agent was started in, if it was (030). Its project is the
     /// worktree's project, not its `cwd`.
     public var worktree: AgentWorktree?
@@ -261,6 +264,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
+        eventWait = try c.decodeIfPresent(EventWait.self, forKey: .eventWait)
         // New in 030, and optional: every agent before it works in its project folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
@@ -334,6 +338,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
         try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
+        try c.encodeIfPresent(eventWait, forKey: .eventWait)
         try c.encodeIfPresent(worktree, forKey: .worktree)
         try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
@@ -357,7 +362,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
-        case startedByWorkflow, startedByRun, startedByAgent, chainDepth, startRequestID
+        case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
         case worktree
         case startingPoint
         case restartPickUps
@@ -401,6 +406,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 startedByRun: UUID? = nil,
                 startedByAgent: UUID? = nil,
                 chainDepth: Int? = nil,
+                eventWait: EventWait? = nil,
                 worktree: AgentWorktree? = nil,
                 startingPoint: StartingPoint? = nil,
                 startRequestID: UUID? = nil,
@@ -438,6 +444,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.startedByRun = startedByRun
         self.startedByAgent = startedByAgent
         self.chainDepth = chainDepth
+        self.eventWait = eventWait
         self.worktree = worktree
         self.startingPoint = startingPoint
         self.startRequestID = startRequestID

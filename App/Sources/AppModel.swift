@@ -106,6 +106,7 @@ final class AppModel {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
+            showsEvents = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -122,9 +123,43 @@ final class AppModel {
         didSet {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
+            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
+    }
+
+    /// Whether the window is showing Events: what happened, what came of it, and who
+    /// is waiting (042). A page like Resources, and not persisted for the same reason.
+    var showsEvents = false {
+        didSet {
+            guard showsEvents, showsEvents != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// The event a workflow row asked to be shown, or `waitingNow` for the strip a
+    /// chat's waiting capsule asked for. Scrolled to, once.
+    var eventsFocus: EventsFocus?
+
+    enum EventsFocus: Equatable {
+        case event(EventPosition)
+        case waitingNow
+    }
+
+    /// Events, at one event or at Waiting now if something asked for it.
+    func showEvents(at focus: EventsFocus? = nil) {
+        eventsFocus = focus
+        showsEvents = true
+    }
+
+    /// A workflow's page, from an event that fired or was refused by it.
+    func showWorkflow(folder: URL, workflowID: String) {
+        showProject(ProjectKey(folder: folder))
+        openWorkflow = Project.standardize(folder).path + "/" + workflowID
     }
 
     /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
@@ -141,6 +176,7 @@ final class AppModel {
     func openAgent(_ agentID: UUID) {
         showsSpending = false
         showsResources = false
+        showsEvents = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         }
@@ -156,7 +192,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsResources ? .resources
+            showsEvents ? .events : showsResources ? .resources
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -165,9 +201,12 @@ final class AppModel {
                 showsSpending = true
             case .resources:
                 showResources()
+            case .events:
+                showEvents()
             case .project(let key):
                 showsSpending = false
                 showsResources = false
+                showsEvents = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -196,6 +235,7 @@ final class AppModel {
         // Resources, for the same reason.
         showsSpending = false
         showsResources = false
+        showsEvents = false
         select(key)
         selection = nil
         openWorkflow = nil
@@ -593,6 +633,29 @@ final class AppModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+    }
+
+    /// The newest page of events and who is waiting (042). A daemon too old to know the
+    /// method leaves the list empty, and the Events page says there is nothing yet.
+    func refreshEvents() async {
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(),
+                                                returning: DaemonAPI.EventsPage.self) else { return }
+        work.takeEvents(page)
+    }
+
+    /// The page before the oldest event the window has, for scrolling back.
+    func loadOlderEvents() async {
+        guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList,
+                                                DaemonAPI.EventsListRequest(before: oldest),
+                                                returning: DaemonAPI.EventsPage.self) else { return }
+        work.takeEvents(page, appending: true)
+    }
+
+    /// The person cancelling an agent's wait (042 FR-013). The Mac only.
+    func cancelWait(of agentID: UUID) async {
+        _ = try? await client.call(DaemonAPI.Method.eventsCancelWait, DaemonAPI.CancelWaitRequest(agentID: agentID),
+                                   returning: [DaemonAPI.WaitingAgent].self)
     }
 
     /// The person ending whoever holds a resource (036 US4). Never a way to take one.
@@ -1052,10 +1115,11 @@ final class AppModel {
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
+        async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, cloning, wake, leases, modes, transcript)
+                   elicitations, attention, resuming, cost, cloning, wake, leases, events, modes, transcript)
     }
 
     func refreshElicitations() async {
