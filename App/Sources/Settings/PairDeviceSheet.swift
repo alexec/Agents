@@ -30,6 +30,8 @@ struct PairDeviceSheet: View {
                 Text("Open Agents on your iPhone or iPad, on this Wi-Fi, and scan this code.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
+                    // Wrapped, not cut short: the sheet is narrow and this is the instruction.
+                    .fixedSize(horizontal: false, vertical: true)
                 QRCode(text: code.text)
                     .frame(width: 220, height: 220)
                     .accessibilityLabel("Pairing code")
@@ -43,6 +45,7 @@ struct PairDeviceSheet: View {
                 Text(problem)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 ProgressView()
             }
