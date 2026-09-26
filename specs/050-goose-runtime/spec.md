@@ -26,8 +26,9 @@ the parts that differ between runtimes. These are: making sure the `goose` the a
 really Goose, how the person picks a provider and a model, how Goose says it has none, which of
 its tools overlap with the app's, and how it asks before acting.
 
-**This feature makes Goose a runtime like the others on the Mac.** The person picks Goose's
-provider and model in Goose's own way, and the app shows and switches them per agent.
+**This feature makes Goose a runtime like the others**, on the Mac and on servers. On the Mac,
+the person picks Goose's provider and model in Goose's own way, and the app shows and switches
+them per agent. On servers, Goose signs in with one provider's key lent from the Mac.
 
 ### The `goose` trap
 
@@ -55,9 +56,18 @@ So "a `goose` was found" never counts as "Goose is installed". The spec rules th
 ways: agents run only a Goose the app installed (D1), and any `goose` the app looks at must say
 it is Goose before the app treats it as installed (FR-003).
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: How should the app get Goose onto the Mac, given that Homebrew's `goose` is a migration tool? → A: The app's own pinned copy, installed from the set-up page. The person's own `goose` is never used (D1).
+- Q: Should this spec cover Goose on Linux servers? → A: Yes. Install Goose on the server as 043 does for Claude, and lend one provider's key per run from Settings (D2).
+- Q: Which approval mode should a Goose agent start in? → A: The person's own Goose mode (usually `auto`), shown clearly, and then the last mode picked in the app (D5).
+
 ## Defaults taken *(Alex to confirm or overturn)*
 
-None of these are settled yet. Each is marked *(default Dn)* where it is used.
+Alex settled D1, D2 and D5 on 2026-09-25. The rest are defaults so that the spec is complete,
+and each is marked *(default Dn)* where it is used.
 
 - **D1. The app's own copy only, installed from the set-up page.** Goose ships as a single
   native program for each platform (macOS Apple silicon and Intel, Linux x86-64 and ARM64), with
@@ -66,23 +76,31 @@ None of these are settled yet. Each is marked *(default Dn)* where it is used.
   pinned Goose release, checked against a checksum the app carries, in the app's own folder,
   which is the pattern Alex settled for Gemini (046 D1) and Codex (047 D3). A `goose` of the
   person's own is never used, changed or removed, even when it is really Goose. This makes the
-  migration-tool trap impossible rather than merely detected. *Alternative: run Goose's own
-  `download_cli.sh` into `~/.local/bin` like Grok, Copilot and Cursor, which needs D1a.*
+  migration-tool trap impossible rather than merely detected. *(Settled by Alex, 2026-09-25,
+  over running Goose's own `download_cli.sh` into `~/.local/bin` like Grok, Copilot and Cursor.)*
 - **D1a. If Goose's own installer is ever run, it runs non-interactively.** Goose's installer
   runs `goose configure` at the end and asks whether to edit the shell's rc files, reading the
-  answers from `/dev/tty`, unless `CONFIGURE=false`. If the app ever runs it (D1's alternative,
-  or on a server), it runs it with `CONFIGURE=false`, never edits `~/.zshrc` or the like, and
-  checks the result is Goose (FR-003).
-- **D2. Mac only in this spec.** Goose on servers is left to a follow-up. On a server, 043 lends
-  one runtime's credential per run. Goose has a credential for each provider, and which provider
-  and which variables to lend is a design of its own. On a server project, a Goose the person
-  installed on the server is offered, as for Grok today. *Alternative: lend one provider's key
-  from Settings (for example `GOOSE_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`) as 043 does
-  for Claude.*
+  answers from `/dev/tty`, unless `CONFIGURE=false`. D1 and D2 do not run it: both fetch the
+  pinned release directly. If a later change ever runs it, it runs with `CONFIGURE=false`, never
+  edits `~/.zshrc` or the like, and checks that the result is Goose (FR-003).
+- **D2. On the Mac and on servers, with one provider's key lent from the Mac.** Servers get
+  Goose the way 043 gives them Claude: a pinned Linux release installed on demand. Its
+  credential is a *Goose server credential* in Settings ▸ Runtime credentials: one provider,
+  that provider's API key, and optionally a model. It is lent to each server run as Goose's own
+  environment (the provider and model as `GOOSE_PROVIDER` and `GOOSE_MODEL`, and the key under
+  the provider's own variable, for example `ANTHROPIC_API_KEY`), and never written to the
+  server's disk. The Mac's own Goose configuration and Keychain keys are never copied to a
+  server. *(Settled by Alex, 2026-09-25.)*
+- **D2a. Key-based providers only, for servers.** The server credential offers the providers
+  whose sign-in is a single API key: Anthropic, OpenAI, Google (Gemini) and OpenRouter. Providers
+  that sign in through a browser (ChatGPT, GitHub Copilot, Tetrate), cloud accounts (Bedrock,
+  Vertex, Databricks, Azure) and local ones (Ollama) are not offered for servers in this version.
+  A server's own Goose configuration is still used on a server marked "use this server's own
+  sign-in only" (043).
 - **D3. The provider is Goose's own setting.** The person chooses a provider and enters its key
   or signs in with `goose configure`, Goose's own interactive set-up. It writes
-  `~/.config/goose/config.yaml` and keeps keys in the Mac's Keychain. The app never asks for a
-  provider key itself and never keeps one. The app's sign-in sheet hands over the exact command
+  `~/.config/goose/config.yaml` and keeps keys in the Mac's Keychain. On the Mac, the app never
+  asks for a provider key itself and never keeps one (servers are D2). The app's sign-in sheet hands over the exact command
   for the app's copy, with **Open Terminal** and **Copy**, as it does for Copilot.
 - **D4. Provider, model and thinking effort per agent, in the app.** Goose reports a **Provider**
   menu, a **Model** menu and, where the model has one, a **Thinking effort** menu for each
@@ -95,8 +113,9 @@ None of these are settled yet. Each is marked *(default Dn)* where it is used.
   ones) and `chat` (no tools). They show in the modes menu. A Goose agent starts in whatever mode
   the person's Goose is set to, which is `auto` for a Goose never configured otherwise. After
   that, the app remembers the last mode picked for Goose, and helpers inherit it, as for other
-  runtimes. *Alternative: start the first Goose agent in `smart_approve` whatever Goose's own
-  default is.*
+  runtimes. On a server, with no Goose configuration there, that means `auto` until a mode is
+  picked. *(Settled by Alex, 2026-09-25, over starting the first agent in `smart_approve` or
+  `approve`.)*
 - **D6. The person's own Goose settings are left alone.** The app does not edit
   `~/.config/goose/config.yaml`, `secrets.yaml`, Goose's Keychain items, its custom providers,
   its recipes or its saved sessions. It does not point Goose at a config folder of its own
@@ -236,12 +255,40 @@ they do for Claude. The fourth is refused, or is named residue.
 
 ---
 
+### User Story 5 - Goose on servers (Priority: P3)
+
+The person has a bare Linux server added as in 043. In Settings ▸ Runtime credentials, they add
+a Goose server credential: they pick Anthropic, paste an Anthropic API key, and optionally pick a
+model. When they start a Goose agent in a project on that server, the server installs Goose's
+pinned release the first time, with its progress in the set-up checklist. The agent then runs on
+Anthropic with the key lent from the Mac. The key is never written to the server's disk, and the
+Mac's own Goose configuration stays on the Mac.
+
+**Why this priority**: It extends 043 to Goose. That matters for the ephemeral servers 043 is
+about, but the Mac comes first.
+
+**Independent Test**: With a Goose server credential in Settings and a Linux server with nothing
+on it, start a Goose agent in a server project and ask it to run `uname -a`. The reply comes
+back from the chosen provider. Afterwards, a search of the server's disk finds the key nowhere,
+and no `~/.config/goose` was copied from the Mac.
+
+**Acceptance Scenarios**:
+
+1. **Given** Settings' runtime credentials, **When** the person opens them, **Then** Goose is listed beside the others, with a provider picker (Anthropic, OpenAI, Google, OpenRouter), where to get that provider's key, an optional model, and a field to paste the key *(default D2, D2a)*.
+2. **Given** a pasted key, **When** it is saved, **Then** the app checks it with that provider, says in words whether it works, keeps it only in the Mac's Keychain, and shows it masked afterwards.
+3. **Given** a server without Goose, **When** Goose is first needed there, **Then** the server installs the pinned Linux release for its architecture, checks it against the app's checksums and FR-003, and shows its progress. A failed install names its cause and leaves nothing half-installed *(default D2, D7)*.
+4. **Given** a Goose agent starting on a server, **When** it starts, **Then** the provider, model and key reach that run only, as Goose's environment. They are not written to the server's disk, any log or any transcript, and are not sent to a server for any other runtime.
+5. **Given** a server marked "use this server's own sign-in only" (043), **When** a Goose agent starts there, **Then** nothing is lent, and the server's own Goose configuration is used.
+6. **Given** no Goose server credential in Settings and no Goose configuration on the server, **When** the person starts a Goose agent there, **Then** the app asks for a provider and key in place before starting. It never copies the Mac's Goose configuration or Keychain keys.
+7. **Given** a Goose agent on a server, **When** the person opens its model menu, **Then** it shows what Goose reports there. A switch to a provider with no key on the server says so, as on the Mac (Story 3, scenario 4).
+
+---
+
 ### Everywhere a runtime is chosen
 
 Goose is offered wherever another runtime is: a workflow's steps, the phone's and iPad's start
 forms, the runtime menu above the prompt, and `start_agent` from another agent. On a server
-project it is offered when a Goose is installed on that server, found and checked as on the Mac
-*(default D2)*.
+project it is offered when it is installed there, or can be installed there (User Story 5).
 
 ### Edge Cases
 
@@ -258,6 +305,9 @@ project it is offered when a Goose is installed on that server, found and checke
 - **A picture attached.** It goes as a picture, since Goose says it takes pictures, unless the chosen model cannot read pictures. In that case Goose's own refusal is shown in a sentence.
 - **The person's Goose recipes, skills and sessions.** They are never written by the app. The app's Goose sessions are saved where Goose saves sessions, so they also appear in Goose's own session list and in Goose Desktop. The plan records whether that can be avoided, and the docs say it if not.
 - **An unsupported Mac.** If the pinned release has no build for this Mac, Goose is shown as unavailable, with the reason, and it is not offered in the start form.
+- **A server with its own `goose`.** A `goose` already on the server, whether Goose or the migration tool, is not used or changed. The server runs the app's pinned copy, as on the Mac *(default D1, D2)*.
+- **A key the provider refuses on a server.** The agent stops with a sentence saying the provider refused the Goose server key, with a way to replace it, and this reads differently from any other failure (043 FR-016).
+- **A server credential for a provider the server cannot reach.** A firewall or a region block is Goose's error. The turn ends with it in a sentence, not as a refused key.
 
 ## Requirements *(mandatory)*
 
@@ -298,15 +348,20 @@ project it is offered when a Goose is installed on that server, found and checke
 - **FR-019**: The app's own tools MUST NOT be held behind Goose's approval prompts where Goose allows exempting them. Where it does not, the briefing MUST NOT claim they run without asking.
 - **FR-020**: The app MUST NOT write to `~/.config/goose` or Goose's Keychain items, and MUST NOT point Goose at another config folder. Everything it sets for its own agents MUST be passed when it starts that agent *(default D6)*.
 
-**Servers**
+**Goose on servers**
 
-- **FR-021**: On a server project, Goose MUST be offered only when a `goose` on the server passes FR-003. The app MUST NOT install Goose on a server or lend it a credential in this feature *(default D2)*.
+- **FR-021**: Settings' runtime credentials MUST list Goose. It takes one provider (Anthropic, OpenAI, Google or OpenRouter), that provider's API key, and an optional model. The app MUST check the key with that provider on save, say in words whether it works, keep it only in the Mac's Keychain, and show it masked afterwards *(default D2, D2a)*.
+- **FR-022**: A server MUST install Goose's pinned Linux release on demand, from official sources, checked against checksums the app carries and FR-003, with progress in the set-up checklist. An incomplete install MUST never be used, and a `goose` already on the server MUST NOT be used or changed *(default D2, D7)*.
+- **FR-023**: The Goose server credential MUST reach a server only as Goose's environment when starting Goose there, for that run. It MUST NOT be written to the server's disk, any log, transcript or crash report, or sent for any other runtime.
+- **FR-024**: The Mac's Goose configuration and its Keychain keys MUST NOT be copied, lent or sent to any server.
+- **FR-025**: 043's rules for servers MUST hold for Goose as they do for Claude: a server's "own sign-in only" mark, asking for the credential in place when none is usable, a refused key shown as its own failure, and a rebuilt server set up again on confirmation.
 
 ### Key Entities
 
 - **Goose runtime**: an entry in the app's runtime list. It holds its name, how it is started (the app's copy of `goose`, with the `acp` subcommand), how it is installed (a pinned release from the set-up page), how it is recognised (FR-003), and what it says about itself when it starts.
-- **Goose release**: the pinned Goose version, with a download and a checksum for each Mac architecture, installed in the app's own folder and replaced as a whole.
+- **Goose release**: the pinned Goose version, with a download and a checksum for each platform (macOS and Linux, ARM64 and x86-64). On the Mac it is installed in the app's own folder from the set-up page. On a server it is one of 043's installed tools. Either way it is replaced as a whole.
 - **Goose session options**: what Goose reports for each agent (provider, model, thinking effort, mode), shown in the app's menus, changed for that agent only.
+- **Goose server credential**: one provider, that provider's API key and an optional model, for servers only. It is kept in the Mac's Keychain and masked when shown, with when it was added and when it last worked. This is 043's runtime credential, gaining a kind that names its provider.
 - **Goose tool policy**: which of Goose's tools are removed for the app's agents, which remain as residue and why, how its questions reach the person, and whether the app's tools are exempt from its approval prompts.
 
 ## Success Criteria *(mandatory)*
@@ -319,13 +374,15 @@ project it is offered when a Goose is installed on that server, found and checke
 - **SC-004**: Every failure in the edge cases above shows as a sentence naming its cause. None shows as an endless wait or as "stopped answering".
 - **SC-005**: After a day of Goose agents in the app, including switching provider, model and mode in the menus, the person's `~/.config/goose` is byte for byte what it was before.
 - **SC-006**: A Goose agent's turns end with the app's outcome report in at least 9 of 10 turns in modes that allow tools, as measured for the other runtimes that have the app's tools.
+- **SC-007**: From a bare Linux server, a person with a Goose server credential in Settings gets a Goose agent's first reply within 5 minutes, having run no command on the server. Afterwards, a search of the server's disk and the Mac's logs finds the key in neither, and finds no copy of the Mac's Goose configuration on the server.
 
 ## Docs *(mandatory)*
 
 - `docs/reference/runtimes.md` — change: the runtime count, plus a Goose row: command `goose acp` (the app's copy), pictures, sign-in (hands over `goose configure`), app tools, notes on modes (`auto` approves on its own), providers, and residue. Name the pressly/goose trap in the notes, as Cursor's row names `agent`.
 - `docs/how-to/sign-a-runtime-in.md` — change: name Goose among the runtimes, and explain that signing Goose in means choosing a provider with `goose configure`.
 - `docs/explanation/scoped-tools.md` — change: add Goose's removed tools and its residue.
-- `docs/how-to/add-a-linux-server.md` — change: Goose is offered on a server when the person has installed it there. The app does not install it there yet.
+- `docs/how-to/add-a-linux-server.md` — change: Goose installs on a server as Claude does, it takes a provider and that provider's key from Settings, and why the Mac's own Goose set-up stays on the Mac.
+- `docs/reference/settings.md` — change: the runtime credentials entry lists Goose's server credential (provider, key, optional model).
 
 ## Assumptions
 
@@ -336,12 +393,13 @@ project it is offered when a Goose is installed on that server, found and checke
   - Each session reports config options `provider` (with "Goose (Default)" meaning the configured default), `mode`, `model` and `thinking_effort`. Modes are `auto` (default), `approve`, `smart_approve` and `chat`.
   - Permission asks use ACP's `session/request_permission` with allow once / allow always / reject once / reject always. A form elicitation from an MCP server is forwarded as an ACP elicitation when the client says it supports one.
   - Goose's own overlapping tools include `scheduler__manage_schedule` (only with `--enable-scheduler`), `summon` and delegation to subagents, `extensionmanager__manage_extensions` (which can switch on more extensions mid-session), and `chatrecall`.
-- **The plan's research must measure, against a real Goose in a scratch home:** the checksum and download for each architecture; whether the macOS build runs without a Gatekeeper prompt when fetched by the app; that `goose --version` and `initialize` identify it (FR-003); whether an unconfigured Goose fails at `session/new` or at the first prompt; whether switching `provider` or `model` over ACP writes `config.yaml` (D4 turns on this); how to remove or disable `summon`, the extension manager and the person's own extensions for one session without writing their config; whether the app's MCP tools can be exempt from Goose's approval; whether Goose raises a question of its own over ACP; the Keychain prompt for the app's copy; and where the app's Goose sessions are saved. Alex's provider key is needed for the live proof.
+- **The plan's research must measure, against a real Goose in a scratch home:** the checksum and download for each architecture; whether the macOS build runs without a Gatekeeper prompt when fetched by the app; that `goose --version` and `initialize` identify it (FR-003); whether an unconfigured Goose fails at `session/new` or at the first prompt; whether switching `provider` or `model` over ACP writes `config.yaml` (D4 turns on this); how to remove or disable `summon`, the extension manager and the person's own extensions for one session without writing their config; whether the app's MCP tools can be exempt from Goose's approval; whether Goose raises a question of its own over ACP; the Keychain prompt for the app's copy; where the app's Goose sessions are saved; and whether the Linux build (glibc or musl) runs on 043's supported servers. Alex's provider key is needed for the live proof.
 - **Builds on 048** (the set-up page and Mac installs, merged `ee64697`) and on 047's groundwork for "only the app's copy" runtimes and pinned updates. Goose is the first app-copy runtime that is a single native program with no Node beside it.
-- `LoginShellPath.fallbacks` searches `~/.local/bin`, where Goose's own installer puts `goose` by default (`GOOSE_BIN_DIR`). With D1 that only matters for recognising (and ignoring) the person's own copy. It would matter for installing only under D1's alternative, where `/opt/homebrew/bin` coming first is exactly the trap.
+- `LoginShellPath.fallbacks` searches `~/.local/bin`, where Goose's own installer puts `goose` by default (`GOOSE_BIN_DIR`). With D1 that only matters for recognising (and ignoring) the person's own copy. Installing there, as Grok, Copilot and Cursor do, was turned down because `/opt/homebrew/bin` comes first, which is exactly the trap.
 - 046, 047 and this spec each add a runtime, a policy entry and a set-up row. Whichever merges later takes the others' rows.
 - The phone and iPad start Goose agents through the Mac. Nothing Goose-specific runs on them.
-- Goose on servers, the app installing Goose on a server, and lending a provider key are out of scope *(default D2)*.
+- Goose reads its provider, model and the provider's key from its environment, which overrides its config file (per Goose's provider docs). So a server can be signed in by lending them per run, as 043 does for Claude. The plan measures this against the pinned release, including that Goose does not try to save a key it was given only in its environment.
+- Browser-sign-in, cloud-account and local providers on servers, and more than one Goose server credential, are out of scope *(default D2a)*.
 
 ## Sources
 
