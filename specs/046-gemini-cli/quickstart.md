@@ -6,7 +6,7 @@ the scratch root's environment only, never in the real app's.
 ## 1. Handshake (no key)
 
 ```sh
-scripts/acp-handshake.sh gemini
+scripts/acp-handshake.sh gemini   # once Phase 1 adds gemini to its RUNTIMES
 ```
 
 Expect `agentInfo.version` = the pinned version, `loadSession: true`, four auth methods, and
