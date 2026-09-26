@@ -58,6 +58,9 @@ SPENT = {"jetbrains": {"air": {"version": 1, "sessionFailure": {
 def prompt(request_id, params):
     session_id = params.get("sessionId", "")
     blocks = params.get("prompt", [])
+    # Every prompt it was sent, one JSON line each, for a walk to read back.
+    with open(os.path.join(HERE, f"{NAME}.prompts"), "a") as f:
+        f.write(json.dumps(blocks) + "\n")
     how = behaviour().split()
     if how and how[0] == "spent":
         # `spent <epoch>`: the plan window says when it is back, as Claude's does.
