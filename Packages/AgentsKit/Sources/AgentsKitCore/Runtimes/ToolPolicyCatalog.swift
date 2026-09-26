@@ -54,6 +54,10 @@ public enum ToolPolicyCatalog {
             RemovedTool(name: "DesignSync", category: .artefacts),
             RemovedTool(name: "mcp__claude_ai_Claude_Docs", category: .artefacts),
             RemovedTool(name: "mcp__claude_ai_Google_Drive", category: .artefacts),
+            // Claude Code's own worktree tools move the session somewhere the app cannot
+            // see: its Changes, its resume and its cleanup would all stay behind (053).
+            RemovedTool(name: "EnterWorktree", category: .workingFolder),
+            RemovedTool(name: "ExitWorktree", category: .workingFolder),
         ],
         kept: [
             KeptTool(name: "AskUserQuestion",

@@ -18,6 +18,9 @@ struct TerminalPane: View {
     @State private var client: ShellClient?
     @State private var rows = 24
     @State private var cols = 80
+    /// The folder `cd` was typed for from the strip, so the strip goes once it has done
+    /// its job: the shell's own folder is not something the daemon can follow.
+    @State private var cdTypedFor: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +39,9 @@ struct TerminalPane: View {
                     }
                     if !client.state.isLive {
                         ended(client)
+                    } else if let opened = client.folder, !sameFolder(opened, agent.cwd),
+                              cdTypedFor.map({ !sameFolder($0, agent.cwd) }) ?? true {
+                        moved(client, from: opened)
                     } else if client.dropped > 0 {
                         Note("The earlier part of this session is no longer held.")
                     }
@@ -72,6 +78,35 @@ struct TerminalPane: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Paper.well)
+    }
+
+    /// The agent moved (053) while this shell went on in the folder it was started in.
+    /// The shell is the person's and may be running something, so nothing ends it: the
+    /// strip says where each of them is, and offers to type the `cd` for them.
+    private func moved(_ client: ShellClient, from opened: URL) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.branch")
+                .foregroundStyle(.secondary)
+            Text("This shell is in \(opened.lastPathComponent). The agent now works in \(agent.worktree?.name ?? agent.cwd.lastPathComponent).")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Button("Type cd there") {
+                let path = agent.cwd.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
+                cdTypedFor = agent.cwd
+                Task { await client.send(Data("cd '\(path)'\r".utf8)) }
+            }
+            .controlSize(.small)
+            .help("Types cd \(agent.cwd.path(percentEncoded: false)) into this shell")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Paper.well)
+    }
+
+    private func sameFolder(_ one: URL, _ other: URL) -> Bool {
+        one.resolvingSymlinksInPath().standardizedFileURL.path == other.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }
 

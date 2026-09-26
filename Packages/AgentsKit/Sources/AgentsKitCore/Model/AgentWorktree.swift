@@ -85,14 +85,16 @@ public enum WorktreeName {
         return trimmed.isEmpty ? "branch" : trimmed
     }
 
-    public static func from(prompt: String, now: Date = Date()) -> String {
+    /// `keepingFiller` is for a name somebody chose (053's `enter_worktree`): every word
+    /// of it is kept, up to the length limit, rather than the first few that say the most.
+    public static func from(prompt: String, keepingFiller: Bool = false, now: Date = Date()) -> String {
         let folded = prompt.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
             .lowercased()
         let words = folded
             .split { !($0.isASCII && ($0.isLetter || $0.isNumber)) }
             .map(String.init)
-            .filter { !filler.contains($0) }
-            .prefix(wordLimit)
+            .filter { keepingFiller || !filler.contains($0) }
+            .prefix(keepingFiller ? Int.max : wordLimit)
 
         var name = ""
         for word in words {

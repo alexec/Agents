@@ -61,6 +61,8 @@ struct ChangesPane: View {
         }
         .onChange(of: model.entries.count) { _, _ in noticeFinishedEdits() }
         .onChange(of: agent.state) { _, _ in revision += 1 }
+        // A move changes where git's view is taken, whether or not a turn went with it (053).
+        .onChange(of: agent.cwd) { _, _ in revision += 1 }
         .onAppear { seenEntries = model.work.firstEntryIndex + model.entries.count }
     }
 

@@ -134,6 +134,9 @@ public actor DaemonCore {
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
     /// and a daemon that restarts has nothing to apologise for (022 FR-016).
     var artifactEdits: [UUID: [ArtifactEdit]] = [:]
+    /// What an agent that has just moved is told at the start of its next turn, whoever
+    /// sends it (053). Once, and then forgotten: the chat keeps the line that says so.
+    var moveNotes: [UUID: String] = [:]
     /// Each agent's reported edits, folded from its transcript the first time the
     /// Changes pane asks and caught up on every ask after (035). Not persisted: the
     /// transcript is the record, and folding it again costs one read.

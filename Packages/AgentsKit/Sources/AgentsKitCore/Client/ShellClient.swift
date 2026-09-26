@@ -21,6 +21,9 @@ public final class ShellClient {
     /// Bytes the daemon says were dropped off the front of the buffer. Non-zero means
     /// the replay is the end of the session rather than the whole of it.
     public private(set) var dropped = 0
+    /// The folder this shell was started in, once attached. An agent that has moved since
+    /// (053) works somewhere else, and the pane says so.
+    public private(set) var folder: URL?
 
     /// Where incoming bytes go: the emulator, set by the pane once its view exists.
     @ObservationIgnored public var onOutput: ((Data) -> Void)?
@@ -49,6 +52,7 @@ public final class ShellClient {
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = response.dropped
+            folder = response.folder
             isAttached = true
             problem = nil
             // Replay what the shell printed before this screen was looking. Feeding
@@ -99,6 +103,7 @@ public final class ShellClient {
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = 0
+            folder = response.folder
             isAttached = true
             problem = nil
         } catch {
