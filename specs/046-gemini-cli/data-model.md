@@ -12,7 +12,7 @@ kind and one toolset.
 | `executable` | `gemini` (the toolset's shim `bin/gemini`) |
 | `arguments` | `["--acp"]` (the policy file's `--policy <path>` is appended at launch) |
 | `install` | `.toolset(runtimeID: "gemini")` |
-| `installPage` | `https://github.com/google-gemini/gemini-cli#-installation` |
+| `installPage` | `https://github.com/google-gemini/gemini-cli` |
 | `usesAppCopyOnly` (new) | `true`: the PATH is never searched |
 
 An agent keeps the shim path it started with until it ends (FR-003a).
