@@ -1,4 +1,5 @@
 import AgentsKit
+import AppKit
 import SwiftUI
 
 /// A project's own skills, on its page between Workflows and Worktrees (059, look/ frame D):
@@ -43,6 +44,11 @@ struct ProjectSkillsSection: View {
             }
             Color.clear.frame(height: 0)
                 .task(id: folder) { await load(folder) }
+                // A skill an agent or `npx skills` added meanwhile shows when the app comes
+                // back to the front, as Settings ▸ Shared does.
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    Task { await load(folder) }
+                }
                 .sheet(item: Binding(get: { updating.map(UpdateTarget.init) }, set: { updating = $0?.name })) { target in
                     UpdateSkillSheet(name: target.name, destination: .project(folder: folder.path), runtimes: runtimes,
                                      onUpdated: { Task { await load(folder) } })
