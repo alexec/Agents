@@ -3,13 +3,13 @@ import Foundation
 
 /// Pairing (021 US5): who may be told, and (046) who may reach this Mac from away.
 ///
-/// A device announces itself once with its public key, and from then on it is routed
-/// to and sealed to. There is still no approving (Alex, 2026-09-21, confirmed for 046's
-/// D1): the announce arrives over the person's own network, so a device that can
-/// announce is already theirs, and it is handed the Mac's relay key in the reply. There
-/// is forgetting since 046: a paired device can drive agents from anywhere through the
-/// relay, so a lost one has to be able to be cut off (FR-008). A forgotten device that
-/// announces again at home is paired again.
+/// A device pairs by scanning the code the Mac shows (security review, Phase 3; this
+/// replaces 046's D1, where announcing on the home network was enough). The code holds
+/// the Mac's key and a one-time secret; the bridge takes the secret as a TLS key, and
+/// only a connection locked with it may announce a device the Mac has not seen. A
+/// paired device announces again over its own link, which only updates its record.
+/// A lost device is forgotten (FR-008), which ends both links, and pairs again by
+/// scanning again.
 extension DaemonCore {
     /// Every record, read from disk the first time it is wanted.
     var devices: [UUID: Device] {
@@ -41,7 +41,22 @@ extension DaemonCore {
     /// its record back. The same id with a **different** key is refused: a key never
     /// changes under an identity, and a device that wants a new key is a new device
     /// with a new id.
-    func announce(_ announcement: DaemonAPI.DeviceAnnouncement) throws -> Device {
+    ///
+    /// A device not yet on record is taken only from a connection locked with the pairing
+    /// code the Mac is showing, and that code is then spent. The Mac's own window may
+    /// still record one, as it always could; a device's connection never.
+    func announce(_ announcement: DaemonAPI.DeviceAnnouncement, role: ConnectionRole = .control) throws -> Device {
+        if role == .pairing {
+            guard let code = pendingPairing, code.expires > now() else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
+                                   message: "That pairing code has run out. Show a new one on the Mac.")
+            }
+        }
+        if device(announcement.id) == nil, role == .device {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
+                               message: "Pair this device by scanning the code in the Mac's Settings.")
+        }
+        defer { if role == .pairing { endPairing() } }
         if let existing = device(announcement.id) {
             guard existing.publicKey == announcement.publicKey else {
                 throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
@@ -77,6 +92,56 @@ extension DaemonCore {
         try deviceStore.save(Array(all.values))
         broadcast(DaemonAPI.Notification.deviceChanged, DaemonAPI.DeviceNotification(removed: id))
         reconsider()
+    }
+
+    // MARK: Pairing codes
+
+    /// `devices/startPairing`. A fresh code each time, replacing any before it, so two
+    /// sheets opened one after the other leave only the second's code working.
+    func startPairing() throws -> DaemonAPI.PairingCode {
+        guard let macKey = relayKey() else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
+                               message: "The phone bridge isn't running, so there is nothing for a phone to pair with.")
+        }
+        // The system's generator: arc4random on the Mac, getrandom on Linux, both made
+        // for secrets.
+        var generator = SystemRandomNumberGenerator()
+        let secret = Data((0..<32).map { _ in UInt8.random(in: .min ... .max, using: &generator) })
+        let code = DaemonAPI.PairingCode(macKey: macKey, secret: secret, name: Self.macName,
+                                         expires: now().addingTimeInterval(Self.pairingLifetime))
+        pendingPairing = code
+        broadcast(DaemonAPI.Notification.pairingChanged, JSONValue.object([:]))
+        return code
+    }
+
+    /// `devices/stopPairing`.
+    func stopPairing() {
+        endPairing()
+    }
+
+    /// `pairing/current`, for the bridge. An expired code is not handed out.
+    func currentPairing() -> DaemonAPI.PairingSecret {
+        guard let code = pendingPairing, code.expires > now() else { return DaemonAPI.PairingSecret(secret: nil, expires: nil) }
+        return DaemonAPI.PairingSecret(secret: code.secret, expires: code.expires)
+    }
+
+    func endPairing() {
+        guard pendingPairing != nil else { return }
+        pendingPairing = nil
+        broadcast(DaemonAPI.Notification.pairingChanged, JSONValue.object([:]))
+    }
+
+    /// Five minutes: long enough to find the phone and open the app, short enough that a
+    /// code left on the screen is soon worth nothing.
+    static let pairingLifetime: TimeInterval = 5 * 60
+
+    /// What the bridge advertises itself as, so the phone looks for this Mac by name.
+    static var macName: String {
+        #if os(macOS)
+        Host.current().localizedName ?? "This Mac"
+        #else
+        ProcessInfo.processInfo.hostName
+        #endif
     }
 
     /// The public half of the Mac's relay key, if a bridge has registered one (046).

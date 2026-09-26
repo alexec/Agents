@@ -22,11 +22,15 @@ public final class DaemonServer: @unchecked Sendable {
         /// agent's token to the helper its own runtime started, rather than to anything
         /// that read the token off `ps`.
         public var peer: Int32?
+        /// What the connection is, as the server has it now: a device's rights, or a
+        /// pairing phone's, reach the daemon with the request so it can tell them apart.
+        public var role: ConnectionRole
 
-        public init(id: UUID, surface: Surface?, peer: Int32? = nil) {
+        public init(id: UUID, surface: Surface?, peer: Int32? = nil, role: ConnectionRole = .control) {
             self.id = id
             self.surface = surface
             self.peer = peer
+            self.role = role
         }
     }
 
@@ -63,10 +67,10 @@ public final class DaemonServer: @unchecked Sendable {
 
         /// A window's connection becomes a device's, for good. Only a window's may: a
         /// helper or a stranger that could say this would be choosing its own rights.
-        func bindDevice(_ device: UUID?) -> Bool {
+        func bindDevice(_ device: UUID?, pairing: Bool = false) -> Bool {
             lock.lock(); defer { lock.unlock() }
             guard _role == .control else { return false }
-            _role = .device
+            _role = pairing ? .pairing : .device
             if let device {
                 _device = device
                 _surface = .device(device)
@@ -79,14 +83,14 @@ public final class DaemonServer: @unchecked Sendable {
         /// it always could.
         func mayClaim(_ claimed: UUID) -> Bool {
             lock.lock(); defer { lock.unlock() }
-            guard _role == .device else { return true }
+            guard _role == .device || _role == .pairing else { return true }
             if let _device { return _device == claimed }
             _device = claimed
             _surface = .device(claimed)
             return true
         }
 
-        var context: ConnectionContext { ConnectionContext(id: id, surface: surface, peer: peer) }
+        var context: ConnectionContext { ConnectionContext(id: id, surface: surface, peer: peer, role: role) }
     }
 
     private let url: URL
@@ -203,6 +207,11 @@ public final class DaemonServer: @unchecked Sendable {
             // what only a window may, or a shell asking for anything at all.
             let role = identity.role
             guard role.allows(method) else {
+                // A phone refused is a phone that does less than it did, and the phone's
+                // own screen is the only other place that would say so.
+                if role == .device || role == .pairing {
+                    DaemonLog.shared.write("socket: refused \(method) to a \(role.rawValue) connection")
+                }
                 return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                              message: "\(method) is not open to this connection (\(role.rawValue))."))
             }
@@ -210,11 +219,13 @@ public final class DaemonServer: @unchecked Sendable {
             // alone: the daemon never hears it, only the rights that follow from it.
             if method == DaemonAPI.Method.connectionBindDevice {
                 let binding = (try? params?.decode(DaemonAPI.DeviceBinding.self)) ?? DaemonAPI.DeviceBinding(id: nil)
-                guard identity.bindDevice(binding.id) else {
+                guard identity.bindDevice(binding.id, pairing: binding.pairing == true) else {
                     return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                                  message: "Only a window's connection can be given to a device."))
                 }
-                DaemonLog.shared.write("socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
+                DaemonLog.shared.write(binding.pairing == true
+                    ? "socket: a connection now carries a device that is pairing"
+                    : "socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
                 return .success([:])
             }
             // A device naming itself, by saying which it is or announcing its key. On a

@@ -83,6 +83,9 @@ public actor DaemonCore {
     /// `DaemonCore+Devices`.
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
+    /// The pairing code the Mac is showing, if it is showing one: memory only, so a
+    /// daemon that restarts has let it go.
+    var pendingPairing: DaemonAPI.PairingCode?
     /// What has already been told to whom, read once by `loadAttention()` and written
     /// whenever it moves. See `DaemonCore+Attention`.
     lazy var attentionStore = AttentionStore(locations: locations)
