@@ -30,6 +30,10 @@ extension Trait where Self == ConditionTrait {
     /// - BigContentTests.aMegabyteDiffIsReadQuickly — a 500 ms budget.
     /// - DaemonTests.theRestartWordsGoAheadOfWhatWasQueued — on the GitHub runner, both
     ///   prompts had not gone within `eventually`'s wait (2026-09-26); green on a Mac.
+    /// - Wall-clock budgets, which a shared runner cannot promise: ChangesTests.
+    ///   twoHundredFilesAreQuickToList (1 s / 500 ms, failed on the runner 2026-09-26),
+    ///   FilesPaneScaleTests.aFolderOfFiftyThousandEntriesListsQuickly (2 s) and
+    ///   SSHMasterTests.aMasterThatDiesIsNoticedWithinASecond (1 s).
     /// - LeaseTests.aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack —
     ///   the next in line is never started with the news (1 of 3 runs under CI=1).
     static var flakyUnderLoad: Self {
