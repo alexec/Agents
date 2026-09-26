@@ -45,3 +45,30 @@ the Linux agentsd built from this branch:
 
 Also found: main's Linux agentsd no longer built (048/047's Mac installer imports CryptoKit and
 URLSession). Guarded: a server's agentsd hashes and downloads nothing of its own (043).
+
+## 2026-09-25 (evening) — live walk on gemini-3-flash-preview, scratch root /tmp/run-046
+
+Three real bugs found and fixed, each proven by a test that reproduces what Gemini did:
+
+1. **No model or mode menu for Gemini** (`b11d931`). Gemini sends `models` and `modes`, not
+   `configOptions`, and sets them with `session/set_model` / `session/set_mode`. The app showed
+   neither menu and dropped a model chosen at the start, so every turn ran on **Auto**, which
+   picked a Pro model and spent the free tier's daily quota. Now the same two menus, set the
+   older way. Live: the agent ran on gemini-3-flash-preview as chosen.
+2. **New files could not be written through the app** (`b153ad4`). Gemini's `write_file` counts
+   only an error with code `ENOENT` as "a new file", and a JSON-RPC error over ACP can never
+   carry one, so "Resource not found" was not enough. Gemini now reads files itself and still
+   writes through the app. Live: `notes.md` created in one write, with the permission ask and
+   diff, no shell, no retries (agent D12830DA).
+3. **Picking a Gemini conversation back up lost it** (`3c644dd`). Gemini answers `session/load`
+   with -32000 "Authentication required" until `authenticate` is called, key or not. Reproduced
+   by hand against the installed Gemini: `authenticate gemini-api-key` then `session/load` loads
+   it. The session now signs in first. Proven by test (GeminiContinueTests); the live re-check was
+   stopped by the quota.
+
+Also seen: a quota refusal now reads "Gemini hit its provider's limit: You have exhausted your
+daily quota on this model." Gemini, told a one-off task was done, chose `afterwards: archive`
+on `finish_turn` (main's new option), so those agents archived themselves — as the option's
+description allows. Gemini keeps its own chat history and project names in `~/.gemini/tmp` and
+`~/.gemini/projects.json` of whoever runs the daemon (the real home, for a scratch daemon); the
+app writes none of it, and `~/.gemini/settings.json` was never created.

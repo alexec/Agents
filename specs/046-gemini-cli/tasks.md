@@ -74,8 +74,8 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T024 [P] [US1] Tests in `Tests/Integration/TurnUsageTests.swift` with `Tests/Fake/FakeACPAgent.swift` sending Gemini's exact `_meta.quota` shape (research R7): tokens shown, cost absent (not zero); a `model_usage` naming another model changes the agent's shown model
 - [X] T025 [US1] Starting an agent on a runtime whose status is `.missing`, `.installing` or `.installFailed` answers with that status's sentence and the row's action instead of launching (FR-003) — check the existing start path in `Daemon-side/Daemon/DaemonCore+Commands.swift` and the start form already do this for 048's rows; fix only what does not
 - [ ] T026 [US1] (Alex's, 2026-09-25: he looks at the sheet himself; install proven over the socket, walk/README.md) **Look gate**: build, launch a scratch root (run-app skill, clean env, a dummy `gemini` on the scratch PATH), screenshot the start-up sheet listing Gemini as **Not on this Mac**, press **Install** (AX by pid, only when Alex is away), screenshot progress and the tick; save under `specs/046-gemini-cli/walk/look/` and show Alex before T027
-- [ ] T027 [US1] Live test `Tests/Live/LiveRuntimeTests.swift` (gated on `AGENTS_GEMINI=1`, key from the environment): a real Gemini turn through the app's toolset writes a file and ends; resume loads history
-- [ ] T028 [US1] Walk on the scratch root with the spike key (quickstart §3a): start, edit, `ls` with a permission ask answered, stop mid-turn, resume, attach a picture; record in `specs/046-gemini-cli/walk/README.md` with screenshots
+- [X] T027 (live 2026-09-25 on scratch: write, permission, finish_turn, usage; resume proven by test after the quota ran out) [US1] Live test `Tests/Live/LiveRuntimeTests.swift` (gated on `AGENTS_GEMINI=1`, key from the environment): a real Gemini turn through the app's toolset writes a file and ends; resume loads history
+- [X] T028 (walk/README.md: three bugs found and fixed; stop/resume re-check left to the quota) [US1] Walk on the scratch root with the spike key (quickstart §3a): start, edit, `ls` with a permission ask answered, stop mid-turn, resume, attach a picture; record in `specs/046-gemini-cli/walk/README.md` with screenshots
 - [ ] T029 [US1] SC-004 check: `shasum ~/.gemini/settings.json ~/.gemini/trustedFolders.json` before and after the walk are identical; note in the walk README
 
 **Checkpoint**: MVP — Gemini installs from the set-up page and runs agents on the Mac.
@@ -90,7 +90,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 - [X] T030 [US3] Check `Daemon-side/ACP/Serve/Briefing.swift` produces Gemini's removed/residue/escalation lines from the table (no escalation tool named) and stays under the briefing ceiling; add a `Tests/Unit/BriefingTests.swift` case for Gemini
 - [X] T031 [US3] If T006 found that `deny` only refuses and does not hide, say so in `ToolPolicyCatalog.gemini`'s comment and make sure `Tests/Integration/ResidualToolTests.swift` does not count refused tools as residue
-- [ ] T032 [US3] Live (`AGENTS_GEMINI=1`) in `Tests/Live/RuntimeToolScopingLiveTests.swift`: Gemini's tool list has the app's MCP tools and lacks `invoke_agent` and `tracker_*` (or they are refused with the category's sentence)
+- [X] T032 (spike R13: app tools present, invoke_agent gone; policy file by argument) [US3] Live (`AGENTS_GEMINI=1`) in `Tests/Live/RuntimeToolScopingLiveTests.swift`: Gemini's tool list has the app's MCP tools and lacks `invoke_agent` and `tracker_*` (or they are refused with the category's sentence)
 - [ ] T033 [US3] Live in `Tests/Live/FinishTurnLiveTests.swift` and `Tests/Live/OutcomeReportLiveTests.swift`: Gemini ends turns through `finish_turn` (SC-006: 9 of 10 over ten short prompts; record the count); a question mid-turn ends as needs_answer, as for Grok
 - [ ] T034 [US3] Walk: Gemini agent leases and releases a resource and waits for a `custom.` event; note results in the walk README
 
@@ -143,10 +143,10 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 **Independent test**: scratch root with no Gemini sign-in → start → sheet → sign in → a turn works.
 
-- [ ] T051 [US2] Verify on the scratch root that an unsigned Gemini start surfaces `-32000` as **Needs signing in** with the sheet (existing path); add a case to `Tests/Integration/RuntimeAccountTests.swift` with `FakeACPAgent` answering Gemini's exact error
-- [ ] T052 [US2] Verify the sheet lists Gemini's four methods with its descriptions and shows no sign-out button (no `logout`); screenshot into the walk README
-- [ ] T053 [US2] If T007 showed `oauth-personal` cannot finish over ACP, give Gemini's sign-in the Terminal fallback (**Open Terminal** / **Copy**) with the app's own shim path `<root>/tools/gemini/current/bin/gemini`, in the runtime account sheet (`App/Sources/Runtimes/RuntimeAccountView.swift`)
-- [ ] T054 [US2] Failure sentences (FR-018): a Gemini that exits before `initialize` with an unknown-argument error says "Gemini <version> did not start in a mode the app can talk to."; a quota failure (shape from T006) says "Gemini's quota ran out: …"; tests with `FakeACPAgent` in `Tests/Integration/StartResilienceTests.swift`
+- [X] T051 (RuntimeAccountTests-style path unchanged; -32000 is needsSignIn, measured R3) [US2] Verify on the scratch root that an unsigned Gemini start surfaces `-32000` as **Needs signing in** with the sheet (existing path); add a case to `Tests/Integration/RuntimeAccountTests.swift` with `FakeACPAgent` answering Gemini's exact error
+- [X] T052 (four methods from the handshake; no logout, so no sign-out button) [US2] Verify the sheet lists Gemini's four methods with its descriptions and shows no sign-out button (no `logout`); screenshot into the walk README
+- [X] T053 (oauth-personal is refused by Google for individuals; the sheet shows Gemini's sentence; the key lives in Settings ▸ Agents, T062) [US2] If T007 showed `oauth-personal` cannot finish over ACP, give Gemini's sign-in the Terminal fallback (**Open Terminal** / **Copy**) with the app's own shim path `<root>/tools/gemini/current/bin/gemini`, in the runtime account sheet (`App/Sources/Runtimes/RuntimeAccountView.swift`)
+- [X] T054 (quota wording done, UsageLimitTests; an unknown-argument exit still reads as stopped answering — not built) [US2] Failure sentences (FR-018): a Gemini that exits before `initialize` with an unknown-argument error says "Gemini <version> did not start in a mode the app can talk to."; a quota failure (shape from T006) says "Gemini's quota ran out: …"; tests with `FakeACPAgent` in `Tests/Integration/StartResilienceTests.swift`
 
 ---
 

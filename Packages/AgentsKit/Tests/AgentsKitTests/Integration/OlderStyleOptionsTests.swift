@@ -64,7 +64,7 @@ struct OlderStyleOptionsTests {
 /// Gemini refuses to load a conversation until `authenticate` has been called (046).
 @Suite("Picking a Gemini conversation back up", .timeLimit(.minutes(1)))
 struct GeminiContinueTests {
-    @Test func itSignsInBeforeLoading() async throws {
+    @Test func itSignsInWhenRefusedAndLoads() async throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("AgentsGeminiContinue-\(UUID().uuidString)", isDirectory: true)
         let work = root.appendingPathComponent("work", isDirectory: true)
@@ -93,11 +93,40 @@ struct GeminiContinueTests {
             let received = await agent.received
             if received.contains(ACP.Method.loadSession) { order = received }
         }
+        // Refused, signed in, loaded: the sign-in only once it was needed.
+        let loads = order.indices.filter { order[$0] == ACP.Method.loadSession }
         let signedIn = try #require(order.firstIndex(of: ACP.Method.authenticate))
-        let loaded = try #require(order.firstIndex(of: ACP.Method.loadSession))
-        #expect(signedIn < loaded)
+        #expect(loads.count == 2)
+        #expect(loads.first! < signedIn && signedIn < loads.last!)
         let page = try await core.transcript(.init(agentID: id))
         let notes = page.entries.compactMap { if case .runtimeNote(let t) = $0.kind { t } else { nil } }
         #expect(!notes.contains { $0.contains("no longer has this conversation") }, "\(notes)")
+    }
+
+    /// Someone whose Gemini already loads is never signed in by the app, so its settings
+    /// are left as they were (Alex, 2026-09-25).
+    @Test func aLoadThatWorksIsNeverPrecededBySigningIn() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsGeminiContinue-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let launcher = FakeLauncher(script: FakeACPAgent.Script())
+        let locations = StoreLocations(root: root)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher)
+        try await core.lendCredential(DaemonAPI.CredentialsLend(
+            runtime: "gemini", secret: Secret("AQ.Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
+        let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "first"))
+        await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
+        try await core.stop(id)
+        try await core.prompt(.init(agentID: id, text: "second"))
+        await eventually("picked up and answered") {
+            guard launcher.launchCount >= 2 else { return false }
+            return await core.agent(id)?.state == .finished
+        }
+        for agent in launcher.allAgents {
+            #expect(!(await agent.received).contains(ACP.Method.authenticate))
+        }
     }
 }

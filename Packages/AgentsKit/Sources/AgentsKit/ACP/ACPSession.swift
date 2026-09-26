@@ -71,9 +71,10 @@ public actor ACPSession {
     /// says we can serve one.
     public let capabilities: ACP.ClientCapabilities
 
-    /// Signed in with this method before a conversation is picked back up (046). Gemini CLI
-    /// answers `session/load` with "Authentication required" until `authenticate` is
-    /// called, key in the environment or not, where `session/new` needs no such call.
+    /// Signed in with this method when picking a conversation back up is refused as not
+    /// signed in, then tried once more (046). Gemini CLI answers `session/load` with
+    /// "Authentication required" until `authenticate` has been called, key in the
+    /// environment or not, where `session/new` needs no such call.
     public let authMethodBeforeContinuing: String?
 
     public private(set) var sessionID: String?
@@ -190,20 +191,31 @@ public actor ACPSession {
         let canResume = initializeResult?.supportsResume ?? false
         let canLoad = initializeResult?.supportsLoad ?? false
         guard canResume || canLoad else { throw ACPSessionError.cannotResumeOrLoad }
-        // Best effort: a refusal here shows up as the load's own refusal, said as that.
-        if let method = authMethodBeforeContinuing { try? await authenticate(methodID: method) }
-
         do {
-            if canResume {
-                let result = try await connection.call(ACP.Method.resumeSession, params)
-                adoptOptions(from: result)
-            } else {
-                try await load(params)
+            try await pickUp(params, resuming: canResume)
+        } catch let error as JSONRPCError where error.code == -32000 && authMethodBeforeContinuing != nil {
+            // Signed in only when refused, and then once (Alex, 2026-09-25): Gemini records
+            // the sign-in type in its own settings when asked to sign in, so someone who
+            // never needed it is never touched.
+            do {
+                try await authenticate(methodID: authMethodBeforeContinuing!)
+                try await pickUp(params, resuming: canResume)
+            } catch let error as JSONRPCError {
+                throw ACPSessionError.sessionGone(error)
             }
         } catch let error as JSONRPCError {
             throw ACPSessionError.sessionGone(error)
         }
         sessionID = id
+    }
+
+    private func pickUp(_ params: JSONValue, resuming: Bool) async throws {
+        if resuming {
+            let result = try await connection.call(ACP.Method.resumeSession, params)
+            adoptOptions(from: result)
+        } else {
+            try await load(params)
+        }
     }
 
     /// Load, with the replay it brings suppressed until the last of it has been dealt

@@ -214,8 +214,10 @@ public struct ToolPolicy: Hashable, Sendable {
     /// never carry: every new file it tried to write through the app failed (walk,
     /// 2026-09-25).
     public var readsFilesItself: Bool
-    /// The sign-in method to call `authenticate` with before picking a conversation back
-    /// up (046: Gemini's `gemini-api-key`, which reads the key from its environment).
+    /// The sign-in method to call `authenticate` with when picking a conversation back up is
+    /// refused as not signed in, before trying once more (046: Gemini's `gemini-api-key`,
+    /// which reads the key from its environment and records that choice in Gemini's own
+    /// settings — so only when needed).
     public var authMethodBeforeContinuing: String?
 
     public init(runtimeID: String,

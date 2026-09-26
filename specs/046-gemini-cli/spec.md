@@ -220,7 +220,7 @@ project it is offered when it is installed there or can be installed there (User
 - **FR-010**: A Gemini agent MUST be given the app's tools and the same briefing as other runtimes.
 - **FR-011**: The runtime tool policy MUST have an entry for Gemini, which removes Gemini's tools that duplicate the app's (standing arrangements, starting agents, notifications, artefact stores) and names as residue any that cannot be removed. The policy MUST cover every runtime in the catalog, and a test MUST say so.
 - **FR-012**: A Gemini agent's mid-turn question MUST reach the person as a card if Gemini can ask over ACP, and otherwise as **Waiting on your answer** with the question.
-- **FR-013**: The app MUST NOT write to `~/.gemini/settings.json` or any other file of Gemini's in the person's home; everything it sets for its own agents MUST be passed when it starts that agent *(default D6)*.
+- **FR-013**: The app MUST NOT write to `~/.gemini/settings.json` or any other file of Gemini's in the person's home; everything it sets for its own agents MUST be passed when it starts that agent *(default D6)*. One exception, settled by Alex on 2026-09-25: when Gemini refuses to pick a conversation back up because it has no sign-in type recorded, the app asks Gemini to sign in with the key once, and Gemini records `security.auth.selectedType: gemini-api-key` in its own settings, as signing in to Gemini does. Someone whose Gemini already loads is never touched.
 
 **Gemini on servers**
 
