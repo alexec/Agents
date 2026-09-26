@@ -41,14 +41,35 @@ Check the build and say whether it is green.
 | `on:` `pull-request-checks-failed` | No settings | Runs when checks fail on one of your open pull requests in this project's GitHub repository. |
 | `on:` `pull-request-review-comments` | No settings | Runs when one of your open pull requests gets review comments from someone with write access to the repository. |
 | `on:` `pull-request-conflicts` | No settings | Runs when one of your open pull requests conflicts with its base branch. |
+| `on:` an event name, such as `pull_request.merged` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `pull_request.*`, for all of its events. Under the name, list details to narrow it, such as `number: 41`; a detail the event does not carry is an error in the file. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
-| `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. A schedule has no such agent, so it does not run. |
+| `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
 | `permission-mode:` | One of the runtime's own modes, such as a read-only or plan mode | The mode the agent runs in. A workflow runs with nobody watching, so this is how to say it must not change anything. |
 | `runtime:` | `claude`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. |
 | `model:` | One of the runtime's models | The model the agent uses. Without it, the runtime's own default. |
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
+
+For example, to start a new agent whenever pull request 41 is merged, or another agent
+publishes `custom.build_green`:
+
+```markdown
+---
+name: After the build
+on:
+  - pull_request.merged:
+      number: 41
+  - custom.build_green
+agent: new
+---
+
+Deploy the docs, then say what you deployed.
+```
+
+The older hyphenated names still work, and each answers to the events listed under
+[Older trigger names](events.md#older-trigger-names). On a workflow's page, its latest run
+shows the event that caused it, with a link to it on the Events page.
 
 A setting the runtime does not offer stops the workflow running, rather than falling back
 to a default. The workflow's page shows which values the runtime offers once it has been

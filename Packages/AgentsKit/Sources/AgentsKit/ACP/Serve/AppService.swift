@@ -827,11 +827,9 @@ public actor AppService {
             takes. To change how an existing workflow runs, \
             read it, then write it back whole with the settings changed.
 
-            Nothing here asks the person first. Creating or changing a workflow takes \
-            effect at once and it is live straight away; removing one deletes its file. \
-            The person has their say afterwards, on the project page, where they can \
-            run a workflow or archive it — so write one only when they asked for it, \
-            and tell them what you wrote.
+            Nothing here asks the person: a workflow you write or remove takes effect at \
+            once, and they see it on the project page, where they can archive it. So \
+            write one only when they asked for it, and say in your reply what you set up.
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
             the rest), any event name works, narrowed by its details written under it, \

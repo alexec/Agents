@@ -1,15 +1,20 @@
 # Agents
 
+Keep your editor and your coding agent. Agents runs several agents at once, shows which
+one needs you, lets them work together and on their own, and lets you answer them from
+your phone. [Why Agents](https://alexec.github.io/Agents/explanation/why-agents/)
+
 A Mac app, rebuilt one feature at a time against a written spec.
 
 Using the app? The docs are at https://alexec.github.io/Agents/ (source in `docs/`;
 preview with `scripts/docs.sh serve`). This README is for building and working on it.
 
 The window is a list of the projects you work in — a project is a folder, named by that
-folder — with that project's agents beside it in three groups: what needs you, what is
-working, what is done. Each project also has a lead: one agent whose job is the project
-rather than a task, which can start the others, brief them, read how they got on, and
-stop one that has gone wrong, asking you before each move.
+folder, on this Mac or on a Linux server — with that project's agents beside it, grouped
+by what they need from you: needs attention, blocked, working, complete, stopped, parked.
+An agent can start up to three helpers of its own, and a project's workflows (Markdown
+files under `.agents/workflows/`) start agents by themselves on a schedule or when
+something happens.
 
 ## Build and run
 

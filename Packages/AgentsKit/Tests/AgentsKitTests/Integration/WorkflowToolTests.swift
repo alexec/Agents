@@ -444,7 +444,7 @@ struct WorkflowToolTests {
         let description = AppService.workflowTool["description"]?.stringValue ?? ""
         #expect(!description.contains("removing one asks"))
         #expect(!description.contains("if they decline"))
-        #expect(description.contains("Nothing here asks the person first."))
+        #expect(description.contains("Nothing here asks the person:"))
 
         let (locations, root) = try temporary()
         let work = try project(root)

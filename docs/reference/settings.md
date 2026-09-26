@@ -25,6 +25,8 @@ Mac it is paired with.
 | Mac | Servers | **Add a server** | Adds a server by the name you use with `ssh`. |
 | Mac | Servers | **Check again** | Shown on the selected server. Tries connecting to it again. |
 | Mac | Servers | **Remove…** | Shown on the selected server. Removes it from the app, stopping any agents running there. Its folders are not touched. **Also delete what Agents installed on** the server removes the app's own files there too. |
+| Mac | Servers | **Signing in on servers**: **Paste a Claude token**, **Save**, **Check again**, **Replace…**, **Remove** | The Claude token that agents on servers sign in with: one from `claude setup-token`, or an API key. It says **Works**, **Checking…**, **No token**, or that Claude refused it and why. Kept in this Mac's Keychain, never written on a server, and lent to a server only while an agent runs there. Agents on this Mac use this Mac's own sign-in. See [Add a Linux server](../how-to/add-a-linux-server.md). |
+| Mac | Servers | **Use this server's own sign-in only** | Shown on the selected server. Agents there use Claude as signed in on the server, and the token is never lent to it. |
 | iPhone and iPad | Settings ▸ Agents | **Local Network** | Lets the app find your Mac on the network you are both on. Without it, the app cannot reach your Mac. |
 | iPhone and iPad | Settings ▸ Agents | **Notifications** | Lets the Mac tell this device when an agent needs you. When it is off, the Mac's **Devices** pane says so and the device is not chosen. |
 
