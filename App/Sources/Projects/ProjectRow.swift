@@ -58,20 +58,29 @@ struct ProjectRow: View {
     /// moment, by construction (FR-007, FR-009).
     private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
-    /// Whether this project wants the person: exactly when something in it is under
-    /// Needs attention, and on no other reckoning (FR-008). It used to OR the daemon's
-    /// count with a separate "asked to be looked at" check that never consulted state,
-    /// which is how a stopped agent went on wanting eyes.
-    private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
+    /// Whether this project wants the person: Needs attention or Blocked (FR-008).
+    /// Both only clear when someone acts; counting Needs attention alone left Blocked
+    /// invisible above the project page.
+    private var needsPerson: Bool {
+        (counts[.needsAttention] ?? 0) > 0 || (counts[.blocked] ?? 0) > 0
+    }
 
     /// What is going on in there, in as few words as it takes.
     ///
     /// Urgency first, and only ever two facts: this is a caption on one line in a
     /// column that can be 200pt wide, and a third would be the one that truncates.
-    /// "Needs attention" goes alone, undiluted — it is the only one of these that is
-    /// asking for something.
+    /// Needs attention and Blocked are the ones asking for something.
     private var subtitle: String? {
-        if needsPerson { return "Needs attention" }
+        if needsPerson {
+            let attention = counts[.needsAttention] ?? 0
+            let blocked = counts[.blocked] ?? 0
+            var parts: [String] = []
+            if attention > 0 { parts.append("Needs attention") }
+            if blocked > 0 {
+                parts.append(blocked == 1 ? "Blocked" : "\(blocked) blocked")
+            }
+            return parts.joined(separator: " · ")
+        }
         // Every chat that is not archived is something: the agent working, the agent
         // waiting, or the person meaning to do something with it. So the row always
         // carries a number about the unarchived chats — the pressing ones first
@@ -101,8 +110,7 @@ struct ProjectRow: View {
     private var accessibilityLabel: String {
         var parts = [summary.name]
         if !summary.exists { parts.append("folder is missing") }
-        if needsPerson { parts.append("needs attention") }
-        if let subtitle, !needsPerson { parts.append(subtitle) }
+        if let subtitle { parts.append(subtitle) }
         return parts.joined(separator: ", ")
     }
 }

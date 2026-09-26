@@ -215,7 +215,7 @@ struct AgentRow: View {
                 Button("Stop") { Task { await model.stop(agent.id) } }
             }
             if agent.state == .archived {
-                Button("Bring back") { Task { await model.unarchive(agent.id) } }
+                Button("Bring Back") { Task { await model.unarchive(agent.id) } }
                 // Now rather than when its time comes (051, US7). Asked first: the daemon
                 // says how much goes, or why it cannot yet.
                 Button("Retire Now…") {
@@ -235,11 +235,14 @@ struct AgentRow: View {
                     }
                     .help(ParkWords.help(action))
                 }
-                Button("Archive") { Task { await model.archive(agent.id) } }
+                Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
             }
             Divider()
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
+            // Only on this Mac: a server's folder is not somewhere Finder can go.
+            if agent.host == .mac {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([agent.cwd])
+                }
             }
         }
     }

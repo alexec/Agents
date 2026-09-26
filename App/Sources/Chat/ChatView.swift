@@ -92,7 +92,23 @@ struct ChatView: View {
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
     @ViewBuilder
     private func actions(for agent: Agent) -> some View {
-        if model.canStop(agent) || agent.state != .archived {
+        if agent.state == .archived {
+            // Matching the phone: an archived chat's own page is where Bring Back lives,
+            // not only on the row you left it from.
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Button {
+                    Task { await model.unarchive(agent.id) }
+                } label: {
+                    Label("Bring Back", systemImage: "tray.and.arrow.up")
+                }
+                .buttonStyle(.paper)
+                .appText(.fine)
+                .help("Bring this chat back from the archive (⌥⌘⌫)")
+            }
+            .chatColumn()
+            .padding(.vertical, 8)
+        } else {
             HStack(spacing: 8) {
                 // Said on the page, so a chat opened from Parked says why it is there
                 // and when (040, FR-011).
@@ -148,19 +164,14 @@ struct ChatView: View {
                 // One click, and back to the project. The context menu on the card has
                 // the same word; this is for when you are already reading the thing you
                 // are putting away.
-                if agent.state != .archived {
-                    Button {
-                        Task {
-                            await model.archive(agent.id)
-                            model.selection = nil
-                        }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox")
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help("Archive this chat and go back to the project")
+                Button {
+                    Task { await model.archive(agent.id, andLeave: true) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
                 }
+                .buttonStyle(.paper)
+                .appText(.fine)
+                .help("Archive this chat and go back to the project")
             }
             .chatColumn()
             .padding(.vertical, 8)

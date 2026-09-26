@@ -31,12 +31,13 @@ ones every Mac app has.
 | Shift-Command-Return | **Session ▸ Carry On** | Tells a **Blocked** agent its block has gone, or a **Waiting** one that its wait is over early. |
 | Control-Command-P | **Session ▸ Park** or **Unpark** | Puts the chat down to come back to later, or puts it back where it was. |
 | Option-Command-Delete | **Session ▸ Archive** or **Bring Back** | Archives the agent, or brings an archived one back. |
+| Delete | Selected session in the sessions list | Archives the selected session (same as **Archive**), and leaves it. |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |
 | Option-Command-Down Arrow, Option-Command-Up Arrow | **Go ▸ Next Session**, **Previous Session** | Moves through the sessions in the list. |
-| Command-J | **Go ▸ Next Needing Attention** | Opens the next agent that needs you. |
+| Command-J | **Go ▸ Next Needing Attention** | Opens the next session that needs you — **Needs attention** or **Blocked**. |
 | Control-Command-1 to 9 | **Go ▸** a project | Opens that project. |
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
-| Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. |
+| Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
 | Command-Down Arrow | **View ▸ Jump to Latest** | Scrolls the conversation to its end. |
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |
@@ -45,6 +46,8 @@ ones every Mac app has.
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
 | Command-, | **Agents ▸ Settings…** | Opens [Settings](settings.md). |
 | Return, Escape | In a sheet or dialog | Takes the highlighted button, or cancels. |
+| Return | On a permission or question card | Takes the first allowing answer, or **Submit** on a multi-step form. |
+| Command-1 to Command-9 | On a permission or question card | Picks that option by position. |
 
 ## See also
 

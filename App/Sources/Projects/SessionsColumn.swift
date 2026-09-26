@@ -74,8 +74,7 @@ struct SessionsColumn: View {
         .onDeleteCommand {
             guard let id = selection, let agent = model.agents.first(where: { $0.id == id }),
                   agent.state != .archived else { return }
-            Task { await model.archive(id) }
-            selection = nil
+            Task { await model.archive(id, andLeave: true) }
         }
         // The window's title is this column's: whatever the right-hand side is reading.
         .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
@@ -119,8 +118,7 @@ struct SessionsColumn: View {
                     Button("Bring Back") { Task { await model.unarchive(agent.id) } }
                 } else {
                     Button("Archive", systemImage: "archivebox") {
-                        Task { await model.archive(agent.id) }
-                        if selection == agent.id { selection = nil }
+                        Task { await model.archive(agent.id, andLeave: true) }
                     }
                     .tint(.gray)
                 }

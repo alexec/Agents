@@ -31,14 +31,19 @@ struct PermissionView: View {
                 plan
                 VStack(alignment: .leading, spacing: 6) {
                     // The agent's own wording, on the agent's own options.
-                    ForEach(request.options) { option in
-                        if option.kind.allows {
-                            Button { answer(option) } label: { label(option) }
-                                .buttonStyle(.paperProminent)
-                        } else {
-                            Button { answer(option) } label: { label(option) }
-                                .buttonStyle(.paper)
-                        }
+                    // Return takes the first allowing answer; ⌘1…n pick by position
+                    // (View ▸ panes yield those keys while this card is up).
+                    ForEach(Array(request.options.enumerated()), id: \.element.id) { index, option in
+                        optionButton(option, index: index)
+                    }
+                }
+                .background {
+                    // Return for the first allowing option without stealing its ⌘n.
+                    if let option = request.options.first(where: \.kind.allows) {
+                        Button("") { answer(option) }
+                            .keyboardShortcut(.defaultAction)
+                            .opacity(0)
+                            .accessibilityHidden(true)
                     }
                 }
             }
@@ -84,6 +89,19 @@ struct PermissionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    @ViewBuilder
+    private func optionButton(_ option: PermissionOption, index: Int) -> some View {
+        if option.kind.allows {
+            Button { answer(option) } label: { label(option) }
+                .buttonStyle(.paperProminent)
+                .modifier(NumberShortcut(index: index))
+        } else {
+            Button { answer(option) } label: { label(option) }
+                .buttonStyle(.paper)
+                .modifier(NumberShortcut(index: index))
+        }
+    }
+
     /// The same as the daemon's own showing of it: the files pane, open on the plan.
     private func show(_ file: ShownFile) {
         let state = states.state(for: request.agentID)
@@ -96,5 +114,19 @@ struct PermissionView: View {
 
     private func answer(_ option: PermissionOption) {
         Task { await model.answer(request, optionID: option.optionID) }
+    }
+}
+
+/// ⌘1 through ⌘9 for the first nine options; later ones are click-only.
+private struct NumberShortcut: ViewModifier {
+    let index: Int
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if index < 9 {
+            content.keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
+        } else {
+            content
+        }
     }
 }

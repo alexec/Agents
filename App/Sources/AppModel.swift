@@ -483,6 +483,15 @@ final class AppModel {
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
 
+    /// How many sessions across every project need a person: Needs attention and Blocked.
+    /// Drives the Dock badge.
+    var needsPersonCount: Int {
+        liveProjects.reduce(0) { total, summary in
+            let c = counts(in: summary.key)
+            return total + (c[.needsAttention] ?? 0) + (c[.blocked] ?? 0)
+        }
+    }
+
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 
@@ -2021,8 +2030,11 @@ final class AppModel {
         }
     }
 
-    func archive(_ id: UUID) async {
+    func archive(_ id: UUID, andLeave: Bool = false) async {
         await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
+        // One path for menu, strip, swipe, ⌫ and the row: leave the chat when asked,
+        // so Archive always means the same thing wherever it is pressed.
+        if andLeave, selection == id { selection = nil }
     }
 
     func unarchive(_ id: UUID) async {

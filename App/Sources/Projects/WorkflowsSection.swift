@@ -1,4 +1,5 @@
 import AgentsKit
+import AppKit
 import SwiftUI
 
 /// A project's standing arrangements, under the agents working on it.
@@ -119,9 +120,23 @@ struct WorkflowsSection: View {
     }
 
     private var empty: some View {
-        Text("No workflows")
-            .appText(.reading)
-            .foregroundStyle(.secondary)
-            .padding(.vertical, 6)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No workflows")
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+            Text("Ask an agent to add one, or put a Markdown file in .agents/workflows.")
+                .appText(.fine)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("How to set up a workflow") {
+                NSWorkspace.shared.open(Self.workflowHelpURL)
+            }
+            .buttonStyle(.link)
+            .appText(.fine)
+        }
+        .padding(.vertical, 6)
     }
+
+    private static let workflowHelpURL =
+        URL(string: "https://alexec.github.io/Agents/how-to/set-up-a-workflow/")!
 }

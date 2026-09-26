@@ -1,4 +1,5 @@
 import AgentsKit
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -176,6 +177,10 @@ struct ContentView: View {
                 RuntimeAccountView(runtimeID: runtimeID)
                     .paperSheet()
             }
+        }
+        // How many sessions need a person, on the Dock — Needs attention and Blocked.
+        .onChange(of: model.needsPersonCount, initial: true) { _, count in
+            NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
         }
     }
 }

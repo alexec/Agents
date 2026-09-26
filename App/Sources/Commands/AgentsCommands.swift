@@ -70,7 +70,8 @@ struct AgentsCommands: Commands {
             ForEach(Array(SidebarPane.allCases.enumerated()), id: \.element) { index, pane in
                 Button(pane.title) { show(pane) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
-                    .disabled(model.selectedAgent == nil || !inspectorFits)
+                    // Off while a question card is up: ⌘1…n answer that card instead.
+                    .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard)
             }
             Divider()
             Button("Events") { model.showEvents() }
@@ -126,6 +127,7 @@ struct AgentsCommands: Commands {
             Button("Next Needing Attention") { nextNeedingAttention() }
                 .keyboardShortcut("j")
                 .disabled(needingAttention.isEmpty)
+                .help("Needs attention or Blocked")
             Divider()
             ForEach(Array(projectsInListOrder.prefix(9).enumerated()), id: \.element.key) { index, summary in
                 Button(summary.name) { model.showProject(summary.key) }
@@ -198,13 +200,16 @@ struct AgentsCommands: Commands {
 
     private func archive() {
         guard let agent = model.selectedAgent, agent.state != .archived else { return }
-        Task {
-            await model.archive(agent.id)
-            if model.selection == agent.id { model.selection = nil }
-        }
+        Task { await model.archive(agent.id, andLeave: true) }
     }
 
     // MARK: Go
+
+    /// A permission or elicitation card is on the open chat: ⌘1…n belong to its
+    /// answers, not to the inspector panes.
+    private var answeringCard: Bool {
+        model.permissionForSelection != nil || model.elicitationForSelection != nil
+    }
 
     /// The project list's order: this Mac's projects, then each server's (037).
     private var projectsInListOrder: [DaemonAPI.ProjectSummary] {
@@ -231,9 +236,13 @@ struct AgentsCommands: Commands {
         model.openAgent(ids[next])
     }
 
-    /// Every session waiting on the person, project by project in the list's order.
+    /// Every session waiting on the person — Needs attention and Blocked — project by
+    /// project in the list's order, Needs attention first within each.
     private var needingAttention: [UUID] {
-        projectsInListOrder.flatMap { model.agents(in: $0.key, group: .needsAttention) }.map(\.id)
+        projectsInListOrder.flatMap { summary in
+            model.agents(in: summary.key, group: .needsAttention)
+                + model.agents(in: summary.key, group: .blocked)
+        }.map(\.id)
     }
 
     /// The one after the chat that is open, round to the first; so pressing it again
