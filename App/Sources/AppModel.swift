@@ -1129,7 +1129,13 @@ final class AppModel {
     /// this Mac's host is reached through it.
     func adoptControlPlane(root: URL) async {
         ControlConfig.save(root)
-        client = DaemonClient(link: ControlConfig.link(root: root).link(for: .mac))
+        await adopt(.local(root))
+    }
+
+    /// First run has paired with a control plane elsewhere (058, frame C).
+    func adopt(_ endpoint: ControlConfig.Endpoint) async {
+        guard let link = ControlConfig.link(endpoint) else { return }
+        client = DaemonClient(link: link.link(for: .mac))
         needsFirstRun = false
         await stayConnected()
     }

@@ -1,5 +1,6 @@
 import AgentsKit
 import AgentsKitCore
+import AppKit
 import SwiftUI
 
 /// Settings ▸ Control plane (058, frames D–G): where it runs, the machines it reaches and
@@ -31,7 +32,7 @@ struct ControlSettingsView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
                 if !control.isReachable {
-                    Text("Can’t reach the control plane at \(SharedFiles.tilde(control.root.path)). What it last said is shown.")
+                    Text("Can’t reach the control plane at \(control.whereItIs). What it last said is shown.")
                         .appText(.supporting).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -182,6 +183,7 @@ struct ControlHostsPage: View {
     @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     @State private var removing: DaemonAPI.ControlHost?
+    @State private var addingByCode = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -202,12 +204,13 @@ struct ControlHostsPage: View {
             }
             HStack(spacing: 8) {
                 Button("Add a Server…") {}.buttonStyle(.paper).disabled(true)
-                Button("Add by Code…") {}.buttonStyle(.paper).disabled(true)
+                Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
             }
-            Text("Adding a server or another Mac through the control plane comes next. Removing a host stops it connecting. Its agents are left running where they are.")
+            Text("Add by Code gives another Mac a code to join with. Installing on a server over ssh comes next. Removing a host stops it connecting. Its agents are left running where they are.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { host in
@@ -285,7 +288,7 @@ struct ControlClientsPage: View {
         }
         .task { await model.refreshDevices() }
         .sheet(isPresented: $pairingDevice) { PairDeviceSheet() }
-        .sheet(isPresented: $pairingMac) { PairMacSheet().paperSheet() }
+        .sheet(isPresented: $pairingMac) { CodeSheet(control: control, purpose: .mac).paperSheet() }
         .confirmationDialog(forgettingClient.map { "Forget \($0.name)?" } ?? "",
                             isPresented: Binding(get: { forgettingClient != nil }, set: { if !$0 { forgettingClient = nil } }),
                             titleVisibility: .visible, presenting: forgettingClient) { client in
@@ -349,39 +352,83 @@ struct ControlClientsPage: View {
     }
 }
 
-// MARK: - G · Pair a Mac
+// MARK: - G · Pair a Mac, and Add by Code
 
-/// Frame G for a Mac: the grant first, then the code as text, since a Mac has no camera.
-/// The code needs pairing over the network (T018–T023, T029), which comes next; until then
-/// the sheet says so where the code would be.
-struct PairMacSheet: View {
+/// Frame G: the grant first, then the code as text, since a Mac has no camera; and the
+/// same sheet for a host's code. A new code each time the grant changes, replacing the
+/// last, so only the code on screen works.
+struct CodeSheet: View {
+    enum Purpose { case mac, host }
+
     @Environment(\.dismiss) private var dismiss
+    let control: ControlSettingsModel
+    let purpose: Purpose
     @State private var grant: Grant = .operator
+    @State private var shown: DaemonAPI.ControlCodeShown?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Pair a Mac").appText(.reading).fontWeight(.semibold)
-            HStack {
-                Text("It may")
-                Spacer()
-                Picker("It may", selection: $grant) {
-                    Text("do everything (Operator)").tag(Grant.operator)
-                    Text("what a phone can (Device)").tag(Grant.device)
+            Text(purpose == .mac ? "Pair a Mac" : "Add a host by code").appText(.reading).fontWeight(.semibold)
+            if purpose == .mac {
+                HStack {
+                    Text("It may")
+                    Spacer()
+                    Picker("It may", selection: $grant) {
+                        Text("do everything (Operator)").tag(Grant.operator)
+                        Text("what a phone can (Device)").tag(Grant.device)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                Divider()
             }
-            Divider()
-            Text("Pairing another Mac needs the control plane to listen on the network, which comes next. Until then, this Mac’s own window is the only Mac that can use it.")
-                .appText(.supporting).tinted(.attention)
-                .fixedSize(horizontal: false, vertical: true)
+            if let shown {
+                Text(shown.text)
+                    .appText(.code)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paper.rule, lineWidth: 1))
+                    .accessibilityLabel("Code")
+                    .accessibilityValue(shown.text)
+                HStack(alignment: .firstTextBaseline) {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(instructions(until: shown.expires, now: context.date))
+                            .appText(.supporting).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(shown.text, forType: .string)
+                    }
+                    .buttonStyle(.paper)
+                }
+            } else {
+                ProgressView().controlSize(.small)
+            }
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
-        .frame(width: 520)
+        .frame(width: 560)
+        .task(id: grant) { shown = await control.startCode(forHost: purpose == .host, grant: grant) }
+        .onDisappear { Task { await control.stopCodes() } }
+    }
+
+    private func instructions(until expires: Date, now: Date) -> String {
+        let left = max(0, Int(expires.timeIntervalSince(now)))
+        let time = left == 0 ? "It has run out; close this and ask again." : "It works once, for \(left / 60):\(String(format: "%02d", left % 60))."
+        switch purpose {
+        case .mac:
+            return "On the other Mac, open Agents, choose Connect to a control plane and paste this. \(time)"
+        case .host:
+            return "On the other machine, start its agents with agentsd --control-code and this code. \(time)"
+        }
     }
 }

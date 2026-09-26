@@ -104,7 +104,8 @@ struct LocalServices {
             (controlLabel, [bridge],
              ["AGENTS_ROOT": hostRoot.path, ControlPlane.rootVariable: controlRoot.path,
               // Off the ordinary port and out of iCloud: a walk is nobody's phone.
-              "AGENTS_BRIDGE_PORT": "8799", "AGENTS_BRIDGE_NO_MAILBOX": "1", "PATH": path],
+              "AGENTS_BRIDGE_PORT": "8799", "AGENTS_BRIDGE_NO_MAILBOX": "1",
+              ControlNet.portVariable: "8798", "PATH": path],
              "control.out"),
             (hostLabel, [agentsd, DaemonCommandLine.controlFlag, ControlPlane.hostSocket(root: controlRoot).path],
              ["AGENTS_ROOT": hostRoot.path, "PATH": path],

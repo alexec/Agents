@@ -14,13 +14,18 @@ public final class Daemon: @unchecked Sendable {
 
     /// Where a host's control plane is, and which host it is there.
     public struct Control: Sendable {
-        public var socket: URL
+        /// The control plane's local socket, for a host on the same Mac; nil for one
+        /// reached over the network.
+        public var socket: URL?
         public var host: HostID
         public var name: String?
-        public init(socket: URL, host: HostID, name: String? = nil) {
+        /// A host code to enrol with, over the network, when this root has not yet.
+        public var code: String?
+        public init(socket: URL?, host: HostID, name: String? = nil, code: String? = nil) {
             self.socket = socket
             self.host = host
             self.name = name
+            self.code = code
         }
     }
 
@@ -150,16 +155,19 @@ public final class Daemon: @unchecked Sendable {
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {
-            let socket = control.socket.path
-            let uplink = ControlUplink(
-                server: server,
-                hello: DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
-                                           machineID: MachineID.current, name: control.name ?? Host.current().localizedName)) {
-                FDTransport(socket: try connectUnixSocket(path: socket))
+            let name = control.name ?? Host.current().localizedName ?? "A Mac"
+            let hello = DaemonAPI.HostHello(host: control.host, version: Self.version, platform: Self.platform,
+                                            machineID: MachineID.current, name: name)
+            if let socket = control.socket?.path {
+                let uplink = ControlUplink(server: server, hello: hello) {
+                    FDTransport(socket: try connectUnixSocket(path: socket))
+                }
+                self.uplink = uplink
+                uplink.start()
+                DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
+            } else {
+                await joinOverTheNetwork(control, server: server, hello: hello)
             }
-            self.uplink = uplink
-            uplink.start()
-            DaemonLog.shared.write("uplink: a host of the control plane at \(socket), as \(control.host)")
         }
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it
         // a prompt, and both of those belong in front of a window that can watch them
@@ -178,6 +186,42 @@ public final class Daemon: @unchecked Sendable {
         // without this it would not take the assertion until one of them next changed
         // state — which for a long turn could be half an hour (024 FR-014).
         await core.reviseWakefulness()
+    }
+
+    /// A host of a control plane elsewhere (058, T021): enrolled once with a host code,
+    /// then dialled with its own key, kept beside it in this root.
+    private func joinOverTheNetwork(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
+        #if canImport(Network) && canImport(CryptoKit)
+        let membershipFile = locations.root.appendingPathComponent("control-host.json")
+        do {
+            let key = try DeviceKey.load(file: locations.root.appendingPathComponent("control-host-key"))
+            var membership = ControlMembership.load(membershipFile)
+            if membership == nil, let text = control.code {
+                guard let code = ControlCode(text: text) else {
+                    DaemonLog.shared.write("uplink: that is not a host code")
+                    return
+                }
+                let joined = try await ControlDialling.enroll(code, announce: DaemonAPI.HostAnnounce(
+                    publicKey: key.publicKey, name: hello.name ?? "A Mac", platform: hello.platform,
+                    version: hello.version, machineID: hello.machineID))
+                try joined.save(membershipFile)
+                membership = joined
+                DaemonLog.shared.write("uplink: enrolled with \(joined.name) as \(joined.host?.rawValue ?? "?")")
+            }
+            guard let membership else {
+                DaemonLog.shared.write("uplink: no control plane to join; start with --control-code")
+                return
+            }
+            let uplink = ControlUplink(server: server, hello: hello, dial: ControlDialling.hostDial(membership, key: key))
+            self.uplink = uplink
+            uplink.start()
+            DaemonLog.shared.write("uplink: a host of \(membership.name) over the network, as \(membership.host?.rawValue ?? "?")")
+        } catch {
+            DaemonLog.shared.write("uplink: could not join the control plane: \(error)")
+        }
+        #else
+        DaemonLog.shared.write("uplink: this build cannot reach a control plane over the network")
+        #endif
     }
 
     /// Serve until there is nothing in hand and nobody connected.

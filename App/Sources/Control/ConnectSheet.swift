@@ -1,14 +1,15 @@
+import AgentsKit
 import AgentsKitCore
 import Network
 import SwiftUI
 
-/// Frame C: control planes on this network by name, and the code one shows.
-///
-/// Pairing over the network is the next part of 058 (T018–T023, T029). Until it lands,
-/// Connect says so rather than pretending: the list is real, the code is read, and the
-/// window stays on the first-run page.
+/// Frame C: control planes on this network by name, and the code one shows (T029). The
+/// code says where to reach it and what this window may do there; Connect pairs with it
+/// and the window becomes that control plane's client.
 struct ConnectSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
+    @State private var connecting = false
     @State private var browser = ControlPlaneBrowser()
     @State private var code = ""
     @State private var chosen: String?
@@ -54,9 +55,10 @@ struct ConnectSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+                if connecting { ProgressView().controlSize(.small) }
                 Button("Connect") { connect() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting)
             }
         }
         .padding(24)
@@ -66,11 +68,30 @@ struct ConnectSheet: View {
     }
 
     private func connect() {
-        answer = "This build can’t pair with a control plane on another machine yet. That comes next. For now, choose Run one on this Mac."
+        guard let parsed = ControlCode(text: code) else {
+            answer = "That isn’t a control plane’s code. It starts with agents-control:."
+            return
+        }
+        guard case .client = parsed.purpose else {
+            answer = "That code is for adding a host, not a window. Ask for Pair a Mac instead."
+            return
+        }
+        connecting = true
+        answer = nil
+        Task {
+            do {
+                let membership = try await ControlConfig.pair(with: parsed)
+                await model.adopt(.remote(membership))
+                dismiss()
+            } catch {
+                answer = "\(error)"
+            }
+            connecting = false
+        }
     }
 }
 
-/// Control planes advertising `_agents._tcp` on this network, by name.
+/// Control planes advertising themselves on this network, by name.
 @MainActor
 @Observable
 final class ControlPlaneBrowser {
@@ -79,7 +100,7 @@ final class ControlPlaneBrowser {
 
     func start() {
         guard browser == nil else { return }
-        let browser = NWBrowser(for: .bonjour(type: "_agents._tcp", domain: nil), using: .tcp)
+        let browser = NWBrowser(for: .bonjour(type: ControlNet.serviceType, domain: nil), using: .tcp)
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let names = results.compactMap { result -> String? in
                 if case .service(let name, _, _, _) = result.endpoint { return name }

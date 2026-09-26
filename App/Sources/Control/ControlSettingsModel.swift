@@ -17,15 +17,21 @@ final class ControlSettingsModel {
     var problem: String?
     private(set) var isReachable = false
 
-    let root: URL
+    /// Where the control plane is, as the page says it when it can't be reached: its
+    /// folder on this Mac, or the addresses it was paired at.
+    let whereItIs: String
     private let link: ControlLink
     private let client: DaemonClient
     private var listening: Task<Void, Never>?
 
-    init(root: URL) {
-        self.root = root
-        link = ControlConfig.link(root: root)
+    init?(endpoint: ControlConfig.Endpoint) {
+        guard let link = ControlConfig.link(endpoint) else { return nil }
+        self.link = link
         client = DaemonClient(link: link.controlLink)
+        switch endpoint {
+        case .local(let root): whereItIs = SharedFiles.tilde(root.path)
+        case .remote(let membership): whereItIs = "\(membership.name) (\(membership.addresses.first ?? "no address"))"
+        }
     }
 
     /// Whether the control plane runs on this Mac, and so may be restarted from here.
@@ -90,6 +96,29 @@ final class ControlSettingsModel {
 
     func remove(_ host: HostID) async {
         await perform(DaemonAPI.Method.hostsRemove, DaemonAPI.HostRequest(host: host))
+    }
+
+    /// A code for a new client with `grant`, or for a new host (frame G, Add by Code).
+    func startCode(forHost: Bool, grant: Grant = .operator) async -> DaemonAPI.ControlCodeShown? {
+        do {
+            let shown: DaemonAPI.ControlCodeShown = if forHost {
+                try await client.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self)
+            } else {
+                try await client.call(DaemonAPI.Method.clientsStartPairing, ["grant": JSONValue.string(grant.rawValue)],
+                                      returning: DaemonAPI.ControlCodeShown.self)
+            }
+            problem = nil
+            return shown
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        return nil
+    }
+
+    func stopCodes() async {
+        _ = try? await client.call(DaemonAPI.Method.clientsStopPairing)
     }
 
     func restart() async {

@@ -46,6 +46,12 @@ public struct DaemonCommandLine: Sendable {
         return arguments.contains(Self.controlHomeFlag) ? ControlPlane.hostSocket(root: ControlPlane.defaultRoot).path : nil
     }
 
+    /// `--control-code <code>`: enrol this host with a control plane over the network,
+    /// once; after that the membership kept in the root is used, and so is it when
+    /// `--control-network` is given alone.
+    public var controlCode: String? { value(after: "--control-code") }
+    public var controlNetwork: Bool { controlCode != nil || arguments.contains("--control-network") }
+
     /// `--host-name <name>`: what the control plane lists this host as, when not this
     /// machine's own name.
     public var hostName: String? { value(after: "--host-name") }

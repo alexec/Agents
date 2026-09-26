@@ -220,7 +220,10 @@ let controlPlane: ControlPlane? = ControlPlane.chosenRoot().map { root in
     try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     DaemonLog.shared.setDestination(root.appendingPathComponent("control.log"))
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
-    return ControlPlane(root: root, version: version, port: Int(port.rawValue),
+    // Its own port, beside the bridge's: phones paired the old way keep 8790.
+    let controlPort = ProcessInfo.processInfo.environment[ControlNet.portVariable].flatMap(Int.init)
+        ?? Int(ControlNet.defaultPort)
+    return ControlPlane(root: root, version: version, port: controlPort,
                         awayFromHome: ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil)
 }
 if let controlPlane {

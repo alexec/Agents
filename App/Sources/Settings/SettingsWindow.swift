@@ -17,7 +17,7 @@ struct SettingsWindow: View {
     @State private var controlPage: ControlPage = .overview
     /// Settings ▸ Control plane's own view of the control plane, while the window has one
     /// (058). Without one, Devices and Servers are listed as they always were.
-    @State private var control: ControlSettingsModel? = ControlConfig.root.map { ControlSettingsModel(root: $0) }
+    @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
 
     static let size = CGSize(width: 1_000, height: 640)
 
@@ -107,7 +107,7 @@ enum SettingsPane: Hashable, CaseIterable {
     /// With a control plane, Devices and Servers fold into its one group (058, frame D):
     /// its hosts are the servers and its clients the devices.
     static var groups: [[SettingsPane]] {
-        let ways: [SettingsPane] = ControlConfig.root == nil ? [.devices, .servers] : [.controlPlane]
+        let ways: [SettingsPane] = ControlConfig.endpoint == nil ? [.devices, .servers] : [.controlPlane]
         return [[.general], [.agents, .runtimes, .spending, .pool], [.shared], ways]
     }
 }
