@@ -53,12 +53,12 @@ public struct PageFollower: Sendable, Equatable {
         case save(String)
     }
 
-    /// The caret's pace: `typingStep` characters every tick, fifty a second at the
-    /// view's 40 ms — a quick read. 240 words a minute was tried first and was too slow
-    /// to sit through. Nothing hurries a long block along; what keeps a long document
+    /// The caret's pace: `typingStep` characters every tick, a hundred a second at the
+    /// view's 40 ms. 240 words a minute was tried first and was too slow to sit
+    /// through; fifty characters a second was still slower than wanted. Nothing hurries a long block along; what keeps a long document
     /// from taking a long time is the agent's next write, which completes whatever is
     /// still on its way rather than racing it.
-    public static let typingStep = 2
+    public static let typingStep = 4
 
     public private(set) var passages: [Passage] = []
     /// The text `passages` came from: the base for the next diff.
