@@ -60,6 +60,9 @@ public final class Daemon: @unchecked Sendable {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")
         }
         let core = self.core
+        // Who may ask for what on the socket, from the caller's code signature.
+        let roles = RolePolicy.forDaemon(at: locations)
+        DaemonLog.shared.write("socket: \(roles.summary)")
         let server = DaemonServer(
             url: locations.socket,
             onConnectionCountChanged: { count in
@@ -79,9 +82,10 @@ public final class Daemon: @unchecked Sendable {
                     await core.connectionEnded(connection)
                 }
             },
+            roles: roles,
             handler: { context, method, params in
                 await core.handle(method: method, params: params,
-                                  from: context.surface, connection: context.id)
+                                  from: context.surface, connection: context.id, peer: context.peer ?? -1)
             })
         self.server = server
         await core.setBroadcaster { method, params in

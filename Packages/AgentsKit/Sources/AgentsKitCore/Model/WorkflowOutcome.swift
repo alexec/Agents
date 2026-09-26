@@ -106,6 +106,9 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case noPullRequest
     /// Three runs in a row with nobody else acting in between.
     case babysittingStopped(pr: Int, runs: Int)
+    /// The file is new, or has changed since the person approved it, and nothing runs
+    /// from a file nobody has looked at (security review, workflow approval).
+    case awaitingApproval
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -128,6 +131,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .worktreeBusy(let pr): return "an agent is already working in #\(pr)'s worktree"
         case .noPullRequest: return "nothing says which pull request"
         case .babysittingStopped(let pr, let runs): return "babysitting #\(pr) stopped after \(runs) tries in a row"
+        case .awaitingApproval: return "it is waiting for your OK"
         }
     }
 
@@ -170,6 +174,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // Stopped babysitting stays stopped until somebody pushes, comments or chooses
         // Resume, so it is the one pull-request refusal that earns the colour.
         case .babysittingStopped: return true
+        // Nothing but a person approving it will ever let it run.
+        case .awaitingApproval: return true
         case .noWorktree, .worktreeDirty, .worktreeBusy, .noPullRequest: return false
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
@@ -187,7 +193,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.archived, .archived), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
-             (.noPullRequest, .noPullRequest):
+             (.noPullRequest, .noPullRequest), (.awaitingApproval, .awaitingApproval):
             return true
         case (.noWorktree(let a), .noWorktree(let b)), (.worktreeDirty(let a), .worktreeDirty(let b)),
              (.worktreeBusy(let a), .worktreeBusy(let b)),

@@ -202,17 +202,40 @@ struct HelperAgentTests {
         #expect(helper.startOptions.values["mode"] == .string("plan"))
     }
 
-    @Test func aModeItNamesIsTheOneItGets() async throws {
+    @Test func aStricterModeItNamesIsTheOneItGets() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let core = try await makeCore(locations, FakeLauncher(script: Self.modes))
+        let (lead, token) = try await caller(core, in: work)
+        await eventually("the caller heard what its runtime offers") {
+            await !(core.agent(lead)?.advertisedOptions.isEmpty ?? true)
+        }
+
+        let id = try await calling(core, token) { t in
+            try await core.startHelper(.init(token: t, prompt: "Count the files", permissionMode: "plan"))
+        }.agentID
+
+        #expect(try #require(await core.agent(id)).startOptions.values["mode"] == .string("plan"))
+    }
+
+    /// The way round the person's choice this closes: an agent kept to planning
+    /// starting one that may edit, and handing it the work.
+    @Test func aLooserModeItNamesIsRefused() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher(script: Self.modes))
         let (_, token) = try await callerInPlanMode(core, in: work)
 
-        let id = try await calling(core, token) { t in
-            try await core.startHelper(.init(token: t, prompt: "Count the files", permissionMode: "default"))
-        }.agentID
-
-        #expect(try #require(await core.agent(id)).startOptions.values["mode"] == .string("default"))
+        let error = await refusal {
+            _ = try await calling(core, token) { t in
+                try await core.startHelper(.init(token: t, prompt: "Count the files", permissionMode: "default"))
+            }
+        }
+        let message = error?.message ?? ""
+        #expect(error?.code == JSONRPCError.invalidParams)
+        #expect(message.hasPrefix("Nothing was started: default would let it do more without asking"))
+        #expect(message.contains("Name no mode and it takes yours"))
+        #expect(await core.allAgents().count == 1, "no agent left behind")
     }
 
     @Test func onAnotherRuntimeItStartsAsThatRuntimeStarts() async throws {
