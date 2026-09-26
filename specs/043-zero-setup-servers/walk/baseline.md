@@ -34,3 +34,11 @@ Three more full runs skipping 043's two fake-ssh suites still failed them (2/3 a
 is not those suites' load alone. Neither test reaches 043's code paths: they drive the core
 directly on a Mac daemon, where `launchEnvironment` returns at once. **Open:** a same-time run of
 the baseline commit, to tell today's machine load from a change; a first attempt was cut off.
+
+## After merging main `4f6a5a3` (at `8319a5a`), 2026-09-25
+
+Both schemes and the Linux gate build. 043's 91 tests pass. Three full runs (1980 tests) fail
+only on main's own: `noCallSiteNamesAStateColourItself` 3/3 (main's `WorktreeRow.swift:94`),
+`anAgentCanStartInANewWorktreeOnALocalBranch` 2/3, `twoHelpers…`, `archivingABlockedAgent…`,
+`theEndingAPersonsPromptOvertook…` 1/3 each. The two tests seen failing earlier on the branch
+(`aListCanLeaveThemOffArchivedAgentsOnly`, `aLeaseThatRanOut…`) did not fail in any of the three.
