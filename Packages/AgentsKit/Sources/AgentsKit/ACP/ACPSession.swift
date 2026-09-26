@@ -71,6 +71,11 @@ public actor ACPSession {
     /// says we can serve one.
     public let capabilities: ACP.ClientCapabilities
 
+    /// Signed in with this method before a conversation is picked back up (046). Gemini CLI
+    /// answers `session/load` with "Authentication required" until `authenticate` is
+    /// called, key in the environment or not, where `session/new` needs no such call.
+    public let authMethodBeforeContinuing: String?
+
     public private(set) var sessionID: String?
     public private(set) var options: [ConfigOption] = []
     public private(set) var commands: [SlashCommand] = []
@@ -111,9 +116,11 @@ public actor ACPSession {
 
     public init(transport: any LineTransport,
                 process: RuntimeProcess? = nil,
-                capabilities: ACP.ClientCapabilities = .none) {
+                capabilities: ACP.ClientCapabilities = .none,
+                authMethodBeforeContinuing: String? = nil) {
         let box = self.box
         self.capabilities = capabilities
+        self.authMethodBeforeContinuing = authMethodBeforeContinuing
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -183,6 +190,8 @@ public actor ACPSession {
         let canResume = initializeResult?.supportsResume ?? false
         let canLoad = initializeResult?.supportsLoad ?? false
         guard canResume || canLoad else { throw ACPSessionError.cannotResumeOrLoad }
+        // Best effort: a refusal here shows up as the load's own refusal, said as that.
+        if let method = authMethodBeforeContinuing { try? await authenticate(methodID: method) }
 
         do {
             if canResume {

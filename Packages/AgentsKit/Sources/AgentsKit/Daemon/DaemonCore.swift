@@ -1091,7 +1091,8 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: LoginShellPath.environment()),
-                                     capabilities: Self.capabilities(for: policy))
+                                     capabilities: Self.capabilities(for: policy),
+                                     authMethodBeforeContinuing: policy.authMethodBeforeContinuing)
     }
 
     /// What the app offers a runtime at the handshake: everything it can serve, less file

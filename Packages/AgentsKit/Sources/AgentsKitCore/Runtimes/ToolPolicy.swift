@@ -214,6 +214,9 @@ public struct ToolPolicy: Hashable, Sendable {
     /// never carry: every new file it tried to write through the app failed (walk,
     /// 2026-09-25).
     public var readsFilesItself: Bool
+    /// The sign-in method to call `authenticate` with before picking a conversation back
+    /// up (046: Gemini's `gemini-api-key`, which reads the key from its environment).
+    public var authMethodBeforeContinuing: String?
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -223,7 +226,8 @@ public struct ToolPolicy: Hashable, Sendable {
                 environmentFiles: [EnvironmentFile] = [],
                 escalationTool: String? = nil,
                 preferredAuthMethods: [String] = [],
-                readsFilesItself: Bool = false) {
+                readsFilesItself: Bool = false,
+                authMethodBeforeContinuing: String? = nil) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -233,6 +237,7 @@ public struct ToolPolicy: Hashable, Sendable {
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods
         self.readsFilesItself = readsFilesItself
+        self.authMethodBeforeContinuing = authMethodBeforeContinuing
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.

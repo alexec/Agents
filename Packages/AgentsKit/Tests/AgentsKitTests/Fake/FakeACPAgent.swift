@@ -15,6 +15,9 @@ actor FakeACPAgent {
         /// `models` and `modes` in a session answer, the older way Gemini CLI sends them
         /// instead of `configOptions` (046).
         var olderStyle: [String: JSONValue] = [:]
+        /// Refuse `session/load` with `-32000` until `authenticate` has been called, as
+        /// Gemini CLI 0.61.0 does (046).
+        var loadNeedsAuthenticate = false
         var updates: [JSONValue] = []
         var stopReason = "end_turn"
         /// How long a turn takes. Zero for almost every test; a real duration for the
@@ -170,6 +173,9 @@ actor FakeACPAgent {
 
         case ACP.Method.loadSession:
             continuedSessionParams = params
+            if script.loadNeedsAuthenticate, !received.contains(ACP.Method.authenticate) {
+                return .failure(JSONRPCError(code: -32000, message: "Authentication required"))
+            }
             if let error = script.sessionGoneError { return .failure(error) }
             if let request = script.requestDuringLoad {
                 // Fired and forgotten: a runtime does not wait for the client before

@@ -60,3 +60,44 @@ struct OlderStyleOptionsTests {
         #expect(options.contains { $0.id == "model" && $0.currentValue == .string("gemini-3-flash-preview") })
     }
 }
+
+/// Gemini refuses to load a conversation until `authenticate` has been called (046).
+@Suite("Picking a Gemini conversation back up", .timeLimit(.minutes(1)))
+struct GeminiContinueTests {
+    @Test func itSignsInBeforeLoading() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("AgentsGeminiContinue-\(UUID().uuidString)", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var script = FakeACPAgent.Script()
+        script.loadNeedsAuthenticate = true
+        let launcher = FakeLauncher(script: script)
+        let locations = StoreLocations(root: root)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: launcher)
+        try await core.lendCredential(DaemonAPI.CredentialsLend(
+            runtime: "gemini", secret: Secret("AQ.Ab8RN6FAKEGEMINICONTINUETEST000000")!), connection: UUID())
+
+        let id = try await core.start(.init(runtimeID: "gemini", cwd: work, prompt: "first"))
+        await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
+        try await core.stop(id)
+        try await core.prompt(.init(agentID: id, text: "second"))
+        await eventually("picked up and answered") {
+            guard launcher.launchCount >= 2 else { return false }
+            return await core.agent(id)?.state == .finished
+        }
+
+        var order: [String] = []
+        for agent in launcher.allAgents {
+            let received = await agent.received
+            if received.contains(ACP.Method.loadSession) { order = received }
+        }
+        let signedIn = try #require(order.firstIndex(of: ACP.Method.authenticate))
+        let loaded = try #require(order.firstIndex(of: ACP.Method.loadSession))
+        #expect(signedIn < loaded)
+        let page = try await core.transcript(.init(agentID: id))
+        let notes = page.entries.compactMap { if case .runtimeNote(let t) = $0.kind { t } else { nil } }
+        #expect(!notes.contains { $0.contains("no longer has this conversation") }, "\(notes)")
+    }
+}

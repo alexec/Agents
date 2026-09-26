@@ -266,7 +266,8 @@ public enum ToolPolicyCatalog {
                 EnvironmentFile(name: "gemini-policy.toml", contents: geminiPolicy(removing: removed),
                                 argument: "--policy"),
             ],
-            readsFilesItself: true)
+            readsFilesItself: true,
+            authMethodBeforeContinuing: "gemini-api-key")
     }()
     // No `escalationTool`, measured rather than omitted: in ACP mode Gemini takes its own
     // `ask_user` out of its tool list (`if (!interactive || isAcpMode)
