@@ -135,3 +135,23 @@ Every agent in every round was either whole and listed, or had its tombstone and
 was lost, and none was half-deleted and listed. The first attempt at this test reported 33
 "neither" in round 1. That was the script: it listed agents from the killed daemon's leftover
 socket before the new daemon was up. Fixed to wait for the new pid in `daemon.lock`.
+
+## Suite against main (T061), 2026-09-26
+
+Main (`a9854e1`) merged in at `5612713`. The only conflict was in `DaemonCore+Dispatch.swift`,
+where main's new `role` argument meets the retired-id mapping; both were kept. Both schemes build.
+
+The full suite ran five times on each side, alternating; a sixth pair was cut off by an app
+restart. There are 2,288 tests on the branch against 2,218 on main. Failures per run: branch 45,
+3, 25, 15, 2; main 10, 2, 2, 10, 1.
+
+- **One real failure, fixed**: `thereAreThirtyUniqueWellFormedNames` counted the event catalogue
+  at 30. `agent.retired` makes 31 (`9995942`). It failed in branch runs 1 and 2, before the fix.
+- **The rest are load**. The ones seen only on the branch are the restart-and-pick-up family
+  (`aPromptSurvivesADaemonKilledWhileTheAgentWasBeingMade`,
+  `aStartingRecordWithNothingQueuedIsStillExplained`, `theyComeBackMostRecentlyActiveFirst` and
+  others), each of which waits 10 s for a pick-up, plus the relay's `aPairedPhoneReachesTheDaemon`.
+  Alone they pass every time. The eight restart, attention and pairing suites (71 tests) run
+  together three times on each side pass every time, in 2.03–2.14 s on the branch and
+  2.12–2.13 s on main, so start-up is not slower. The branch's extra 70 tests (real git
+  worktrees, real restarts) add load to a suite already known to flake under it.

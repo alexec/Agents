@@ -368,7 +368,7 @@ state on archive.
   - The two settings in `docs/reference/settings.md`.
   - `agent.retired` in `docs/reference/events.md`.
   - Then run `python3 scripts/docs-check.py`.
-- [ ] T061 Merge `main` again, rebuild both schemes one after the other, and run the full suite six times on the branch and six on `main`. Record the differences in `walk/README.md`. Only new failures are this lane's.
+- [X] T061 Merge `main` again, rebuild both schemes one after the other, and run the full suite six times on the branch and six on `main`. Record the differences in `walk/README.md`. Only new failures are this lane's.
 - [ ] T062 Ask Alex with AskUserQuestion to look at the row notes, the retired line and the retired page on his iPhone and iPad. Install Remote from this branch on one device at a time, after saying it replaces his Remote. Batch the question as quickstart §5 says.
 - [ ] T063 Before merging, stop and ask Alex. Merging turns retirement on for the real store: at the first start, every archived agent gets `archivedAt` = that start (FR-008), so nothing goes for 30 days by age. The 2 GB cap **does** apply after the first day, and the real store has 791 MB archived, so nothing is retired at once. Say both facts in the question.
 
