@@ -140,3 +140,11 @@ daemon's socket:
 
 Not walked: the rows on screen. Driving the scratch window was declined while Alex was at the
 Mac, so the look of frames A, C and E is still to be seen. Both schemes build.
+
+**Second attempt at the on-screen walk (2026-09-26 11:17, Alex away): blocked, because the Mac
+was locked.** A real turn ran, with a shell and a subagent in the background. The window
+capture ([walk/card-mark.png](../walk/card-mark.png)) shows the agent's card with its mark:
+"1 shell, 1 subagent in the background". While the Mac is locked, `loginwindow` is frontmost,
+so no click can reach the scratch window, and its accessibility tree is empty. So the chat
+could not be opened, and the block over the prompt (A), Stop pressed on screen, and the
+Background pane (C) are still unseen. The phone (E) is Alex's to see.
