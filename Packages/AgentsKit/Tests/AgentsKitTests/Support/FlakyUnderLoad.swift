@@ -20,6 +20,8 @@ extension Trait where Self == ConditionTrait {
     ///   runner 2026-09-26.
     /// - FilesPaneScaleTests.aFolderOfFiftyThousandEntriesListsQuickly — 2 s.
     /// - SSHMasterTests.aMasterThatDiesIsNoticedWithinASecond — 1 s.
+    /// - LinkChooserTests.aQuietDirectLinkLosesAfterTheWindow — 4 s; took 35 s on the
+    ///   runner 2026-09-26, still choosing the relay.
     /// - AttentionTests.theSettlingPauseIsNotStartedAgainByARestart — a 2 s pause, 1.5 s
     ///   slept through it, and delivery looked for within the next 1 s.
 
