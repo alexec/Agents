@@ -20,8 +20,14 @@ struct RemoteApp: App {
     /// The fake is kept for the layout work — it holds a question waiting and a
     /// conversation long enough to page, neither of which a real Mac reliably has when
     /// somebody wants to look at a screen.
+    ///
+    /// The real one is two links (046): the Mac's own network when the phone is on it,
+    /// and the relay through iCloud when it is not.
     @State private var model = RemoteModel(
-        link: ProcessInfo.processInfo.arguments.contains("-fake") ? FakeDaemon() : NetworkLink())
+        link: ProcessInfo.processInfo.arguments.contains("-fake")
+            ? FakeDaemon()
+            : AwayLink(device: RemoteModel.deviceID,
+                       key: try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)))
 
     var body: some Scene {
         WindowGroup {

@@ -21,6 +21,13 @@ final class RemoteModel {
 
     /// Whether the Mac is answering, and when it last did.
     private(set) var isConnected = false
+    /// Which way the Mac is being reached (046): on its own network, or through iCloud.
+    /// The fake and the old single link are always direct.
+    private(set) var link: RemoteLink = .direct
+    /// What is getting in the relay's way, when anything is (046, FR-014).
+    private(set) var relayTrouble: RelayTrouble?
+    /// Whether this device holds the Mac's relay key, so it can reach the Mac from away.
+    private(set) var hasMacKey = AwayLink.macKey != nil
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
 
@@ -51,13 +58,15 @@ final class RemoteModel {
     private var presence: PresenceReporter?
     /// Which device this is, minted once and kept. Told to the Mac right after every
     /// connection (`surface/identify`), so every later request on it is this device's.
-    private let deviceID: UUID = {
+    private let deviceID = RemoteModel.deviceID
+
+    nonisolated static var deviceID: UUID {
         let key = "device.id"
         if let text = UserDefaults.standard.string(forKey: key), let id = UUID(uuidString: text) { return id }
         let id = UUID()
         UserDefaults.standard.set(id.uuidString, forKey: key)
         return id
-    }()
+    }
     /// This device's key, made once and kept in this device's keychain. The Mac only
     /// ever sees the public half.
     private let key: DeviceKey? = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)
@@ -88,10 +97,53 @@ final class RemoteModel {
         return fresh
     }
 
+    /// The two links, when this is the real app rather than the fake (046).
+    @ObservationIgnored private let away: AwayLink?
+    @ObservationIgnored private var watchingLink: Task<Void, Never>?
+    @ObservationIgnored private var watchdog: Task<Void, Never>?
+
     init(link: any DaemonLink) {
         client = DaemonClient(link: link)
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        away = link as? AwayLink
+        guard let away else { return }
+        self.link = away.chooser.link
+        away.onTrouble { [weak self] trouble in
+            Task { @MainActor in self?.heard(trouble) }
+        }
+        let links = away.chooser.links()
+        watchingLink = Task { [weak self] in
+            for await link in links { self?.link = link }
+        }
+    }
+
+    /// Away, and slower (046): what the screens read to show the Away line and to put
+    /// the terminal, the live page and files behind "needs the same network".
+    var isAway: Bool { link == .relayed }
+
+    /// The phone is away with nothing to reach the Mac with: it has not been on the
+    /// Mac's network since it was installed, or it was forgotten (FR-009).
+    var needsPairingAtHome: Bool { away != nil && !hasMacKey && !isConnected }
+
+    private func heard(_ trouble: RelayTrouble) {
+        switch trouble {
+        case .forgotten, .notPaired:
+            AwayLink.keepMacKey(nil)
+            hasMacKey = false
+            relayTrouble = nil
+        case .slowedDown(let seconds):
+            guard seconds > 3 else { return }
+            relayTrouble = trouble
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(seconds + 2))
+                if case .slowedDown = self?.relayTrouble { self?.relayTrouble = nil }
+            }
+        case .noICloud, .iCloudFull:
+            relayTrouble = trouble
+        case .macNotAnswering, .gap:
+            break
+        }
     }
 
     /// Put what the person typed on a page on disk, through the daemon, which is the one
@@ -411,7 +463,7 @@ final class RemoteModel {
         startRefusal = nil
         unsettledStart = request
         do {
-            let id = try await client.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            let id = try await sendOnce(DaemonAPI.Method.agentsStart, request).decode(UUID.self)
             await started(id, in: request.cwd)
             return true
         } catch let refused as JSONRPCError {
@@ -731,6 +783,8 @@ final class RemoteModel {
             await identify()
             startPresence()
             presence?.connected()
+            watchTheDirectLink()
+            if link == .relayed || away?.chooser.link == .relayed { relayTrouble = nil }
             await files.reconnected()
             await refreshEverything()
             return true
@@ -798,7 +852,51 @@ final class RemoteModel {
     private func lostTouch() async {
         isConnected = false
         listening = nil
+        watchdog?.cancel()
+        away?.chooser.lost()
         await connect()
+    }
+
+    /// Leaving home, noticed (046, R8): a direct link whose Wi‑Fi went does not always
+    /// fail, it can go quiet. So while on it the Mac is asked every five seconds and given
+    /// three to answer; one that does not is let go, and the reconnect finds the relay.
+    private func watchTheDirectLink() {
+        watchdog?.cancel()
+        guard let away, away.chooser.link == .direct else { return }
+        let client = client
+        watchdog = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, away.chooser.link == .direct else { return }
+                let answered = await withTaskGroup(of: Bool.self) { group in
+                    group.addTask { (try? await client.call(DaemonAPI.Method.ping)) != nil }
+                    group.addTask { try? await Task.sleep(for: .seconds(3)); return false }
+                    let first = await group.next() ?? false
+                    group.cancelAll()
+                    return first
+                }
+                if !answered {
+                    await client.disconnect()
+                    return
+                }
+            }
+        }
+    }
+
+    /// A call that changes something, sent so that it happens once even if the link
+    /// changes under it (046, FR-003). Its params carry the id the Mac dedups — a send's
+    /// `sendID`, a start's `requestID` — or it is one the Mac can safely do twice (stop,
+    /// archive). A call lost with the connection is sent once more, unchanged, as soon
+    /// as the Mac is back.
+    @discardableResult
+    private func sendOnce(_ method: String, _ params: some Encodable & Sendable) async throws -> JSONValue {
+        do {
+            return try await client.call(method, params)
+        } catch is JSONRPCTransportError {
+        } catch DaemonClient.ConnectError.couldNotConnect {
+        }
+        if let underway = reconnecting { await underway.value } else { await connect() }
+        return try await client.call(method, params)
     }
 
     func refreshEverything() async {
@@ -846,11 +944,19 @@ final class RemoteModel {
     private func announce() async {
         guard let key else { return }
         do {
-            thisDevice = try await client.call(
+            let reply = try await client.call(
                 DaemonAPI.Method.devicesAnnounce,
                 DaemonAPI.DeviceAnnouncement(id: deviceID, publicKey: key.publicKey,
                                              name: UIDevice.current.name, kind: kind),
-                returning: Device.self)
+                returning: DaemonAPI.AnnounceReply.self)
+            thisDevice = reply.device
+            // The Mac's relay key, handed over only here, on the direct link: this is the
+            // pairing that lets the phone reach it from anywhere (046, D1). A Mac whose
+            // bridge has not registered one yet says nothing, and the key kept stays.
+            if let macKey = reply.macKey {
+                AwayLink.keepMacKey(macKey)
+                hasMacKey = true
+            }
             note("pairing: announced as \(deviceID)")
         } catch {
             note("pairing: announce failed: \(error)")
@@ -873,6 +979,16 @@ final class RemoteModel {
                 note("mailbox: subscribe failed: \(error)")
                 subscribed = false
             }
+            // The relay's wake-up (046): a push when the Mac writes to this device's
+            // zone, so a relayed session looks at once. Polling still works without it.
+            if hasMacKey {
+                do {
+                    try await CloudKitRelayChannel().subscribe(device: deviceID)
+                    note("relay: subscribed")
+                } catch {
+                    note("relay: subscribe failed: \(error)")
+                }
+            }
         }
     }
 
@@ -884,6 +1000,10 @@ final class RemoteModel {
     /// decides nothing about where the need belongs.
     func receivedPush(_ userInfo: [AnyHashable: Any]) async {
         note("push: \(userInfo)")
+        if CloudKitRelayChannel.isRelayPush(userInfo) {
+            away?.poke()
+            return
+        }
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
         if pushed.withdrawn || pushed.envelope == nil {
             notifier.withdraw(pushed.token)
@@ -1218,9 +1338,9 @@ final class RemoteModel {
             return false
         }
         do {
-            try await client.call(DaemonAPI.Method.permissionsAnswer,
-                                  DaemonAPI.AnswerRequest(permissionID: request.id,
-                                                          optionID: optionID))
+            try await sendOnce(DaemonAPI.Method.permissionsAnswer,
+                               DaemonAPI.AnswerRequest(permissionID: request.id, optionID: optionID,
+                                                       sendID: UUID()))
             return true
         } catch {
             problem = "That question could not be answered."
@@ -1242,10 +1362,9 @@ final class RemoteModel {
             return false
         }
         do {
-            try await client.call(DaemonAPI.Method.elicitationsAnswer,
-                                  DaemonAPI.AnswerElicitationRequest(requestID: request.id,
-                                                                     action: action,
-                                                                     content: content))
+            try await sendOnce(DaemonAPI.Method.elicitationsAnswer,
+                               DaemonAPI.AnswerElicitationRequest(requestID: request.id, action: action,
+                                                                  content: content, sendID: UUID()))
             return true
         } catch {
             // The daemon refuses an answer that does not fit the shape the agent asked
@@ -1280,9 +1399,9 @@ final class RemoteModel {
             return false
         }
         do {
-            try await client.call(DaemonAPI.Method.agentsPrompt,
-                                  DaemonAPI.PromptRequest(agentID: agentID, text: what,
-                                                          attachments: attachments))
+            try await sendOnce(DaemonAPI.Method.agentsPrompt,
+                               DaemonAPI.PromptRequest(agentID: agentID, text: what,
+                                                       attachments: attachments, sendID: UUID()))
             return true
         } catch {
             problem = "That did not reach your Mac. What you typed is still there."

@@ -177,6 +177,29 @@ public actor CloudKitRelayChannel: RelayChannel {
         }
     }
 
+    // MARK: The device's side
+
+    /// A silent push whenever the device's zone changes, so a waiting relayed session
+    /// looks at once rather than at its next tick (R7). Saved under a stable id, so saving
+    /// it again changes nothing. The zone is made first: a subscription to a zone that is
+    /// not there is refused.
+    public func subscribe(device: UUID) async throws {
+        try await ensureZone(device: device)
+        let subscription = CKRecordZoneSubscription(zoneID: Self.zoneID(device),
+                                                    subscriptionID: Self.subscriptionID(device))
+        let info = CKSubscription.NotificationInfo()
+        info.shouldSendContentAvailable = true
+        subscription.notificationInfo = info
+        try await mapped { _ = try await database.modifySubscriptions(saving: [subscription], deleting: []) }
+    }
+
+    public static func subscriptionID(_ device: UUID) -> String { zonePrefix + device.uuidString }
+
+    /// Whether a push is the relay's rather than the mailbox's.
+    public static func isRelayPush(_ userInfo: [AnyHashable: Any]) -> Bool {
+        CKNotification(fromRemoteNotificationDictionary: userInfo)?.subscriptionID?.hasPrefix(zonePrefix) == true
+    }
+
     /// CloudKit's errors, in the words the two ends act on (R7, R12).
     private func mapped<T>(_ work: () async throws -> T) async throws -> T {
         do {
