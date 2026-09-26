@@ -44,6 +44,6 @@ Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `dev
 
 | Code | Name | When |
 |---|---|---|
-| -32040 | `hostOffline` | A request for a host that is not online. |
-| -32041 | `noSuchHost` | `h` names no host. |
-| -32042 | `lastOperator` | Demoting or forgetting the last operator. |
+| -32070 | `hostOffline` | A request for a host that is not online. |
+| -32071 | `noSuchHost` | `h` names no host. |
+| -32072 | `lastOperator` | Demoting or forgetting the last operator. |

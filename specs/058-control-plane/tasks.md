@@ -22,7 +22,7 @@ or on Alex's paired devices.
 
 - [ ] T001 Rename the `agents-bridge` target to `agents-control` in `project.yml`. Keep its bundle, CloudKit entitlement and `Contents/Helpers` embedding in `Agents.app`. Move `Bridge/` to `Control/`. Then run `xcodegen` and build both schemes one after the other, with plugin validation skipped.
 - [ ] T002 [P] Create the empty module folder `Packages/AgentsKit/Sources/AgentsKitCore/Control/` and the test folder `Packages/AgentsKit/Tests/AgentsKitTests/Control/`. Check `swift build` still passes on the Linux gate. Nothing in `Control/` may import Network, CryptoKit or CloudKit.
-- [ ] T003 [P] Add the failures `hostOffline` (-32040), `noSuchHost` (-32041) and `lastOperator` (-32042) to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, with messages in the style of the existing ones.
+- [x] T003 [P] Add the failures `hostOffline` (-32070), `noSuchHost` (-32071) and `lastOperator` (-32072) (-32040 to -32042 are taken) to `DaemonAPI.Failure` in `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`, with messages in the style of the existing ones.
 
 ---
 

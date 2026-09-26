@@ -1751,6 +1751,14 @@ public enum DaemonAPI {
         /// A method this connection's role may not call: an agent's helper asking for
         /// something only a window may, or a process that is neither (security review).
         public static let notPermitted = -32045
+        /// A call for a host the control plane knows but cannot reach right now (058).
+        /// Answered by the control plane at once, rather than left to time out.
+        public static let hostOffline = -32070
+        /// A call naming a host the control plane has never enrolled, or has removed.
+        public static let noSuchHost = -32071
+        /// Demoting or forgetting the last client allowed to do everything: nobody could
+        /// then change it back (058, FR-009).
+        public static let lastOperator = -32072
     }
 
     // MARK: Workflows

@@ -25,7 +25,7 @@ Rules:
 1. The control plane reads `m.method` (and nothing else in `m`) to check the grant. A refused
    request is answered by the control plane with `Failure.notPermitted` and `h` set.
 2. A request for a host that is not online is answered by the control plane with
-   `Failure.hostOffline` (new, -32040) at once.
+   `Failure.hostOffline` (new, -32070) at once.
 3. Request ids are the client's; the control plane never rewrites them. Ids need only be unique
    per (client connection, host), as they are per `DaemonClient` today.
 4. Replies and notifications from a host carry `h`. The client's `ControlLink` strips it and
