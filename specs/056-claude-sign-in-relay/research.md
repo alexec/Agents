@@ -202,3 +202,20 @@ The server's own-sign-in check (`ServerSignIn.exists`), which read Claude's vari
 `-32060`). The server's daemon raises it before starting Claude when no relay is offered,
 the server isn't "own sign-in only", and the server has no Claude sign-in of its own. The
 window shows the 053 sign-in sheet for Claude on the Mac.
+
+## R6, measured (T035, 2026-09-26)
+
+- **The token lives 8 hours.** The Mac's token was due at 15:00:08. At 14:55:09 it was
+  renewed, to 22:55:09, by one of the Claude processes running on the Mac: Claude renews
+  its own sign-in in the last five minutes before expiry whenever it runs.
+- **`claude auth status` did not renew it** at 14:51:35, eight and a half minutes out,
+  outside that window. My second run, at 14:55:14, came five seconds after Claude had
+  already renewed it, so it proved nothing either way.
+- **What was built**: the relay asks the Mac's Claude with `claude auth status` first. If
+  the token is unchanged, it runs a one-word turn on the smallest model
+  (`claude -p . --max-turns 1 --model haiku`), which certainly renews, for a few tokens.
+  The second step only runs when the first left the sign-in as it was.
+- **In practice** a relayed token rarely expires while Claude runs on the Mac, because any
+  Claude running there renews it in time. The relay's renewal covers a Mac where no Claude
+  runs for hours. That case wasn't walked end to end: it needs a natural expiry with no
+  Claude running on the Mac, which this Mac, running agents all day, doesn't have.

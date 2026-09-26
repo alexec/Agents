@@ -27,10 +27,10 @@ public final class ClaudeKeychainSignIn: MacSignInSource, @unchecked Sendable {
     private var cached: (token: MacSignInToken, expires: Date)?
     private var failed: (at: Date, why: MacSignInFailure)?
 
-    public init(service: String, renewer: @escaping Renewer = ClaudeKeychainSignIn.askTheMacsClaude) {
+    public init(service: String, renewer: Renewer? = nil) {
         read = { try Self.readKeychain(service: service) }
         now = { Date() }
-        self.renewer = renewer
+        self.renewer = renewer ?? Self.askTheMacsClaude(service: service)
     }
 
     init(reader: @escaping Reader, now: @escaping @Sendable () -> Date = { Date() },
@@ -75,21 +75,40 @@ public final class ClaudeKeychainSignIn: MacSignInSource, @unchecked Sendable {
         return token
     }
 
-    /// The command the Mac's own Claude is asked to renew with (research R6, measured by
-    /// T035): Claude checks its sign-in on the way and renews one near or past its expiry.
-    public static let renewArguments = ["auth", "status"]
+    /// What the Mac's own Claude is asked to run, in order, until its sign-in has changed
+    /// (research R6). Claude renews a sign-in within five minutes of its expiry whenever it
+    /// runs (measured 2026-09-26: a token due at 15:00:08 was renewed at 14:55:09 by Claude
+    /// running on the Mac). `auth status` costs nothing, but whether it renews was not
+    /// proven. A one-word turn on the smallest model certainly does, for a few tokens, and is
+    /// asked only if the first left the sign-in as it was.
+    public static let renewCommands: [[String]] = [
+        ["auth", "status"],
+        ["-p", ".", "--max-turns", "1", "--model", "haiku"],
+    ]
 
-    /// Run the Mac's own `claude`, found on the login shell's PATH, with `renewArguments`,
-    /// and give up after 30 seconds.
-    public static let askTheMacsClaude: Renewer = {
-        let environment = LoginShellPath.environment()
-        let path = (environment["PATH"] ?? "/usr/bin:/bin").split(separator: ":").map(String.init)
-        guard let claude = path.map({ URL(fileURLWithPath: $0).appendingPathComponent("claude") })
-            .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return }
+    /// Run the Mac's own `claude`, found on the login shell's PATH, with each of
+    /// `renewCommands` until the item at `service` holds another token, 30 seconds each.
+    public static func askTheMacsClaude(service: String) -> Renewer {
+        {
+            let environment = LoginShellPath.environment()
+            let path = (environment["PATH"] ?? "/usr/bin:/bin").split(separator: ":").map(String.init)
+            guard let claude = path.map({ URL(fileURLWithPath: $0).appendingPathComponent("claude") })
+                .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return }
+            let before = (try? parse(try readKeychain(service: service)))?.0.access
+            for arguments in renewCommands {
+                await run(claude, arguments, environment: environment)
+                let after = (try? parse(try readKeychain(service: service)))?.0.access
+                if after != nil, after != before { return }
+            }
+        }
+    }
+
+    private static func run(_ executable: URL, _ arguments: [String], environment: [String: String]) async {
         let process = Process()
-        process.executableURL = claude
-        process.arguments = renewArguments
+        process.executableURL = executable
+        process.arguments = arguments
         process.environment = environment
+        process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
