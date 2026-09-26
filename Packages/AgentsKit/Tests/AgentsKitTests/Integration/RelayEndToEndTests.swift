@@ -60,7 +60,7 @@ struct RelayEndToEndTests {
             if paired { await host.pair(id, key: key.publicKey) }
             let transport = RelayTransport(channel: FakeRelayChannel(cloud: cloud), device: id, key: key,
                                            macKey: mac.publicKey, pollEvery: .milliseconds(20), onTrouble: onTrouble)
-            try await transport.open(timeout: .seconds(paired ? 5 : 1))
+            try await transport.open(timeout: paired ? max(.seconds(5), Eventually.timeout) : .seconds(1))
             let client = DaemonClient(link: GivenLink(transport: transport))
             try await client.connect(startIfNeeded: false)
             return (client, transport, id)

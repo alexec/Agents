@@ -42,7 +42,7 @@ struct RelayCarryingTests {
         func phone() async throws -> RelayTransport {
             let transport = RelayTransport(channel: FakeRelayChannel(cloud: cloud), device: device, key: phoneKey,
                                            macKey: mac.publicKey, pollEvery: .milliseconds(20))
-            try await transport.open(timeout: .seconds(5))
+            try await transport.open(timeout: max(.seconds(5), Eventually.timeout))
             return transport
         }
 
