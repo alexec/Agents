@@ -365,6 +365,8 @@ struct CodeSheet: View {
     let purpose: Purpose
     @State private var grant: Grant = .operator
     @State private var shown: DaemonAPI.ControlCodeShown?
+    /// Who was there when the code was made, so whoever it lets in can be named.
+    @State private var before: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -383,7 +385,11 @@ struct CodeSheet: View {
                 }
                 Divider()
             }
-            if let shown {
+            if let joined {
+                Text("\(joined) joined with this code. It can’t be used again.")
+                    .appText(.reading)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let shown {
                 Text(shown.text)
                     .appText(.code)
                     .textSelection(.enabled)
@@ -417,8 +423,25 @@ struct CodeSheet: View {
         }
         .padding(24)
         .frame(width: 560)
-        .task(id: grant) { shown = await control.startCode(forHost: purpose == .host, grant: grant) }
+        .task(id: grant) {
+            before = members
+            shown = await control.startCode(forHost: purpose == .host, grant: grant)
+        }
         .onDisappear { Task { await control.stopCodes() } }
+    }
+
+    /// The hosts or clients there are now, by id.
+    private var members: Set<String> {
+        purpose == .host ? Set(control.hosts.map(\.id.rawValue)) : Set(control.clients.map(\.id.uuidString))
+    }
+
+    /// Whoever arrived since the code was made: the code let them in, and is spent.
+    private var joined: String? {
+        guard shown != nil else { return nil }
+        if purpose == .host {
+            return control.hosts.first { !before.contains($0.id.rawValue) }?.name
+        }
+        return control.clients.first { !before.contains($0.id.uuidString) }?.name
     }
 
     private func instructions(until expires: Date, now: Date) -> String {

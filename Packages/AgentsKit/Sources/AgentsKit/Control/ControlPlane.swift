@@ -43,7 +43,7 @@ public final class ControlPlane: @unchecked Sendable {
     /// Where this Mac's host connects.
     public static func hostSocket(root: URL) -> URL { root.appendingPathComponent("hosts.sock") }
 
-    /// The name the window's record has, so every launch of it is one client.
+    /// What the window on this Mac is called when the Mac has no name to give it.
     public static let windowName = "This Mac"
 
     public init(root: URL, version: String, port: Int? = nil, awayFromHome: Bool = false) {
@@ -116,9 +116,12 @@ public final class ControlPlane: @unchecked Sendable {
             transport.close()
             return
         }
-        let existing = await methods.allClients.first { $0.kind == .mac && $0.name == Self.windowName }
-        let record = existing ?? ClientRecord(id: UUID(), name: Self.windowName, kind: .mac, publicKey: Data(),
+        // The window on this Mac is the one client with no key: it came in by signature.
+        // Named for the Mac, as every other client sees it.
+        let existing = await methods.allClients.first { $0.kind == .mac && $0.publicKey.isEmpty }
+        var record = existing ?? ClientRecord(id: UUID(), name: Self.windowName, kind: .mac, publicKey: Data(),
                                               grant: .operator, paired: Date())
+        record.name = Host.current().localizedName ?? Self.windowName
         try? await methods.admit(record)
         await router.attachClient(await methods.client(record.id) ?? record, transport: transport)
     }

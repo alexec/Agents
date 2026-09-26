@@ -95,19 +95,19 @@ or on Alex's paired devices.
 
 **Independent test**: quickstart.md steps 1–6 with a real Claude turn: start, question, answer, files, terminal, stop, control plane down and back.
 
-- [ ] T018 [US1] Put `ControlRouter` in place of the line pipe in `Control/Sources/main.swift`:
+- [x] T018 (the listener lives in `ControlNet`, in the bridge process; its own port, `AGENTS_CONTROL_PORT`, 8791 by default, and Bonjour type `_agents-control._tcp`) [US1] Put `ControlRouter` in place of the line pipe in `Control/Sources/main.swift`:
   - The `--root` flag, defaulting to `~/Library/Application Support/Agents Control`.
   - The `AGENTS_CONTROL_PORT` env var (default 8790), plus `AGENTS_CONTROL_NO_BONJOUR` and `AGENTS_CONTROL_NO_MAILBOX` for walks.
   - Clients are keyed by `clients.json`.
   - A `code --client <grant>` / `code --host` subcommand prints a pairing code, for walks and scripts.
-- [ ] T019 [US1] In `Control/Sources/DirectLink.swift`, add host PSKs: identity `h:<id>`, derived with HKDF(ECDH, "agents-host-v1", id), plus the enrolment identity `e:`. Client PSKs `d:` and `p:` stay as they are, so today's devices' keys still work.
-- [ ] T020 [US1] Add a host listener path in `Control/Sources/main.swift`. An `h:` connection becomes a `HostSession`. An `e:` connection may call only `hosts/announce`, which issues a key, writes `hosts.json`, and replies `{host}`.
+- [x] T019 (`ControlKeys`: identities c:/h:/p:/e:, salts of their own; keys in 0600 files, not the keychain) [US1] In `Control/Sources/DirectLink.swift`, add host PSKs: identity `h:<id>`, derived with HKDF(ECDH, "agents-host-v1", id), plus the enrolment identity `e:`. Client PSKs `d:` and `p:` stay as they are, so today's devices' keys still work.
+- [x] T020 [US1] Add a host listener path in `Control/Sources/main.swift`. An `h:` connection becomes a `HostSession`. An `e:` connection may call only `hosts/announce`, which issues a key, writes `hosts.json`, and replies `{host}`.
 - [x] T021 [US1] (MVP: `--control <socket>` and `--host-id`, over the control plane's local socket; codes and the keychain come with TLS) Add `--control <code>` and `--control-home` to `Daemon/Sources/main.swift` and `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCommandLine.swift`.
   - `<code>` enrols once and stores the host key: in the keychain on a Mac, or in a `0600` file on Linux.
   - `--control-home` dials the control plane on loopback with the stored key.
   - Both imply `--serve`.
-- [ ] T022 [US1] Write a macOS TLS-PSK dialer for `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink+Network.swift`, reusing `LinkTLS` from `AgentsKitCore/Remote/LinkTLS.swift`. Keep it behind `canImport(Network)`.
-- [ ] T023 [US1] Write `ControlConfig` for the window in `App/Sources/Control/ControlConfig.swift`. It holds the control-plane address and the window's client id, in defaults scoped by root (the scratch-defaults lesson). The window's key goes in the keychain.
+- [x] T022 (`ControlDialling`) [US1] Write a macOS TLS-PSK dialer for `ControlUplink` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/ControlUplink+Network.swift`, reusing `LinkTLS` from `AgentsKitCore/Remote/LinkTLS.swift`. Keep it behind `canImport(Network)`.
+- [x] T023 (and a remote endpoint, a membership and key in the window’s root) [US1] Write `ControlConfig` for the window in `App/Sources/Control/ControlConfig.swift`. It holds the control-plane address and the window's client id, in defaults scoped by root (the scratch-defaults lesson). The window's key goes in the keychain.
 - [ ] T024 [US1] In `App/Sources/AppModel.swift`, when `ControlConfig` exists, build clients from one `ControlLink`: one `DaemonClient` per host from `hosts/list` and `control/hostChanged`, instead of `SocketLink` + `HostSet`. Without it, keep today's path untouched (R7 Transition).
 - [ ] T025 [US1] Write `ThisMacHost` in `App/Sources/Control/ThisMacHost.swift` (R11): the `HostID` whose `machineID` matches this Mac. Replace the `host == .mac` gates with it in:
   - `App/Sources/Sidebar/FilesPane.swift`, plus pictures and `OpenElsewhere.swift`
@@ -116,7 +116,7 @@ or on Alex's paired devices.
 - [ ] T027 [US1] Credentials: lend through each host's `DaemonClient` over its channel, operator only (FR-020). Check `App/Sources/Hosts/Lending.swift` needs nothing beyond its new client source.
   - Show `SignInRelays` for servers as "needs this Mac on the same network" (the regression R9 states).
 - [ ] T028 [US1] Show the away state in the sidebar (frame H): every host's projects stay listed but greyed, under one strip, **Can't reach the control plane**, that names the expected address. The strip goes in `App/Sources/Sidebar/` next to today's offline-server strip, reusing `HostProblem+Words.swift`.
-- [ ] T029 [US1] Pairing the window: the window's pairing client (`clients/announce` with kind `mac`) goes in `App/Sources/Control/WindowPairing.swift`, reusing `DeviceKey` and `NetworkLink` from AgentsKitCore. Check the keychain access group builds for macOS.
+- [x] T029 (Connect… pairs with a code; walks/network.md) [US1] Pairing the window: the window's pairing client (`clients/announce` with kind `mac`) goes in `App/Sources/Control/WindowPairing.swift`, reusing `DeviceKey` and `NetworkLink` from AgentsKitCore. Check the keychain access group builds for macOS.
   - For walks, the env var `AGENTS_CONTROL=<code>` pairs without UI.
 - [x] T030 [US1] (walks/us1.md) Walk: quickstart steps 1–6 on `/tmp/cp-walk` with a real Claude turn. Screenshot each step. Record the result in `specs/058-control-plane/walks/us1.md`.
 
