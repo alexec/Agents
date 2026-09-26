@@ -18,8 +18,8 @@ on your Mac and your phone. A runtime's own tools put work somewhere else.
 
 - A schedule made with the runtime's own scheduler is a job with no row in the project.
   You would not see it, and you could not stop it from the app.
-- A subagent started by the runtime is an agent you cannot see, open or stop, and whose
-  cost is not in the total.
+- An agent the runtime addresses as a peer, by listing other agents and messaging them,
+  is talking to agents the app cannot see, open or stop.
 - A notification sent through the runtime's own channel never reaches your phone through
   the app, and is not in the conversation afterwards.
 - A report written into a runtime's own document store is somewhere you never agreed to
@@ -46,6 +46,13 @@ Nothing the work itself needs is touched. Reading, searching, editing and writin
 running commands, planning, and keeping a to-do list all stay. So does searching and
 reading the web, where the runtime has it.
 
+A runtime's own subagents and background commands stay too, where the app can show them.
+Claude and Codex tell the app about each one as it starts and ends, so each appears in a
+list over the prompt, with **Stop** for a background command, and ends with the turn that
+started it (see [Watch an agent's background work](../how-to/watch-background-work.md)). What
+is taken away is the part that reaches other agents as peers: Claude's tools for listing
+agents and sending them messages.
+
 The runtime's tool for asking you a question also stays, on purpose. When an agent asks
 you something that way, the app holds the question and shows it to you as a card, on the
 Mac or on your phone, and waits for your answer. Taking that tool away would break the
@@ -57,8 +64,10 @@ The runtimes do not all offer the same way to take a tool away, so the app uses 
 each one has.
 
 - **Claude** takes a list of tools to deny for each session. It loses its schedulers,
-  monitors and workflows, its push notifications, its subagents, its report tools, and
-  connectors that store documents. Other connectors you have set up are left alone.
+  monitors and workflows, its push notifications, its tools for listing and messaging other
+  agents, its own worktree tools, its report tools, and connectors that store documents. It
+  keeps its subagents and its tools for reading and stopping background work, which the
+  app shows. Other connectors you have set up are left alone.
 - **Grok** takes a list of the tools to keep for each session, plus a settings file the
   app writes inside its own folder. It loses its scheduler, its feedback tool and its
   subagents. Two of its tools, `workflow` and `monitor`, cannot be removed this way, so the
@@ -71,10 +80,11 @@ each one has.
   agent's briefing names them and says what to use instead.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its long-running goals, its automations, its memories and its
-  ChatGPT connectors. Its six sub-agent tools (`spawn_agent`, `send_message` and the rest)
-  come with the model and cannot be switched off, so the briefing names them and says to
-  start helpers with the app's own tool instead. Its question tool stays, and its questions
-  reach you as a card.
+  ChatGPT connectors. Its sub-agents are switched on, and the app shows them as it does
+  Claude's. Its question tool stays, and its questions reach you as a card.
+- **Gemini** loses its own subagents and task tracker.
+- **Antigravity** takes a list of tools to deny for each session. It loses its tool for
+  starting subagents; its question tool stays, and its questions reach you as a card.
 
 Where a tool can only be named in the briefing, the agent is being asked, not stopped.
 That is weaker, and the app says so rather than pretending otherwise.

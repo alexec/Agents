@@ -95,9 +95,12 @@ reaches the agents you are running.
 Everything the protocol defines, decided by what each runtime advertises rather than by
 which runtime it is.
 
-Four runtimes are known: Claude, Grok, Copilot and Cursor. Three are commands of their own
-and Claude is an npm package run through your Node, because `claude` has no ACP flag. What
-the app starts for Cursor is `cursor-agent`, not `agent`, which belongs to Grok.
+Seven runtimes are known: Claude, Codex, Gemini, Antigravity, Grok, Copilot and Cursor.
+Grok, Copilot and Cursor are commands of their own that you install. Claude is an npm
+adapter, because `claude` has no ACP flag, run through your Node or installed in the app's
+own folder. Codex, Gemini and Antigravity are only ever the app's own copies, installed from
+the set-up sheet or **Settings ▸ Agent Runtimes**. What the app starts for Cursor is
+`cursor-agent`, not `agent`, which belongs to Grok.
 
 No code in the app asks which runtime it is talking to. A runtime that advertises a thing
 gets that thing, and one that does not, does not: Cursor offers no options to pick from and
@@ -126,6 +129,18 @@ no way to sign out, so the app shows neither.
   A command the app puts in front of you is one it knows it would start. What a runtime
   says about itself in prose is shown, but never followed: Cursor's sign-in text says to
   run `agent login`, and `agent` here is Grok.
+- **Steering.** Where a runtime advertises `_meta.steering` (the Claude adapter and
+  codex-acp do), a prompt queued behind a running turn offers **Send now**, which goes in
+  through `_session/steering` rather than waiting for the turn to end.
+- **Background work.** The app opts in to JetBrains AIR's `asyncTasks` and
+  `nativeSubagentSessions`, so a runtime's background shells and subagents are listed over
+  the prompt, each shell with **Stop**, and a subagent's steps have a pane of their own.
+  What still runs when the runtime is let go ends with the turn.
+- **Notices, providers and vendor extensions.** Session notices are drawn in the chat;
+  a provider the runtime does not mark required can be turned off; `_auth/status_update`
+  says which account a runtime is signed in with; Cursor's `cursor/update_todos` becomes
+  the plan and its `ask_question` a form card. An extension request the app does not know
+  is refused and logged.
 - **Conversations the app did not start.** The runtime's own list, ready to be picked up,
   branched, or deleted with a confirmation.
 - **What to ask next.** When a turn ends the agent may offer a few things you might want
@@ -158,15 +173,20 @@ from your terminal a minute later has everything it always had.
 
 How it is asked for depends on what each runtime offers, and it is a table rather than a
 condition — `ToolPolicyCatalog` is the one place that knows. Claude takes a denial list on
-the session and loses fifteen built-ins and two connectors. Copilot takes flags at launch
+the session and loses fourteen built-ins and two connectors. Copilot takes flags at launch
 and loses its subagents, its session store and the whole rival MCP server that duplicated
 this app's remit. Grok takes an allow list on the session, plus a config overlay the app
 writes under its own root. Cursor has no lever at all, so its three conflicting tools stay
-— and are named in the briefing instead, along with what to use in their place.
+— and are named in the briefing instead, along with what to use in their place. Codex
+takes feature switches in a `CODEX_CONFIG` set only for its sessions, Gemini loses its
+subagents and task tracker, and Antigravity takes a deny list under `_meta.agy` and loses
+`start_subagent`.
 
 Nothing the work needs is touched: reading, searching, editing, writing, running commands,
 planning and keeping a to-do list stay, and so does the question tool each runtime raises
-an escalation through — the one thing here it would matter most to break.
+an escalation through — the one thing here it would matter most to break. Nor are a
+runtime's own subagents and background tasks, where the app can show them: Claude keeps
+`Agent`, `TaskOutput` and `TaskStop`, and Codex runs with `multi_agent` on.
 
 To re-ask every runtime what it has today, and see anything the policy does not account
 for:

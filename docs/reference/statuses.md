@@ -18,7 +18,7 @@ colour.
 | Status | Group | What it means | What you can do |
 | --- | --- | --- | --- |
 | **Starting** | Working | The agent has been made and its first turn is about to begin. | **Stop**, **Park**, **Archive**, **Branch**. |
-| **Working** | Working | A turn is in progress. | **Stop**, **Park**, **Archive**, **Branch**. A prompt you send waits until the turn ends. |
+| **Working** | Working | A turn is in progress. | **Stop**, **Park**, **Archive**, **Branch**. A prompt you send waits until the turn ends, unless you click **Send now** on it. |
 | **Coming back after a restart** | Working | The app is bringing the conversation back by itself after the app or the Mac restarted. | **Stop**. |
 | **Waiting on you** | Needs attention | The agent has asked you something in the middle of its turn, such as permission to run a command, and is paused until you answer. | Answer the card above the prompt. **Stop**, **Park**, **Archive**, **Branch**. It stays under Needs attention until you answer. |
 | **Waiting on your answer** | Needs attention | The turn ended with a question for you. | Reply in the prompt. **Park**, **Archive**, **Branch**. |

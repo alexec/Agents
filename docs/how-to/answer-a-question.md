@@ -52,6 +52,15 @@ Whichever it is, the agent and its project say **Needs attention** until you ans
 Answer from wherever is closest. Answering on one device clears the card and the
 notification everywhere else.
 
+Once you answer a card with questions, the conversation keeps what you said, in a bubble
+of yours: each question, and under it your answer in the card's own words, such as the
+choice you picked, several choices joined with commas, or what you typed in the box beside
+a choice. A question you left empty is left out. A card you declined or closed says **You
+declined the agent's form** or **The form was closed**.
+
+Cursor's questions come as the same card, one question to a page; any of them can be left
+empty.
+
 ## If it doesn't work
 
 - **The card is gone but the agent is not working.** It stopped, or the app restarted,
