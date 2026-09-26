@@ -56,6 +56,31 @@ public final class AgentsModel {
     /// because a chat watched for hours hears thousands between pages.
     @ObservationIgnored private var heardSincePage: [TranscriptEntry] = []
     private static let heardSincePageLimit = 1_000
+
+    /// Whether the chat is following the end of the conversation, as the chat says.
+    ///
+    /// The page is trimmed at the front only while it is. A window left on a busy agent
+    /// for an afternoon heard every entry of it, and transcripts run to tens of
+    /// megabytes, so what streams in cannot simply pile up. But the rows at the top are
+    /// the ones somebody who scrolled up is reading, and taking them away would move
+    /// the page under them, so while they are away from the end nothing goes.
+    @ObservationIgnored public var isFollowingEnd = true
+    /// How many entries a followed page keeps: three of the daemon's 200-entry pages,
+    /// many screens more than a pane shows. Trimmed only once a further page has
+    /// piled up past it, so the fold is done again once a page rather than per entry.
+    static let entriesKept = 600
+    static let entriesTrimmedAt = 800
+    /// And never fewer rows than this, whatever the entries come to. A run of tool
+    /// calls is one row however many entries it took, and a page trimmed to a few rows
+    /// would not fill the pane: the chat would ask for the page before straight back.
+    static let itemsKept = 100
+    /// Told the entries that go when the front of the page is trimmed, for anything
+    /// that folds the whole conversation into something (the phone's marks on the
+    /// files the agent touched) and would lose them otherwise.
+    @ObservationIgnored public var onTrimmed: ([TranscriptEntry]) -> Void = { _ in }
+    /// When to look at trimming next. Not every entry past the mark: a page that could
+    /// not be trimmed (too few rows) would otherwise be measured again for every chunk.
+    @ObservationIgnored private var nextTrimAt = entriesTrimmedAt
     /// Each agent's folder in the form projects compare by, worked out once.
     ///
     /// `Project.standardize` resolves symlinks, which is the file system being asked
@@ -69,6 +94,8 @@ public final class AgentsModel {
         didSet {
             guard watching != oldValue else { return }
             clearTranscript()
+            // A chat opens at its end, whatever the last one was left at.
+            isFollowingEnd = true
         }
     }
 
@@ -260,7 +287,11 @@ public final class AgentsModel {
             guard entryIDs.insert(notification.entry.id).inserted else { return }
             entries.append(notification.entry)
             display.add(notification.entry)
-            transcriptItems = display.items
+            if isFollowingEnd, entries.count > nextTrimAt {
+                trimFront()
+            } else {
+                transcriptItems = display.items
+            }
 
         case .permission(let notification):
             // One question per agent at a time, so the agent's old one goes whether
@@ -526,7 +557,10 @@ public final class AgentsModel {
 
     /// An earlier page, put in front of what is already held.
     public func prepend(_ page: TranscriptPage) {
-        entries.insert(contentsOf: page.entries, at: 0)
+        // Only what is not already held. Where a trimmed page starts is counted, not
+        // read off the file, and an entry that was heard but never written would put
+        // the count past it: the page asked for then ends with entries already here.
+        entries.insert(contentsOf: page.entries.filter { !entryIDs.contains($0.id) }, at: 0)
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.hasMoreBefore
         refold()
@@ -547,6 +581,38 @@ public final class AgentsModel {
         display = TranscriptDisplayBuilder()
         for entry in entries { display.add(entry) }
         transcriptItems = display.items
+        nextTrimAt = Self.entriesTrimmedAt
+    }
+
+    /// The oldest entries let go, down to `entriesKept`, while the chat follows the end.
+    ///
+    /// Cut where a row begins, so every row left is the row it was — the same id, the
+    /// same fold, a run still open or not as before — and the pane has nothing to
+    /// redraw but the rows that went, far above it. What went is only marked as being
+    /// there: `hasMoreBefore`, and `firstEntryIndex` moved on past it, so reaching the
+    /// top pages it back in from the daemon the way any earlier page comes.
+    private func trimFront() {
+        let items = display.items
+        var position: [UUID: Int] = [:]
+        for (index, entry) in entries.enumerated() where position[entry.id] == nil {
+            position[entry.id] = index
+        }
+        let starts = items.compactMap { position[$0.id] }
+        let latest = starts.count > Self.itemsKept ? starts[starts.count - Self.itemsKept] : 0
+        let wanted = starts.first { $0 >= entries.count - Self.entriesKept } ?? latest
+        let cut = min(wanted, latest)
+        guard cut > 0 else {
+            transcriptItems = items
+            nextTrimAt = entries.count + Self.entriesTrimmedAt - Self.entriesKept
+            return
+        }
+        let dropped = Array(entries[..<cut])
+        entries.removeFirst(cut)
+        firstEntryIndex += cut
+        hasMoreBefore = true
+        refold()
+        nextTrimAt = max(Self.entriesTrimmedAt, entries.count + Self.entriesTrimmedAt - Self.entriesKept)
+        onTrimmed(dropped)
     }
 
     /// Taken out once it has been acted on. This is "look at this now", and a client

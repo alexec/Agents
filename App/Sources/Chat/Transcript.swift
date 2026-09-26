@@ -24,6 +24,7 @@ struct Transcript: View {
                        // from (FR-042).
                        scrollToEndToken: model.scrollToEndToken,
                        focusedEntry: model.focusedEntry,
-                       clearFocus: { model.clearFocus() })
+                       clearFocus: { model.clearFocus() },
+                       onFollowing: { model.work.isFollowingEnd = $0 })
     }
 }

@@ -21,7 +21,8 @@ struct ChangesPane: View {
     /// finished, or the agent's turn moved on. Asking is keyed on it, so a burst of
     /// them while a request is out collapses into one more request, not many.
     @State private var revision = 0
-    /// How far into the window's transcript this pane has looked for finished edits.
+    /// How far into the conversation, counted over the whole transcript, this pane has
+    /// looked for finished edits.
     @State private var seenEntries = 0
     /// Tool calls seen carrying a diff, so their ending can be told from any other.
     @State private var diffCalls: Set<String> = []
@@ -60,7 +61,7 @@ struct ChangesPane: View {
         }
         .onChange(of: model.entries.count) { _, _ in noticeFinishedEdits() }
         .onChange(of: agent.state) { _, _ in revision += 1 }
-        .onAppear { seenEntries = model.entries.count }
+        .onAppear { seenEntries = model.work.firstEntryIndex + model.entries.count }
     }
 
     private struct Ask: Equatable {
@@ -82,10 +83,15 @@ struct ChangesPane: View {
 
     /// An edit counts once its tool call has ended; that is when the list can change.
     private func noticeFinishedEdits() {
+        // Counted by position in the whole conversation rather than in the page, because
+        // the page loses its oldest entries as a long one goes on, and an earlier page
+        // going in front is nothing new either.
         let entries = model.entries
-        if entries.count < seenEntries { seenEntries = 0 }
+        let from = model.work.firstEntryIndex
+        var start = seenEntries - from
+        if start < 0 || start > entries.count { start = 0 }
         var finished = false
-        for entry in entries[seenEntries...] {
+        for entry in entries[start...] {
             switch entry.kind {
             case .toolCall(let call), .toolCallUpdate(let call):
                 guard let id = call.toolCallID else { continue }
@@ -99,7 +105,7 @@ struct ChangesPane: View {
                 continue
             }
         }
-        seenEntries = entries.count
+        seenEntries = from + entries.count
         if finished { revision += 1 }
     }
 
