@@ -224,11 +224,11 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Tests for User Story 7
 
-- [ ] T031 [P] [US7] In `Tests/PersonalPluginsTests.swift`, test:
+- [X] T031 [P] [US7] In `Tests/PersonalPluginsTests.swift`, test:
   - Claude's `_meta.claudeCode.options.plugins` lists the project's plugins, then the personal ones, merged with the tool policy's `disallowedTools` (use `DaemonCore.merging`);
   - Grok's `_meta.pluginDirs` likewise, and a plugin's `.mcp.json` servers appear in Grok's `sessionServers` and no other runtime's;
   - the Gemini link `~/.gemini/extensions/<name>` is relative, is recorded, and is not put back once deleted; its dangling link is removed when the plugin goes; `gemini-extension.json` is written once when missing and never overwritten.
-- [ ] T032 [P] [US7] In `Tests/PersonalPluginsTests.swift`, test Codex with a fake `codex` script on `PATH` that logs its arguments:
+- [X] T032 [P] [US7] In `Tests/PersonalPluginsTests.swift`, test Codex with a fake `codex` script on `PATH` that logs its arguments:
   - `~/.agents/plugins/marketplace.json` is written with the marker, `name: agents-personal`, and sources `./.agents/plugins/<name>`;
   - an index the person wrote themselves is never touched;
   - an unchanged fingerprint → no `plugin add`; a touched file → `plugin add <name>@agents-personal`; a removed plugin → `plugin remove` and its record entry dropped;
@@ -236,20 +236,20 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Implementation for User Story 7
 
-- [ ] T033 [US7] Create `Src/Projects/PersonalDotAgents+Plugins.swift`:
+- [X] T033 [US7] Create `Src/Projects/PersonalDotAgents+Plugins.swift`:
   - `personalPluginFolders(home:)`;
   - `pluginInfo(_:)` per data-model.md `PluginInfo`, with contents counts for `skills`, `commands`, `agents`, `hooks` and `mcpServers`;
   - `pluginServers(_:)`, read from `.mcp.json`;
   - `fingerprint(_:)`: relative path, size and modification date of each file, hashed.
-- [ ] T034 [US7] Extend `sessionMeta(runtimeID:cwd:)` in `Src/Daemon/DaemonCore+Projects.swift` to add personal plugin folders after the project's own, for Claude and Grok, and pass Grok's plugin servers into `sessionServers` (R12).
-- [ ] T035 [US7] Add the Codex step to `Src/Daemon/DaemonCore+PersonalLayout.swift`:
+- [X] T034 [US7] Extend `sessionMeta(runtimeID:cwd:)` in `Src/Daemon/DaemonCore+Projects.swift` to add personal plugin folders after the project's own, for Claude and Grok, and pass Grok's plugin servers into `sessionServers` (R12).
+- [X] T035 [US7] Add the Codex step to `Src/Daemon/DaemonCore+PersonalLayout.swift`:
   - write the index;
   - diff fingerprints against `codexPlugins`;
   - run the toolset's `codex` binary with `HOME` set to the personal home (`plugin add` / `plugin remove`), off the actor, with a `terminationHandler`, never `waitUntilExit`;
   - record the new fingerprint on success.
 
   It runs at daemon start and before a Codex session only.
-- [ ] T036 [US7] Add the Gemini extension-link step to `Src/Projects/PersonalDotAgents+Plugins.swift`, recorded like skill links, only when Gemini is installed.
+- [X] T036 [US7] Add the Gemini extension-link step to `Src/Projects/PersonalDotAgents+Plugins.swift`, recorded like skill links, only when Gemini is installed.
 - [ ] T037 [US7] Run quickstart step 5's plugin half live on the probe home. Record in `walk/README.md` that `plover-mcp` logged for Claude, Codex (after the app's own add) and Grok, and that touching a plugin file makes the next Codex start add it again while a second unchanged start does not.
 
 ---

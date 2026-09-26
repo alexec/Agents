@@ -175,8 +175,11 @@ extension DaemonCore {
     /// plugins only from one.
     func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
         DotAgents.refreshPlugins(for: cwd)
+        // The person's own plugins after the project's (054, R12), for the runtimes that
+        // take plugins this way.
+        let personal = locations.personalHome.map(PersonalDotAgents.personalPluginFolders) ?? []
         return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
-                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd)))
+                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: DotAgents.pluginFolders(for: cwd) + personal))
     }
 
     /// Two `_meta` objects as one, key by key and all the way down, because Claude's

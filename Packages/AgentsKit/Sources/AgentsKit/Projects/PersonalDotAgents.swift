@@ -143,6 +143,9 @@ public enum PersonalDotAgents {
             if let instructionsFile = rule.instructionsFile {
                 placeLink(home: home, at: instructionsFile, to: "\(folder)/\(router)", record: &record)
             }
+            if rule.pluginHandover == .extensionLink {
+                linkGeminiExtensions(home: home, record: &record)
+            }
         }
     }
 
@@ -267,9 +270,18 @@ public enum PersonalDotAgents {
     /// them, and no other link is (FR-008, R7). A record entry goes with its skill, so the
     /// same skill added again is linked again.
     static func sweep(home: URL, skillsFolder: String, record: inout Record) {
+        sweep(home: home, folder: skillsFolder, sharedFolder: "\(folder)/\(skills)",
+              present: Set(sharedSkills(home: home)), record: &record)
+    }
+
+    /// The same for any folder the app links into from a folder in `~/.agents`: a link in
+    /// `folder` that resolves inside `sharedFolder` to nothing goes, and so does the record
+    /// of a name no longer in `present`.
+    static func sweep(home: URL, folder linkFolder: String, sharedFolder: String, present: Set<String>,
+                      record: inout Record) {
         let fileManager = FileManager.default
-        let folderURL = home.appending(path: skillsFolder, directoryHint: .isDirectory)
-        let shared = home.appending(path: "\(folder)/\(skills)").standardizedFileURL.path + "/"
+        let folderURL = home.appending(path: linkFolder, directoryHint: .isDirectory)
+        let shared = home.appending(path: sharedFolder).standardizedFileURL.path + "/"
         if (try? fileManager.destinationOfSymbolicLink(atPath: folderURL.path)) == nil {
             let entries = (try? fileManager.contentsOfDirectory(atPath: folderURL.path)) ?? []
             for name in entries {
@@ -278,14 +290,13 @@ public enum PersonalDotAgents {
                 let resolved = (destination.hasPrefix("/") ? URL(filePath: destination)
                                 : folderURL.appending(path: destination)).standardizedFileURL
                 guard resolved.path.hasPrefix(shared), !fileManager.fileExists(atPath: resolved.path) else { continue }
-                attempt("remove the dangling link \(skillsFolder)/\(name)") {
+                attempt("remove the dangling link \(linkFolder)/\(name)") {
                     try fileManager.removeItem(at: url)
                 }
             }
         }
-        let present = Set(sharedSkills(home: home))
-        for path in record.links.keys where path.hasPrefix(skillsFolder + "/") {
-            let name = String(path.dropFirst(skillsFolder.count + 1))
+        for path in record.links.keys where path.hasPrefix(linkFolder + "/") {
+            let name = String(path.dropFirst(linkFolder.count + 1))
             if !present.contains(name) { record.links.removeValue(forKey: path) }
         }
     }

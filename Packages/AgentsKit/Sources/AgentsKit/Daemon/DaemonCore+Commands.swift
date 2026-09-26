@@ -389,6 +389,7 @@ extension DaemonCore {
         layOutOnce(cwd)
         // And the person's own `~/.agents`, so a skill added since the last start is here (054).
         reconcileHome()
+        await syncCodexPlugins(before: runtimeID)
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
@@ -786,6 +787,8 @@ extension DaemonCore {
         // was, and the window lends one and asks again (043).
         let lent = try launchEnvironment(for: runtime.id)
         await record(.runtimeNote(RuntimeNote.starting(runtime.name)), for: agent.id)
+        // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
+        await syncCodexPlugins(before: agent.runtimeID)
         let session = try LentEnvironment.$value.withValue(lent) {
             try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
         }

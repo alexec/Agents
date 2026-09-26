@@ -124,6 +124,11 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var appTokens: [String: UUID] = [:]
+    /// The one `codex plugin add/remove` pass running, which a second Codex start waits
+    /// on rather than running its own (054, R12).
+    var codexPluginSync: Task<Void, Never>?
+    /// The `codex` a test runs in place of the toolset's.
+    var codexCLIOverride: URL?
     #if canImport(Network) && canImport(Security)
     /// Stdio MCP servers over loopback http, for a runtime that takes none from the client
     /// (054, research R11). It listens only once a session needs it.

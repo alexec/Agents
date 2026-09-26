@@ -89,7 +89,7 @@ extension PersonalDotAgents {
         return .success(servers)
     }
 
-    private static func server(named name: String, _ value: Any) -> Result<MCPServer, MCPFileProblem> {
+    static func server(named name: String, _ value: Any) -> Result<MCPServer, MCPFileProblem> {
         guard let entry = value as? [String: Any] else {
             return .failure(MCPFileProblem(message: "The server “\(name)” should be an object."))
         }

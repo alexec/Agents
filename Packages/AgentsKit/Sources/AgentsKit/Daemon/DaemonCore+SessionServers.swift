@@ -61,9 +61,14 @@ extension DaemonCore {
     /// here, every time, so an edit reaches the next session without a restart, and
     /// nothing read from it is kept (R10, FR-023).
     func sessionServers(runtimeID: String, chosen: [MCPServer], token: String, managesAgents: Bool,
-                        cwd: URL, capabilities: ACP.MCPCapabilities?,
-                        pluginServers: [MCPServer] = []) async -> [MCPServer] {
+                        cwd: URL, capabilities: ACP.MCPCapabilities?) async -> [MCPServer] {
         let personal = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
+        // Grok loads a plugin's skills and commands from `pluginDirs` but never starts its
+        // servers, so they go here too (R9, R12).
+        var pluginServers: [MCPServer] = []
+        if PersonalDotAgents.rule(for: runtimeID)?.pluginHandover == .sessionMetaWithServers, let home = locations.personalHome {
+            pluginServers = PersonalDotAgents.personalPluginServers(home: home)
+        }
         if case .failure(let problem) = personal {
             DaemonLog.shared.write("personal servers: left out, \(problem.message)"
                                    + (problem.line.map { " (line \($0))" } ?? ""))
