@@ -226,9 +226,12 @@ new runtime in the controls, and that the next prompt goes to it with the histor
 - **Worktrees.** The chat keeps its worktree and branch; the new runtime works in the same place.
 - **Cost limits (010).** A chat's spending keeps adding up across runtimes. A cost limit the person
   set is never a reason to switch.
-- **Different options.** Mode and model do not map one to one between runtimes. The new runtime
-  starts in the closest mode to the one the chat was in and in the model named on the pool entry,
-  else the runtime's default; never in a looser mode than the chat had.
+- **Different options.** Mode and model do not map one to one between runtimes. See FR-015 for
+  how each is carried. The chat never starts on the new runtime in a looser mode than it had.
+- **Permissions given before the switch.** An "always allow" given to the old runtime was that
+  runtime's own. The new runtime may ask again.
+- **Queued slash commands.** A queued prompt that starts with a slash command the new runtime
+  does not offer is held, and the chat says so. It is not sent as plain text.
 
 ## Requirements *(mandatory)*
 
@@ -270,8 +273,23 @@ new runtime in the controls, and that the next prompt goes to it with the histor
   reason, and the old runtime's expected return time if known.
 - **FR-014**: Every switch MUST be published as an event other agents and workflows can wait on
   (042), carrying the chat, both runtimes and the reason.
-- **FR-015**: The new runtime MUST start in a mode no looser than the chat's current mode, and in
-  the pool entry's model or else the runtime's default.
+- **FR-015**: The chat's settings MUST be carried over in three kinds:
+  - **Settings the app owns, carried as they are:** folder, worktree, extra folders, attached MCP
+    servers, the app's own tools, project, cost ceiling and spending, and queued prompts. The
+    app's tool policy is the new runtime's own, not a copy of the old one's.
+  - **Settings the runtime advertises, mapped:**
+    - *Mode:* the new runtime's loosest mode that is no looser than the chat's current mode,
+      judged on the same scale as a helper agent's mode (028). If the current mode has no place
+      on that scale, the chat MUST get the new runtime's strictest mode.
+    - *Model:* the model named on the pool entry, else the model last chosen for that runtime,
+      else the runtime's default. A model is never matched by name across vendors.
+    - *Effort and any other option:* the same value if the new runtime offers that value under
+      the same kind of option; otherwise the runtime's default.
+    - *Extra command-line arguments:* dropped.
+  - **Runtime-private state, not carried:** the runtime's own session, its compaction of the
+    chat, its "always allow" answers and its slash commands.
+- **FR-015a**: The switch note MUST say which mode and model the new runtime started in, and name
+  any setting that could not be carried over.
 
 **Pool page**
 
