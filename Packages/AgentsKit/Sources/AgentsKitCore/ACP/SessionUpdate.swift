@@ -2,7 +2,7 @@ import Foundation
 
 /// What a `session/update` notification turns into.
 ///
-/// All fifteen kinds the protocol defines. An unfamiliar kind is reported once and
+/// All sixteen kinds the protocol defines. An unfamiliar kind is reported once and
 /// skipped: a new update type shipping in a runtime must never stop an agent working.
 public enum SessionUpdate: Sendable {
     case entry(TranscriptEntry.Kind)
@@ -65,6 +65,9 @@ public enum SessionUpdate: Sendable {
         case "compaction_update":
             return .entry(.compaction(status: update["status"]?.stringValue ?? "in_progress",
                                       summary: [ContentBlock](wire: update["summary"])))
+        case "notice":
+            guard let notice = SessionNotice(wire: update) else { return .ignored(kind) }
+            return .entry(.notice(notice))
         case "compaction_summary_chunk":
             return .entry(.compaction(status: "in_progress",
                                       summary: [ContentBlock](wire: update["content"])))

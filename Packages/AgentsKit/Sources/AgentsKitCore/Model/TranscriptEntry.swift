@@ -45,6 +45,8 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case elicitationAsked(ElicitationRequest)
         case elicitationAnswered(id: UUID, summary: String)
         case compaction(status: String, summary: [ContentBlock])
+        /// The runtime telling the person something beside the reply (ACP `notice`).
+        case notice(SessionNotice)
         case permissionAsked(PermissionRequest)
         case permissionAnswered(optionID: String, optionName: String?)
         case optionChanged(id: String, value: JSONValue)

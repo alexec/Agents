@@ -31,12 +31,16 @@ public enum ACP {
         /// 2026-09-18. `session/setConfigOption` and `session/set_option` are both
         /// method-not-found; this spelling is the one that exists.
         public static let setConfigOption = "session/set_config_option"
+        /// The older way to set a mode or a model, for a runtime that advertises
+        /// `modes` and `models` but no `configOptions`. Gemini CLI is one (046).
+        /// `set_config_option` is used wherever the runtime offers it.
+        public static let setSessionMode = "session/set_mode"
+        public static let setSessionModel = "session/set_model"
     }
 
     /// Named so that "we chose not to" and "we forgot" stay different things. Each of
     /// these is in the spec's Out of Scope section with the reason.
     public enum UnusedMethod {
-        public static let setSessionMode = "session/set_mode"
         public static let mcpMessage = "mcp/message"
         public static let cancelRequest = "$/cancel_request"
         public static let nesPrefix = "nes/"
@@ -74,6 +78,7 @@ public enum ACP {
         public var terminalAuth: Bool
         public var elicitationForm: Bool
         public var elicitationURL: Bool
+        public var notices: Bool
 
         public init(readTextFile: Bool = false,
                     writeTextFile: Bool = false,
@@ -83,7 +88,8 @@ public enum ACP {
                     plan: Bool = false,
                     terminalAuth: Bool = false,
                     elicitationForm: Bool = false,
-                    elicitationURL: Bool = false) {
+                    elicitationURL: Bool = false,
+                    notices: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
             self.terminal = terminal
@@ -93,6 +99,7 @@ public enum ACP {
             self.terminalAuth = terminalAuth
             self.elicitationForm = elicitationForm
             self.elicitationURL = elicitationURL
+            self.notices = notices
         }
 
         /// What 001 sent. Kept as a named thing so the change that turns a flag on is
@@ -117,7 +124,8 @@ public enum ACP {
             plan: true,
             terminalAuth: true,
             elicitationForm: true,
-            elicitationURL: true)
+            elicitationURL: true,
+            notices: true)
 
         public var wire: JSONValue {
             var caps: [String: JSONValue] = [
@@ -127,6 +135,7 @@ public enum ACP {
             var session: [String: JSONValue] = [:]
             if booleanConfigOptions { session["configOptions"] = ["boolean": .object([:])] }
             if compaction { session["compaction"] = .object([:]) }
+            if notices { session["notices"] = .object([:]) }
             if !session.isEmpty { caps["session"] = .object(session) }
             if plan { caps["plan"] = .object([:]) }
             if terminalAuth { caps["auth"] = ["terminal": .bool(true)] }
@@ -331,6 +340,36 @@ public enum ACP {
         public var name: String?
         public var `protocol`: String?
         public var configured: Bool?
+        /// Mandatory: the runtime says it cannot be turned off, so `providers/disable`
+        /// is never offered for it.
+        public var required: Bool?
+
+        public init(id: String, name: String? = nil, protocol: String? = nil,
+                    configured: Bool? = nil, required: Bool? = nil) {
+            self.id = id
+            self.name = name
+            self.protocol = `protocol`
+            self.configured = configured
+            self.required = required
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, providerId, name, `protocol`, configured, required
+        }
+
+        /// `id` is the shape this was first written against; the schema now says
+        /// `providerId`. Either is read, so a runtime on either side still lists.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(String.self, forKey: .id)
+                ?? c.decode(String.self, forKey: .providerId)
+            name = try? c.decodeIfPresent(String.self, forKey: .name)
+            `protocol` = try? c.decodeIfPresent(String.self, forKey: .protocol)
+            configured = try? c.decodeIfPresent(Bool.self, forKey: .configured)
+            required = try? c.decodeIfPresent(Bool.self, forKey: .required)
+        }
+
+        public var canBeDisabled: Bool { required != true }
     }
 
     static func timestamp(from string: String) -> Date? {
