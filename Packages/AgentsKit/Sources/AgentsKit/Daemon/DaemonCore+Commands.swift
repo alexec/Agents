@@ -1124,7 +1124,7 @@ extension DaemonCore {
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
-                ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
+                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
         } else if let limit = Self.usageLimit(error) {

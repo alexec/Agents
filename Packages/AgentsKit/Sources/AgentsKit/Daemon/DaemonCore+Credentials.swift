@@ -25,24 +25,29 @@ public enum LentEnvironment {
     }
 }
 
-/// A server's own Claude sign-in, as `claude login` or the person's profile left it.
+/// A server's own sign-in for a runtime a window can lend to: Claude's as `claude login` or
+/// the person's profile left it (043), Gemini's key in the profile (046).
 enum ServerSignIn {
     /// `$HOME`, as the server's shell has it.
     static var home: String { ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory() }
 
     static func exists(runtimeID: String) -> Bool {
-        guard runtimeID == "claude" else { return true }
-        if FileManager.default.fileExists(atPath: "\(home)/.claude/.credentials.json") {
+        let variables = CredentialKind.variables(for: runtimeID)
+        guard !variables.isEmpty else { return true }
+        // Claude's own login leaves a file as well as, or instead of, a variable.
+        if runtimeID == RuntimeCatalog.claude.id,
+           FileManager.default.fileExists(atPath: "\(home)/.claude/.credentials.json") {
             return true
         }
         let env = LoginShellPath.environment()
-        return CredentialKind.allVariables.contains { !(env[$0] ?? "").isEmpty }
+        return variables.contains { !(env[$0] ?? "").isEmpty }
     }
 }
 
 extension DaemonCore {
-    /// The runtimes a window can lend for (043). Only Claude (D3).
-    static let lendableRuntimes: Set<String> = ["claude"]
+    /// The runtimes a window can lend for: every one with a kind of credential Settings
+    /// takes (043 Claude, 046 Gemini).
+    static let lendableRuntimes: Set<String> = Set(CredentialKind.allCases.map(\.runtimeID))
 
     func offerCredentials(_ offer: DaemonAPI.CredentialsOffer, connection: UUID?) {
         // On this Mac an offer is the window saying what it still holds: a key taken out
@@ -72,7 +77,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.notOffered,
                                message: "This connection did not offer a credential for \(lend.runtime).")
         }
-        guard let secret = Secret(lend.secret), secret.kind == lend.kind else {
+        guard let secret = Secret(lend.secret), secret.kind == lend.kind, secret.kind.runtimeID == lend.runtime else {
             throw JSONRPCError(code: DaemonAPI.Failure.notOffered, message: "That is not a \(lend.runtime) credential.")
         }
         lentCredentials[connection, default: [:]][lend.runtime] = secret
@@ -144,13 +149,15 @@ extension DaemonCore {
 
     static func isAuthenticationFailure(_ error: JSONRPCError) -> Bool {
         if case .object(let data)? = error.data, data["errorKind"] == .string("authentication_failed") { return true }
-        return error.message.contains("Failed to authenticate")
+        // Google's words for a Gemini key it does not know (046, contracts/credentials.md).
+        return error.message.contains("Failed to authenticate") || error.message.contains("API key not valid")
+            || error.message.contains("API_KEY_INVALID")
     }
 
     static func wanted(_ runtimeID: String, offered: Bool) -> JSONRPCError {
         let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
         return JSONRPCError(code: DaemonAPI.Failure.credentialWanted,
-                            message: "\(name) on this server needs a token.",
+                            message: "\(name) on this server needs a \(CredentialKind.noun(for: runtimeID)).",
                             data: (try? JSONValue.encoding(DaemonAPI.CredentialWanted(runtime: runtimeID, offered: offered))) ?? nil)
     }
 }

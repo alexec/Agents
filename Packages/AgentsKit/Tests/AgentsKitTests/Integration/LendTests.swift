@@ -270,4 +270,33 @@ struct LendTests {
         }
         #expect(applied == ["GEMINI_API_KEY": Self.geminiKey, "ANTHROPIC_API_KEY": "claude's", "PATH": "/bin"])
     }
+
+    // MARK: Gemini on a server (046, US4)
+
+    @Test func aServerLendsGeminiItsKeyForThatRunOnly() async throws {
+        let setup = try await setUp(server: true, ownSignIn: false)
+        let window = UUID()
+        _ = await call(setup, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.CredentialsOffer(runtimes: ["claude", "gemini"], ownSignInOnly: false), on: window)
+        // Nothing lent yet: the start is refused before anything runs, and asks.
+        let first = await startGemini(setup, on: window)
+        #expect(wanted(first)?.runtime == "gemini")
+        if case .failure(let error) = first { #expect(error.message == "Gemini on this server needs a key.") }
+        #expect(!setup.launcher.launches.contains { $0.runtime == "gemini" })
+
+        guard case .success = await lendGemini(setup, on: window) else { Issue.record("refused"); return }
+        guard case .success = await startGemini(setup, on: window) else { Issue.record("did not start"); return }
+        let pairs = zip(setup.launcher.launches.map(\.runtime), setup.launcher.lent)
+        #expect(pairs.contains { $0.0 == "gemini" && $0.1 == ["GEMINI_API_KEY": Self.geminiKey] })
+    }
+
+    @Test func aKeyForOneRuntimeIsNotTakenForAnother() async throws {
+        let setup = try await setUp(server: true)
+        let window = UUID()
+        _ = await call(setup, DaemonAPI.Method.credentialsOffer,
+                       DaemonAPI.CredentialsOffer(runtimes: ["claude", "gemini"], ownSignInOnly: false), on: window)
+        let result = await call(setup, DaemonAPI.Method.credentialsLend,
+                                DaemonAPI.CredentialsLend(runtime: "claude", secret: Secret(Self.geminiKey)!), on: window)
+        guard case .failure = result else { Issue.record("a Gemini key was taken for Claude"); return }
+    }
 }

@@ -1034,6 +1034,10 @@ final class AppModel {
             guard let self else { return false }
             return self.credentials.record("claude") != nil && !(self.hosts.host(id)?.ownSignInOnly ?? false)
         }
+        hosts.toolsetWanted = { [weak self] id, runtimeID in
+            guard let self else { return false }
+            return self.credentials.record(runtimeID) != nil && !(self.hosts.host(id)?.ownSignInOnly ?? false)
+        }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
         }
