@@ -457,7 +457,7 @@ public actor DaemonCore {
     /// What each connection has lent, in memory only, dropped when it closes (043, R6).
     var lentCredentials: [UUID: [String: Secret]] = [:]
     /// Sign-in relays the windows connected here offered (047), by connection.
-    var relayOffers: [UUID: DaemonAPI.RelayOffer] = [:]
+    var relayOffers: [UUID: [String: DaemonAPI.RelayOffer]] = [:]
     /// One gate per forwarded relay socket, started on the first offer of it.
     var relayGates: [String: RelayGate] = [:]
     /// What a window lent this Mac's own agents (046, D3): Gemini's key, which has no other

@@ -16,7 +16,7 @@ struct MacSignInRelayTests {
     }
 
     static func jwt(_ claims: [String: Any]) throws -> String {
-        try MacSignIn.unsigned(claims).replacingOccurrences(of: ".standin", with: ".c2lnbmF0dXJl")
+        try CodexFileSignIn.unsigned(claims).replacingOccurrences(of: ".standin", with: ".c2lnbmF0dXJl")
     }
 
     /// A Mac sign-in file shaped like Codex's, with made-up secrets.
@@ -37,7 +37,7 @@ struct MacSignInRelayTests {
     @Test func theStandInHoldsNoSecretAndNoPersonalDetail() throws {
         let folder = try Self.temporary()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let signIn = MacSignIn(file: try Self.signInFile(in: folder))
+        let signIn = CodexFileSignIn(file: try Self.signInFile(in: folder))
         let standIn = try signIn.standIn()
         for secret in ["ACCESS-SECRET", "REFRESH-SECRET", "alex@example.com", "org-secret-ish"] {
             #expect(!standIn.contains(secret), "\(secret) must not reach a server")
@@ -47,11 +47,11 @@ struct MacSignInRelayTests {
         #expect(object["auth_mode"] as? String == "chatgpt")
         #expect(tokens["account_id"] as? String == "acct-1")
         #expect((tokens["access_token"] as? String)?.hasSuffix(".standin") == true)
-        let claims = MacSignIn.claims(tokens["id_token"] as! String)
+        let claims = CodexFileSignIn.claims(tokens["id_token"] as! String)
         let auth = try #require(claims["https://api.openai.com/auth"] as? [String: Any])
         #expect(auth["chatgpt_plan_type"] as? String == "plus")
         #expect(auth["organizations"] == nil)
-        #expect(try signIn.current() == .init(access: "ACCESS-SECRET", account: "acct-1"))
+        #expect(try signIn.current() == .init(access: "ACCESS-SECRET", headers: ["ChatGPT-Account-Id": "acct-1"]))
     }
 
     @Test func anAPIKeySignInIsNotOneTheRelayCanLend() throws {
@@ -59,7 +59,7 @@ struct MacSignInRelayTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = folder.appendingPathComponent("auth.json")
         try Data(#"{"auth_mode":"apikey","OPENAI_API_KEY":"sk-proj-x"}"#.utf8).write(to: file)
-        let signIn = MacSignIn(file: file)
+        let signIn = CodexFileSignIn(file: file)
         #expect(!signIn.isSignedIn)
         #expect(throws: (any Error).self) { try signIn.standIn() }
     }
@@ -67,10 +67,33 @@ struct MacSignInRelayTests {
     @Test func aRenewalSomebodyElseMadeIsUsedWithoutSpendingTheRefreshToken() async throws {
         let folder = try Self.temporary()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let signIn = MacSignIn(file: try Self.signInFile(in: folder, access: "NEWER"),
+        let signIn = CodexFileSignIn(file: try Self.signInFile(in: folder, access: "NEWER"),
                                tokenEndpoint: URL(string: "https://example.invalid/never-called")!)
-        let renewed = try await signIn.renew(after: .init(access: "OLDER", account: "acct-1"))
+        let renewed = try await signIn.renew(after: .init(access: "OLDER", headers: ["ChatGPT-Account-Id": "acct-1"]))
         #expect(renewed.access == "NEWER")
+    }
+
+    /// The runtime's own sign-in never reaches the service; this Mac's does, with the
+    /// headers its sign-in carries and no others (056).
+    @Test func theUpstreamRequestCarriesThisMacsSignInOnly() throws {
+        let raw = Data("POST /v1/messages?beta=true HTTP/1.1\r\nHost: 127.0.0.1:9\r\nAuthorization: Bearer sk-ant-oat01-agents-relay-standin\r\nx-api-key: sk-ant-api-server\r\nanthropic-beta: oauth-2025-04-20\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\n{}".utf8)
+        guard case .complete(let request) = HTTPRequest.parse(raw) else { Issue.record("not parsed"); return }
+
+        let claudeURL = try #require(MacSignInRelay.upstreamURL(host: "api.anthropic.com", target: request.target))
+        let claude = MacSignInRelay.upstream(request, url: claudeURL, token: MacSignInToken(access: "MAC-ACCESS"))
+        #expect(claude.url?.absoluteString == "https://api.anthropic.com/v1/messages?beta=true")
+        #expect(claude.value(forHTTPHeaderField: "Authorization") == "Bearer MAC-ACCESS")
+        #expect(claude.value(forHTTPHeaderField: "x-api-key") == nil)
+        #expect(claude.value(forHTTPHeaderField: "anthropic-beta") == "oauth-2025-04-20")
+        #expect(claude.value(forHTTPHeaderField: "Connection") == nil)
+        #expect(claude.value(forHTTPHeaderField: "ChatGPT-Account-Id") == nil)
+        #expect(claude.httpBody == Data("{}".utf8))
+
+        let codexURL = try #require(MacSignInRelay.upstreamURL(host: "chatgpt.com", target: request.target))
+        let codex = MacSignInRelay.upstream(request, url: codexURL,
+                                            token: MacSignInToken(access: "A", headers: ["ChatGPT-Account-Id": "acct-1"]))
+        #expect(codex.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "acct-1")
+        #expect("\(MacSignInToken(access: "MAC-ACCESS"))".contains("MAC-ACCESS") == false)
     }
 
     @Test func requestsParseWithLengthOrChunkedBodies() {
@@ -110,7 +133,7 @@ struct MacSignInRelayTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let certificates = RelayCertificates(folder: folder.appendingPathComponent("relay"))
         let relay = MacSignInRelay(relay: try #require(ToolPolicyCatalog.codex.relay),
-                                   signIn: MacSignIn(file: try Self.signInFile(in: folder)),
+                                   signIn: CodexFileSignIn(file: try Self.signInFile(in: folder)),
                                    certificates: certificates)
         let port = try await relay.start()
         defer { relay.stop() }
@@ -164,7 +187,7 @@ struct MacSignInRelayTests {
         #expect(keyMode == 0o600)
 
         let relay = MacSignInRelay(relay: try #require(ToolPolicyCatalog.codex.relay),
-                                   signIn: MacSignIn(file: folder.appendingPathComponent("no-sign-in.json")),
+                                   signIn: CodexFileSignIn(file: folder.appendingPathComponent("no-sign-in.json")),
                                    certificates: certificates)
         let port = try await relay.start()
         defer { relay.stop() }
