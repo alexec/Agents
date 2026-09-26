@@ -31,6 +31,8 @@ something particular done.
   or out from the app.
 - [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
   put them in `~/.agents` once, for every runtime and project.
+- [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): a pool of
+  runtimes a chat carries on with when its plan's allowance is spent.
 
 ### Servers
 

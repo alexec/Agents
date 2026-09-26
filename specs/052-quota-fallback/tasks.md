@@ -413,8 +413,8 @@
 
 ## Phase 10: Polish and cross-cutting
 
-- [ ] T071 [P] Write `docs/how-to/keep-going-when-a-runtime-runs-out.md`. It covers setting up the pool, credit on keys, what a switch looks like, reading the Pool page, Matching models, Continue with and its sheet, and marking a runtime available.
-- [ ] T072 [P] Update the reference pages:
+- [X] T071 [P] Write `docs/how-to/keep-going-when-a-runtime-runs-out.md`. It covers setting up the pool, credit on keys, what a switch looks like, reading the Pool page, Matching models, Continue with and its sheet, and marking a runtime available.
+- [X] T072 [P] *(Done 2026-09-26. `agent.runtime_switched` is under Agents in events.md. Codex's lent-key row is gone from R13's reading, since 047 removed that key.)* Update the reference pages:
   - `docs/reference/settings.md`: the Pool tab, the switch, the per-chat tick;
   - `docs/reference/runtimes.md`: for each runtime, what is recognised, as in research R13, with Copilot, Cursor, Grok and Antigravity said plainly to be "not yet recognised";
   - `docs/reference/events.md`: the three events;
