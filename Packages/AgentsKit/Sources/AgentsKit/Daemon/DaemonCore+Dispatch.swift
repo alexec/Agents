@@ -220,6 +220,18 @@ extension DaemonCore {
             case DaemonAPI.Method.skillsList:
                 let request = try require(params, as: DaemonAPI.SkillsListRequest.self)
                 return .success(try JSONValue.encoding(try skillsList(request)))
+
+            case DaemonAPI.Method.skillsCheckUpdates:
+                let request = try require(params, as: DaemonAPI.SkillsListRequest.self)
+                return .success(try JSONValue.encoding(try await skillsCheckUpdates(request)))
+
+            case DaemonAPI.Method.skillsUpdatePreview:
+                let request = try require(params, as: DaemonAPI.SkillNameRequest.self)
+                return .success(try JSONValue.encoding(try await skillsUpdatePreview(request)))
+
+            case DaemonAPI.Method.skillsRemove:
+                let request = try require(params, as: DaemonAPI.SkillNameRequest.self)
+                return .success(try JSONValue.encoding(try skillsRemove(request)))
             #endif
 
             case DaemonAPI.Method.runtimesInstall:

@@ -1575,6 +1575,36 @@ final class AppModel {
                                returning: DaemonAPI.SkillsListAnswer.self).skills
     }
 
+    /// Whether each added skill at a destination has an update (FR-018). Nil when it could
+    /// not be asked; the page then shows no marks rather than wrong ones.
+    func skillUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
+        try? await client.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
+    }
+
+    func skillUpdatePreview(_ name: String, at destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.SkillUpdatePreviewAnswer, DaemonAPI.CatalogError> {
+        do {
+            return .success(try await client.call(DaemonAPI.Method.skillsUpdatePreview,
+                                                  DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                                  returning: DaemonAPI.SkillUpdatePreviewAnswer.self))
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// Take out a skill the app or the skills tool added; its folder goes to the Trash.
+    func removeSkill(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.skillsRemove,
+                                      DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                      returning: DaemonAPI.SkillRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.catalogError(error)
+        }
+    }
+
     /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
     private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,

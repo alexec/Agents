@@ -1,0 +1,146 @@
+{
+  "sha": "cef9b7b16dad00295f48a410fd3b28fa0110a637",
+  "tree": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "acb41e77034d70ca0891cf31546b7c113cfcd58c",
+      "size": 24
+    },
+    {
+      "path": "skills",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d13e3b657eceed2b6f9cd854807a8a3d34a96a39"
+    },
+    {
+      "path": "skills/mixed",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1f465f7626044af9e6d9499aa736c67f140c3283"
+    },
+    {
+      "path": "skills/mixed/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f228a542d2057b193eb09694c011d3ddf5f34df0",
+      "size": 15
+    },
+    {
+      "path": "skills/mixed/SKILL.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84e95cc687b2ee3a29f7da37fa09457b2238f1fa",
+      "size": 94
+    },
+    {
+      "path": "skills/mixed/Zeta.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2c5ab93ecbd9988bc3ccb16481f155f8a80cada4",
+      "size": 13
+    },
+    {
+      "path": "skills/mixed/a-b.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3da6d4113f06d92608c1f7c89ad6da36fe26d4ff",
+      "size": 12
+    },
+    {
+      "path": "skills/mixed/a_b.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c090f0491c7d2c4ab25135f327b017e1e3d4f35",
+      "size": 12
+    },
+    {
+      "path": "skills/mixed/alpha.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a22bab1bf9f9f8e80d1720a998593fba515ebe02",
+      "size": 14
+    },
+    {
+      "path": "skills/nested",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "820550423c35b0d018cce703a0142076f01b1531"
+    },
+    {
+      "path": "skills/nested/SKILL.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d7bf9ef1f6ed48aaa7bfc4ab3a9c5124ee22731",
+      "size": 159
+    },
+    {
+      "path": "skills/nested/assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c5168646bb908928c79c6b81e37420905fbe4396"
+    },
+    {
+      "path": "skills/nested/assets/logo.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f4ed4802f5c80cecfab9a3c7013b3e67175234e9",
+      "size": 264
+    },
+    {
+      "path": "skills/nested/references",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e9b05cbb5d196ddd2b2d6388d398d5d11032e967"
+    },
+    {
+      "path": "skills/nested/references/x.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c9390fb44289b57bf092ad907513df2d75630dce",
+      "size": 13
+    },
+    {
+      "path": "skills/nested/references/y.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ca67b8cc3b38d88f0583861565255c46266ce710",
+      "size": 13
+    },
+    {
+      "path": "skills/nested/scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "df785d6fdd1d800cb9e423b7504ec76fcd18ff69"
+    },
+    {
+      "path": "skills/nested/scripts/lint.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "93041e3e77cf2519692a7b0515ea438f15397d79",
+      "size": 20
+    },
+    {
+      "path": "skills/plain",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "23d62e67393a5c2fea8e704ecd9d15f6541312c8"
+    },
+    {
+      "path": "skills/plain/SKILL.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "080f5c1fbc4d6e7c60c69a6edf98725e1b4b4377",
+      "size": 86
+    },
+    {
+      "path": "skills/plain/notes.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3179e6878308c0ade0b91e4871855756bfb11ed2",
+      "size": 12
+    }
+  ],
+  "truncated": false
+}

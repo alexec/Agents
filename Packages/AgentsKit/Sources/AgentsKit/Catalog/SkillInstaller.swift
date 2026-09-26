@@ -147,6 +147,58 @@ struct SkillInstaller: Sendable {
         return now != nil && now != recorded
     }
 
+    // MARK: Remove
+
+    /// Take out a skill a lock names: its folder to the Trash, then its lock entry and its
+    /// sidecar record. A folder no lock names is refused and left as it is (FR-020, FR-021).
+    /// If the lock cannot be written, the folder comes back.
+    func remove(_ name: String, at place: SkillPlace, now: Date = Date()) throws -> URL {
+        var lock = try SkillLock.load(place.lockKind, at: place.lock)
+        guard let (key, _) = place.managedEntry(folderName: name, in: lock) else {
+            throw DaemonAPI.CatalogError.notManaged(name: name)
+        }
+        let folder = place.skills.appending(path: name)
+        var trashed: URL?
+        if Self.exists(folder) { trashed = try trash(folder, place: place, now: now) }
+        do {
+            lock.remove(name: key)
+            try lock.write()
+        } catch {
+            if let trashed { try? FileManager.default.moveItem(at: trashed, to: folder) }
+            throw DaemonAPI.CatalogError.failed("could not write \(place.lock.lastPathComponent)")
+        }
+        var side = CatalogSidecar.load(from: sidecar)
+        side.skills[CatalogSidecar.key(place.destination, name: name)] = nil
+        try? side.save(to: sidecar) { _ in true }
+        return trashed ?? folder
+    }
+
+    // MARK: What an update changes
+
+    /// Files added, changed and removed going from the installed folder to a staged one,
+    /// by path and content.
+    static func changes(from installed: URL, to staged: URL) -> DaemonAPI.SkillChanges {
+        let before = files(in: installed), after = files(in: staged)
+        let added = after.keys.filter { before[$0] == nil }.sorted()
+        let removed = before.keys.filter { after[$0] == nil }.sorted()
+        let changed = after.keys.filter { before[$0] != nil && before[$0] != after[$0] }.sorted()
+        return .init(added: added, changed: changed, removed: removed)
+    }
+
+    /// Relative path → git blob id, for every plain file under `folder`.
+    private static func files(in folder: URL) -> [String: String] {
+        var out: [String: String] = [:]
+        let base = folder.standardizedFileURL.path
+        let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        while let url = walker?.nextObject() as? URL {
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  let data = try? Data(contentsOf: url) else { continue }
+            out[String(url.standardizedFileURL.path.dropFirst(base.count + 1))] = SkillHashes.blobSHA(data)
+        }
+        return out
+    }
+
     // MARK: Helpers
 
     /// To the person's Trash for the ordinary daemon, to `<root>/trash` for anything else.

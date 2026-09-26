@@ -405,7 +405,7 @@ public actor DaemonCore {
     /// Previews fetched and not yet added, in `<root>/catalog-staging`.
     lazy var catalogStaging = SkillStaging(root: locations.root.appending(path: "catalog-staging"))
     /// When each source was last asked whether it has moved on, and what it said (FR-018).
-    var catalogUpdateChecks: [String: (at: Date, head: String)] = [:]
+    var catalogUpdateChecks: [String: SkillUpdates.Answer] = [:]
     /// Between an add's rename and its lock write, for the test that an add stopped there
     /// leaves nothing behind. Nil everywhere else.
     var catalogAfterRename: (@Sendable () throws -> Void)?

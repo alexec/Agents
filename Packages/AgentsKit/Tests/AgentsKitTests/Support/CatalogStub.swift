@@ -9,7 +9,7 @@ import Foundation
 /// Each test gets its own: the session carries an id in a header, and the class looks its
 /// state up by it, so suites running side by side do not answer each other's requests.
 final class CatalogStub: URLProtocol, @unchecked Sendable {
-    enum Mode: Sendable { case normal, down, rateLimited }
+    enum Mode: Sendable { case normal, down, rateLimited, movedOn }
 
     final class State: @unchecked Sendable {
         private let lock = NSLock()
@@ -31,7 +31,7 @@ final class CatalogStub: URLProtocol, @unchecked Sendable {
     }
 
     static let http = SkillHashesTests.fixtures.appending(path: "http")
-    struct Meta: Decodable { var owner: String; var repo: String; var commit: String; var branch: String }
+    struct Meta: Decodable { var owner: String; var repo: String; var commit: String; var branch: String; var next: String }
     static let meta: Meta = try! JSONDecoder().decode(Meta.self, from: Data(contentsOf: http.appending(path: "meta.json")))
     static let skills = SkillHashesTests.fixtures.appending(path: "skills")
 
@@ -90,13 +90,25 @@ final class CatalogStub: URLProtocol, @unchecked Sendable {
                 return data.isEmpty ? (404, [:], Data()) : (200, [:], data)
             }
         case "github.test":
-            if path == "/\(m.owner)/\(m.repo).git/info/refs" { return (200, [:], file("info-refs.txt")) }
+            if path == "/\(m.owner)/\(m.repo).git/info/refs" {
+                return (200, [:], file(state.mode == .movedOn ? "next/info-refs.txt" : "info-refs.txt"))
+            }
         case "api.github.test":
             if state.mode == .rateLimited {
                 return (403, ["x-ratelimit-remaining": "0", "x-ratelimit-reset": "1790000000"], file("rate-limited.json"))
             }
             if path == "/repos/\(m.owner)/\(m.repo)/git/trees/\(m.commit)" { return (200, [:], file("tree.json")) }
+            if path == "/repos/\(m.owner)/\(m.repo)/git/trees/\(m.next)" { return (200, [:], file("next/tree.json")) }
         case "raw.github.test":
+            // At the second commit, the files that changed come from next/raw; the rest are as before.
+            let next = "/\(m.owner)/\(m.repo)/\(m.next)/"
+            if path.hasPrefix(next) {
+                let rel = String(path.dropFirst(next.count))
+                if let data = try? Data(contentsOf: http.appending(path: "next/raw/\(rel)")) { return (200, [:], data) }
+                if let data = try? Data(contentsOf: skills.deletingLastPathComponent().appending(path: rel)) {
+                    return (200, [:], data)
+                }
+            }
             let prefix = "/\(m.owner)/\(m.repo)/\(m.commit)/"
             if path.hasPrefix(prefix), let data = try? Data(contentsOf: skills.deletingLastPathComponent()
                 .appending(path: String(path.dropFirst(prefix.count)))) {

@@ -15,6 +15,8 @@ struct ProjectSkillsSection: View {
     @State private var skills: [DaemonAPI.ListedSkill] = []
     @State private var runtimes: [DaemonAPI.RuntimeName] = []
     @State private var adding = false
+    @State private var updates: [String: DaemonAPI.UpdateState] = [:]
+    @State private var updating: String?
 
     private var onMac: Bool { model.selectedProjectKey?.host == .mac }
 
@@ -32,10 +34,19 @@ struct ProjectSkillsSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .paperRow()
             } else {
-                ForEach(skills) { skill in ProjectSkillRow(skill: skill) }
+                ForEach(skills) { skill in
+                    ProjectSkillRow(skill: skill, folder: folder,
+                                    hasUpdate: SharedSkillsPage.available(updates[skill.name]),
+                                    update: { updating = skill.name },
+                                    changed: { Task { await load(folder) } })
+                }
             }
             Color.clear.frame(height: 0)
                 .task(id: folder) { await load(folder) }
+                .sheet(item: Binding(get: { updating.map(UpdateTarget.init) }, set: { updating = $0?.name })) { target in
+                    UpdateSkillSheet(name: target.name, destination: .project(folder: folder.path), runtimes: runtimes,
+                                     onUpdated: { Task { await load(folder) } })
+                }
                 .sheet(isPresented: $adding) {
                     AddSkillSheet(destination: .project(folder: folder.path), runtimes: runtimes,
                                   installed: Set(skills.map(\.name)),
@@ -66,6 +77,8 @@ struct ProjectSkillsSection: View {
 
     private func load(_ folder: URL) async {
         if let fresh = await model.projectSkills(folder) { skills = fresh }
+        if skills.contains(where: { $0.managed != nil }),
+           let fresh = await model.skillUpdates(at: .project(folder: folder.path)) { updates = fresh }
         if runtimes.isEmpty, let snapshot = await model.sharedSnapshot() { runtimes = snapshot.runtimes }
     }
 }
@@ -73,21 +86,49 @@ struct ProjectSkillsSection: View {
 /// One of a project's skills: its name and description, and where it came from when a
 /// catalogue gave it.
 private struct ProjectSkillRow: View {
+    @Environment(AppModel.self) private var model
     let skill: DaemonAPI.ListedSkill
+    let folder: URL
+    var hasUpdate = false
+    var update: () -> Void = {}
+    var changed: () -> Void = {}
+    @State private var confirmingRemove = false
+    @State private var failure: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(skill.name).appText(.reading).fontWeight(.semibold).lineLimit(1).fixedSize()
             if skill.managed != nil { SharedChip(text: "skills.sh", tone: .source) }
-            Text(detail).appText(.supporting).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+            if hasUpdate { SharedChip(text: "update", tone: .attention) }
+            Text(failure ?? detail).appText(.supporting)
+                .foregroundStyle(failure == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(SharedInk.attention))
+                .lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
+            // Only for a skill a lock names; the project's own are the person's to change.
+            if skill.managed != nil {
+                if hasUpdate { Button("Update…", action: update).buttonStyle(.paperProminent).appText(.fine) }
+                Button("Remove") { confirmingRemove = true }.buttonStyle(.paper).appText(.fine)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .paperRow()
         .help(skill.folder)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+        .confirmationDialog("Move \(skill.name) to the Trash?", isPresented: $confirmingRemove) {
+            Button("Move to Trash", role: .destructive) {
+                Task {
+                    if let error = await model.removeSkill(skill.name, at: .project(folder: folder.path)) {
+                        failure = CatalogErrorWords.sentence(error)
+                    } else {
+                        changed()
+                    }
+                }
+            }
+        } message: {
+            Text("Agents in this project won't have it after that. The removal shows in the project's changes, uncommitted.")
+        }
     }
 
     private var detail: String {

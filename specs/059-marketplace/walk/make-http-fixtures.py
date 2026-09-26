@@ -105,7 +105,39 @@ json.dump({"message": "API rate limit exceeded for 127.0.0.1. (But here's the go
            "documentation_url": "https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"},
           open(os.path.join(OUT, "rate-limited.json"), "w"), indent=2)
 
-json.dump({"owner": "fixture-owner", "repo": "fixture-skills", "commit": commit, "branch": "main"},
+# A second commit, for updates (US3): nested's SKILL.md changes and a file is added; plain is
+# untouched. Served as http/next/ once the stand-in is told to move on.
+NEXT = os.path.join(OUT, "next")
+os.makedirs(NEXT, exist_ok=True)
+with open(os.path.join(repo, "skills/nested/SKILL.md"), "a") as f:
+    f.write("\nAlso run scripts/lint.sh before committing.\n")
+with open(os.path.join(repo, "skills/nested/references/y.md"), "w") as f:
+    f.write("Reference y.\n")
+env2 = dict(os.environ, GIT_AUTHOR_DATE="2026-09-24T12:00:00Z", GIT_COMMITTER_DATE="2026-09-24T12:00:00Z")
+subprocess.run(["git", "-c", "core.fsmonitor=false", "add", "-A"], cwd=repo, check=True, timeout=30)
+subprocess.run(["git", "-c", "core.fsmonitor=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.com",
+                "commit", "-q", "-m", "nested: one more line"], cwd=repo, env=env2, check=True, timeout=30)
+commit2 = git("rev-parse", "HEAD", cwd=repo).decode().strip()
+refs2 = pkt(b"# service=git-upload-pack\n") + b"0000" + pkt(commit2.encode() + b" HEAD\x00" + caps + b"\n") \
+      + pkt(commit2.encode() + b" refs/heads/main\n") + b"0000"
+open(os.path.join(NEXT, "info-refs.txt"), "wb").write(refs2)
+entries2 = []
+for line in git("ls-tree", "-r", "-t", "-l", commit2, cwd=repo).decode().splitlines():
+    meta, path = line.split("\t", 1)
+    mode, typ, sha, size = meta.split()
+    e = {"path": path, "mode": mode, "type": typ, "sha": sha}
+    if typ == "blob":
+        e["size"] = int(size)
+    entries2.append(e)
+json.dump({"sha": git("rev-parse", f"{commit2}^{{tree}}", cwd=repo).decode().strip(), "tree": entries2,
+           "truncated": False}, open(os.path.join(NEXT, "tree.json"), "w"), indent=2)
+# The files that changed, as raw would serve them at the new commit.
+for rel in ("skills/nested/SKILL.md", "skills/nested/references/y.md"):
+    dest = os.path.join(NEXT, "raw", rel)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copy(os.path.join(repo, rel), dest)
+
+json.dump({"owner": "fixture-owner", "repo": "fixture-skills", "commit": commit, "branch": "main", "next": commit2},
           open(os.path.join(OUT, "meta.json"), "w"), indent=2)
 shutil.rmtree(work)
 print(commit)

@@ -14,27 +14,36 @@ struct SkillPreviewView: View {
     let runtimes: [DaemonAPI.RuntimeName]
     let back: () -> Void
     let added: (DaemonAPI.ManagedSkill) -> Void
+    /// Set when this is an update of a skill already there (US3): what it changes, and
+    /// whether the copy there was edited since it was added.
+    var update: DaemonAPI.SkillUpdatePreviewAnswer? = nil
 
     @State private var state: DaemonAPI.DestinationState?
     @State private var adding = false
     @State private var failure: DaemonAPI.CatalogError?
     @State private var confirmingReplace = false
     @State private var askedAgain = false
+    @State private var confirmingLoss = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Button("‹ Results", action: back).buttonStyle(.link)
-                Text(preview.name).appText(.title).lineLimit(1)
-                Spacer(minLength: 12)
-                AddToPicker(addTo: $addTo, projectName: projectName, projectFolder: projectFolder)
+                if update == nil {
+                    Button("‹ Results", action: back).buttonStyle(.link)
+                    Text(preview.name).appText(.title).lineLimit(1)
+                    Spacer(minLength: 12)
+                    AddToPicker(addTo: $addTo, projectName: projectName, projectFolder: projectFolder)
+                } else {
+                    Text("Update \(preview.name)").appText(.title).lineLimit(1)
+                    Spacer(minLength: 12)
+                }
             }
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 10)
 
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 10) {
                     facts
-                    files
+                    if let update { changes(update.changes) } else { files }
                     if !preview.runnableFiles.isEmpty { scriptWarning }
                     stateNotes
                     HStack(spacing: 8) {
@@ -73,6 +82,11 @@ struct SkillPreviewView: View {
             }
             askedAgain = true
             failure = nil
+        }
+        .confirmationDialog("Your edits to \(preview.name) will be lost", isPresented: $confirmingLoss) {
+            Button("Update anyway", role: .destructive) { Task { await add(replace: true) } }
+        } message: {
+            Text("The copy there was changed since it was added. Updating puts it in the Trash and takes the new one.")
         }
         .confirmationDialog("Replace \(preview.name)?", isPresented: $confirmingReplace) {
             Button("Replace") { Task { await add(replace: true) } }
@@ -113,6 +127,30 @@ struct SkillPreviewView: View {
         .accessibilityLabel("\(preview.files.count) files")
     }
 
+    /// What an update changes, file by file, in place of the plain file list.
+    private func changes(_ changes: DaemonAPI.SkillChanges) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("What changes").appText(.fine).foregroundStyle(.secondary)
+            if changes.added.isEmpty && changes.changed.isEmpty && changes.removed.isEmpty {
+                Text("Nothing in the files; only the commit moves on.").appText(.supporting)
+            }
+            ForEach(changes.changed, id: \.self) { changeRow("changed", $0) }
+            ForEach(changes.added, id: \.self) { changeRow("new", $0) }
+            ForEach(changes.removed, id: \.self) { changeRow("gone", $0) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paper.rule, lineWidth: 1))
+    }
+
+    private func changeRow(_ kind: String, _ path: String) -> some View {
+        HStack(spacing: 6) {
+            SharedChip(text: kind, tone: kind == "gone" ? .attention : .source)
+            Text(path).appText(.code).lineLimit(1).truncationMode(.middle)
+        }
+    }
+
     private var scriptWarning: some View {
         let n = preview.runnableFiles.count
         return Text(n == 1 ? "This skill brings a script. An agent may run it when the skill is in use, with the same permissions as the agent."
@@ -129,6 +167,10 @@ struct SkillPreviewView: View {
         if let failure {
             note(CatalogErrorWords.sentence(failure), attention: true)
         }
+        if update?.edited == true {
+            note("You've edited this skill since it was added. Updating replaces your edits; the copy with them goes to the Trash.",
+                 attention: true)
+        }
         if !preview.canAdd {
             note(problemWords, attention: true)
         }
@@ -138,12 +180,12 @@ struct SkillPreviewView: View {
                  attention: true)
         case .managedOther(let source)?:
             note("A skill of this name from \(source) is there already. Adding this one replaces it.", attention: false)
-        case .sameSkill(let update)?:
+        case .sameSkill(let update)? where self.update == nil:
             note(update ? "An older copy of this skill is there. Adding replaces it with this commit." : "This skill is added already.",
                  attention: false)
         case .unavailable(let error)?:
             note(CatalogErrorWords.sentence(error), attention: true)
-        case .free?, nil:
+        case .free?, .sameSkill?, nil:
             EmptyView()
         }
     }
@@ -179,6 +221,20 @@ struct SkillPreviewView: View {
 
     @ViewBuilder
     private var primaryButton: some View {
+        if update != nil {
+            Button("Update") {
+                if update?.edited == true { confirmingLoss = true } else { Task { await add(replace: true) } }
+            }
+            .buttonStyle(.paperProminent)
+            .disabled(adding || !preview.canAdd)
+            .keyboardShortcut(.defaultAction)
+        } else {
+            addButton
+        }
+    }
+
+    @ViewBuilder
+    private var addButton: some View {
         switch state {
         case .unmanaged(let path)?:
             Button("Reveal yours") { SharedFiles.reveal(path) }.buttonStyle(.paper)

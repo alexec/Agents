@@ -10,6 +10,10 @@ struct SharedSkillsPage: View {
     @State private var filter = ""
     @State private var chosenID: String?
     @State private var adding = false
+    /// Which added skills have an update, asked for when the page appears (FR-018).
+    @State private var updates: [String: DaemonAPI.UpdateState] = [:]
+    @State private var updating: String?
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 0) {
@@ -40,17 +44,33 @@ struct SharedSkillsPage: View {
             .frame(width: 400)
             Divider()
             if let chosen {
-                SkillDetail(skill: chosen, runtimes: snapshot.runtimes)
+                SkillDetail(skill: chosen, runtimes: snapshot.runtimes,
+                            hasUpdate: Self.available(updates[chosen.name]),
+                            update: { updating = chosen.name },
+                            removed: { Task { await refresh() } })
                     .id(chosen.id)
             } else {
                 Text("Choose a skill").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .task { if let fresh = await model.skillUpdates(at: .personal) { updates = fresh } }
+        .sheet(item: Binding(get: { updating.map(UpdateTarget.init) }, set: { updating = $0?.name })) { target in
+            UpdateSkillSheet(name: target.name, destination: .personal, runtimes: snapshot.runtimes,
+                             onUpdated: { Task {
+                                 await refresh()
+                                 if let fresh = await model.skillUpdates(at: .personal) { updates = fresh }
+                             } })
         }
         .sheet(isPresented: $adding) {
             AddSkillSheet(destination: .personal, runtimes: snapshot.runtimes,
                           installed: Set(yours.map(\.name)),
                           onAdded: { Task { await refresh() } })
         }
+    }
+
+    static func available(_ state: DaemonAPI.UpdateState?) -> Bool {
+        if case .available? = state { return true }
+        return false
     }
 
     private var matching: [DaemonAPI.Skill] {
@@ -77,6 +97,7 @@ struct SharedSkillsPage: View {
                 if skill.clash != nil { SharedChip(text: "clash", tone: .attention) }
                 if case .plugin(let plugin) = skill.source { SharedChip(text: plugin, tone: .source) }
                 if skill.managed != nil { SharedChip(text: "skills.sh", tone: .source) }
+                if Self.available(updates[skill.name]) { SharedChip(text: "update", tone: .attention) }
                 Text(skill.clash.map { "Also in \(SharedFiles.tilde($0))" } ?? skill.description ?? "")
                     .foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
@@ -96,7 +117,13 @@ private struct SkillDetail: View {
 
     let skill: DaemonAPI.Skill
     let runtimes: [DaemonAPI.RuntimeName]
+    var hasUpdate = false
+    var update: () -> Void = {}
+    var removed: () -> Void = {}
+    @Environment(AppModel.self) private var model
     @State private var text = ""
+    @State private var confirmingRemove = false
+    @State private var removeFailure: String?
 
     static func takenAt(_ managed: DaemonAPI.ManagedSkill) -> String {
         guard let commit = managed.commit else { return "not recorded" }
@@ -135,9 +162,31 @@ private struct SkillDetail: View {
             }
             .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+            if let removeFailure {
+                Text(removeFailure).appText(.fine).foregroundStyle(SharedInk.attention)
+            }
             HStack {
                 Button("Reveal in Finder") { SharedFiles.reveal(skill.path) }.buttonStyle(.paper)
                 Button("Edit SKILL.md") { SharedFiles.open(skill.path + "/SKILL.md") }.buttonStyle(.paper)
+                // Only for a skill a lock names: the person's own keep exactly today's actions (FR-021).
+                if skill.managed != nil {
+                    Spacer()
+                    if hasUpdate { Button("Update…", action: update).buttonStyle(.paperProminent) }
+                    Button("Remove…") { confirmingRemove = true }.buttonStyle(.paper)
+                }
+            }
+            .confirmationDialog("Move \(skill.name) to the Trash?", isPresented: $confirmingRemove) {
+                Button("Move to Trash", role: .destructive) {
+                    Task {
+                        if let error = await model.removeSkill(skill.name, at: .personal) {
+                            removeFailure = CatalogErrorWords.sentence(error)
+                        } else {
+                            removed()
+                        }
+                    }
+                }
+            } message: {
+                Text("No agent you start will have it after that. You can take it back out of the Trash.")
             }
         }
         .padding(20)
@@ -147,4 +196,10 @@ private struct SkillDetail: View {
                 ?? "No SKILL.md in this folder."
         }
     }
+}
+
+/// A skill to update, as a sheet's item.
+struct UpdateTarget: Identifiable {
+    let name: String
+    var id: String { name }
 }

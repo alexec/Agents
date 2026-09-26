@@ -125,6 +125,61 @@ extension DaemonCore {
         return .init(skills: catalogInstaller.list(at: place))
     }
 
+    // MARK: skills/check-updates
+
+    func skillsCheckUpdates(_ request: DaemonAPI.SkillsListRequest) async throws -> DaemonAPI.SkillUpdatesAnswer {
+        let place: SkillPlace
+        do { place = try skillPlace(request.destination) } catch let e as DaemonAPI.CatalogError { throw Self.refusal(e) }
+        var cache = catalogUpdateChecks
+        let states = await SkillUpdates(github: catalogGitHub, sidecar: catalogInstaller.sidecar)
+            .check(catalogInstaller.managed(at: place), at: place, cache: &cache)
+        catalogUpdateChecks = cache
+        let available = states.filter { if case .available = $0.value { true } else { false } }.keys.sorted()
+        DaemonLog.shared.write("catalog: update-check \(states.count) skills → \(available.isEmpty ? "current" : "available: \(available.joined(separator: ", "))")")
+        return .init(updates: states)
+    }
+
+    // MARK: skills/update-preview
+
+    /// The skill's source at its current commit, staged as a preview, with what it would
+    /// change in the installed folder and whether that folder was edited since.
+    func skillsUpdatePreview(_ request: DaemonAPI.SkillNameRequest) async throws -> DaemonAPI.SkillUpdatePreviewAnswer {
+        do {
+            let place = try skillPlace(request.destination)
+            guard let managed = catalogInstaller.managed(at: place)[request.name],
+                  let (owner, repo) = SkillsCatalog.gitHubSource(managed.source) else {
+                throw DaemonAPI.CatalogError.notManaged(name: request.name)
+            }
+            let folderPath = managed.skillPath.map { String($0.dropLast("SKILL.md".count)) } ?? ""
+            let skillID = folderPath.split(separator: "/").last.map(String.init) ?? request.name
+            let result = DaemonAPI.CatalogResult(id: "\(owner)/\(repo)/\(skillID)", name: request.name, owner: owner,
+                                                 repo: repo, skillID: skillID, installs: 0, known: KnownOwners.isKnown(owner))
+            let id = UUID()
+            var staged = try await SkillPreviewer(catalog: catalog, github: catalogGitHub)
+                .stage(result, into: await catalogStaging.folder(for: id), id: id)
+            staged.preview.destinationState = catalogInstaller.state(of: staged.preview, at: place)
+            await catalogStaging.put(staged)
+            let changes = SkillInstaller.changes(from: place.skills.appending(path: request.name), to: staged.folder)
+            DaemonLog.shared.write("catalog: update-preview \(request.name) @ \(staged.preview.commit.prefix(7))")
+            return .init(preview: staged.preview, changes: changes, edited: managed.edited)
+        } catch let error as DaemonAPI.CatalogError {
+            throw Self.refusal(error)
+        }
+    }
+
+    // MARK: skills/remove
+
+    func skillsRemove(_ request: DaemonAPI.SkillNameRequest) throws -> DaemonAPI.SkillRemoveAnswer {
+        do {
+            let place = try skillPlace(request.destination)
+            let trashed = try catalogInstaller.remove(request.name, at: place)
+            DaemonLog.shared.write("catalog: remove \(request.name) → \(place.folder.map { "project \($0.lastPathComponent)" } ?? "personal")")
+            return .init(trashedTo: trashed.path)
+        } catch let error as DaemonAPI.CatalogError {
+            throw Self.refusal(error)
+        }
+    }
+
     /// Settings ▸ Shared's personal skills, each with where a lock says it came from.
     func withManagedSkills(_ snapshot: DaemonAPI.SharedSnapshot) -> DaemonAPI.SharedSnapshot {
         guard let place = try? skillPlace(.personal) else { return snapshot }
