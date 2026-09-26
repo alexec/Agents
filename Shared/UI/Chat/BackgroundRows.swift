@@ -81,6 +81,10 @@ struct BackgroundItemRow: View {
         Text(item.name)
             .appText(.supporting)
             .fontWeight(.medium)
+            // An ended one stays listed so its steps and output can still be read, and
+            // must not look like one still running (walked 2026-09-26: a stopped shell
+            // in the pane read exactly like a live one).
+            .foregroundStyle(item.isRunning ? .primary : .secondary)
             .lineLimit(1)
             .help(item.command ?? "\(BackgroundWords.noun(item)): \(item.name)")
     }
@@ -101,7 +105,9 @@ struct BackgroundItemRow: View {
 
     private var age: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(item.isStopping ? "Stopping…" : BackgroundWords.age(item, now: context.date))
+            Text(item.isStopping ? "Stopping…"
+                 : BackgroundWords.ended(item).map { "\($0) · \(BackgroundWords.age(item))" }
+                 ?? BackgroundWords.age(item, now: context.date))
                 .appText(.fine)
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
@@ -115,15 +121,18 @@ struct BackgroundItemRow: View {
             Button("Output") { output(item) }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .help("Open what it has printed so far")
+                .help(item.isRunning ? "Open what it has printed so far" : "Open what it printed")
         }
         if item.kind == .subagent, let steps = actions.steps {
             Button("Steps") { steps(item) }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .help("See what this subagent is doing")
+                .help(item.isRunning ? "See what this subagent is doing" : "See what this subagent did")
         }
-        if item.canStop, let stop = actions.stop {
+        if !item.isRunning {
+            // Ended: nothing to stop, so no Stop, not even a greyed one.
+            EmptyView()
+        } else if item.canStop, let stop = actions.stop {
             Button("Stop") { Task { await stop(item) } }
                 .buttonStyle(.paper)
                 .appText(.fine)

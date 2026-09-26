@@ -292,6 +292,18 @@ public enum BackgroundWords {
         }
     }
 
+    /// How it ended, in a word or two, for a row that is still listed after it has:
+    /// "Stopped", "Finished". Nil while it runs.
+    public static func ended(_ item: BackgroundItem) -> String? {
+        switch item.state {
+        case .completed: return "Finished"
+        case .failed: return "Failed"
+        case .stopped: return "Stopped"
+        case .disconnected: return "Ended with the turn"
+        case .running, .paused: return nil
+        }
+    }
+
     /// How long it has run, or ran: "0:37", "12:04", "1:02:10".
     public static func age(_ item: BackgroundItem, now: Date = Date()) -> String {
         let seconds = max(0, Int((item.endedAt ?? now).timeIntervalSince(item.startedAt)))

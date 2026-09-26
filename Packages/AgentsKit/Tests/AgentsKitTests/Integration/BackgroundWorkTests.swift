@@ -114,6 +114,16 @@ struct BackgroundWorkTests {
         #expect(!items.contains { $0.id == "0" })
     }
 
+    @Test func anEndedOneSaysHowItEnded() {
+        var item = BackgroundItem(id: "t", kind: .task, name: "Tick", taskType: "shell", canStop: true)
+        #expect(BackgroundWords.ended(item) == nil)
+        item.state = .stopped
+        #expect(BackgroundWords.ended(item) == "Stopped")
+        #expect(!item.offersStop, "an ended one offers no Stop")
+        item.state = .completed
+        #expect(BackgroundWords.ended(item) == "Finished")
+    }
+
     @Test func theMarkCountsWhatRuns() {
         let items = [BackgroundItem(id: "a", kind: .task, name: "a", taskType: "shell"),
                      BackgroundItem(id: "b", kind: .subagent, name: "b"),
