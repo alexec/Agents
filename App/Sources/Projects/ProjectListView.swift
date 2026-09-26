@@ -7,6 +7,7 @@ import SwiftUI
 /// work rather than the length of the history, which is the whole point of the change.
 struct ProjectListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
@@ -128,6 +129,18 @@ struct ProjectListView: View {
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isAddingServer) { AddServerSheet().paperSheet() }
+        // File ▸ Add Project Folder…, Clone Repository… and Add Server…: the same
+        // sheets as the + menu, on this Mac.
+        .onChange(of: requests.projectSheet) { _, sheet in
+            guard let sheet else { return }
+            requests.projectSheet = nil
+            targetHost = .mac
+            switch sheet {
+            case .chooseFolder: isChoosingFolder = true
+            case .clone: isCloning = true
+            case .addServer: isAddingServer = true
+            }
+        }
     }
 
     @ViewBuilder

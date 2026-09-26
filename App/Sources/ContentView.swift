@@ -3,7 +3,8 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    @State private var frame = SidebarFrame()
+    /// The app's, so the menu bar can open and switch it too.
+    @Environment(SidebarFrame.self) private var frame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
     /// Which columns are showing. The projects stay put: moving between them is the
@@ -138,7 +139,6 @@ struct ContentView: View {
             }
         }
         .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
-        .environment(frame)
         .environment(sidebarStates)
         .environment(webHolders)
         .task { await model.stayConnected() }

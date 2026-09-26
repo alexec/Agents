@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -8,25 +9,31 @@ struct AgentsApp: App {
     /// once at launch and on every change, so no window decides for itself.
     @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
 
+    /// One window, so one of each: the menus act on the window they were made with.
+    @State private var requests = WindowRequests()
+    @State private var frame = SidebarFrame()
+
+    init() {
+        // No tabs: the only way left to a second window, and a second window would be a
+        // mirror of the first, because what is selected lives on the one model.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     var body: some Scene {
+        // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
+        // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a
+        // `Window` scene, because the window state a `WindowGroup` saved restores no
+        // window into one, and the app then opens with nothing on screen.
         WindowGroup {
             ContentView()
                 .environment(model)
+                .environment(requests)
+                .environment(frame)
                 .onChange(of: appearance, initial: true) { Appearance.apply(appearance) }
         }
         .defaultSize(width: 1_100, height: 720)
         .commands {
-            // A menu item rather than a shortcut on the button. The button only
-            // exists while you are scrolled away from the end, which is precisely
-            // when a keyboard route is no help if it lives on the button.
-            CommandGroup(after: .toolbar) {
-                Button("Jump to Latest") { model.scrollToEnd() }
-                    .keyboardShortcut(.downArrow, modifiers: .command)
-                // The keyboard route to what the sidebar's last row does. The row is
-                // the way in; this is for the hands that never leave the keys.
-                Button("Spending") { model.showsSpending = true }
-                Button("Resources") { model.showResources() }
-            }
+            AgentsCommands(model: model, requests: requests, frame: frame)
         }
 
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
