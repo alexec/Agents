@@ -1158,19 +1158,22 @@ final class RemoteModel {
     }
 
     /// The newest events and who is waiting (042). The phone only reads them.
-    func refreshEvents() async {
-        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(),
+    func refreshEvents(_ filter: EventFilter? = nil) async {
+        let filter = filter ?? work.eventsFilter
+        work.eventsFilter = filter
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
-        work.takeEvents(page)
+        work.takeEvents(page, for: filter)
     }
 
     /// The page before the oldest event the phone has, for scrolling back.
     func loadOlderEvents() async {
+        let filter = work.eventsFilter
         guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
         guard let page = try? await client.call(DaemonAPI.Method.eventsList,
-                                                DaemonAPI.EventsListRequest(before: oldest),
+                                                DaemonAPI.EventsListRequest(before: oldest, filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
-        work.takeEvents(page, appending: true)
+        work.takeEvents(page, for: filter, appending: true)
     }
 
     private func refreshProjects() async {
