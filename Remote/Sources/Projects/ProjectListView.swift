@@ -156,15 +156,23 @@ private struct SpendingRow: View {
 /// asking, or asked and told nothing.
 private struct Waiting: View {
     @Environment(RemoteModel.self) private var model
+    @State private var pairingAgain = false
 
     var body: some View {
         if model.needsPairing {
             PairingView()
         } else if model.isStale {
-            ContentUnavailableView("Can't reach your Mac",
-                                   systemImage: "wifi.slash",
-                                   description: Text("It needs to be awake and on a network. "
-                                                     + "This screen fills in as soon as it answers."))
+            ContentUnavailableView {
+                Label("Can't reach your Mac", systemImage: "wifi.slash")
+            } description: {
+                Text("It needs to be awake and on a network. "
+                     + "This screen fills in as soon as it answers.")
+            } actions: {
+                // A device the Mac has forgotten is only turned away at home, not told
+                // why, so the way back is offered here too.
+                Button("Pair Again…") { pairingAgain = true }
+            }
+            .sheet(isPresented: $pairingAgain) { PairingView() }
         } else {
             ProgressView()
         }
