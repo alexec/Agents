@@ -61,31 +61,33 @@ struct ProjectListView: View {
             } else if model.projects.isEmpty, model.clones.isEmpty, model.hasLoadedProjects {
                 EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
             }
+
+            // Pages about all the work rather than one project: rows of the list like
+            // any other, so they take the list's selection and its keys, rather than
+            // buttons pinned under it painting a highlight of their own. Always there,
+            // so each can be found before it has anything to say.
+            Section("Activity") {
+                EventsRow().tag(SidebarItem.events)
+                ResourcesRow().tag(SidebarItem.resources)
+                SpendingRow(selection: $selection).tag(SidebarItem.spending)
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
-        // Carried over from the agent list this replaced: four agents running is four
-        // numbers to add up in your head, which is the sort of thing you only do after
-        // the bill. Pinned rather than scrolled with the projects: it is about all of
-        // them, and a list long enough to scroll is exactly when you want it.
+        // Why the Mac is awake, pinned at the foot: a status line rather than somewhere
+        // to go, so not a row of the list. It is absent entirely when there is nothing
+        // to say, which is most of the time (024 FR-015).
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 0) {
-                // Above Spending, and a row of its own rather than a second line
-                // inside it: that row is a button into Spending, and why the Mac is
-                // awake is not spending. It is absent entirely when there is nothing
-                // to say, which is most of the time (024 FR-015).
-                WakefulnessRow()
-                // Above Spending (036): who holds the Mac's shared things. Always
-                // there, like Spending, so the page can be found before anything is
-                // leased; its count line is what comes and goes.
-                // Above Resources (042): what happened. Always there, so the page can
-                // be found before anything has; no count, because a record is read,
-                // not something asking for attention.
-                EventsRow(selection: $selection)
-                ResourcesRow(selection: $selection)
-                SpendingRow(selection: $selection)
-            }
+            WakefulnessRow()
+        }
+        // A folder dragged in from Finder becomes a project, as File ▸ Add Project
+        // Folder… does. Folders only: a file is not somewhere to work.
+        .dropDestination(for: URL.self) { urls, _ in
+            let folders = urls.filter { $0.hasDirectoryPath || (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            guard !folders.isEmpty else { return false }
+            Task { for folder in folders { await model.addProject(folder) } }
+            return true
         }
         // Named only when it is not the ordinary daemon. Two copies of this app can
         // be running against two roots, and an unlabelled window is the one you
@@ -283,35 +285,23 @@ private struct SpendingRow: View {
     private var isPicked: Bool { selection == .spending }
 
     var body: some View {
-        Button {
-            selection = .spending
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                Text(today == nil ? "Spending" : "Today")
-                Spacer()
-                VStack(alignment: .trailing, spacing: 1) {
-                    if let today {
-                        Text(today).monospacedDigit()
-                    }
-                    // Nothing when there is no limit: headroom that does not exist is
-                    // not a thing to draw an empty gauge for.
-                    if let state = model.costState, let left = state.dayHeadroom,
-                       let daily = state.limits.daily {
-                        Text("\(left.money(in: daily.currency)) left")
-                            .appText(.fine)
-                    }
+        HStack(alignment: .firstTextBaseline) {
+            Label(today == nil ? "Spending" : "Today", systemImage: "dollarsign.circle")
+            Spacer()
+            VStack(alignment: .trailing, spacing: 1) {
+                if let today {
+                    Text(today).monospacedDigit()
+                }
+                // Nothing when there is no limit: headroom that does not exist is
+                // not a thing to draw an empty gauge for.
+                if let state = model.costState, let left = state.dayHeadroom,
+                   let daily = state.limits.daily {
+                    Text("\(left.money(in: daily.currency)) left")
                 }
             }
             .appText(.fine)
             .foregroundStyle(foreground)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isPicked ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
         .help(today == nil
               ? "What all of the work has cost"
               : "What every agent has cost today. Opens Spending.")
