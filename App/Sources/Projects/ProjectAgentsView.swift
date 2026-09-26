@@ -26,6 +26,21 @@ struct ProjectAgentsView: View {
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
     var body: some View {
+        if summary == nil {
+            // No project: one that was selected has gone (a rebuilt server, 043) or there
+            // are none yet. A page with a prompt here would start an agent nowhere.
+            VStack(spacing: 6) {
+                Text("No project selected").appText(.reading).foregroundStyle(.secondary)
+                Text("Choose one on the left, or add a folder.").appText(.fine).foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("")
+        } else {
+            page
+        }
+    }
+
+    private var page: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 heading

@@ -57,7 +57,12 @@ struct CredentialRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(name).fontWeight(.semibold)
-                Text("No token").appText(.fine).foregroundStyle(.secondary)
+                // Replacing keeps the old one until the new one is saved: say which.
+                if isReplacing, let record = credentials.record(runtimeID) {
+                    Text("Replacing \(record.mask)").appText(.fine).foregroundStyle(.secondary)
+                } else {
+                    Text("No token").appText(.fine).foregroundStyle(.secondary)
+                }
             }
             HStack {
                 SecureField("Paste a \(name) token", text: $text)
