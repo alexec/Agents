@@ -310,6 +310,10 @@ extension DaemonCore {
                 try await unqueue(request)
                 return .success([:])
 
+            case DaemonAPI.Method.agentsStopBackground:
+                let request = try require(params, as: DaemonAPI.StopBackgroundRequest.self)
+                return .success(["stopped": .bool(try await stopBackground(request))])
+
             case DaemonAPI.Method.agentsSendNow:
                 let request = try require(params, as: DaemonAPI.UnqueueRequest.self)
                 try await sendNow(request)

@@ -106,6 +106,9 @@ public enum DaemonAPI {
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
+        /// Stop one shell or task an agent left running in the background, and nothing
+        /// else it is doing (057).
+        public static let agentsStopBackground = "agents/stopBackground"
         /// A queued prompt sent into the running turn rather than after it, where the
         /// runtime advertises steering. Takes an `UnqueueRequest`: the same two ids.
         public static let agentsSendNow = "agents/sendNow"
@@ -759,6 +762,16 @@ public enum DaemonAPI {
 
         public var mention: FileMention {
             FileMention(url: URL(filePath: path), relativePath: relativePath)
+        }
+    }
+
+    /// `agents/stopBackground` (057): which agent, and the runtime's id for the task.
+    public struct StopBackgroundRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var itemID: String
+        public init(agentID: UUID, itemID: String) {
+            self.agentID = agentID
+            self.itemID = itemID
         }
     }
 

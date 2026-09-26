@@ -703,8 +703,8 @@ public actor DaemonCore {
 
     /// Append to the record first, then tell the windows. That order is the whole
     /// reason a daemon killed mid-turn still leaves something true behind.
-    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID) async {
-        let entry = TranscriptEntry(kind: kind)
+    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
+        let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
         try? await store.append(entry, for: agentID)
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at
@@ -1076,6 +1076,13 @@ public actor DaemonCore {
             changed(agent)
             await record(.planUpdated(plan), for: agentID)
 
+        case .subagentEntry(let subagentID, let kind):
+            guard !kind.isInvisibleAgentText else { return }
+            await record(kind, for: agentID, subagentID: subagentID)
+
+        case .background(let update):
+            await noteBackground(update, agentID: agentID)
+
         case .planRemoved(let planID):
             guard var agent = agents[agentID] else { return }
             agent.plans = Plan.withdrawing(planID, in: agent.plans)
@@ -1176,6 +1183,8 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
+        // What it ran in the background went with it.
+        endBackground(of: agentID)
         // A runtime's cost reading is let go by its own listener, once it has heard the
         // last of that session — not here, where the listener may still have a reading
         // to get through. See `costReadings`.

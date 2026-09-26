@@ -90,6 +90,16 @@ actor FakeACPAgent {
         /// Advertise `_meta.steering.supported`, and answer `_session/steering` with
         /// this outcome. Nil advertises nothing, and the method is not found.
         var steering: String?
+
+        // MARK: Background work (057)
+
+        /// Updates about background work, sent during the turn after `updates`, each under
+        /// the session named (nil: the agent's own). Sent only if the client advertised
+        /// what the real adapters wait for: `asyncTasks` for `async_task_*`, and
+        /// `nativeSubagentSessions` for `subagent_*` and anything under a subagent's id.
+        var air: [(session: String?, update: JSONValue)] = []
+        /// What a runtime says instead when the client did not opt in: the prose.
+        var withoutAir: [JSONValue] = []
     }
 
     private var script: Script
@@ -113,6 +123,11 @@ actor FakeACPAgent {
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
     private(set) var continuedSessionParams: JSONValue?
+    /// What the client said it could do at the handshake.
+    private(set) var clientCapabilities: JSONValue?
+    /// Tasks announced and not yet ended, which is what Stop can reach.
+    private var runningTasks: [String: String] = [:]
+    private(set) var stopRequests: [JSONValue] = []
 
     init(script: Script = Script(), transport: any LineTransport) {
         self.script = script
@@ -132,6 +147,7 @@ actor FakeACPAgent {
         received.append(method)
         switch method {
         case ACP.Method.initialize:
+            clientCapabilities = params?["clientCapabilities"]
             if script.handshakeDelay > .zero { try? await Task.sleep(for: script.handshakeDelay) }
             var sessionCapabilities = script.sessionCapabilities
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
@@ -226,6 +242,22 @@ actor FakeACPAgent {
             for update in script.updatesOnClose { await send(update: update) }
             return .success([:])
 
+        case ACP.Method.stopAsyncTask where advertised("asyncTasks"):
+            stopRequests.append(params ?? .null)
+            guard let id = params?["asyncTaskId"]?.stringValue,
+                  let name = runningTasks.removeValue(forKey: id) else {
+                return .success(["stopped": false])
+            }
+            // As Claude's adapter 0.81.2 does it, captured: the ending twice, then the
+            // notice, then the answer.
+            let ending: JSONValue = ["sessionUpdate": "async_task_state_update",
+                                     "asyncTaskId": .string(id), "state": "stopped"]
+            await send(update: ending)
+            await send(update: ending)
+            await send(update: ["sessionUpdate": "notice", "severity": "info",
+                                "title": "Task stopped by user", "description": .string("\(name).")])
+            return .success(["stopped": true])
+
         default:
             return .failure(.methodNotFound(method))
         }
@@ -240,6 +272,21 @@ actor FakeACPAgent {
         if !script.updatesOnFirstTurnOnly || turnsTaken == 1 {
             for update in script.updates { await send(update: update) }
         }
+        let airOn = advertised("asyncTasks"), subagentsOn = advertised("nativeSubagentSessions")
+        for (session, update) in script.air {
+            let kind = update["sessionUpdate"]?.stringValue ?? ""
+            let needs = kind.hasPrefix("async_task_") && session == nil ? airOn : subagentsOn
+            guard needs else { continue }
+            if kind == "async_task_spawned", let id = update["asyncTaskId"]?.stringValue {
+                runningTasks[id] = update["name"]?.stringValue ?? id
+            }
+            if kind == "async_task_state_update", let id = update["asyncTaskId"]?.stringValue,
+               update["state"]?.stringValue != "running" {
+                runningTasks[id] = nil
+            }
+            await send(update: update, as: session)
+        }
+        if !airOn { for update in script.withoutAir { await send(update: update) } }
         for notification in script.extensionNotifications {
             try? connection.notify(notification.method, notification.params)
         }
@@ -269,9 +316,22 @@ actor FakeACPAgent {
         return .success(.object(result))
     }
 
-    private func send(update: JSONValue) async {
+    private func send(update: JSONValue, as session: String? = nil) async {
         try? connection.notify(ACP.ClientMethod.sessionUpdate,
-                                     ["sessionId": .string(sessionID), "update": update])
+                                     ["sessionId": .string(session ?? sessionID), "update": update])
+    }
+
+    /// Whether the client listed this JetBrains "AIR" capability, read the way both
+    /// adapters read it: version at least 1 and the name in the list.
+    private func advertised(_ capability: String) -> Bool {
+        let air = clientCapabilities?["_meta"]?["jetbrains"]?["air"]
+        guard (air?["version"]?.intValue ?? 0) >= 1 else { return false }
+        return (air?["capabilities"]?.arrayValue ?? []).contains(.string(capability))
+    }
+
+    /// Send an update under a subagent's session, outside a turn.
+    func emit(_ update: JSONValue, as session: String) async {
+        await send(update: update, as: session)
     }
 
     /// Send a notification under any method at all, the way a runtime speaking its own

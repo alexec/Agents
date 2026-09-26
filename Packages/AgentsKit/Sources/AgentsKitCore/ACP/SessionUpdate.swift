@@ -13,6 +13,9 @@ public enum SessionUpdate: Sendable {
     case usage(Usage)
     case plan(Plan)
     case planRemoved(String)
+    /// A shell or a subagent the agent left running (057). Only sent to a client that
+    /// said it could show them.
+    case background(BackgroundUpdate)
     case ignored(String)
     case unknown(String)
 
@@ -71,6 +74,10 @@ public enum SessionUpdate: Sendable {
         case "compaction_summary_chunk":
             return .entry(.compaction(status: "in_progress",
                                       summary: [ContentBlock](wire: update["content"])))
+        case "async_task_spawned", "async_task_progress", "async_task_state_update",
+             "subagent_spawned", "subagent_state_update":
+            guard let background = BackgroundUpdate.decode(update) else { return .unknown(kind) }
+            return .background(background)
         default:
             return .unknown(kind)
         }

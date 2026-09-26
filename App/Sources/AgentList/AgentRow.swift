@@ -113,6 +113,16 @@ struct AgentRow: View {
                     LeaseMark(status: leases)
                 }
 
+                // What it has running in the background (057), on the same kind of line.
+                if let running = BackgroundWords.mark(agent.background) {
+                    Label(running, systemImage: "apple.terminal")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(running)
+                }
+
                 // When an archived agent will be retired, or why it is being kept
                 // (051): on the same kind of line, only when there is something to say.
                 if agent.state == .archived,
