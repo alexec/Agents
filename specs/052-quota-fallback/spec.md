@@ -41,6 +41,14 @@ Yes, with two limits the person should know about up front:
   the files on disk are as the old runtime left them. It does not have the old runtime's private
   working memory (its cache, its internal notes, its own summary of a long chat).
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: Where does the person look at the state of the pool? → A: On a Pool page of its own. It is
+  a row in the sidebar's Activity section, beside Events, Resources and Spending, and it is on
+  the phone too. The pool is still edited in Settings, and the page links there.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A chat moves on by itself when its runtime runs out (Priority: P1)
@@ -100,29 +108,53 @@ and check the pool is as it was left. Check an uninstalled runtime is offered as
 
 ---
 
-### User Story 3 - Seeing which runtimes are out, and until when (Priority: P2)
+### User Story 3 - A Pool page: which runtimes are out, until when, and what moved (Priority: P1)
 
-After a switch, the person wants to know what state their allowances are in. The pool in Settings
-shows each runtime as available or out, with the time it is expected back when the runtime said
-so. New chats started on a runtime that is out warn before the first prompt and offer the first
-available one instead. The person can mark a runtime as available again by hand, for when they
-know better (they bought more credit, a new month began).
+The person wants one place to look at the state of their allowances. Beside Events, Resources and
+Spending in the sidebar's Activity section there is a **Pool** row. Its page lists the pool in
+order. Each runtime has a line that reads plainly: *Available*, *Out until 07:00*, *Out since
+02:14, trying again after 03:14*, or *Can't be used: not signed in*. Next to each runtime is how
+many chats are on it now. Under the list are the recent switches, newest first: when, which chat,
+from which runtime to which, and why. Each one opens its chat. Any chats waiting for an allowance
+to come back are listed at the top, each with the time it will resume.
 
-**Why this priority**: Without it, every other chat hits the same wall one at a time, and the
-person cannot tell why things moved.
+From the page the person can mark a runtime as available again by hand, when they know better
+(they bought more credit, or a new month began). There is also a link to where the pool is edited.
+The sidebar row carries a small mark when any runtime in the pool is out, so the person can see
+that without opening the page. The phone has the same page wherever it shows Spending.
 
-**Independent Test**: Make a runtime report out with a reset time; check Settings shows it out
-until then, check a new chat on it warns, clear it by hand, check the warning is gone.
+New chats started on a runtime that is out warn before the first prompt and offer the first
+available one instead.
+
+**Why this priority**: The person asked for it. Switching that happens where nobody can see it is
+hard to trust. Without this page, every other chat also hits the same wall one at a time, and the
+person cannot tell why their chats moved.
+
+**Independent Test**: On a scratch root with a pool of three:
+1. Make one runtime report out with a reset time.
+2. Make a second report out with no reset time.
+3. Cause one switch.
+4. Check that the Pool page shows each state in words, the chat counts, the switch with a working
+   link to its chat, and the mark on the sidebar row.
+5. Clear one runtime by hand, and check that the page and the mark update without a relaunch.
 
 **Acceptance Scenarios**:
 
-1. **Given** A ran out with a stated reset time, **When** that time passes, **Then** A is shown as
-   available again without the person doing anything.
-2. **Given** A ran out without a stated reset time, **When** the person looks at the pool,
-   **Then** A shows as out since the time it ran out, and is tried again no sooner than one hour
+1. **Given** a pool where nothing is out, **When** the person opens the Pool page, **Then** every
+   runtime reads Available, the switch list says there have been none, and the sidebar row has
+   no mark.
+2. **Given** A ran out with a stated reset time, **When** that time passes, **Then** A reads
+   Available again on the page without the person doing anything, and the mark goes if nothing
+   else is out.
+3. **Given** A ran out without a stated reset time, **When** the person looks at the page,
+   **Then** A reads as out since the time it ran out, and as tried again no sooner than one hour
    later.
-3. **Given** several chats on A, **When** A runs out in one of them, **Then** the others move the
+4. **Given** A is out, **When** the person marks it available, **Then** the page, the mark and
+   the next switch decision all treat A as available.
+5. **Given** several chats on A, **When** A runs out in one of them, **Then** the others move the
    next time they would send A a turn, without first failing on A themselves.
+6. **Given** the pool is empty or switching is off, **When** the person opens the page, **Then**
+   it says so and links to where the pool is set up, rather than showing an empty list.
 
 ---
 
@@ -241,6 +273,22 @@ new runtime in the controls, and that the next prompt goes to it with the histor
 - **FR-015**: The new runtime MUST start in a mode no looser than the chat's current mode, and in
   the pool entry's model or else the runtime's default.
 
+**Pool page**
+
+- **FR-019**: The sidebar's Activity section MUST have a Pool row, always present, that opens a
+  page about the whole pool, on the Mac and on the phone.
+- **FR-020**: The page MUST show, for each runtime in pool order, its state in words (available;
+  out until a time; out since a time and when it will next be tried; unusable and why) and how
+  many chats are on it now.
+- **FR-021**: The page MUST list recent switches, newest first, each with its time, chat, the
+  runtime it came from, the runtime it went to and the reason, and each MUST open its chat.
+- **FR-022**: The page MUST list chats waiting for an allowance to return, with when each will
+  resume.
+- **FR-023**: The person MUST be able to mark an out runtime as available from the page.
+- **FR-024**: The Pool row MUST show a mark whenever any runtime in the pool is out, and the page
+  and mark MUST update as states change, with no relaunch.
+- **FR-025**: Switches MUST be kept for the page for at least 30 days.
+
 **Everyone out**
 
 - **FR-016**: When no runtime in the pool is usable, the chat MUST stop with a note naming the
@@ -279,11 +327,14 @@ new runtime in the controls, and that the next prompt goes to it with the histor
   recognised, or the docs say plainly that it is not yet.
 - **SC-006**: A person reading a switched chat can say which runtime answered each turn and why it
   changed, from the chat alone.
+- **SC-007**: From anywhere in the app, the person can tell whether any runtime is out without
+  opening anything, and with one click can see which ones are out, until when, and every chat
+  that moved in the last 30 days.
 
 ## Docs *(mandatory)*
 
 - `docs/how-to/keep-going-when-a-runtime-runs-out.md` — add: setting up the pool, what a switch
-  looks like, marking a runtime available again, continuing a chat with another runtime by hand.
+  looks like, reading the Pool page, marking a runtime available again, continuing a chat with another runtime by hand.
 - `docs/reference/settings.md` — change: the pool, its switch, the per-chat opt-out.
 - `docs/reference/runtimes.md` — change: for each runtime, whether its spent allowance is
   recognised and whether it states a return time.
