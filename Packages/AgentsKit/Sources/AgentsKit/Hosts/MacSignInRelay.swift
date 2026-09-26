@@ -103,6 +103,42 @@ public final class MacSignInRelay: @unchecked Sendable {
                                        "proxy-connection", "transfer-encoding", "content-length", "upgrade",
                                        "te", "trailer", "accept-encoding"]
 
+    /// The upstream URL for a request target, or nil unless the target is origin-form: a
+    /// path starting with one `/`, then an optional query, in characters a URL may carry
+    /// as they are. Built by parts, so the host is always `host` and nothing in the target
+    /// can become a user, a port or another host; and checked once built, all the same.
+    static func upstreamURL(host: String, target: String) -> URL? {
+        guard target.hasPrefix("/"), !target.hasPrefix("//") else { return nil }
+        let allowed = CharacterSet.urlPathAllowed.union(.urlQueryAllowed).union(CharacterSet(charactersIn: "%"))
+        guard target.unicodeScalars.allSatisfy(allowed.contains), hasWellFormedEscapes(target) else { return nil }
+        let parts = target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+        components.percentEncodedPath = String(parts[0])
+        if parts.count == 2 { components.percentEncodedQuery = String(parts[1]) }
+        guard let url = components.url, url.scheme == "https", url.host == host,
+              url.user == nil, url.password == nil, url.port == nil else { return nil }
+        return url
+    }
+
+    /// Every `%` followed by two hex digits.
+    private static func hasWellFormedEscapes(_ text: String) -> Bool {
+        let bytes = Array(text.utf8)
+        let hex = Set("0123456789abcdefABCDEF".utf8)
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == UInt8(ascii: "%") {
+                guard index + 2 < bytes.count,
+                      hex.contains(bytes[index + 1]), hex.contains(bytes[index + 2]) else { return false }
+                index += 3
+            } else {
+                index += 1
+            }
+        }
+        return true
+    }
+
     private func forward(_ request: HTTPRequest, on connection: NWConnection, renewed: Bool) async {
         // A WebSocket upgrade is refused plainly: the runtime falls back to HTTPS at once,
         // where it would otherwise retry for seconds (research R12).
@@ -111,12 +147,20 @@ public final class MacSignInRelay: @unchecked Sendable {
             send(connection, head: "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
             return
         }
-        guard let token = try? signIn.current(),
-              let upstream = Self.upstream(request, host: relay.upstreamHost, token: token) else {
+        // The token goes only to the runtime's own service. A target that is not a plain
+        // path could name another host (`@evil.example/`), so it is refused before the
+        // sign-in is even read. The target is not logged: it is not one the relay knows.
+        guard let url = Self.upstreamURL(host: relay.upstreamHost, target: request.target) else {
+            log("relay: \(request.method) -> 400 (the request target is not a path)")
+            send(connection, head: "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
+            return
+        }
+        guard let token = try? signIn.current() else {
             log("relay: \(request.method) \(request.pathOnly) -> 502 (no sign-in on this Mac)")
             send(connection, head: "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", close: true)
             return
         }
+        let upstream = Self.upstream(request, url: url, token: token)
 
         let streamer = Streamer()
         let task = session.dataTask(with: upstream)
@@ -161,9 +205,9 @@ public final class MacSignInRelay: @unchecked Sendable {
 
     /// The request as it goes on to the service: everything the runtime sent but its own
     /// sign-in (`Authorization`, `x-api-key`) and hop-by-hop headers, with this Mac's token
-    /// and the headers the sign-in carries (Codex's account id) in their place.
-    static func upstream(_ request: HTTPRequest, host: String, token: MacSignInToken) -> URLRequest? {
-        guard let url = URL(string: "https://\(host)\(request.target)") else { return nil }
+    /// and the headers the sign-in carries (Codex's account id) in their place, sent to a
+    /// `url` that `upstreamURL` has already checked.
+    static func upstream(_ request: HTTPRequest, url: URL, token: MacSignInToken) -> URLRequest {
         var upstream = URLRequest(url: url)
         upstream.httpMethod = request.method
         for header in request.headers where !dropped.contains(header.name.lowercased()) {

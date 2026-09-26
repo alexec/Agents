@@ -1,0 +1,17 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:error",
+        "revision": 1,
+        "category": "limit",
+        "severity": "error",
+        "title": "This Claude session reached its configured budget.",
+        "actions": [
+          "new_session"
+        ]
+      }
+    }
+  }
+}

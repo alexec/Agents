@@ -86,8 +86,24 @@ private struct EntryRow: View {
         case .elicitationAsked(let request):
             Text("Asked: \(request.title)").appText(.supporting).foregroundStyle(.secondary)
 
-        case .elicitationAnswered(_, let summary):
-            Text(summary).appText(.supporting).foregroundStyle(.secondary)
+        case .elicitationAnswered(_, let summary, let answers):
+            if answers.isEmpty {
+                Text(summary).appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                // What they said is theirs, so it sits in their bubble, each answer
+                // under the question it answers: the card that asked is gone.
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(answers.enumerated()), id: \.offset) { _, answer in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(answer.question).appText(.supporting).foregroundStyle(.secondary)
+                            Text(answer.answer).appText(.reading).textSelection(.enabled)
+                        }
+                    }
+                }
+                .padding(12)
+                .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
         case .compaction(let status, let summary):
             VStack(alignment: .leading, spacing: 6) {
@@ -128,6 +144,19 @@ private struct EntryRow: View {
 
         case .runtimeNote(let text):
             Text(text).appText(.fine).foregroundStyle(.secondary)
+
+        case .poolSwitch(let record):
+            SwitchNote(record: record)
+
+        case .settingsChanged(let record):
+            Text("Changed what it carried on with: "
+                 + record.carried.compactMap { s in s.to?.stringValue.map { "\(s.name) \($0)" } }.joined(separator: ", "))
+                .appText(.fine).foregroundStyle(.secondary)
+
+        case .handoff(let markdown, let characters):
+            HandoffLine(markdown: markdown, characters: characters)
+        case .background(let item):
+            BackgroundEntryLine(item: item)
 
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
@@ -193,13 +222,32 @@ struct QueuedPromptRow: View {
     @Environment(\.chatActions) private var actions
     let prompt: QueuedPrompt
     let agentID: UUID
+    /// A turn is running and its runtime takes words mid-turn (`_session/steering`).
+    var canSendNow = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Waiting its turn")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Waiting its turn")
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                    Spacer(minLength: 8)
+                    if canSendNow {
+                        Button {
+                            Task { await actions.sendNow(prompt, agentID) }
+                        } label: {
+                            Label("Send now", systemImage: "arrow.up")
+                                .appText(.fine)
+                                #if os(iOS)
+                                .frame(minHeight: 44)
+                                .contentShape(.rect)
+                                #endif
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Send this into the turn that is running, without waiting for it to end")
+                    }
+                }
                 BlocksView(blocks: prompt.blocks)
                     .appText(.reading)
                     .foregroundStyle(.secondary)
@@ -267,6 +315,7 @@ private struct ToolRunRow: View {
 /// there: what it produced, where it worked, and what the runtime actually sent.
 private struct ToolCallLine: View {
     @Environment(\.chatActions) private var actions
+    @Environment(\.backgroundWork) private var background
     let call: ToolCall
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
@@ -309,13 +358,21 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        Text(call.line)
+        Text(call.line + runsOn)
             .appText(.supporting)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
+    }
+
+    /// " · running in the background", while what this call started still runs (057).
+    /// The call itself came back at once; without this it reads as done.
+    private var runsOn: String {
+        guard let id = call.toolCallID,
+              background.contains(where: { $0.toolCallID == id && $0.isRunning }) else { return "" }
+        return " · running in the background"
     }
 
     // MARK: What it did, once asked
@@ -480,6 +537,8 @@ private struct StateLine: View {
             case .processDied: return "The runtime crashed"
             case .signInRefused: return "Its sign-in was refused"
             case .runtimeError: return "The runtime reported an error"
+            case .allowanceSpent: return "Its allowance ran out"
+            case .rateLimited: return "Rate limited, and still limited after retrying"
             case .daemonGone: return "Stopped when the daemon did"
             case .maxTokens: return "Ran out of room"
             case .maxTurnRequests: return "Hit its limit"

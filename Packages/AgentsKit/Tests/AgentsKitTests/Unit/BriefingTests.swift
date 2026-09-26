@@ -260,7 +260,7 @@ struct BriefingTests {
             let text = Briefing.text(for: policy)
             #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
             #expect(text.contains(AppTool.startAgent))
-            #expect(text.contains("three"))
+            #expect(text.contains("five"))
         }
     }
 

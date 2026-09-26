@@ -106,6 +106,12 @@ public enum DaemonAPI {
         public static let agentsStart = "agents/start"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
+        /// Stop one shell or task an agent left running in the background, and nothing
+        /// else it is doing (057).
+        public static let agentsStopBackground = "agents/stopBackground"
+        /// A queued prompt sent into the running turn rather than after it, where the
+        /// runtime advertises steering. Takes an `UnqueueRequest`: the same two ids.
+        public static let agentsSendNow = "agents/sendNow"
         /// Files under an agent's folders matching what follows an `@`, found on the
         /// Mac, so a phone can name them too (033).
         public static let filesMention = "files/mention"
@@ -292,6 +298,22 @@ public enum DaemonAPI {
         // limit is not stopped.
         public static let costState = "cost/state"
         public static let costSetLimits = "cost/setLimits"
+        /// The pool of runtimes a chat can carry on with, and each one's state (052).
+        public static let poolState = "pool/state"
+        public static let poolSet = "pool/set"
+        public static let poolMarkAvailable = "pool/markAvailable"
+        /// Stop a chat waiting for an allowance (052, US4).
+        public static let poolStopWaiting = "pool/stopWaiting"
+        /// Carry a chat on with another runtime by hand, or change what an automatic
+        /// switch carried on with (052, US5). A preview unless `confirmed`.
+        public static let agentsContinueWith = "agents/continueWith"
+        /// A chat's own "carry on when this runs out" (052, FR-003).
+        public static let agentsSetSwitching = "agents/setSwitching"
+        /// The model and effort options each runtime offers, for Matching models (US6).
+        public static let poolModels = "pool/models"
+        /// What another daemon learned about a shared allowance (052, R6): the Mac's
+        /// window carries it between the Mac and each server.
+        public static let poolApplyAllowances = "pool/applyAllowances"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
         /// which is why it is `wake/state` while the notification below is
@@ -381,6 +403,8 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+        /// The pool, its states or its switches changed (052). Debounced to one a second.
+        public static let poolChanged = "pool/changed"
         /// The retention settings, or what the archive holds, changed (051). A
         /// `RetentionState`.
         public static let retentionChanged = "retention/changed"
@@ -759,6 +783,16 @@ public enum DaemonAPI {
         }
     }
 
+    /// `agents/stopBackground` (057): which agent, and the runtime's id for the task.
+    public struct StopBackgroundRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var itemID: String
+        public init(agentID: UUID, itemID: String) {
+            self.agentID = agentID
+            self.itemID = itemID
+        }
+    }
+
     public struct UnqueueRequest: Codable, Sendable {
         public var agentID: UUID
         public var promptID: UUID
@@ -1022,6 +1056,104 @@ public enum DaemonAPI {
     /// Each field is a double optional and the distinction is the whole point:
     /// **absent** means "leave it as it is", **present and null** means "no limit".
     /// A limit of zero is a limit; clearing one requires an explicit null.
+    /// `pool/markAvailable`: the person says an entry's credential is back (FR-023).
+    public struct PoolMarkAvailable: Codable, Sendable {
+        public var entryID: UUID
+        public init(entryID: UUID) { self.entryID = entryID }
+    }
+
+    /// `agents/continueWith` (US5). Name the runtime by its pool entry, or by id for one
+    /// outside the pool; or `adjust` the settings the chat is on after an automatic switch.
+    public struct ContinueWithRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var entryID: UUID?
+        public var runtimeID: String?
+        public var adjust: Bool
+        public var choices: [String: JSONValue]
+        public var confirmed: Bool
+        /// Remember the pair in Matching models (US6): in the level that already holds the
+        /// chat's model, else this one, else a new level with this name.
+        public var remember: Remember?
+
+        public struct Remember: Codable, Sendable {
+            public var levelID: UUID?
+            public var newLevelName: String?
+            public init(levelID: UUID? = nil, newLevelName: String? = nil) {
+                self.levelID = levelID
+                self.newLevelName = newLevelName
+            }
+        }
+
+        public init(agentID: UUID, entryID: UUID? = nil, runtimeID: String? = nil, adjust: Bool = false,
+                    choices: [String: JSONValue] = [:], confirmed: Bool = false, remember: Remember? = nil) {
+            self.remember = remember
+            self.agentID = agentID
+            self.entryID = entryID
+            self.runtimeID = runtimeID
+            self.adjust = adjust
+            self.choices = choices
+            self.confirmed = confirmed
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            entryID = try c.decodeIfPresent(UUID.self, forKey: .entryID)
+            runtimeID = try c.decodeIfPresent(String.self, forKey: .runtimeID)
+            adjust = try c.decodeIfPresent(Bool.self, forKey: .adjust) ?? false
+            choices = try c.decodeIfPresent([String: JSONValue].self, forKey: .choices) ?? [:]
+            confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+            remember = try c.decodeIfPresent(Remember.self, forKey: .remember)
+        }
+    }
+
+    /// What `agents/continueWith` answers: the plan, and the options it was made against,
+    /// which fill the sheet's menus. Empty options when the runtime has never said what it
+    /// offers in this folder: the sheet says so. `agent` is set once it is applied.
+    public struct ContinueWithResult: Codable, Sendable {
+        public var runtimeID: String
+        public var plan: CarryPlan
+        public var options: [ConfigOption]
+        public var agent: Agent?
+
+        public init(runtimeID: String, plan: CarryPlan, options: [ConfigOption], agent: Agent? = nil) {
+            self.runtimeID = runtimeID
+            self.plan = plan
+            self.options = options
+            self.agent = agent
+        }
+    }
+
+    public struct ApplyAllowances: Codable, Sendable {
+        public var states: [AllowanceState]
+        public init(states: [AllowanceState]) { self.states = states }
+    }
+
+    public struct PoolModelsRequest: Codable, Sendable {
+        public var runtimeIDs: [String]
+        public init(runtimeIDs: [String]) { self.runtimeIDs = runtimeIDs }
+    }
+
+    public struct SetSwitchingRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var isOn: Bool
+        public init(agentID: UUID, isOn: Bool) {
+            self.agentID = agentID
+            self.isOn = isOn
+        }
+    }
+
+    public struct PoolStopWaiting: Codable, Sendable {
+        public var agentID: UUID
+        public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// `pool/state`: the last day of switches unless `days` asks for more (052, FR-025).
+    public struct PoolStateRequest: Codable, Sendable {
+        public var days: Int?
+        public init(days: Int? = nil) { self.days = days }
+    }
+
     public struct SetLimitsRequest: Codable, Sendable {
         public var perAgent: Cost??
         public var daily: Cost??
@@ -1554,6 +1686,8 @@ public enum DaemonAPI {
         public static let noSuchNeed = -32021
         /// A daemon asked to quit while a turn is in flight (037).
         public static let busy = -32040
+        /// A chat asked to move to another runtime while its turn is running (052, US5).
+        public static let stopTheTurnFirst = -32046
         /// A server daemon had to start a runtime for this request and has no sign-in to
         /// start it with. Nothing was started, so the same request (same `sendID`) can be
         /// sent again after `credentials/lend` (043). `data`: `runtime`, `offered`.

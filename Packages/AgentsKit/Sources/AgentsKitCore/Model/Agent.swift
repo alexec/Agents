@@ -70,6 +70,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// What the agent said it was going to do. The current one is last.
     public var plans: [Plan]
 
+    /// What it left running in the background — shells, subagents — and the last few
+    /// that finished (057). Only a runtime told it may send these ever fills it.
+    public var background: [BackgroundItem]
+
     /// Folders beyond `cwd` that this agent may reach, where the runtime takes them.
     public var additionalDirectories: [URL]
 
@@ -116,6 +120,18 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// which is after the agent's last tool call, so without this the agent's name for
     /// the work would be overwritten a moment after it was given.
     public var titledByAgent: Bool
+
+    /// The pool entry the chat is on now (052): which runtime *and* which way of paying
+    /// for it, since Codex on its plan and Codex on a key are two entries. Nil when it
+    /// started outside the pool.
+    public var poolEntryID: UUID?
+
+    /// The chat's own "carry on when this runs out" is off (052, FR-003). Off is rare, so
+    /// only written when true.
+    public var switchingOff: Bool
+    /// Waiting for an allowance to come back, when every runtime in the pool was out
+    /// (052, US4). Kept on the record, so a restart still resumes it.
+    public var allowanceWait: AllowanceWait?
 
     public var createdAt: Date
     public var lastActivityAt: Date
@@ -274,6 +290,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // own, which is the app-wide per-agent limit applying.
         costCeiling = try c.decodeIfPresent(Cost.self, forKey: .costCeiling)
         plans = try c.decodeIfPresent([Plan].self, forKey: .plans) ?? []
+        background = try c.decodeIfPresent([BackgroundItem].self, forKey: .background) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
         mcpServers = try c.decodeIfPresent([MCPServer].self, forKey: .mcpServers) ?? []
         // New in 004. A record written before it has nothing waiting.
@@ -316,6 +333,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
         titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
+        // New in 052. An older record is on no pool entry and carries on by default.
+        poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
+        switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
+        allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
         // New in 040. A record written before it was never parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
         // New with self-archiving. A record from before never asked; one from a
@@ -362,6 +383,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !costToDate.isEmpty { try c.encode(costToDate, forKey: .costToDate) }
         try c.encodeIfPresent(costCeiling, forKey: .costCeiling)
         if !plans.isEmpty { try c.encode(plans, forKey: .plans) }
+        if !background.isEmpty { try c.encode(background, forKey: .background) }
         if !additionalDirectories.isEmpty {
             try c.encode(additionalDirectories, forKey: .additionalDirectories)
         }
@@ -381,6 +403,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
+        try c.encodeIfPresent(poolEntryID, forKey: .poolEntryID)
+        if switchingOff { try c.encode(switchingOff, forKey: .switchingOff) }
+        try c.encodeIfPresent(allowanceWait, forKey: .allowanceWait)
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
@@ -407,8 +432,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case restartPickUps
         case report, outcomeAsked
         case titledByAgent
+        case poolEntryID, switchingOff, allowanceWait
         case parking
         case afterTurn
+        case background
         case archivedAt, retirement
     }
 
@@ -439,6 +466,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 costToDate: [String: Decimal] = [:],
                 costCeiling: Cost? = nil,
                 plans: [Plan] = [],
+                background: [BackgroundItem] = [],
                 additionalDirectories: [URL] = [],
                 mcpServers: [MCPServer] = [],
                 queuedPrompts: [QueuedPrompt] = [],
@@ -481,6 +509,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.costToDate = costToDate
         self.costCeiling = costCeiling
         self.plans = plans
+        self.background = background
         self.additionalDirectories = additionalDirectories
         self.mcpServers = mcpServers
         self.queuedPrompts = queuedPrompts
@@ -498,6 +527,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.report = report
         self.outcomeAsked = outcomeAsked
         self.titledByAgent = titledByAgent
+        self.poolEntryID = nil
+        self.switchingOff = false
+        self.allowanceWait = nil
         self.parking = parking
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt

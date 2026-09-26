@@ -66,6 +66,11 @@ struct ChatView: View {
             open: { location in NSWorkspace.shared.open(URL(filePath: location.path)) },
             terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            // A switch note's two links (052).
+            adjustSwitch: { [model] record in model.adjustingSwitch = record },
+            showPool: { [model] in model.showsPool = true },
+            sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
+            canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
             showEdit: { [frame, states, agent] diff, toolCallID in
                 guard let agent else { return }
@@ -73,7 +78,15 @@ struct ChatView: View {
                     path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
-            })
+            },
+            // The sidebar's Background pane, at that subagent (057, frame C).
+            subagentSteps: { [frame, states, agent] id in
+                guard let agent else { return }
+                states.state(for: agent.id).subagent = id
+                frame.pane = .background
+                if !frame.isOpen { frame.open() }
+            },
+            backgroundOutput: { item in BackgroundOutput.open(item) })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

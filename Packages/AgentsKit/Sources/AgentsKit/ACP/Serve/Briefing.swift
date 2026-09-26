@@ -99,7 +99,7 @@ public enum Briefing {
     /// agents — and the limit is said here as well as in the tool's description so it
     /// is known before the first call rather than learned from a refusal.
     public static let helpers = """
-        If a piece of the work can go on alongside the rest, you can start up to three \
+        If a piece of the work can go on alongside the rest, you can start up to five \
         agents in this project with \(AppTool.startAgent), and stop or archive them when \
         their part is done. Do not start one for work you could simply do yourself.
         """

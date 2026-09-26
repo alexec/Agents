@@ -34,6 +34,8 @@ struct ProjectListView: View {
             VStack(spacing: 0) {
                 EventsRow()
                 SpendingRow()
+                // The pool, when there is one (052): with the Mac's dot.
+                if model.poolStatus?.rows.isEmpty == false { PoolRow() }
             }
         }
         .overlay {

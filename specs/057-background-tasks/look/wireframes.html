@@ -1,0 +1,233 @@
+<!doctype html><html><head><meta charset="utf-8"><title>057 wireframes</title><style>
+/* Wireframes for background tasks and subagents (057). Lo-fi on purpose, in 054's paper
+   style. Open with #a … #e to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:900px;line-height:1.4}
+.note{font:italic 12px -apple-system;color:#c2185b}
+.win{width:900px;height:600px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.titlebar{height:36px;display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid rgba(0,0,0,.06)}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.titlebar .t{font:600 13px -apple-system;color:#333;margin-left:180px}.titlebar .s{color:#8a877f;font-size:12px}
+.split{flex:1;display:flex;min-height:0}
+.list{width:230px;border-right:1px solid rgba(0,0,0,.08);background:#f1eee8;padding:8px;display:flex;flex-direction:column;gap:6px}
+.list .h{font:600 11px -apple-system;color:#8a877f;padding:6px 6px 2px;text-transform:uppercase;letter-spacing:.04em}
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;gap:2px}
+.card.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.card .nm{font-weight:600}.card .ln{color:#6d6a64;font-size:11px}
+.card .mk{color:#6d6a64;font-size:11px}.card .mk b{font-weight:600;color:#3d5a80}
+.chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.acts{display:flex;justify-content:flex-end;gap:8px;padding:8px 18px}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 9px;font-size:12px;white-space:nowrap}
+.btn.s{padding:1px 7px;font-size:11px}
+.btn.stop{border-color:#d9b8a8;color:#9a3b1d}
+.tx{flex:1;overflow:hidden;padding:4px 40px;display:flex;flex-direction:column;gap:10px}
+.me{align-self:flex-end;background:#e3eaf3;border-radius:12px;padding:6px 11px;max-width:70%}
+.say{line-height:1.45}
+.tool{border:1px solid #e3dfd6;background:#fff;border-radius:8px;padding:6px 10px;font-size:12px;color:#555;display:flex;gap:8px;align-items:center}
+.tool .mono,.mono{font:11.5px "SF Mono",Menlo,monospace}
+.tool.dim{color:#8a877f}
+.noteline{font-size:12px;color:#6d6a64;display:flex;gap:6px;align-items:center}
+.foot{padding:8px 40px 14px;display:flex;flex-direction:column;gap:8px;background:#f7f5f0;border-top:1px solid rgba(0,0,0,.05)}
+.bg{border:1px solid #e3dfd6;background:#fbfaf7;border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+.bg .h{display:flex;gap:6px;align-items:center;font-size:11px;color:#8a877f;padding:0 2px 2px}
+.task{display:flex;align-items:center;gap:8px;padding:4px 4px;border-radius:6px}
+.task .ic{width:18px;text-align:center;color:#3d5a80}
+.task .nm{font-weight:600;white-space:nowrap}
+.task .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;font-size:12px}
+.task .age{color:#8a877f;font-size:11px;font-variant-numeric:tabular-nums}
+.task.done{opacity:.55}
+.caps{display:flex;gap:8px;flex-wrap:wrap}
+.capsule{border-radius:12px;padding:3px 10px;font-size:11px;background:#fff;border:1px solid #e3dfd6;color:#555}
+.facts{display:flex;gap:10px;align-items:center}
+.field{background:#fff;border:1px solid #dcd8cf;border-radius:14px;padding:10px 14px;color:#aaa}
+.side{width:300px;border-left:1px solid rgba(0,0,0,.08);background:#fbfaf7;display:flex;flex-direction:column}
+.panes{display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.06)}
+.pane{padding:3px 7px;border-radius:5px;font-size:11px;color:#666}.pane.on{background:rgba(0,0,0,.07);color:#3d5a80}
+.out{background:#1f1f1f;color:#ddd;border-radius:8px;padding:8px 10px;font:11px "SF Mono",Menlo,monospace;line-height:1.5;margin:0 12px}
+.phone{width:320px;height:640px;background:#f7f5f0;border-radius:36px;box-shadow:0 0 0 8px #222,0 10px 30px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column}
+.phone .nav{height:74px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 8px;font-weight:600;border-bottom:1px solid rgba(0,0,0,.06)}
+.phone .tx{padding:8px 14px}
+.phone .foot{padding:8px 12px 26px}
+.sheet{position:absolute;left:0;right:0;bottom:0;height:340px;background:#fbfaf7;border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.2);padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.grab{width:36px;height:5px;border-radius:3px;background:#ccc;align-self:center}
+.dimmer{position:absolute;inset:0;background:rgba(0,0,0,.18)}
+.row2{display:flex;gap:40px;align-items:flex-start}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- A — Mac: a working chat with one of each -->
+<div class="frame" id="a"><div class="cap">A · Mac: “In the background”, above the prompt</div>
+<div class="sub">Where 036's leases and 042's wait already sit: the rows over the prompt, on both apps. One row per shell or subagent while it runs. A shell has Stop. A subagent does not, because neither Claude nor Codex offers a way to stop one on its own (both send <span class="mono">capabilities: {}</span>); the agent's own Stop stops it. The card in the list says the same in one line.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="t">Background tasks setup</span><span class="s">work</span></div>
+ <div class="split">
+  <div class="list">
+   <div class="h">Working</div>
+   <div class="card sel"><span class="nm">Background tasks setup</span><span class="mk"><b>▸</b> 1 shell, 1 subagent in the background</span></div>
+   <div class="card"><span class="nm">Fix login redirect</span><span class="ln">Edited the callback handler.</span></div>
+   <div class="h">Complete</div>
+   <div class="card"><span class="nm">Docs typo</span><span class="ln">Fixed the heading.</span></div>
+  </div>
+  <div class="chat">
+   <div class="acts"><span class="btn">⏹ Stop</span><span class="btn">Park</span><span class="btn">Archive</span></div>
+   <div class="tx">
+    <div class="me">Start the tick loop in the background, and have a subagent count /usr/bin.</div>
+    <div class="tool"><span>▸</span><span class="mono">for i in $(seq 1 300); do echo tick $i; sleep 1; done</span><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="tool"><span>◎</span><b>Count files</b><span class="ds">subagent</span><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="say">Both are running. I'll report the count when the subagent finishes.</div>
+   </div>
+   <div class="foot">
+    <div class="bg">
+     <div class="h">In the background · 2</div>
+     <div class="task"><span class="ic">▸</span><span class="nm">Print a tick every second</span><span class="ds mono">for i in $(seq 1 300); do echo tick…</span><span class="age">0:37</span><span class="btn s">Output</span><span class="btn s stop">Stop</span></div>
+     <div class="task"><span class="ic">◎</span><span class="nm">Count files</span><span class="ds">Run ls /usr/bin | wc -l, then sleep 20, then report…</span><span class="age">0:12</span><span class="btn s">Steps</span></div>
+    </div>
+    <div class="facts"><span class="capsule">⎇ agents/implement-background-tasks</span><span style="flex:1"></span><span class="capsule">24k / 1M</span><span class="capsule">Claude</span></div>
+    <div class="field">Reply…</div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="note">Output opens the task's output file in the Files pane, following as it grows. Steps: see frame C. The tool-call cards in the transcript keep a small “in the background” tag, so the prose “Command running in background with ID: bixt00wz6…” is gone.</div>
+</div>
+
+<!-- B — Mac: the turn ended, a shell still runs; after Stop -->
+<div class="frame" id="b"><div class="cap">B · Mac: the turn has ended and the shell still runs, then Stop</div>
+<div class="sub">The case that needs this most. On a real Claude turn the turn ended at 32 s and the shell ran on. The agent is under Complete, but its card still says something runs, so it is never quietly left behind. Stop answers at once: the row leaves the block, and the adapter's own notice goes into the transcript as a line. A shell or subagent that ends by itself leaves the same way, with a line saying how it ended.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="t">Background tasks setup</span><span class="s">work</span></div>
+ <div class="split">
+  <div class="list">
+   <div class="h">Working</div>
+   <div class="card"><span class="nm">Fix login redirect</span><span class="ln">Edited the callback handler.</span></div>
+   <div class="h">Complete</div>
+   <div class="card sel"><span class="nm">Background tasks setup</span><span class="ln">The count is 932; the tick loop runs on.</span><span class="mk"><b>▸</b> 1 shell in the background</span></div>
+   <div class="card"><span class="nm">Docs typo</span><span class="ln">Fixed the heading.</span></div>
+  </div>
+  <div class="chat">
+   <div class="acts"><span class="btn">Park</span><span class="btn">Archive</span></div>
+   <div class="tx">
+    <div class="tool"><span>◎</span><b>Count files</b><span class="ds">subagent</span><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="noteline">✓ Subagent “Count files” finished · 0:25</div>
+    <div class="say">The file count finished: /usr/bin has 932 entries. The tick loop is still running in the background.</div>
+    <div class="noteline" style="color:#9a3b1d">⏹ Task stopped by user · Print a tick every second for 5 minutes <span class="btn s">Output</span></div>
+   </div>
+   <div class="foot">
+    <div class="bg">
+     <div class="h">In the background · 1</div>
+     <div class="task done"><span class="ic">▸</span><span class="nm">Print a tick every second</span><span class="ds mono">for i in $(seq 1 300); do echo tick…</span><span class="age">Stopping…</span><span class="btn s">Output</span><span class="btn s stop" style="opacity:.4">Stop</span></div>
+    </div>
+    <div class="facts"><span class="capsule">⎇ agents/implement-background-tasks</span><span style="flex:1"></span><span class="capsule">24k / 1M</span><span class="capsule">Claude</span></div>
+    <div class="field">Reply…</div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="note">The dimmed row is the moment between the click and the answer (40 ms in the capture). Then the block is gone, because nothing runs.</div>
+</div>
+
+<!-- C — Mac: a subagent's own steps -->
+<div class="frame" id="c"><div class="cap">C · Mac: what a subagent is doing, in the sidebar</div>
+<div class="sub">Once the app opts in, a subagent's own steps and words arrive under a session of their own, not the agent's, and the Agent tool card is no longer sent. Unrouted, the subagent's report would read as the agent's. Proposed: they go into the subagent's own page, opened by Steps (or the card in the transcript), in the sidebar where Changes and Terminal are. The chat shows only what the agent itself said and did. A permission the subagent asks for is still asked in the chat, named as the subagent's.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="t">Background tasks setup</span><span class="s">work</span></div>
+ <div class="split">
+  <div class="chat">
+   <div class="acts"><span class="btn">⏹ Stop</span><span class="btn">Park</span><span class="btn">Archive</span></div>
+   <div class="tx" style="padding:4px 24px">
+    <div class="me">Start the tick loop in the background, and have a subagent count /usr/bin.</div>
+    <div class="tool"><span>▸</span><span class="mono">for i in $(seq 1 300)…</span><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="tool" style="border-color:#3d5a80"><span>◎</span><b>Count files</b><span class="ds">subagent · 2 steps</span><span style="margin-left:auto" class="capsule">running</span></div>
+    <div class="say">Both are running.</div>
+   </div>
+   <div class="foot" style="padding:8px 24px 14px">
+    <div class="bg">
+     <div class="h">In the background · 2</div>
+     <div class="task"><span class="ic">▸</span><span class="nm">Print a tick every second</span><span class="age">0:37</span><span class="btn s stop">Stop</span></div>
+     <div class="task" style="background:#e3eaf3"><span class="ic">◎</span><span class="nm">Count files</span><span class="age">0:12</span><span class="btn s">Steps</span></div>
+    </div>
+    <div class="field">Reply…</div>
+   </div>
+  </div>
+  <div class="side">
+   <div class="panes"><span class="pane">Files</span><span class="pane">Changes</span><span class="pane">Terminal</span><span class="pane">Browser</span><span class="pane">Exchanged</span><span class="pane on">Background</span></div>
+   <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+    <div style="font:600 14px -apple-system">◎ Count files</div>
+    <div style="font-size:12px;color:#6d6a64">Subagent · running 0:12 · stops with the agent</div>
+    <div class="tool" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="color:#8a877f;font-size:11px">Asked to</span><span>Run <span class="mono">ls /usr/bin | wc -l</span> with Bash, then run <span class="mono">sleep 20</span>, then report the count.</span></div>
+    <div class="tool"><span>✓</span><span class="mono">ls /usr/bin | wc -l</span><span style="margin-left:auto" class="mono">932</span></div>
+    <div class="tool"><span>◌</span><span class="mono">sleep 20</span></div>
+    <div class="say" style="font-size:12px;color:#8a877f">Its report appears here when it has one.</div>
+   </div>
+  </div>
+ </div>
+</div>
+</div>
+
+<!-- D — the alternative: the list as a sidebar pane -->
+<div class="frame" id="d"><div class="cap">D · Alternative: the whole list in a sidebar pane</div>
+<div class="sub">Instead of rows over the prompt, a sixth pane, <b>Background</b>, lists everything and shows a shell's output live. Above the prompt there is only one capsule, “▸ 2 in the background”, which opens the pane. It leaves the chat quieter but puts Stop two clicks away, and on the phone the pane is a sheet anyway.</div>
+<div class="win">
+ <div class="titlebar"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="t">Background tasks setup</span><span class="s">work</span></div>
+ <div class="split">
+  <div class="chat">
+   <div class="acts"><span class="btn">⏹ Stop</span><span class="btn">Park</span><span class="btn">Archive</span></div>
+   <div class="tx" style="padding:4px 24px">
+    <div class="me">Start the tick loop in the background, and have a subagent count /usr/bin.</div>
+    <div class="tool"><span>▸</span><span class="mono">for i in $(seq 1 300)…</span><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="tool"><span>◎</span><b>Count files</b><span style="margin-left:auto" class="capsule">in the background</span></div>
+    <div class="say">Both are running.</div>
+   </div>
+   <div class="foot" style="padding:8px 24px 14px">
+    <div class="caps"><span class="capsule" style="border-color:#3d5a80;color:#3d5a80">▸ 2 in the background</span><span class="capsule">▣ Screen · 4 min</span></div>
+    <div class="field">Reply…</div>
+   </div>
+  </div>
+  <div class="side" style="width:340px">
+   <div class="panes"><span class="pane">Files</span><span class="pane">Changes</span><span class="pane">Terminal</span><span class="pane">Browser</span><span class="pane">Exchanged</span><span class="pane on">Background</span></div>
+   <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+    <div class="task" style="background:#fff;border:1px solid #3d5a80"><span class="ic">▸</span><span class="nm">Print a tick every second</span><span style="flex:1"></span><span class="age">0:37</span><span class="btn s stop">Stop</span></div>
+    <div class="out">tick 34<br>tick 35<br>tick 36<br>tick 37</div>
+    <div class="task" style="background:#fff;border:1px solid #e3dfd6"><span class="ic">◎</span><span class="nm">Count files</span><span style="flex:1"></span><span class="age">0:12</span></div>
+    <div style="font-size:11px;color:#8a877f;padding:4px 2px">Finished</div>
+    <div class="task done"><span class="ic">▸</span><span class="nm">npm run dev</span><span style="flex:1"></span><span class="age">stopped 09:41</span></div>
+   </div>
+  </div>
+ </div>
+</div>
+</div>
+
+<!-- E — Remote -->
+<div class="frame" id="e"><div class="cap">E · iPhone: one line over the prompt, the list in a sheet</div>
+<div class="sub">Two rows over a phone's prompt would take a fifth of the screen, so the phone gets one line, “▸ 2 in the background”, and a tap opens the list as a sheet with Stop on each shell. A subagent's row opens its steps as they are on the Mac. The iPad is the Mac's layout (frame A or D, whichever is chosen).</div>
+<div class="row2">
+ <div class="phone">
+  <div class="nav"><span style="color:#3d5a80">‹</span><span>Background tasks setup</span><span style="color:#3d5a80">⏹</span></div>
+  <div class="tx">
+   <div class="me">Start the tick loop in the background, and have a subagent count /usr/bin.</div>
+   <div class="tool"><span>▸</span><span class="mono">for i in $(seq 1 300)…</span></div>
+   <div class="tool"><span>◎</span><b>Count files</b></div>
+   <div class="say">Both are running.</div>
+  </div>
+  <div style="flex:1"></div>
+  <div class="foot">
+   <div class="caps"><span class="capsule" style="border-color:#3d5a80;color:#3d5a80">▸ 2 in the background ›</span></div>
+   <div class="field">Reply…</div>
+  </div>
+ </div>
+ <div class="phone" style="position:relative">
+  <div class="nav"><span style="color:#3d5a80">‹</span><span>Background tasks setup</span><span style="color:#3d5a80">⏹</span></div>
+  <div class="dimmer"></div>
+  <div class="sheet">
+   <div class="grab"></div>
+   <div style="font:600 15px -apple-system;padding:4px 0">In the background</div>
+   <div class="task" style="background:#fff;border:1px solid #e3dfd6;flex-wrap:wrap"><span class="ic">▸</span><span class="nm">Print a tick every second</span><span style="flex:1"></span><span class="btn s stop">Stop</span><span class="ds mono" style="flex-basis:100%;padding-left:26px">for i in $(seq 1 300)… · 0:37</span></div>
+   <div class="task" style="background:#fff;border:1px solid #e3dfd6;flex-wrap:wrap"><span class="ic">◎</span><span class="nm">Count files</span><span style="flex:1"></span><span style="color:#8a877f">›</span><span class="ds" style="flex-basis:100%;padding-left:26px">Subagent · 0:12 · stops with the agent</span></div>
+  </div>
+ </div>
+</div>
+</div>
+</body></html>

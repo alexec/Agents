@@ -45,11 +45,12 @@ public enum ToolPolicyCatalog {
             RemovedTool(name: "Monitor", category: .standingArrangements),
             RemovedTool(name: "RemoteTrigger", category: .standingArrangements),
             RemovedTool(name: "PushNotification", category: .escalation),
-            RemovedTool(name: "Agent", category: .agents),
+            // `Agent`, `TaskOutput` and `TaskStop` are Claude's own: subagents, and reading
+            // or stopping what it left running. Given back (Alex, 2026-09-26, 057) now the
+            // app shows them as a list with Stop rather than as prose. What stays gone
+            // addresses other agents as peers, which is the app's job.
             RemovedTool(name: "ListAgents", category: .agents),
             RemovedTool(name: "SendMessage", category: .agents),
-            RemovedTool(name: "TaskOutput", category: .agents),
-            RemovedTool(name: "TaskStop", category: .agents),
             RemovedTool(name: "ReportFindings", category: .artefacts),
             RemovedTool(name: "DesignSync", category: .artefacts),
             RemovedTool(name: "mcp__claude_ai_Claude_Docs", category: .artefacts),
@@ -206,9 +207,10 @@ public enum ToolPolicyCatalog {
     /// away (turning the shell features off empties the shell tools), so `sleep_tool` takes
     /// `clock.sleep`, and `goals`, `memories`, `apps` and `in_app_local_automation` take
     /// Codex's own long-running goals, memory store, ChatGPT connectors and automations.
-    /// The `collaboration.*` tools do not go: `multi_agent` and `multi_agent_v2` off leave
-    /// all six listed, because the model's own catalog entry names its sub-agent tools. So
-    /// they are residue, and the briefing names them, as Cursor's `Task` is named.
+    /// `multi_agent` is left on (Alex, 2026-09-26, 057): Codex's sub-agents are its own,
+    /// and the app shows them as a list rather than refusing them. Off, it never took the
+    /// `collaboration.*` tools away anyway (the model's catalog names them), so they were
+    /// residue that every call was refused for.
     /// `default_mode_request_user_input` is the opposite of the rest: it lets Codex's
     /// question tool, which the adapter raises as a form elicitation, ask outside plan mode.
     ///
@@ -226,14 +228,6 @@ public enum ToolPolicyCatalog {
             KeptTool(name: "request_user_input",
                      because: "It is the escalation path: the adapter raises it as a form elicitation, which the daemon holds and the phone can answer."),
         ],
-        residue: [
-            ResidualTool(name: "spawn_agent", category: .agents),
-            ResidualTool(name: "send_message", category: .agents),
-            ResidualTool(name: "followup_task", category: .agents),
-            ResidualTool(name: "interrupt_agent", category: .agents),
-            ResidualTool(name: "list_agents", category: .agents),
-            ResidualTool(name: "wait_agent", category: .agents),
-        ],
         lever: .environmentJSON(variable: "CODEX_CONFIG", value: .object([
             "features": .object([
                 "sleep_tool": .bool(false),
@@ -241,7 +235,7 @@ public enum ToolPolicyCatalog {
                 "in_app_local_automation": .bool(false),
                 "memories": .bool(false),
                 "apps": .bool(false),
-                "multi_agent": .bool(false),
+                "multi_agent": .bool(true),
                 "default_mode_request_user_input": .bool(true),
             ]),
         ])),

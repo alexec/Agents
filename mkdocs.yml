@@ -64,12 +64,20 @@ nav:
       - how-to/index.md
       - how-to/add-a-project.md
       - how-to/start-in-a-worktree.md
+      - how-to/give-an-agent-more-folders.md
+      - how-to/choose-runtime-model-mode.md
+      - how-to/pick-up-a-conversation.md
       - how-to/answer-a-question.md
+      - how-to/send-while-an-agent-works.md
+      - how-to/watch-background-work.md
+      - how-to/use-a-shell.md
       - how-to/add-a-linux-server.md
       - how-to/set-up-a-workflow.md
       - how-to/watch-a-pull-request.md
       - how-to/sign-a-runtime-in.md
       - how-to/share-skills-across-agents.md
+      - how-to/keep-going-when-a-runtime-runs-out.md
+      - how-to/limit-spending.md
       - how-to/archive-park-stop.md
       - how-to/attach-files.md
       - how-to/read-an-agents-changes.md

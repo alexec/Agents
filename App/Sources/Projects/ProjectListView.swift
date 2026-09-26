@@ -70,6 +70,7 @@ struct ProjectListView: View {
                 EventsRow().tag(SidebarItem.events)
                 ResourcesRow().tag(SidebarItem.resources)
                 SpendingRow(selection: $selection).tag(SidebarItem.spending)
+                PoolSidebarRow().tag(SidebarItem.pool)
             }
         }
         .listStyle(.sidebar)

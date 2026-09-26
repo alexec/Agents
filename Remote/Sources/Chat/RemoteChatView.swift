@@ -12,6 +12,8 @@ struct RemoteChatView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// How much of the foot of the screen the prompt area and any card above it cover.
     @State private var formHeight: CGFloat = 0
+    /// The subagent whose steps are open, by its id (057).
+    @State private var subagentOnScreen: String?
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -70,6 +72,16 @@ struct RemoteChatView: View {
                 if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
+        // Moving this chat by hand, or changing what a switch chose, and the Pool (052).
+        .sheet(item: Binding(get: { model.continuing }, set: { model.continuing = $0 })) { request in
+            ContinueWithList(request: request)
+        }
+        .sheet(isPresented: Binding(get: { model.isShowingPool }, set: { model.isShowingPool = $0 })) {
+            NavigationStack {
+                PoolPageView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { model.isShowingPool = false } } }
+            }
+        }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
                                     set: { if !$0 { model.fileOnScreen = nil } })) {
             // A look-aside, not a level. On the Mac this is a pane beside the
@@ -80,6 +92,21 @@ struct RemoteChatView: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { model.fileOnScreen = nil }
+                            }
+                        }
+                }
+            }
+            .paperSheet()
+        }
+        .sheet(isPresented: Binding(get: { subagentOnScreen != nil },
+                                    set: { if !$0 { subagentOnScreen = nil } })) {
+            NavigationStack {
+                if let id = subagentOnScreen,
+                   let item = agent?.background.first(where: { $0.id == id }) {
+                    SubagentStepsView(item: item, entries: model.entries)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") { subagentOnScreen = nil }
                             }
                         }
                 }
@@ -200,7 +227,16 @@ struct RemoteChatView: View {
                 model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
             },
             terminalOutput: { [model] id in model.terminalOutput(id) },
-            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) })
+            unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            adjustSwitch: { [model] record in
+                model.continuing = RemoteContinue(agentID: record.agentID, runtimeID: record.to.runtimeID, adjust: true)
+            },
+            showPool: { [model] in model.isShowingPool = true },
+            sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
+            canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
+            // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
+            // (057, frame E).
+            subagentSteps: { id in subagentOnScreen = id })
     }
 }
 
@@ -213,6 +249,19 @@ private struct ChatMenu: View {
     var body: some View {
         Menu {
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
+            // Another runtime, by hand, and this chat's own "carry on" switch (052).
+            Menu("Continue with", systemImage: "arrow.triangle.swap") {
+                Toggle("Carry on when \(PoolWords.runtimeName(agent.runtimeID)) runs out",
+                       isOn: Binding(get: { !agent.switchingOff },
+                                     set: { on in Task { await model.setSwitching(agent.id, isOn: on) } }))
+                ForEach((model.poolStatus?.rows ?? []).filter { $0.entry.runtimeID != agent.runtimeID }) { row in
+                    Button(PoolWords.runtimeName(row.entry.runtimeID)) {
+                        model.continuing = RemoteContinue(agentID: agent.id, runtimeID: row.entry.runtimeID,
+                                                          entryID: row.entry.id)
+                    }
+                }
+            }
+            .disabled(model.isStale)
             // Park goes back to the project, as on the Mac: the person is done with it
             // for now (040).
             if let action = agent.parkAction {

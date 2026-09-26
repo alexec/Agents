@@ -129,7 +129,8 @@ extension DaemonCore {
     static func blockedNote(_ block: Block?, names: (Wait) -> String) -> String {
         let block = block ?? Block()
         let named = block.waits.map { "\u{201C}\(names($0))\u{201D}" }
-        var note = "Recorded. The person will see this conversation under \"Blocked\"."
+        let byItself = !named.isEmpty || block.checkAgainAt != nil
+        var note = "Recorded. The person will see this conversation under \"\(byItself ? "Waiting" : "Blocked")\"."
         switch named.count {
         case 0: break
         case 1: note += " You will be resumed when \(named[0]) has finished"

@@ -1,0 +1,69 @@
+{
+  "options": [
+    {
+      "category": "model",
+      "currentValue": "copilot-smart",
+      "id": "model",
+      "name": "Model",
+      "options": [
+        {
+          "name": "copilot-fast",
+          "value": "copilot-fast"
+        },
+        {
+          "name": "copilot-smart",
+          "value": "copilot-smart"
+        }
+      ],
+      "type": "select"
+    },
+    {
+      "category": "mode",
+      "currentValue": "default",
+      "id": "mode",
+      "name": "Mode",
+      "options": [
+        {
+          "name": "default",
+          "value": "default"
+        },
+        {
+          "name": "acceptEdits",
+          "value": "acceptEdits"
+        },
+        {
+          "name": "bypassPermissions",
+          "value": "bypassPermissions"
+        }
+      ],
+      "type": "select"
+    }
+  ],
+  "plan": {
+    "dropped": [],
+    "rows": [
+      {
+        "from": "grok-smart",
+        "name": "Model",
+        "optionID": "model",
+        "source": {
+          "runtimeDefault": {}
+        },
+        "to": "copilot-smart"
+      },
+      {
+        "from": "default",
+        "name": "Mode",
+        "optionID": "mode",
+        "source": {
+          "sameValue": {}
+        },
+        "to": "default"
+      }
+    ],
+    "values": {
+      "mode": "default"
+    }
+  },
+  "runtimeID": "copilot"
+}

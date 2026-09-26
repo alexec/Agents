@@ -141,7 +141,10 @@ struct RuntimeAccountView: View {
 
     private var state: String {
         switch account.state {
-        case .ready: return "Signed in and ready"
+        case .ready:
+            // The runtime's own word for the account, where it says (`_auth/status_update`).
+            guard let signedInAs = account.signedInAs else { return "Signed in and ready" }
+            return "Signed in with \(signedInAs.label), and ready"
         case .needsSignIn: return "Installed, and needs signing in"
         case .unknown: return "Not asked yet"
         }

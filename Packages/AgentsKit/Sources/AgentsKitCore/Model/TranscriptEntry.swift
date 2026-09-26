@@ -19,11 +19,19 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var at: Date
     public var kind: Kind
+    /// The subagent this was said or done by, when it was not the agent itself (057).
+    ///
+    /// A field rather than a kind of its own, so a subagent's edit is still an edit to
+    /// every place that reads edits (Changes, the files it touched). The chat leaves
+    /// these out, and the subagent's own page shows only these. Absent on everything
+    /// written before, which is the agent's.
+    public var subagentID: String?
 
-    public init(id: UUID = UUID(), at: Date = Date(), kind: Kind) {
+    public init(id: UUID = UUID(), at: Date = Date(), kind: Kind, subagentID: String? = nil) {
         self.id = id
         self.at = at
         self.kind = kind
+        self.subagentID = subagentID
     }
 
     public enum Kind: Codable, Hashable, Sendable {
@@ -43,7 +51,9 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case usageRecorded(TurnUsage)
         case servedRequest(ServedRequest)
         case elicitationAsked(ElicitationRequest)
-        case elicitationAnswered(id: UUID, summary: String)
+        /// `answers` is what was said, question by question, when the form was
+        /// answered; empty for a decline, a withdrawal, and every record written before.
+        case elicitationAnswered(id: UUID, summary: String, answers: [ElicitationAnswer] = [])
         case compaction(status: String, summary: [ContentBlock])
         /// The runtime telling the person something beside the reply (ACP `notice`).
         case notice(SessionNotice)
@@ -51,6 +61,11 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         case permissionAnswered(optionID: String, optionName: String?)
         case optionChanged(id: String, value: JSONValue)
         case stateChanged(AgentState, reason: EndedReason?)
+
+        /// Something started running in the background, or stopped running there
+        /// (057). Written when it starts and when it ends, as it stood then; the list
+        /// over the prompt is `Agent.background`, which is always current.
+        case background(BackgroundItem)
 
         /// The agent saying how the work went, at the end of it. Drawn at the foot of
         /// the conversation so the list and the transcript agree about the same turn.
@@ -60,6 +75,17 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// could not give the session back". This is how the record stays honest
         /// across the gaps where there is no agent process at all.
         case runtimeNote(String)
+
+        /// A chat carried on with another runtime (052): drawn as the tinted note, with
+        /// what it carried and what it did not. An older build reads it as unrecognised.
+        case poolSwitch(SwitchRecord)
+
+        /// What the new runtime was handed, built from this record (052, R4). Drawn
+        /// folded under the switch note, never as the person's words.
+        case handoff(markdown: String, characters: Int)
+
+        /// The settings a switch chose, changed afterwards from its note (052, FR-029).
+        case settingsChanged(SwitchRecord)
 
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a

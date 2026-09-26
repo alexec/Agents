@@ -52,7 +52,8 @@ extension TranscriptEntry.Kind {
             return .elicitationAsked(request)
         case "elicitationAnswered":
             guard let id = payload["id"]?.stringValue.flatMap(UUID.init(uuidString:)) else { return nil }
-            return .elicitationAnswered(id: id, summary: payload["summary"]?.stringValue ?? "")
+            return .elicitationAnswered(id: id, summary: payload["summary"]?.stringValue ?? "",
+                                        answers: (try? payload["answers"]?.decode([ElicitationAnswer].self)) ?? [])
         case "compaction":
             return .compaction(status: payload["status"]?.stringValue ?? "",
                                summary: [ContentBlock](wire: payload["summary"]))
@@ -73,6 +74,15 @@ extension TranscriptEntry.Kind {
             return .stateChanged(state, reason: try? payload["reason"]?.decode(EndedReason.self))
         case "runtimeNote":
             return .runtimeNote(payload["_0"]?.stringValue ?? "")
+        case "poolSwitch", "settingsChanged":
+            guard let record = try? payload["_0"]?.decode(SwitchRecord.self) else { return nil }
+            return name == "poolSwitch" ? .poolSwitch(record) : .settingsChanged(record)
+        case "handoff":
+            return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
+                            characters: payload["characters"]?.intValue ?? 0)
+        case "background":
+            guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
+            return .background(item)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -119,8 +129,10 @@ extension TranscriptEntry.Kind {
             return ["servedRequest": ["_0": (try? JSONValue.encoding(request)) ?? .null]]
         case .elicitationAsked(let request):
             return ["elicitationAsked": ["_0": (try? JSONValue.encoding(request)) ?? .null]]
-        case .elicitationAnswered(let id, let summary):
-            return ["elicitationAnswered": ["id": .string(id.uuidString), "summary": .string(summary)]]
+        case .elicitationAnswered(let id, let summary, let answers):
+            var payload: [String: JSONValue] = ["id": .string(id.uuidString), "summary": .string(summary)]
+            if !answers.isEmpty { payload["answers"] = (try? JSONValue.encoding(answers)) ?? .null }
+            return ["elicitationAnswered": .object(payload)]
         case .compaction(let status, let summary):
             return ["compaction": ["status": .string(status), "summary": summary.wire]]
         case .notice(let notice):
@@ -139,8 +151,16 @@ extension TranscriptEntry.Kind {
             return ["stateChanged": .object(payload)]
         case .runtimeNote(let text):
             return ["runtimeNote": ["_0": .string(text)]]
+        case .background(let item):
+            return ["background": ["_0": (try? JSONValue.encoding(item)) ?? .null]]
         case .workReported(let report):
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
+        case .poolSwitch(let record):
+            return ["poolSwitch": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .settingsChanged(let record):
+            return ["settingsChanged": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .handoff(let markdown, let characters):
+            return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.

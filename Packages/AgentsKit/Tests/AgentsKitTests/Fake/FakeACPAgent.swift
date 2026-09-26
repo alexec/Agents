@@ -39,6 +39,18 @@ actor FakeACPAgent {
         var promptError: JSONRPCError?
         /// What the runtime calls the session, sent as a `session_info_update`.
         var title: String?
+        /// `_meta` on the `session/prompt` result: where Claude's and Codex's adapters put
+        /// a typed failure when the client asked for them (052, research R1).
+        var promptResultMeta: JSONValue?
+        /// Sent as a `usage_update` carrying this `_meta` before the turn ends: Claude's
+        /// `_claude/rateLimit` (052, R2).
+        var usageMeta: JSONValue?
+        /// Sent during the turn as a `session_info_update` with no title and this `_meta`:
+        /// a failure not tied to the turn's own answer (052).
+        var sessionInfoMeta: JSONValue?
+        /// Fail this many prompts, with `promptError` or `promptResultMeta`, and then take
+        /// turns normally. Zero means every prompt fails the way the script says.
+        var failTimes = 0
         /// What the runtime says on its way out, sent while answering `session/close`.
         /// Real ones do this — a tool call marked cancelled, a last usage line — and
         /// it is the last thing they ever say, so there is no second chance to hear it.
@@ -64,8 +76,9 @@ actor FakeACPAgent {
         /// uses the file methods and none sends an elicitation form.
         var clientRequests: [(method: String, params: JSONValue)] = []
         /// Notifications under a method of the runtime's own invention, sent during the
-        /// turn. A real one is Cursor's `cursor/update_todos`. Nothing is expected back,
-        /// which is exactly why they used to vanish without trace.
+        /// turn. A real one is `_auth/status_update`. Nothing is expected back, which is
+        /// exactly why they used to vanish without trace. (Cursor's `cursor/*` methods
+        /// look like these and are requests: put those in `clientRequests`.)
         var extensionNotifications: [(method: String, params: JSONValue)] = []
         /// How long the handshake takes. Zero for almost every test; a real duration
         /// for the ones about what the daemon is doing while a runtime is still
@@ -86,6 +99,19 @@ actor FakeACPAgent {
         var sessions: [JSONValue] = []
         /// What `initialize` offers as ways to sign in.
         var authMethods: [JSONValue] = []
+        /// Advertise `_meta.steering.supported`, and answer `_session/steering` with
+        /// this outcome. Nil advertises nothing, and the method is not found.
+        var steering: String?
+
+        // MARK: Background work (057)
+
+        /// Updates about background work, sent during the turn after `updates`, each under
+        /// the session named (nil: the agent's own). Sent only if the client advertised
+        /// what the real adapters wait for: `asyncTasks` for `async_task_*`, and
+        /// `nativeSubagentSessions` for `subagent_*` and anything under a subagent's id.
+        var air: [(session: String?, update: JSONValue)] = []
+        /// What a runtime says instead when the client did not opt in: the prose.
+        var withoutAir: [JSONValue] = []
     }
 
     private var script: Script
@@ -101,12 +127,23 @@ actor FakeACPAgent {
     /// what we served rather than only on what we were asked.
     private(set) var clientAnswers: [(method: String, result: Result<JSONValue, JSONRPCError>)] = []
     private(set) var promptContent: JSONValue?
+    /// Every prompt's content, in the order they came, so a test can see what was sent
+    /// and how many times (052: a failed prompt is sent to the next runtime once).
+    private(set) var prompts: [JSONValue] = []
+    private var promptsFailed = 0
     private(set) var deletedSessions: [String] = []
     private(set) var disabledProviders: [String] = []
+    /// Every `_session/steering` request, as it arrived.
+    private(set) var steers: [JSONValue] = []
     /// What `session/new` was asked for, so a test can see what we attached to a
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
     private(set) var continuedSessionParams: JSONValue?
+    /// What the client said it could do at the handshake.
+    private(set) var clientCapabilities: JSONValue?
+    /// Tasks announced and not yet ended, which is what Stop can reach.
+    private var runningTasks: [String: String] = [:]
+    private(set) var stopRequests: [JSONValue] = []
 
     init(script: Script = Script(), transport: any LineTransport) {
         self.script = script
@@ -126,6 +163,7 @@ actor FakeACPAgent {
         received.append(method)
         switch method {
         case ACP.Method.initialize:
+            clientCapabilities = params?["clientCapabilities"]
             if script.handshakeDelay > .zero { try? await Task.sleep(for: script.handshakeDelay) }
             var sessionCapabilities = script.sessionCapabilities
             if script.supportsResume { sessionCapabilities["resume"] = [:] }
@@ -134,12 +172,18 @@ actor FakeACPAgent {
             // What every runtime the app starts says, unless a test says otherwise.
             if capabilities["mcpCapabilities"] == nil { capabilities["mcpCapabilities"] = ["http": true, "sse": true] }
             capabilities["sessionCapabilities"] = .object(sessionCapabilities)
-            return .success([
+            var result: [String: JSONValue] = [
                 "protocolVersion": .int(script.protocolVersion),
                 "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
                 "authMethods": .array(script.authMethods),
-            ])
+            ]
+            if script.steering != nil { result["_meta"] = ["steering": ["supported": true]] }
+            return .success(.object(result))
+
+        case ACP.Method.steering where script.steering != nil:
+            steers.append(params ?? .null)
+            return .success(["outcome": .string(script.steering ?? "")])
 
         case ACP.Method.newSession:
             newSessionParams = params
@@ -204,8 +248,13 @@ actor FakeACPAgent {
 
         case ACP.Method.prompt:
             promptContent = params?["prompt"]
-            if let error = script.promptError { return .failure(error) }
-            return await runTurn()
+            prompts.append(params?["prompt"] ?? .null)
+            // Failing a set number of times, then working: the retry and the "succeeds on
+            // the next runtime" cases (052). Without a count, the script fails every time.
+            let failing = script.failTimes == 0 || promptsFailed < script.failTimes
+            if failing, script.promptError != nil || script.promptResultMeta != nil { promptsFailed += 1 }
+            if failing, let error = script.promptError { return .failure(error) }
+            return await runTurn(failing: failing)
 
         case ACP.Method.authenticate, ACP.Method.logout:
             return .success([:])
@@ -214,12 +263,28 @@ actor FakeACPAgent {
             for update in script.updatesOnClose { await send(update: update) }
             return .success([:])
 
+        case ACP.Method.stopAsyncTask where advertised("asyncTasks"):
+            stopRequests.append(params ?? .null)
+            guard let id = params?["asyncTaskId"]?.stringValue,
+                  let name = runningTasks.removeValue(forKey: id) else {
+                return .success(["stopped": false])
+            }
+            // As Claude's adapter 0.81.2 does it, captured: the ending twice, then the
+            // notice, then the answer.
+            let ending: JSONValue = ["sessionUpdate": "async_task_state_update",
+                                     "asyncTaskId": .string(id), "state": "stopped"]
+            await send(update: ending)
+            await send(update: ending)
+            await send(update: ["sessionUpdate": "notice", "severity": "info",
+                                "title": "Task stopped by user", "description": .string("\(name).")])
+            return .success(["stopped": true])
+
         default:
             return .failure(.methodNotFound(method))
         }
     }
 
-    private func runTurn() async -> Result<JSONValue, JSONRPCError> {
+    private func runTurn(failing: Bool = true) async -> Result<JSONValue, JSONRPCError> {
         if script.turnDelay > .zero { try? await Task.sleep(for: script.turnDelay) }
         if let title = script.title {
             await send(update: ["sessionUpdate": "session_info_update", "title": .string(title)])
@@ -228,6 +293,21 @@ actor FakeACPAgent {
         if !script.updatesOnFirstTurnOnly || turnsTaken == 1 {
             for update in script.updates { await send(update: update) }
         }
+        let airOn = advertised("asyncTasks"), subagentsOn = advertised("nativeSubagentSessions")
+        for (session, update) in script.air {
+            let kind = update["sessionUpdate"]?.stringValue ?? ""
+            let needs = kind.hasPrefix("async_task_") && session == nil ? airOn : subagentsOn
+            guard needs else { continue }
+            if kind == "async_task_spawned", let id = update["asyncTaskId"]?.stringValue {
+                runningTasks[id] = update["name"]?.stringValue ?? id
+            }
+            if kind == "async_task_state_update", let id = update["asyncTaskId"]?.stringValue,
+               update["state"]?.stringValue != "running" {
+                runningTasks[id] = nil
+            }
+            await send(update: update, as: session)
+        }
+        if !airOn { for update in script.withoutAir { await send(update: update) } }
         for notification in script.extensionNotifications {
             try? connection.notify(notification.method, notification.params)
         }
@@ -251,15 +331,35 @@ actor FakeACPAgent {
         }
         // Held after everything the turn does and before it ends: a test sees the turn
         // at work, and it ends when the test says.
+        if let meta = script.usageMeta {
+            await send(update: ["sessionUpdate": "usage_update", "used": 1000, "size": 200000, "_meta": meta])
+        }
+        if failing, let meta = script.sessionInfoMeta {
+            await send(update: ["sessionUpdate": "session_info_update", "_meta": meta])
+        }
         if let gate = script.gate { await gate.pass() }
         var result: [String: JSONValue] = ["stopReason": .string(script.stopReason)]
         if let usage = script.usage { result["usage"] = usage }
+        if failing, let meta = script.promptResultMeta { result["_meta"] = meta }
         return .success(.object(result))
     }
 
-    private func send(update: JSONValue) async {
+    private func send(update: JSONValue, as session: String? = nil) async {
         try? connection.notify(ACP.ClientMethod.sessionUpdate,
-                                     ["sessionId": .string(sessionID), "update": update])
+                                     ["sessionId": .string(session ?? sessionID), "update": update])
+    }
+
+    /// Whether the client listed this JetBrains "AIR" capability, read the way both
+    /// adapters read it: version at least 1 and the name in the list.
+    private func advertised(_ capability: String) -> Bool {
+        let air = clientCapabilities?["_meta"]?["jetbrains"]?["air"]
+        guard (air?["version"]?.intValue ?? 0) >= 1 else { return false }
+        return (air?["capabilities"]?.arrayValue ?? []).contains(.string(capability))
+    }
+
+    /// Send an update under a subagent's session, outside a turn.
+    func emit(_ update: JSONValue, as session: String) async {
+        await send(update: update, as: session)
     }
 
     /// Send a notification under any method at all, the way a runtime speaking its own
@@ -281,6 +381,23 @@ actor FakeACPAgent {
     /// What the client answered one method with, for a test that cares.
     func answer(to method: String) -> Result<JSONValue, JSONRPCError>? {
         clientAnswers.first { $0.method == method }?.result
+    }
+
+    /// Every answer to one method, in order, for a test that sends it more than once.
+    func answers(to method: String) -> [Result<JSONValue, JSONRPCError>] {
+        clientAnswers.filter { $0.method == method }.map(\.result)
+    }
+
+    /// Make a request of the client outside a turn and say what came back, the way a
+    /// runtime calling a method of its own invention does.
+    func emitRequest(_ method: String, _ params: JSONValue = [:]) async -> Result<JSONValue, JSONRPCError> {
+        do {
+            return .success(try await connection.call(method, params))
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(.internalError("\(error)"))
+        }
     }
 
     static func chunk(_ text: String, messageID: String? = nil) -> JSONValue {

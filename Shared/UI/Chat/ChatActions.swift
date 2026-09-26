@@ -15,12 +15,27 @@ struct ChatActions {
     var open: @MainActor (ToolCallLocation) -> Void = { _ in }
     var terminalOutput: @MainActor (String) -> String = { _ in "" }
     var unqueue: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
+    /// Open the sheet that changes what a switch carried on with (052, FR-029).
+    var adjustSwitch: @MainActor (SwitchRecord) -> Void = { _ in }
+    /// Go to the Pool page (052).
+    var showPool: @MainActor () -> Void = {}
+    /// Send a queued prompt into the running turn, and whether this runtime can take one
+    /// there at all: what it advertised, by runtime id.
+    var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
+    var canSendNow: @MainActor (String?) -> Bool = { _ in false }
     /// Show an edit among the rest of what the agent changed (035): the Mac's Changes
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.
     var showEdit: (@MainActor (ToolCallContent.Diff, String?) -> Void)? = nil
+    /// Open a subagent's own steps, by its id (057): the Mac's Background pane, the
+    /// phone's sheet. Nil offers nothing.
+    var subagentSteps: (@MainActor (String) -> Void)? = nil
+    /// Open what a background task printed, from its output file (057).
+    var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
 }
 
 extension EnvironmentValues {
     @Entry var chatActions = ChatActions()
+    /// The open agent's background work (057), for a tool call to say it runs on.
+    @Entry var backgroundWork: [BackgroundItem] = []
 }

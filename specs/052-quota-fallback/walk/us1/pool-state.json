@@ -1,0 +1,110 @@
+{
+  "at": 812130470.188938,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "CB5284CC-301C-4567-9198-49EE75BEC8A0",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      "state": {
+        "credentialKey": "grok:sign-in",
+        "entryID": "CB5284CC-301C-4567-9198-49EE75BEC8A0",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812130462.016378,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812134062.016378,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    },
+    {
+      "chats": 1,
+      "entry": {
+        "id": "DC21979C-D608-49B7-B017-1DA7B370D845",
+        "payment": {
+          "allowance": {
+            "label": "Copilot Pro"
+          }
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "DC21979C-D608-49B7-B017-1DA7B370D845",
+        "learnedFrom": "person",
+        "rateLimitStreak": [],
+        "since": 812130470.188938,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "available": {}
+        }
+      }
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "CB5284CC-301C-4567-9198-49EE75BEC8A0",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      {
+        "id": "DC21979C-D608-49B7-B017-1DA7B370D845",
+        "payment": {
+          "allowance": {
+            "label": "Copilot Pro"
+          }
+        },
+        "runtimeID": "copilot"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "switches": [
+    {
+      "agentID": "D275CB1D-3F4E-4AF9-B487-807E110BF759",
+      "at": 812130462.105,
+      "billing": {
+        "allowance": {
+          "label": "Copilot Pro"
+        }
+      },
+      "carried": [],
+      "dropped": [],
+      "from": {
+        "runtimeID": "grok"
+      },
+      "fromReturnsAt": 812134062.016,
+      "id": "D1F3C1F8-7D3D-4C8E-833D-DF598DF9FA72",
+      "reason": "allowanceSpent",
+      "to": {
+        "entryID": "DC21979C-D608-49B7-B017-1DA7B370D845",
+        "runtimeID": "copilot"
+      }
+    }
+  ],
+  "titles": [
+    "D275CB1D-3F4E-4AF9-B487-807E110BF759",
+    "Plan the login redirect fix."
+  ],
+  "waiting": []
+}

@@ -6,10 +6,18 @@ public enum ACPSessionEvent: Sendable {
     case optionsChanged([ConfigOption])
     case commandsChanged([SlashCommand])
     case titleChanged(String)
+    /// A typed failure that arrived while no turn was running, so there is no turn's
+    /// answer to carry it (052). One arriving during a turn rides on `TurnResult.failure`.
+    case sessionFailure(SessionFailure)
     /// How full the context is, sent several times a turn.
     case usageChanged(Usage)
     case planChanged(Plan)
     case planRemoved(String)
+    /// Something the agent said or did from inside one of its subagents (057): the
+    /// subagent's id, and the entry. Kept apart from `.entry` so the chat is the agent's.
+    case subagentEntry(String, TranscriptEntry.Kind)
+    /// A shell or subagent started, moved on or ended in the background (057).
+    case background(BackgroundUpdate)
     /// The agent is blocked until `answerPermission` is called with one of the options.
     case permissionRequested(PermissionRequest)
     /// The agent is blocked until `answerElicitation` is called. A permission question
@@ -27,6 +35,10 @@ public enum ACPSessionEvent: Sendable {
     /// extension of its own. Nothing to act on, but reported for the same reason as
     /// `unknownUpdate`: an agent is never quietly poorer for what it was sent.
     case unknownNotification(String)
+    /// A request whose method we do not recognise, declined with `-32601`. Said out
+    /// loud for the same reason: a runtime falls back quietly, and the next vendor
+    /// method is otherwise invisible.
+    case unknownRequest(String)
 }
 
 /// How a turn came to an end, including the case where a runtime invents a stop reason.
@@ -39,13 +51,24 @@ public struct TurnResult: Sendable {
     /// The turn's own words said it failed, for a runtime that says so in words and then
     /// ends the turn normally (049). Nil for every other turn.
     public var runtimeError: RuntimeLaunch.TurnError?
+    /// A failure the runtime reported in a shape (052, R1): from the answer's `_meta`, or
+    /// from a `session_info_update` that came during the turn. An error-severity one
+    /// means the turn did not do its work, whatever `reason` says.
+    public var failure: SessionFailure?
+    /// The latest plan window the runtime reported during the turn (052, R2). Carried on
+    /// the result because the update that brought it and the turn's answer arrive by two
+    /// different roads, and the answer can get there first.
+    public var rateLimit: RateLimitInfo?
 
     public init(reason: EndedReason?, rawStopReason: String?, usage: TurnUsage? = nil,
-                runtimeError: RuntimeLaunch.TurnError? = nil) {
+                runtimeError: RuntimeLaunch.TurnError? = nil, failure: SessionFailure? = nil,
+                rateLimit: RateLimitInfo? = nil) {
+        self.rateLimit = rateLimit
         self.reason = reason
         self.rawStopReason = rawStopReason
         self.usage = usage
         self.runtimeError = runtimeError
+        self.failure = failure
     }
 }
 
@@ -86,6 +109,19 @@ public actor ACPSession {
     public private(set) var options: [ConfigOption] = []
     public private(set) var commands: [SlashCommand] = []
     public private(set) var initializeResult: ACP.InitializeResult?
+    /// The last account the runtime said it was using, for a runtime that says.
+    public private(set) var authStatus: AuthStatus?
+    /// Cursor's todo list as it stands, so a merging update has something to merge into.
+    private var todos = TodoList()
+    /// Who hears `authStatus` change. A handler rather than an event, because a session
+    /// only asked a question has no listener, and the account is still worth hearing.
+    private var authStatusHandler: (@Sendable (AuthStatus) async -> Void)?
+
+    /// Be told whenever the runtime says which account it is using. Set before
+    /// `initialize`: the first push follows the handshake.
+    public func whenAuthStatusChanges(_ handler: @escaping @Sendable (AuthStatus) async -> Void) {
+        authStatusHandler = handler
+    }
 
     /// True while a `session/load` replay is arriving. The replayed conversation is
     /// confirmation, not content: we already have the transcript, and recording it
@@ -96,8 +132,37 @@ public actor ACPSession {
     /// The agent's words in the turn under way, only while `launch` has a
     /// `turnErrorPrefix` to look for in them, and only the start of them.
     private var turnText = ""
+    /// Whether a `session/prompt` is out, so a failure reported alongside it belongs to
+    /// the turn rather than to the session at large (052).
+    private var turnInFlight = false
+    private var turnFailure: SessionFailure?
+    private var turnRateLimit: RateLimitInfo?
 
     private var isReplaying = false
+
+    /// The subagents the runtime has announced, by the session id their updates come
+    /// under, with their names for the questions they ask (057).
+    private var subagents: [String: String] = [:]
+
+    /// Whose update this is: nil for the agent's own, or the subagent's id.
+    ///
+    /// Only a subagent the runtime announced. Any other session id is taken as the
+    /// agent's, exactly as before 057: a runtime picking a conversation back up may say
+    /// it under an id that is not the one we asked for, and none of that is a subagent.
+    /// Both runtimes that send subagents announce one before anything it says (Claude
+    /// holds a child's updates until then; Codex replays them after).
+    private func owner(of params: JSONValue?) -> String? {
+        guard let from = params?["sessionId"]?.stringValue, from != sessionID,
+              subagents[from] != nil else { return nil }
+        return from
+    }
+
+    /// The session a request or update came under, when it is not the agent's own.
+    private func foreignSession(of params: JSONValue?) -> String? {
+        guard let from = params?["sessionId"]?.stringValue, let sessionID, from != sessionID
+        else { return nil }
+        return from
+    }
 
     /// Except when the conversation is one we never had. Adopting a session from the
     /// runtime's own list is the one case where the replay is the transcript.
@@ -409,13 +474,23 @@ public actor ACPSession {
             "prompt": blocks.wire,
         ]
         turnText = ""
+        turnFailure = nil
+        turnRateLimit = nil
+        turnInFlight = true
+        defer { turnInFlight = false }
         let result = try await connection.call(ACP.Method.prompt, params)
         let decoded = try? result.decode(ACP.PromptResult.self)
         let raw = decoded?.stopReason
+        var failure = turnFailure
+        if let answered = SessionFailure.from(meta: result["_meta"]) {
+            failure = failure?.superseded(by: answered) ?? answered
+        }
         return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
                           rawStopReason: raw,
                           usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]),
-                          runtimeError: launch?.turnError(in: turnText))
+                          runtimeError: launch?.turnError(in: turnText),
+                          failure: failure,
+                          rateLimit: turnRateLimit)
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -437,8 +512,38 @@ public actor ACPSession {
         return TurnUsage(totalTokens: input + output, inputTokens: input, outputTokens: output)
     }
 
+    /// Stop one thing running in the background, leaving the turn and everything else
+    /// alone (057). True when the runtime stopped it; false when it had already gone,
+    /// which the runtime says rather than failing.
+    public func stopBackgroundTask(_ id: String) async throws -> Bool {
+        guard let sessionID else { throw ACPSessionError.noSession }
+        guard capabilities.backgroundTasks else { throw ACPSessionError.notSupported(ACP.Method.stopAsyncTask) }
+        let result = try await connection.call(ACP.Method.stopAsyncTask,
+                                               ["sessionId": .string(sessionID), "asyncTaskId": .string(id)])
+        return result["stopped"]?.boolValue ?? false
+    }
+
     /// A notification: the turn's own reply comes back as `cancelled` once the runtime
     /// has stopped what it was doing.
+    /// Put words into the turn that is running (`_session/steering`).
+    ///
+    /// Always with `idleBehavior: promptRequired`: if no turn is running the words
+    /// stay ours, and go as an ordinary `session/prompt` whose turn the daemon owns.
+    /// An outcome that cannot be read is `failed`, so the caller keeps the words.
+    public func steer(_ blocks: [ContentBlock]) async throws -> ACP.SteeringOutcome {
+        guard initializeResult?.supportsSteering ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.steering)
+        }
+        guard let sessionID else { throw ACPSessionError.noSession }
+        let params: JSONValue = [
+            "sessionId": .string(sessionID),
+            "prompt": blocks.wire,
+            "_meta": ["steering": ["idleBehavior": "promptRequired"]],
+        ]
+        let result = try await connection.call(ACP.Method.steering, params)
+        return (try? result.decode(ACP.SteeringResult.self))?.outcome ?? .failed
+    }
+
     public func cancel() async {
         guard let sessionID else { return }
         try? connection.notify(ACP.Method.cancel, ["sessionId": .string(sessionID)])
@@ -587,6 +692,33 @@ public actor ACPSession {
 
     // MARK: Incoming
 
+    /// The command lines of calls asked to run in the background, by the call's id and
+    /// by its description, until the task they start is announced. Only the last few:
+    /// a task is announced straight after the call that started it.
+    private var backgroundCommands: [(keys: Set<String>, command: String)] = []
+
+    /// A tool call that says `run_in_background` and carries a `command` is a shell
+    /// about to be announced without one. Keyed on those two fields, not on a runtime.
+    private func noteBackgroundCommand(in update: JSONValue) {
+        guard let input = update["rawInput"], input["run_in_background"]?.boolValue == true,
+              let command = input["command"]?.stringValue, !command.isEmpty else { return }
+        var keys: Set<String> = []
+        if let id = update["toolCallId"]?.stringValue { keys.insert(id) }
+        if let description = input["description"]?.stringValue { keys.insert(description) }
+        guard !keys.isEmpty else { return }
+        backgroundCommands.removeAll { !$0.keys.isDisjoint(with: keys) }
+        backgroundCommands.append((keys, command))
+        if backgroundCommands.count > 8 { backgroundCommands.removeFirst() }
+    }
+
+    private func backgroundCommand(for item: BackgroundItem) -> String? {
+        let wanted = Set([item.toolCallID, item.detail, item.name].compactMap { $0 })
+        guard let index = backgroundCommands.lastIndex(where: { !$0.keys.isDisjoint(with: wanted) }) else {
+            return nil
+        }
+        return backgroundCommands.remove(at: index).command
+    }
+
     private func startListening() {
         guard notificationTask == nil else { return }
         notificationTask = Task { [weak self] in
@@ -599,7 +731,7 @@ public actor ACPSession {
         }
     }
 
-    private func receive(_ method: String, _ params: JSONValue?) {
+    private func receive(_ method: String, _ params: JSONValue?) async {
         if method == JSONRPCConnection.markerMethod {
             // Our own marker, back out of the stream behind everything that was in it
             // when we put it there. All of that has now been through here.
@@ -617,10 +749,17 @@ public actor ACPSession {
             }
             return
         }
+        if method == ACP.ExtensionMethod.authStatusUpdate, initializeResult?.pushesAuthStatus == true {
+            if let status = AuthStatus(wire: params), status != authStatus {
+                authStatus = status
+                await authStatusHandler?(status)
+            }
+            return
+        }
         // A notification is a method we know or a method we do not, and until now the
-        // second kind left no trace at all. Cursor sends `cursor/update_todos` and two
-        // others; something else will send something else next year. Nothing to act on,
-        // but it is said out loud, the way an unrecognised update kind already is.
+        // second kind left no trace at all. Something will send something new next
+        // year. Nothing to act on, but it is said out loud, the way an unrecognised
+        // update kind already is.
         guard method == ACP.ClientMethod.sessionUpdate else {
             eventsContinuation.yield(.unknownNotification(method))
             return
@@ -629,7 +768,31 @@ public actor ACPSession {
             eventsContinuation.yield(.unknownNotification("\(method) with no update"))
             return
         }
-        switch SessionUpdate.decode(update) {
+        let decoded = SessionUpdate.decode(update)
+        noteBackgroundCommand(in: update)
+        if case .background(var background) = decoded {
+            guard !isReplaying || recordsReplay else { return }
+            if case .spawned(var item) = background {
+                item.parentID = owner(of: params)
+                if item.kind == .task, item.command == nil {
+                    item.command = backgroundCommand(for: item)
+                }
+                if item.kind == .subagent { subagents[item.id] = item.name }
+                background = .spawned(item)
+            }
+            eventsContinuation.yield(.background(background))
+            return
+        }
+        if let subagent = owner(of: params) {
+            // A subagent's words and work are its own; its context meter, its plan and
+            // its title are not the agent's, and are not taken as though they were.
+            guard case .entry(let kind) = decoded, !isReplaying || recordsReplay else { return }
+            eventsContinuation.yield(.subagentEntry(subagent, kind))
+            return
+        }
+        switch decoded {
+        case .background:
+            break
         case .entry(let kind):
             guard !isReplaying || recordsReplay else { return }
             if !isReplaying, launch?.turnErrorPrefix != nil, turnText.count < 4096,
@@ -646,6 +809,7 @@ public actor ACPSession {
         case .modeChanged(let mode):
             eventsContinuation.yield(.entry(.optionChanged(id: "mode", value: .string(mode))))
         case .usage(let usage):
+            if turnInFlight, let window = usage.rateLimit { turnRateLimit = window }
             eventsContinuation.yield(.usageChanged(usage))
         case .plan(let plan):
             guard !isReplaying else { return }
@@ -654,6 +818,14 @@ public actor ACPSession {
             eventsContinuation.yield(.planRemoved(id))
         case .title(let title):
             eventsContinuation.yield(.titleChanged(title))
+        case .failure(let failure, let title):
+            if let title { eventsContinuation.yield(.titleChanged(title)) }
+            guard !isReplaying else { return }
+            if turnInFlight {
+                turnFailure = turnFailure?.superseded(by: failure) ?? failure
+            } else {
+                eventsContinuation.yield(.sessionFailure(failure))
+            }
         case .ignored:
             break
         case .unknown(let kind):
@@ -683,9 +855,39 @@ public actor ACPSession {
             return await serveTerminal(method: method, params: params, service: terminalService)
         case ACP.ClientMethod.createElicitation where capabilities.elicitationForm || capabilities.elicitationURL:
             return await askElicitation(params)
+        case ACP.ExtensionMethod.updateTodos where capabilities.plan:
+            return takeTodos(params)
+        case ACP.ExtensionMethod.askQuestion where capabilities.elicitationForm:
+            return await askQuestions(params)
         default:
+            eventsContinuation.yield(.unknownRequest(method))
             return .failure(.methodNotFound(method))
         }
+    }
+
+    /// Cursor's todo list, as the session's plan. Answered with `{}` whatever it held:
+    /// Cursor does not wait for or read the answer, only for an error to log.
+    private func takeTodos(_ params: JSONValue?) -> Result<JSONValue, JSONRPCError> {
+        guard todos.apply(params) else { return .success(.object([:])) }
+        // Kept through a replay but not said: the plan the daemon holds already says
+        // what the replay would, which is why a replayed `plan` update is not said either.
+        if !isReplaying { eventsContinuation.yield(.planChanged(todos.plan)) }
+        return .success(.object([:]))
+    }
+
+    /// Cursor's questions, on the same card as a form elicitation, answered in Cursor's
+    /// own shape. A set we cannot draw is refused, so Cursor falls back to its own
+    /// permission prompts as it did before.
+    private func askQuestions(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
+        guard let request = CursorQuestion.request(from: params, agentID: UUID()) else {
+            eventsContinuation.yield(.unknownRequest(ACP.ExtensionMethod.askQuestion))
+            return .failure(.methodNotFound(ACP.ExtensionMethod.askQuestion))
+        }
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<ElicitationOutcome, Never>) in
+            pendingElicitations[request.id] = continuation
+            eventsContinuation.yield(.elicitationRequested(request))
+        }
+        return .success(CursorQuestion.reply(to: outcome))
     }
 
     // MARK: Serving what an agent asks of us
@@ -805,7 +1007,14 @@ public actor ACPSession {
     }
 
     private func askPermission(_ params: JSONValue?) async -> Result<JSONValue, JSONRPCError> {
-        let request = permissionRequest(from: params)
+        var request = permissionRequest(from: params)
+        if let foreign = foreignSession(of: params) {
+            // A request is served as it arrives and a notification is not, so the
+            // subagent's announcement can still be queued behind this. Everything the
+            // runtime said before asking is let through first, which is how it is named.
+            if subagents[foreign] == nil { await waitForReplayToDrain() }
+            request.subagent = subagents[foreign]
+        }
         let chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
             pendingPermissions[request.id] = continuation
             eventsContinuation.yield(.permissionRequested(request))

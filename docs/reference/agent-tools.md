@@ -7,23 +7,24 @@ description: Every tool the app gives an agent, what it does, and whether you ar
 # Tools the app gives agents
 
 The app gives every agent it starts a set of tools of its own, alongside the runtime's
-tools. This page lists them all, in the order an agent sees them. Copilot conversations
-get none of them (see [Runtimes](runtimes.md)).
+tools, on every runtime (see [Runtimes](runtimes.md)). This page lists them all, in the
+order an agent sees them. Copilot takes them over a local http address the app serves
+only to that agent, and uses its own follow-up suggestions instead of the app's.
 
 The last column says whether you are asked before the tool runs. Where it says the app
 answers, the runtime's permission question is answered by the app and you do not see it.
 Where it says the runtime decides, you get the same permission card as for any other tool
-if the runtime asks; Claude and Cursor ask.
+if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool call.
 
 | Tool | What it does | Asks the person first? |
 | --- | --- | --- |
-| `finish_turn` | Ends the agent's turn and says how it went: **Complete**, **Nothing to do**, **Waiting on your answer**, **Partly done**, **Stuck** or **Blocked**, with a one- or two-sentence message that shows under the agent's name. It can also name the conversation, and offer the one thing you are most likely to say next, which waits in your prompt. For **Blocked**, it names the agents it is waiting on, or how many minutes until it checks again, and the agent carries on by itself when the wait is over. An agent that has finished and cleaned up can ask to be **parked** (with **Complete**, **Nothing to do** or **Partly done**) or **archived** (with **Complete** or **Nothing to do**) once the turn ends. The ask is dropped if you send it something first. | No. The app answers. |
+| `finish_turn` | Ends the agent's turn and says how it went: **Complete**, **Nothing to do**, **Waiting on your answer**, **Partly done**, **Stuck** or **Blocked**, with a one- or two-sentence message that shows under the agent's name. It can also name the conversation, and offer the one thing you are most likely to say next, which waits in your prompt. For **Blocked**, it names the agents it is waiting on, or how many minutes until it checks again, and the agent sits under **Waiting** and carries on by itself when the wait is over. A block that names neither sits under **Blocked** until you carry it on. An agent that has finished and cleaned up can ask to be **parked** (with **Complete**, **Nothing to do** or **Partly done**) or **archived** (with **Complete** or **Nothing to do**) once the turn ends. The ask is dropped if you send it something first. | No. The app answers. |
 | `show_file` | Opens a file in the files pane beside the conversation, at a line. A Markdown file opens as a page that follows the agent's edits. The file must be inside the folders the agent was given. If you are reading another conversation, it waits until you open this one. | No. The app answers. |
 | `manage_workflows` | Lists, reads, writes and removes this project's workflows. A workflow an agent writes or changes appears on the project page straight away, waiting for your OK: it does not run until you click **Approve**, and you can archive it instead. See [Workflow triggers and actions](workflows.md). | No. The app answers. |
-| `start_agent` | Starts another agent in this project with a prompt of its own, marked as started by this agent. It can choose the runtime, model, a permission mode no looser than its own, and whether to work in the project folder, a new worktree, an existing worktree or a branch. At most three agents started by agents can exist in a project at once, until one is archived. | The runtime decides. |
+| `start_agent` | Starts another agent in this project with a prompt of its own, marked as started by this agent. It can choose the runtime, model, a permission mode no looser than its own, and whether to work in the project folder, a new worktree, an existing worktree or a branch. At most five agents started by agents can exist in a project at once, until one is archived. | The runtime decides. |
 | `stop_agent` | Stops an agent this agent started, as your **Stop** would. | The runtime decides. |
 | `archive_agent` | Archives an agent this agent started, stopping it first, which frees its place. | The runtime decides. |
-| `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the three places are in use. | The runtime decides. |
+| `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the five places are in use. | The runtime decides. |
 | `lease_resource` | Takes a turn with something only one agent should use at a time: a simulator, a browser, the screen, or anything it names. Waits up to 45 seconds if someone else holds it, then keeps the agent's place in line. A lease lasts 30 minutes unless the agent asks for up to 240, and calling it again extends it. | The runtime decides. |
 | `release_resource` | Gives back a lease, or leaves the line for one. | The runtime decides. |
 | `list_resources` | Lists what can be leased on this Mac, and who holds or is waiting for what. | The runtime decides. |

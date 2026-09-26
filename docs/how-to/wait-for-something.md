@@ -13,8 +13,8 @@ a pull request's checks and then carry on.
 
 ## Before you start
 
-- An agent on Claude, Grok or Cursor. Copilot conversations do not get the app's tools,
-  so a Copilot agent cannot wait. See [Runtimes](../reference/runtimes.md).
+- An agent on any runtime. Every runtime gets the app's `wait_for_event` tool; see
+  [Runtimes](../reference/runtimes.md).
 - For waiting on a pull request: a project on GitHub, set up as in
   [Have an agent watch a pull request](watch-a-pull-request.md).
 - The names of everything an agent can wait for are on [Events](../reference/events.md).
@@ -32,11 +32,11 @@ a pull request's checks and then carry on.
    `pull_request.checks_passed` with `number: 41`, and sets a time limit if you gave one.
 
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
-   ask.
+   ask, and Copilot always does.
 
 3. Check that it is waiting. Above the prompt, the chat shows a capsule such as
    **◷ Waiting for pull_request.checks_passed #41 · since 14:02 · until 18:00**. On the
-   project page, the agent is under **Blocked** with the same line under its report.
+   project page, the agent is under **Waiting** with the same line under its report.
 
 4. Leave it. When the checks pass, the agent is started again with a message saying what
    happened and when, and it carries on with the release notes. If the time limit passes
@@ -84,5 +84,5 @@ The publishing agent is told who it woke. A workflow can start on the same event
 ## See also
 
 - [Events](../reference/events.md), for every name and its details
-- [Statuses and groups](../reference/statuses.md), for **Blocked**
+- [Statuses and groups](../reference/statuses.md), for **Waiting** and **Blocked**
 - [Set up a workflow](set-up-a-workflow.md), to start a new agent when something happens

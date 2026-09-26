@@ -210,7 +210,7 @@ extension DaemonCore {
         if CredentialKind.variables(for: runtimeID).contains(where: { !(own[$0] ?? "").isEmpty }) { return [:] }
         let name = RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID
         throw JSONRPCError(code: DaemonAPI.Failure.credentialWanted,
-                           message: "\(name) needs an API key. Add one in Settings ▸ Agents.",
+                           message: "\(name) needs an API key. Add one in Settings ▸ Agent Runtimes.",
                            data: (try? JSONValue.encoding(DaemonAPI.CredentialWanted(runtime: runtimeID, offered: false))) ?? nil)
     }
 

@@ -20,6 +20,10 @@ public enum RemoteLink: Sendable, Hashable {
 /// ordinary lost-touch path reconnects, and this time the direct link wins. So coming
 /// home needs no state machine of its own — it is a reconnect, the same one a Mac
 /// restart causes.
+///
+/// Neither leg is waited on for longer than `patience`. A CloudKit call on a poor
+/// network does not fail, it waits, and the model runs one attempt at a time: a leg
+/// that never came back held every later reconnect behind it until the app was killed.
 public final class LinkChooser: DaemonLink, @unchecked Sendable {
     public typealias MakeTransport = @Sendable () async throws -> any LineTransport
 
@@ -28,6 +32,7 @@ public final class LinkChooser: DaemonLink, @unchecked Sendable {
     private let probe: MakeTransport
     private let window: Duration
     private let probeEvery: Duration
+    private let patience: Duration
 
     private let lock = NSLock()
     private var current: RemoteLink = .none
@@ -37,12 +42,14 @@ public final class LinkChooser: DaemonLink, @unchecked Sendable {
     /// `direct` and `probe` are usually the same Bonjour link with different patience;
     /// `relay` makes a session and returns once the Mac has answered it.
     public init(direct: @escaping MakeTransport, relay: @escaping MakeTransport,
-                probe: MakeTransport? = nil, window: Duration = .seconds(2), probeEvery: Duration = .seconds(5)) {
+                probe: MakeTransport? = nil, window: Duration = .seconds(2), probeEvery: Duration = .seconds(5),
+                patience: Duration = .seconds(25)) {
         self.direct = direct
         self.relay = relay
         self.probe = probe ?? direct
         self.window = window
         self.probeEvery = probeEvery
+        self.patience = patience
     }
 
     public var link: RemoteLink { lock.withLock { current } }
@@ -72,16 +79,22 @@ public final class LinkChooser: DaemonLink, @unchecked Sendable {
     /// Say the link is gone, from the model's lost-touch path.
     public func lost() { set(.none) }
 
+    /// Neither leg answered within `patience`.
+    public enum Failure: Error, Sendable {
+        case noAnswer
+    }
+
     enum Event: Sendable {
         case direct(Result<any LineTransport, any Error>)
         case relay(Result<any LineTransport, any Error>)
         case windowOver
+        case outOfPatience
     }
 
     public func transport() async throws -> any LineTransport {
         lock.withLock { watching?.cancel(); watching = nil }
         let (events, sink) = AsyncStream<Event>.makeStream()
-        let direct = direct, relay = relay, window = window
+        let direct = direct, relay = relay, window = window, patience = patience
         let directLeg = Task {
             let result: Result<any LineTransport, any Error>
             do { result = .success(try await direct()) } catch { result = .failure(error) }
@@ -98,7 +111,21 @@ public final class LinkChooser: DaemonLink, @unchecked Sendable {
             try? await Task.sleep(for: window)
             sink.yield(.windowOver)
         }
-        defer { timer.cancel(); sink.finish() }
+        let giveUp = Task {
+            try? await Task.sleep(for: patience)
+            guard !Task.isCancelled else { return }
+            sink.yield(.outOfPatience)
+        }
+        defer { timer.cancel(); giveUp.cancel(); sink.finish() }
+
+        /// Nothing chosen: neither leg is wanted, whenever it comes back.
+        func abandon() {
+            directLeg.cancel()
+            relayLeg.cancel()
+            Task { if case .success(let late) = await directLeg.value { late.close() } }
+            Task { if case .success(let late) = await relayLeg.value { late.close() } }
+            set(.none)
+        }
 
         var windowOver = false
         var directFailed = false
@@ -133,9 +160,14 @@ public final class LinkChooser: DaemonLink, @unchecked Sendable {
             case .windowOver:
                 windowOver = true
                 if let relayReady { return useRelay(relayReady) }
+            case .outOfPatience:
+                if let relayReady { return useRelay(relayReady) }
+                abandon()
+                throw relayError ?? Failure.noAnswer
             }
         }
-        set(.none)
+        // Only reached when the caller was cancelled.
+        abandon()
         throw relayError ?? JSONRPCTransportError.closed
     }
 

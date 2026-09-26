@@ -304,6 +304,39 @@ public actor DaemonCore {
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
+
+    // MARK: The pool (052)
+
+    lazy var poolStore = PoolStore(locations: locations)
+    /// The person's pool, read once and kept in step with `pool.json`.
+    lazy var pool: PoolSettings = poolStore.load()
+    /// Each credential's state, keyed by `AllowanceState.credentialKey`.
+    lazy var allowances: [String: AllowanceState] = Dictionary(
+        poolStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
+    /// The prompt each agent's current turn was sent, for a retry or a carry-on.
+    var lastPrompts: [UUID: SentPrompt] = [:]
+    /// Rate-limit retries so far for each agent's current prompt (R7).
+    var rateLimitAttempts: [UUID: Int] = [:]
+    /// The latest plan window each agent's runtime reported (R2).
+    var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
+    /// before it carries on (052). `resend` is whether the turn failed and its prompt
+    /// goes again.
+    var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
+    /// When `pool/changed` last went out, and whether one is held back to go at the end
+    /// of the second (052 US3): a burst of changes is one broadcast.
+    var poolBroadcastAt: ContinuousClock.Instant?
+    var poolBroadcastHeld = false
+    /// When each runtime was last started just to see its models (US6): at most once in
+    /// ten minutes, so an open Pool page never keeps starting runtimes.
+    var modelsProbedAt: [String: Date] = [:]
+    /// Credentials already tried for the prompt a chat is carrying (052): never gone back
+    /// to for the same prompt. Cleared by a turn that works.
+    var carryTried: [UUID: Set<String>] = [:]
+    /// A handoff to send with the chat's next prompt, when the switch did not re-send one.
+    var pendingHandoff: [UUID: String] = [:]
+    /// How rate limits are retried. A test shortens the waits; nothing else changes it.
+    var rateLimitPolicy = RateLimitPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
     ///
     /// A runtime's cost is a **running total for its session**, not what the last turn
@@ -559,6 +592,8 @@ public actor DaemonCore {
         // Providers are asked for separately, so a previous answer is kept.
         account.providers = accounts[runtimeID]?.providers ?? []
         account.currentProviderID = accounts[runtimeID]?.currentProviderID
+        // Pushed by the runtime after the handshake, so a handshake has nothing to say about it.
+        account.signedInAs = accounts[runtimeID]?.signedInAs
         // A handshake does not prove a sign-in (see `RuntimeAccount.init`), so it does
         // not take back a refusal: a window warming up a draft would otherwise put the
         // runtime back to ready a second after it refused. A turn that works does.
@@ -569,6 +604,26 @@ public actor DaemonCore {
         guard accounts[runtimeID] != account else { return }
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// What a runtime pushed about its own account. Its word is better than a handshake's:
+    /// "nobody" is a sign-in needed before any session fails, and a named account takes
+    /// back an earlier refusal.
+    func noteAuthStatus(runtimeID: String, _ status: AuthStatus) {
+        var account = accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
+        account.signedInAs = status
+        account.state = status.isSignedOut ? .needsSignIn : .ready
+        account.checkedAt = Date()
+        guard accounts[runtimeID] != account else { return }
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// Hear what this session's runtime says about its account for as long as it runs.
+    func hearAuthStatus(from session: ACPSession, runtimeID: String) async {
+        await session.whenAuthStatusChanges { [weak self] status in
+            await self?.noteAuthStatus(runtimeID: runtimeID, status)
+        }
     }
 
     /// A runtime that just refused for want of a sign-in.
@@ -681,8 +736,8 @@ public actor DaemonCore {
 
     /// Append to the record first, then tell the windows. That order is the whole
     /// reason a daemon killed mid-turn still leaves something true behind.
-    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID) async {
-        let entry = TranscriptEntry(kind: kind)
+    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
+        let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
         try? await store.append(entry, for: agentID)
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at
@@ -1028,6 +1083,7 @@ public actor DaemonCore {
             changed(agent)
 
         case .usageChanged(let usage):
+            if let window = usage.rateLimit { notePlanWindow(window, agentID: agentID) }
             guard var agent = agents[agentID] else { return }
             agent.usage = usage
             // The only place a cost ever arrives. The turn's own reply carries tokens
@@ -1053,6 +1109,13 @@ public actor DaemonCore {
             agent.plans = Plan.applying(plan, to: agent.plans)
             changed(agent)
             await record(.planUpdated(plan), for: agentID)
+
+        case .subagentEntry(let subagentID, let kind):
+            guard !kind.isInvisibleAgentText else { return }
+            await record(kind, for: agentID, subagentID: subagentID)
+
+        case .background(let update):
+            await noteBackground(update, agentID: agentID)
 
         case .planRemoved(let planID):
             guard var agent = agents[agentID] else { return }
@@ -1129,6 +1192,13 @@ public actor DaemonCore {
         // transcript and out of agent.json, exactly like an update kind we do not know.
         case .unknownNotification(let method):
             DaemonLog.shared.write("agent \(agentID) sent a notification we do not know: \(method)")
+
+        // A failure the runtime reported with no turn running (052): said once in the
+        // conversation, and nothing about the agent's state changes.
+        case .sessionFailure(let failure):
+            await noteFailure(failure, for: agentID)
+        case .unknownRequest(let method):
+            DaemonLog.shared.write("agent \(agentID) sent a request we do not know, declined: \(method)")
         }
     }
 
@@ -1151,6 +1221,8 @@ public actor DaemonCore {
     func forget(_ agentID: UUID) -> Task<Void, Never>? {
         let draining = eventTasks.removeValue(forKey: agentID)
         live.removeValue(forKey: agentID)
+        // What it ran in the background went with it.
+        endBackground(of: agentID)
         // A runtime's cost reading is let go by its own listener, once it has heard the
         // last of that session — not here, where the listener may still have a reading
         // to get through. See `costReadings`.

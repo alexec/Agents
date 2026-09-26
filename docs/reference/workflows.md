@@ -46,7 +46,7 @@ Check the build and say whether it is green.
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
 | `agent:` `triggering` | | Each run goes to the agent that set it off. For a pull-request trigger, that is the agent last active in the pull request's worktree. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
 | `permission-mode:` | One of the runtime's own modes, such as a read-only or plan mode | The mode the agent runs in. A workflow runs with nobody watching, so this is how to say it must not change anything. |
-| `runtime:` | `claude`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. |
+| `runtime:` | `claude`, `codex`, `gemini`, `antigravity`, `grok`, `copilot`, `cursor` | The runtime the agent runs on. Without it, Claude. A name this version does not know stops the workflow running, and its page names the runtimes it knows. See [Runtimes](runtimes.md). |
 | `model:` | One of the runtime's models | The model the agent uses. Without it, the runtime's own default. |
 | `effort:` | One of the runtime's levels, such as `low` or `high` | How hard the agent thinks. Without it, the runtime's own default. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
