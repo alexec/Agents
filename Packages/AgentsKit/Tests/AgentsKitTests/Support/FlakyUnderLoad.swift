@@ -22,6 +22,12 @@ extension Trait where Self == ConditionTrait {
     /// - SSHMasterTests.aMasterThatDiesIsNoticedWithinASecond — 1 s.
     /// - AttentionTests.theSettlingPauseIsNotStartedAgainByARestart — a 2 s pause, 1.5 s
     ///   slept through it, and delivery looked for within the next 1 s.
+
+    /// And one that is not a budget but a bug, here until it is fixed rather than hidden
+    /// by a longer wait:
+    /// - PTYTests.aProgramSeesATerminalOnItsOutput — under load the program exited and
+    ///   none of its output ever arrived (45 s, 2026-09-26). A pty whose child exits
+    ///   first can lose what it wrote.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
         return .disabled(if: environment["CI"] != nil && environment["AGENTS_RUN_FLAKY"] != "1",

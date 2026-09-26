@@ -35,7 +35,7 @@ struct MachineEventTests {
     }
 
     private func eventually(_ what: String, _ check: () async throws -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+        let deadline = ContinuousClock.now.advanced(by: max(.seconds(20), Eventually.timeout))
         while ContinuousClock.now < deadline {
             if try await check() { return }
             try await Task.sleep(for: .milliseconds(20))

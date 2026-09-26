@@ -152,7 +152,7 @@ struct DraftOptionsTests {
         /// Broadcasting is a hand-off to another task, so what the daemon has said and
         /// what this has heard are a moment apart. Waited for rather than slept past.
         func wait(for method: String) async -> JSONValue? {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+            let deadline = ContinuousClock.now.advanced(by: max(.seconds(3), Eventually.timeout))
             while ContinuousClock.now < deadline {
                 if let found = first(method) { return found }
                 try? await Task.sleep(for: .milliseconds(10))

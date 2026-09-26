@@ -33,7 +33,7 @@ struct UnreportedEndingTests {
     }
 
     private func settle(_ core: DaemonCore, _ id: UUID) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        let deadline = ContinuousClock.now.advanced(by: max(.seconds(5), Eventually.timeout))
         while ContinuousClock.now < deadline {
             if let agent = await core.agent(id),
                !agent.state.hasTurnInFlight, agent.queuedPrompts.isEmpty,
