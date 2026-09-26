@@ -21,7 +21,8 @@ extension DaemonCore {
             return DaemonAPI.ShellAttachResponse(state: attachment.state,
                                                  scrollback: attachment.scrollback,
                                                  dropped: attachment.dropped,
-                                                 startedAt: attachment.startedAt)
+                                                 startedAt: attachment.startedAt,
+                                                 folder: attachment.folder)
         } catch ShellHost.Failure.willNotStart(let reason) {
             throw JSONRPCError(code: DaemonAPI.Failure.shellWillNotStart, message: reason)
         }
@@ -94,7 +95,8 @@ extension DaemonCore {
             return DaemonAPI.ShellAttachResponse(state: attachment.state,
                                                  scrollback: attachment.scrollback,
                                                  dropped: attachment.dropped,
-                                                 startedAt: attachment.startedAt)
+                                                 startedAt: attachment.startedAt,
+                                                 folder: attachment.folder)
         } catch ShellHost.Failure.stillLive {
             throw JSONRPCError(code: DaemonAPI.Failure.shellNotLive,
                                message: "That shell is still running.")

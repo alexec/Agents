@@ -373,10 +373,13 @@ of the turn, with Cancel.
   a worktree, and with a move waiting during a turn.
   - Save them to `specs/053-move-to-worktree/walk/`.
   - Show Alex and settle the layout before T037.
-- [ ] T037 [US3] In `App/Sources/Sidebar/TerminalPane.swift`, when the open shell's folder differs
+- [X] T037 [US3] In `App/Sources/Sidebar/TerminalPane.swift`, when the open shell's folder differs
   from `agent.cwd`, show a strip: "This agent now works in <name>." with an **Open a terminal
   there** button, which starts a new shell through the existing path (it opens in `agent.cwd`).
   Never end the old shell.
+  *(Built as "Type cd there": a new shell cannot start while the old one is live, and the old one is
+  never ended, so the strip types `cd` into it on request. The daemon's attach reply now carries the
+  folder a shell was started in.)*
 
 **Checkpoint**: the person can move an agent from its page.
 

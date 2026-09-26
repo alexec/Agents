@@ -1303,12 +1303,15 @@ public enum DaemonAPI {
         public var scrollback: Data
         public var dropped: Int
         public var startedAt: Date
+        /// Where the shell was started. Nil from an older daemon (053).
+        public var folder: URL?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
+            self.folder = folder
         }
     }
 

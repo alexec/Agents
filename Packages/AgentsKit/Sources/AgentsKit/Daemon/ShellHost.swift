@@ -16,12 +16,16 @@ public final class ShellHost: @unchecked Sendable {
         /// means the replay is the end of the session rather than the whole of it.
         public var dropped: Int
         public var startedAt: Date
+        /// The folder the shell was started in. An agent that moved since (053) works
+        /// somewhere else, and the pane says so.
+        public var folder: URL?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
+            self.folder = folder
         }
     }
 
@@ -77,7 +81,8 @@ public final class ShellHost: @unchecked Sendable {
             return Attachment(state: existing.state,
                               scrollback: buffer.tail,
                               dropped: buffer.dropped,
-                              startedAt: existing.startedAt)
+                              startedAt: existing.startedAt,
+                              folder: existing.folder)
         }
 
         // A shell that is over but whose output is still worth reading stays until the
@@ -87,7 +92,8 @@ public final class ShellHost: @unchecked Sendable {
             return Attachment(state: existing.state,
                               scrollback: buffer.tail,
                               dropped: buffer.dropped,
-                              startedAt: existing.startedAt)
+                              startedAt: existing.startedAt,
+                              folder: existing.folder)
         }
 
         let session = try start(agentID: agentID, folder: folder, rows: rows, cols: cols)
@@ -101,7 +107,8 @@ public final class ShellHost: @unchecked Sendable {
         return Attachment(state: session.state,
                           scrollback: buffer.tail,
                           dropped: buffer.dropped,
-                          startedAt: session.startedAt)
+                          startedAt: session.startedAt,
+                          folder: session.folder)
     }
 
     /// The window has stopped looking. Kills nothing and stops nothing: a shell
@@ -146,7 +153,8 @@ public final class ShellHost: @unchecked Sendable {
         return Attachment(state: session.state,
                           scrollback: Data(),
                           dropped: 0,
-                          startedAt: session.startedAt)
+                          startedAt: session.startedAt,
+                          folder: session.folder)
     }
 
     // MARK: Using one

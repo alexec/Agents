@@ -736,4 +736,23 @@ struct MoveTests {
         let args = await serverArguments(launcher)
         #expect(!args.contains(DaemonCore.noMoveToolsFlag))
     }
+
+    // MARK: The terminal (T037)
+
+    /// A shell opened before the move goes on where it was: it is the person's, and may be
+    /// running something. It says where it was started, so the pane can say the agent is
+    /// somewhere else now.
+    @Test func aShellOpenedBeforeTheMoveSaysWhereItWasStarted() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        let before = try await core.attachShell(.init(agentID: id, rows: 24, cols: 80))
+        #expect(before.folder.map { Project.standardize($0) } == repo.project)
+
+        _ = try await personMove(core, id, .newWorktree(name: "shelled"))
+        let after = try await core.attachShell(.init(agentID: id, rows: 24, cols: 80))
+
+        #expect(after.folder.map { Project.standardize($0) } == repo.project, "the live shell was not moved")
+        #expect(await core.agent(id)?.cwd != repo.project)
+    }
 }
