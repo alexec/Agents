@@ -65,6 +65,12 @@ public struct SSHCommand: Sendable {
         return args + ["--", destination]
     }
 
+    /// Ask the master to add a reverse forward (047): `remote`, a Unix socket path on the
+    /// server, to `local` on this Mac (`host:port`). sshd makes the socket owner-only.
+    public func remoteForwardArguments(remote: String, local: String) -> [String] {
+        control + ["-O", "forward", "-R", "\(remote):\(local)", "--", destination]
+    }
+
     /// `-O check` or `-O exit`, asked of the master.
     public func controlArguments(_ operation: String) -> [String] {
         control + ["-O", operation, "--", destination]

@@ -230,7 +230,22 @@ public enum ToolPolicyCatalog {
             ]),
         ])),
         escalationTool: "request_user_input",
-        preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"])
+        preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"],
+        // A server never offers ChatGPT: its sign-in is the Mac's, and never lent (FR-020).
+        serverEnvironment: ["NO_BROWSER": "1"],
+        // A lent key alone is not a sign-in (the adapter answers -32000), and the api-key
+        // sign-in writes the key into Codex's home unless that home's config keeps sign-ins
+        // in memory. Measured on agents-bare, research T008.
+        lentKeyHome: LentKeyHome(whenLent: "CODEX_API_KEY", variable: "CODEX_HOME", folder: "codex-home",
+                                 configFile: "config.toml",
+                                 config: "cli_auth_credentials_store = \"ephemeral\"\n",
+                                 environment: ["DEFAULT_AUTH_REQUEST": #"{"methodId":"api-key"}"#]),
+        // The Mac's ChatGPT sign-in, relayed (research R12). Codex insists on HTTPS for it,
+        // keeps only the origin for its model calls, and trusts CODEX_CA_CERTIFICATE.
+        relay: SignInRelay(homeVariable: "CODEX_HOME", certificateVariable: "CODEX_CA_CERTIFICATE",
+                           configFile: "config.toml", signInFile: "auth.json",
+                           configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n",
+                           macSignIn: ".codex/auth.json", upstreamHost: "chatgpt.com"))
 
     /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
     ///

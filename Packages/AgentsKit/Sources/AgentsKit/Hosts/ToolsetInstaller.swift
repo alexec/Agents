@@ -19,7 +19,7 @@ public struct ToolsetInstaller: Sendable {
     /// Why this server cannot have the toolset, before anything is downloaded; nil when
     /// it can.
     public static func refusal(_ facts: ServerFacts, _ toolset: Toolset) -> HostProblem? {
-        guard facts.canInstallClaude else { return .unsupportedLibc(facts.libc.display) }
+        guard facts.canInstallToolsets else { return .unsupportedLibc(facts.libc.display) }
         guard facts.downloader != nil else { return .noDownloader }
         guard facts.freeBytes >= toolset.manifest.minFreeBytes else {
             return .diskFullForTools(needed: toolset.manifest.minFreeBytes, free: facts.freeBytes)
@@ -112,7 +112,7 @@ public struct ToolsetInstaller: Sendable {
             do { try process.run() } catch { process.terminationHandler = nil; done.resume(throwing: error) }
         }
         guard status == 0 else {
-            throw HostProblem.toolsetInstallFailed("The app could not pack its Claude toolset.")
+            throw HostProblem.toolsetInstallFailed("The app could not pack its \(RuntimeCatalog.runtime(id: toolset.manifest.runtimeID)?.name ?? toolset.manifest.runtimeID) toolset.")
         }
         return tar
     }

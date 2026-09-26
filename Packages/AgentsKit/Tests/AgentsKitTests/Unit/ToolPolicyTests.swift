@@ -176,6 +176,42 @@ struct ToolPolicyTests {
         #expect(claude["CODEX_CONFIG"] == "the person's own", "and nobody else's launch is touched")
     }
 
+    /// On a server (047, research T008): Codex never offers ChatGPT, and a lent key comes with
+    /// a home of the app's own that keeps the sign-in in memory. On the Mac, neither.
+    @Test func onAServerCodexGetsNoBrowserAndAnEphemeralHomeWhenAKeyIsLent() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("policy-env-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        let base = ["PATH": "/usr/bin"]
+        let policy = ToolPolicyCatalog.codex
+
+        let mac = ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base)
+        #expect(mac["NO_BROWSER"] == nil && mac["CODEX_HOME"] == nil && mac["DEFAULT_AUTH_REQUEST"] == nil)
+
+        let ownSignIn = ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base, onServer: true)
+        #expect(ownSignIn["NO_BROWSER"] == "1")
+        #expect(ownSignIn["CODEX_HOME"] == nil, "a server's own sign-in lives in its own ~/.codex")
+
+        let lent = LentEnvironment.$value.withValue(["CODEX_API_KEY": "sk-proj-test"]) {
+            ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base, onServer: true)
+        }
+        #expect(lent["NO_BROWSER"] == "1")
+        #expect(lent["DEFAULT_AUTH_REQUEST"] == #"{"methodId":"api-key"}"#)
+        let home = try #require(lent["CODEX_HOME"])
+        #expect(home == root.appendingPathComponent("runtimes/codex-home").path)
+        #expect(try String(contentsOfFile: home + "/config.toml", encoding: .utf8)
+                == "cli_auth_credentials_store = \"ephemeral\"\n")
+        let mode = try FileManager.default.attributesOfItem(atPath: home)[.posixPermissions] as? Int
+        #expect(mode == 0o700)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: home) == ["config.toml"],
+                "the app writes the config and nothing else there")
+
+        let claude = LentEnvironment.$value.withValue(["ANTHROPIC_API_KEY": "sk-ant-api-test"]) {
+            ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude, locations: locations, onto: base, onServer: true)
+        }
+        #expect(claude["NO_BROWSER"] == nil && claude["CODEX_HOME"] == nil)
+    }
+
     /// Codex's methods as its handshake sent them (research R2), offered ChatGPT first;
     /// a runtime with no order keeps the old rule.
     @Test func signInMethodsFollowTheRuntimesOwnOrder() throws {

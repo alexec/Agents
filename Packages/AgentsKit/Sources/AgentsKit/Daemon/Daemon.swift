@@ -29,7 +29,8 @@ public final class Daemon: @unchecked Sendable {
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
         // The Mac installs what is missing (048); a server keeps 043's way.
-        var installer: RuntimeInstaller?
+        var installer: (any RuntimeInstalling)?
+        #if canImport(Security)
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
             #if canImport(CryptoKit)
@@ -43,6 +44,10 @@ public final class Daemon: @unchecked Sendable {
                 discovery: discovery,
                 toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
         }
+        #endif
+        // A server's runtimes get their policy's server environment (047: Codex never
+        // offers ChatGPT there).
+        let launcher = launcher ?? (serve ? ProcessSessionLauncher(locations: locations, onServer: true) : nil)
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
                                installer: installer, launcher: launcher)
         self.serve = serve
@@ -62,7 +67,9 @@ public final class Daemon: @unchecked Sendable {
         // It was never in the home folder, so this is the whole of cleaning up (027).
         await core.clearCloneStaging()
         // Before anything is picked up: nothing can be running from an old toolset yet.
+        #if canImport(Security)
         (core.installer as? RuntimeInstaller)?.tidy()
+        #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
         let recovered = await core.recover()

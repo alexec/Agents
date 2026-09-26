@@ -1052,7 +1052,9 @@ final class AppModel {
         }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }
-            return self.credentials.record(runtimeID) != nil && !(self.hosts.host(id)?.ownSignInOnly ?? false)
+            guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
+            // A key in Settings, or this Mac's own sign-in relayed (047).
+            return self.credentials.record(runtimeID) != nil || SignInRelays.canRelay(runtimeID)
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)

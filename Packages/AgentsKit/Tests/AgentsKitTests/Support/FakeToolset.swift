@@ -40,7 +40,9 @@ struct FakeToolset {
                 *) echo "npm ERR! code ECONNREFUSED" >&2
                    echo "npm ERR! network request failed" >&2; exit 1 ;;
             esac
-            d="$prefix/node_modules/@agentclientprotocol/claude-agent-acp/dist"
+            # The package the lock is for, from the package.json beside it (047: Claude's or Codex's).
+            pkg=$(sed -n 's/.*"dependencies"[^"]*"\\([^"]*\\)".*/\\1/p' "$prefix/package.json")
+            d="$prefix/node_modules/${pkg:-@agentclientprotocol/claude-agent-acp}/dist"
             mkdir -p "$d" && echo "// fake adapter" > "$d/index.js"
             """)
 
@@ -55,18 +57,34 @@ struct FakeToolset {
             try handle.close()
         }
 
+        nodeSHA = sha
+        toolset = try Self.bundle(at: bundle, runtimeID: "claude", package: "@agentclientprotocol/claude-agent-acp", sha: sha)
+    }
+
+    /// The Node tarball's SHA-256, for another runtime's toolset on the same mirror.
+    let nodeSHA: String
+
+    /// Another runtime's toolset (047), sharing this one's Node mirror, so one fake server
+    /// can be given both.
+    func other(runtimeID: String, package: String, in folder: URL) throws -> Toolset {
+        let bundle = folder.appendingPathComponent("toolset-\(runtimeID)", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        return try Self.bundle(at: bundle, runtimeID: runtimeID, package: package, sha: nodeSHA)
+    }
+
+    private static func bundle(at bundle: URL, runtimeID: String, package: String, sha: String) throws -> Toolset {
         let manifest = Toolset.Manifest(
-            runtimeID: "claude",
+            runtimeID: runtimeID,
             node: .init(version: Self.nodeVersion, sha256: ["aarch64": sha, "x86_64": sha]),
-            package: "@agentclientprotocol/claude-agent-acp", packageVersion: "0.0.0-fake",
+            package: package, packageVersion: "0.0.0-fake",
             entry: "dist/index.js", minFreeBytes: 1024)
         let manifestData = try JSONEncoder().encode(manifest)
-        let lock = Data(#"{"name":"agents-claude-toolset","lockfileVersion":3,"packages":{}}"#.utf8)
+        let lock = Data(#"{"name":"agents-\#(runtimeID)-toolset","lockfileVersion":3,"packages":{}}"#.utf8)
         try manifestData.write(to: bundle.appendingPathComponent(Toolset.manifestFile))
         try lock.write(to: bundle.appendingPathComponent(Toolset.lockFile))
-        try Data(#"{"name":"agents-claude-toolset","private":true}"#.utf8)
+        try Data(#"{"name":"agents-\#(runtimeID)-toolset","private":true,"dependencies":{"\#(package)":"0.0.0-fake"}}"#.utf8)
             .write(to: bundle.appendingPathComponent(Toolset.packageFile))
-        toolset = try Toolset.load(from: bundle)
+        return try Toolset.load(from: bundle)
     }
 
     /// What the fake server needs in its environment: its own curl and no npx of the Mac's.

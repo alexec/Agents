@@ -1,3 +1,6 @@
+// The Mac's own installer: CryptoKit and URLSession, neither of which a Linux server's
+// agentsd has or needs (servers install through `ToolsetInstaller`).
+#if canImport(Security)
 import AgentsKitCore
 #if canImport(CryptoKit)
 import CryptoKit
@@ -265,3 +268,4 @@ public struct MacToolsetInstaller: Sendable {
         output.contains("No space left on device") ? .noSpace : fallback
     }
 }
+#endif
