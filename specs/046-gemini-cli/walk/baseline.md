@@ -7,3 +7,8 @@
 - `aLeaseThatRanOutWhileTheDaemonWasDownIsHandedOnAsItComesBack()` (LeaseTests.swift:134)
 
 Any other failure after a 046 change is 046's until shown otherwise.
+
+Also on the base commit (c5ce35f, checked in /tmp/w-046-base 2026-09-25): run together with
+`--filter "aStoppedAgentIsPickedUpRatherThanCopied|aPickedUpAgentKeepsTheCommandsItsNewRuntimeDoesNotRepeat"`,
+both fail `launcher.launchCount == 2` (1 run of 2 on base, 3 of 3 on the branch); each passes alone.
+Not 046's; a race between those two tests.

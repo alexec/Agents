@@ -225,8 +225,7 @@ extension DaemonCore {
                                message: "There is no runtime called \(runtimeID).")
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: "\(runtime.name) is not installed, or is not where we looked.")
+            throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
         let session = try launcher.launch(runtime: runtime, path: path, cwd: locations.root)
         do {

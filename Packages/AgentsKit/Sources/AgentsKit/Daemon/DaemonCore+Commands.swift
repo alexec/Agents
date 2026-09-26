@@ -381,9 +381,7 @@ extension DaemonCore {
                                message: "\(cwd.path) is not there any more.")
         }
         guard case .available(let path, _) = discovery.locate(runtime) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: "\(runtime.name) is not installed, or is not where we looked.",
-                               data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
+            throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
         // Before anything starts, and outside the catch below: wanting a credential is not
         // the runtime failing, and the window answers it by lending one (043).

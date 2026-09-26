@@ -141,4 +141,39 @@ struct RuntimeInstallDispatchTests {
         #expect(await core.runtimeStatuses().first { $0.id == "grok" }?.availability
                 == .missing(lookedIn: ["/nowhere"]))
     }
+
+    // MARK: Starting on a runtime that is not ready (046, FR-003)
+
+    private func startGemini(_ core: DaemonCore, in root: URL) async -> JSONRPCError? {
+        do {
+            _ = try await core.start(.init(runtimeID: "gemini", cwd: root, prompt: "go"))
+            return nil
+        } catch let error as JSONRPCError {
+            return error
+        } catch {
+            return nil
+        }
+    }
+
+    @Test func startingOneThatIsNotHereSaysWhereToInstallIt() async throws {
+        let (core, root) = try core(installer: Gated(result: .installFailed(reason: "x")))
+        defer { try? FileManager.default.removeItem(at: root) }
+        let error = try #require(await startGemini(core, in: root))
+        #expect(error.code == DaemonAPI.Failure.runtimeNotFound)
+        #expect(error.message == "Gemini isn’t on this Mac. Install it from Settings ▸ Agents.")
+    }
+
+    @Test func startingOneBeingInstalledSaysSo() async throws {
+        let gated = Gated(result: .installFailed(reason: "Couldn’t reach the internet to download Gemini."))
+        let (core, root) = try core(installer: gated)
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = await install(core, "gemini")
+        let during = try #require(await startGemini(core, in: root))
+        #expect(during.message.hasPrefix("Gemini is still being installed."))
+
+        gated.open()
+        await core.waitForInstall("gemini")
+        let after = try #require(await startGemini(core, in: root))
+        #expect(after.message == "Couldn’t reach the internet to download Gemini.")
+    }
 }
