@@ -31,24 +31,29 @@ struct ConnectionRoleTests {
     }
 
     /// One request, and the one line that answers it.
-    private func ask(_ fd: Int32, _ method: String) -> [String: Any]? {
+    private func ask(_ fd: Int32, _ method: String) async -> [String: Any]? {
         let line = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\(method)\",\"params\":{}}\n"
         _ = line.withCString { Darwin.write(fd, $0, strlen($0)) }
         // Five seconds, or `Eventually`'s longer wait on CI: a busy runner can take that
         // long to answer, and no answer reads as "not refused".
         let wait = max(5, Double(Eventually.timeout.components.seconds))
-        return readLine(fd, deadline: Date().addingTimeInterval(wait))
+        return await readLine(fd, deadline: Date().addingTimeInterval(wait))
     }
 
-    private func readLine(_ fd: Int32, deadline: Date) -> [String: Any]? {
+    /// Read off the pool: this blocks until the line or the deadline, and the daemon
+    /// being asked needs the pool to answer.
+    private func readLine(_ fd: Int32, deadline: Date) async -> [String: Any]? {
+        guard let line = await offThePool({ Self.rawLine(fd, deadline: deadline) }) else { return nil }
+        return try? JSONSerialization.jsonObject(with: line) as? [String: Any]
+    }
+
+    private static func rawLine(_ fd: Int32, deadline: Date) -> Data? {
         var received = Data()
         var byte: UInt8 = 0
         while Date() < deadline {
             let n = Darwin.read(fd, &byte, 1)
             if n == 1 {
-                if byte == UInt8(ascii: "\n") {
-                    return try? JSONSerialization.jsonObject(with: received) as? [String: Any]
-                }
+                if byte == UInt8(ascii: "\n") { return received }
                 received.append(byte)
             } else if n == 0 {
                 return nil
@@ -87,11 +92,11 @@ struct ConnectionRoleTests {
         let fd = connect(path)
         defer { close(fd) }
 
-        #expect(errorCode(ask(fd, DaemonAPI.Method.ping)) == nil)
+        #expect(errorCode(await ask(fd, DaemonAPI.Method.ping)) == nil)
         for method in [DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.agentsStart,
                        DaemonAPI.Method.agentsList, DaemonAPI.Method.shellInput,
                        DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.daemonQuit] {
-            #expect(errorCode(ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
+            #expect(errorCode(await ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
         }
         #expect(heard.all == [DaemonAPI.Method.ping], "nothing refused reached the daemon")
     }
@@ -106,12 +111,12 @@ struct ConnectionRoleTests {
 
         for method in [DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.agentsStartHelper,
                        DaemonAPI.Method.leasesLease, DaemonAPI.Method.eventsWait] {
-            #expect(errorCode(ask(fd, method)) == nil, "\(method)")
+            #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
         }
         for method in [DaemonAPI.Method.permissionsAnswer, DaemonAPI.Method.agentsStart,
                        DaemonAPI.Method.agentsSetOption, DaemonAPI.Method.workflowsRun,
                        DaemonAPI.Method.shellInput, DaemonAPI.Method.credentialsLend] {
-            #expect(errorCode(ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
+            #expect(errorCode(await ask(fd, method)) == DaemonAPI.Failure.notPermitted, "\(method)")
         }
     }
 
@@ -129,8 +134,8 @@ struct ConnectionRoleTests {
         window.broadcast("agent/entry", ["secret": "for the window"])
         stranger.broadcast("agent/entry", ["secret": "for the window"])
 
-        #expect(readLine(windowFD, deadline: Date().addingTimeInterval(5))?["method"] as? String == "agent/entry")
-        #expect(readLine(strangerFD, deadline: Date().addingTimeInterval(1)) == nil)
+        #expect(await readLine(windowFD, deadline: Date().addingTimeInterval(5))?["method"] as? String == "agent/entry")
+        #expect(await readLine(strangerFD, deadline: Date().addingTimeInterval(1)) == nil)
     }
 
     // MARK: Signatures

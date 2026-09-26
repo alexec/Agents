@@ -97,8 +97,11 @@ struct CloseOnExecTests {
         // take that long to land. An inherited descriptor fails either way, only later.
         var timeout = timeval(tv_sec: max(2, Int(Eventually.timeout.components.seconds)), tv_usec: 0)
         setsockopt(mine, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
-        var byte: UInt8 = 0
-        let read = Darwin.read(mine, &byte, 1)
+        // Off the pool: the read blocks for as long as the timeout.
+        let read = await offThePool { () -> Int in
+            var byte: UInt8 = 0
+            return Darwin.read(mine, &byte, 1)
+        }
         #expect(read == 0, "the connection was still open: a shell inherited it")
     }
 
