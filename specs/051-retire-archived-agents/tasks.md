@@ -242,16 +242,16 @@ and the settings reach every server.
 
 **Independent test**: quickstart §2, the Off bullet, and the Settings screenshots.
 
-- [ ] T038 [P] [US3] Add to `RetirementTests.swift`:
+- [X] T038 [P] [US3] Add to `RetirementTests.swift`:
   - `retention/set` unconfirmed that would retire 3 answers `applied: false` with the count and bytes, and changes nothing.
   - Confirmed, it retires them and broadcasts `retention/changed`.
   - One that would retire nothing applies at once.
   - `forever` with `none` retires nothing for agents 400 days old and 50 GB total.
   - The settings survive a restart.
   - A device connection is refused `retention/set`.
-- [ ] T039 [US3] Implement `retention/set` fully in `DaemonCore+Retention.swift`: build the preview by calling `RetentionPlan.decide` with the proposed settings (no holds, so it is an upper bound: say "up to" in the words when holds exist), save, check, broadcast. Make T038 pass.
-- [ ] T040 [US3] In `App/Sources/AppModel.swift`, add `setRetention(_:confirmed:)`, following `setCostLimits`: after its own daemon applies the settings, call `retention/set { confirmed: true }` on every connected server. In `refreshServer`, push the Mac's settings on connect, the same way limits are pushed. Subscribe to `retention/changed` in `AgentsModel` to keep `retentionState` current.
-- [ ] T041 [US3] Wire `ArchiveSettingsView` (T020) to `setRetention`. A picker change sends unconfirmed. On `applied: false` it shows the confirm sheet, and Cancel puts the picker back.
+- [X] T039 [US3] Implement `retention/set` fully in `DaemonCore+Retention.swift`: build the preview by calling `RetentionPlan.decide` with the proposed settings (no holds, so it is an upper bound: say "up to" in the words when holds exist), save, check, broadcast. Make T038 pass.
+- [X] T040 [US3] In `App/Sources/AppModel.swift`, add `setRetention(_:confirmed:)`, following `setCostLimits`: after its own daemon applies the settings, call `retention/set { confirmed: true }` on every connected server. In `refreshServer`, push the Mac's settings on connect, the same way limits are pushed. Subscribe to `retention/changed` in `AgentsModel` to keep `retentionState` current.
+- [X] T041 [US3] Wire `ArchiveSettingsView` (T020) to `setRetention`. A picker change sends unconfirmed. On `applied: false` it shows the confirm sheet, and Cancel puts the picker back.
 
 ---
 

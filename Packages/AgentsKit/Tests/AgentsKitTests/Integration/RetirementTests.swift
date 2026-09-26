@@ -228,4 +228,62 @@ struct RetirementTests {
         #expect(await core.agent(small.id) != nil)
         #expect(await core.retentionState().archivedBytes == 1_000)
     }
+
+    // MARK: US3
+
+    private func set(_ core: DaemonCore, _ settings: RetentionSettings,
+                     confirmed: Bool) async -> DaemonAPI.RetentionSetResult {
+        await core.setRetention(.init(settings: settings, confirmed: confirmed))
+    }
+
+    @Test func aChangeThatWouldRetireAgentsIsDescribedBeforeItIsApplied() async throws {
+        let (locations, work) = try temporary()
+        let agents = [archived(work, daysAgo: 10), archived(work, daysAgo: 11), archived(work, daysAgo: 12)]
+        let core = try await core(locations, seeded: agents)
+        await sized(core, Dictionary(uniqueKeysWithValues: agents.map { ($0.id, 1_000) }))
+
+        let asked = await set(core, RetentionSettings(keepFor: .days7), confirmed: false)
+        #expect(!asked.applied)
+        #expect(asked.wouldRetire == DaemonAPI.RetirePreview(count: 3, bytes: 3_000))
+        #expect(await core.retentionState().settings.keepFor == .days30)
+        for agent in agents { #expect(await core.agent(agent.id) != nil) }
+
+        let done = await set(core, RetentionSettings(keepFor: .days7), confirmed: true)
+        #expect(done.applied)
+        #expect(done.state?.retiredCount == 3)
+        for agent in agents { #expect(await core.agent(agent.id) == nil) }
+    }
+
+    @Test func aChangeThatRetiresNothingIsAppliedAtOnce() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(locations, seeded: [archived(work, daysAgo: 3)])
+        let result = await set(core, RetentionSettings(keepFor: .days14, cap: .gb5), confirmed: false)
+        #expect(result.applied)
+        #expect(await core.retentionState().settings == RetentionSettings(keepFor: .days14, cap: .gb5))
+    }
+
+    @Test func foreverWithNoLimitKeepsEverythingAndSurvivesARestart() async throws {
+        let (locations, work) = try temporary()
+        let ancient = archived(work, daysAgo: 400)
+        let core = try await core(locations, seeded: [ancient])
+        await sized(core, [ancient.id: 50_000_000_000])
+        _ = await set(core, RetentionSettings(keepFor: .forever, cap: .none), confirmed: true)
+        #expect(await core.agent(ancient.id) != nil)
+
+        let again = try await self.core(locations)
+        await again.checkRetention()
+        #expect(await again.agent(ancient.id) != nil)
+        #expect(await again.retentionState().settings.isOff)
+    }
+
+    @Test func onlyThePersonsWindowMayChangeTheSettingsOrRetire() {
+        for method in [DaemonAPI.Method.retentionSet, DaemonAPI.Method.agentsRetire] {
+            #expect(ConnectionRole.control.allows(method))
+            #expect(!ConnectionRole.device.allows(method))
+            #expect(!ConnectionRole.agent.allows(method))
+            #expect(!ConnectionRole.stranger.allows(method))
+        }
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.retentionState))
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsRetired))
+    }
 }

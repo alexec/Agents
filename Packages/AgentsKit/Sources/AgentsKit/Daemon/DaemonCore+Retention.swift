@@ -75,16 +75,33 @@ extension DaemonCore {
 
     // MARK: Settings
 
-    /// `retention/set`. For now it saves and says so; what a change retires comes with
-    /// the check.
+    /// `retention/set` (FR-011). A change that would retire agents at once is only
+    /// described until the person confirms it; one that retires nothing is applied
+    /// straight away. Applied, it is saved, checked at once, and told to every window.
     public func setRetention(_ request: DaemonAPI.RetentionSetRequest) async -> DaemonAPI.RetentionSetResult {
         loadRetentionIfNeeded()
+        if !request.confirmed {
+            let archived = candidates()
+            let preview = RetentionPlan.decide(archived: archived, holds: await holds(for: archived),
+                                               settings: request.settings, saneNow: now())
+            if !preview.retire.isEmpty {
+                let sizes = Dictionary(archived.map { ($0.id, $0.sizeOnDisk) }, uniquingKeysWith: { a, _ in a })
+                let bytes = preview.retire.reduce(0) { $0 + (sizes[$1.id] ?? 0) }
+                return DaemonAPI.RetentionSetResult(
+                    applied: false, wouldRetire: DaemonAPI.RetirePreview(count: preview.retire.count, bytes: bytes))
+            }
+        }
         retention.settings = request.settings
         saveRetention()
+        await checkRetention()
         let state = retentionState()
         broadcast(DaemonAPI.Notification.retentionChanged, state)
         return DaemonAPI.RetentionSetResult(applied: true, state: state)
     }
+
+    /// What keeps each of these agents past its time (051, FR-007). Nothing yet: the
+    /// holds come with US5.
+    func holds(for candidates: [RetentionPlan.Candidate]) async -> [UUID: Hold] { [:] }
 
     func saveRetention() {
         do { try retentionStore.save(retention) } catch {
@@ -119,7 +136,8 @@ extension DaemonCore {
         loadRetentionIfNeeded()
         let saneNow = retention.clock.tick(now: now(), uptime: uptime)
         let before = retentionState()
-        let decision = RetentionPlan.decide(archived: candidates(), holds: [:],
+        let archived = candidates()
+        let decision = RetentionPlan.decide(archived: archived, holds: await holds(for: archived),
                                             settings: retention.settings, saneNow: saneNow)
         for retiring in decision.retire {
             do {
