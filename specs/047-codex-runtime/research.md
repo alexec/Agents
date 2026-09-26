@@ -1,0 +1,252 @@
+# Research: Codex as a Runtime
+
+Measured on 2026-09-25 against `@agentclientprotocol/codex-acp@1.13.1` (npm `latest` that
+day, published 14:05 UTC) and the `@openai/codex@0.156.1` it resolves to, on this Mac
+(Apple silicon, Node v26.8.2). Codex is not installed here and nobody is signed in. Every
+probe ran with `HOME=/tmp/codex-home` and npm's cache at `/tmp/codex-npm-cache`, so nothing
+reached `~/.codex` or `~/.npm`. Anything below that needs a live, signed-in turn is marked
+**to measure in the Phase 0 spike**, which needs Alex's ChatGPT sign-in once.
+
+## R1. What runs, and why it is always the app's toolset
+
+- **Measured**: codex-acp is a Node package (`bin: codex-acp → dist/index.js`, 1.5 MB), not
+  a native program. It depends on `@openai/codex ^0.156.1`, whose `optionalDependencies`
+  are npm aliases to six per-platform packages (`@openai/codex@0.156.1-darwin-arm64`, etc.),
+  each carrying one native `codex` binary. `npm install --package-lock-only` for
+  `codex-acp@1.13.1` gives a lock of 26 packages that includes all four platforms the app
+  needs (darwin-arm64/x64, linux-arm64/x64), each with `os`, `cpu` and an `integrity` hash.
+  `npm ci --ignore-scripts --omit=dev` from that lock took **4.7 s** here and installed
+  only `codex-darwin-arm64`. That comes to 342 MB in `node_modules`, of which the binary
+  (`vendor/aarch64-apple-darwin/bin/codex`) is 238 MB. The unpacked linux-x64 package is
+  387 MB.
+- **Decision**: Codex is a toolset runtime, shaped exactly like Claude's (043/048):
+  - pinned Node v24.21.0 (the same pin as Claude's);
+  - `package: @agentclientprotocol/codex-acp`, `packageVersion: 1.13.1`,
+    `entry: dist/index.js`;
+  - the lock above;
+  - `minFreeBytes` of 1 GiB (about 520 MB unpacked, plus room).
+
+  The app writes it with `scripts/update-toolset.sh codex v24.21.0 1.13.1`, a
+  generalisation of `update-claude-toolset.sh` that checks the lock holds
+  `codex-<platform>` for all four platforms.
+- **Decision: never through the person's npx.** Claude's catalog entry is `npx -y …`, and
+  discovery prefers the person's own `npx` on the PATH before the app's toolset. Codex does
+  not do that. `Runtime` gains `searchesPath` (default true, false for Codex), and its
+  `executable` is `codex-acp`, the shim's name inside the toolset. There are three reasons:
+  (1) D5: `npx -y codex-acp@1.13.1` resolves `@openai/codex` by a caret range, so two Macs
+  could run different Codex binaries under the same app version; (2) FR-003: the 330 MB
+  fetch would happen silently inside the first turn, where the app cannot show progress;
+  (3) FR-002: a `codex-acp` of the person's on the PATH would otherwise win.
+- **Alternatives**:
+  - Claude's npx route: rejected, above.
+  - A codex-acp native build from GitHub releases: there is none; the adapter is
+    TypeScript.
+  - Running the `codex` binary alone: it has no ACP mode; the adapter is what speaks ACP.
+  - Sharing Claude's Node folder: see plan, Complexity Tracking.
+
+## R2. Handshake: what Codex says about itself
+
+`initialize` with the app's client capabilities (`elicitation.form` and `.url`,
+`auth.terminal`), signed out, answered in about 1 s:
+
+```json
+{"protocolVersion":1,
+ "agentInfo":{"name":"@agentclientprotocol/codex-acp","title":"Codex","version":"1.13.1"},
+ "agentCapabilities":{"auth":{"logout":{}},"loadSession":true,
+   "promptCapabilities":{"embeddedContext":true,"image":true},
+   "sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"fork":{},
+                          "additionalDirectories":{},"subagents":{}},
+   "mcpCapabilities":{"acp":false,"http":true,"sse":false}},
+ "authMethods":[
+   {"id":"api-key","name":"API Key","_meta":{"api-key":{"provider":"openai"}}},
+   {"id":"chat-gpt","name":"ChatGPT"},
+   {"id":"chat-gpt-device-code","name":"ChatGPT (device code)"}],
+ "_meta":{"steering":{"supported":true},"goal":{…},"jetbrains":{"air":{…}}}}
+```
+
+- **Resume (US1 #7)**: `loadSession` and `resume` both work through the existing path, so
+  no "starts afresh" wording is needed.
+- **Pictures**: `image: true`.
+- **Sign-out (US2 #5)**: `auth.logout` is advertised, so the sheet's sign-out button
+  appears through the existing capability check.
+- **Subagents**: `sessionCapabilities.subagents` and the JetBrains "AIR" extensions (native
+  subagent sessions, async tasks, goals) are only used by the adapter "after capability
+  negotiation". The app advertises none of them, so they stay off (see R5 for the tools
+  behind them).
+- **MCP**: stdio servers (the README: "command-based stdio config") and HTTP. The app's MCP
+  server goes in `session/new` `mcpServers` as for the other four. **To confirm in the
+  spike** that its tools reach the model.
+
+## R3. Not signed in, and what Codex writes
+
+- `session/new` unsigned returned `{"code":-32000,"message":"Authentication required"}`.
+  That is ACP's `authRequired`, which the daemon already turns into `needsSignIn` (FR-008).
+  Nothing new is needed.
+- Starting the adapter created `~/.codex/` in the scratch home, holding
+  `installation_id`, several SQLite stores (`state_5`, `logs_2`, `memories_1`, `queue_1`,
+  `goals_1`), `skills/` and `tmp/`. That is Codex keeping its own state, as it does from a
+  terminal. FR-016 is about the app: the app writes none of it and never sets `CODEX_HOME`.
+  SC-004's check compares `~/.codex/config.toml` and `~/.codex/auth.json`'s account, not
+  the whole folder.
+
+## R4. Signing in on the Mac
+
+- The methods are `api-key`, `chat-gpt` (hidden when `NO_BROWSER` is set) and
+  `chat-gpt-device-code` (offered because the app advertises URL elicitation).
+  `RuntimeAccount.preferredMethod` today picks the first method without a terminal, which
+  would be `api-key`. D1 wants ChatGPT first, so the runtime's policy entry gains an
+  ordering hint (`preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"]`),
+  and the sheet shows that order. There is no id comparison in view code.
+- **To measure in the spike**: that `authenticate {methodId:"chat-gpt"}` opens the browser
+  from the adapter process (it depends on `open`) and completes with a local callback,
+  writing `~/.codex/auth.json`, the same file `codex login` writes. Then Codex in a
+  terminal is signed in too (US2 Independent Test). If the browser step cannot finish over
+  ACP, the device-code method is the fallback: it arrives as a URL elicitation, which the
+  app already shows as a link with a code.
+- **Environment keys on the Mac**: `CODEX_API_KEY` and `OPENAI_API_KEY` in the login
+  environment reach the adapter unchanged. Which sign-in wins is the adapter's business.
+  The app neither adds nor strips a key on the Mac.
+
+## R5. Tools, and taking some away
+
+Codex's built-in tools come from feature switches in its config, not from a fixed list.
+The switches found in the 0.156.1 binary's strings, and in the adapter, are these:
+
+| Codex feature | Tools / behaviour | Decision |
+|---|---|---|
+| `multi_agent` (`collab`) | `spawn_agent`, `send_input`, `wait`, `close_agent`: Codex's own subagents | **off**, category agents |
+| `memories` | Codex's memory store (`memories_1.sqlite`) and its tools | **off**, category artefacts |
+| `apps` | ChatGPT connectors (Drive, etc.) exposed as tools | **off**, category artefacts, the same call as Claude's two connectors |
+| `goals` | long-running goals (`goals_1.sqlite`; the adapter's goal extension) | **off**, category standing arrangements |
+| `image_generation` | image generation | keep: not the app's remit |
+| `web_search_request` / `web_search_cached` | `web_search` | keep: a work tool |
+| `unified_exec`, `shell_snapshot`, `apply_patch_freeform`, `js_repl`, `undo` | shell, patching, REPL | keep: work tools |
+| `request_user_input` / `default_mode_request_user_input` | its question tool | **keep and turn on in every mode**, as the escalation tool (R6) |
+
+- **Lever**: `CODEX_CONFIG`, a JSON object the adapter parses at start
+  (`JSON.parse(process.env.CODEX_CONFIG)`) and merges into every session's config. It is
+  per process, additive, and writes nothing. **Decision**: a new `Lever.environmentJSON(variable:
+  "CODEX_CONFIG", value:)` with value
+  `{"features":{"multi_agent":false,"memories":false,"apps":false,"goals":false,"default_mode_request_user_input":true}}`.
+  The policy's `removed` lists the tool names each switch removes, for the briefing.
+- **To measure in the spike**: that each key is honoured. The adapter's error message says
+  a bad `CODEX_CONFIG` fails the session open, which is loud, and good. Also measure that
+  the tools are gone from the model's list, not merely refused. Any that remain become
+  `residue`, and the briefing's residue line names them.
+- **Rejected**:
+  - `CODEX_HOME` pointing at an app-owned folder: it would move `auth.json` and sign the
+    person out (D6, and Cursor's R7).
+  - Editing `~/.codex/config.toml`: FR-016.
+  - `-c key=value` on the `codex` command line: the adapter starts Codex, not the app, so
+    there is no argument path.
+- **The person's own MCP servers and profiles in `config.toml`**: left alone. Codex loads
+  them with the app's. None of Alex's is known to duplicate the app.
+
+## R6. Questions
+
+The adapter handles Codex's `request_user_input` by calling `elicitation/create` (form)
+when the client advertises form elicitation, which the app does, and falls back to empty
+answers when it does not. **Decision**: `escalationTool: "request_user_input"`, kept in
+the policy's `kept` list with the reason. `default_mode_request_user_input: true` in
+`CODEX_CONFIG` lets it ask outside plan mode. **To measure in the spike**: a card appears
+on the Mac and the phone, and an answer reaches Codex.
+
+## R7. Usage, cost and limits
+
+- The adapter sends `usage_update` with `used` and `size` (the context window) and no
+  `cost`. It also tracks Codex's `rateLimits` (5-hour and weekly plan windows) in session
+  state.
+- **Decision**: the existing meter shows context use. Cost stays absent, never zero
+  (FR-005).
+- **To measure in the spike**: whether per-turn token counts arrive anywhere (the prompt
+  result's `_meta`), and in what shape a plan-limit refusal reaches `session/prompt`, and
+  whether it names a reset time. FR-011's sentence is built from that. If it arrives as an
+  error with text, the existing "turn ended with an error" path already shows the text.
+
+## R8. Modes and models
+
+- The adapter's `AgentMode`s:
+  - `read-only` ("Ask for approval": workspace-write, no network, approval on request);
+  - `agent` (the default);
+  - `agent-full-access` ("Full access": danger-full-access, approval never).
+
+  `INITIAL_AGENT_MODE` picks the first. `session/set_mode` changes it. The model and
+  reasoning effort come as config options. The existing mode and model menus read these
+  generically, and the "helpers inherit the starter's mode, same runtime only" rule
+  (548c5e1) covers D7.
+- **To measure in the spike**: whether a call to the app's own MCP tools (`finish_turn`,
+  `lease_resource`, …) raises a permission request in `agent` mode. If it does, try Codex's
+  per-server `mcp_servers.<name>` approval setting through `CODEX_CONFIG` (FR-015). If that
+  fails, record which tools ask, and keep the briefing from claiming otherwise.
+
+## R9. Servers
+
+- **Toolset**: the same manifest as the Mac's (one pin, D5), installed by 043's
+  `ToolsetInstaller` into `~/.agents-server/tools/codex/<id>/`. The Linux Codex binaries
+  are statically linked musl builds, so Codex itself adds no libc constraint. Node's glibc
+  requirement, `canInstallClaude` today, still applies, and is renamed
+  `canInstallToolset`.
+- **Key**: an OpenAI API key (`sk-proj-…`, `sk-…`, never `sk-ant-…`), lent as
+  `CODEX_API_KEY`. `OPENAI_API_KEY` is cleared when one is lent, so the lent one wins (it
+  already takes precedence in the adapter; clearing makes it certain).
+- **`NO_BROWSER=1`** in every server launch of Codex, so `chat-gpt` is never offered there
+  (FR-020). `chat-gpt-device-code` remains, because it is the server's own sign-in and is
+  written on the server by Codex. It is only reachable when the person marks the server
+  "own sign-in only" (043), which is that mark's meaning.
+- **To measure in the spike on agents-bare**: whether `CODEX_API_KEY` in the environment
+  is enough for `session/new`, or whether `authenticate {methodId:"api-key"}` is needed. If
+  it is needed, the launcher sets `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}`, which the
+  adapter reads for exactly this case.
+- **Own sign-in on a server** (`ServerSignIn.exists("codex")`): `~/.codex/auth.json` on the
+  server, or `CODEX_API_KEY` or `OPENAI_API_KEY` in its login environment.
+- **Refused key**: the adapter's shape for a refused key is **to measure in the spike**, in
+  order to extend `isAuthenticationFailure`, which today knows Claude's `errorKind`.
+- **Checking a key on save**: `GET https://api.openai.com/v1/models` with
+  `Authorization: Bearer`. 200 is **Works**, 401 is refused, and anything else is "could
+  not check". It costs no tokens.
+
+## R10. Claude-only points to generalise (shared with 046)
+
+Every place 043 or 048 assumes the one toolset is Claude's:
+
+- `Daemon/Sources/main.swift`: `Resources/toolsets/claude` becomes `Resources/toolsets`
+  (every subfolder with a manifest).
+- `Daemon.swift` / `RuntimeInstaller.toolset`: one `MacToolsetInstaller` becomes a map
+  by runtime id. `recipe(for:)` looks up the runtime's own.
+- `MacToolsetInstaller` and `ToolsetInstaller`'s shim is written as `bin/npx`; it becomes
+  `bin/<runtime.executable>`, and the shim's comment becomes runtime-neutral.
+- `ToolsetInstaller`: `serverFolder(runtimeID: "claude")` ×4 becomes
+  `toolset.manifest.runtimeID`. `isInstalled`, `swap` and `removeOthers` take the runtime.
+- `Host.swift` `canInstallClaude`; `ServerConnection`'s `Claude` state, `wantsClaude` and
+  `installClaude` step; `HostSet.claudeToolset`: all become per-toolset.
+- `DaemonCore+Credentials.swift`:
+  - `lendableRuntimes = ["claude"]`;
+  - `ServerSignIn.exists` (only `~/.claude/.credentials.json`);
+  - `LentEnvironment.applied`, which clears Claude's two variables only;
+  - `isAuthenticationFailure`.
+- `CredentialKind`: prefixes and variables are Claude's. Each kind gains its `runtimeID`,
+  and `allVariables` becomes per runtime.
+- App: `ServerCredentials.runtimes = ["claude"]`, `Lending.swift` `record("claude")`,
+  `AppModel.swift` `record("claude")`, `ServersSettingsView` `claudeLine`, and
+  `AgentsSettingsView`'s Claude footer.
+
+046's plan (Phase 2) lists the same set. Whichever lane lands first does it once. The
+other merges it, and keeps only what the first lacked (046's plan predates 048, so it has
+no Mac toolset map).
+
+## R11. Moving the Mac toolset to a new pin
+
+048 installs the Mac toolset only when it is missing. `RuntimeDiscovery.appToolset`
+accepts any whole `current`, so a new pin in the app bundle is never installed. D5 needs
+that fixed, and fixing it helps Claude too.
+
+**Decision**, the same as 043's server rule:
+- discovery also reports whether `current` resolves to the bundled toolset's id;
+- the daemon installs a stale one's new id beside it at once;
+- it swaps `current` when no agent of that runtime is running (checked again at each agent
+  ending);
+- it removes old ids only after the swap.
+
+A running agent's process was started from the old folder's real path, so it keeps it.
+The installer's `realPath` already launches through the resolved path, not through
+`current`, and **to confirm in Phase 4**, `SessionLauncher` must do the same.
