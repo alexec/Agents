@@ -29,3 +29,15 @@ Open:
   Alex's call.
 - Copilot cannot move at all until it gets the app's tools, which is outside this feature.
 - Claude asks permission before `enter_worktree`, as it does before the lease tools.
+
+## Runtimes that would forget are left out (Alex, 2026-09-26)
+
+- Measured again after main brought Codex, Gemini and Antigravity: Codex carries its
+  conversation into another folder (yes, on the app's own copy). Gemini and Antigravity could
+  not be measured here: each needs a sign-in the real app holds (an API key, a Google login),
+  so they count as "cannot move" until they are.
+- `RuntimeCatalog.carriesConversationAcrossFolders` = Claude, Copilot, Cursor, Codex. Every
+  other runtime's agents get `--no-move-tools`, the daemon refuses to move them, and the page
+  shows the Worktree choice disabled with the reason (`grok-choice-disabled.png`: "main",
+  greyed, tooltip "Grok can't carry its conversation into another folder, so this agent stays
+  where it is. Start a new one in a worktree instead.").
