@@ -28,8 +28,8 @@ Mac. The pasted token goes away entirely.
 
 ## Defaults taken *(Alex to confirm or overturn)*
 
-Alex settled D1 and D2 on 2026-09-26. The rest are defaults so that the spec is complete, and
-each is marked *(default Dn)* where it is used.
+Alex settled D1 and D2, and confirmed D3–D7, on 2026-09-26. Each is marked *(default Dn)*
+where it is used.
 
 - **D1. A server's Claude uses this Mac's own Claude sign-in, relayed.** It is the same
   sign-in Claude uses on this Mac, the one `claude` keeps in this Mac's Keychain. Nothing of
@@ -174,7 +174,7 @@ turn ends saying the Mac went offline.
 
 1. **Given** Claude on this Mac is not signed in, or is signed in some way the relay does
    not lend *(default D3)*, **When** the person starts Claude on a server not marked "own
-   sign-in only", **Then** it ends before starting with "Claude on this Mac isn't signed in
+   sign-in only" and with no Claude sign-in of its own, **Then** it ends before starting with "Claude on this Mac isn't signed in
    with a Claude account", offering the sign-in sheet and the "own sign-in only" setting.
 2. **Given** a server marked "own sign-in only", **When** Claude starts there, **Then**
    nothing is relayed, and the server's own sign-in is used. If it has none, it ends with
@@ -248,8 +248,9 @@ port on the server. It is refused. As the person's own account, a Claude turn st
   them, including helpers and agents started from the Remote.
 - **FR-004**: The relay MUST answer only requests from the server account the Mac connects
   as. Every other request MUST be refused and logged as refused *(D5)*.
-- **FR-005**: The relay MUST read the Mac's current sign-in for each request, so a renewal
-  by Claude on the Mac is picked up at once.
+- **FR-005**: The relay MUST pick up a renewal by Claude on the Mac before it uses an expired
+  sign-in, and at the latest on the next refused request, so a renewal made on the Mac is
+  never lost.
 - **FR-006**: When a request is refused because the sign-in expired, the relay MUST re-read
   the saved sign-in, renew it at most once if it's still expired, save the renewed sign-in
   where Claude keeps it, and send the request again. It MUST NOT discard or overwrite the
@@ -325,6 +326,8 @@ port on the server. It is refused. As the person's own account, a Claude turn st
   longer lists Claude.
 - `docs/reference/runtimes.md` — change: Claude on servers uses this Mac's sign-in, not a
   token from Settings.
+- `.agents/skills/test-servers/SKILL.md`: change. A Claude turn on a server needs this Mac
+  signed in, not a pasted token.
 - `docs/how-to/sign-a-runtime-in.md` — change: signing Claude in on the Mac is also what
   signs it in on servers.
 

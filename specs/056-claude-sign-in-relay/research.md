@@ -62,7 +62,7 @@ holds a token.
   connected. A pasted token keeps working without the Mac, if 043 ever lets servers run
   on their own.
 
-## R3. What a build would change
+## First sketch: what a build would change (superseded by R3–R8 below)
 
 - `ToolPolicyCatalog`: give Claude a `relay` policy (origin `api.anthropic.com`, header
   `Authorization`, no account header, no TLS required).
@@ -73,3 +73,128 @@ holds a token.
 - Settings ▸ Servers: Claude's row reads "Uses this Mac's sign-in". The pasted token
   either goes, or stays as the fallback for when the Mac is signed out. That's a decision
   for the spec.
+
+## R3. Over TLS, sharing Codex's relay (measured 2026-09-26)
+
+**Decision**: Claude goes through the same TLS listener and the same app-made CA as Codex's
+relay. On the server it's pointed at `https://127.0.0.1:<gate port>`, and
+`NODE_EXTRA_CA_CERTS` names the CA.
+
+**Measured** on agents-devbox, with a throwaway CA and a CA-signed server certificate
+(`serverAuth`, IP SAN `127.0.0.1`), the same shape `RelayCertificates` makes for Codex:
+- Without `NODE_EXTRA_CA_CERTS`, Claude refuses at once:
+  `SSL certificate verification failed (UNABLE_TO_VERIFY_LEAF_SIGNATURE)`. The request
+  never reaches the relay.
+- With it, `claude -p "Reply with the word ok."` answers `ok` in 1.3 s. The relay saw
+  `HEAD /api/hello` and `POST /v1/messages` (200) using the stand-in.
+
+**Rationale**: One listener, one certificate set and one code path on the Mac. The traffic
+inside the ssh socket is encrypted end to end as Codex's is, so the server's gate relays
+bytes it can't read.
+
+**Alternatives**: plain HTTP (R1 finding 4). It works, but it needs a second listener,
+and the gate would carry the stand-in in the clear. The stand-in is no secret, but then
+nothing on the server could read our traffic only because the gate is well behaved.
+
+## R4. Through the ACP adapter (measured 2026-09-26)
+
+**Decision**: No change to how the adapter is started. The relay's variables go into the
+environment the server's daemon already builds for a runtime (`launchEnvironment`).
+
+**Measured**: `claude-agent-acp` was started on agents-devbox with the relay's variables and
+driven over stdio (`initialize`, `session/new`, `session/prompt`). The Claude it spawned
+(`claude-agent-sdk-linux-arm64/claude … --output-format stream-json`) had
+`ANTHROPIC_BASE_URL=https://127.0.0.1:18767` and the throwaway `CLAUDE_CONFIG_DIR` in its
+`/proc/<pid>/environ`. The relay logged `HEAD /api/hello` three times and
+`POST /v1/messages` twice, all 200, using the stand-in. The driver's printed reply was lost
+to an app restart mid-run. The relay log is the evidence. The two orphaned processes were
+stopped by pid afterwards.
+
+## R5. Reading the Mac's sign-in
+
+**Decision**: Read the Keychain item `Claude Code-credentials` (account = the Mac user) by
+running `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w`. Parse
+`claudeAiOauth.accessToken`, `expiresAt` and `scopes`. Hold the result in memory until
+60 s before `expiresAt`, and re-read at once on any 401.
+
+**Rationale**: The item is written by `claude` through `/usr/bin/security`, so reading it the
+same way raised no prompt in the spike (R1 finding 5). Reading it with `SecItemCopyMatching`
+from the app would be a different client in the item's access list, and would prompt on
+every unsigned build (the security review's "unsigned builds are strangers"). A subprocess
+per request would add tens of milliseconds to each model call, so the relay caches. The 401
+re-read keeps FR-005's promise: a renewal by the Mac's Claude is picked up on the next
+refused request at the latest.
+
+**What counts as signed in (D3)**: the item exists, parses, and its scopes include
+`user:inference`. `claude auth status --json` (`authMethod: "claude.ai"`) says the same, but
+it starts a Claude process. It's kept for the Settings line only, not per request.
+
+**Alternatives**: `SecItemCopyMatching` (prompts, above). Copying the item into the app's own
+Keychain (a second copy of a rotating secret: the problem R12 avoided).
+
+## R6. Renewing: let the Mac's Claude do it
+
+**Decision**: The relay never exchanges the refresh token itself. When the access token is
+expired or refused, the relay asks the Mac's own `claude` to renew. Then it re-reads the
+item. How it asks is measured before it's built (T-spike, below). The candidates, cheapest
+first:
+1. `claude auth status`, if it renews an expired token as a side effect;
+2. a one-token turn: `claude -p . --max-turns 1 --model haiku`, which renews before calling
+   the API. It's certain to renew, but it spends a small turn against the plan.
+
+The relay runs one renewal at a time (a single in-flight task every waiter awaits), so two
+servers finding it expired together cause one renewal (spec edge case).
+
+**Rationale**: The sign-in is Claude's, and so is the lock that stops two renewals racing.
+A second renewer, the app, is what could sign the Mac out (spec D4). Letting Claude do it
+means the app never writes the Keychain item, never needs Claude's client id or token
+endpoint, and can't spend a refresh token Claude is also spending. Codex's relay renews
+itself (047) because Codex's sign-in is a plain file with no lock of its own. That reason
+doesn't carry over.
+
+**How it's measured, safely**: the Mac's access token expired at about 15:00 on 2026-09-26
+(expiresAt read in R1). Just after a natural expiry, with nothing else using Claude, run
+candidate 1 and read `expiresAt` before and after. This is Claude renewing its own item,
+which it does several times a day anyway, so it puts nothing at risk. No test ever renews
+Alex's sign-in from app code.
+
+**Alternatives**: the app renews with the OAuth exchange and writes the item back with
+`security add-generic-password -U`. Rejected: it races Claude's own renewal, needs values
+read out of Claude's binary, and a mistake signs Alex out.
+
+## R7. What the server's Claude is started with
+
+**Decision**: On a relayed run the server's daemon sets:
+- `ANTHROPIC_BASE_URL=https://127.0.0.1:<gate port>`
+- `CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-agents-relay-standin`
+- `NODE_EXTRA_CA_CERTS=<root>/runtimes/claude-relay-ca.pem`
+
+It takes out `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK` and
+`CLAUDE_CODE_USE_VERTEX` (spec edge case: the relay replaces any sign-in in the server's
+environment). No home folder or file is written for Claude, unlike Codex. The stand-in
+starts `sk-ant-oat`, so Claude sends the subscription headers the relay passes on as-is.
+
+**Measured**: with `CLAUDE_CODE_OAUTH_TOKEN` set, the server's Claude made no sign-in or
+profile calls. It made only `/api/hello` and `/v1/messages` (R1, R3, R4), so there's nothing
+for it to renew and nothing the relay has to fake.
+
+## R8. Removing the token
+
+**Decision**: `CredentialKind` loses `.oauthToken` and `.apiKey`. Gemini's key is the only
+kind left. Everything that exists only for Claude's token goes with them:
+- the Claude check in `CredentialCheck`;
+- the "needs a token" `TokenAskCard` (Gemini's ask becomes "needs a key");
+- `claudeLine`'s token wording. Claude joins `toolsetLine`, which already speaks for relayed
+  runtimes.
+
+`CredentialStore` already drops a record of a kind it no longer knows, one at a time
+(f10cd50). 056 adds deleting that runtime's Keychain item
+(`agents.runtime-credential.claude`) on first start.
+
+The server's own-sign-in check (`ServerSignIn.exists`), which read Claude's variables off
+`CredentialKind`, reads them from Claude's relay policy instead.
+
+**New failure**: `signInWanted` (`-32070`, clear of the codes on every branch today, highest
+`-32060`). The server's daemon raises it before starting Claude when no relay is offered,
+the server isn't "own sign-in only", and the server has no Claude sign-in of its own. The
+window shows the 053 sign-in sheet for Claude on the Mac.
