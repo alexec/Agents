@@ -35,7 +35,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T005 Ask Alex for a Gemini API key (AskUserQuestion); keep it only in the scratch root's launch environment and in `/tmp`, never in a repo file or the real app's environment
 - [X] T006 With a hand-run `npm ci` of `App/Resources/toolsets/gemini/` into `/tmp/gemini-spike/` (Node from the pinned tarball), run a real `--acp` turn with the app's MCP server in `mcpServers` and a hand-written policy file on `--policy`; record in `specs/046-gemini-cli/research.md` R2 (MCP tools reach the model), R3 (untrusted folder does not stop a turn), R5 (a `deny` rule with no `argsPattern` hides the tool or only refuses it), R9 (shape of a quota / `RESOURCE_EXHAUSTED` failure over ACP)
 - [X] T007 Same setup, no key in the environment: call `authenticate` with `oauth-personal` and with `gemini-api-key`; record in research R4 what each does over ACP and whether a lent `GEMINI_API_KEY` alone is enough on a server
-- [ ] T008 (Mac half done, R13: `npm ci` 4 s, no compiler, `node-pty` not needed) On agents-bare (test-servers skill, 127.0.0.1:2223) and on this Mac, confirm `npm ci --ignore-scripts` of the Gemini lock succeeds without a compiler and `run_shell_command` works (`node-pty` prebuilt or skipped); record in research R10
+- [X] T008 (Mac half done, R13: `npm ci` 4 s, no compiler, `node-pty` not needed) On agents-bare (test-servers skill, 127.0.0.1:2223) and on this Mac, confirm `npm ci --ignore-scripts` of the Gemini lock succeeds without a compiler and `run_shell_command` works (`node-pty` prebuilt or skipped); record in research R10
 
 **Result (R13)**: all measured but quota (left to the walk) and agents-bare (T008). Two decisions by Alex: `--skip-trust` (D7) and one Settings key for the Mac and servers (D3 revised) — tasks T059–T062 below.
 
@@ -118,7 +118,7 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T041 `DaemonCore.lendableRuntimes` = runtimes with a bundled toolset; `ServerSignIn.exists(runtimeID:)` asks a per-runtime check (Claude: `~/.claude/.credentials.json` or its variables); `lendCredential` refuses a kind whose `runtimeID` ≠ `lend.runtime`, in `Daemon-side/Daemon/DaemonCore+Credentials.swift`
 - [X] T042 `ToolsetInstaller` scripts use the toolset's `runtimeID` for `serverFolder` and the shim from T010; `ServerFacts.canInstallClaude` → `canInstall(_ toolset:)`, in `Daemon-side/Hosts/ToolsetInstaller.swift` and `Core/Hosts/Host.swift`
 - [X] T043 App side: `ServerCredentials.runtimes` from the bundled toolsets; `Lending`, `AppModel` (the `record("claude")` at the host check) and `ServersSettingsView` (`claudeLine`) iterate runtimes, in `App/Sources/Settings/ServerCredentials.swift`, `App/Sources/Hosts/Lending.swift`, `App/Sources/AppModel.swift`, `App/Sources/Settings/ServersSettingsView.swift`, `App/Sources/Hosts/HostSet.swift`
-- [ ] T044 Run `Tests/Integration/LendTests.swift`, `ServerInstallerTests.swift`, `ToolsetInstallTests.swift`, `RebuiltServerTests.swift`, `Tests/Unit/CredentialKindTests.swift` and (with `AGENTS_BARE=1`) `Tests/Live/BareServerLiveTests.swift`: Claude on servers unchanged
+- [X] T044 Run `Tests/Integration/LendTests.swift`, `ServerInstallerTests.swift`, `ToolsetInstallTests.swift`, `RebuiltServerTests.swift`, `Tests/Unit/CredentialKindTests.swift` and (with `AGENTS_BARE=1`) `Tests/Live/BareServerLiveTests.swift`: Claude on servers unchanged
 
 ---
 
@@ -131,9 +131,9 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [X] T045 [US4] Add `CredentialKind.geminiAPIKey`: prefix `AIza`, runtime `gemini`, lends `GEMINI_API_KEY`, clears `GEMINI_API_KEY` and `GOOGLE_API_KEY`, display "Gemini API key"; paste refusal sentence "That isn't a Gemini API key. They start with AIza; get one at aistudio.google.com/apikey." in `Core/Runtimes/CredentialKind.swift`; tests in `Tests/Unit/CredentialKindTests.swift` (masked descriptions only)
 - [X] T046 [US4] Gemini key check in `Daemon-side/Credentials/CredentialCheck.swift`: `GET https://generativelanguage.googleapis.com/v1beta/models?pageSize=1` with header `x-goog-api-key` (never in the URL); 200 → Works, 400 `API_KEY_INVALID` or 403 → refused, else could-not-check; tests in `Tests/Unit/CredentialCheckTests.swift` with a stubbed session
 - [X] T047 [US4] Keychain record `gemini` beside Claude's; Settings ▸ Runtime credentials shows a Gemini row (kind, where to get one, paste field, masked `AIza…` + last 4) in `App/Sources/Settings/ServerCredentials.swift`; **look gate**: one screenshot to Alex
-- [ ] T048 [US4] If T007 found a key in the environment is not enough, call `authenticate` with `gemini-api-key` after lending on a server, in the server launch path in `Daemon-side/Daemon/DaemonCore+Credentials.swift`
+- [X] T048 [US4] If T007 found a key in the environment is not enough, call `authenticate` with `gemini-api-key` after lending on a server, in the server launch path in `Daemon-side/Daemon/DaemonCore+Credentials.swift`
 - [X] T049 [US4] Server start offers Gemini in a server project's runtime list when installable there; the set-up checklist shows the Gemini toolset install; "own sign-in only" sends no key — verify through `App/Sources/Hosts/` and fix gaps
-- [ ] T050 [US4] Extend `Tests/Live/BareServerLiveTests.swift` (`AGENTS_BARE=1 AGENTS_GEMINI=1`): install Gemini's toolset on agents-bare, run a turn, then `scripts/leak-check.sh` for the key on the server's disk and the Mac's logs (SC-005, time recorded)
+- [X] T050 [US4] Extend `Tests/Live/BareServerLiveTests.swift` (`AGENTS_BARE=1 AGENTS_GEMINI=1`): install Gemini's toolset on agents-bare, run a turn, then `scripts/leak-check.sh` for the key on the server's disk and the Mac's logs (SC-005, time recorded)
 
 ---
 

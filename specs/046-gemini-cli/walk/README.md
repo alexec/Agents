@@ -29,3 +29,19 @@
   said "Gemini stopped answering" and called the process dead. Fixed: a provider's limit is
   said in its own words and ends the turn (UsageLimitTests). The write_file fix is proven by
   test only until the quota resets.
+
+## 2026-09-25 — Gemini on a bare Linux server (agents-bare, 127.0.0.1:2223, real ssh)
+
+`AGENTS_BARE=1 swift test --filter aBareServerGetsGeminiLendsItsKeyAndSaysARefusalIsOne`, with
+the Linux agentsd built from this branch:
+- Gemini's toolset (Node v24.21.0 + @google/gemini-cli 0.61.0) installed from nothing, `npm ci
+  --ignore-scripts` with no compiler (T008), server connected in **12.3 s**.
+- A Gemini start asked for the key once, was lent a made-up `AIza…` key, started; Google
+  refused it and the agent said "Gemini refused the key in Settings. Replace it in Settings ▸
+  Servers."
+- `grep` for the key over the server's `$HOME` and `/tmp`: nothing (FR-016).
+- Claude's case (`aBareServerGetsClaudeLendsOnDemandAndSaysARefusalIsOne`) still passes.
+- A real turn on the server waits for the quota to reset on Alex's free key.
+
+Also found: main's Linux agentsd no longer built (048/047's Mac installer imports CryptoKit and
+URLSession). Guarded: a server's agentsd hashes and downloads nothing of its own (043).

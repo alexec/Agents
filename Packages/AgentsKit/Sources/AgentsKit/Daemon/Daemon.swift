@@ -32,7 +32,12 @@ public final class Daemon: @unchecked Sendable {
         var installer: RuntimeInstaller?
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
+            #if canImport(CryptoKit)
             let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
+            #else
+            // Only a Mac installs its own toolsets, and only a Mac can hash them (043).
+            let toolsets: [String: Toolset] = [:]
+            #endif
             discovery.bundledToolsetIDs = toolsets.mapValues(\.id)
             installer = RuntimeInstaller(
                 discovery: discovery,
