@@ -22,9 +22,9 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 ## Phase 1: Setup
 
 - [ ] T001 Merge current `main` into this branch and confirm `swift test` in `Kit/` and both Xcode schemes build before any change; record the failing-test baseline (main's known flakes) in `specs/046-gemini-cli/walk/baseline.md`
-- [ ] T002 Create `scripts/update-gemini-toolset.sh` from `scripts/update-claude-toolset.sh`: package `@google/gemini-cli`, version `0.61.0`, `entry` `bundle/gemini.js`, `forwardsArguments: true`, `minFreeBytes` 419430400; writes `App/Resources/toolsets/gemini/{manifest.json,package.json,package-lock.json,mac-node.json}` with Node v24.21.0 checksums for Linux `x86_64`/`aarch64` and macOS `arm64`/`x64` (same Node pin as `App/Resources/toolsets/claude/`)
-- [ ] T003 Run `scripts/update-gemini-toolset.sh` and commit `App/Resources/toolsets/gemini/`; check the folder is copied into the app bundle's `toolsets/` beside `claude/` in `project.yml` (add it if the Claude folder is listed by name)
-- [ ] T004 [P] Add `"gemini": [<toolset shim>, "--acp"]` to `RUNTIMES` in `scripts/acp-handshake.sh` and the Gemini tool names to `scripts/runtime-tools.sh`, taking the shim path from `AGENTS_GEMINI_SHIM` (no PATH lookup)
+- [X] T002 Create `scripts/update-gemini-toolset.sh` from `scripts/update-claude-toolset.sh`: package `@google/gemini-cli`, version `0.61.0`, `entry` `bundle/gemini.js`, `forwardsArguments: true`, `minFreeBytes` 419430400; writes `App/Resources/toolsets/gemini/{manifest.json,package.json,package-lock.json,mac-node.json}` with Node v24.21.0 checksums for Linux `x86_64`/`aarch64` and macOS `arm64`/`x64` (same Node pin as `App/Resources/toolsets/claude/`)
+- [X] T003 Run `scripts/update-gemini-toolset.sh` and commit `App/Resources/toolsets/gemini/`; check the folder is copied into the app bundle's `toolsets/` beside `claude/` in `project.yml` (add it if the Claude folder is listed by name)
+- [X] T004 [P] Add `"gemini": [<toolset shim>, "--acp"]` to `RUNTIMES` in `scripts/acp-handshake.sh` and the Gemini tool names to `scripts/runtime-tools.sh`, taking the shim path from `AGENTS_GEMINI_SHIM` (no PATH lookup)
 
 ---
 
