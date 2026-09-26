@@ -78,6 +78,14 @@ struct RuntimeInstallDispatchTests {
         #expect(await core.runtimeStatuses().allSatisfy { $0.runtime.install == nil }, "no button is offered")
     }
 
+    /// It runs a vendor's script, so only the app's own window may ask: an agent's
+    /// helper and a stranger on the socket are turned away before dispatch.
+    @Test func onlyTheWindowMayAsk() {
+        #expect(ConnectionRole.control.allows(DaemonAPI.Method.runtimesInstall))
+        #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.runtimesInstall))
+        #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.runtimesInstall))
+    }
+
     @Test func aPhoneIsRefused() async throws {
         let (core, root) = try core(installer: Gated(result: .installFailed(reason: "x")))
         defer { try? FileManager.default.removeItem(at: root) }
