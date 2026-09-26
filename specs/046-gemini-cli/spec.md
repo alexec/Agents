@@ -40,11 +40,18 @@ and each is marked *(default Dn)* where it is used.
 - **D2. On the Mac and on servers.** Servers get Gemini the way 043 gives them Claude: a
   pinned toolset installed on demand, and a credential from the Mac's Settings lent to each
   run and never written to the server's disk. *(Settled by Alex.)*
-- **D3. On the Mac, Gemini uses its own sign-in.** Whatever Gemini CLI already has in the
-  person's home (a Google account sign-in or an API key in its environment) is what an agent on
-  the Mac uses, as with 043's D5 for Claude. A key in Settings is for servers only.
-- **D4. A server credential is a Gemini API key.** Settings takes a Gemini API key from Google
-  AI Studio. A Google account sign-in (a browser sign-in whose tokens live in the Mac's
+- **D3. One Gemini key in Settings, for the Mac and servers.** Google's own sign-in no longer
+  works for individuals in Gemini CLI (measured 2026-09-25: "migrate to Antigravity"), so an
+  API key is the way in. The key in Settings ▸ Runtime credentials is handed to Gemini agents
+  on this Mac as well as on servers; a `GEMINI_API_KEY` already in the person's environment is
+  used when Settings has none. *(Settled by Alex, 2026-09-25, replacing "Gemini's own sign-in
+  on the Mac".)*
+- **D7. Trusted for the session.** Gemini loads the app's tools only in a folder it trusts, so
+  the app starts it trusting the agent's folder for that session (`--skip-trust`), writing
+  nothing of Gemini's. A project's own Gemini hooks and settings then load in those agents too.
+  *(Settled by Alex, 2026-09-25.)*
+- **D4. The credential is a Gemini API key.** Settings takes a Gemini API key from Google
+  AI Studio (they start `AIza` or `AQ.`). A Google account sign-in (a browser sign-in whose tokens live in the Mac's
   `~/.gemini`) is not copied to servers in this version. *Alternative: lend the Mac's Google
   account sign-in too.*
 - **D5. Pinned.** Each app version names one Gemini version, the same on the Mac and on
@@ -181,8 +188,8 @@ project it is offered when it is installed there or can be installed there (User
 - **Quota or rate limit.** Gemini refuses the turn because of a quota or rate limit (common on the free tier). The turn ends with that reason in a sentence, not as a crash, and the agent can be prompted again later.
 - **Free-tier model fallback.** Gemini switches to a smaller model in the middle of a session when the larger one's quota runs out. The model shown for the agent follows what Gemini reports, if it reports it. The app never claims a model that is not being used.
 - **The person's own Gemini settings.** `~/.gemini/settings.json`, and anything else of Gemini's in the person's home, is never written by the app. MCP servers the person configured there are left as they are. Whether Gemini loads them in the app's agents is recorded in the plan's research *(default D6)*.
-- **A key in the environment.** On the Mac, `GEMINI_API_KEY` or `GOOGLE_API_KEY` in the environment the app was launched with is Gemini's own sign-in and is used as such *(default D3)*. On a server, a key from Settings replaces any key in the server's environment for that run (043 D1).
-- **A Google account sign-in on the Mac, nothing in Settings, and a server agent.** The app asks for a Gemini API key in place. It does not copy the Mac's Google sign-in to the server *(default D4)*.
+- **A key in the environment.** On the Mac, a `GEMINI_API_KEY` in the environment the app was launched with is used only when Settings has no Gemini key; a key in Settings wins, for that agent's process only *(D3)*. On a server, the key from Settings replaces any key in the server's environment for that run (043 D1).
+- **Google sign-in.** Gemini still offers it, and for individuals it refuses with its own sentence ("migrate to Antigravity"); the sheet shows that sentence and points to the key in Settings *(D3)*.
 - **A key Google refuses.** The agent stops with a sentence saying the key was refused, and a way to replace it, distinct from any other failure (043 FR-016).
 - **Unsupported attachments.** A picture attached for a Gemini agent goes as a picture if Gemini says it takes pictures, and as a reference to the file if not. The app follows what Gemini says about itself when it starts.
 
@@ -205,7 +212,8 @@ project it is offered when it is installed there or can be installed there (User
 
 - **FR-007**: A Gemini agent that cannot start because Gemini is not signed in MUST say so and offer the runtime sign-in sheet; it MUST NOT fail silently or wait forever.
 - **FR-008**: The sign-in sheet MUST show Gemini's own sign-in choices and advice, and hand over a browser or terminal step where Gemini needs one.
-- **FR-009**: On the Mac, a Gemini agent MUST use Gemini's own sign-in, and a key in Settings MUST NOT be sent to agents on the Mac *(default D3)*.
+- **FR-009**: A Gemini agent on the Mac MUST be given the Gemini key from Settings, for that agent's process only; with none in Settings, a `GEMINI_API_KEY` in the person's environment is used; with neither, the agent says it needs a key and where to put it *(D3)*.
+- **FR-009a**: Gemini MUST be started trusting the agent's folder for that session only, writing nothing to Gemini's own files, so the app's tools load *(D7)*.
 
 **The app's tools and scoping**
 
@@ -216,7 +224,7 @@ project it is offered when it is installed there or can be installed there (User
 
 **Gemini on servers**
 
-- **FR-014**: Settings' runtime credentials MUST list Gemini, take a Gemini API key, check it with Google on save and say in words whether it works, and keep it only in the Mac's Keychain, shown masked afterwards *(default D4)*.
+- **FR-014**: Settings' runtime credentials MUST list Gemini, take a Gemini API key (`AIza…` or `AQ.…`), check it with Google on save and say in words whether it works, and keep it only in the Mac's Keychain, shown masked afterwards *(default D4)*.
 - **FR-015**: A server MUST install Gemini's pinned toolset on demand, from official sources, checked against checksums the app carries, with progress in the set-up checklist; an incomplete install MUST never be used *(default D2, D5)*.
 - **FR-016**: A Gemini key MUST reach a server only as part of starting Gemini there, for that run, and MUST NOT be written to the server's disk, any log, transcript or crash report, or sent for any other runtime.
 - **FR-017**: 043's rules for servers MUST hold for Gemini as they do for Claude: a server's "own sign-in only" mark, asking for the key in place when none is usable, a refused key shown as its own failure, and a rebuilt server set up again on confirmation.

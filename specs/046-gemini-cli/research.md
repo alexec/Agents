@@ -280,3 +280,41 @@ other toolset folder at the end of an install. Gemini's bundle loads its chunks 
 it mid-turn. **Decision**: the daemon passes the ids in use (agents holding the runtime record
 the toolset path they started from) and `removeOthers` skips them; the next install, or the
 next daemon start, removes them once unused.
+
+## R13. The live trial (T005–T008), 2026-09-25
+
+Gemini CLI 0.61.0 from the app's own lock (`npm ci --ignore-scripts` into `/tmp/gemini-spike`,
+4 s, no compiler; `node-pty` not built and not missed), Node v26 on this Mac, a scratch
+`HOME`, Alex's key read from `/tmp/gemini-key` and never printed. Driven over `--acp` with a
+stub stdio MCP server named `agents` offering `finish_turn`.
+
+- **Key**: Alex's AI Studio key starts `AQ.` (53 characters), not `AIza`. Google now issues
+  both. `GEMINI_API_KEY` in the environment is enough: no `settings.json`, no `authenticate`
+  call. **Decision**: `geminiAPIKey` is recognised by either prefix (R4 superseded).
+- **Untrusted folder (R3)**: a turn works. But **stdio MCP servers are refused** in an
+  untrusted folder (`MCP server '…' uses stdio transport but current folder is not trusted`,
+  silently for the model), and the app's own server is stdio — so without trust a Gemini agent
+  has no `finish_turn`, leases, waits or workflows. `--skip-trust` trusts the folder for that
+  session only and wrote nothing to `trustedFolders.json`; the app's tool then arrives as
+  `mcp_agents_finish_turn`, and a real call reached the server. Gemini asks permission first,
+  as Claude does. **Decision (Alex, 2026-09-25)**: start Gemini with `--skip-trust`. Its cost,
+  said plainly: a project's own `.gemini` hooks, agents and settings load in the app's Gemini
+  agents, as if the person had trusted it in Gemini.
+- **MCP (R2)**: reaches the model once trusted, as above.
+- **Deny hides (R5)**: without `--policy`, `invoke_agent` is in the model's list; with it, it
+  is not. `tracker_*` are absent either way in 0.61.0 (off by default); their rules stay as a
+  guard for when Gemini turns them on.
+- **Usage (R7)**: exactly as read: `_meta.quota.token_count` on every ending; `model_usage`
+  names `gemini-3.8-flash` for an `auto` session, and a second entry `auto` on a later turn.
+- **Sign-in (R4)**: `authenticate oauth-personal` answered `-32000` "This client is no longer
+  supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to
+  the Antigravity suite of products" — after a real browser sign-in completed and left Google
+  tokens in the scratch home (deleted at once). `authenticate gemini-api-key` answers `{}` and
+  writes `security.auth.selectedType` into Gemini's own `settings.json`; it does not supply a
+  key. So for individuals **an API key is the only way in**. **Decision (Alex, 2026-09-25)**:
+  the Gemini key in Settings ▸ Runtime credentials is lent to Gemini agents on this Mac as well
+  as on servers (D3 revised); a `GEMINI_API_KEY` already in the person's environment is used
+  when Settings has none. The sheet's Google choice stays (Gemini offers it; Workspace and
+  paid accounts may still work) and its refusal is shown as Gemini words it.
+- **Quota (R9)**: not provoked; the free tier did not run out in five turns. Left to the walk.
+- **Modes**: `default`, `autoEdit`, `yolo`, `plan` (ids differ from the help text's `auto_edit`).
