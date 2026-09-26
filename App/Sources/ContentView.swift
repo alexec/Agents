@@ -46,11 +46,7 @@ struct ContentView: View {
         .paperGround()
         // What the chat does not need is how wide the sidebar opens (`SidebarFrame.open`).
         .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.paneWidth = $0 }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                SidebarToggle(windowWidth: width)
-            }
-        }
+        // Its toggle is in the sessions column's toolbar, after the search field.
     }
 
     private var isShowingActivity: Bool {
