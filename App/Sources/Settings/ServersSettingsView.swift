@@ -77,7 +77,7 @@ private struct ServerLine: View {
                     .appText(.fine).foregroundStyle(.secondary)
             }
             Text(subtitle).appText(.fine).foregroundStyle(.secondary)
-            Text(model.hosts.claudeLine(host.id, hasCredential: model.credentials.record("claude") != nil))
+            Text(model.hosts.claudeLine(host.id, canRelay: SignInRelays.canRelay(RuntimeCatalog.claude.id)))
                 .appText(.fine).foregroundStyle(.secondary)
             ForEach(ServerBinaries.serverRuntimes.filter { $0 != RuntimeCatalog.claude.id }, id: \.self) { runtimeID in
                 Text(model.hosts.toolsetLine(host.id, runtimeID: runtimeID,

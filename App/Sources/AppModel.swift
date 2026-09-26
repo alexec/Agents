@@ -1154,7 +1154,8 @@ final class AppModel {
         }
         hosts.claudeWanted = { [weak self] id in
             guard let self else { return false }
-            return self.credentials.record("claude") != nil && !(self.hosts.host(id)?.ownSignInOnly ?? false)
+            // This Mac's own Claude sign-in, relayed (056).
+            return SignInRelays.canRelay(RuntimeCatalog.claude.id) && !(self.hosts.host(id)?.ownSignInOnly ?? false)
         }
         hosts.toolsetWanted = { [weak self] id, runtimeID in
             guard let self else { return false }

@@ -34,8 +34,8 @@ final class SignInRelays: @unchecked Sendable {
         switch relay.macSignIn {
         case .file(let path):
             made = CodexFileSignIn(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path))
-        case .keychain:
-            made = nil
+        case .keychain(let service):
+            made = ClaudeKeychainSignIn(service: service)
         }
         sources[runtimeID] = made
         return made

@@ -6,12 +6,18 @@ import Foundation
 //
 // Not for the prompt box: its value changes on screen but not in its SwiftUI binding, so
 // Send stays disabled. Send a turn with server-rpc.sh instead.
+//
+// A prefix of "-" matches only an empty field that is not a search field: the toolbar's
+// "Search sessions" comes first in the tree, so "" finds it rather than the Add a server
+// sheet's.
 let a = CommandLine.arguments
 guard a.count >= 4 else { print("usage: field.swift <pid> <prefix> <value> [--confirm]"); exit(2) }
 let app = AXUIElementCreateApplication(pid_t(a[1])!)
 func attr(_ e: AXUIElement, _ n: String) -> AnyObject? { var v: AnyObject?; AXUIElementCopyAttributeValue(e, n as CFString, &v); return v }
+func matches(_ value: String) -> Bool { a[2] == "-" ? value.isEmpty : value.hasPrefix(a[2]) }
 func find(_ e: AXUIElement, _ d: Int) -> AXUIElement? {
-    if (attr(e, kAXRoleAttribute) as? String) == "AXTextField", (attr(e, kAXValueAttribute) as? String ?? "").hasPrefix(a[2]) { return e }
+    if (attr(e, kAXRoleAttribute) as? String) == "AXTextField",
+       !(a[2] == "-" && (attr(e, kAXSubroleAttribute) as? String) == "AXSearchField"), matches(attr(e, kAXValueAttribute) as? String ?? "") { return e }
     if d > 40 { return nil }
     for c in (attr(e, kAXChildrenAttribute) as? [AXUIElement]) ?? [] { if let f = find(c, d + 1) { return f } }
     return nil

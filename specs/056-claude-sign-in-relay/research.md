@@ -125,6 +125,10 @@ per request would add tens of milliseconds to each model call, so the relay cach
 re-read keeps FR-005's promise: a renewal by the Mac's Claude is picked up on the next
 refused request at the latest.
 
+**Measured (T016, 2026-09-26)**: 20 reads took 17.1 ms median and 36.2 ms at worst, and the
+item's scopes include `user:inference`. A read per request would add about 17 ms to every
+model call. The cache stays.
+
 **What counts as signed in (D3)**: the item exists, parses, and its scopes include
 `user:inference`. `claude auth status --json` (`authMethod: "claude.ai"`) says the same, but
 it starts a Claude process. It's kept for the Settings line only, not per request.

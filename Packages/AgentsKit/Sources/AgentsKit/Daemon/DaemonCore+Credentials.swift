@@ -36,11 +36,12 @@ enum ServerSignIn {
     static var home: String { ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory() }
 
     static func exists(runtimeID: String) -> Bool {
-        let variables = CredentialKind.variables(for: runtimeID)
-        guard !variables.isEmpty else { return true }
-        // Claude's own login leaves a file as well as, or instead of, a variable.
-        if runtimeID == RuntimeCatalog.claude.id,
-           FileManager.default.fileExists(atPath: "\(home)/.claude/.credentials.json") {
+        let relay = ToolPolicyCatalog.policy(for: runtimeID).relay
+        let variables = Set(CredentialKind.variables(for: runtimeID) + (relay?.ownSignInVariables ?? []))
+        guard !variables.isEmpty || relay?.ownSignInFile != nil else { return true }
+        // Claude's own login leaves a file as well as, or instead of, a variable (056: the
+        // policy says where).
+        if let file = relay?.ownSignInFile, FileManager.default.fileExists(atPath: "\(home)/\(file)") {
             return true
         }
         let env = LoginShellPath.environment()
