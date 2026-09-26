@@ -25,8 +25,9 @@ What is new:
    silently inside a first turn (R1).
 2. **More than one toolset.** 048 wires exactly one toolset (Claude's) into the daemon and
    the app. It becomes a map by runtime id, on the Mac and on servers. **The Mac toolset
-   also learns to move to a new pin** (D5), which 048 does not do yet. That helps Claude
-   too.
+   also learns to move to a new pin** (D5), which 048 does not do yet: an outdated toolset
+   gets an **Update** button, and a folder an agent still runs from is never removed.
+   That helps Claude too, and it is the same design as 046's Phase 6.
 3. **A tool policy** through `CODEX_CONFIG`: a JSON object the adapter merges into Codex's
    session config. It switches off the `multi_agent`, `memories`, `apps` and `goals`
    features, and nothing in `~/.codex` changes (R5). The escalation tool is
@@ -130,7 +131,7 @@ specs/047-codex-runtime/
 
 ```text
 Packages/AgentsKit/Sources/AgentsKitCore/
-├── Model/Runtime.swift                  # + `searchesPath` (false for Codex)
+├── Model/Runtime.swift                  # + `usesAppCopyOnly` (true for Codex; the same field as 046)
 ├── Runtimes/RuntimeCatalog.swift        # + codex
 ├── Runtimes/ToolPolicy.swift            # Lever + .environmentJSON(variable:, value:)
 ├── Runtimes/ToolPolicyCatalog.swift     # + codex policy
@@ -138,12 +139,12 @@ Packages/AgentsKit/Sources/AgentsKitCore/
 ├── Runtimes/Toolset.swift               # shim named for the runtime; comments not Claude-only
 └── Hosts/Host.swift                     # canInstallClaude → canInstallToolset
 Packages/AgentsKit/Sources/AgentsKit/
-├── Runtimes/RuntimeDiscovery.swift      # skip PATH when !searchesPath; stale-pin check
+├── Runtimes/RuntimeDiscovery.swift      # skip PATH when usesAppCopyOnly; outdated check
 ├── Runtimes/RuntimeInstaller.swift      # toolsets: [runtimeID: MacToolsetInstaller]
-├── Runtimes/MacToolsetInstaller.swift   # shim name from runtime; install beside, swap when idle
+├── Runtimes/MacToolsetInstaller.swift   # shim name from runtime; keep folders agents still run from
 ├── ACP/Serve/SessionLauncher*.swift     # apply .environmentJSON; NO_BROWSER on servers
 ├── Daemon/Daemon.swift                  # toolsets folder, not claude's
-├── Daemon/DaemonCore+Install.swift      # update-when-idle for a stale Mac toolset
+├── Daemon/DaemonCore+Install.swift      # install an outdated toolset on Update
 ├── Daemon/DaemonCore+Credentials.swift  # lendable = runtimes with a toolset; own sign-in per runtime
 └── Hosts/ToolsetInstaller.swift         # folder from manifest.runtimeID
 Daemon/Sources/main.swift                # Resources/toolsets, not toolsets/claude
@@ -201,7 +202,7 @@ api-key` must be called too (R9). Findings go into research.md as "Measured" lin
   shim name).
 
 **Phase 2: Codex on the Mac (US1 + US3, the MVP).**
-- Add `RuntimeCatalog.codex` (`searchesPath: false`), its toolset folder and its policy
+- Add `RuntimeCatalog.codex` (`usesAppCopyOnly: true`), its toolset folder and its policy
   (`.environmentJSON` lever) in one commit, with the totality test gaining Codex.
 - Discovery skips the PATH for it, so a `codex-acp` of the person's is never used (FR-002).
 - The start sheet and Settings ▸ Agents list Codex with 048's install button and progress.
@@ -220,13 +221,13 @@ api-key` must be called too (R9). Findings go into research.md as "Measured" lin
   is advertised.
 - Plan-limit and rate-limit endings get a sentence, from what the spike shows.
 
-**Phase 4: Moving a Mac toolset to a new pin (D5, FR-003a).**
+**Phase 4: Moving a Mac toolset to a new pin (D5, FR-003a), the same design as 046's
+Phase 6, and done once by whichever lane lands first.**
 - `RuntimeDiscovery` reports a toolset whose `current` is not the bundled id as available
-  but stale.
-- The daemon installs the new id beside it straight away.
-- It swaps `current` when no agent of that runtime is running, as 043 does on servers.
-- A running agent keeps the path it launched with, because its process already holds the
-  old folder, and the old folder is removed only after the swap.
+  and `outdated`.
+- The setup row shows **Update**, which installs the new id and moves `current`.
+- An agent records the executable path it started from. A folder any agent still runs from
+  is kept until that agent ends, so a running Codex agent keeps its build.
 - This applies to Claude's toolset as well.
 
 **Phase 5: Codex on servers (US4).**
@@ -247,6 +248,6 @@ api-key` must be called too (R9). Findings go into research.md as "Measured" lin
 
 | Deviation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| `Runtime.searchesPath` (Codex never uses the person's npx or `codex-acp`) | D3/D5: the pinned lock, including the exact 238 MB Codex binary, is what runs, and it is installed with progress | `npx -y codex-acp@1.13.1` like Claude resolves `@openai/codex` by a caret range, and does its 330 MB fetch silently inside the first turn |
+| `Runtime.usesAppCopyOnly` (Codex never uses the person's npx or `codex-acp`) | D3/D5: the pinned lock, including the exact 238 MB Codex binary, is what runs, and it is installed with progress | `npx -y codex-acp@1.13.1` like Claude resolves `@openai/codex` by a caret range, and does its 330 MB fetch silently inside the first turn |
 | `Lever.environmentJSON` | Codex's only per-process, additive lever is `CODEX_CONFIG` (R5) | `CODEX_HOME` would sign the person out (D6), and there is no deny-list flag |
 | Toolset per runtime, each with its own Node (~180 MB twice) | 043's rule is that a toolset is replaced as a whole. Codex and Claude pins move independently | a shared Node would couple the two runtimes' updates, for a saving only on disk |

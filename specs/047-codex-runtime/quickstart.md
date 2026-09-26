@@ -60,8 +60,9 @@ still being installed.
 ## 4. A new pin (D5, FR-003a)
 
 With a Codex agent running on toolset A, rebuild with toolset B:
-- B installs beside A, and the agent keeps running;
-- when the agent ends, `current` moves to B and A is removed.
+- the Codex row shows **Update**, and pressing it installs B and moves `current`, while the
+  agent keeps running on A;
+- A's folder is removed only once that agent has ended.
 
 Claude's toolset behaves the same way.
 

@@ -17,10 +17,11 @@ none of that work shows up in the app's lists, on the phone, in workflows or in 
 recorded this plainly: "Codex isn't a runtime."
 
 Codex does not speak the agent protocol (ACP) on its own. Its ACP adapter, published by the
-same project that publishes Claude's, carries Codex inside it and ships as one program per
-platform. So the app can install that program itself: the person needs nothing on their Mac
-beforehand, not even Node. How the app installs its runtimes' programs at start-up is a
-separate feature, which another lane is planning. This spec needs Codex to be one of the
+same project that publishes Claude's, is a Node package that carries Codex's own program for
+each platform. So the app can install it the way it installs Claude for somebody without Node:
+a pinned Node and the adapter, in the app's own folder. The person needs nothing on their Mac
+beforehand. How the app installs its runtimes' programs at start-up is a separate feature
+(048, now merged). This spec needs Codex to be one of the
 programs it installs, and says what Codex needs from it. The work here is in
 the parts that differ between runtimes: how Codex signs in (a ChatGPT account, with a refresh
 token Codex keeps rotating), its own approval and sandbox presets, which of its tools overlap
@@ -276,7 +277,7 @@ project it is offered when it is installed there, or can be installed there (Use
 ## Assumptions
 
 - Codex is run through its ACP adapter (published as `@agentclientprotocol/codex-acp`, 1.13.1 on 2026-09-25), which carries Codex itself and ships a self-contained build per platform. The plan's research measures, against a real signed-in Codex rather than from this spec: where the official per-platform builds and their checksums are published, whether a build runs without Node, whether the Mac build is signed so it runs without a Gatekeeper prompt, the exact command, its sign-in methods over ACP, its modes and models, its tool names, whether it can ask a question or sign out over ACP, whether it loads a conversation, and how the app's MCP tools reach it. Codex is not installed on this Mac today, and Alex will sign it in with his ChatGPT account for the live proof.
-- The adapter's release has builds for macOS (Apple silicon and Intel) and Linux (x86-64 and ARM64). If one turns out to need Node after all, the installer installs a pinned Node beside it, and the person still installs nothing.
+- The adapter's release has builds for macOS (Apple silicon and Intel) and Linux (x86-64 and ARM64). Measured in planning: the adapter needs Node, so the installer installs a pinned Node beside it, as it does for Claude, and the person still installs nothing.
 - **Depends on the start-up installer**, a separate feature being planned in another lane. That feature owns downloading, checking, updating, progress and failure reporting for the app's runtime programs on the Mac. This spec adds Codex to its list, and can be planned alongside it, but cannot ship on the Mac before it. Until the installer's spec exists, this plan must coordinate with that lane rather than build a Codex-only installer.
 - Codex accepts an OpenAI API key through its environment, so a server can be signed in by lending the key per run, as 043 does for Claude.
 - This builds on 043 (runtime credentials, server toolsets, "own sign-in only"), which is merged. It extends 043's D3 "Claude first" to Codex, as 046 does for Gemini. 046 and this spec both add a runtime, a policy entry and a toolset; whichever merges second takes the other's rows.

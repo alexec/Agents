@@ -26,7 +26,7 @@ PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/lib/node_modules/@agentclie
 The adapter finds Codex's native binary through `@openai/codex`'s own `bin/codex.js`, under
 the same `node_modules`. `CODEX_PATH` is never set.
 
-The PATH is never searched (`searchesPath: false`). A `codex`, `codex-acp` or `npx` of the
+The PATH is never searched (`usesAppCopyOnly: true`). A `codex`, `codex-acp` or `npx` of the
 person's is never run.
 
 ## Environment
@@ -65,10 +65,9 @@ live test.
 
 ## Mac toolset update (R11)
 
-1. At daemon start, and at each app update, if `tools/codex/current` does not resolve to the
-   bundled id, install the bundled id beside it (a `.part-<id>` folder, then `ok`, then a
-   rename).
-2. When no Codex agent is running, `ln -sfn <new id> current`, done atomically by renaming a
-   temporary link over it, and remove the other ids.
-3. A Codex agent is launched through the resolved `<id>` path, never through `current`, so
-   a swap does not change a running process.
+1. If `tools/codex/current` does not resolve to the bundled id, the row is `outdated` and
+   offers **Update**.
+2. **Update** installs the bundled id beside it (a `.part-<id>` folder, then `ok`, then a
+   rename) and moves `current` by renaming a temporary link over it.
+3. A Codex agent is launched through the resolved `<id>` path, never through `current`, and
+   records that path. Old ids are removed only when no agent still runs from them.

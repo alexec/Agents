@@ -6,13 +6,13 @@ Only additions and changes are listed. Everything else is 043/048 as merged.
 
 | Field | Type | Codex | Notes |
 |---|---|---|---|
-| `searchesPath` | `Bool`, default `true` | `false` | When false, `RuntimeDiscovery.locate` looks only at the app's toolset (Mac `tools/<id>/current`, server `~/.agents-server/tools/<id>/current`). It is decoded with a default, so an older phone or Mac reads `true` (R1). |
+| `usesAppCopyOnly` | `Bool`, default `false` | `true` | When true, `RuntimeDiscovery.locate` looks only at the app's toolset (Mac `tools/<id>/current`, server `~/.agents-server/tools/<id>/current`). It is decoded with a default, so an older phone or Mac reads `false` (R1). The same field as 046's. |
 
 `RuntimeCatalog.codex`:
 
 ```text
 id: "codex"   name: "Codex"   executable: "codex-acp"   arguments: []
-searchesPath: false
+usesAppCopyOnly: true
 install: .toolset(runtimeID: "codex")
 installPage: https://github.com/agentclientprotocol/codex-acp
 ```
@@ -39,11 +39,11 @@ order is whichever merges first.
 | installing | an install task under way | 048's `installing(progress:)` |
 | failed | the last install threw | 048's `installFailed(reason:)` |
 | current | `current` → the bundled id, whole | `available` |
-| **stale** (new) | `current` → another id, whole | `available`, and an install of the bundled id starts in the background |
-| **ready to swap** (new) | the bundled id is whole beside a stale `current` | `available`. `current` moves when no agent of the runtime runs |
+| **outdated** (new, 046's T035) | `current` → another id, whole | `available`, `RuntimeStatus.outdated = true`, with an **Update** button beside the tick |
 
 Transitions: missing → installing → current | failed; failed → installing (on retry);
-current → stale (app update) → ready to swap → current (idle swap; old ids removed).
+current → outdated (app update) → installing (Update) → current. Old ids are removed only
+when no agent still runs from them (046's T037).
 
 ## ToolPolicy: one lever and one field added
 

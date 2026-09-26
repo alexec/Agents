@@ -31,7 +31,7 @@ reached `~/.codex` or `~/.npm`. Anything below that needs a live, signed-in turn
   `codex-<platform>` for all four platforms.
 - **Decision: never through the person's npx.** Claude's catalog entry is `npx -y …`, and
   discovery prefers the person's own `npx` on the PATH before the app's toolset. Codex does
-  not do that. `Runtime` gains `searchesPath` (default true, false for Codex), and its
+  not do that. `Runtime` gains `usesAppCopyOnly` (default false, true for Codex; 046 adds the same field for Gemini), and its
   `executable` is `codex-acp`, the shim's name inside the toolset. There are three reasons:
   (1) D5: `npx -y codex-acp@1.13.1` resolves `@openai/codex` by a caret range, so two Macs
   could run different Codex binaries under the same app version; (2) FR-003: the 330 MB
@@ -240,13 +240,17 @@ no Mac toolset map).
 accepts any whole `current`, so a new pin in the app bundle is never installed. D5 needs
 that fixed, and fixing it helps Claude too.
 
-**Decision**, the same as 043's server rule:
-- discovery also reports whether `current` resolves to the bundled toolset's id;
-- the daemon installs a stale one's new id beside it at once;
-- it swaps `current` when no agent of that runtime is running (checked again at each agent
-  ending);
-- it removes old ids only after the swap.
+**Decision**: the design 046 planned for the same gap (its Phase 6, T035–T039), so the
+two lanes build it once:
+- discovery reports `outdated` when `current` does not resolve to the bundled toolset's id;
+- the setup row offers **Update**, which runs the same install and moves `current`;
+- each agent records the executable path it started from, and a toolset folder any agent
+  still runs from is not removed until that agent ends.
 
-A running agent's process was started from the old folder's real path, so it keeps it.
-The installer's `realPath` already launches through the resolved path, not through
-`current`, and **to confirm in Phase 4**, `SessionLauncher` must do the same.
+Earlier draft, replaced: a silent install at start, with the swap made when no agent was
+running. It was rejected to match 046, and because 048's rows already put installs in the
+person's hands.
+
+A running agent's process was started from the old folder's resolved path, so it keeps it.
+**To confirm in Phase 4**: `SessionLauncher` launches through the resolved path, not
+through `current`.
