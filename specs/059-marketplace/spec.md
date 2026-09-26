@@ -179,8 +179,9 @@ named `review` to You. Then stop the fixture server and search.
 - **`npx skills` used as well.** Skills it added appear with their source, because the app reads
   and writes the same record. Update and Remove from the app work on them too. Skills the app
   adds are seen by `npx skills update`.
-- **A project on a server (remote host).** Its page has no Add skill… in this slice. The Skills
-  section lists what is there, read-only.
+- **A project on a server (remote host).** Its page has no Skills section in this slice
+  (research R10). Listing a host's folders comes with the MCP slice, which needs to reach hosts
+  anyway.
 - **The app is in a scratch root.** Downloads, the destination and the record all use the scratch
   home, never the real one, so a walk cannot change the person's own skills.
 
@@ -209,7 +210,7 @@ named `review` to You. Then stop the fixture server and search.
 - **FR-006**: Choosing a result MUST fetch that skill at its repository's current commit, and
   show:
   - owner and repository, with links;
-  - the commit;
+  - the commit (with its date when GitHub allows the extra request, research R4);
   - the install count;
   - the destination path;
   - SKILL.md rendered;
