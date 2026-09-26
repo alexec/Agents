@@ -78,4 +78,30 @@ struct LineSplitterTests {
         #expect(lines.last == "{\"b\":2}")
         #expect(splitter.examined == wire.count)
     }
+
+    /// A peer that never ends its line is let go once the line passes the limit, and
+    /// what it sent is not kept.
+    @Test func givesUpOnALineLongerThanItsLimit() {
+        var splitter = LineSplitter(maximumLine: 1024)
+        let block = [UInt8](repeating: UInt8(ascii: "x"), count: 512)
+        #expect(feed(&splitter, block).isEmpty)
+        #expect(!splitter.overflowed)
+        #expect(feed(&splitter, block + [UInt8(ascii: "x")]).isEmpty)
+        #expect(splitter.overflowed)
+        // Nothing more is taken, newline or not.
+        #expect(feed(&splitter, Array("{\"a\":1}\n".utf8)).isEmpty)
+    }
+
+    /// Lines under the limit go through however many there are and however they
+    /// arrive, including a read longer than the limit made of short lines.
+    @Test func passesLinesUnderItsLimit() {
+        var splitter = LineSplitter(maximumLine: 16)
+        let wire = Array(String(repeating: "{\"a\":1}\n", count: 20).utf8)
+        #expect(feed(&splitter, wire).count == 20)
+        #expect(!splitter.overflowed)
+        let split = Array("{\"b\":2}".utf8)
+        #expect(feed(&splitter, Array(split[..<3])).isEmpty)
+        #expect(feed(&splitter, Array(split[3...]) + [UInt8(ascii: "\n")]) == ["{\"b\":2}"])
+        #expect(!splitter.overflowed)
+    }
 }
