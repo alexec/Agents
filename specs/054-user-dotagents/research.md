@@ -195,7 +195,9 @@ offers neither, and its log does not mention the plugin.
    app's own `agents` server too, which is why 036 saw Copilot agents with no app tools. FR-018
    (never write a runtime's config) and Story 6 ("every runtime") cannot both hold for Copilot.
    The ways out are: write `~/.copilot/mcp-config.json`, run stdio servers behind a local http
-   endpoint the app serves, or accept the gap. **This is Alex's call, for the plan.**
+   endpoint the app serves, or accept the gap. **Decided by Alex, 2026-09-26: the local http
+   bridge.** The app serves each stdio server over local http for Copilot. That writes no
+   config, and gives Copilot agents the app's own `agents` tools too.
 3. **The clash rule (FR-020) only orders what the app sends.** When the same name is in the
    runtime's own config, Codex and Copilot keep their own, Claude and Grok take the request's,
    and Cursor runs both. Settings should say which copy each runtime ends up with, not promise
@@ -205,6 +207,7 @@ offers neither, and its log does not mention the plugin.
    Gemini through a `~/.gemini/extensions/<name>` link. Grok does not start a plugin's MCP
    server, so a plugin's server should also go out in `mcpServers` for Grok. Codex needs a
    one-time `plugin add`, which writes its config and copies the plugin, so the app must add it
-   again on every change. Cursor and Copilot-over-ACP are not reachable today.
+   again on every change. **Decided by Alex, 2026-09-26: the app re-adds it whenever the plugin's
+   folder changes**, and the Plugins page says so. Cursor and Copilot-over-ACP are not reachable today.
 5. **Only the log shows what a runtime got**, so the Settings view (FR-024) should report
    what the app sent and what each runtime is known to do with it, not ask the model.

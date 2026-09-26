@@ -72,9 +72,9 @@ Not rendered to PNG; they are in [wireframes.html](wireframes.html#f):
 - **Personal only.** A project's own `.agents` folder belongs on its project page, which is a
   separate piece of work.
 - **Mac only.** Nothing on the phone.
-- **Open: Copilot and stdio servers.** Copilot refuses every stdio server the app sends, the
-  app's own included (R9). The wireframes show that as a gap. The alternative is the app
-  serving stdio servers over local http for Copilot, which would also give Copilot agents the
-  app's own tools.
-- **Open: Codex's plugin copy.** Codex copies a plugin when it is added. Either the app re-adds
-  it on every change (and says so in E), or the person does.
+- **Decided (Alex, 2026-09-26): Copilot gets stdio servers through a local http bridge.**
+  Copilot refuses every stdio server sent over ACP (R9), so the app serves them to it over
+  local http. That also gives Copilot agents the app's own tools, so frames A and C should
+  show Copilot as reached once the bridge is built.
+- **Decided (Alex, 2026-09-26): the app re-adds a plugin to Codex whenever the plugin
+  changes**, since Codex keeps a copy. Frame E's Codex line says so.
