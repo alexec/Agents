@@ -165,6 +165,10 @@ targets:
           your agents are doing.
         NSBonjourServices:
           - _agents._tcp
+        # Pairing: the camera reads the code the Mac shows in Settings ▸ Devices, once.
+        NSCameraUsageDescription: >-
+          To read the pairing code your Mac shows, so only your own phone or iPad can
+          connect to it.
         # A silent push — a need moved elsewhere, or met — wakes the app to show or
         # remove its own banner (021 T079). Best effort by Apple's design.
         UIBackgroundModes:

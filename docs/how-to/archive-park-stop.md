@@ -69,6 +69,28 @@ Three ways to put an agent down, each keeping its whole conversation:
 | Where it is listed | **Stopped** | **Parked** | **Archived**, folded away |
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
+| Afterwards | | | Retired after 30 days, or sooner when archived agents take more than 2 GB |
 | Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring back** |
+
+## How long archived chats are kept
+
+An archived chat is kept whole, and can be brought back or branched from, for **30 days**.
+After that it is **retired**: its conversation is deleted, and a short record of who the agent
+was is kept, so an event or a chat that names it still says who it was. Archived chats may also
+take up to **2 GB** between them; past that, the ones archived longest ago are retired first.
+
+- Nothing is retired on the day it was archived, so an archive by mistake can always be undone.
+- A chat whose worktree still has changes that are not committed or merged is kept until they
+  are, and its card says so. So is one a workflow run still belongs to, or one you have open.
+- A few days before a chat is retired, its card under **Archived** says **Retires in 3 days**.
+  The list ends with how many older chats have been retired.
+- To keep a chat, bring it back, or park it instead of archiving it. Only archived chats are
+  ever retired.
+- To retire one now, right-click its card under **Archived** and choose **Retire Now…**.
+- To change how long and how much, or to keep archived chats forever, see **Settings ▸ Agents ▸
+  Archived agents** in the [settings reference](../reference/settings.md).
+
+Retiring deletes only what Agents keeps. It never touches your files, your commits, or the
+runtime's own copy of the conversation.
 
 To put a whole project away, see [Add a project](add-a-project.md).

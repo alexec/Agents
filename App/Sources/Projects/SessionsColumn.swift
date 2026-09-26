@@ -36,10 +36,18 @@ struct SessionsColumn: View {
                 }
             }
             let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
-            if !archived.isEmpty {
+            // What has been retired from here (051), as the section's last line.
+            let retiredLine = query.isEmpty
+                ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
+            if !archived.isEmpty || retiredLine != nil {
                 Section(isExpanded: $showsArchived) {
                     ForEach(archived.prefix(Self.archivedShown)) { agent in
                         row(agent)
+                    }
+                    if let retiredLine {
+                        Text(retiredLine)
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     heading("Archived", count: archived.count)

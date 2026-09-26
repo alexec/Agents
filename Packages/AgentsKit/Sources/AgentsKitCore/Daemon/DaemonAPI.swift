@@ -88,6 +88,15 @@ public enum DaemonAPI {
         /// bridge stops carrying anything for it through the relay. Refused `notAllowed` on
         /// a device's own connection.
         public static let devicesForget = "devices/forget"
+        /// The Mac's window asking for a pairing code to show as a QR code: the Mac's key,
+        /// a one-time secret and this Mac's name, good for five minutes or one device,
+        /// whichever comes first (security review, Phase 3). Asking again replaces it.
+        public static let devicesStartPairing = "devices/startPairing"
+        /// The window's pairing sheet closing before anybody scanned it.
+        public static let devicesStopPairing = "devices/stopPairing"
+        /// The bridge asking for the code's secret, so its listener can take it. A window's
+        /// connection only, which the bridge's is; a device's never.
+        public static let pairingCurrent = "pairing/current"
         /// The bridge handing the daemon the public half of the Mac's relay key, so a device
         /// announcing on the direct link is given it (046, R4). Said once per connection,
         /// right after `mailbox/carry`.
@@ -110,6 +119,15 @@ public enum DaemonAPI {
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
+        /// Retire one archived agent now, or with `confirmed: false`, say how much that
+        /// frees (051). The person's alone.
+        public static let agentsRetire = "agents/retire"
+        /// What is left of retired agents, by project or by id (051).
+        public static let agentsRetired = "agents/retired"
+        /// How long archived agents are kept, and how much space they take (051).
+        public static let retentionState = "retention/state"
+        /// Change that, confirming first when the change retires agents at once (051).
+        public static let retentionSet = "retention/set"
         /// Put a chat down to come back to, or pick it back up (040). The person's
         /// word about their own attention: no agent tool reaches either.
         public static let agentsPark = "agents/park"
@@ -236,6 +254,10 @@ public enum DaemonAPI {
         /// Which runtimes this window could lend a credential for, and whether this server
         /// takes lends at all. Names only; sent on every connect to a server (043).
         public static let credentialsOffer = "credentials/offer"
+        /// That this window relays a runtime's sign-in from the Mac (047): where the relay's
+        /// socket was forwarded to on the server, the certificate it answers with, and the
+        /// stand-in sign-in the runtime is given. Nothing secret; sent on every connect.
+        public static let relayOffer = "relay/offer"
         /// A credential for one runtime, for this connection only, sent only after the
         /// daemon answered `credentialWanted`. Held in memory and dropped when the
         /// connection closes; a daemon without `--serve` refuses it (043, D5).
@@ -310,6 +332,9 @@ public enum DaemonAPI {
         public static let attentionChanged = "attention/changed"
         /// A device announced or was heard from: the whole record (021).
         public static let deviceChanged = "device/changed"
+        /// A pairing code began, was used or ran out. Carries nothing: whoever needs the
+        /// secret asks `pairing/current` on a connection allowed to.
+        public static let pairingChanged = "pairing/changed"
         /// Something for a device's mailbox: a `MailboxItem`, sealed. The daemon has no
         /// CloudKit and must not; the bridge hears this and posts it. Every connection
         /// hears it, and that is safe: a need id, a device id and ciphertext name
@@ -345,6 +370,13 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+        /// The retention settings, or what the archive holds, changed (051). A
+        /// `RetentionState`.
+        public static let retentionChanged = "retention/changed"
+        /// An agent was retired and is not in any list any more (051). An
+        /// `AgentRemovedNotification`. An older window ignores it and drops the agent at
+        /// its next `agents/list`.
+        public static let agentRemoved = "agent/removed"
 
         /// A lease was granted, extended, released, ended or expired, or a line moved:
         /// the whole `LeaseSnapshot`, which clients replace rather than merge (036).
@@ -438,6 +470,9 @@ public enum DaemonAPI {
         /// the ordinary case; non-zero means `costToDate` is a floor rather than the
         /// whole.** Like `counts`, recomputed on every call and never stored.
         public var unmeasuredAgents: Int
+        /// How many agents have been retired from this project (051). Their costs are
+        /// still in `costToDate`: retiring an agent changes no total.
+        public var retiredCount: Int = 0
         /// Which machine the project is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
@@ -448,6 +483,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
+            case retiredCount
         }
 
         /// Whether anything in this project wants the user.
@@ -486,6 +522,7 @@ public enum DaemonAPI {
             }
             costToDate = try c.decodeIfPresent([String: Decimal].self, forKey: .costToDate) ?? [:]
             unmeasuredAgents = try c.decodeIfPresent(Int.self, forKey: .unmeasuredAgents) ?? 0
+            retiredCount = try c.decodeIfPresent(Int.self, forKey: .retiredCount) ?? 0
         }
     }
 
@@ -1361,6 +1398,12 @@ public enum DaemonAPI {
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
+        /// The agent was retired: only its tombstone is left (051). The message says who
+        /// it was and when, and replaces `noSuchAgent` for that id and nothing else.
+        public static let agentRetired = -32050
+        /// Retire now on an agent that is not archived, or that something still holds
+        /// (051). The message is the reason.
+        public static let retireRefused = -32051
         /// No longer raised: a prompt sent to a working agent waits its turn rather
         /// than being refused. The number is kept so an older window still reads it.
         public static let alreadyRunning = -32006
@@ -2055,14 +2098,76 @@ public enum DaemonAPI {
         }
     }
 
-    /// `connection/bindDevice`: which device a bridge connection carries, when the
-    /// bridge knows. The relay knows from the key that opened the frame; the LAN link
-    /// learns it from the device until it has a key of its own to know it by.
+    /// `connection/bindDevice`: which device a bridge connection carries. The relay knows
+    /// from the key that opened the frame, the direct link from the key its TLS was
+    /// locked with. `pairing` is a connection locked with a pairing code instead: nobody
+    /// yet, allowed only to announce itself.
     public struct DeviceBinding: Codable, Sendable {
         public var id: UUID?
+        public var pairing: Bool?
 
-        public init(id: UUID?) {
+        public init(id: UUID?, pairing: Bool = false) {
             self.id = id
+            self.pairing = pairing ? true : nil
+        }
+    }
+
+    /// What the Mac shows as a QR code, and what the phone reads from it.
+    public struct PairingCode: Codable, Sendable, Hashable {
+        /// The Mac's relay key, X9.63. The phone keeps this one and no other.
+        public var macKey: Data
+        /// Thirty-two random bytes, good once.
+        public var secret: Data
+        /// This Mac's name, as the bridge advertises it on Bonjour.
+        public var name: String
+        public var expires: Date
+
+        public init(macKey: Data, secret: Data, name: String, expires: Date) {
+            self.macKey = macKey
+            self.secret = secret
+            self.name = name
+            self.expires = expires
+        }
+
+        /// The text in the QR code: `agents-pair:1:<key>:<secret>:<name>`, the key and the
+        /// secret in base64url and the name percent-encoded.
+        public var text: String {
+            let name = name.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+            return "agents-pair:1:\(Self.base64url(macKey)):\(Self.base64url(secret)):\(name)"
+        }
+
+        /// A code read back from a QR code's text, without its expiry: the phone does not
+        /// know it and does not need to, the Mac refuses a code it has let go.
+        public init?(text: String) {
+            let parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 5, parts[0] == "agents-pair", parts[1] == "1",
+                  let key = Self.data(base64url: parts[2]), key.count == 65, key.first == 0x04,
+                  let secret = Self.data(base64url: parts[3]), secret.count == 32,
+                  let name = parts[4].removingPercentEncoding
+            else { return nil }
+            self.init(macKey: key, secret: secret, name: name, expires: .distantFuture)
+        }
+
+        static func base64url(_ data: Data) -> String {
+            data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        }
+
+        static func data(base64url text: String) -> Data? {
+            var base = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            while base.count % 4 != 0 { base += "=" }
+            return Data(base64Encoded: base)
+        }
+    }
+
+    /// `pairing/current`: the secret the bridge's listener should take, if any.
+    public struct PairingSecret: Codable, Sendable, Hashable {
+        public var secret: Data?
+        public var expires: Date?
+
+        public init(secret: Data?, expires: Date?) {
+            self.secret = secret
+            self.expires = expires
         }
     }
 
@@ -2229,6 +2334,24 @@ public extension DaemonAPI {
         }
     }
 
+    /// `relay/offer` (047): the Mac lends a runtime its own sign-in through a relay, without
+    /// the sign-in ever reaching the server. `socketPath` is the server end of the window's
+    /// reverse forward to the relay (made owner-only by sshd); `caCertificate` is the PEM the
+    /// runtime is told to trust for it; `standIn` is a sign-in file with no secret in it.
+    struct RelayOffer: Codable, Hashable, Sendable {
+        public var runtime: String
+        public var socketPath: String
+        public var caCertificate: String
+        public var standIn: String
+
+        public init(runtime: String, socketPath: String, caCertificate: String, standIn: String) {
+            self.runtime = runtime
+            self.socketPath = socketPath
+            self.caCertificate = caCertificate
+            self.standIn = standIn
+        }
+    }
+
     /// `credentials/lend` (043). The one message that carries a credential's text. It is
     /// never logged: the server prints only the method's name for it.
     struct CredentialsLend: Codable, Hashable, Sendable, CustomStringConvertible, CustomReflectable {
@@ -2303,4 +2426,95 @@ public extension DaemonAPI {
 
     /// The most `files/write` takes, and the most the window sends.
     static let attachmentLimit = 25 * 1024 * 1024
+
+    // MARK: Retiring archived agents (051)
+
+    /// `retention/state`, and what `retention/changed` carries.
+    public struct RetentionState: Codable, Hashable, Sendable {
+        public var settings: RetentionSettings
+        public var archivedCount: Int
+        public var archivedBytes: Int
+        public var retiredCount: Int
+        /// Over the cap with nothing more that can be retired yet, and why.
+        public var overCap: OverCap?
+
+        public init(settings: RetentionSettings, archivedCount: Int, archivedBytes: Int,
+                    retiredCount: Int, overCap: OverCap? = nil) {
+            self.settings = settings
+            self.archivedCount = archivedCount
+            self.archivedBytes = archivedBytes
+            self.retiredCount = retiredCount
+            self.overCap = overCap
+        }
+    }
+
+    public struct RetentionSetRequest: Codable, Sendable {
+        public var settings: RetentionSettings
+        /// Without it, a change that would retire agents at once is only described.
+        public var confirmed: Bool
+
+        public init(settings: RetentionSettings, confirmed: Bool) {
+            self.settings = settings
+            self.confirmed = confirmed
+        }
+    }
+
+    /// How much retiring would free.
+    public struct RetirePreview: Codable, Hashable, Sendable {
+        public var count: Int
+        public var bytes: Int
+        /// Some of them may turn out to be held when the time comes, which a preview
+        /// cannot know; the confirmation then says "up to".
+        public var upTo: Bool
+
+        public init(count: Int, bytes: Int, upTo: Bool = false) {
+            self.count = count
+            self.bytes = bytes
+            self.upTo = upTo
+        }
+    }
+
+    public struct RetentionSetResult: Codable, Sendable {
+        public var applied: Bool
+        /// When not applied: what it would retire.
+        public var wouldRetire: RetirePreview?
+        /// When applied: the state after.
+        public var state: RetentionState?
+
+        public init(applied: Bool, wouldRetire: RetirePreview? = nil, state: RetentionState? = nil) {
+            self.applied = applied
+            self.wouldRetire = wouldRetire
+            self.state = state
+        }
+    }
+
+    public struct RetireRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var confirmed: Bool
+
+        public init(agentID: UUID, confirmed: Bool) {
+            self.agentID = agentID
+            self.confirmed = confirmed
+        }
+    }
+
+    public struct RetiredRequest: Codable, Sendable {
+        /// The most one answer carries.
+        public static let limitCeiling = 200
+
+        public var folder: URL?
+        public var ids: [UUID]?
+        public var limit: Int?
+
+        public init(folder: URL? = nil, ids: [UUID]? = nil, limit: Int? = nil) {
+            self.folder = folder
+            self.ids = ids
+            self.limit = limit
+        }
+    }
+
+    public struct AgentRemovedNotification: Codable, Sendable {
+        public var agentID: UUID
+        public init(agentID: UUID) { self.agentID = agentID }
+    }
 }

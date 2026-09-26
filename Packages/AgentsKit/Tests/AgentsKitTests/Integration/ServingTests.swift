@@ -147,6 +147,64 @@ struct ServingTests {
         #expect(await writeIsOnTheRecord())
     }
 
+    /// Antigravity (049, T025a): its own card, with the diff, then a write through us. The
+    /// person answers the first; the second is the same question, so it is not asked.
+    @Test func aWriteAlreadyAllowedOnTheRuntimesOwnCardIsNotAskedAgain() async throws {
+        let (locations, work) = try temporary()
+        let target = work.appending(path: "hello.txt")
+        var script = FakeACPAgent.Script()
+        script.clientRequests = [
+            (ACP.ClientMethod.requestPermission, [
+                "toolCall": ["toolCallId": "c1", "title": "Run client_create_file?", "kind": "edit", "status": "pending",
+                             "content": [["type": "diff", "path": .string(target.path), "newText": "hello\n"]],
+                             "locations": [["path": .string(target.path)]]],
+                "options": [["optionId": "allow_once", "name": "Allow", "kind": "allow_once"],
+                            ["optionId": "reject_once", "name": "Deny", "kind": "reject_once"]]]),
+            (ACP.ClientMethod.writeTextFile, ["path": .string(target.path), "content": "hello\n"]),
+        ]
+        let launcher = FakeLauncher(script: script, capabilities: serving)
+        let core = try core(launcher, locations: locations)
+        _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "write it"))
+
+        await eventually("the runtime's own card is asked") { await core.pendingPermissionRequests().isEmpty == false }
+        let pending = await core.pendingPermissionRequests()
+        #expect(pending.count == 1)
+        #expect(pending.first?.toolCall.title == "Run client_create_file?")
+        guard let request = pending.first else { return }
+        try await core.answerPermission(.init(permissionID: request.id, optionID: "allow_once"))
+
+        await eventually("the file was written without a second question") {
+            (try? String(contentsOf: target, encoding: .utf8)) == "hello\n"
+        }
+        #expect(await core.pendingPermissionRequests().isEmpty)
+    }
+
+    /// Allowing one file on the runtime's card allows that file, not the next.
+    @Test func anAllowedEditOfOneFileDoesNotLetAnotherThrough() async throws {
+        let (locations, work) = try temporary()
+        let allowed = work.appending(path: "a.txt")
+        let other = work.appending(path: "b.txt")
+        var script = FakeACPAgent.Script()
+        script.clientRequests = [
+            (ACP.ClientMethod.requestPermission, [
+                "toolCall": ["toolCallId": "c1", "title": "Edit a.txt", "kind": "edit", "status": "pending",
+                             "content": [["type": "diff", "path": .string(allowed.path), "newText": "a"]]],
+                "options": [["optionId": "allow_once", "name": "Allow", "kind": "allow_once"]]]),
+            (ACP.ClientMethod.writeTextFile, ["path": .string(other.path), "content": "b"]),
+        ]
+        let launcher = FakeLauncher(script: script, capabilities: serving)
+        let core = try core(launcher, locations: locations)
+        _ = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "write it"))
+
+        await eventually("the runtime's own card is asked") { await core.pendingPermissionRequests().isEmpty == false }
+        guard let first = await core.pendingPermissionRequests().first else { return }
+        try await core.answerPermission(.init(permissionID: first.id, optionID: "allow_once"))
+        await eventually("the other file's write is asked about") {
+            await core.pendingPermissionRequests().contains { $0.toolCall.diffs.first?.path == other.path }
+        }
+        #expect(FileManager.default.fileExists(atPath: other.path) == false, "nothing yet")
+    }
+
     @Test func aRefusedWriteLeavesTheFileAloneAndTellsTheAgent() async throws {
         let (locations, work) = try temporary()
         let target = work.appending(path: "kept.txt")

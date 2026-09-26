@@ -96,4 +96,27 @@ public enum AppTool {
 
     /// The older name for the outcome half: how the work went, on its own.
     public static let reportOutcome = "report_outcome"
+
+    /// The name the app's MCP server goes by in a runtime's session (`mcpServers`).
+    public static let serverName = "agents"
+
+    /// Every tool the app's MCP server serves.
+    public static let all: [String] = [
+        finishTurn, showFile, manageWorkflows, startAgent, stopAgent, archiveAgent, listMyAgents,
+        leaseResource, releaseResource, listResources, waitForEvent, cancelWait, publishEvent,
+        pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+    ]
+
+    /// How runtimes put the server's name in front of a tool's, as measured: Claude's
+    /// adapter says `mcp__agents__finish_turn`, Antigravity `agents_finish_turn` (049).
+    static let serverPrefixes = ["mcp__\(serverName)__", "\(serverName)_", "\(serverName)-", "\(serverName)/"]
+
+    /// Whether `called` is one of the app's own tools, named with the app's server in front.
+    /// Never a bare name: a runtime's own tool can share one — Antigravity has a
+    /// `list_resources` of its own — and only the server in front says whose it is.
+    public static func isServedByTheApp(_ called: String) -> Bool {
+        serverPrefixes.contains { prefix in
+            called.hasPrefix(prefix) && all.contains(String(called.dropFirst(prefix.count)))
+        }
+    }
 }

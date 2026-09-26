@@ -87,8 +87,17 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
+        } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
+            // Retired (051): nothing left to chat with, only who it was.
+            RetiredAgentPage(tombstone: gone, startedBy: model.retiredStarterLabel(gone)).paperGround()
         } else if model.selection != nil {
             chat(inWindowOf: width)
+                // Every route to an agent by id comes here — a workflow's run, a pull
+                // request's agent, a menu. One the window has no agent for may have been
+                // retired (051): asked once, and the page above shows when it has been.
+                .task(id: model.selection) {
+                    if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
+                }
         } else {
             // The project on its own: a new session, its pull requests, workflows and
             // worktrees. Its sessions are the middle column's.

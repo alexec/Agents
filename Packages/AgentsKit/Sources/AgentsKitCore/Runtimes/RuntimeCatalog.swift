@@ -82,7 +82,20 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
         usesAppCopyOnly: true)
 
-    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini]
+    /// Google's Antigravity ACP server (049), not the `agy` CLI: the CLI has no ACP mode
+    /// (google-antigravity/antigravity-cli#31), and Google publishes this server for ACP
+    /// clients. A signed binary per platform, downloaded from Google by the set-up page and
+    /// never shipped with the app; what it needs at launch is in `RuntimeLaunchCatalog`.
+    public static let antigravity = Runtime(
+        id: "antigravity",
+        name: "Antigravity",
+        executable: "agy_acp_server",
+        arguments: [],
+        install: .toolset(runtimeID: "antigravity"),
+        installPage: URL(string: "https://antigravity.google/docs/ide/extensions")!,
+        usesAppCopyOnly: true)
+
+    public static let builtIn: [Runtime] = [claude, grok, copilot, cursor, codex, gemini, antigravity]
 
     public static func runtime(id: String) -> Runtime? {
         builtIn.first { $0.id == id }

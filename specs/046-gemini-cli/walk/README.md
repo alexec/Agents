@@ -72,3 +72,16 @@ on `finish_turn` (main's new option), so those agents archived themselves — as
 description allows. Gemini keeps its own chat history and project names in `~/.gemini/tmp` and
 `~/.gemini/projects.json` of whoever runs the daemon (the real home, for a scratch daemon); the
 app writes none of it, and `~/.gemini/settings.json` was never created.
+
+## 2026-09-26 — lease and wait (T034), scratch root /tmp/run-046 (build 8f38e16, main)
+
+- gemini-3-flash-preview was still refused by Google ("You have exhausted your daily quota on
+  this model.", said in those words); gemini-3.5-flash-lite, from the same model menu, was not.
+- One Gemini agent, told to lease `gemini-walk`, wait for `custom.gemini_go`, release, and say
+  the event's message: `lease_resource` → "Leased gemini-walk until 23:27." The events page's
+  waiting list then showed it "◷ Waiting for custom.gemini_go · until 23:22", cancellable.
+- `custom.gemini_go` raised with the message `pineapple-42`: the event's consequence was
+  "woke" that agent. It released the lease ("Released gemini-walk."; the lease was gone from
+  the snapshot), replied `pineapple-42` and ended through `finish_turn` (done). Usage was
+  recorded as 71,416 tokens in and 187 out.
+- The key was in no file under the root.

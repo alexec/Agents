@@ -69,6 +69,9 @@ struct BriefingTests {
     @Test func andNamesTheToolWhereThePolicyKnowsIt() {
         #expect(Briefing.escalation(named: "AskUserQuestion").contains("`AskUserQuestion`"))
         #expect(Briefing.text(for: ToolPolicyCatalog.claude).contains("`AskUserQuestion`"))
+        // Antigravity's reaches the person as a permission request whose options are the
+        // answers (049, R7), so it is named too.
+        #expect(Briefing.text(for: ToolPolicyCatalog.antigravity).contains("`ask_question`"))
     }
 
     /// And names nothing on a runtime with no tool that can reach the person — which

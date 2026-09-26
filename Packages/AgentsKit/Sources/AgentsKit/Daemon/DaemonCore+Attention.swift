@@ -160,6 +160,10 @@ extension DaemonCore {
         presences[connection] = Presence(surface: surface, watching: report.watching,
                                          active: report.active, heardAt: now)
         if report.active, let watching = report.watching { markRead(watching) }
+        // An archived chat on screen is read whole (051, FR-024).
+        if let watching = report.watching, agents[watching]?.isSlim == true {
+            Task { [weak self] in await self?.makeWhole(watching) }
+        }
         if let id = surface.deviceID, var known = device(id) {
             // Heard from is what the default rung reads when nobody is in hand, and what
             // the device says about its own permission is what makes it eligible at all.

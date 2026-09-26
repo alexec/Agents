@@ -292,3 +292,137 @@ through `current`.
   `{"features":{"apps":false,"default_mode_request_user_input":true,"goals":false,"in_app_local_automation":false,"memories":false,"multi_agent":false,"sleep_tool":false}}`.
   `scripts/runtime-tools.sh codex` then reports 5 of 5 removed, the kept tool present, the
   6 residue named, and 0 unexplained.
+
+## Measured on agents-bare (2026-09-25, T008): a server and an OpenAI key
+
+The pinned toolset was installed by hand into `/tmp/codex-spike`: Node linux-arm64 checked
+against the manifest's SHA-256, then `npm ci` of the lock in **4.2 s**, which pulled only
+`codex-linux-arm64`. ACP was then driven over ssh from this Mac, with the key sent on stdin
+into the adapter's environment and never on a command line.
+
+- **`NO_BROWSER=1`**: `authMethods` is `api-key`, `chat-gpt-device-code`. There is no
+  `chat-gpt` (FR-020).
+- **Key in the environment alone**: `session/new` gives `-32000` "Authentication required".
+  **With `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}`** the session opens.
+- **But the adapter's api-key sign-in saves the key**: it writes
+  `~/.codex/auth.json` = `{"auth_mode":"apikey","OPENAI_API_KEY":"sk-…"}` (0600), and later runs
+  reuse it, even with a different key in `CODEX_API_KEY`. That breaks FR-019. The file was
+  deleted from the box straight away.
+- `CODEX_CONFIG={"cli_auth_credentials_store":"ephemeral"}` does **not** help: it is thread
+  config, and the file is still written.
+- **`CODEX_HOME=<app-owned folder>` whose `config.toml` says
+  `cli_auth_credentials_store = "ephemeral"`** does: no `auth.json` is written, and a search of
+  that home for the key (its SQLite stores included) finds nothing. The session opens and
+  reaches OpenAI.
+- **Decision (servers, a key lent)**: start Codex with `CODEX_HOME=<server root>/runtimes/codex-home`
+  (0700; the app writes only its `config.toml`), `DEFAULT_AUTH_REQUEST={"methodId":"api-key"}`,
+  `CODEX_API_KEY` = the lent key with `OPENAI_API_KEY` cleared, and `NO_BROWSER=1`. When the
+  server is "own sign-in only", none of that: Codex uses the server's own `~/.codex`.
+  D6's rule against `CODEX_HOME` is about the person's home on their Mac; the app's own folder
+  on a server signs nobody out.
+- **Plan limit (R7)**: with the key's account out of credit, `session/prompt` answered
+  `-32603` with `data: {"message":"Quota exceeded. Check your plan and billing details.",
+  "codexErrorInfo":"usageLimitExceeded"}`. OpenAI's own answer for that key was
+  `insufficient_quota` / `credit_balance_exhausted`. So a real server turn waits for Alex to
+  add credit to that account. Everything short of the model's reply is proven.
+- **Key check (FR-017)**: `GET https://api.openai.com/v1/models` answered 200 for that key even
+  with no credit, so "Works" in Settings means the key is valid, not that it has credit. The
+  quota ending says the rest.
+
+## R12. Option 2: a server's Codex signed in through this Mac's ChatGPT sign-in (spike, 2026-09-25)
+
+Alex asked for the Mac's ChatGPT sign-in to be usable on servers. A plain copy fails, because
+Codex rotates the refresh token and two copies sign each other out. So this spike tried a
+**relay**: the sign-in stays on the Mac, and the server's Codex sends its ChatGPT traffic
+back to the Mac, which adds the Mac's current token. Alex allowed the Mac's `auth.json` to be
+read for this. Files: `walk/relay-spike/` (`relay.py`, `run-trial.sh`, the relay's log, the
+start of the trial log; there are no tokens in any of them).
+
+**How it was wired**:
+- On the box, Codex ran with its own `CODEX_HOME`, holding two files:
+  - `auth.json`: a stand-in with `auth_mode: chatgpt`, JWTs whose signature is `standin`, the
+    real account id (not secret), and `refresh_token: relay-standin-no-refresh`;
+  - `config.toml`: `chatgpt_base_url = "https://127.0.0.1:18765/<secret>/backend-api/"`.
+- `CODEX_CA_CERTIFICATE` pointed at a throwaway CA's public certificate.
+- The relay on the Mac listened on 127.0.0.1:18765 with a server certificate from that CA,
+  and was reached through `ssh -R 18765:127.0.0.1:18765`. It forwarded to
+  `https://chatgpt.com`, replacing `Authorization` with the Mac's access token and setting
+  `ChatGPT-Account-Id`.
+
+**Measured**:
+1. **It works.** The session opened, and a real turn ran `uname -a` on the box and returned
+   `Linux 6cf224fd8030 6.8.0-117-generic … aarch64`, with usage (14 335 tokens,
+   `gpt-6-astra`). The relay saw account and plugin checks, `ps/mcp`, analytics and
+   `codex/responses`, all 200.
+2. **Nothing of the real sign-in reached the box.** The last 24 characters of each real
+   token (access, refresh, id) were searched for across `/tmp/codex-relay` and
+   `/home/agents`, and none was found.
+3. **Codex insists on HTTPS** ("workspace backend must use an HTTPS origin without
+   credentials"). `CODEX_CA_CERTIFICATE` works, but the certificate must be a CA-signed
+   server certificate (serverAuth, IP SAN). A self-signed certificate that is its own CA is
+   refused by rustls without a word: nothing reached the relay.
+4. **The secret path does not survive.** `chatgpt_base_url`'s path is kept for account and
+   plugin calls, but workspace routing keeps only the origin, so `codex/responses` came to
+   `https://127.0.0.1:18765/backend-api/codex/responses` without the secret. The spike let
+   `/backend-api/` through. A real design needs another guard, because any process on the
+   server that can reach that loopback port could use Alex's ChatGPT plan.
+5. **WebSockets first**: Codex opens `wss://…/codex/responses` (101), then falls back to
+   HTTPS POST when the relay does not carry the upgrade. It works either way; carrying the
+   WebSocket would be the faster path.
+6. **The Mac's token can go stale.** At the first try the Mac's access token had been
+   invalidated ("token_invalidated", maybe when credits were bought). One Codex request on
+   the Mac renewed it (`last_refresh` moved), and after that everything passed. The relay
+   must deal with this: a 401 from chatgpt.com has to lead to a renewal, done by Codex on the
+   Mac (so only one party ever rotates the refresh token), and then a retry.
+
+**What a product version needs**:
+- The relay built into the Mac's daemon, carried over the existing server link rather than a
+  separate `ssh -R`.
+- A guard on the server end: the server's agentsd listens on loopback and checks that the
+  peer socket belongs to the same uid (`/proc/net/tcp` → inode → uid), or an equivalent.
+- Its own CA, made per install and kept in the Mac's Keychain; only the public certificate
+  goes to the server.
+- Renewal on 401 through the Mac's Codex.
+- The stand-in `auth.json` and `config.toml` written into the app-owned `CODEX_HOME` on the
+  server. They hold no secret.
+- A check that this use of a ChatGPT plan (one person, their own machines) is fine by
+  OpenAI's terms.
+
+### Built into the app, walked on agents-bare (2026-09-26, scratch root /tmp/run-relay)
+
+What was built, in the order the list above gives it:
+- **The server link carries it.** The window's ssh master adds `-O forward -R
+  ~/.agents-server/relay-codex.sock:127.0.0.1:<Mac relay port>`, and sshd makes that socket
+  owner-only (`srw-------`). Then `relay/offer` tells the server's agentsd the socket, the CA
+  certificate and the stand-in sign-in. No separate ssh is needed.
+- **Guarded by uid.** `RelayGate` listens on the server's `127.0.0.1:0` and lets a connection
+  through only when `/proc/net/tcp` (or `tcp6`, v4-mapped) says its socket belongs to the
+  daemon's uid. It pipes bytes to the socket; TLS ends on the Mac.
+- **Its own CA, made per install**, in `<root>/hosts/relay/`. The keys are 0600 files and
+  are imported with `kSecImportToMemoryOnly`, not kept in the Keychain. Only `ca.pem` goes
+  to the server.
+- **Renewal on 401.** The Mac relay re-reads `~/.codex/auth.json`. If the token is
+  unchanged, it refreshes once through `auth.openai.com/oauth/token`, then retries. It
+  does not use the Mac's Codex for this, as planned above. It refreshes itself, and only
+  when nobody else has.
+- The server's `CODEX_HOME` is `<root>/runtimes/codex-relay-home`, holding `config.toml`
+  (`chatgpt_base_url` pointing at the gate) and a stand-in `auth.json` with no secret.
+
+**Walked.** A Codex agent on agents-bare ran `uname -a` and wrote `~/work/relay.txt`
+through the Mac's ChatGPT sign-in. `relay.log` shows only 200s: `codex/responses`,
+`analytics-events`, `ps/mcp`.
+
+**Found in the walk: the gate read only the first page of `/proc/net/tcp`.** Foundation reads
+a file by its size, and `/proc` files say 0, so it got 4096 of the table's 7200 bytes. Any
+connection listed further down was refused as "another account": ten in one turn. Codex
+retried them, so the turn still passed. Fixed by reading to EOF (`RelayGate.readToEnd`). In
+the next turn nothing was refused.
+
+**Another account is refused.** `docker exec -u nobody agents-bare curl -k
+https://127.0.0.1:<gate>/…` got its connection closed (curl exit 35). The daemon logged
+"relay gate: refused a connection from port 52742 (uid 65534, not uid 1000)". The same
+request as `agents` got 200.
+
+**Not done:** a search of the box for the Mac's real tokens. The attempt was stopped
+before it reached the box. The stand-in's absence of secrets is covered by
+`MacSignInRelayTests.theStandInHoldsNoSecretAndNoPersonalDetail`.

@@ -29,20 +29,28 @@ public final class Daemon: @unchecked Sendable {
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
         // The Mac installs what is missing (048); a server keeps 043's way.
-        var installer: RuntimeInstaller?
+        var installer: (any RuntimeInstalling)?
+        #if canImport(Security)
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
             #if canImport(CryptoKit)
             let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
+            let archives = toolsetsFolder.map(ArchiveToolset.loadAll(from:)) ?? [:]
             #else
             // Only a Mac installs its own toolsets, and only a Mac can hash them (043).
             let toolsets: [String: Toolset] = [:]
+            let archives: [String: ArchiveToolset] = [:]
             #endif
-            discovery.bundledToolsetIDs = toolsets.mapValues(\.id)
+            discovery.bundledToolsetIDs = toolsets.mapValues(\.id).merging(archives.mapValues(\.id)) { node, _ in node }
             installer = RuntimeInstaller(
                 discovery: discovery,
-                toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
+                toolsets: toolsets.mapValues { MacToolsetInstaller(toolset: $0, tools: locations.tools) },
+                archives: archives.mapValues { MacArchiveInstaller(toolset: $0, tools: locations.tools) })
         }
+        #endif
+        // A server's runtimes get their policy's server environment (047: Codex never
+        // offers ChatGPT there).
+        let launcher = launcher ?? (serve ? ProcessSessionLauncher(locations: locations, onServer: true) : nil)
         self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
                                installer: installer, launcher: launcher)
         self.serve = serve
@@ -62,7 +70,9 @@ public final class Daemon: @unchecked Sendable {
         // It was never in the home folder, so this is the whole of cleaning up (027).
         await core.clearCloneStaging()
         // Before anything is picked up: nothing can be running from an old toolset yet.
+        #if canImport(Security)
         (core.installer as? RuntimeInstaller)?.tidy()
+        #endif
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")
@@ -93,7 +103,8 @@ public final class Daemon: @unchecked Sendable {
             roles: roles,
             handler: { context, method, params in
                 await core.handle(method: method, params: params,
-                                  from: context.surface, connection: context.id, peer: context.peer ?? -1)
+                                  from: context.surface, connection: context.id, peer: context.peer ?? -1,
+                                  role: context.role)
             })
         self.server = server
         await core.setBroadcaster { method, params in
@@ -101,6 +112,9 @@ public final class Daemon: @unchecked Sendable {
         }
         await core.setAddressedBroadcaster { method, params, wanted in
             server.broadcast(method, params, to: wanted)
+        }
+        await core.setConnectionCloser { wanted in
+            server.closeConnections(where: wanted)
         }
         // Shell output goes out the same door as every other notification.
         await core.connectShells()

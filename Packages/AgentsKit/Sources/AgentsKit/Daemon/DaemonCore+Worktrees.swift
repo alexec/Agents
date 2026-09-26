@@ -336,6 +336,19 @@ extension DaemonCore {
         } catch {}
     }
 
+    /// Whether an archived agent's app-made worktree still holds work that only its
+    /// conversation explains (051, FR-007): changes not committed, or commits not merged.
+    /// A worktree another agent still works in is not this agent's to hold: that agent
+    /// has its own record of it. One the person made is never the app's business.
+    func worktreeHoldsWork(of agentID: UUID) async -> Bool {
+        guard let worktree = agents[agentID]?.worktree, worktree.madeByApp else { return false }
+        let request = DaemonAPI.WorktreeRemovalRequest(project: worktree.project, root: worktree.root,
+                                                       confirmed: false)
+        guard let facts = try? await removalFacts(request), facts.madeByApp, facts.exists,
+              facts.check.blockedBy.isEmpty else { return false }
+        return facts.check.losesWork
+    }
+
     /// "3 uncommitted changes and commits not in main", as a removal confirmation says it.
     public static func whatIsLost(_ check: DaemonAPI.RemovalCheck, base: String? = nil) -> String {
         var parts: [String] = []

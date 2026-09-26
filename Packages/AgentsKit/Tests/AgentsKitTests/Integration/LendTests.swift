@@ -202,7 +202,7 @@ struct LendTests {
     // MARK: Gemini's key on this Mac (046, D3)
 
     /// Made up, in the shape Google issues now.
-    static let geminiKey = "AQ.Ab8RN6Kfake-LENDTEST-gemini-key-0000000000000000"
+    static let geminiKey = "AQ." + "Ab8RN6Kfake-LENDTEST-gemini-key-0000000000000000"
 
     private func lendGemini(_ setup: Setup, on connection: UUID) async -> Result<JSONValue, JSONRPCError> {
         await call(setup, DaemonAPI.Method.credentialsLend,

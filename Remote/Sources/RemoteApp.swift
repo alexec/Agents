@@ -73,7 +73,14 @@ struct RemoteView: View {
                     .paperGround()
                     .navigationDestination(for: RemoteRoute.self) { route in
                         switch route {
-                        case .agent: RemoteChatView().paperGround()
+                        case .agent(let id):
+                            // Retired (051): nothing left to chat with, only who it was.
+                            if model.selectedAgent == nil, let gone = model.work.tombstones[id] {
+                                RetiredAgentPage(tombstone: gone).paperGround()
+                            } else {
+                                RemoteChatView().paperGround()
+                                    .task(id: id) { await model.lookUpRetired(id) }
+                            }
                         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
                         }
                     }

@@ -19,6 +19,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// signing in or out, no folders outside a project, no quitting the daemon. A
     /// connection becomes one only by the bridge saying so, and never stops being one.
     case device
+    /// A phone on the direct link with a pairing code and no key yet: it may say who it
+    /// is and nothing more. Once it has, it hangs up and comes back as a device.
+    case pairing
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
@@ -84,6 +87,10 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.eventsList,
         DaemonAPI.Method.leasesSnapshot,
         DaemonAPI.Method.costState,
+        // Reads only: the phone shows the notes, the retired line and the retired page,
+        // and never changes the settings or retires anything (051, FR-028).
+        DaemonAPI.Method.retentionState,
+        DaemonAPI.Method.agentsRetired,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,
@@ -107,6 +114,10 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.shellRestart,
     ]).union(strangerMethods)
 
+    /// Announcing, and finding out a daemon is answering.
+    public static let pairingMethods: Set<String> = Set<String>([DaemonAPI.Method.devicesAnnounce])
+        .union(strangerMethods)
+
     /// Enough to find out a daemon is answering, which a client does before anything.
     public static let strangerMethods: Set<String> = [
         DaemonAPI.Method.ping,
@@ -118,6 +129,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         case .control: true
         case .agent: Self.agentMethods.contains(method)
         case .device: Self.deviceMethods.contains(method)
+        case .pairing: Self.pairingMethods.contains(method)
         case .stranger: Self.strangerMethods.contains(method)
         }
     }

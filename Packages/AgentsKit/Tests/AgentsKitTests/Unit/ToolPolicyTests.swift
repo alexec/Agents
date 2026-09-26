@@ -176,6 +176,89 @@ struct ToolPolicyTests {
         #expect(claude["CODEX_CONFIG"] == "the person's own", "and nobody else's launch is touched")
     }
 
+    /// Antigravity (049): a deny list at `_meta.agy.disabledTools`, exactly as the server
+    /// documents it, taking only `start_subagent` and never the question tool.
+    @Test func antigravitySendsADenyListUnderAgy() throws {
+        let policy = ToolPolicyCatalog.antigravity
+        let meta = try #require(policy.sessionMeta)
+        #expect(meta == .object(["agy": .object(["disabledTools": .array([.string("start_subagent")])])]))
+        #expect(policy.escalationTool == "ask_question")
+        #expect(policy.kept.map(\.name) == ["ask_question"])
+        #expect(policy.launchArguments.isEmpty)
+        #expect(policy.environmentFiles.isEmpty)
+        #expect(policy.preferredAuthMethods.first == "oauth-personal", "a Google account first (049 D3)")
+    }
+
+    /// Its home is the daemon's, never `~/.gemini`; a key in the daemon's own environment
+    /// is not handed on; and nobody else's launch changes.
+    @Test func antigravityLaunchesInTheDaemonsOwnHome() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("policy-env-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        let base = ["PATH": "/usr/bin", "GEMINI_API_KEY": "stray", "GOOGLE_API_KEY": "stray", "HOME": "/Users/x"]
+        let antigravity = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.antigravity,
+                                                             locations: locations, onto: base)
+        #expect(antigravity["GEMINI_HOME"] == root.path + "/runtimes/antigravity/home")
+        #expect(antigravity["AGY_ACP_DISABLE_WORKSPACE_TRUST"] == "1")
+        #expect(antigravity["AGY_ACP_FORCE_FILE_STORAGE"] == "1", "a sign-in the app can copy to a server (D8)")
+        #expect(antigravity["GEMINI_API_KEY"] == nil)
+        #expect(antigravity["GOOGLE_API_KEY"] == nil)
+        #expect(antigravity["PATH"] == "/usr/bin")
+        let claude = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude, locations: locations, onto: base)
+        #expect(claude == base)
+        #expect(RuntimeLaunchCatalog.antigravity.folders(root: root.path) == [root.path + "/runtimes/antigravity/home"])
+    }
+
+    /// Antigravity signs in with a Google account only (049 D3): the key and Agent Platform
+    /// methods its server also offers are on no sheet, and Google comes first.
+    @Test func antigravityOffersGoogleSignInOnly() throws {
+        let sent = try JSONDecoder().decode([ACP.AuthMethod].self, from: Data(#"""
+            [{"id":"oauth-personal","name":"Log in with Google"},{"id":"oauth-business","name":"Log in with Gemini Enterprise"},
+             {"id":"gemini-api-key","name":"Gemini API key"},{"id":"agent-platform","name":"Gemini Enterprise Agent Platform"}]
+            """#.utf8))
+        let account = RuntimeAccount(runtimeID: "antigravity", authMethods: sent)
+        #expect(account.orderedAuthMethods.map(\.id) == ["oauth-personal", "oauth-business"])
+        #expect(account.preferredMethod?.id == "oauth-personal")
+        // Nobody else's list changes.
+        #expect(RuntimeAccount(runtimeID: "grok", authMethods: sent).orderedAuthMethods.count == 4)
+    }
+
+    /// On a server (047, research T008): Codex never offers ChatGPT, and a lent key comes with
+    /// a home of the app's own that keeps the sign-in in memory. On the Mac, neither.
+    @Test func onAServerCodexGetsNoBrowserAndAnEphemeralHomeWhenAKeyIsLent() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("policy-env-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        let base = ["PATH": "/usr/bin"]
+        let policy = ToolPolicyCatalog.codex
+
+        let mac = ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base)
+        #expect(mac["NO_BROWSER"] == nil && mac["CODEX_HOME"] == nil && mac["DEFAULT_AUTH_REQUEST"] == nil)
+
+        let ownSignIn = ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base, onServer: true)
+        #expect(ownSignIn["NO_BROWSER"] == "1")
+        #expect(ownSignIn["CODEX_HOME"] == nil, "a server's own sign-in lives in its own ~/.codex")
+
+        let lent = LentEnvironment.$value.withValue(["CODEX_API_KEY": "sk-proj-test"]) {
+            ProcessSessionLauncher.environment(for: policy, locations: locations, onto: base, onServer: true)
+        }
+        #expect(lent["NO_BROWSER"] == "1")
+        #expect(lent["DEFAULT_AUTH_REQUEST"] == #"{"methodId":"api-key"}"#)
+        let home = try #require(lent["CODEX_HOME"])
+        #expect(home == root.appendingPathComponent("runtimes/codex-home").path)
+        #expect(try String(contentsOfFile: home + "/config.toml", encoding: .utf8)
+                == "cli_auth_credentials_store = \"ephemeral\"\n")
+        let mode = try FileManager.default.attributesOfItem(atPath: home)[.posixPermissions] as? Int
+        #expect(mode == 0o700)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: home) == ["config.toml"],
+                "the app writes the config and nothing else there")
+
+        let claude = LentEnvironment.$value.withValue(["ANTHROPIC_API_KEY": "sk-ant-api-test"]) {
+            ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude, locations: locations, onto: base, onServer: true)
+        }
+        #expect(claude["NO_BROWSER"] == nil && claude["CODEX_HOME"] == nil)
+    }
+
     /// Codex's methods as its handshake sent them (research R2), offered ChatGPT first;
     /// a runtime with no order keeps the old rule.
     @Test func signInMethodsFollowTheRuntimesOwnOrder() throws {

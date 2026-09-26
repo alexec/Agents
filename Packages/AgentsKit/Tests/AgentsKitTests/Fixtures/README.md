@@ -29,3 +29,11 @@ Responses to `GitHubQuery.text` (038), written by hand in the shape a real respo
 moment: #412 failing and changes requested (with comments from a collaborator, a member, a
 contributor, a stranger, a bot and the viewer), #405 approved, #398 failing through a status
 context, #390 a conflicting draft still running, and #377 timed out.
+
+## archived-agent.json
+
+A real-sized archived record (051): a scratch Claude agent's `agent.json` from 2026-09-25, with its
+`advertisedOptions` and `availableCommands` exactly as the runtime sent them — they are what make an
+archived record 24 KB rather than 1.4 KB. The title and paths are rewritten under `/fixture/`, the
+id replaced, and the state set to archived by the person. `scripts/seed-archived.swift` copies it to
+fill scratch stores, and the slim and tombstone tests read it.

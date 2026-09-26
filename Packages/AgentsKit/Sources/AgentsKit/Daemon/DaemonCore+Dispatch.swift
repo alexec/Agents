@@ -12,13 +12,31 @@ extension DaemonCore {
     /// not say, and nil only for a caller inside this process.
     public func handle(method: String, params: JSONValue?,
                        from surface: Surface? = nil, connection: UUID? = nil,
-                       peer: Int32? = nil) async -> Result<JSONValue, JSONRPCError> {
+                       peer: Int32? = nil, role: ConnectionRole = .control) async -> Result<JSONValue, JSONRPCError> {
         if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
-        return await RequestConnection.$current.withValue(connection) {
-            await dispatch(method: method, params: params, from: surface, connection: connection)
+        let answer = await RequestConnection.$current.withValue(connection) {
+            await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
         }
+        return retiredInstead(of: answer, params: params)
+    }
+
+    /// "That agent is not here" about an agent that was retired says so instead, with who
+    /// it was and when (051). In one place rather than in each of the thirty-odd methods
+    /// that look an agent up: every one of them answers `noSuchAgent`, and the id is in
+    /// its parameters, under whichever name that method uses.
+    func retiredInstead(of answer: Result<JSONValue, JSONRPCError>,
+                        params: JSONValue?) -> Result<JSONValue, JSONRPCError> {
+        guard case .failure(let error) = answer, error.code == DaemonAPI.Failure.noSuchAgent,
+              let fields = params?.objectValue else { return answer }
+        for value in fields.values {
+            if let id = value.stringValue.flatMap(UUID.init(uuidString:)), let tombstone = retired[id] {
+                return .failure(JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                                             message: RetirementWords.retiredSentence(tombstone)))
+            }
+        }
+        return answer
     }
 
     /// A token speaks for its agent only from inside that agent's runtime.
@@ -40,7 +58,8 @@ extension DaemonCore {
     }
 
     private func dispatch(method: String, params: JSONValue?,
-                          from surface: Surface?, connection: UUID?) async -> Result<JSONValue, JSONRPCError> {
+                          from surface: Surface?, connection: UUID?,
+                          role: ConnectionRole) async -> Result<JSONValue, JSONRPCError> {
         do {
             switch method {
             case DaemonAPI.Method.ping:
@@ -49,6 +68,11 @@ extension DaemonCore {
             case DaemonAPI.Method.credentialsOffer:
                 let request = try require(params, as: DaemonAPI.CredentialsOffer.self)
                 offerCredentials(request, connection: connection)
+                return .success([:])
+
+            case DaemonAPI.Method.relayOffer:
+                let request = try require(params, as: DaemonAPI.RelayOffer.self)
+                try offerRelay(request, connection: connection)
                 return .success([:])
 
             case DaemonAPI.Method.credentialsLend:
@@ -95,7 +119,17 @@ extension DaemonCore {
             case DaemonAPI.Method.devicesAnnounce:
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
                 return .success(try JSONValue.encoding(
-                    DaemonAPI.AnnounceReply(device: try announce(announcement), macKey: relayKey())))
+                    DaemonAPI.AnnounceReply(device: try announce(announcement, role: role), macKey: relayKey())))
+
+            case DaemonAPI.Method.devicesStartPairing:
+                return .success(try JSONValue.encoding(try startPairing()))
+
+            case DaemonAPI.Method.devicesStopPairing:
+                stopPairing()
+                return .success([:])
+
+            case DaemonAPI.Method.pairingCurrent:
+                return .success(try JSONValue.encoding(currentPairing()))
 
             case DaemonAPI.Method.devicesForget:
                 let request = try require(params, as: DaemonAPI.DeviceForget.self)
@@ -340,6 +374,23 @@ extension DaemonCore {
             // about it until the verdict next moved (024 T037).
             case DaemonAPI.Method.wakeState:
                 return .success(try JSONValue.encoding(await wakeState()))
+
+            // Retiring archived agents (051). The two writes are the person's; the
+            // role table keeps devices and agents to the reads.
+            case DaemonAPI.Method.retentionState:
+                return .success(try JSONValue.encoding(await retentionState()))
+
+            case DaemonAPI.Method.retentionSet:
+                let request = try require(params, as: DaemonAPI.RetentionSetRequest.self)
+                return .success(try JSONValue.encoding(await setRetention(request)))
+
+            case DaemonAPI.Method.agentsRetire:
+                let request = try require(params, as: DaemonAPI.RetireRequest.self)
+                return .success(try JSONValue.encoding(try await retireNow(request)))
+
+            case DaemonAPI.Method.agentsRetired:
+                let request = try require(params, as: DaemonAPI.RetiredRequest.self)
+                return .success(try JSONValue.encoding(await retiredTombstones(request)))
 
             case DaemonAPI.Method.costSetLimits:
                 let request = try require(params, as: DaemonAPI.SetLimitsRequest.self)

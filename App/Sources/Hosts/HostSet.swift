@@ -42,6 +42,8 @@ final class HostSet {
     @ObservationIgnored private var retrying: [HostID: Task<Void, Never>] = [:]
     @ObservationIgnored private let store: HostStore
     @ObservationIgnored private let locations: StoreLocations
+    /// The sign-ins this Mac relays to servers (047).
+    @ObservationIgnored lazy var relays = SignInRelays(locations: locations)
     @ObservationIgnored private var pathMonitor: NWPathMonitor?
     @ObservationIgnored private var wakeObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var quitObserver: (any NSObjectProtocol)?
@@ -220,7 +222,8 @@ final class HostSet {
                            wantsClaude: @escaping @Sendable () async -> Bool,
                            wants: @escaping @Sendable (String) async -> Bool = { _ in false },
                            offer: @escaping @Sendable () async -> DaemonAPI.CredentialsOffer? = { nil },
-                           lender: DaemonClient.CredentialLender? = nil) -> ServerConnection {
+                           lender: DaemonClient.CredentialLender? = nil,
+                           relay: @escaping @Sendable () async -> ServerConnection.RelayGrant? = { nil }) -> ServerConnection {
         ServerConnection(hostID: host.id, ssh: ssh(for: host, locations: locations),
                          socket: locations.hostsFolder.appendingPathComponent("\(host.id.rawValue).sock"),
                          installedBy: ServerHost.currentMacName,
@@ -228,7 +231,7 @@ final class HostSet {
                          toolset: { ServerBinaries.claudeToolset },
                          wantsClaude: wantsClaude,
                          otherToolsets: { ServerBinaries.otherToolsets },
-                         wants: wants, offer: offer, lender: lender)
+                         wants: wants, offer: offer, lender: lender, relay: relay)
     }
 
     /// A new connection for a host, asking this set what to offer and who lends (043).
@@ -239,7 +242,17 @@ final class HostSet {
                                    await MainActor.run { self?.toolsetWanted(id, runtimeID) ?? false }
                                },
                                offer: { [weak self] in await MainActor.run { self?.offerFor(id) } },
-                               lender: lenderFor(id))
+                               lender: lenderFor(id),
+                               relay: relayFor(id))
+    }
+
+    /// What this window relays to a server (047): nothing to one marked "own sign-in only".
+    func relayFor(_ id: HostID) -> @Sendable () async -> ServerConnection.RelayGrant? {
+        let relays = self.relays
+        return { [weak self] in
+            let ownOnly = await MainActor.run { self?.host(id)?.ownSignInOnly ?? true }
+            return ownOnly ? nil : await relays.grant()
+        }
     }
 
     /// Say again what this window may lend a server: a credential was just added (043).
@@ -501,7 +514,7 @@ enum ServerBinaries {
     }
 
     /// Every other pinned toolset a server may be given, for the runtimes Settings takes a
-    /// credential for (046: Gemini). Codex's is left to its own lane's server half.
+    /// credential for (046: Gemini, 047: Codex).
     nonisolated static let otherToolsets: [Toolset] = {
         guard let folder = Bundle.main.url(forResource: "toolsets", withExtension: nil) else { return [] }
         let lendable = Set(CredentialKind.allCases.map(\.runtimeID))
