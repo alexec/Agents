@@ -442,8 +442,63 @@ extension DaemonCore {
     }
 
     /// Tell every window the pool changed.
+    ///
+    /// At most once a second: a change inside the second after the last one is held,
+    /// and the one broadcast at the end of it carries the state as it is then.
     func broadcastPool() {
+        let clock = ContinuousClock()
+        if let last = poolBroadcastAt, clock.now - last < Self.poolBroadcastGap {
+            guard !poolBroadcastHeld else { return }
+            poolBroadcastHeld = true
+            let wait = Self.poolBroadcastGap - (clock.now - last)
+            Task {
+                try? await Task.sleep(for: wait)
+                await self.sendHeldPoolBroadcast()
+            }
+            return
+        }
+        poolBroadcastAt = clock.now
         broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+    }
+
+    static let poolBroadcastGap: Duration = .seconds(1)
+
+    private func sendHeldPoolBroadcast() {
+        poolBroadcastHeld = false
+        poolBroadcastAt = ContinuousClock().now
+        broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
+    }
+
+    /// The pool's clocks, on the workflow heartbeat (no timer of its own): a return time
+    /// that has passed makes that credential available, and a grant whose date has
+    /// passed is out, each said once, so the Pool page and the sidebar dot change
+    /// without a relaunch (US3-AS4).
+    func settlePoolClocks(now at: Date) {
+        var changed = false
+        for key in Array(allowances.keys) {
+            guard var state = allowances[key], state.isOut || state.status != .available else { continue }
+            let wasOut = state.isOut
+            guard state.settle(now: at) else { continue }
+            allowances[key] = state
+            changed = true
+            if wasOut, !state.isOut, let entry = pool.entries.first(where: { AllowanceState.credentialKey(for: $0) == key }) {
+                raiseAllowanceBack(entry, how: "time")
+            }
+        }
+        for entry in pool.entries where entry.payment.expires != nil {
+            var state = allowanceState(for: entry)
+            guard state.checkExpiry(payment: entry.payment, now: at) else { continue }
+            allowances[state.credentialKey] = state
+            changed = true
+            raiseAllowanceOut(entry, state: state, reason: "credit expired")
+        }
+        guard changed else { return }
+        do {
+            try poolStore.saveAllowances(allowances.values.sorted { $0.credentialKey < $1.credentialKey })
+        } catch {
+            DaemonLog.shared.write("allowances could not be written: \(error)")
+        }
+        broadcastPool()
     }
 
     /// Why an entry cannot be used at all, in the page's words.

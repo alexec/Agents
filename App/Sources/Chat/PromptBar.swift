@@ -86,6 +86,7 @@ struct PromptBar: View {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
                 atItsLimit
+                startingOnOut
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: attachments,
                                     refusal: { $0.refusal(from: model.promptCapabilities) },
@@ -182,6 +183,25 @@ struct PromptBar: View {
                 SettingsLink { Text("Raise the limit") }
                     .buttonStyle(.paper)
                     .appText(.fine)
+            }
+        }
+    }
+
+    /// A new chat about to start on a runtime that is out (052, US3): said before the
+    /// first prompt, with the first runtime in the pool that is not out.
+    @ViewBuilder
+    private var startingOnOut: some View {
+        if agent == nil, let runtimeID = model.draftRuntimeID,
+           let notice = model.poolStatus?.startingOnOut(runtimeID) {
+            HStack(spacing: 10) {
+                Text(notice.sentence)
+                    .appText(.fine)
+                    .foregroundStyle(StateTint.attention.style(or: .primary))
+                if let instead = notice.instead {
+                    Button("Use \(PoolWords.runtimeName(instead)) instead") { chooseRuntime(instead) }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                }
             }
         }
     }

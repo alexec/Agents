@@ -157,6 +157,20 @@ public enum PoolWords {
         return (headline, lines)
     }
 
+    /// Above a new chat's prompt, when its runtime is out (US3).
+    public static func startingOnOut(_ runtimeID: String, state: AllowanceState, now: Date) -> String {
+        let name = runtimeName(runtimeID)
+        switch state.current(now: now) {
+        case .out(let until?, _, _):
+            return "\(name) is out until \(time(until, now: now)), so its first turn would be refused."
+        case .out(nil, let retry?, _):
+            // Not a time the provider gave: only when the app will try it again.
+            return "\(name) is out, so its first turn would be refused. It is tried again after \(time(retry, now: now))."
+        default:
+            return "\(name) is out, so its first turn would be refused."
+        }
+    }
+
     /// The agent row's line under a chat that moved (wireframes §2).
     public static func carriedOnFrom(_ record: SwitchRecord, now: Date) -> String {
         "⇄ Carried on from \(runtimeName(record.from.runtimeID)) at \(time(record.at, now: now))"

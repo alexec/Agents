@@ -35,6 +35,16 @@ public struct PoolStatus: Codable, Hashable, Sendable {
         return "\(out) out\(chats)"
     }
 
+    /// A new chat about to start on a runtime whose allowance is out (US3): the sentence
+    /// that says so, and the first runtime in the pool that is not out and can be used,
+    /// if there is one. Nil when the runtime is not out, or is not in the pool.
+    public func startingOnOut(_ runtimeID: String) -> (sentence: String, instead: String?)? {
+        guard let out = rows.first(where: { $0.entry.runtimeID == runtimeID && !$0.entry.isKeyed }) ?? rows.first(where: { $0.entry.runtimeID == runtimeID }),
+              out.state.isOut else { return nil }
+        let instead = rows.first { $0.entry.runtimeID != runtimeID && !$0.state.isOut && $0.unusable == nil }?.entry.runtimeID
+        return (PoolWords.startingOnOut(runtimeID, state: out.state, now: at), instead)
+    }
+
     public struct Row: Codable, Hashable, Sendable, Identifiable {
         public var entry: PoolEntry
         public var state: AllowanceState

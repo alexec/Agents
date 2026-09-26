@@ -313,6 +313,10 @@ public actor DaemonCore {
     /// before it carries on (052). `resend` is whether the turn failed and its prompt
     /// goes again.
     var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
+    /// When `pool/changed` last went out, and whether one is held back to go at the end
+    /// of the second (052 US3): a burst of changes is one broadcast.
+    var poolBroadcastAt: ContinuousClock.Instant?
+    var poolBroadcastHeld = false
     /// Credentials already tried for the prompt a chat is carrying (052): never gone back
     /// to for the same prompt. Cleared by a turn that works.
     var carryTried: [UUID: Set<String>] = [:]
