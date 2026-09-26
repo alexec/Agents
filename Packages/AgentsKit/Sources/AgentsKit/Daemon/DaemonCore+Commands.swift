@@ -384,9 +384,7 @@ extension DaemonCore {
         // existed has it by the first turn.
         layOutOnce(cwd)
         guard case .available(let path, _) = discovery.locate(runtime) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
-                               message: notYetInstalled(runtime) ?? "\(runtime.name) is not installed, or is not where we looked.",
-                               data: ["lookedIn": .array(discovery.searchPaths.map(JSONValue.string))])
+            throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
         // Before anything starts, and outside the catch below: wanting a credential is not
         // the runtime failing, and the window answers it by lending one (043).
@@ -405,7 +403,7 @@ extension DaemonCore {
             let token = mintAppToken()
             let result = try await session.newSession(cwd: cwd,
                                                       mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
-                                                      meta: ToolPolicyCatalog.policy(for: runtimeID).sessionMeta)
+                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
@@ -806,7 +804,7 @@ extension DaemonCore {
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).
-        let meta = ToolPolicyCatalog.policy(for: agent.runtimeID).sessionMeta
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd)
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
@@ -1129,18 +1127,34 @@ extension DaemonCore {
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
-                ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
+                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
+        } else if let limit = Self.usageLimit(error) {
+            // Not "stopped answering" either: the provider said the quota or rate limit
+            // was reached, in a sentence of its own (046, FR-018; Gemini's free tier).
+            await record(.runtimeNote("\(runtimeName) hit its provider’s limit: \(limit)"), for: agentID)
         } else {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        await move(agentID, on: refused == nil ? .processDied : .turnEnded(.signInRefused))
+        let limited = refused == nil && Self.usageLimit(error) != nil
+        await move(agentID, on: refused != nil ? .turnEnded(.signInRefused) : limited ? .turnEnded(.refusal) : .processDied)
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)
+    }
+
+    /// The provider's own sentence when a turn was refused for a quota or rate limit: a
+    /// JSON-RPC 429, or an error that says so. Gemini answers a spent free tier with
+    /// `429 "You have exhausted your daily quota on this model."` (research R13).
+    static func usageLimit(_ error: any Error) -> String? {
+        guard let error = error as? JSONRPCError else { return nil }
+        let words = error.message.lowercased()
+        guard error.code == 429 || words.contains("quota") || words.contains("rate limit")
+                || words.contains("resource_exhausted") else { return nil }
+        return error.message
     }
 
     /// Close every question this agent has open, because the runtime that asked them has
