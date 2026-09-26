@@ -115,7 +115,9 @@ Every screen shows the same moment, 02:20:
 
 ![The Add credit on an API key sheet: runtime, key, kind of credit, amount, expiry](wireframes/mac-add-credit.svg)
 
-- **Only two kinds can be picked**: *Free credit* and *Prepaid, with auto-recharge off*.
+- **Three kinds can be picked**: *Free tier, no billing on the key*, *Free credit*, and *Prepaid,
+  with auto-recharge off*. A free tier, such as a Gemini AI Studio key, comes back on the
+  provider's schedule (daily for Gemini), as an allowance does.
   *Billed with no limit* is shown greyed out, with the reason, so the person knows it was
   thought of and refused on purpose (FR-001a, US2-AS5).
 - **The app takes the person's word for it.** The sheet says plainly that it cannot see the

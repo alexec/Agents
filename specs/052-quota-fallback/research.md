@@ -49,7 +49,9 @@ Versions read on 2026-09-25:
    - **Claude without the extension**: the prompt is rejected with an internal error whose text
      starts with one of the Claude SDK's `USAGE_LIMIT_ERROR_PREFIXES`, such as "You've hit your",
      "You're out of usage credits" or "You're out of extra usage".
-   - **Gemini (046)**: a 429 saying "You have exhausted your daily quota on this model." is spent.
+   - **Gemini (046, on main since 2026-09-25)**: `DaemonCore.usageLimit` in
+     `DaemonCore+Commands.swift` is where it is recognised now, and a limit ends the turn as
+     `.refusal`. 052 moves that test into `LimitRecognition` and splits it. A 429 saying "You have exhausted your daily quota on this model." is spent.
      Any other 429, or `RESOURCE_EXHAUSTED` with "rate limit", is a rate limit. This splits the
      single thing that the Gemini lane's `usageLimit` detects today.
    - **Keys on OpenAI and Anthropic**: `insufficient_quota`, and "credit balance is too low",
@@ -58,7 +60,7 @@ Versions read on 2026-09-25:
    refusal:` prefix, so that its wording can be added later (FR-006, spec Edge Cases).
 
 **Rationale.** Typed failures are the vendors' own classification, and they separate a quota from
-a rate limit, which words cannot do reliably. Two of the five catalogue runtimes support them
+a rate limit, which words cannot do reliably. Two of the six catalogue runtimes support them
 today, and those are the two with the biggest plan allowances.
 
 **Consequence that must ship with it.** Asking for the extension changes what these adapters do
@@ -102,7 +104,10 @@ otherwise:
   Otherwise it uses the one-hour rule.
 - **Words-only runtimes.** They get a time only if their captured wording includes one, and the
   one-hour rule otherwise (FR-008).
-- **Credit.** A credit entry that runs out has no return time (FR-001c).
+- **Credit.** A free-credit or prepaid entry that runs out has no return time (FR-001c).
+- **Gemini's free tier.** Its daily quota resets at midnight Pacific time. A free-tier Gemini
+  entry whose quota is spent is out until the next midnight in `America/Los_Angeles`. This comes
+  from the entry's `ResetRule`, not from the error, which gives no time.
 
 **Alternatives.** Polling each provider's usage page was rejected: it needs credentials the app
 does not hold, and it breaks the rule that the app never polls on a tight cadence.
@@ -234,13 +239,15 @@ Lists are refreshed when the Pool page opens, at most once every 10 minutes per 
 when retries are exhausted and there is no pool to move to. The other lanes are handled like
 this:
 
-- **Gemini (046)** ends a limit as `.refusal` today. 052 replaces that with the two cases above.
+- **Gemini (046)** is on main, and ends a limit as `.refusal` through `DaemonCore.usageLimit`. 052
+  replaces that with the two cases above, and moves the test into `LimitRecognition`. Its
+  `UsageLimitTests` become rows of `LimitRecognitionTests`.
 - **Antigravity** adds `runtimeError`, which stays separate: a runtime reporting a failure in
   words never switches.
 - **Order.** Whichever lane merges second takes in the other's cases. `EndedReasonTests` walks
   `allCases`, so a missing summary line fails the suite.
 - **Checks before building.** At task time, check `git grep -n 'runtimeError\|usageLimit' main`
-  first. On 2026-09-25 neither was on main.
+  first. After the 046 merge on 2026-09-25, `usageLimit` is on main and `runtimeError` is not.
 
 ## R12. Events
 
@@ -259,7 +266,7 @@ They sit in the existing `agent` and `cost` families, so workflows can already f
 |---|---|---|---|---|
 | Claude | typed | typed | `_claude/rateLimit.resetsAt` | overage fields (R3) |
 | Codex | typed | typed | if forwarded (R2), else title, else 1 h | `spendControlReached` |
-| Gemini (046) | words, daily quota | words, 429 | none (1 h) | keys: credit only (FR-001a) |
+| Gemini (046, on main) | words, daily quota | words, 429 | free tier: next midnight Pacific; credit: none | always a key: free tier, free credit or prepaid only (FR-001a) |
 | Copilot, Cursor, Grok | **not yet**, and the docs say so | not yet | — | — |
 
 Copilot, Cursor and Grok are listed in `docs/reference/runtimes.md` as "not yet recognised". A

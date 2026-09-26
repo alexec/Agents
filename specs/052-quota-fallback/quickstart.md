@@ -78,6 +78,9 @@ move at the end of that turn, and the note to say that paid extra usage had star
   that is not free or prepaid credit.
 - Give a `.prepaid(amount: $0.05)` entry a script that reports `cost: 0.03` per turn. After the
   second turn, expect *Credit used up*, before the provider refuses.
+- For a `.freeTier(.dailyAt(0, "America/Los_Angeles"))` entry refused with Gemini's daily-quota
+  429, expect it to be out until the next midnight Pacific, and available again after that on its
+  own.
 - For `.freeCredit(expires: yesterday)`, expect the entry to be out at once, and never tried.
 - Mark a used-up entry available. Expect it to be tried again, and never put back to
   `available` by a timer.

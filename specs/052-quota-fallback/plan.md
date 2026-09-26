@@ -8,7 +8,7 @@
 
 A chat whose runtime says its allowance is spent moves to the next entry in the person's pool.
 It moves with the conversation, with its settings mapped across, and with the prompt that failed
-re-sent once. Pay-as-you-go is never used: keys join the pool only on free or prepaid credit, and
+re-sent once. Pay-as-you-go is never used: keys join the pool only on a free tier, free credit or prepaid credit, and
 a runtime that starts using paid overage is treated as out.
 
 The feature rests on one finding from reading the adapters (research R1). **The Claude and Codex
@@ -80,7 +80,7 @@ Linux `agentsd`, where entries are judged per host.
 
 **Scale/Scope**:
 
-- 5 catalogue runtimes, plus 046, 047 and 049–050 as they land.
+- 6 catalogue runtimes (Gemini, 046, merged 2026-09-25), plus 047 servers and 049–050 as they land.
 - Pools of 2–8 entries.
 - Up to hundreds of chats on one entry.
 - 30 days of switches.

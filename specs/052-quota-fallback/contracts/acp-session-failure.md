@@ -66,5 +66,5 @@ captured text:
 | runtime | spent | rate limit |
 |---|---|---|
 | claude (no extension) | error text starts with any `USAGE_LIMIT_ERROR_PREFIXES` entry (SDK list, copied with its version) | — |
-| gemini | 429 and "exhausted your daily quota" | other 429s; `RESOURCE_EXHAUSTED` with "rate limit" |
+| gemini | 429 and "exhausted your daily quota": out until the entry's reset (free tier: next midnight Pacific) | other 429s; `RESOURCE_EXHAUSTED` with "rate limit" |
 | keyed OpenAI / Anthropic | `insufficient_quota`; "credit balance is too low" → `.creditGone` | 429 without those |

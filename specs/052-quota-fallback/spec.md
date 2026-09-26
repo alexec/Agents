@@ -10,7 +10,7 @@
 
 ## Why this feature exists
 
-Every runtime the app can start (Claude, Codex, Copilot, Cursor, Grok, and those still to come)
+Every runtime the app can start (Claude, Codex, Copilot, Cursor, Grok, Gemini, and those still to come)
 comes with an allowance: a subscription window, a monthly quota, some free credit. When it runs
 out, the turn fails, and the chat stops. Some runtimes go further and offer to carry on at
 pay-as-you-go prices. The person using this app does not want that. They already have several
@@ -81,8 +81,8 @@ Yes, with two limits the person should know about up front:
   monthly quota, a used-up plan window, credit gone) is told apart from a short rate limit (too
   many requests just now). Only a spent allowance marks the runtime out and moves the chat. A rate
   limit leaves the chat on its runtime, which is tried again after a short wait, and it switches
-  only if the limit keeps coming back. The 046 Gemini lane's `usageLimit` recognition is the
-  starting point. Today it treats a JSON-RPC 429, "quota", "rate limit" or "RESOURCE_EXHAUSTED" as
+  only if the limit keeps coming back. Gemini's `usageLimit` recognition (046, on main since
+  2026-09-25) is the starting point. Today it treats a JSON-RPC 429, "quota", "rate limit" or "RESOURCE_EXHAUSTED" as
   one thing and ends the turn as a plain refusal with the provider's sentence. 052 splits that into
   the two kinds, per runtime. Gemini's spent free tier ("You have exhausted your daily quota on
   this model.") is the first captured example.
@@ -92,8 +92,15 @@ Yes, with two limits the person should know about up front:
   same enum, so whichever lane merges second takes the other's cases and re-runs the tests over
   every ending. The two stay distinct: `runtimeError` is a runtime reporting a failure in words,
   which FR-006 says never switches, and a spent allowance is one that has been positively
-  recognised. The plan checks main for `runtimeError` and Gemini's `usageLimit` before adding
-  anything.
+  recognised. As of the 046 merge, main has Gemini's `usageLimit`, which ends a limit as `refusal`,
+  and has no `runtimeError` yet.
+- Q: Gemini runs only on an API key, and its free tier is a quota that comes back every day. Is
+  that credit that never returns? → A: No. It is a third kind of key: a **free tier**. The key
+  has no billing account behind it, so the provider refuses rather than charges, and its quota
+  comes back on the provider's own schedule. For Gemini, that is daily. A free-tier entry behaves
+  like an allowance: it is out until the reset, then available again by itself. As with prepaid
+  credit, the app cannot see whether billing is attached to the key, so the person says so when
+  adding it.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -140,15 +147,17 @@ in cannot be added. With fewer than two runtimes in the pool, nothing switches.
 
 Each entry says how it is paid for. Codex signed in with a ChatGPT plan reads **Allowance**.
 **Add a runtime** offers allowances. An API key is under a separate **Add credit on an API
-key…**, which only accepts a key whose spending has a hard stop. The person picks one of two
+key…**, which only accepts a key whose spending has a hard stop. The person picks one of three
 kinds:
+- **Free tier, no billing on the key**: the provider's free quota, which comes back on its own
+  schedule. A Gemini key from AI Studio with no billing account is the common case.
 - **Free credit**: a trial or promotional grant.
 - **Prepaid, auto-recharge off**: a balance they topped up once that will not refill itself.
 
 A third choice, **Billed with no limit**, is shown, but it is greyed out with the reason: the pool
 never carries a chat onto open-ended billing. The person can also give the credit's amount (say
-$10) and when it expires. A Gemini key on its free tier then reads **Free credit · ≈ $1.40 of $10
-used · expires 31 Oct**.
+$10) and when it expires. A Gemini key on its free tier reads **Free tier · resets daily**, and a
+trial grant reads **Free credit · ≈ $1.40 of $10 used · expires 31 Oct**.
 
 The same runtime can be added twice with different credentials. For example, Codex can be on its
 plan early in the list and on a prepaid key as a last resort.
@@ -401,6 +410,8 @@ It builds on Story 5's sheet, which fills in the same rows.
   credential and optionally a model, and add, remove and reorder its entries in Settings.
 - **FR-001a**: Each entry MUST show how it is paid for:
   - **allowance**: a plan or account sign-in;
+  - **free tier**: an API key with no billing attached, whose quota resets on the provider's
+    schedule;
   - **free credit**: a grant on an API key;
   - **prepaid credit**: an API key with auto-recharge off, as the person states it.
 
@@ -413,9 +424,11 @@ It builds on Story 5's sheet, which fills in the same rows.
   entry out when that spending reaches the amount, or when the expiry date passes, even if the
   provider has not refused. Where the runtime reports no cost, the page MUST say that spending
   is not known, rather than show zero.
-- **FR-001c**: A provider's "credit used up" or "insufficient balance" refusal on a keyed entry
-  MUST be recognised as that entry being out, with no return time. The entry MUST NOT come back
-  by itself. It returns only when the person marks it available, or raises its amount.
+- **FR-001c**: A provider's "credit used up" or "insufficient balance" refusal on a free-credit or
+  prepaid entry MUST be recognised as that entry being out, with no return time. The entry MUST
+  NOT come back by itself. It returns only when the person marks it available, or raises its
+  amount. A free-tier entry whose quota is spent is out until the provider's reset, and then
+  comes back by itself, as an allowance does.
 - **FR-002**: Only installed, signed-in runtimes MUST be addable; entries that stop being usable
   MUST stay in the pool, shown as unavailable, and be skipped.
 - **FR-003**: Switching MUST be off until the pool holds at least two runtimes, and the person

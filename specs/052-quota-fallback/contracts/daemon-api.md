@@ -19,7 +19,7 @@ last 30 days of switches (FR-021, FR-025).
 Params: a `PoolSettings`. The whole thing is replaced, as `cost/setLimits` does. It rejects with
 `-32602` and a sentence in these cases:
 
-- a keyed entry that is not free or prepaid credit (FR-001a);
+- a keyed entry that is not a free tier, free credit or prepaid credit (FR-001a);
 - an API-key credential marked as an allowance;
 - a model in two levels for one runtime (FR-032);
 - an unknown runtime.

@@ -20,6 +20,9 @@ One runtime with one way of paying for it (FR-001, FR-001a).
 
 - `.allowance(label: String?)` — label as shown, e.g. "Max plan", "ChatGPT plan"; taken from the
   runtime's account report where it gives one (Codex `ChatGPT <planType>`).
+- `.freeTier(reset: ResetRule)`: a key with no billing attached. `ResetRule` is `.dailyAt(hour:
+  timeZone:)`, which is `.dailyAt(0, "America/Los_Angeles")` for Gemini, or `.unknown`, which
+  falls back to the one-hour rule.
 - `.freeCredit(amount: Cost?, expires: Date?)`
 - `.prepaid(amount: Cost?, expires: Date?)`
 
@@ -29,7 +32,9 @@ cannot be stored (FR-001a, SC-002).
 Validation on `pool/set`:
 
 - `runtimeID` must be known.
-- A keyed entry (`credentialRef != nil`) must be `.freeCredit` or `.prepaid`.
+- A keyed entry (`credentialRef != nil`) must be `.freeTier`, `.freeCredit` or `.prepaid`.
+- Gemini entries are always keyed (`CredentialKind.geminiAPIKey`), so a Gemini entry is never an
+  `.allowance`.
 - An `.allowance` entry must have `credentialRef == nil`, or name a subscription token. That
   covers `CredentialKind.oauthToken` for Claude. An API-key credential can never be an allowance.
 - Amounts are positive.
@@ -96,7 +101,8 @@ out(retryAfter) ──next switch after it──▶ tried again; a success makes
 out(any) ──Mark available / amount raised─▶ available   (learnedFrom: .person)
 ```
 
-A credit entry that is `out` never goes back to `available` on a timer (FR-001c).
+A free-credit or prepaid entry that is `out` never goes back to `available` on a timer. A
+free-tier entry does: its `until` is the next reset under its `ResetRule` (FR-001c).
 
 ## Agent (additions to the existing record)
 

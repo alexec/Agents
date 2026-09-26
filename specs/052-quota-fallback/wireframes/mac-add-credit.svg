@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="640" viewBox="0 0 760 640" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="690" viewBox="0 0 760 690" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
   <style>
     .t { fill:#1d1d1f; }
     .s { fill:#6e6e73; }
@@ -13,10 +13,10 @@
     .out { fill:#c93400; }
   </style>
 
-  <rect x="0.5" y="0.5" width="759" height="639" rx="12" fill="#e9e9ec" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="759" height="689" rx="12" fill="#e9e9ec" stroke="#c7c7cc"/>
 
   <!-- sheet -->
-  <rect x="60" y="24" width="640" height="560" rx="14" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="60" y="24" width="640" height="610" rx="14" fill="#fff" stroke="#c7c7cc"/>
   <text x="84" y="62" class="title t">Add credit on an API key</text>
   <text x="84" y="86" class="f s">A key joins the pool only if its spending stops by itself when the credit is gone.</text>
 
@@ -27,34 +27,38 @@
   <text x="432" y="171" class="f s">from Settings ▸ Servers credentials</text>
 
   <text x="84" y="214" class="h">WHAT KIND OF CREDIT IS IT?</text>
-  <!-- option 1 -->
+  <!-- option 0 -->
   <circle cx="94" cy="240" r="7" fill="#fff" stroke="#c7c7cc"/>
-  <text x="110" y="245" class="r t">Free credit</text>
-  <text x="110" y="263" class="f s">A trial or promotional grant. It ends when it is spent or expires.</text>
+  <text x="110" y="245" class="r t">Free tier, no billing on the key</text>
+  <text x="110" y="263" class="f s">The provider's free quota, back on its own schedule. Gemini: resets daily at midnight Pacific.</text>
+  <!-- option 1 -->
+  <circle cx="94" cy="290" r="7" fill="#fff" stroke="#c7c7cc"/>
+  <text x="110" y="295" class="r t">Free credit</text>
+  <text x="110" y="313" class="f s">A trial or promotional grant. It ends when it is spent or expires.</text>
   <!-- option 2 selected -->
-  <circle cx="94" cy="290" r="7" fill="#1d1d1f"/><circle cx="94" cy="290" r="3" fill="#fff"/>
-  <text x="110" y="295" class="r t">Prepaid, with auto-recharge off</text>
-  <text x="110" y="313" class="f s">You topped it up once, and it will not refill itself. Check this with the provider: the app cannot.</text>
+  <circle cx="94" cy="340" r="7" fill="#1d1d1f"/><circle cx="94" cy="340" r="3" fill="#fff"/>
+  <text x="110" y="345" class="r t">Prepaid, with auto-recharge off</text>
+  <text x="110" y="363" class="f s">You topped it up once, and it will not refill itself. Check this with the provider: the app cannot.</text>
   <!-- option 3 disabled -->
-  <circle cx="94" cy="340" r="7" fill="#f2f2f7" stroke="#e5e5ea"/>
-  <text x="110" y="345" class="r q">Billed with no limit</text>
-  <text x="110" y="363" class="f q">Auto-recharge on, or invoiced. The pool never carries a chat onto this.</text>
+  <circle cx="94" cy="390" r="7" fill="#f2f2f7" stroke="#e5e5ea"/>
+  <text x="110" y="395" class="r q">Billed with no limit</text>
+  <text x="110" y="413" class="f q">Auto-recharge on, or invoiced. The pool never carries a chat onto this.</text>
 
-  <line x1="84" y1="386" x2="676" y2="386" stroke="#f2f2f7"/>
+  <line x1="84" y1="436" x2="676" y2="436" stroke="#f2f2f7"/>
 
-  <text x="84" y="416" class="rb t">Amount</text>
-  <rect x="220" y="400" width="120" height="28" rx="6" class="btn"/><text x="232" y="419" class="r t">$10.00</text>
-  <text x="352" y="419" class="f s">Optional. The app stops at this even if the provider has not said no.</text>
-  <text x="84" y="458" class="rb t">Expires</text>
-  <rect x="220" y="442" width="120" height="28" rx="6" class="btn"/><text x="232" y="461" class="r q">No date</text>
-  <text x="352" y="461" class="f s">Optional. Free grants usually have one.</text>
+  <text x="84" y="466" class="rb t">Amount</text>
+  <rect x="220" y="450" width="120" height="28" rx="6" class="btn"/><text x="232" y="469" class="r t">$10.00</text>
+  <text x="352" y="469" class="f s">Optional. The app stops at this even if the provider has not said no.</text>
+  <text x="84" y="508" class="rb t">Expires</text>
+  <rect x="220" y="492" width="120" height="28" rx="6" class="btn"/><text x="232" y="511" class="r q">No date</text>
+  <text x="352" y="511" class="f s">Optional. Free grants usually have one. Not asked for a free tier.</text>
 
-  <rect x="84" y="488" width="592" height="40" rx="8" fill="#fafafa" stroke="#e5e5ea"/>
-  <text x="100" y="513" class="f s">It goes last in the pool, after every allowance. Drag it higher in Settings ▸ Pool if you want it sooner.</text>
+  <rect x="84" y="538" width="592" height="40" rx="8" fill="#fafafa" stroke="#e5e5ea"/>
+  <text x="100" y="563" class="f s">It goes last in the pool, after every allowance. Drag it higher in Settings ▸ Pool if you want it sooner.</text>
 
-  <rect x="496" y="540" width="80" height="30" rx="8" class="btn"/><text x="536" y="560" class="r t" text-anchor="middle">Cancel</text>
-  <rect x="586" y="540" width="90" height="30" rx="8" fill="#1d1d1f"/><text x="631" y="560" class="r" fill="#fff" text-anchor="middle">Add</text>
+  <rect x="496" y="590" width="80" height="30" rx="8" class="btn"/><text x="536" y="610" class="r t" text-anchor="middle">Cancel</text>
+  <rect x="586" y="590" width="90" height="30" rx="8" fill="#1d1d1f"/><text x="631" y="610" class="r" fill="#fff" text-anchor="middle">Add</text>
 
-  <text x="60" y="608" class="note">Add stays disabled until a kind is picked; “Billed with no limit” can never be picked (US2-AS5). Spending against the</text>
-  <text x="60" y="624" class="note">amount is the app's own record of what that entry's chats cost. Where a runtime reports no cost, the page says “not known”.</text>
+  <text x="60" y="658" class="note">Add stays disabled until a kind is picked; “Billed with no limit” can never be picked (US2-AS5). Spending against the</text>
+  <text x="60" y="674" class="note">amount is the app's own record of what that entry's chats cost. Where a runtime reports no cost, the page says “not known”.</text>
 </svg>
