@@ -1,0 +1,5 @@
+{
+  "name": "agents-gemini-toolset",
+  "private": true,
+  "dependencies": { "@google/gemini-cli": "0.61.0" }
+}

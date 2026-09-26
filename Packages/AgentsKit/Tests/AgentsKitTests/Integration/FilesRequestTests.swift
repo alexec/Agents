@@ -122,8 +122,10 @@ struct FilesRequestTests {
 
         let listing = try await core.listFiles(.init(agentID: id, folder: work.path))
         let names = listing.entries.map(\.name)
-        #expect(names.first == "zeta")
-        #expect(names.contains("b.txt"))
+        // The folder before the file, whatever else the start put there (`DotAgents`).
+        let folder = try #require(names.firstIndex(of: "zeta"))
+        let file = try #require(names.firstIndex(of: "b.txt"))
+        #expect(folder < file)
         #expect(listing.omitted == 0)
 
         // And it survives the wire, which is the point of it.

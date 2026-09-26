@@ -108,6 +108,12 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     public var downloader: String?
     /// The Claude toolset `current` points at, when it is whole (`ok` is there).
     public var toolsetID: String?
+    /// The same for every runtime the app installs on a server, Claude's included (046):
+    /// runtime id to the toolset id its `current` points at.
+    public var toolsetIDs: [String: String] = [:]
+    /// Runtimes with a sign-in of their own on the server, found in its login environment
+    /// (046: `GEMINI_API_KEY`). Only ever names; Claude's stays `hasOwnClaudeSignIn`.
+    public var ownSignIns: Set<String> = []
     /// The person's own `npx` on their login PATH (037's way to run Claude).
     public var hasNpx: Bool = false
     /// The server has a Claude sign-in of its own: `~/.claude/.credentials.json`, or a
@@ -130,6 +136,7 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         self.libc = libc
         self.downloader = downloader
         self.toolsetID = toolsetID
+        if let toolsetID { toolsetIDs[RuntimeCatalog.claude.id] = toolsetID }
         self.hasNpx = hasNpx
         self.hasOwnClaudeSignIn = hasOwnClaudeSignIn
     }
@@ -150,10 +157,25 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
         hasNpx = try c.decodeIfPresent(Bool.self, forKey: .hasNpx) ?? false
         hasOwnClaudeSignIn = try c.decodeIfPresent(Bool.self, forKey: .hasOwnClaudeSignIn) ?? false
+        toolsetIDs = try c.decodeIfPresent([String: String].self, forKey: .toolsetIDs) ?? [:]
+        ownSignIns = try c.decodeIfPresent(Set<String>.self, forKey: .ownSignIns) ?? []
+        // Facts saved before 046 knew Claude's alone.
+        if toolsetIDs.isEmpty, let toolsetID { toolsetIDs[RuntimeCatalog.claude.id] = toolsetID }
     }
 
-    /// Node's official Linux builds need glibc 2.28 or later; musl has none (043, R2).
-    public var canInstallClaude: Bool {
+    /// The toolset a runtime's `current` points at on this server, when it is whole.
+    public func toolsetID(for runtimeID: String) -> String? { toolsetIDs[runtimeID] }
+
+    /// Whether the server signs `runtimeID` in by itself (043 for Claude, 046 for the rest).
+    public func hasOwnSignIn(_ runtimeID: String) -> Bool {
+        runtimeID == RuntimeCatalog.claude.id ? hasOwnClaudeSignIn : ownSignIns.contains(runtimeID)
+    }
+
+    /// Node's official Linux builds need glibc 2.28 or later; musl has none (043, R2). Every
+    /// toolset is Node and a package, so this is whether any of them can go on (046).
+    public var canInstallClaude: Bool { canInstallToolsets }
+
+    public var canInstallToolsets: Bool {
         if case .glibc(let major, let minor) = libc { return (major, minor) >= (2, 28) }
         return false
     }

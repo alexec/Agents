@@ -34,6 +34,9 @@ RUNTIMES = {
     # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
     # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
+    # Never a gemini on the PATH (046, D1): the app's own toolset's shim, named by
+    # AGENTS_GEMINI_SHIM, e.g. <root>/tools/gemini/current/bin/gemini.
+    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
 }
 
 CLIENT = {
@@ -53,6 +56,21 @@ GROK_OVERLAY = """# Written by the Agents app. Do not edit: rebuilt on every lau
 [features]
 image_gen = false
 video_gen = false
+"""
+
+GEMINI_POLICY = """# Written by the Agents app. Do not edit: rebuilt on every launch.
+
+[[rule]]
+toolName = ["tracker_create_task", "tracker_update_task", "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency", "tracker_visualize"]
+decision = "deny"
+priority = 999
+denyMessage = "Use `manage_workflows` for anything that has to happen on its own."
+
+[[rule]]
+toolName = ["invoke_agent"]
+decision = "deny"
+priority = 999
+denyMessage = "This app starts and stops agents; ask me rather than starting one."
 """
 
 POLICIES = {
@@ -110,6 +128,18 @@ POLICIES = {
             "memories": False, "apps": False, "multi_agent": False,
             "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
     },
+    # A file named by an argument rather than a variable (046, R5).
+    "gemini": {
+        "removed": ["invoke_agent", "tracker_create_task", "tracker_update_task",
+                    "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency",
+                    "tracker_visualize"],
+        "kept": [],
+        "residue": [],
+        "meta": None,
+        "args": [],
+        "env": {},
+        "files": {"--policy": GEMINI_POLICY},  # written to a temp file below
+    },
 }
 
 POLICIES["claude"]["meta"]["claudeCode"]["options"]["disallowedTools"] = POLICIES["claude"]["removed"]
@@ -138,6 +168,11 @@ def ask(name, command, policy, scoped):
     arguments = list(command) + (policy["args"] if scoped else [])
     environment = dict(BASE_ENV)
     if scoped:
+        for flag, contents in policy.get("files", {}).items():
+            handle = tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False)
+            handle.write(contents)
+            handle.close()
+            arguments += [flag, handle.name]
         for variable, contents in policy["env"].items():
             handle = tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False)
             handle.write(contents)
@@ -247,7 +282,7 @@ def report(name):
         print("   started, but said nothing about its tools")
         return 0
 
-    if not policy["removed"] and not policy["args"] and policy["meta"] is None:
+    if not policy["removed"] and not policy["args"] and policy["meta"] is None and not policy.get("files"):
         print("   no lever on this runtime; everything conflicting is residue")
     else:
         # Substring rather than word match: a name may be a whole server

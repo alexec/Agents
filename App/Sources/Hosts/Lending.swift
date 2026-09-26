@@ -36,6 +36,30 @@ extension AppModel {
         return await hosts.lend(id, runtime: wanted.runtime, secret)
     }
 
+    /// What this Mac's own agents are lent (046, D3): Gemini's key, which is the only way
+    /// into Gemini for an individual. Offered then lent on every connect and whenever a key
+    /// is saved or removed; an offer without it tells the daemon to stop lending it.
+    func lendToThisMac() async {
+        let runtimes = ServerCredentials.runtimes.filter { id in
+            credentials.record(id) != nil && CredentialKind.kinds(for: id).contains(where: \.isLentOnTheMac)
+        }
+        _ = try? await client(for: .mac).call(DaemonAPI.Method.credentialsOffer,
+                                   DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: false))
+        for id in runtimes {
+            guard let secret = credentials.secretToLend(id) else { continue }
+            _ = try? await client(for: .mac).call(DaemonAPI.Method.credentialsLend, DaemonAPI.CredentialsLend(runtime: id, secret: secret))
+        }
+    }
+
+    /// This Mac's daemon wants a key it was not lent (a start raced the connect's lend, or
+    /// the key was just added): lend what Settings has. With none, the start's refusal says
+    /// where to add one.
+    func answerMacCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
+        guard credentials.secretToLend(wanted.runtime) != nil else { return false }
+        await lendToThisMac()
+        return true
+    }
+
     /// The person answered the ask: pasted and saved (true), or cancelled.
     func finishTokenAsk(saved: Bool) {
         guard let ask = tokenAsk else { return }

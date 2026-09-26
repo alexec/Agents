@@ -2,7 +2,8 @@ import AgentsKit
 import Foundation
 import Observation
 
-/// The credentials this window lends to servers, as Settings shows them (043, US2).
+/// The credentials this window lends, as Settings shows them: to servers (043, US2), and
+/// Gemini's to this Mac's own agents too (046, D3).
 ///
 /// A thin face on `CredentialStore`: the records to draw, the check in flight, and what the
 /// last save found. The secret itself is read from the Keychain only when it is saved,
@@ -10,8 +11,8 @@ import Observation
 @MainActor
 @Observable
 final class ServerCredentials {
-    /// The runtimes the app can install on a server, and so take a credential for (D3).
-    static let runtimes = ["claude"]
+    /// The runtimes that take a credential from Settings, in the catalog's order.
+    static let runtimes = RuntimeCatalog.builtIn.map(\.id).filter { !CredentialKind.kinds(for: $0).isEmpty }
 
     enum Checking: Equatable {
         case idle
@@ -33,9 +34,9 @@ final class ServerCredentials {
 
     func record(_ runtimeID: String) -> CredentialStore.Record? { records[runtimeID] }
 
-    /// Nil for text that is not a Claude credential, with no side effect.
+    /// False for text that is not a credential for `runtimeID`, with no side effect.
     func save(_ text: String, for runtimeID: String) async -> Bool {
-        guard let secret = Secret(text) else { return false }
+        guard let secret = Secret(text), secret.kind.runtimeID == runtimeID else { return false }
         do {
             try store.save(secret, for: runtimeID)
         } catch {

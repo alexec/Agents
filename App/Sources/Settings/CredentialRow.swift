@@ -1,7 +1,8 @@
 import AgentsKit
 import SwiftUI
 
-/// One runtime's credential for servers, in Settings ▸ Servers (043, contracts/ui.md § 1).
+/// One runtime's credential, in Settings ▸ Servers (043, contracts/ui.md § 1): Claude's for
+/// servers, Gemini's for servers and this Mac (046).
 ///
 /// Empty: a field to paste into, and where to get one. Saved: the mask, when it was added
 /// and last worked, and Replace and Remove. The text is never shown again once saved.
@@ -37,7 +38,7 @@ struct CredentialRow: View {
             }
             Text(dates(record)).appText(.fine).foregroundStyle(.secondary)
             if case .answered(.refused(let why)) = credentials.checking[runtimeID] {
-                Text("\(name) refused this token: \(why)").appText(.fine).tinted(.failure)
+                Text("\(name) refused this \(noun): \(why)").appText(.fine).tinted(.failure)
             }
             HStack {
                 Spacer()
@@ -47,7 +48,10 @@ struct CredentialRow: View {
                 Button("Check again") { Task { await credentials.check(runtimeID) } }
                     .disabled(credentials.checking[runtimeID] == .checking)
                 Button("Replace…") { isReplacing = true }
-                Button("Remove", role: .destructive) { credentials.remove(runtimeID) }
+                Button("Remove", role: .destructive) {
+                    credentials.remove(runtimeID)
+                    Task { await model.lendToThisMac() }
+                }
             }
             .controlSize(.small)
         }
@@ -61,11 +65,11 @@ struct CredentialRow: View {
                 if isReplacing, let record = credentials.record(runtimeID) {
                     Text("Replacing \(record.mask)").appText(.fine).foregroundStyle(.secondary)
                 } else {
-                    Text("No token").appText(.fine).foregroundStyle(.secondary)
+                    Text("No \(noun)").appText(.fine).foregroundStyle(.secondary)
                 }
             }
             HStack {
-                SecureField("Paste a \(name) token", text: $text)
+                SecureField("Paste a \(name) \(noun)", text: $text)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(save)
                 if isReplacing {
@@ -74,10 +78,10 @@ struct CredentialRow: View {
                 Button("Save", action: save).disabled(text.isEmpty)
             }
             if notACredential {
-                Text("That isn’t a Claude token or API key. They start sk-ant-oat or sk-ant-api.")
+                Text(CredentialKind.pasteRefusal(for: runtimeID))
                     .appText(.fine).tinted(.failure)
             }
-            Text("Make one with `claude setup-token` on this Mac, or use an API key from console.anthropic.com.")
+            Text(CredentialKind.whereToGet(for: runtimeID))
                 .appText(.fine).foregroundStyle(.secondary)
         }
     }
@@ -86,6 +90,7 @@ struct CredentialRow: View {
         let pasted = text
         Task {
             if await credentials.save(pasted, for: runtimeID) {
+                await model.lendToThisMac()
                 text = ""
                 notACredential = false
                 isReplacing = false
@@ -94,6 +99,8 @@ struct CredentialRow: View {
             }
         }
     }
+
+    private var noun: String { CredentialKind.noun(for: runtimeID) }
 
     private func tint(_ record: CredentialStore.Record) -> StateTint {
         switch credentials.checking[runtimeID] {
