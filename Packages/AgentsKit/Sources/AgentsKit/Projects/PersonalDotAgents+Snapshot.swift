@@ -56,6 +56,12 @@ extension PersonalDotAgents {
 
     private static func tilde(_ relative: String) -> String { "~/\(relative)" }
 
+    /// A path under the personal home written from `~`, the way the person thinks of it.
+    /// Against that home rather than the daemon's: a scratch copy has a home of its own.
+    private static func tilde(_ path: String, in home: URL) -> String {
+        path.hasPrefix(home.path + "/") ? "~" + path.dropFirst(home.path.count) : path
+    }
+
     // MARK: Instructions
 
     private static func instructions(home: URL, present: [Rule], looks: inout [DaemonAPI.Look]) -> DaemonAPI.Instructions {
@@ -127,7 +133,7 @@ extension PersonalDotAgents {
             if let clash {
                 let runtime = present.first { $0.skillsFolder != nil }.map { names([$0.runtimeID]) } ?? "It"
                 looks.append(.init(kind: .clash, page: .skills, item: name,
-                                   text: "A skill of that name is also in \((clash as NSString).abbreviatingWithTildeInPath) and was left there. \(runtime) gets that one."))
+                                   text: "A skill of that name is also in \(tilde(clash, in: home)) and was left there. \(runtime) gets that one."))
             }
             list.append(.init(name: name, path: url.path, description: skillDescription(url), source: .personal,
                               clash: clash, reach: reach))
@@ -215,7 +221,7 @@ extension PersonalDotAgents {
                 else if runsBothServers.contains(id) { what = "\(names([id])) runs both." }
                 else { what = "\(names([id])) uses the one from mcp.json." }
                 looks.append(.init(kind: .clash, page: .mcp, item: server.name,
-                                   text: "Also in \((file as NSString).abbreviatingWithTildeInPath). \(what)"))
+                                   text: "Also in \(tilde(file, in: home)). \(what)"))
             }
             result.servers.append(serverRow(server, clash: clash, reach: reach))
         }
