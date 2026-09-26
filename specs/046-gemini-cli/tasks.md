@@ -32,10 +32,12 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 
 **Purpose**: settle research's five "to measure" items before code depends on them.
 
-- [ ] T005 Ask Alex for a Gemini API key (AskUserQuestion); keep it only in the scratch root's launch environment and in `/tmp`, never in a repo file or the real app's environment
-- [ ] T006 With a hand-run `npm ci` of `App/Resources/toolsets/gemini/` into `/tmp/gemini-spike/` (Node from the pinned tarball), run a real `--acp` turn with the app's MCP server in `mcpServers` and a hand-written policy file on `--policy`; record in `specs/046-gemini-cli/research.md` R2 (MCP tools reach the model), R3 (untrusted folder does not stop a turn), R5 (a `deny` rule with no `argsPattern` hides the tool or only refuses it), R9 (shape of a quota / `RESOURCE_EXHAUSTED` failure over ACP)
-- [ ] T007 Same setup, no key in the environment: call `authenticate` with `oauth-personal` and with `gemini-api-key`; record in research R4 what each does over ACP and whether a lent `GEMINI_API_KEY` alone is enough on a server
-- [ ] T008 On agents-bare (test-servers skill, 127.0.0.1:2223) and on this Mac, confirm `npm ci --ignore-scripts` of the Gemini lock succeeds without a compiler and `run_shell_command` works (`node-pty` prebuilt or skipped); record in research R10
+- [X] T005 Ask Alex for a Gemini API key (AskUserQuestion); keep it only in the scratch root's launch environment and in `/tmp`, never in a repo file or the real app's environment
+- [X] T006 With a hand-run `npm ci` of `App/Resources/toolsets/gemini/` into `/tmp/gemini-spike/` (Node from the pinned tarball), run a real `--acp` turn with the app's MCP server in `mcpServers` and a hand-written policy file on `--policy`; record in `specs/046-gemini-cli/research.md` R2 (MCP tools reach the model), R3 (untrusted folder does not stop a turn), R5 (a `deny` rule with no `argsPattern` hides the tool or only refuses it), R9 (shape of a quota / `RESOURCE_EXHAUSTED` failure over ACP)
+- [X] T007 Same setup, no key in the environment: call `authenticate` with `oauth-personal` and with `gemini-api-key`; record in research R4 what each does over ACP and whether a lent `GEMINI_API_KEY` alone is enough on a server
+- [ ] T008 (Mac half done, R13: `npm ci` 4 s, no compiler, `node-pty` not needed) On agents-bare (test-servers skill, 127.0.0.1:2223) and on this Mac, confirm `npm ci --ignore-scripts` of the Gemini lock succeeds without a compiler and `run_shell_command` works (`node-pty` prebuilt or skipped); record in research R10
+
+**Result (R13)**: all measured but quota (left to the walk) and agents-bare (T008). Two decisions by Alex: `--skip-trust` (D7) and one Settings key for the Mac and servers (D3 revised) — tasks T059–T062 below.
 
 **Checkpoint**: research has no "to measure" left; any change of decision is reflected in plan.md and contracts before Phase 3.
 
@@ -147,6 +149,13 @@ with plugin validation skipped; no runtime-id `if`/`switch` outside the catalogs
 - [ ] T054 [US2] Failure sentences (FR-018): a Gemini that exits before `initialize` with an unknown-argument error says "Gemini <version> did not start in a mode the app can talk to."; a quota failure (shape from T006) says "Gemini's quota ran out: …"; tests with `FakeACPAgent` in `Tests/Integration/StartResilienceTests.swift`
 
 ---
+
+## Phase 9b: The Gemini key on the Mac too (D3 revised, D7) — added after the trial
+
+- [X] T059 [US1] Start Gemini with `--skip-trust` (`RuntimeCatalog.gemini.arguments`), and in the check scripts and launch contract (research R13)
+- [ ] T060 [US2] `CredentialKind.geminiAPIKey` recognises `AIza` and `AQ.` prefixes (Alex's real key is `AQ.`, 53 characters); tests in `Tests/Unit/CredentialKindTests.swift` with made-up keys of both shapes
+- [ ] T061 [US2] The Mac daemon accepts a lent Gemini key from a Mac window (today `lendCredential` refuses on the Mac with `notAServer`): kept in memory for the daemon's life, not per connection, used only in the environment of Gemini processes on this Mac (`GEMINI_API_KEY` set, `GOOGLE_API_KEY` removed), never written; a key already in the person's environment is used when none is lent. In `Daemon-side/Daemon/DaemonCore+Credentials.swift` and `App/Sources/Hosts/Lending.swift` (the window lends at connect and when the key changes); tests in `Tests/Integration/LendTests.swift`
+- [ ] T062 [US2] A Gemini start with no key anywhere answers "Gemini needs an API key. Add one in Settings ▸ Runtime credentials." with a button to Settings, instead of the sheet's Google choice; the sheet shows Gemini's own refusal of `oauth-personal` as it words it
 
 ## Phase 10: Polish & cross-cutting
 

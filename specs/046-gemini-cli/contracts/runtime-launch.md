@@ -3,7 +3,7 @@
 ## On the Mac
 
 ```text
-<root>/tools/gemini/current/bin/gemini --acp --policy <root>/runtimes/gemini-policy.toml
+<root>/tools/gemini/current/bin/gemini --acp --skip-trust --policy <root>/runtimes/gemini-policy.toml
 ```
 
 `bin/gemini` is the toolset's shim: `exec <toolset>/node/bin/node <toolset>/lib/node_modules/@google/gemini-cli/bundle/gemini.js "$@"`.

@@ -18,7 +18,7 @@ RUNTIMES = {
     # Not "agent", which is what Cursor calls itself and what Grok installs.
     "cursor": ["cursor-agent", "acp"],
     # Never a gemini on the PATH (046, D1): the app's own toolset's shim.
-    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp"],
+    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
 }
 
 # What the app advertises today. Kept beside ACP.ClientCapabilities.app on purpose:

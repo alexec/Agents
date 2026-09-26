@@ -59,7 +59,10 @@ public enum RuntimeCatalog {
         id: "gemini",
         name: "Gemini",
         executable: "gemini",
-        arguments: ["--acp"],
+        // `--skip-trust`: Gemini starts no stdio MCP server in a folder it does not trust,
+        // and the app's own tools are one. Trusted for this session only; nothing is
+        // written to Gemini's `trustedFolders.json` (Alex, 2026-09-25; research R13).
+        arguments: ["--acp", "--skip-trust"],
         install: .toolset(runtimeID: "gemini"),
         installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
         usesAppCopyOnly: true)

@@ -33,7 +33,7 @@ RUNTIMES = {
     "cursor": ["cursor-agent", "acp"],
     # Never a gemini on the PATH (046, D1): the app's own toolset's shim, named by
     # AGENTS_GEMINI_SHIM, e.g. <root>/tools/gemini/current/bin/gemini.
-    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp"],
+    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
 }
 
 CLIENT = {
