@@ -125,8 +125,20 @@ public final class AgentsModel {
     /// Here rather than in the Mac's own model so a phone shows the same output in a
     /// call's detail. Only what arrived while this client was listening: the output is
     /// streamed, not kept in the transcript.
+    ///
+    /// Bounded as a whole as well as per terminal. Every agent's output reaches every
+    /// window, so a window left open for days heard every command every agent ran, and
+    /// until 2026-09-25 kept all of it. The terminals written to least recently go
+    /// first, the agent on screen's last.
     public private(set) var terminalOutput: [String: String] = [:]
     public static let terminalOutputLimit = 200_000
+    /// Bytes of output kept across all terminals, and how many terminals.
+    public static let terminalOutputBudget = 4_000_000
+    public static let terminalsKept = 256
+    /// Whose each kept terminal is, and the order they were last written to, oldest first.
+    @ObservationIgnored private var terminalAgents: [String: UUID] = [:]
+    @ObservationIgnored private var terminalsByWrite: [String] = []
+    @ObservationIgnored private var terminalOutputBytes = 0
 
     /// A choice made on a control that the daemon has not yet confirmed (033).
     ///
@@ -322,12 +334,20 @@ public final class AgentsModel {
             }
 
         case .terminalOutput(let notification):
-            var text = terminalOutput[notification.terminalID, default: ""] + notification.chunk
+            let id = notification.terminalID
+            let before = terminalOutput[id]?.utf8.count ?? 0
+            var text = terminalOutput[id, default: ""] + notification.chunk
             // The tail, because a build that prints for ten minutes is read from the end.
-            if text.count > Self.terminalOutputLimit {
+            // Bytes first: they are counted already, and characters are counted by walking.
+            if text.utf8.count > Self.terminalOutputLimit, text.count > Self.terminalOutputLimit {
                 text = String(text.suffix(Self.terminalOutputLimit))
             }
-            terminalOutput[notification.terminalID] = text
+            terminalOutput[id] = text
+            terminalOutputBytes += text.utf8.count - before
+            terminalAgents[id] = notification.agentID
+            if let at = terminalsByWrite.lastIndex(of: id) { terminalsByWrite.remove(at: at) }
+            terminalsByWrite.append(id)
+            dropOldTerminalOutput()
 
         case .unreadable:
             break
@@ -396,6 +416,18 @@ public final class AgentsModel {
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
         projects = (projects.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
+    /// Down to the budget, never taking the terminal just written to.
+    private func dropOldTerminalOutput() {
+        while terminalsByWrite.count > 1,
+              terminalOutputBytes > Self.terminalOutputBudget || terminalsByWrite.count > Self.terminalsKept {
+            let older = terminalsByWrite.dropLast()
+            let at = older.firstIndex { terminalAgents[$0] != watching } ?? older.startIndex
+            let id = terminalsByWrite.remove(at: at)
+            terminalOutputBytes -= terminalOutput.removeValue(forKey: id)?.utf8.count ?? 0
+            terminalAgents[id] = nil
+        }
     }
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
