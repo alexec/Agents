@@ -141,7 +141,7 @@ App/Sources/
 │   └── SkillPreviewView.swift                # the detail's left column and the SKILL.md reader
 ├── Projects/ProjectSkillsSection.swift       # new (frame D)
 ├── Projects/ProjectAgentsView.swift          # (change) section between Workflows and Worktrees
-└── AppModel.swift (+ AppModel+Catalog.swift) # calls, per-destination "added" names
+└── Catalog/AppModel+Catalog.swift            # calls, per-destination "added" names
 
 docs/  # per the spec's Docs list
 ```
