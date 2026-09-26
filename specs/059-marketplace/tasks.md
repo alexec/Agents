@@ -309,11 +309,11 @@ any.
   - a project add is listed by `npx skills list` and restored by `npx skills experimental_install` (SC-005).
 
   Record it in `specs/059-marketplace/walk/interop.md`.
-- [ ] T056 [P] Add `docs/how-to/add-a-skill-from-a-catalogue.md`: search, look before adding, You or a project, update and remove, and what "known" means. Add it to `mkdocs.yml` after `share-skills-across-agents.md`.
-- [ ] T057 [P] Change `docs/how-to/share-skills-across-agents.md` to link the new how-to as the way in, alongside by hand and `npx skills`.
-- [ ] T058 [P] Change `docs/reference/settings.md`: Shared ▸ Skills gains Add skill…, From / Taken at, and Update / Remove for managed skills.
-- [ ] T059 [P] Change `docs/explanation/projects-hosts-worktrees.md`: the project page's Skills section, the fact that a worktree has its own `.agents/skills`, and no section on server projects yet.
-- [ ] T060 [P] Change `docs/explanation/scoped-tools.md` with a short section on trust: skills.sh does not review what it lists; the app shows everything before adding, marks scripts, and pins the commit.
+- [X] T056 [P] Add `docs/how-to/add-a-skill-from-a-catalogue.md`: search, look before adding, You or a project, update and remove, and what "known" means. Add it to `mkdocs.yml` after `share-skills-across-agents.md`.
+- [X] T057 [P] Change `docs/how-to/share-skills-across-agents.md` to link the new how-to as the way in, alongside by hand and `npx skills`.
+- [X] T058 [P] Change `docs/reference/settings.md`: Shared ▸ Skills gains Add skill…, From / Taken at, and Update / Remove for managed skills.
+- [X] T059 [P] Change `docs/explanation/projects-hosts-worktrees.md`: the project page's Skills section, the fact that a worktree has its own `.agents/skills`, and no section on server projects yet.
+- [X] T060 (put in docs/explanation/projects-hosts-worktrees.md and the how-to, not scoped-tools.md, which is about agents' own tools) [P] Change `docs/explanation/scoped-tools.md` with a short section on trust: skills.sh does not review what it lists; the app shows everything before adding, marks scripts, and pins the commit.
 - [ ] T061 Run `swift test` in full. If anything fails, compare six full runs against main before blaming the branch.
 - [ ] T062 Build `Agents` then `Remote` one after the other with `-skipPackagePluginValidation`, and run the Linux gate (`scripts/build-linux-agentsd.sh`) so the `canImport` guards hold.
 - [ ] T063 Walk what ships: rerun quickstart §3 and §4 on the final commit of the branch, after merging main into it, before asking Alex for the merge.

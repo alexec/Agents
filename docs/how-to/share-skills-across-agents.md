@@ -28,6 +28,9 @@ A project's own `.agents` folder still applies inside that project, as well as t
 
 ## Add a skill
 
+To find one on skills.sh and add it from the app, see
+[Add a skill from a catalogue](add-a-skill-from-a-catalogue.md). To add one by hand:
+
 1. Make a folder in `~/.agents/skills` named for the skill, with a `SKILL.md` in it, the
    same shape as a Claude Code skill: a front matter with `name` and `description`, then
    the instructions.

@@ -43,6 +43,8 @@ something particular done.
   or Antigravity in or out from the app, and give Gemini its key.
 - [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
   put them in `~/.agents` once, for every runtime and project.
+- [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
+  before it goes in, and add it for yourself or to a project.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): a pool of
   runtimes a chat carries on with when its plan's allowance is spent.
 - [Limit what agents spend](limit-spending.md): the Spending page, and a limit per agent
