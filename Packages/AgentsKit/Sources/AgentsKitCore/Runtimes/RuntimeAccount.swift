@@ -56,9 +56,22 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
                   promptCapabilities: handshake.accepts)
     }
 
-    /// The method to offer first: the one that can be done without a terminal.
+    /// The methods in the order to offer them: the runtime's own order where its policy
+    /// names one (047: Codex puts ChatGPT first), the rest after in the order it sent them.
+    public var orderedAuthMethods: [ACP.AuthMethod] {
+        let order = ToolPolicyCatalog.policy(for: runtimeID).preferredAuthMethods
+        guard !order.isEmpty else { return authMethods }
+        let named = order.compactMap { id in authMethods.first { $0.id == id } }
+        return named + authMethods.filter { !order.contains($0.id) }
+    }
+
+    /// The method to offer first: the runtime's own first choice where its policy names
+    /// one, and otherwise the one that can be done without a terminal.
     public var preferredMethod: ACP.AuthMethod? {
-        authMethods.first { $0.terminalCommand == nil } ?? authMethods.first
+        if !ToolPolicyCatalog.policy(for: runtimeID).preferredAuthMethods.isEmpty {
+            return orderedAuthMethods.first
+        }
+        return authMethods.first { $0.terminalCommand == nil } ?? authMethods.first
     }
 
     public var needsTerminal: Bool {

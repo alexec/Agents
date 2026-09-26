@@ -1,6 +1,6 @@
 import Foundation
 
-// The four policies, one per runtime this app knows how to start.
+// The policies, one per runtime this app knows how to start.
 //
 // Total over `RuntimeCatalog.builtIn`, and a unit test says so. A runtime without an
 // entry here is a bug rather than a runtime that keeps everything: the failure of a
@@ -178,6 +178,60 @@ public enum ToolPolicyCatalog {
         ],
         lever: .words)
 
+    /// Codex: feature switches in `CODEX_CONFIG` (047, research R5).
+    ///
+    /// Codex's tools come from features in its config rather than a fixed list, and its
+    /// ACP adapter merges the JSON object in `CODEX_CONFIG` into every session's config for
+    /// that process. So the lever is an environment variable, and nothing in `~/.codex` is
+    /// touched: `CODEX_HOME` would move `auth.json` too and sign the person out, which is
+    /// Cursor's reason for having no lever at all.
+    ///
+    /// Measured on 0.156.1 with a real ChatGPT turn (research R5): the switches do take tools
+    /// away (turning the shell features off empties the shell tools), so `sleep_tool` takes
+    /// `clock.sleep`, and `goals`, `memories`, `apps` and `in_app_local_automation` take
+    /// Codex's own long-running goals, memory store, ChatGPT connectors and automations.
+    /// The `collaboration.*` tools do not go: `multi_agent` and `multi_agent_v2` off leave
+    /// all six listed, because the model's own catalog entry names its sub-agent tools. So
+    /// they are residue, and the briefing names them, as Cursor's `Task` is named.
+    /// `default_mode_request_user_input` is the opposite of the rest: it lets Codex's
+    /// question tool, which the adapter raises as a form elicitation, ask outside plan mode.
+    ///
+    /// ChatGPT is offered before an API key when signing in (D1).
+    public static let codex = ToolPolicy(
+        runtimeID: RuntimeCatalog.codex.id,
+        removed: [
+            RemovedTool(name: "sleep", category: .standingArrangements),
+            RemovedTool(name: "goals", category: .standingArrangements),
+            RemovedTool(name: "automations", category: .standingArrangements),
+            RemovedTool(name: "memories", category: .artefacts),
+            RemovedTool(name: "apps", category: .artefacts),
+        ],
+        kept: [
+            KeptTool(name: "request_user_input",
+                     because: "It is the escalation path: the adapter raises it as a form elicitation, which the daemon holds and the phone can answer."),
+        ],
+        residue: [
+            ResidualTool(name: "spawn_agent", category: .agents),
+            ResidualTool(name: "send_message", category: .agents),
+            ResidualTool(name: "followup_task", category: .agents),
+            ResidualTool(name: "interrupt_agent", category: .agents),
+            ResidualTool(name: "list_agents", category: .agents),
+            ResidualTool(name: "wait_agent", category: .agents),
+        ],
+        lever: .environmentJSON(variable: "CODEX_CONFIG", value: .object([
+            "features": .object([
+                "sleep_tool": .bool(false),
+                "goals": .bool(false),
+                "in_app_local_automation": .bool(false),
+                "memories": .bool(false),
+                "apps": .bool(false),
+                "multi_agent": .bool(false),
+                "default_mode_request_user_input": .bool(true),
+            ]),
+        ])),
+        escalationTool: "request_user_input",
+        preferredAuthMethods: ["chat-gpt", "chat-gpt-device-code", "api-key"])
+
     /// In the same order as `RuntimeCatalog.builtIn`, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex]
 }

@@ -3,11 +3,12 @@ import Foundation
 import CryptoKit
 #endif
 
-/// Everything a server needs to run one runtime that the app can install there (043).
+/// Everything a machine needs to run one runtime that the app installs itself: on a server
+/// (043) and on this Mac (048).
 ///
-/// Claude is the only one (D3): Node.js, and the ACP adapter from npm with its own
-/// per-platform Claude binary. The app carries `manifest.json` and an npm lock for it in
-/// `Resources/toolsets/<runtime>/`, made by `scripts/update-claude-toolset.sh`; a server
+/// Node.js, and one npm package that speaks ACP with its own per-platform binary: Claude's
+/// adapter, Codex's adapter (047). The app carries `manifest.json` and an npm lock for each
+/// in `Resources/toolsets/<runtime>/`, made by `scripts/update-toolset.sh`; the machine
 /// downloads what they name and checks it against them.
 ///
 /// On a server it lives in `~/.agents-server/tools/<runtime>/<id>/`, with `current`
@@ -60,8 +61,13 @@ public struct Toolset: Hashable, Sendable {
         /// The adapter's script, relative to its package folder.
         public var entry: String
         /// Under this much free space in the server's home, the install is refused before
-        /// anything is downloaded. The toolset is about 484 MB once unpacked.
+        /// anything is downloaded. Claude's toolset is about 484 MB once unpacked, Codex's
+        /// about 520 MB.
         public var minFreeBytes: Int64
+        /// Whether the shim passes its own arguments on to the package (046: Gemini is
+        /// started with `--acp`). Absent from a manifest that has never needed it, so those
+        /// manifests' bytes, and so their toolset ids, stay what they were.
+        public var forwardsArguments: Bool?
 
         public struct Node: Codable, Hashable, Sendable {
             public var version: String
@@ -106,14 +112,22 @@ public struct Toolset: Hashable, Sendable {
     /// no install scripts, and nothing said to a server about audits or funding.
     public static let npmCIArguments = ["ci", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"]
 
-    /// The `bin/npx` a toolset is started through: not npx, but the pinned adapter run by
-    /// the toolset's own Node. One line per element, none containing a single quote, so
-    /// the server's script can hand them to `printf` quoted.
+    /// The name of the shim in `bin/`: the runtime's own `executable`, which is what
+    /// discovery looks for there. `npx` for Claude, whose recipe is `npx -y <adapter>`;
+    /// `codex-acp` for Codex (047).
+    public var shimName: String {
+        RuntimeCatalog.runtime(id: manifest.runtimeID)?.executable ?? "npx"
+    }
+
+    /// The `bin/<shimName>` a toolset is started through: the pinned package run by the
+    /// toolset's own Node, whatever the name says. One line per element, none containing a
+    /// single quote, so the server's script can hand them to `printf` quoted.
     public var shimLines: [String] {
-        ["#!/bin/sh",
-         "# Agents (043): not npx. Runs the Claude adapter this toolset was installed with.",
-         #"d=$(cd "$(dirname "$0")/.." && pwd -P)"#,
-         #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""#]
+        let forwards = manifest.forwardsArguments == true ? #" "$@""# : ""
+        return ["#!/bin/sh",
+                "# Agents: runs the \(manifest.package) this toolset was installed with.",
+                #"d=$(cd "$(dirname "$0")/.." && pwd -P)"#,
+                #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""# + forwards]
     }
 
     /// Where a server keeps one runtime's toolsets, relative to its home.
@@ -131,6 +145,18 @@ public struct Toolset: Hashable, Sendable {
             .flatMap { try? JSONDecoder().decode(MacNode.self, from: $0) }
         return Toolset(manifest: manifest, id: id(manifest: manifestData, lock: lockData), folder: folder,
                        macNode: macNode)
+    }
+
+    /// Every toolset under `folder` (the bundle's `toolsets/`), keyed by the runtime its
+    /// manifest names. A subfolder without a readable manifest and lock is skipped.
+    public static func loadAll(from folder: URL) -> [String: Toolset] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        var toolsets: [String: Toolset] = [:]
+        for name in names.sorted() {
+            guard let toolset = try? load(from: folder.appendingPathComponent(name, isDirectory: true)) else { continue }
+            toolsets[toolset.manifest.runtimeID] = toolset
+        }
+        return toolsets
     }
 
     public static func id(manifest: Data, lock: Data) -> String {

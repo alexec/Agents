@@ -173,18 +173,18 @@ if detach {
     }
 }
 
-// The app's pinned Claude toolset (043, 048), when this is the agentsd inside
-// Agents.app: Contents/Helpers/agentsd beside Contents/Resources/toolsets/claude.
-let toolsetFolder: URL? = {
+// The app's pinned toolsets (043, 048, 047), when this is the agentsd inside Agents.app:
+// Contents/Helpers/agentsd beside Contents/Resources/toolsets/<runtime>/.
+let toolsetsFolder: URL? = {
     let me = URL(filePath: Bundle.main.executablePath ?? CommandLine.arguments[0]).resolvingSymlinksInPath()
     let folder = me.deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("Resources/toolsets/claude", isDirectory: true)
-    return FileManager.default.fileExists(atPath: folder.appendingPathComponent("manifest.json").path) ? folder : nil
+        .appendingPathComponent("Resources/toolsets", isDirectory: true)
+    return FileManager.default.fileExists(atPath: folder.path) ? folder : nil
 }()
 
 let daemon: Daemon
 do {
-    daemon = try Daemon(serve: serve, toolsetFolder: toolsetFolder)
+    daemon = try Daemon(serve: serve, toolsetsFolder: toolsetsFolder)
 } catch Daemon.StartError.alreadyRunning {
     // Another daemon holds the lock. That is the ordinary case when two windows open
     // at once, and there is nothing to say about it.

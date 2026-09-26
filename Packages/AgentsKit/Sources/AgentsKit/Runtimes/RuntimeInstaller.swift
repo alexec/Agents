@@ -11,26 +11,27 @@ public protocol RuntimeInstalling: Sendable {
     func install(_ runtime: Runtime, progress: @escaping @Sendable (String) -> Void) async -> RuntimeAvailability
 }
 
-/// Installs the runtimes in `RuntimeCatalog` on this Mac, each its own way: Claude from
-/// the app's pinned toolset, the rest with the vendor's own script or npm.
+/// Installs the runtimes in `RuntimeCatalog` on this Mac, each its own way: Claude and
+/// Codex from the app's pinned toolsets, the rest with the vendor's own script or npm.
 ///
 /// Whatever the recipe, the result is decided by looking again with the same discovery
 /// the app uses: a script that exits 0 and leaves nothing where the app looks is a
 /// failure, said as one, not a success nobody can start.
 public struct RuntimeInstaller: RuntimeInstalling {
     public var discovery: RuntimeDiscovery
-    /// Nil when the app's bundle carries no toolset, as in `swift run` or a build without
-    /// its resources. Claude then gets its page and no button.
-    public var toolset: MacToolsetInstaller?
+    /// The app's pinned toolsets, by runtime id. Empty when the app's bundle carries none,
+    /// as in `swift run` or a build without its resources; those runtimes then get their
+    /// page and no button.
+    public var toolsets: [String: MacToolsetInstaller]
     public var environment: [String: String]
     public var timeout: Duration
 
     public init(discovery: RuntimeDiscovery,
-                toolset: MacToolsetInstaller?,
+                toolsets: [String: MacToolsetInstaller] = [:],
                 environment: [String: String] = LoginShellPath.installEnvironment(),
                 timeout: Duration = .seconds(300)) {
         self.discovery = discovery
-        self.toolset = toolset
+        self.toolsets = toolsets
         self.environment = environment
         self.timeout = timeout
     }
@@ -38,10 +39,15 @@ public struct RuntimeInstaller: RuntimeInstalling {
     /// Debug builds only: every vendor script is this URL instead (048's walk).
     public static let testScriptVariable = "AGENTS_TEST_INSTALL_SCRIPT"
 
+    /// Old toolsets out, at the daemon's start (see `MacToolsetInstaller.tidy`).
+    public func tidy() {
+        for toolset in toolsets.values { toolset.tidy() }
+    }
+
     public func recipe(for runtime: Runtime) -> RuntimeInstall? {
         switch runtime.install {
-        case .toolset:
-            return toolset?.toolset.macNode == nil ? nil : runtime.install
+        case .toolset(let runtimeID):
+            return toolsets[runtimeID]?.toolset.macNode == nil ? nil : runtime.install
         case .npmGlobal:
             return npm == nil ? nil : runtime.install
         case .script, nil:
@@ -55,8 +61,10 @@ public struct RuntimeInstaller: RuntimeInstalling {
         }
         do {
             switch recipe {
-            case .toolset:
-                guard let toolset else { return .installFailed(reason: "The app can’t install \(runtime.name) itself.") }
+            case .toolset(let runtimeID):
+                guard let toolset = toolsets[runtimeID] else {
+                    return .installFailed(reason: "The app can’t install \(runtime.name) itself.")
+                }
                 try await toolset.install(progress: progress)
             case .script(var url, let shell):
                 #if DEBUG
@@ -71,7 +79,7 @@ public struct RuntimeInstaller: RuntimeInstalling {
                 try await runNPM(package, for: runtime)
             }
         } catch let failure as MacToolsetInstaller.Failure {
-            return .installFailed(reason: failure.sentence)
+            return .installFailed(reason: failure.sentence(for: runtime.name))
         } catch let failure as Failure {
             return .installFailed(reason: failure.sentence)
         } catch {

@@ -27,7 +27,7 @@ struct RuntimeAccountView: View {
 
             if account.state != .ready, !account.authMethods.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(account.authMethods, id: \.id) { method in
+                    ForEach(account.orderedAuthMethods, id: \.id) { method in
                         Button(method.name ?? method.id) {
                             Task { terminalCommand = await model.signIn(runtimeID: runtimeID,
                                                                         methodID: method.id) }

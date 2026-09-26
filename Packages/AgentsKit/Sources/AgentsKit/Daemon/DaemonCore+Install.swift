@@ -22,7 +22,9 @@ extension DaemonCore {
                                message: "Install \(runtime.name) from the Mac.")
         }
         if installs[runtimeID] != nil { return status(of: runtime) }
-        if discovery.locate(runtime).isAvailable {
+        // Here, and the toolset this app carries: nothing to do. Here but outdated is what
+        // **Update** asks for, and installs the new one beside the old (047).
+        if discovery.locate(runtime).isAvailable, !discovery.isOutdated(runtime) {
             installStates[runtimeID] = nil
             return status(of: runtime)
         }
@@ -37,6 +39,17 @@ extension DaemonCore {
         return status(of: runtime)
     }
 
+    /// Why `runtime` cannot be started, when an install is under way or failed (047,
+    /// FR-003): said instead of "not installed", which would be untrue while it is being
+    /// installed and unhelpful after the install said why. Nil otherwise.
+    func notYetInstalled(_ runtime: Runtime) -> String? {
+        if installs[runtime.id] != nil { return "\(runtime.name) is still being installed. Try again when it is." }
+        if case .installFailed(let reason)? = installStates[runtime.id] {
+            return "\(runtime.name) isn’t installed: \(reason)"
+        }
+        return nil
+    }
+
     /// The overlay `runtimes/list` draws: what an install says, over what discovery sees.
     func overlaid(_ status: RuntimeStatus) -> RuntimeStatus {
         var status = status
@@ -47,6 +60,7 @@ extension DaemonCore {
                 status.availability = state
             }
         }
+        status.outdated = status.availability.isAvailable && discovery.isOutdated(status.runtime)
         return status
     }
 

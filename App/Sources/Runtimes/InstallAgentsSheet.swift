@@ -55,15 +55,23 @@ private extension String {
 
 /// One agent: here and where, being installed, or a way to get it. The same row in the
 /// sheet, in Settings ▸ Agents and under an empty project list.
+///
+/// Laid out the way an `AgentRow` is: the state as an icon on the left, the name on the
+/// top line and where it stands on the line under it, so this list reads like every
+/// other list of things in the app.
 struct RuntimeInstallRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     let status: RuntimeStatus
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(status.runtime.name).appText(.reading).fontWeight(.medium)
+        HStack(alignment: .top, spacing: 12) {
+            RuntimeStatusIcon(availability: status.availability)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(status.runtime.name)
+                    .appText(.reading).fontWeight(.semibold)
+                    .lineLimit(1)
                 detail
             }
             Spacer(minLength: 12)
@@ -74,24 +82,22 @@ struct RuntimeInstallRow: View {
     @ViewBuilder private var detail: some View {
         switch status.availability {
         case .available(let path, _):
-            Label(path, systemImage: "checkmark")
-                .appText(.fine).foregroundStyle(.secondary)
+            Text(path)
+                .appText(.supporting).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.middle)
         case .installing(let progress):
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text(progress.map { "\($0)…" } ?? "Starting…").appText(.fine).foregroundStyle(.secondary)
-            }
+            Text(progress.map { "\($0)…" } ?? "Starting…")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .lineLimit(1)
         case .installFailed(let reason):
-            Text(reason).appText(.fine).tinted(.failure)
+            Text(reason).appText(.supporting).tinted(.failure)
                 .fixedSize(horizontal: false, vertical: true)
         case .missing:
-            Text("Not on this Mac").appText(.fine).foregroundStyle(.secondary)
+            Text("Not on this Mac").appText(.supporting).foregroundStyle(.secondary)
         case .needsSignIn, .failed:
-            if let reason = status.unavailableReason {
-                Text(reason).appText(.fine).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(status.unavailableReason ?? "Can’t be used")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -112,6 +118,11 @@ struct RuntimeInstallRow: View {
                         .help("Try installing \(status.runtime.name) again")
                 }
             }
+        case .available where status.outdated && status.runtime.install != nil:
+            // This app carries a newer pin than the one installed (047). Agents already
+            // running keep the old one until they end.
+            Button("Update") { install() }
+                .help("Install the \(status.runtime.name) this version of Agents carries. Agents already running keep theirs.")
         default:
             EmptyView()
         }
@@ -124,6 +135,57 @@ struct RuntimeInstallRow: View {
 
     private func install() {
         Task { await model.installRuntime(status.id) }
+    }
+}
+
+/// An agent's state as the icon beside its name: the same 18-point well and glyph size
+/// as an agent's `StatusIcon`, and the same spinner while something is under way.
+/// Only a failure is coloured; being here or not here yet is not news that needs it.
+private struct RuntimeStatusIcon: View {
+    let availability: RuntimeAvailability
+
+    var body: some View {
+        Group {
+            if availability.isInstalling {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.7)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 15))
+                    .foregroundStyle(tint.style(or: .secondary))
+            }
+        }
+        .frame(width: 18, height: 18)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+
+    private var symbol: String {
+        switch availability {
+        case .available: "checkmark.circle"
+        case .missing, .installing: "circle.dashed"
+        case .needsSignIn: "person.crop.circle.badge.exclamationmark"
+        case .failed, .installFailed: "exclamationmark.triangle"
+        }
+    }
+
+    private var tint: StateTint {
+        switch availability {
+        case .needsSignIn, .failed, .installFailed: .failure
+        case .available, .missing, .installing: .none
+        }
+    }
+
+    private var label: String {
+        switch availability {
+        case .available: "Installed"
+        case .missing: "Not installed"
+        case .installing: "Installing"
+        case .needsSignIn: "Signed out"
+        case .failed: "Can’t be used"
+        case .installFailed: "Install failed"
+        }
     }
 }
 

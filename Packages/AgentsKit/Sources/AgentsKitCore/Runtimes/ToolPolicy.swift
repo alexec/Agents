@@ -145,6 +145,11 @@ public enum Lever: Hashable, Sendable {
     /// The removed names follow `flag` on the command line, and `extra` is the rest of
     /// the flags.
     case launchArguments(flag: String, repeatsFlag: Bool, extra: [String])
+    /// A JSON object in an environment variable, read by the runtime at start and merged
+    /// into its own config for that process only (047: Codex's `CODEX_CONFIG`, whose
+    /// feature switches take the removed tools away). The removed names are for the
+    /// briefing; the switches that remove them are in `value`.
+    case environmentJSON(variable: String, value: JSONValue)
     /// No mechanism at all. Everything conflicting is residue.
     case words
 }
@@ -179,6 +184,10 @@ public struct ToolPolicy: Hashable, Sendable {
     /// question flow and nobody has established what its model calls it, so its line stays
     /// as it was rather than naming something that might not be there (FR-008).
     public var escalationTool: String?
+    /// The order to offer this runtime's own sign-in methods in, by id, first to last (047:
+    /// Codex puts ChatGPT before an API key, D1). Methods not named keep their order after
+    /// these. Empty keeps the rule for everyone else: the first one without a terminal.
+    public var preferredAuthMethods: [String]
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -186,7 +195,8 @@ public struct ToolPolicy: Hashable, Sendable {
                 residue: [ResidualTool] = [],
                 lever: Lever,
                 environmentFiles: [EnvironmentFile] = [],
-                escalationTool: String? = nil) {
+                escalationTool: String? = nil,
+                preferredAuthMethods: [String] = []) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -194,6 +204,7 @@ public struct ToolPolicy: Hashable, Sendable {
         self.lever = lever
         self.environmentFiles = environmentFiles
         self.escalationTool = escalationTool
+        self.preferredAuthMethods = preferredAuthMethods
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.
@@ -208,9 +219,20 @@ public struct ToolPolicy: Hashable, Sendable {
             Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: [:])
         case .sessionMetaAllowList(let path, let keep, let extra):
             Self.nesting(.array(keep.map(JSONValue.string)), at: path, beside: extra)
-        case .launchArguments, .words:
+        case .launchArguments, .environmentJSON, .words:
             nil
         }
+    }
+
+    /// What is added to the runtime's environment when the process is started: the
+    /// `environmentJSON` lever's variable, its value as compact JSON with sorted keys, so
+    /// the same policy is the same text every launch. Empty for every other lever.
+    public var launchEnvironment: [String: String] {
+        guard case .environmentJSON(let variable, let value) = lever else { return [:] }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) else { return [:] }
+        return [variable: text]
     }
 
     /// Fold the path from the inside out: the value goes at the last key, `beside` joins

@@ -43,7 +43,7 @@ struct RuntimeDiscoveryTests {
 
     @Test func everyBuiltInRuntimeIsReportedOneWayOrTheOther() {
         let statuses = discovery(["/opt/homebrew/bin/copilot"]).statuses()
-        #expect(statuses.count == 4)
+        #expect(statuses.count == RuntimeCatalog.builtIn.count)
         #expect(statuses.filter { $0.availability.isAvailable }.map(\.id) == ["copilot"])
         #expect(statuses.allSatisfy { RuntimeCatalog.runtime(id: $0.id) != nil })
     }
