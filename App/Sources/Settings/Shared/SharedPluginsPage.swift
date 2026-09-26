@@ -36,7 +36,7 @@ struct SharedPluginsPage: View {
                 }
                 .padding(20)
             }
-            .frame(width: 480)
+            .frame(width: 440)
             Divider()
             if let chosen {
                 PluginDetail(plugin: chosen, runtimes: snapshot.runtimes)

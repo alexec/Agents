@@ -33,12 +33,15 @@ struct SharedInstructionsPage: View {
                         let reach = snapshot.instructions?.reach[runtime.id]
                         GridRow(alignment: .firstTextBaseline) {
                             Text(runtime.name)
-                            Text(Self.reads(reach)).appText(.code).foregroundStyle(.secondary)
+                                .accessibilityLabel("\(runtime.name): \(Self.reads(reach)). \(SharedReachList.line(reach ?? .unchecked(nil)))")
+                            Text(Self.reads(reach))
+                                // A path in code type; a sentence about a runtime as prose.
+                                .appText(Self.reads(reach).hasPrefix("~/") || Self.reads(reach).hasPrefix("/") ? .code : .supporting)
+                                .foregroundStyle(.secondary).accessibilityHidden(true)
                             Text(Self.mark(reach))
                                 .foregroundStyle(reach?.gets == true ? SharedInk.reach : .secondary)
+                                .accessibilityHidden(true)
                         }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(runtime.name): \(Self.reads(reach)). \(SharedReachList.line(reach ?? .unchecked(nil)))")
                     }
                 }
             }

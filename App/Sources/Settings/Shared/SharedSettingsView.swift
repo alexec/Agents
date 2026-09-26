@@ -81,10 +81,10 @@ enum SharedPage: Hashable {
 }
 
 extension DaemonAPI.SharedSnapshot {
-    /// Nothing in the folder yet: frame H.
+    /// Nothing in the folder yet: frame H. The instructions do not count: the layout
+    /// writes a starter `AGENTS.md` into every folder it makes, so it is always there.
     var isEmpty: Bool {
-        instructions?.exists != true && skills.isEmpty && mcp.servers.isEmpty && mcp.problem == nil
-            && plugins.isEmpty && otherFiles.isEmpty
+        skills.isEmpty && mcp.servers.isEmpty && mcp.problem == nil && plugins.isEmpty && otherFiles.isEmpty
     }
 
     func warns(_ page: DaemonAPI.Look.Page) -> Bool {
@@ -144,7 +144,8 @@ private struct SharedSidebar: View {
             .contentShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
+        // A button is already one element: `children: .ignore` would swap it for one
+        // that cannot be pressed. No Text inside carries a label of its own (memory).
         .accessibilityLabel(title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : ""))
         .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }
@@ -283,7 +284,6 @@ struct SharedRow<Content: View>: View {
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }

@@ -130,6 +130,22 @@ struct PersonalSnapshotTests {
         #expect(runtimeOnly == ["codex/figma", "cursor/notes"])
     }
 
+    // A link not placed yet is placed before the runtime's next agent; only one the app
+    // placed and the person removed is left out (FR-009).
+    @Test func aLinkNotYetPlacedIsNotOneThatWasRemoved() throws {
+        let home = try home()
+        try skill("dataviz", at: ".agents/skills", in: home)
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        let before = PersonalDotAgents.snapshot(home: home, installed: ["claude"], record: record)
+        #expect(before.skills.first?.reach["claude"]?.gets == true)
+
+        PersonalDotAgents.reconcile(home: home, installed: ["claude"], record: &record)
+        try fileManager.removeItem(at: home.appending(path: ".claude/skills/dataviz"))
+        let after = PersonalDotAgents.snapshot(home: home, installed: ["claude"], record: record)
+        #expect(after.skills.first?.reach["claude"] == .leftOut("its link in ~/.claude/skills was removed"))
+    }
+
     @Test func otherFilesAreSorted() throws {
         let kinds = snapshot(try fullHome()).otherFiles.map { "\($0.kind.rawValue) \($0.path)" }
         #expect(kinds == ["git .git", "managed .skill-lock.json", "unused README.md", "persona personas/reviewer.md"])

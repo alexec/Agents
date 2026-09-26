@@ -59,19 +59,21 @@ struct SharedOverviewPage: View {
 
     private func row(_ title: String, count: Int?, cell: @escaping (String) -> Cell) -> some View {
         GridRow {
+            // A grid row is not a view of its own, so the row's one label sits on its
+            // title and the cells are hidden: otherwise every cell carries it.
             HStack(spacing: 6) {
                 Text(title)
                 if let count { SharedChip(text: "\(count)") }
             }
             .frame(minWidth: 170, alignment: .leading)
             .padding(.leading, 14)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spokenRow(title, cell: cell))
             ForEach(snapshot.runtimes) { runtime in
-                cell(runtime.id).frame(maxWidth: .infinity)
+                cell(runtime.id).frame(maxWidth: .infinity).accessibilityHidden(true)
             }
         }
         .padding(.vertical, 10)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(spokenRow(title, cell: cell))
     }
 
     private func spokenRow(_ title: String, cell: (String) -> Cell) -> String {

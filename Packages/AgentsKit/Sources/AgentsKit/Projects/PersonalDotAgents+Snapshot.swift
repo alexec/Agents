@@ -31,7 +31,7 @@ extension PersonalDotAgents {
             DaemonAPI.RuntimeName(id: $0.runtimeID, name: RuntimeCatalog.runtime(id: $0.runtimeID)?.name ?? $0.runtimeID)
         }
         var looks: [DaemonAPI.Look] = []
-        snapshot.instructions = instructions(home: home, present: present, looks: &looks)
+        snapshot.instructions = instructions(home: home, present: present, record: record, looks: &looks)
         let plugins = personalPluginFolders(home: home)
         snapshot.skills = skills(home: home, present: present, plugins: plugins, record: record, appHomes: appHomes,
                                  looks: &looks)
@@ -64,7 +64,7 @@ extension PersonalDotAgents {
 
     // MARK: Instructions
 
-    private static func instructions(home: URL, present: [Rule], looks: inout [DaemonAPI.Look]) -> DaemonAPI.Instructions {
+    private static func instructions(home: URL, present: [Rule], record: Record, looks: inout [DaemonAPI.Look]) -> DaemonAPI.Instructions {
         let url = home.appending(path: "\(folder)/\(router)")
         var reach: [String: Reach] = [:]
         for rule in present {
@@ -72,7 +72,7 @@ extension PersonalDotAgents {
                 if let why = rule.noInstructions {
                     reach[rule.runtimeID] = .noWay(why)
                     looks.append(.init(kind: .noFile, page: .instructions, item: names([rule.runtimeID]),
-                                       text: "No personal instructions file: \(why.prefix(1).lowercased() + why.dropFirst())."))
+                                       text: "No personal instructions file. \(why)."))
                 } else {
                     reach[rule.runtimeID] = .unchecked(nil)
                 }
@@ -84,8 +84,10 @@ extension PersonalDotAgents {
                 reach[rule.runtimeID] = .gets("\(tilde(file)) → link")
             } else if DotAgents.exists(link) {
                 reach[rule.runtimeID] = .ownCopy(link.path)
-            } else {
+            } else if record.links[file] != nil {
                 reach[rule.runtimeID] = .leftOut("no \(tilde(file)): its link was removed")
+            } else {
+                reach[rule.runtimeID] = .gets("\(tilde(file)), linked before its next agent starts")
             }
         }
         return DaemonAPI.Instructions(path: url.path, exists: DotAgents.exists(url), reach: reach)
@@ -112,8 +114,11 @@ extension PersonalDotAgents {
                         reach[rule.runtimeID] = .ownCopy(link.path)
                     } else if managedNames.contains(name) {
                         reach[rule.runtimeID] = .leftOut("another tool manages that name in \(tilde(skillsFolder))")
-                    } else {
+                    } else if record.links["\(skillsFolder)/\(name)"] != nil {
                         reach[rule.runtimeID] = .leftOut("its link in \(tilde(skillsFolder)) was removed")
+                    } else {
+                        // Not placed yet: the layout before its next agent places it.
+                        reach[rule.runtimeID] = .gets("linked in \(tilde(skillsFolder)) before its next agent starts")
                     }
                 } else if rule.readsSharedSkills {
                     reach[rule.runtimeID] = .gets("reads ~/.agents/skills")
@@ -123,8 +128,10 @@ extension PersonalDotAgents {
                         reach[rule.runtimeID] = .gets("through a link in the home the app gives it")
                     } else if DotAgents.exists(link) {
                         reach[rule.runtimeID] = .ownCopy(link.path)
-                    } else {
+                    } else if record.links[link.path] != nil {
                         reach[rule.runtimeID] = .leftOut("its link in the home the app gives it was removed")
+                    } else {
+                        reach[rule.runtimeID] = .gets("linked into the home the app gives it before its next agent starts")
                     }
                 } else {
                     reach[rule.runtimeID] = .unchecked(nil)

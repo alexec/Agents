@@ -74,6 +74,13 @@ struct SharedSkillsPage: View {
 }
 
 private struct SkillDetail: View {
+    /// The file without its front matter, which the lines above already show.
+    static func body(of text: String) -> String {
+        guard text.hasPrefix("---"), let end = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 3)..<text.endIndex)
+        else { return text }
+        return String(text[end.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     let skill: DaemonAPI.Skill
     let runtimes: [DaemonAPI.RuntimeName]
     @State private var text = ""
@@ -90,7 +97,13 @@ private struct SkillDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("SKILL.md").appText(.code).foregroundStyle(.secondary)
-                    Text(text).appText(.supporting).textSelection(.enabled)
+                    // As the agent is offered it: its name and description, then the body.
+                    Text(skill.name).appText(.reading).fontWeight(.semibold)
+                    if let description = skill.description {
+                        Text(description).appText(.supporting)
+                    }
+                    Text(Self.body(of: text)).appText(.supporting).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(14)

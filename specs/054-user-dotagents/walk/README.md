@@ -138,10 +138,48 @@ again, as it should.
 
 Afterwards `probe/run.sh clean` was run and `/tmp/run-054d` removed.
 
-## 6. Settings ▸ Shared
+## 6. Settings ▸ Shared (T049)
 
-Not walked yet: the screen was locked when the tab was built (f545b2c). The walk needs the
-screen, and is next when Alex is away and the Mac unlocked.
+2026-09-26 08:15–08:25, after the screen unlocked. A scratch copy of the built app ran on root
+`/tmp/run-054w` with `AGENTS_PERSONAL_HOME` set to a probe home holding one of everything:
+`AGENTS.md`, four skills (one also real in `~/.claude/skills`, a clash), three servers in
+`mcp.json` (`github` also in `~/.codex/config.toml`), a plugin with a skill, a command and a
+server, a persona, a README and a `.git`. Codex, Gemini and Antigravity had read-only toolset
+links, so all seven runtimes counted as installed. The window stayed behind Alex's and was
+driven by AX by pid; screenshots are window captures. Frame by frame, against `look/`:
+
+| Frame | Shot | Against the approved frame |
+|---|---|---|
+| A · Overview | [a-overview](look/a-overview.png) | Matches: grid, counts, "n · k its own", "n of m", —, ?, legend, Needs a look rows. Antigravity is a seventh column. |
+| B · Skills | [b-skills](look/b-skills.png) | Matches: Yours, then From plugins; the clash chip and struck dot; the plugin chip; the detail with reach per runtime, SKILL.md, Reveal and Edit. |
+| C · MCP servers | [c-servers](look/c-servers.png) | Matches, without the "Last start" line (R13): Yours, From the app, Only in one agent's own config with Reveal; env shown as `GITHUB_TOKEN ••••••`; Codex "uses its own copy". |
+| D · mcp.json broken | [d-mcp-broken](look/d-mcp-broken.png) | Matches: a banner with the line and Edit mcp.json, no modal; the app's own server still listed; ⚠ in the sidebar and on the overview. |
+| E · Plugins | [e-plugins](look/e-plugins.png) | Matches: content chips, file tree with the server's name, How each gets it. |
+| F · Instructions | [f-instructions](look/f-instructions.png) | Matches: the file, then Reads and Gets per runtime. |
+| G · Other files | [g-other-files](look/g-other-files.png) | Matches: .git, README (unused), the persona, with Reveal and Edit. |
+| H · Nothing yet | [h-empty](look/h-empty.png) | Matches. |
+
+What the walk found and fixed before these shots:
+
+- **Sidebar rows could not be pressed by accessibility.** `.accessibilityElement(children: .ignore)`
+  on a SwiftUI `Button` replaces the button with an element with no action, so AXPress (and
+  VoiceOver) did nothing. A button is one element already; it now only gets its label.
+- **The overview grid's one label landed on every cell** (a `GridRow` is not a view), so each
+  row read eight times. The label now sits on the row's title, and the cells are hidden.
+- **"Its link was removed" for a link not yet placed.** A runtime installed after the daemon
+  started (here Codex and Antigravity) showed as left out. Now only a recorded link that is gone
+  counts as removed. One never placed reads as "linked before its next agent starts", which is
+  what the layout before a session does. There is a test for it.
+- **Runtime names were lowercased** in the instructions notes ("cursor keeps…"), so the notes now
+  keep them as written. The Reads column now uses code type only for paths.
+- **SKILL.md showed its raw front matter.** It now shows the name, the description and then the
+  body, as frame B does.
+- **Frame H never showed**, because the layout always writes a starter `AGENTS.md`. The empty
+  state now does not count it.
+- The Plugins list was 480 wide and squeezed its detail; it is 440, like the other pages.
+
+The tab re-reads when the app comes to the front. A background scratch copy never does, so the
+broken-file shot came from a fresh launch.
 
 ## The whole suite, six times (T052)
 

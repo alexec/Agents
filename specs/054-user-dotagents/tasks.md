@@ -284,7 +284,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 - [X] T046 [P] [US5] Create `App/Sources/Settings/Shared/SharedServersPage.swift` (frames C and D): Yours, From the app, and Only in one agent's own config, with reach per runtime in the detail and env names masked as `••••••`. The problem banner shows with Edit mcp.json. There is no "Last start" line (R13).
 - [X] T047 [P] [US5] Create `App/Sources/Settings/Shared/SharedPluginsPage.swift` (frame E): rows with content chips, and a detail with the file tree and "How each gets it", including Codex's last-added time.
 - [X] T048 [P] [US5] Create `App/Sources/Settings/Shared/SharedInstructionsPage.swift` (frame F) and `App/Sources/Settings/Shared/SharedOtherFilesPage.swift` (frame G), plus the empty state (frame H) in `SharedSettingsView.swift`.
-- [ ] T049 [US5] Walk quickstart step 6 with the run-app skill on a scratch copy with `AGENTS_PERSONAL_HOME`. Screenshot each page and the broken-`mcp.json` state into `specs/054-user-dotagents/walk/`, and compare each with its frame in `look/`. Drive the window by pid with AX, and only when Alex is idle (memory), leasing the screen for the shots.
+- [X] T049 [US5] Walk quickstart step 6 with the run-app skill on a scratch copy with `AGENTS_PERSONAL_HOME`. Screenshot each page and the broken-`mcp.json` state into `specs/054-user-dotagents/walk/`, and compare each with its frame in `look/`. Drive the window by pid with AX, and only when Alex is idle (memory), leasing the screen for the shots.
 
 ---
 
@@ -292,7 +292,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 - [ ] T050 [P] Gemini (R14): once Alex's Gemini key is in Settings, run `probe/run.sh acp gemini` for MCP and plugins, and `probe/run.sh gemini` for skills and instructions. Add its rules to the rule table and research R14, or record that it is still unprobed. Ask Alex for the key rather than looking for it.
 - [X] T051 [P] Write `docs/how-to/share-skills-across-agents.md` (skills, AGENTS.md, `mcp.json`, plugins, what moves the first time, opting a skill out) and update `docs/explanation/projects-hosts-worktrees.md`, `docs/reference/runtimes.md` (per runtime: skills, instructions, MCP transports, plugins, the bridge) and `docs/reference/settings.md` (the Shared tab). Run `scripts/docs-check.py`.
-- [ ] T052 Run the full quickstart (steps 1–6) and record the results in `walk/README.md`. Run `swift test` six times, and compare the failures with T001's baseline before blaming this branch.
+- [X] T052 Run the full quickstart (steps 1–6) and record the results in `walk/README.md`. Run `swift test` six times, and compare the failures with T001's baseline before blaming this branch.
 - [X] T053 Build both schemes and the Linux gate. Confirm `MCPBridge` is compiled out of the Linux build. Check that no `/tmp/dotagents-probe`, scratch root or borrowed sign-in is left behind (`probe/run.sh clean`).
 - [X] T055 [P] Antigravity (049, branch `agents/speckit-specify-support-antigravity`), once it is merged:
   - Its agents already get `mcp.json` servers through `sessionServers`, since R10 goes by the handshake (049 measured `mcpCapabilities {http, sse}`). Prove it with `probe/acp.py` using 049's command line.
