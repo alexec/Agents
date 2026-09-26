@@ -125,7 +125,11 @@ struct ContentView: View {
         // its chat beside the list rather than pushing it over the project, so moving
         // between two chats is one click, and the list stays in sight.
         Group {
-            if isShowingActivity {
+            if model.needsFirstRun {
+                // No control plane and nothing of the old way: one question, and no
+                // sidebar or toolbar until it is answered (058, frame A).
+                FirstRunView()
+            } else if isShowingActivity {
                 // Events, Resources and Spending are about all of the work, so the
                 // sessions of one project have no place beside them: two columns.
                 NavigationSplitView(columnVisibility: $columns) {

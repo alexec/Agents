@@ -84,6 +84,13 @@ targets:
       # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
       - path: App/Agents.entitlements
         buildPhase: none
+      # The two launch agents Run one on this Mac registers (058, R5). SMAppService
+      # reads them from here and nowhere else.
+      - path: App/LaunchAgents
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
     dependencies:
       - package: AgentsKit
       - package: SwiftTerm
@@ -91,6 +98,12 @@ targets:
       # The helper goes in the bundle, so there is one thing to build, one thing to
       # sign, and nothing for anyone to install.
       - target: agentsd
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      # The control plane (058), in the bundle for the same reason: Run one on this Mac
+      # has nothing to download.
+      - target: agents-bridge
         copy:
           destination: wrapper
           subpath: Contents/Helpers

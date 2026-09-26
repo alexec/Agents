@@ -25,13 +25,17 @@ public final class ControlPlane: @unchecked Sendable {
 
     public static let rootVariable = "AGENTS_CONTROL_ROOT"
     public static let rootFlag = "--control-root"
+    /// `--control-plane`: the ordinary root. What the launch agent says, since a plist
+    /// cannot name a path under the person's home.
+    public static let defaultRootFlag = "--control-plane"
 
     public static func chosenRoot(arguments: [String] = CommandLine.arguments,
                                   environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         if let at = arguments.firstIndex(of: rootFlag), arguments.indices.contains(at + 1) {
             return URL(fileURLWithPath: arguments[at + 1], isDirectory: true)
         }
-        return environment[rootVariable].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        if let root = environment[rootVariable] { return URL(fileURLWithPath: root, isDirectory: true) }
+        return arguments.contains(defaultRootFlag) ? defaultRoot : nil
     }
 
     /// Where this Mac's window connects.

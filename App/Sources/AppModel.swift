@@ -387,8 +387,12 @@ final class AppModel {
     private var draftOptionsGeneration = 0
     private var draftID: UUID?
 
-    /// This Mac's host: through the control plane when the window has one (058).
-    private let client = ControlConfig.macClient()
+    /// This Mac's host: through the control plane when the window has one (058). Set
+    /// once more when first run chooses one.
+    private var client = ControlConfig.macClient()
+    /// No control plane and nothing of the old way: the window asks how to work, and
+    /// starts nothing until it is told (058, FR-017).
+    private(set) var needsFirstRun = ControlConfig.needsFirstRun
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
@@ -1115,8 +1119,19 @@ final class AppModel {
     /// Connect, and keep trying if that fails, which is what the window does when it
     /// opens.
     func stayConnected() async {
+        // Nothing to connect to, and nothing to start: the first run says where.
+        guard !needsFirstRun else { return }
         await connect()
         if !isConnected { await reconnect() }
+    }
+
+    /// First run has a control plane (058): from here the window is its client, and
+    /// this Mac's host is reached through it.
+    func adoptControlPlane(root: URL) async {
+        ControlConfig.save(root)
+        client = DaemonClient(link: ControlConfig.link(root: root).link(for: .mac))
+        needsFirstRun = false
+        await stayConnected()
     }
 
     /// Keep going back until the daemon answers.
@@ -1142,6 +1157,8 @@ final class AppModel {
     }
 
     func connect() async {
+        // Never the old way's daemon while first run is still deciding the new way.
+        guard !needsFirstRun else { return }
         do {
             try await client.connect()
             isConnected = true

@@ -23,6 +23,9 @@ public struct DaemonCommandLine: Sendable {
     /// `--host-id <id>`: which host this is, said on the control plane's local socket.
     /// `mac` unless told otherwise, so a set-up moved across keeps its host id (R7).
     public static let hostIDFlag = "--host-id"
+    /// `--control-home`: a host of the control plane at its ordinary root on this Mac,
+    /// which is what the launch agent says (R5).
+    public static let controlHomeFlag = "--control-home"
 
     public let arguments: [String]
     public let mode: Mode
@@ -38,7 +41,10 @@ public struct DaemonCommandLine: Sendable {
     }
 
     /// The control plane's host socket, when this daemon is one of its hosts.
-    public var controlSocket: String? { value(after: Self.controlFlag) }
+    public var controlSocket: String? {
+        if let socket = value(after: Self.controlFlag) { return socket }
+        return arguments.contains(Self.controlHomeFlag) ? ControlPlane.hostSocket(root: ControlPlane.defaultRoot).path : nil
+    }
 
     public var hostID: HostID {
         value(after: Self.hostIDFlag).map(HostID.init(rawValue:)) ?? .mac
