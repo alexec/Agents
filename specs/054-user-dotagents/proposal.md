@@ -68,13 +68,16 @@ This is the part to verify, by probe rather than by reading binaries: put a thro
 and a line in `~/.agents/AGENTS.md` on a scratch `HOME`, start each runtime over ACP, and ask
 it what skills and instructions it has.
 
+Probed 2026-09-26; see [research.md](research.md) R1.
+
 | Runtime | Skills from `~/.agents/skills` | User instructions | Link needed |
 |---|---|---|---|
-| Claude | no (checked) | `~/.claude/CLAUDE.md` | skills per skill, CLAUDE.md |
-| Codex | yes, documented user scope | `$CODEX_HOME/AGENTS.md` | AGENTS.md only |
-| Grok | to probe (binary names `.grok/AGENTS.md`) | to probe | likely both |
-| Cursor | to probe (it recognises `~/.claude/skills` etc. as skill paths) | to probe | to probe |
-| Copilot | to probe | to probe | to probe |
+| Claude | no | `~/.claude/CLAUDE.md` | skills per skill, CLAUDE.md |
+| Codex | yes | `~/.codex/AGENTS.md` | AGENTS.md |
+| Grok | yes | `~/.grok/AGENTS.md` (also reads Claude's and Cursor's) | AGENTS.md |
+| Cursor | yes | none on disk | none |
+| Copilot | yes | `~/.copilot/copilot-instructions.md` | copilot-instructions.md |
+| Gemini | not probed | not probed | none until probed |
 
 The table becomes the `links` list, as in `DotAgents`, keyed by runtime.
 

@@ -188,12 +188,14 @@ shows every skill and names the clash.
   MUST place one link per skill in that runtime's personal skills folder, pointing at
   `~/.agents/skills/<name>`. It MUST NOT replace the runtime's skills folder itself with a link.
 - **FR-003**: For each runtime that reads personal instructions from its own file and not from
-  `~/.agents/AGENTS.md`, the app MUST link that file to `~/.agents/AGENTS.md`. At least Claude
-  (`~/.claude/CLAUDE.md`) and Codex (`~/.codex/AGENTS.md`).
+  `~/.agents/AGENTS.md`, the app MUST link that file to `~/.agents/AGENTS.md`. Per the probe (research R1): Claude
+  (`~/.claude/CLAUDE.md`), Codex (`~/.codex/AGENTS.md`), Grok (`~/.grok/AGENTS.md`) and Copilot
+  (`~/.copilot/copilot-instructions.md`). Cursor has no such file and gets none.
 - **FR-004**: Which runtimes need which links MUST be settled by a probe on a scratch home for
   each supported runtime (Claude, Codex, Grok, Cursor, Copilot), recorded with the plan, and
   never guessed from a binary's strings alone.
-- **FR-005**: A real skill folder in a runtime's personal skills folder MUST be moved to
+- **FR-005**: A real skill folder in a personal skills folder the app links into (Claude's only,
+  research R3) MUST be moved to
   `~/.agents/skills/<name>` and linked back when that name is free there; when it is not, both
   MUST be left untouched.
 - **FR-006**: A real personal instructions file (`~/.claude/CLAUDE.md` etc.) MUST be moved to
