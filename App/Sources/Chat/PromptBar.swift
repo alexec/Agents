@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 struct PromptBar: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    @Environment(\.chatActions) private var chatActions
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
     /// Set on a project page, where the folder is the project and changing it would
@@ -208,6 +209,15 @@ struct PromptBar: View {
 
     // MARK: The folder, and what runs in it
 
+    /// What a row over the prompt does on a Mac (057): Stop, the subagent's steps in
+    /// the sidebar, and the output in TextEdit.
+    private func backgroundActions(_ agent: Agent) -> BackgroundActions {
+        BackgroundActions(
+            stop: { [model] item in await model.stopBackground(item, of: agent.id) },
+            steps: { [chatActions] item in chatActions.subagentSteps?(item.id) },
+            output: { item in BackgroundOutput.open(item) })
+    }
+
     private var whereAndWhat: some View {
         HStack(spacing: 12) {
             if let agent {
@@ -220,6 +230,8 @@ struct PromptBar: View {
                              waitHint: agent.eventWait.map(EventWords.hint) ?? "",
                              openWait: { model.showEvents(at: .waitingNow) },
                              cancelWait: { Task { await model.cancelWait(of: agent.id) } },
+                             background: agent.background,
+                             backgroundActions: backgroundActions(agent),
                              place: agentPlace(agent)) {
                     ContextMeter(agent: agent)
                 }

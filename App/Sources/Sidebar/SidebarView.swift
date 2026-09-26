@@ -104,6 +104,9 @@ struct SidebarView: View {
             ArtifactsPane(agent: agent, state: state)
                 .opacity(frame.pane == .artifacts ? 1 : 0)
                 .allowsHitTesting(frame.pane == .artifacts)
+            BackgroundPane(agent: agent, state: state)
+                .opacity(frame.pane == .background ? 1 : 0)
+                .allowsHitTesting(frame.pane == .background)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

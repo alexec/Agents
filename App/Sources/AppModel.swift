@@ -1983,6 +1983,14 @@ final class AppModel {
         await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id)) }
     }
 
+    /// Stop one shell an agent left running, and nothing else it is doing (057).
+    func stopBackground(_ item: BackgroundItem, of agentID: UUID) async {
+        await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsStopBackground,
+                                                           DaemonAPI.StopBackgroundRequest(agentID: agentID, itemID: item.id))
+        }
+    }
+
     func archive(_ id: UUID) async {
         await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id)) }
     }

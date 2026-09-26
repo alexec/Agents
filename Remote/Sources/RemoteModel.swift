@@ -843,18 +843,45 @@ final class RemoteModel {
     func connect() async {
         guard reconnecting == nil else { return }
         reconnecting = Task { [weak self] in
-            var wait = Duration.seconds(1)
             while !Task.isCancelled {
                 guard let self else { return }
-                if await self.tryOnce() { break }
-                try? await Task.sleep(for: wait)
+                // Lost again while this attempt was still settling in: `lostTouch` found
+                // this loop running and left it to go round once more.
+                if await self.tryOnce(), self.isConnected { break }
+                let nap = Task<Void, Never> { try? await Task.sleep(for: self.backOff) }
+                self.backingOff = nap
+                await withTaskCancellationHandler { await nap.value } onCancel: { nap.cancel() }
+                self.backingOff = nil
                 // Backing off to half a minute, so a phone in a pocket with no Mac to
                 // find is not holding the radio open every second all afternoon.
-                wait = min(wait * 2, .seconds(30))
+                self.backOff = min(self.backOff * 2, .seconds(30))
             }
-            await self?.finishedReconnecting()
+            // Cancelled by a pairing, which has already started the loop that replaces
+            // this one; that one's handle is not this one's to clear.
+            if !Task.isCancelled { self?.finishedReconnecting() }
         }
         await reconnecting?.value
+    }
+
+    /// How long the loop waits before the next attempt, and the wait itself, so coming
+    /// back to the app can cut it short.
+    @ObservationIgnored private var backOff = Duration.seconds(1)
+    @ObservationIgnored private var backingOff: Task<Void, Never>?
+
+    /// The app came to the front. A phone that was in a pocket may have been half a
+    /// minute into a back-off, or holding a connection that died while it was
+    /// suspended; either way the person is looking now, so look now.
+    private func cameToTheFront() async {
+        backOff = .seconds(1)
+        if let backingOff {
+            backingOff.cancel()
+            return
+        }
+        guard isConnected, reconnecting == nil else { return }
+        if await !client.answers(within: .seconds(4)) {
+            // The listener hears the connection close and reconnects.
+            await client.disconnect()
+        }
     }
 
     private func tryOnce() async -> Bool {
@@ -863,12 +890,15 @@ final class RemoteModel {
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
+            backOff = .seconds(1)
             listen()
+            // Before anything is asked over it, so a link that goes quiet now is let go
+            // rather than holding this attempt, and every later one, for ever.
+            watchTheLink()
             await announce()
             await identify()
             startPresence()
             presence?.connected()
-            watchTheDirectLink()
             if link == .relayed || away?.chooser.link == .relayed { relayTrouble = nil }
             await files.reconnected()
             await refreshEverything()
@@ -947,22 +977,19 @@ final class RemoteModel {
     /// Leaving home, noticed (046, R8): a direct link whose Wi‑Fi went does not always
     /// fail, it can go quiet. So while on it the Mac is asked every five seconds and given
     /// three to answer; one that does not is let go, and the reconnect finds the relay.
-    private func watchTheDirectLink() {
+    /// The relay goes quiet too — a Mac asleep, iCloud unreachable — and is asked the
+    /// same, with the patience a round trip through iCloud needs.
+    private func watchTheLink() {
         watchdog?.cancel()
-        guard let away, away.chooser.link == .direct else { return }
+        guard let away else { return }
         let client = client
         watchdog = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                guard !Task.isCancelled, away.chooser.link == .direct else { return }
-                let answered = await withTaskGroup(of: Bool.self) { group in
-                    group.addTask { (try? await client.call(DaemonAPI.Method.ping)) != nil }
-                    group.addTask { try? await Task.sleep(for: .seconds(3)); return false }
-                    let first = await group.next() ?? false
-                    group.cancelAll()
-                    return first
-                }
-                if !answered {
+                let relayed = away.chooser.link == .relayed
+                try? await Task.sleep(for: relayed ? .seconds(20) : .seconds(5))
+                guard !Task.isCancelled else { return }
+                if await !client.answers(within: relayed ? .seconds(20) : .seconds(3)) {
+                    // Closed by `answers`; the listener hears it and reconnects.
                     await client.disconnect()
                     return
                 }
@@ -1014,7 +1041,12 @@ final class RemoteModel {
     /// which is what "in the person's hands" means on a device.
     func scenePhase(_ phase: ScenePhase) {
         presence?.scenePhase(phase)
-        if phase == .active { Task { await refreshAttention() } }
+        if phase == .active {
+            Task {
+                await cameToTheFront()
+                await refreshAttention()
+            }
+        }
     }
 
     private var kind: Device.Kind {
@@ -1635,6 +1667,21 @@ final class RemoteModel {
         do {
             try await client.call(DaemonAPI.Method.agentsUnqueue,
                                   DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
+        } catch {
+            problem = "That did not reach your Mac."
+        }
+    }
+
+    /// Stop one shell an agent left running, and nothing else it is doing (057). The
+    /// row goes when the daemon says the agent changed.
+    func stopBackground(_ item: BackgroundItem, of agentID: UUID) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be stopped."
+            return
+        }
+        do {
+            try await client.call(DaemonAPI.Method.agentsStopBackground,
+                                  DaemonAPI.StopBackgroundRequest(agentID: agentID, itemID: item.id))
         } catch {
             problem = "That did not reach your Mac."
         }

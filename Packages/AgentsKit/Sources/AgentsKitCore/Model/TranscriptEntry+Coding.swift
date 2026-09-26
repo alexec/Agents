@@ -79,6 +79,9 @@ extension TranscriptEntry.Kind {
         case "handoff":
             return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
                             characters: payload["characters"]?.intValue ?? 0)
+        case "background":
+            guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
+            return .background(item)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -145,6 +148,8 @@ extension TranscriptEntry.Kind {
             return ["stateChanged": .object(payload)]
         case .runtimeNote(let text):
             return ["runtimeNote": ["_0": .string(text)]]
+        case .background(let item):
+            return ["background": ["_0": (try? JSONValue.encoding(item)) ?? .null]]
         case .workReported(let report):
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
         case .poolSwitch(let record):

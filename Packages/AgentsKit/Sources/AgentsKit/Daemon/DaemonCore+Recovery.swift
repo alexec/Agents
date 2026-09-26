@@ -31,6 +31,10 @@ extension DaemonCore {
         // See `loadWorkflowRuns`.
         loadWorkflowRuns()
         await loadFromDisk()
+        // Nothing the last daemon's runtimes ran in the background is running now (057).
+        // Any agent at all, not only the ones that were working: a shell outlives the
+        // turn that started it, so an agent at rest can still have one on its record.
+        for id in agents.keys { endBackground(of: id) }
         // `agents` is a Dictionary, whose order is nobody's. Most recently active
         // first, because pick-up is one at a time and the chat the person last left
         // running should not wait behind every runtime ahead of it.

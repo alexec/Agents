@@ -12,6 +12,8 @@ struct RemoteChatView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// How much of the foot of the screen the prompt area and any card above it cover.
     @State private var formHeight: CGFloat = 0
+    /// The subagent whose steps are open, by its id (057).
+    @State private var subagentOnScreen: String?
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -90,6 +92,21 @@ struct RemoteChatView: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { model.fileOnScreen = nil }
+                            }
+                        }
+                }
+            }
+            .paperSheet()
+        }
+        .sheet(isPresented: Binding(get: { subagentOnScreen != nil },
+                                    set: { if !$0 { subagentOnScreen = nil } })) {
+            NavigationStack {
+                if let id = subagentOnScreen,
+                   let item = agent?.background.first(where: { $0.id == id }) {
+                    SubagentStepsView(item: item, entries: model.entries)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") { subagentOnScreen = nil }
                             }
                         }
                 }
@@ -216,7 +233,10 @@ struct RemoteChatView: View {
             },
             showPool: { [model] in model.isShowingPool = true },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
-            canSendNow: { [model] runtimeID in model.canSteer(runtimeID) })
+            canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
+            // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
+            // (057, frame E).
+            subagentSteps: { id in subagentOnScreen = id })
     }
 }
 

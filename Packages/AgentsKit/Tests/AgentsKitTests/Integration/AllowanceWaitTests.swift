@@ -158,7 +158,10 @@ struct AllowanceWaitTests {
 
     @Test func aRestartKeepsTheWaitAndStillCarriesOn() async throws {
         let (first, id, clock, _, root) = try await everyoneOut()
-        _ = first
+        // A daemon that restarts has written its records first: saves go out on a queue,
+        // so wait for it, as a real exit would, before the next one reads the disk.
+        let saving = await first.saveTail
+        await saving?.value
         clock.now = back.addingTimeInterval(1)
         let (second, _, launcher) = try await core([], clock: clock, root: root)
         #expect(await second.agent(id)?.allowanceWait?.runtimeID == "claude")

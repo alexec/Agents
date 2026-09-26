@@ -78,7 +78,15 @@ struct ChatView: View {
                     path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
-            })
+            },
+            // The sidebar's Background pane, at that subagent (057, frame C).
+            subagentSteps: { [frame, states, agent] id in
+                guard let agent else { return }
+                states.state(for: agent.id).subagent = id
+                frame.pane = .background
+                if !frame.isOpen { frame.open() }
+            },
+            backgroundOutput: { item in BackgroundOutput.open(item) })
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

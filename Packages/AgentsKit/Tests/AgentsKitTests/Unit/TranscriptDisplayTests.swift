@@ -57,6 +57,43 @@ struct TranscriptDisplayTests {
         #expect(items[0].latestToolCall?.title == "Write hello.txt", "the update does not lose the title")
     }
 
+    /// Claude's background Agent call never sends its tool_call, only one bare update
+    /// (057). Drawn, it was a line reading "Tool call" and nothing more.
+    @Test func anUpdateForNoCallThatSaysNothingIsNotDrawn() {
+        let bare = ToolCall(toolCallID: "agent", title: "Tool call",
+                            raw: .object(["sessionUpdate": .string("tool_call_update")]))
+        let items = TranscriptEntry.display([
+            message("Starting it."),
+            TranscriptEntry(kind: .toolCallUpdate(bare)),
+            message("It runs."),
+        ])
+        #expect(items.allSatisfy { $0.latestToolCall == nil })
+        // The same bare update for a call already on the page is merged, as before.
+        let merged = TranscriptEntry.display([call("t1", "Write hello.txt"),
+                                              TranscriptEntry(kind: .toolCallUpdate(ToolCall(toolCallID: "t1", title: "Tool call")))])
+        #expect(merged.count == 1)
+        #expect(merged[0].latestToolCall?.title == "Write hello.txt")
+    }
+
+    /// The Bash call that starts a background shell finishes after the line saying the
+    /// shell started (057, captured). Its update belongs to the run already drawn.
+    @Test func anUpdateAfterItsRunClosedJoinsThatRun() {
+        let started = BackgroundItem(id: "b1", kind: .task, name: "Print ticks", taskType: "shell",
+                                     canStop: true, startedAt: Date())
+        let items = TranscriptEntry.display([
+            call("bash", "for i in …; done", status: "pending"),
+            TranscriptEntry(kind: .background(started)),
+            update("bash", status: "completed"),
+        ])
+        let runs = items.compactMap { item -> [ToolCall]? in
+            if case .toolRun(_, let calls) = item { return calls }
+            return nil
+        }
+        #expect(runs.count == 1, "no second, nameless run")
+        #expect(runs.first?.first?.title == "for i in …; done")
+        #expect(runs.first?.first?.status == "completed")
+    }
+
     @Test func aRunOfCallsShowsTheLatestAndKeepsTheRest() {
         let items = TranscriptEntry.display([
             call("t1", "Read the file"),

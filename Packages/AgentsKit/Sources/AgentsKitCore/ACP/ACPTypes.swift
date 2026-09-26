@@ -10,10 +10,11 @@ import Foundation
 /// `initialize`'s `_meta.steering.supported` (the marker for `_session/steering`) and
 /// `agentCapabilities._meta.authStatus` (the marker for `_auth/status_update`). It is
 /// written on `session/new`, `load`, `resume` and `fork` for tool scoping and plugins,
-/// by runtime through the catalogs (`ToolPolicyCatalog`, `DotAgents`). What is not
-/// read: vendor `_meta` on updates, and the rest of the handshake's — Grok's
-/// `x.ai/hooks`, Claude's `jetbrains` and `goal`. Reading those is how one code path
-/// becomes three.
+/// by runtime through the catalogs (`ToolPolicyCatalog`, `DotAgents`), and in our own
+/// capabilities for one opt-in, JetBrains "AIR" (057): a capability two runtimes share,
+/// whose results arrive as update kinds of their own, never by asking which runtime this
+/// is. What is not read: vendor `_meta` on updates, and the rest of the handshake's —
+/// Grok's `x.ai/hooks`, Claude's `goal`. Reading those is how one code path becomes three.
 public enum ACP {
     public static let protocolVersion = 1
 
@@ -44,6 +45,10 @@ public enum ACP {
         /// `set_config_option` is used wherever the runtime offers it.
         public static let setSessionMode = "session/set_mode"
         public static let setSessionModel = "session/set_model"
+        /// Stop one background task without cancelling the turn (057). Claude and Codex
+        /// both answer it, once `asyncTasks` was advertised. `{stopped: false}` is an
+        /// answer, not an error: the task had already gone.
+        public static let stopAsyncTask = "_session/async_task/stop"
         /// A vendor extension shared by the Claude adapter and codex-acp: words put into
         /// the turn that is running rather than queued behind it. Advertised by
         /// `initialize`'s root `_meta.steering.supported`, and only used where it is.
@@ -91,6 +96,14 @@ public enum ACP {
         public var elicitationForm: Bool
         public var elicitationURL: Bool
         public var notices: Bool
+        /// JetBrains "AIR" `asyncTasks` (057): the runtime sends `async_task_*` updates for
+        /// what it runs in the background, and takes `_session/async_task/stop`. It stops
+        /// saying so in the Bash result's prose the moment this is on.
+        public var backgroundTasks: Bool
+        /// JetBrains "AIR" `nativeSubagentSessions` (057): a subagent is announced with
+        /// `subagent_*`, and everything it says and does arrives under its own session id.
+        /// The Agent tool card stops coming, so this is only on where those are routed.
+        public var subagentSessions: Bool
         /// JetBrains' AIR session-failure extension (052, R1). Asked for only where every
         /// kind of typed failure is read: once asked, Claude and Codex end a refused turn
         /// with `end_turn` and the failure under `_meta`, and a client that does not read
@@ -107,6 +120,8 @@ public enum ACP {
                     elicitationForm: Bool = false,
                     elicitationURL: Bool = false,
                     notices: Bool = false,
+                    backgroundTasks: Bool = false,
+                    subagentSessions: Bool = false,
                     sessionFailures: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
@@ -118,6 +133,8 @@ public enum ACP {
             self.elicitationForm = elicitationForm
             self.elicitationURL = elicitationURL
             self.notices = notices
+            self.backgroundTasks = backgroundTasks
+            self.subagentSessions = subagentSessions
             self.sessionFailures = sessionFailures
         }
 
@@ -145,6 +162,8 @@ public enum ACP {
             elicitationForm: true,
             elicitationURL: true,
             notices: true,
+            backgroundTasks: true,
+            subagentSessions: true,
             sessionFailures: true)
 
         public var wire: JSONValue {
@@ -163,8 +182,16 @@ public enum ACP {
             if elicitationForm { elicitation["form"] = .object([:]) }
             if elicitationURL { elicitation["url"] = .object([:]) }
             if !elicitation.isEmpty { caps["elicitation"] = .object(elicitation) }
-            if sessionFailures {
-                caps["_meta"] = ["jetbrains": ["air": ["version": 1, "capabilities": ["sessionFailure"]]]]
+            // All of JetBrains' AIR extensions asked for go in one list: 057's background
+            // tasks and subagents, and 052's typed session failures.
+            var air: [JSONValue] = []
+            if backgroundTasks { air.append("asyncTasks") }
+            if subagentSessions { air.append("nativeSubagentSessions") }
+            if sessionFailures { air.append("sessionFailure") }
+            if !air.isEmpty {
+                // Version 1 is the only one either adapter reads, and each checks for
+                // `>= 1`, so this is the floor rather than a guess.
+                caps["_meta"] = ["jetbrains": ["air": ["version": 1, "capabilities": .array(air)]]]
             }
             return .object(caps)
         }

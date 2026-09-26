@@ -9,7 +9,9 @@ struct ClientCapabilitiesTests {
     @Test func typedFailuresAreAskedFor() {
         let wire = ACP.ClientCapabilities.app.wire
         #expect(wire["_meta"]?["jetbrains"]?["air"]?["version"] == .int(1))
-        #expect(wire["_meta"]?["jetbrains"]?["air"]?["capabilities"] == ["sessionFailure"])
+        // One AIR list for everything asked for: 057's background tasks and subagents too.
+        #expect(wire["_meta"]?["jetbrains"]?["air"]?["capabilities"]
+                == ["asyncTasks", "nativeSubagentSessions", "sessionFailure"])
     }
 
     @Test func everythingOfferedBeforeIsStillOffered() {

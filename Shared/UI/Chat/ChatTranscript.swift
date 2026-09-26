@@ -85,6 +85,7 @@ struct ChatTranscript: View {
                                       toggle: { toggle(item.id) })
                             .id(item.id)
                     }
+                    .environment(\.backgroundWork, agent.background)
                     ForEach(agent.queuedPrompts) { queued in
                         QueuedPromptRow(prompt: queued, agentID: agent.id,
                                         canSendNow: canSendNow)

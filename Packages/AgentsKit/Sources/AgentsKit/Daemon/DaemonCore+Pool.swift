@@ -273,10 +273,11 @@ extension DaemonCore {
 
         // What the old runtime was asking can no longer be answered there (T040).
         await closeQuestionsOfAGoneRuntime(agentID)
-        // Its plan window was the old runtime's: left, it would mark the new one out
-        // until the old one's reset.
-        latestRateLimit[agentID] = nil
         await releaseRuntime(for: agentID)
+        // Its plan window was the old runtime's: left, it would mark the new one out
+        // until the old one's reset. Cleared after the release, which drains the old
+        // runtime's last updates, so a late one cannot put it back.
+        latestRateLimit[agentID] = nil
 
         let page = try? await store.transcript(for: agentID, before: nil, limit: 10_000)
         let size = agent.usage?.size ?? 0
@@ -823,5 +824,16 @@ extension DaemonCore {
     /// and on the credential for the Pool page.
     func notePlanWindow(_ info: RateLimitInfo, agentID: UUID) {
         latestRateLimit[agentID] = info
+        // Late: a plan window saying when it is back can be read after the refusal it
+        // explains, which was then recorded with no time. Put the time in, so a wait is
+        // made on it rather than on the one-hour guess (R2).
+        let at = now()
+        guard info.isRejected, let back = info.resetsAt, back > at, let agent = agents[agentID] else { return }
+        let entry = poolEntry(for: agent)
+        guard var state = allowances[AllowanceState.credentialKey(for: entry)],
+              case .out(nil, _, .allowanceSpent) = state.status,
+              at.timeIntervalSince(state.since) < 60 else { return }
+        state.status = .out(until: back, retryAfter: nil, why: .allowanceSpent)
+        setAllowanceState(state)
     }
 }

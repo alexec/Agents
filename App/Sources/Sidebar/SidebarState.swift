@@ -2,12 +2,12 @@ import AgentsKit
 import Foundation
 import Observation
 
-/// Which of the five panes the column is showing.
+/// Which of the six panes the column is showing.
 ///
-/// One column, five panes, taking turns. The spec's assumption, and the reason a pane
+/// One column, six panes, taking turns. The spec's assumption, and the reason a pane
 /// is a single case rather than a set.
 enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
-    case files, changes, terminal, browser, artifacts
+    case files, changes, terminal, browser, artifacts, background
 
     var id: String { rawValue }
 
@@ -18,6 +18,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .terminal: return "Terminal"
         case .browser: return "Browser"
         case .artifacts: return "Exchanged"
+        case .background: return "Background"
         }
     }
 
@@ -28,6 +29,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .terminal: return "apple.terminal"
         case .browser: return "globe"
         case .artifacts: return "tray.full"
+        case .background: return "person.crop.circle.badge.clock"
         }
     }
 }
@@ -177,6 +179,9 @@ final class AgentPaneState {
     /// The file open in the Changes pane, and which edit to bring into view. Nil is
     /// the list.
     var changesSelection: ChangesSelection?
+    /// The subagent whose steps the Background pane shows (057), by its id. Nil is the
+    /// list of everything the agent has had in the background.
+    var subagent: String?
     /// The terminal tabs, by shell number, left to right (055). Filled from the daemon
     /// the first time the pane is shown, so a window opening finds the shells that are
     /// still running rather than only the first.
