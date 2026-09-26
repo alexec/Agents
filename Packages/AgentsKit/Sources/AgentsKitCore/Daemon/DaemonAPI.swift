@@ -192,6 +192,12 @@ public enum DaemonAPI {
         public static let worktreesCheck = "worktrees/check"
         /// Remove a worktree the app made, and its branch when that is safe.
         public static let worktreesRemove = "worktrees/remove"
+        /// The person moving an agent into a worktree or back to its project folder, or
+        /// taking back a move still waiting for the turn to end (053).
+        public static let agentsMove = "agents/move"
+        /// What the MCP helper relays when an agent calls `enter_worktree` or
+        /// `exit_worktree` (053). The caller is the token.
+        public static let agentsMoveSelf = "agents/moveSelf"
         /// A GitHub project's pull requests, from the daemon's cache (038). Never runs
         /// `gh`; `null` when the project is not on GitHub.
         public static let pullRequestsList = "pullRequests/list"
@@ -1955,6 +1961,59 @@ public enum DaemonAPI {
             project = try c.decode(URL.self, forKey: .project)
             root = try c.decode(URL.self, forKey: .root)
             confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
+        }
+    }
+
+    /// An agent moving itself (053): what it passed to `enter_worktree` or `exit_worktree`.
+    public struct MoveSelfRequest: Codable, Sendable {
+        public var token: String
+        public var target: MoveTarget
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(token: String, target: MoveTarget, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.token = token
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+    }
+
+    /// The person moving an agent (053). No target takes back the move that is waiting.
+    public struct MoveRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var target: MoveTarget?
+        public var removeLeft: Bool
+        public var discardChanges: Bool
+
+        public init(agentID: UUID, target: MoveTarget?, removeLeft: Bool = false, discardChanges: Bool = false) {
+            self.agentID = agentID
+            self.target = target
+            self.removeLeft = removeLeft
+            self.discardChanges = discardChanges
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            agentID = try c.decode(UUID.self, forKey: .agentID)
+            target = try c.decodeIfPresent(MoveTarget.self, forKey: .target)
+            removeLeft = try c.decodeIfPresent(Bool.self, forKey: .removeLeft) ?? false
+            discardChanges = try c.decodeIfPresent(Bool.self, forKey: .discardChanges) ?? false
+        }
+    }
+
+    /// What a move request came to: made now, waiting for the turn to end, or nothing to
+    /// do. The message is what the agent's tool returns and what a window may show.
+    public struct MoveAnswer: Codable, Sendable {
+        public enum When: String, Codable, Sendable { case now, afterTurn, nothing }
+        public var when: When
+        public var message: String
+        public var agent: Agent?
+
+        public init(when: When, message: String, agent: Agent? = nil) {
+            self.when = when
+            self.message = message
+            self.agent = agent
         }
     }
 

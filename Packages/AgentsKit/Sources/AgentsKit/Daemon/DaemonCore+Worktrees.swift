@@ -23,12 +23,46 @@ extension DaemonCore {
         }
         switch choice {
         case .new:
-            return try await makeWorktree(in: repository, project: project, prompt: prompt)
+            return try await makeWorktree(in: repository, project: project,
+                                          wanted: WorktreeName.from(prompt: prompt, now: now()))
         case .existing(let root):
             return try await existingWorktree(root, in: repository, project: project)
         case .branch(let name):
             return try await makeWorktree(onBranch: name, in: repository, project: project)
         }
+    }
+
+    /// Where a move should put an agent (053): the folder to work in, and the worktree
+    /// it is in, or none for the project folder. Makes the worktree for a new one.
+    func prepareMoveTarget(_ target: MoveTarget, for agent: Agent) async throws -> (cwd: URL, worktree: AgentWorktree?) {
+        let project = agent.projectFolder
+        if target == .projectFolder { return (project, nil) }
+        guard let repository = await GitWorktrees.repository(of: project) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
+                               message: "\(project.lastPathComponent) is not in a git repository, so it has no worktrees.")
+        }
+        switch target {
+        case .projectFolder:
+            return (project, nil)
+        case .newWorktree(let name):
+            let made = try await makeWorktree(in: repository, project: project,
+                                              wanted: moveName(name, for: agent),
+                                              from: agent.worktree.map { _ in agent.cwd })
+            return (made.cwd, made.worktree)
+        case .existing(let root):
+            if Self.canonicalPath(root) == Self.canonicalPath(repository.toplevel) { return (project, nil) }
+            let chosen = try await existingWorktree(root, in: repository, project: project)
+            return (chosen.cwd, chosen.worktree)
+        }
+    }
+
+    /// What a new worktree made by a move is called: the name the agent gave, cleaned the
+    /// way a prompt is, or else its title, or else `agent-` and the time.
+    func moveName(_ given: String?, for agent: Agent) -> String {
+        if let given, !given.trimmingCharacters(in: .whitespaces).isEmpty {
+            return WorktreeName.from(prompt: given, keepingFiller: true, now: now())
+        }
+        return WorktreeName.from(prompt: agent.title ?? "", now: now())
     }
 
     /// A new worktree in the app's folder on a branch already there, named for it.
@@ -72,10 +106,17 @@ extension DaemonCore {
         return (Self.workingFolder(in: made, prefix: repository.prefix), worktree)
     }
 
+    /// A new worktree in the project's worktrees folder, on a new `agents/` branch.
+    ///
+    /// Made from what `from` has checked out: the project folder for a start, or the
+    /// worktree an agent is moving out of (053), so its commits come along. Everything
+    /// else — which repository, which folder, the exclude line, the names held — is the
+    /// project's, since from inside a linked worktree git calls that worktree the top and
+    /// the new one would be made inside it (053 research R4).
     private func makeWorktree(in repository: GitWorktrees.Repository, project: URL,
-                              prompt: String) async throws -> (cwd: URL, worktree: AgentWorktree) {
+                              wanted: String, from: URL? = nil) async throws -> (cwd: URL, worktree: AgentWorktree) {
         let folder = repository.worktreesFolder
-        let wanted = WorktreeName.from(prompt: prompt, now: now())
+        let checkout = from ?? project
         // Chosen and held before the first `await`: on an actor that is the whole of
         // the lock, so two starts from the same words cannot both pick the same name.
         var taken = reservedWorktreeNames(under: folder)
@@ -84,11 +125,11 @@ extension DaemonCore {
         reserveWorktreeName(name, under: folder)
         defer { releaseWorktreeName(name, under: folder) }
 
-        guard await GitWorktrees.hasCommit(in: project) else {
+        guard await GitWorktrees.hasCommit(in: checkout) else {
             throw JSONRPCError(code: DaemonAPI.Failure.worktreeFailed,
                                message: "There is no commit here yet to base a worktree on. Commit something first.")
         }
-        let base = await GitWorktrees.base(in: project)
+        let base = await GitWorktrees.base(in: checkout)
         do {
             try GitWorktrees.ensureExcluded(commonDir: repository.commonDir)
         } catch let failure as GitWorktrees.Failure {
@@ -105,7 +146,7 @@ extension DaemonCore {
             let branchTaken = await GitWorktrees.branchExists(branch, in: project)
             if !branchTaken {
                 do {
-                    try await GitWorktrees.add(branch: branch, path: root, in: project)
+                    try await GitWorktrees.add(branch: branch, path: root, in: checkout)
                     let made = Project.standardize(root)
                     let worktree = AgentWorktree(name: name, root: made, branch: branch,
                                                  project: project, base: base, madeByApp: true)
@@ -131,7 +172,7 @@ extension DaemonCore {
         }
     }
 
-    private func existingWorktree(_ root: URL, in repository: GitWorktrees.Repository,
+    func existingWorktree(_ root: URL, in repository: GitWorktrees.Repository,
                                   project: URL) async throws -> (cwd: URL, worktree: AgentWorktree) {
         let wanted = Self.canonical(root)
         let entries = (try? await GitWorktrees.list(in: project)) ?? []
@@ -304,7 +345,7 @@ extension DaemonCore {
         return parts.joined(separator: " and ")
     }
 
-    private struct RemovalFacts {
+    struct RemovalFacts {
         var project: URL
         var root: URL
         var branch: String?
@@ -314,7 +355,7 @@ extension DaemonCore {
         var check: DaemonAPI.RemovalCheck
     }
 
-    private func removalFacts(_ request: DaemonAPI.WorktreeRemovalRequest) async throws -> RemovalFacts {
+    func removalFacts(_ request: DaemonAPI.WorktreeRemovalRequest) async throws -> RemovalFacts {
         let project = Project.standardize(request.project)
         guard let repository = await GitWorktrees.repository(of: project) else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAWorktree,

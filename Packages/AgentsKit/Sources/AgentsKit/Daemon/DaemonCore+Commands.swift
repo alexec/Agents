@@ -907,6 +907,9 @@ extension DaemonCore {
         var outgoing = blocks
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { outgoing.insert(.text(preface), at: 0) }
+        // Where it now works, when it has just been moved (053): first of all, so what
+        // follows is read from the right folder.
+        if let moved = moveNotes.removeValue(forKey: agentID) { outgoing.insert(.text(moved), at: 0) }
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
@@ -1012,6 +1015,10 @@ extension DaemonCore {
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
+        // A move asked for in this turn is made now, between the runtime going and the
+        // next one starting, and before the stop below is heard: a stopped turn still
+        // moves, it just does not carry on by itself (053).
+        let movedBy = await applyPendingMove(agentID)
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
@@ -1031,6 +1038,17 @@ extension DaemonCore {
         // them.
         if crossedItsLimit {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
+            return
+        }
+        // The agent moved itself so that it could carry on working there: started again,
+        // unless the person has queued words, which go first. No question about how the
+        // turn went: it ended to move (053).
+        if movedBy == .agent {
+            if agents[agentID]?.queuedPrompts.isEmpty == true {
+                await continueAfterMove(agentID)
+            } else {
+                await drainQueue(after: agentID)
+            }
             return
         }
         // Ended blocked, with everything it named already over (039): carried on here,
@@ -1141,6 +1159,9 @@ extension DaemonCore {
         let limited = refused == nil && Self.usageLimit(error) != nil
         await move(agentID, on: refused != nil ? .turnEnded(.signInRefused) : limited ? .turnEnded(.refusal) : .processDied)
         await releaseRuntime(for: agentID)
+        // A move asked for before the runtime fell over is still made, but nothing starts
+        // by itself: the runtime failing is for the person to see first (053).
+        await applyPendingMove(agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)

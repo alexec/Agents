@@ -28,10 +28,18 @@ worktree, and `Pkg/` stands for `Packages/AgentsKit/`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm the baseline. Run `swift test` in `Pkg/` once and write down, in this file under
+- [X] T001 Confirm the baseline. Run `swift test` in `Pkg/` once and write down, in this file under
   T001, which tests fail on this branch's base `5f9b974` before any change (memory: the suite is
   broadly flaky under load, so note every failure by name).
-- [ ] T002 Write `Pkg/Tests/AgentsKitTests/Live/RuntimeMoveLiveTests.swift`:
+  **Baseline, 2026-09-25, on main `a3895a8` merged in (`db6568b`)**: 2198 tests in 254 suites,
+  108 s, 42 failing. Server tests (`ServerLinkTests.agentsd` not built in this worktree: aMacIsRefused,
+  aNewServerIsSetUpAndAnswers, connectingStarts…, twoConnectsAtOnceAreOne, the Toolset/Update/Remove
+  ones), restart tests (anAgentFoundDeadOnStartUp…, severalInterruptedAgents…, theyAreStartedOneAtATime,
+  theRestartWordsGoAhead…, WorkflowRestart chain/depth), ConnectionRole socket tests (aStranger…,
+  aHelperReaches…, aDevice…, onlyAWindowsConnection…, theBinderWaits…) and a handful of timing ones.
+  The build may have picked up this lane's first additive model edits; T044 compares against a
+  clean main run.
+- [X] T002 Write `Pkg/Tests/AgentsKitTests/Live/RuntimeMoveLiveTests.swift`:
   - Gate it `.enabled(if: AGENTS_LIVE == "1")`, as in `LiveRuntimeTests.swift`.
   - For each of `claude`, `grok`, `copilot` and `cursor`, with two temporary folders A and B that
     are both git repositories:
@@ -44,13 +52,17 @@ worktree, and `Pkg/` stands for `Packages/AgentsKit/`.
     PELICAN.
   - Launch with a clean environment except for auth (memory: driving agentsd by hand). Stagger
     the npx starts.
-- [ ] T003 Run T002 with `AGENTS_LIVE=1`, and run `./scripts/runtime-tools.sh`.
+- [X] T003 Run T002 with `AGENTS_LIVE=1`, and run `./scripts/runtime-tools.sh`.
   - Write the results into `specs/053-move-to-worktree/research.md`: fill in R2 for Claude
     through the adapter, and R3 for Grok, Copilot and Cursor.
   - List any worktree-moving tool a runtime other than Claude offers, and check Grok first.
   - If all four keep the word, mark T027 to T029 "not needed" with the reason. Otherwise
     **stop and ask Alex** with the results, then carry on with Phase 2, which doesn't depend on
     the answer.
+  **Result**: Claude, Copilot and Cursor carry their conversation into another folder; Grok refuses
+  (`Path not found`) and would carry on having forgotten it. No runtime but Claude has a worktree
+  tool. Codex and Gemini are not installed here. Handover (T027 to T029) is for Grok alone: asked
+  of Alex at the Phase 3 gate.
 
 ---
 

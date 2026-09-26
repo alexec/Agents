@@ -263,11 +263,21 @@ struct ConnectionRoleTests {
     }
 
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        #expect(ConnectionRole.agentMethods.count == 19)
+        #expect(ConnectionRole.agentMethods.count == 20)
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))
         #expect(ConnectionRole.control.allows("anything/atAll"))
         #expect(!ConnectionRole.agent.hearsNotifications && !ConnectionRole.stranger.hearsNotifications)
         #expect(ConnectionRole.device.hearsNotifications, "the phone's lists are kept by them")
+    }
+    /// An agent moves only itself, by its token; a window or the phone moves an agent by
+    /// its id; a stranger moves nothing (053).
+    @Test func movingIsTheCallersOwnAndNeverAStrangers() {
+        #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsMoveSelf))
+        #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.agentsMove))
+        #expect(ConnectionRole.device.allows(DaemonAPI.Method.agentsMove))
+        #expect(!ConnectionRole.device.allows(DaemonAPI.Method.agentsMoveSelf))
+        #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.agentsMove))
+        #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.agentsMoveSelf))
     }
 }

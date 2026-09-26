@@ -52,6 +52,8 @@ public actor AppService {
     public static let publishEventToolName = AppTool.publishEvent
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
+    public static let enterWorktreeToolName = AppTool.enterWorktree
+    public static let exitWorktreeToolName = AppTool.exitWorktree
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -152,6 +154,15 @@ public actor AppService {
     /// Where those go.
     public typealias PullRequestsSink = @Sendable (PullRequestCall) async -> Outcome
 
+    /// `enter_worktree` or `exit_worktree` (053), as the agent made it: one move, which
+    /// the daemon checks and keeps for when the turn ends.
+    public enum MoveCall: Sendable, Equatable {
+        case move(target: MoveTarget, removeLeft: Bool, discardChanges: Bool)
+    }
+
+    /// Where those go.
+    public typealias MovesSink = @Sendable (MoveCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -162,6 +173,7 @@ public actor AppService {
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
     private let pullRequestsSink: PullRequestsSink
+    private let movesSink: MovesSink
     /// Whether the four agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -191,6 +203,9 @@ public actor AppService {
                 },
                 events: @escaping EventsSink = { _ in
                     .refused("This app cannot wait on or publish events.")
+                },
+                moves: @escaping MovesSink = { _ in
+                    .refused("This app cannot move agents.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -202,6 +217,7 @@ public actor AppService {
         self.leasesSink = leases
         self.eventsSink = events
         self.pullRequestsSink = pullRequests
+        self.movesSink = moves
         self.managesAgents = managesAgents
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
@@ -256,9 +272,11 @@ public actor AppService {
             let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
             // The three event tools, for every agent (042).
             let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
+            // The two for moving itself, for every agent (053).
+            let moveTools = [Self.enterWorktreeTool, Self.exitWorktreeTool]
             return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
                                               Self.workflowTool] + agentTools + leaseTools
-                                             + eventTools + pullRequestTools
+                                             + eventTools + moveTools + pullRequestTools
                                              + [Self.tool, Self.reportOutcomeTool])])
 
         case "tools/call":
@@ -351,6 +369,13 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await leasesSink(call)))
+                }
+            }
+
+            if let call = Self.moveCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await movesSink(call)))
                 }
             }
 
@@ -506,6 +531,45 @@ public actor AppService {
             }
             return .success(.publish(name: event, message: arguments?["message"]?.stringValue,
                                      details: strings(arguments?["details"])))
+        }
+        return nil
+    }
+
+    /// Which of the two move calls a tool name is, with its arguments read (053). `nil`
+    /// when the name is neither.
+    static func moveCall(named name: String,
+                         _ arguments: JSONValue?) -> Result<MoveCall, AgentCallProblem>? {
+        func text(_ key: String) -> String? {
+            let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+        if name.hasSuffix(enterWorktreeToolName) {
+            let name = text("name"), path = text("path")
+            if name != nil, path != nil {
+                return .failure("Nothing was moved: give name for a new worktree or path for one already there, not both.")
+            }
+            if let path {
+                guard path.hasPrefix("/") else {
+                    return .failure("Nothing was moved: path has to be an absolute path, starting at /.")
+                }
+                return .success(.move(target: .existing(URL(filePath: path, directoryHint: .isDirectory)),
+                                      removeLeft: false, discardChanges: false))
+            }
+            return .success(.move(target: .newWorktree(name: name), removeLeft: false, discardChanges: false))
+        }
+        if name.hasSuffix(exitWorktreeToolName) {
+            let discard = arguments?["discard_changes"]?.boolValue ?? false
+            switch text("action") {
+            case "keep":
+                guard !discard else {
+                    return .failure("Nothing was moved: discard_changes only goes with action remove.")
+                }
+                return .success(.move(target: .projectFolder, removeLeft: false, discardChanges: false))
+            case "remove":
+                return .success(.move(target: .projectFolder, removeLeft: true, discardChanges: discard))
+            default:
+                return .failure("Nothing was moved: action has to be keep or remove.")
+            }
         }
         return nil
     }
@@ -1154,6 +1218,59 @@ public actor AppService {
                 ],
             ],
             "required": .array(["name"]),
+        ],
+    ]
+
+    // MARK: Moving (053). Words from contracts/move.md.
+
+    static let enterWorktreeTool: JSONValue = [
+        "name": .string(enterWorktreeToolName),
+        "title": "Move into a worktree",
+        "description": """
+            Move yourself into a git worktree of this project: a new one, or one that is \
+            already there. Use it on your own judgement when the work turns into a change \
+            that should be on its own branch, or when asked. The move happens when your turn \
+            ends, so finish your turn soon after calling it; edits you make before then land \
+            where you are now. Nothing uncommitted comes with you. A new worktree starts from \
+            the commit your current folder has checked out, so commit first what you want to \
+            bring. After the move you are started again in the new folder to carry on.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "name": [
+                    "type": "string",
+                    "description": "A name for a new worktree. Leave out for one named from this conversation's title. Not with path.",
+                ],
+                "path": [
+                    "type": "string",
+                    "description": "The absolute path of an existing worktree of this repository to move into. Not with name.",
+                ],
+            ],
+        ],
+    ]
+
+    static let exitWorktreeTool: JSONValue = [
+        "name": .string(exitWorktreeToolName),
+        "title": "Move back to the project folder",
+        "description": """
+            Move yourself back to the project folder from the worktree you are in. keep \
+            leaves the worktree and its branch as they are; remove takes the worktree away \
+            after you have left, and its branch if the app made it and it is merged. Remove \
+            is refused for a worktree the app did not make or another agent works in, and, \
+            unless discard_changes is true, when anything in it is uncommitted or unmerged: \
+            ask the person before discarding. The move happens when your turn ends.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "action": ["type": "string", "enum": .array(["keep", "remove"])],
+                "discard_changes": [
+                    "type": "boolean",
+                    "description": "Only with remove. Remove even though work would be lost.",
+                ],
+            ],
+            "required": .array(["action"]),
         ],
     ]
 

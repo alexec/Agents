@@ -37,6 +37,9 @@ The adapter (`@agentclientprotocol/claude-agent-acp` 0.81.2) implements `session
 **Decision**: Expect Claude to keep its session across a move. Phase 0 confirms it through the
 adapter, not only the CLI.
 
+**Confirmed through the adapter (T003, 2026-09-25, `RuntimeMoveLiveTests`)**: after
+`session/resume` in folder B, Claude answered PELICAN.
+
 ## R3. Grok, Cursor and Copilot
 
 **Finding (filesystem only, not yet run)**:
@@ -51,6 +54,20 @@ So Grok and Cursor may answer `session/resume` or `session/load` in a new folder
 - A runtime that fails still carries on through the existing fallback (new session, briefing
   again, the chat line FR-008 asks for), but it has lost its memory. For those, R5's handover
   applies.
+
+**Measured (T003, 2026-09-25, `RuntimeMoveLiveTests`, through each ACP adapter)**:
+
+| Runtime | Continued in folder B | Remembered |
+|---------|----------------------|------------|
+| Claude | yes | yes |
+| Copilot | yes | yes |
+| Cursor | yes | yes (the hash was not the folder, or its load looks further) |
+| Grok | **no**: `session/load` answers `-32603 Path not found` (`FS_NOT_FOUND`) | — |
+| Codex, Gemini | not installed on this Mac, not measured | |
+
+So Grok alone loses its conversation on a move. Through today's fallback it carries on in a new
+session with the briefing again, and has forgotten everything it was told. `runtime-tools.sh grok`
+lists no worktree-moving tool (Grok's list is an allow-list, and nothing new was found).
 
 **Rejected**: copying or linking the runtime's session file into the new folder's key before
 resuming. It's the runtime's private storage, it differs per runtime, it moves between releases

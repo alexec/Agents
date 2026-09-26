@@ -152,9 +152,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// What it is waiting to happen, if anything (042). Made by a tool call mid-turn
     /// and kept here, not on the report, so whatever the turn then reports leaves it be.
     public var eventWait: EventWait?
-    /// The worktree this agent was started in, if it was (030). Its project is the
-    /// worktree's project, not its `cwd`.
+    /// The worktree this agent works in, if it does: the one it was started in (030) or
+    /// moved into (053). Its project is the worktree's project, not its `cwd`.
     public var worktree: AgentWorktree?
+    /// A move asked for and not yet made (053). Applied when the turn ends, or at once
+    /// when none is running. Cleared when applied, cancelled, archived or deleted.
+    public var pendingMove: PendingMove?
     /// Where git's view of this agent's changes is measured from: the commit its folder
     /// was on when it started (035). Nil outside a repository, and for agents started
     /// before 035.
@@ -275,6 +278,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         eventWait = try c.decodeIfPresent(EventWait.self, forKey: .eventWait)
         // New in 030, and optional: every agent before it works in its project folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
+        pendingMove = (try? c.decodeIfPresent(PendingMove.self, forKey: .pendingMove)) ?? nil
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
         startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
         // New in 011, and counted from nothing, so every record written before the
@@ -351,6 +355,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
         try c.encodeIfPresent(eventWait, forKey: .eventWait)
         try c.encodeIfPresent(worktree, forKey: .worktree)
+        try c.encodeIfPresent(pendingMove, forKey: .pendingMove)
         try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
@@ -376,6 +381,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
         case worktree
+        case pendingMove
         case startingPoint
         case restartPickUps
         case report, outcomeAsked
@@ -421,6 +427,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 chainDepth: Int? = nil,
                 eventWait: EventWait? = nil,
                 worktree: AgentWorktree? = nil,
+                pendingMove: PendingMove? = nil,
                 startingPoint: StartingPoint? = nil,
                 startRequestID: UUID? = nil,
                 restartPickUps: Int = 0,
@@ -460,6 +467,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.chainDepth = chainDepth
         self.eventWait = eventWait
         self.worktree = worktree
+        self.pendingMove = pendingMove
         self.startingPoint = startingPoint
         self.startRequestID = startRequestID
         self.restartPickUps = restartPickUps

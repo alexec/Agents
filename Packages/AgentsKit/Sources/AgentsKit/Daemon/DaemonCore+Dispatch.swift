@@ -427,6 +427,14 @@ extension DaemonCore {
                 return .success(["note": .string(started.note),
                                  "agentID": .string(started.agentID.uuidString)])
 
+            case DaemonAPI.Method.agentsMoveSelf:
+                let request = try require(params, as: DaemonAPI.MoveSelfRequest.self)
+                return .success(["note": .string(try await moveSelf(request).message)])
+
+            case DaemonAPI.Method.agentsMove:
+                let request = try require(params, as: DaemonAPI.MoveRequest.self)
+                return .success(try JSONValue.encoding(try await move(request)))
+
             case DaemonAPI.Method.agentsStopHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
