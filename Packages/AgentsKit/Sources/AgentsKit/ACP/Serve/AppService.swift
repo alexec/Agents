@@ -256,28 +256,7 @@ public actor AppService {
             return .success([:])
 
         case "tools/list":
-            // The one that ends a turn first, the two that act mid-turn, and the two
-            // older names last, described as such (023).
-            // The four agent tools after the workflow tool, and only for an agent that
-            // may use them (028).
-            let agentTools = managesAgents
-                ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
-                : []
-            // The three lease tools after those, for every agent: waiting for the
-            // simulator is not managing anyone (036).
-            let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
-            // The two pull-request tools, for every agent (038 R7): the list is fixed
-            // when a session is made, and a standing or triggering run resumes a session
-            // made long before. Outside such a run they refuse, in words.
-            let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
-            // The three event tools, for every agent (042).
-            let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
-            // The two for moving itself, for every agent (053).
-            let moveTools = [Self.enterWorktreeTool, Self.exitWorktreeTool]
-            return .success(["tools": .array([Self.finishTurnTool, Self.showFileTool,
-                                              Self.workflowTool] + agentTools + leaseTools
-                                             + eventTools + moveTools + pullRequestTools
-                                             + [Self.tool, Self.reportOutcomeTool])])
+            return .success(["tools": .array(Self.tools(managesAgents: managesAgents))])
 
         case "tools/call":
             let name = params?["name"]?.stringValue ?? ""
@@ -533,6 +512,30 @@ public actor AppService {
                                      details: strings(arguments?["details"])))
         }
         return nil
+    }
+
+    /// Every tool this server offers, in the order they are listed.
+    static func tools(managesAgents: Bool) -> [JSONValue] {
+        // The one that ends a turn first, the two that act mid-turn, and the two
+        // older names last, described as such (023).
+        // The four agent tools after the workflow tool, and only for an agent that
+        // may use them (028).
+        let agentTools = managesAgents
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
+            : []
+        // The three lease tools after those, for every agent: waiting for the
+        // simulator is not managing anyone (036).
+        let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
+        // The two pull-request tools, for every agent (038 R7): the list is fixed
+        // when a session is made, and a standing or triggering run resumes a session
+        // made long before. Outside such a run they refuse, in words.
+        let pullRequestTools = [Self.pushPullRequestTool, Self.replyOnPullRequestTool]
+        // The three event tools, for every agent (042).
+        let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
+        // The two for moving itself, for every agent (053).
+        let moveTools = [Self.enterWorktreeTool, Self.exitWorktreeTool]
+        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool] + agentTools + leaseTools
+            + eventTools + moveTools + pullRequestTools + [Self.tool, Self.reportOutcomeTool]
     }
 
     /// Which of the two move calls a tool name is, with its arguments read (053). `nil`

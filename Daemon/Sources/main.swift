@@ -140,6 +140,14 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "mcp" {
                                                              details: details),
                                fallback: "Published.")
         }
+    } moves: { call in
+        switch call {
+        case .move(let target, let removeLeft, let discardChanges):
+            return await relay(DaemonAPI.Method.agentsMoveSelf,
+                               DaemonAPI.MoveSelfRequest(token: token, target: target, removeLeft: removeLeft,
+                                                         discardChanges: discardChanges),
+                               fallback: "The move is asked for.")
+        }
     }
     let task = Task {
         await service.run()

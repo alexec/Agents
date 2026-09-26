@@ -70,21 +70,21 @@ worktree, and `Pkg/` stands for `Packages/AgentsKit/`.
 
 The record, the wire types and the one function that applies a move. Nothing calls it yet.
 
-- [ ] T004 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AgentMoveRecordTests.swift`:
+- [X] T004 [P] Write `Pkg/Tests/AgentsKitTests/Unit/AgentMoveRecordTests.swift`:
   - An `Agent` with `pendingMove` round-trips, for each `MoveTarget` case.
   - A record without the key decodes with `pendingMove == nil`.
   - A record from before 053 (take a JSON fixture of one from `AgentWorktreeRecordTests`) still
     decodes.
   - `MoveTarget.newWorktree(name: nil)`, `.newWorktree(name: "x")`, `.existing(url)` and
     `.projectFolder` each round-trip.
-- [ ] T005 [P] Create `Pkg/Sources/AgentsKitCore/Model/AgentMove.swift`:
+- [X] T005 [P] Create `Pkg/Sources/AgentsKitCore/Model/AgentMove.swift`:
   - `public enum MoveTarget: Codable, Hashable, Sendable { case newWorktree(name: String?); case existing(URL); case projectFolder }`.
   - `public enum MoveAsker: String, Codable, Sendable { case agent, person }`.
   - `public struct PendingMove: Codable, Hashable, Sendable`, with `target: MoveTarget`,
     `removeLeft: Bool` ("Only with `projectFolder`"), `discardChanges: Bool` ("Only with
     `removeLeft`"), `askedBy: MoveAsker` and `askedAt: Date`. Doc comments come from
     data-model.md.
-- [ ] T006 In `Pkg/Sources/AgentsKitCore/Model/Agent.swift`:
+- [X] T006 In `Pkg/Sources/AgentsKitCore/Model/Agent.swift`:
   - Add `public var pendingMove: PendingMove?` after `worktree`, with the doc comment "A move asked
     for and not yet made (053). Applied when the turn ends, or at once when none is running.
     Cleared when applied, cancelled, archived or deleted."
@@ -92,25 +92,25 @@ The record, the wire types and the one function that applies a move. Nothing cal
     `afterTurn` does, `encode` using `encodeIfPresent`, and the memberwise init (default nil).
 
   Make T004 pass.
-- [ ] T007 [P] In `Pkg/Sources/AgentsKitCore/Model/AppTool.swift`:
+- [X] T007 [P] In `Pkg/Sources/AgentsKitCore/Model/AppTool.swift`:
   - Add `public static let enterWorktree = "enter_worktree"` and
     `public static let exitWorktree = "exit_worktree"`, with a comment block ("Two for moving
     this agent itself (053). Offered to every agent: moving yourself is not managing anyone.
     Neither name ends with another tool's name.").
   - Add a unit assertion to the existing AppTool or AppService test file that no tool name ends
     with either name, and that neither ends with another.
-- [ ] T008 [P] In `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
+- [X] T008 [P] In `Pkg/Sources/AgentsKitCore/Daemon/DaemonAPI.swift`:
   - Add the methods `agentsMove = "agents/move"` and `agentsMoveSelf = "agents/moveSelf"`.
   - Add `MoveSelfRequest { token: String; target: MoveTarget; removeLeft: Bool; discardChanges: Bool }`.
   - Add `MoveRequest { agentID: UUID; target: MoveTarget?  // nil cancels; removeLeft: Bool = false; discardChanges: Bool = false }`.
   - Add `MoveAnswer { enum When: String { case now, afterTurn, nothing }; when; message: String; agent: Agent? }`,
     as in contracts/move.md §2.
   - Add no new failure codes.
-- [ ] T009 In `Pkg/Sources/AgentsKitCore/Daemon/ConnectionRole.swift`:
+- [X] T009 In `Pkg/Sources/AgentsKitCore/Daemon/ConnectionRole.swift`:
   - Classify `agentsMove` with `agentsStop`.
   - Classify `agentsMoveSelf` with the token-bound app-tool methods (`agentsStopHelper`'s group).
   - Extend the existing role test so each is refused to a stranger.
-- [ ] T010 Write the first half of `Pkg/Tests/AgentsKitTests/Integration/MoveTests.swift`, which
+- [X] T010 Write the first half of `Pkg/Tests/AgentsKitTests/Integration/MoveTests.swift`, which
   calls `applyPendingMove` directly on an idle agent:
   - **Project folder → new worktree.** Afterwards:
     - `cwd` is `<top>/.agents/worktrees/<name>`, and `worktree.madeByApp` is true.
@@ -133,7 +133,7 @@ The record, the wire types and the one function that applies a move. Nothing cal
     without one.
   - **Failure.** In a repository with no commit, the move fails: `cwd` is unchanged, `pendingMove`
     is cleared, and the transcript has "Could not move: …".
-- [ ] T011 In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Worktrees.swift`, generalise the private
+- [X] T011 In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Worktrees.swift`, generalise the private
   `makeWorktree(in:project:prompt:)` into
   `makeWorktree(in repository:, project:, wanted: String, from: URL? = nil)`:
   - `from ?? project` is the folder where `GitWorktrees.hasCommit`, `GitWorktrees.base` and
@@ -148,7 +148,7 @@ The record, the wire types and the one function that applies a move. Nothing cal
       read as `projectFolder`.
     - `projectFolder` gives `(agent.projectFolder, nil)`.
   - 030's `WorktreeStartTests` must still pass.
-- [ ] T012 Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Moves.swift`, with
+- [X] T012 Create `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Moves.swift`, with
   `func applyPendingMove(_ agentID: UUID) async`:
   1. Take and clear `pendingMove`.
   2. `prepareMoveTarget`.
@@ -175,7 +175,7 @@ again by itself in the new folder.
 **Independent test**: quickstart §3. In MoveTests, the fake agent's turn calls the tool, ends,
 and the next launch's cwd is the worktree, with an app prompt sent.
 
-- [ ] T013 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/MoveToolParsingTests.swift`, for
+- [X] T013 [P] [US1] Write `Pkg/Tests/AgentsKitTests/Unit/MoveToolParsingTests.swift`, for
   `AppService.moveCall(named:_:)`:
   - `enter_worktree` with no arguments gives `.newWorktree(name: nil)`.
   - With `name` it gives `.newWorktree(name:)`, and with an absolute `path` it gives
@@ -187,7 +187,7 @@ and the next launch's cwd is the worktree, with an app prompt sent.
   - `remove` gives `removeLeft` true.
   - `discard_changes: true` with `keep` is refused.
   - The refusal texts match contracts/move.md §1's local refusals.
-- [ ] T014 [US1] In `Pkg/Sources/AgentsKit/ACP/Serve/AppService.swift`:
+- [X] T014 [US1] In `Pkg/Sources/AgentsKit/ACP/Serve/AppService.swift`:
   - Add `static let enterWorktreeTool` and `exitWorktreeTool`, with the JSON from
     contracts/move.md §1, word for word.
   - Add `public enum MoveCall: Sendable, Equatable { case move(target: MoveTarget, removeLeft: Bool, discardChanges: Bool) }`,
@@ -198,10 +198,10 @@ and the next launch's cwd is the worktree, with an app prompt sent.
   - Route them in `tools/call` before `agentCall`.
 
   Make T013 pass.
-- [ ] T015 [US1] In `Daemon/Sources/main.swift`, add the `moves:` closure. It relays `.move` as
+- [X] T015 [US1] In `Daemon/Sources/main.swift`, add the `moves:` closure. It relays `.move` as
   `DaemonAPI.Method.agentsMoveSelf` with `MoveSelfRequest(token:…)`, following the `events:`
   relay's shape.
-- [ ] T016 [US1] Write the second half of `MoveTests.swift`, for asking:
+- [X] T016 [US1] Write the second half of `MoveTests.swift`, for asking:
   - A fake turn calls the move with `.newWorktree(name: nil)` in the middle of the turn:
     - The answer is `.afterTurn`, and its message contains "when this turn ends" and the expected
       name.
@@ -212,12 +212,14 @@ and the next launch's cwd is the worktree, with an app prompt sent.
   - Asking twice in one turn: only the last request applies, and only one worktree is made.
   - With the turn stopped after asking, the move still applies but no app prompt is sent.
   - With the turn failed after asking, the move still applies (via `turnFailed`).
+  *(Not covered by a test: the fake's `promptError` fails a turn before it can be held open, so there is
+  no moment to ask mid-turn. `turnFailed` calls `applyPendingMove` the same way `finishTurn` does.)*
   - A prompt queued by the person during the turn goes first, with the move preface on it, and no
     app prompt is added.
   - Refusals at ask time store nothing: not a repository; `path` not a worktree of this
     repository; a missing worktree.
   - `exit_worktree` from the project folder answers `.nothing` with "not in a worktree".
-- [ ] T017 [US1] In `DaemonCore+Moves.swift`, add
+- [X] T017 [US1] In `DaemonCore+Moves.swift`, add
   `func askMove(_ agentID: UUID, _ move: PendingMove) async throws -> DaemonAPI.MoveAnswer`:
   - Validate as in data-model.md "Validation". For `removeLeft`, run the 030 `removalFacts` with
     the mover left out of `blockedBy`, and list what would be lost.
@@ -232,7 +234,7 @@ and the next launch's cwd is the worktree, with an app prompt sent.
     which resolves the token (as the other `agents/*` token methods do) and uses
     `askedBy: .agent`.
   - Wire `agentsMoveSelf` in `DaemonCore+Dispatch.swift`.
-- [ ] T018 [US1] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`:
+- [X] T018 [US1] In `Pkg/Sources/AgentsKit/Daemon/DaemonCore+Commands.swift`:
   - In `finishTurn`, after `await releaseRuntime(for: agentID)` and **before**
     `guard stops[agentID, default: 0] == stopsBefore`, add
     `let moved = await applyPendingMoveIfAny(agentID)`.
