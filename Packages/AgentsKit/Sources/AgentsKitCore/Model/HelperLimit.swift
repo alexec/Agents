@@ -7,7 +7,7 @@ import Foundation
 /// in the project, not per starter, so the most a project can ever hold that nobody
 /// typed for is this many.
 public enum HelperLimit {
-    public static let perProject = 3
+    public static let perProject = 5
 
     /// The places in use in a project: every agent another agent started there that
     /// has not been archived, plus starts that have taken a place and not yet made
