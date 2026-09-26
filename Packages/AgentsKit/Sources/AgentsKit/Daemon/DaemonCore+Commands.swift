@@ -383,6 +383,8 @@ extension DaemonCore {
         // Before the runtime reads the folder, so a project from before the layout
         // existed has it by the first turn.
         layOutOnce(cwd)
+        // And the person's own `~/.agents`, so a skill added since the last start is here (054).
+        reconcileHome()
         guard case .available(let path, _) = discovery.locate(runtime) else {
             throw notStartable(runtime, lookedIn: discovery.searchPaths)
         }
@@ -793,6 +795,8 @@ extension DaemonCore {
 
     private func connect(_ session: ACPSession, runtime: Runtime, for agent: Agent) async throws -> ACPSession {
         _ = try await session.initialize()
+        // Picked back up with what `~/.agents` holds now, not what it held at the start (054).
+        reconcileHome()
 
         // A new process is a new MCP server, so a new token. The old one stopped
         // working when the last process died.

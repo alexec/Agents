@@ -42,17 +42,17 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ## Phase 1: Setup
 
-- [ ] T001 Merge `main` into `agents/consider-how-might-have` in the worktree. Confirm it with `git merge-base --is-ancestor main HEAD`, since a branch can move under a merge. Build both schemes (`xcodebuild … -skipPackagePluginValidation`, one after the other) and run `swift test` in `Pkg/` once, recording the failures already on `main` in `specs/054-user-dotagents/walk/baseline.md`.
-- [ ] T002 [P] Create the empty folders and files named in plan.md: `Src/MCP/`, `App/Sources/Settings/Shared/`, and `specs/054-user-dotagents/walk/README.md` with a heading for each quickstart step.
+- [X] T001 Merge `main` into `agents/consider-how-might-have` in the worktree. Confirm it with `git merge-base --is-ancestor main HEAD`, since a branch can move under a merge. Build both schemes (`xcodebuild … -skipPackagePluginValidation`, one after the other) and run `swift test` in `Pkg/` once, recording the failures already on `main` in `specs/054-user-dotagents/walk/baseline.md`.
+- [X] T002 [P] Create the empty folders and files named in plan.md: `Src/MCP/`, `App/Sources/Settings/Shared/`, and `specs/054-user-dotagents/walk/README.md` with a heading for each quickstart step. *(Git keeps no empty folder, so `Src/MCP/` and `App/Sources/Settings/Shared/` come with their first files, in T020 and T042.)*
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 Add `AGENTS_PERSONAL_HOME` to `Src/Store/StoreLocations.swift`: `personalHome: URL?` is the named home, or the real home only when the root is the standard root, else nil (R4). Add `personalLayout` (`<root>/personal-layout.json`).
-- [ ] T004 [P] Test T003 in `Tests/Unit/PersonalHomeTests.swift`: a scratch root without the variable → nil; with it → that folder; the standard root → `FileManager.homeDirectoryForCurrentUser`.
-- [ ] T005 Make `DotAgents`'s helpers `place`, `attempt`, `exists`, `isDirectory`, `json(at:)`, `encoded` and `writeGeminiManifest` `internal` (not private) in `Src/Projects/DotAgents.swift` and `Src/Projects/DotAgents+Plugins.swift`. No change of behaviour, and the existing `DotAgentsTests` stay green.
-- [ ] T006 Create `Src/Projects/PersonalDotAgents.swift` with the rule table from data-model.md `RuntimeLinkRule`:
+- [X] T003 Add `AGENTS_PERSONAL_HOME` to `Src/Store/StoreLocations.swift`: `personalHome: URL?` is the named home, or the real home only when the root is the standard root, else nil (R4). Add `personalLayout` (`<root>/personal-layout.json`).
+- [X] T004 [P] Test T003 in `Tests/Unit/PersonalHomeTests.swift`: a scratch root without the variable → nil; with it → that folder; the standard root → `FileManager.homeDirectoryForCurrentUser`.
+- [X] T005 Make `DotAgents`'s helpers `place`, `attempt`, `exists`, `isDirectory`, `json(at:)`, `encoded` and `writeGeminiManifest` `internal` (not private) in `Src/Projects/DotAgents.swift` and `Src/Projects/DotAgents+Plugins.swift`. No change of behaviour, and the existing `DotAgentsTests` stay green. *(Done 2026-09-26: they were already internal, with nothing `private`, so no edit was needed.)*
+- [X] T006 Create `Src/Projects/PersonalDotAgents.swift` with the rule table from data-model.md `RuntimeLinkRule`:
   - `runtimeID`;
   - `configFolder`;
   - `readsSharedSkills`: "true for Codex, Grok, Cursor, Copilot";
@@ -63,11 +63,11 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - `pluginHandover`: `sessionMeta` (Claude), `sessionMetaWithServers` (Grok), `codexMarketplace` (Codex), `extensionLink` (Gemini), `none` (Cursor, Copilot).
 
   Gemini has no instructions or skills rule until R14. A runtime counts as installed only when `RuntimeDiscovery.locate` finds it, never because its folder exists.
-- [ ] T007 Add the placed-links record to `Src/Projects/PersonalDotAgents.swift`, per data-model.md `PlacedLinks`:
+- [X] T007 Add the placed-links record to `Src/Projects/PersonalDotAgents.swift`, per data-model.md `PlacedLinks`:
   - Fields: `home`, `links` (path → destination) and `codexPlugins` (plugin → fingerprint).
   - Loading it with a different `home` resets it.
   - Missing or unreadable reads as empty; writes are atomic.
-- [ ] T008 Create `Src/Daemon/DaemonCore+PersonalLayout.swift`:
+- [X] T008 Create `Src/Daemon/DaemonCore+PersonalLayout.swift`:
   - `reconcileHome()` runs every per-runtime step on the actor, each in its own `attempt`, and does nothing when `personalHome` is nil.
   - Call it once in `Src/Daemon/Daemon.swift` at start, and in `freshSession` and the pick-up path in `Src/Daemon/DaemonCore+Commands.swift`, beside `layOutOnce(cwd)` (FR-010).
 
@@ -82,18 +82,18 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] In `Tests/PersonalDotAgentsTests.swift`, test US1 scenarios 1, 2 and 4 on a temporary home:
+- [X] T009 [P] [US1] In `Tests/PersonalDotAgentsTests.swift`, test US1 scenarios 1, 2 and 4 on a temporary home:
   - with Claude installed, a Claude link `~/.claude/skills/<name> -> ../../.agents/skills/<name>` is made and it is relative (FR-013);
   - `~/.claude/skills/synced` with a `.bucket-x` file is byte-for-byte unchanged;
   - no link is made for Codex, Grok, Cursor or Copilot;
   - no link is made for a runtime that is not installed (use a discovery stub).
-- [ ] T010 [P] [US1] In `Tests/Integration/PersonalLayoutTests.swift`, test US1 scenario 3 with a daemon on a temporary root and `AGENTS_PERSONAL_HOME`: a skill added after the daemon starts is linked before the next `agents/start` makes its session. Also test SC-006: the same daemon with no `AGENTS_PERSONAL_HOME` leaves a sentinel home untouched.
-- [ ] T011 [P] [US1] In `Tests/PersonalDotAgentsTests.swift`, test SC-005: a reconcile of 100 skills on a warm home finishes in under 50 ms.
+- [X] T010 [P] [US1] In `Tests/Integration/PersonalLayoutTests.swift`, test US1 scenario 3 with a daemon on a temporary root and `AGENTS_PERSONAL_HOME`: a skill added after the daemon starts is linked before the next `agents/start` makes its session. Also test SC-006: the same daemon with no `AGENTS_PERSONAL_HOME` leaves a sentinel home untouched.
+- [X] T011 [P] [US1] In `Tests/PersonalDotAgentsTests.swift`, test SC-005: a reconcile of 100 skills on a warm home finishes in under 50 ms.
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] In `Src/Projects/PersonalDotAgents.swift`, make the skill-link step: create `~/.agents/skills` and `~/.agents/personas` when they are missing (FR-001), then apply data-model.md's reconcile table for each skill and each installed runtime with a `skillsFolder`. Skip managed names (FR-007), and skip a `skillsFolder` that is itself a link (spec, Edge Cases).
-- [ ] T013 [US1] Wire the step into `reconcileHome()` in `Src/Daemon/DaemonCore+PersonalLayout.swift`, so T009 to T011 pass.
+- [X] T012 [US1] In `Src/Projects/PersonalDotAgents.swift`, make the skill-link step: create `~/.agents/skills` and `~/.agents/personas` when they are missing (FR-001), then apply data-model.md's reconcile table for each skill and each installed runtime with a `skillsFolder`. Skip managed names (FR-007), and skip a `skillsFolder` that is itself a link (spec, Edge Cases).
+- [X] T013 [US1] Wire the step into `reconcileHome()` in `Src/Daemon/DaemonCore+PersonalLayout.swift`, so T009 to T011 pass.
 
 **Checkpoint**: quickstart step 2's HERON-7 row holds for all five runtimes.
 

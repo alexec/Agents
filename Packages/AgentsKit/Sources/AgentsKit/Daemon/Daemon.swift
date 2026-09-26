@@ -63,6 +63,8 @@ public final class Daemon: @unchecked Sendable {
         await core.clearCloneStaging()
         // Before anything is picked up: nothing can be running from an old toolset yet.
         (core.installer as? RuntimeInstaller)?.tidy()
+        // The person's `~/.agents`, laid out before anything is picked up (054).
+        await core.reconcileHome()
         let recovered = await core.recover()
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")

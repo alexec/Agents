@@ -14,7 +14,18 @@ import Foundation
 public struct StoreLocations: Sendable {
     public var root: URL
 
-    public init(root: URL) { self.root = root }
+    /// The home folder whose `~/.agents` every agent shares (054), or nil for none.
+    ///
+    /// Only the ordinary daemon lays out the person's real home. A scratch copy or a
+    /// test gets one only when `AGENTS_PERSONAL_HOME` names it, so a walk on a branch
+    /// build never rearranges somebody's `~/.claude` (research R4). Settable, so a test
+    /// hands one in directly rather than through the environment.
+    public var personalHome: URL?
+
+    public init(root: URL) {
+        self.root = root
+        self.personalHome = Self.personalHome(root: root, environment: ProcessInfo.processInfo.environment)
+    }
 
     /// The one every process uses unless it was told otherwise.
     ///
@@ -28,12 +39,25 @@ public struct StoreLocations: Sendable {
     }
 
     /// The ordinary place: one daemon, one set of agents, no arguments.
-    public static var standard: StoreLocations {
+    public static var standard: StoreLocations { StoreLocations(root: standardRoot) }
+
+    /// The ordinary root on its own, so deciding a root's personal home does not build a
+    /// whole `StoreLocations` (which would decide its own, and so on).
+    static var standardRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return StoreLocations(root: base.appendingPathComponent("Agents", isDirectory: true))
+        return base.appendingPathComponent("Agents", isDirectory: true)
     }
 
     public static let rootVariable = "AGENTS_ROOT"
+    public static let personalHomeVariable = "AGENTS_PERSONAL_HOME"
+
+    /// Pure, like `chosen`: the named home first, then the real one for the ordinary
+    /// root, and none for anything else.
+    public static func personalHome(root: URL, environment: [String: String]) -> URL? {
+        if let named = environment[personalHomeVariable], !named.isEmpty { return expand(named) }
+        guard root.standardizedFileURL.path == standardRoot.standardizedFileURL.path else { return nil }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
     public static let rootArgument = "--root"
 
     /// Pure, so the rule is testable without a process to run it in.
@@ -77,6 +101,9 @@ public struct StoreLocations: Sendable {
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// The links the app placed in the personal home, so one the person removed is not
+    /// put back (054, FR-009). Per root, like everything else the daemon remembers.
+    public var personalLayout: URL { root.appendingPathComponent("personal-layout.json") }
     /// What the app installs for this daemon (048): `tools/<runtime>/<id>/`, with
     /// `current` pointing at the one in use. Per root, so a scratch copy installs its own.
     public var tools: URL { root.appendingPathComponent("tools", isDirectory: true) }
