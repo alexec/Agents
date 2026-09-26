@@ -1,0 +1,77 @@
+2026-09-26T17:21:19Z relay: HEAD /api/hello -> 200
+2026-09-26T17:21:19Z relay: HEAD /api/hello -> 200
+2026-09-26T17:21:47Z relay: HEAD /api/hello -> 200
+2026-09-26T17:21:47Z relay: HEAD /api/hello -> 200
+2026-09-26T17:21:48Z relay: POST /v1/messages -> 200
+2026-09-26T17:21:48Z relay: POST /v1/messages -> 200
+2026-09-26T17:21:50Z relay: POST /v1/messages -> 200
+2026-09-26T17:21:53Z relay: POST /v1/messages -> 200
+2026-09-26T17:22:12Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:12Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:13Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:14Z relay: POST /v1/messages -> 200
+2026-09-26T17:22:16Z relay: POST /v1/messages -> 200
+2026-09-26T17:22:17Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:17Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:18Z relay: HEAD /api/hello -> 200
+2026-09-26T17:22:18Z relay: POST /v1/messages -> 200
+2026-09-26T17:22:20Z relay: POST /v1/messages -> 200
+2026-09-26T17:25:12Z relay: GET /backend-api/ps/plugins/suggested/codex -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/ps/plugins/installed -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/plugins/featured -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/ps/plugins/installed -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/wham/accounts/check -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:13Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:13Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:14Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:14Z relay: GET /backend-api/wham/settings/user -> 200
+2026-09-26T17:25:14Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:14Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:14Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:14Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:14Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:15Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:15Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:15Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:16Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:16Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:16Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:16Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:17Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:17Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:17Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:18Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:18Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:18Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:19Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:19Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:20Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:20Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:20Z relay: GET /backend-api/codex/responses -> 404 (no WebSockets)
+2026-09-26T17:25:21Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:21Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:21Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:22Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:22Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:23Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:23Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:24Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:24Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:24Z relay: GET /backend-api/ps/plugins/list -> 200
+2026-09-26T17:25:25Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:28Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:28Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:28Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:31Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:31Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:31Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:31Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:34Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:35Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:39Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:40Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:40Z relay: POST /backend-api/codex/responses -> 200
+2026-09-26T17:25:40Z relay: POST /backend-api/codex/analytics-events/events -> 200
+2026-09-26T17:25:41Z relay: POST /backend-api/codex/analytics-events/events -> 200

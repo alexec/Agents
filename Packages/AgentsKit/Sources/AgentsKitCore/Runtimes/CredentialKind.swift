@@ -1,16 +1,13 @@
 import Foundation
 
-/// What sort of credential a pasted string is (043, D1; Gemini's, 046). Codex has none: a
-/// server's Codex signs in through the Mac's ChatGPT sign-in, relayed (047, R12).
+/// What sort of credential a pasted string is (043, D1; Gemini's, 046). Claude and Codex have
+/// none: a server's Claude and Codex sign in through this Mac's own sign-ins, relayed (047
+/// R12, 056).
 ///
 /// Told apart by prefix, because each is handed to its runtime in its own environment
 /// variable and checked with its own request. Anything else is refused at paste, with a
 /// sentence, rather than saved and found wrong on a server later.
 public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
-    /// Made by `claude setup-token` for a subscription: `sk-ant-oat…`.
-    case oauthToken
-    /// From the Anthropic console: `sk-ant-api…`.
-    case apiKey
     /// From Google AI Studio (046): `AIza…`, or `AQ.…` for the keys it issues now. The only
     /// way into Gemini CLI for an individual since Google closed its own sign-in to them.
     case geminiAPIKey
@@ -25,7 +22,6 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// The runtime it signs in.
     public var runtimeID: String {
         switch self {
-        case .oauthToken, .apiKey: RuntimeCatalog.claude.id
         case .geminiAPIKey: RuntimeCatalog.gemini.id
         }
     }
@@ -39,8 +35,6 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// runtime's others are taken out of the environment, so the one from Settings wins (D1).
     public var environmentVariable: String {
         switch self {
-        case .oauthToken: "CLAUDE_CODE_OAUTH_TOKEN"
-        case .apiKey: "ANTHROPIC_API_KEY"
         case .geminiAPIKey: "GEMINI_API_KEY"
         }
     }
@@ -49,7 +43,6 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// lent. Gemini prefers `GOOGLE_API_KEY` to `GEMINI_API_KEY` when both are set.
     public var clearedVariables: [String] {
         switch self {
-        case .oauthToken, .apiKey: ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]
         case .geminiAPIKey: ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
         }
     }
@@ -59,14 +52,10 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
         Array(Set(kinds(for: runtimeID).flatMap(\.clearedVariables))).sorted()
     }
 
-    /// Claude's, as 043 had them; kept for the server's own-sign-in check.
-    public static let allVariables = variables(for: RuntimeCatalog.claude.id)
-
-    /// Lent to this Mac's own agents as well as to servers (046, D3). Claude on the Mac uses
-    /// the person's own sign-in; Gemini has no sign-in an individual can use but a key.
+    /// Lent to this Mac's own agents as well as to servers (046, D3): Gemini has no sign-in
+    /// an individual can use but a key.
     public var isLentOnTheMac: Bool {
         switch self {
-        case .oauthToken, .apiKey: false
         case .geminiAPIKey: true
         }
     }
@@ -74,40 +63,25 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// How Settings names it.
     public var display: String {
         switch self {
-        case .oauthToken: "Subscription token"
-        case .apiKey: "API key"
         case .geminiAPIKey: "Gemini API key"
         }
     }
 
-    /// What Settings calls one when it cannot say which kind: "token" for Claude's two,
-    /// "key" for the others.
-    public static func noun(for runtimeID: String) -> String {
-        runtimeID == RuntimeCatalog.claude.id ? "token" : "key"
-    }
+    /// What Settings calls one when it cannot say which kind.
+    public static func noun(for runtimeID: String) -> String { "key" }
 
     /// Where to get one, under the paste field.
     public static func whereToGet(for runtimeID: String) -> String {
-        switch runtimeID {
-        case RuntimeCatalog.gemini.id:
-            "Get one at aistudio.google.com/apikey. Gemini agents on this Mac use it too: Google’s own sign-in is closed to individuals."
-        default:
-            "Make one with `claude setup-token` on this Mac, or use an API key from console.anthropic.com."
-        }
+        "Get one at aistudio.google.com/apikey. Gemini agents on this Mac use it too: Google’s own sign-in is closed to individuals."
     }
 
     /// What is said when the pasted text is not one.
     public static func pasteRefusal(for runtimeID: String) -> String {
-        switch runtimeID {
-        case RuntimeCatalog.gemini.id: "That isn’t a Gemini API key. They start AIza or AQ."
-        default: "That isn’t a Claude token or API key. They start sk-ant-oat or sk-ant-api."
-        }
+        "That isn’t a Gemini API key. They start AIza or AQ."
     }
 
     var prefixes: [String] {
         switch self {
-        case .oauthToken: ["sk-ant-oat"]
-        case .apiKey: ["sk-ant-api"]
         case .geminiAPIKey: ["AIza", "AQ."]
         }
     }
@@ -116,7 +90,6 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// stored, so its mask starts with none of them.
     var maskPrefix: String {
         switch self {
-        case .oauthToken, .apiKey: prefixes[0]
         case .geminiAPIKey: "key "
         }
     }
@@ -145,7 +118,7 @@ public struct Secret: Hashable, Sendable, CustomStringConvertible, CustomDebugSt
 
     public var lastFour: String { String(text.suffix(4)) }
 
-    /// `sk-ant-oat…a3f9`, or `key …a3f9` for Gemini's.
+    /// `key …a3f9`.
     public var mask: String { Self.mask(kind: kind, lastFour: lastFour) }
 
     public static func mask(kind: CredentialKind, lastFour: String) -> String {

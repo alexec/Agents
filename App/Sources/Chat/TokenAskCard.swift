@@ -1,9 +1,9 @@
 import AgentsKit
 import SwiftUI
 
-/// "Claude on devbox needs a token" (043, contracts/ui.md § 3): asked before a server agent
-/// starts, rather than starting one that will fail. Saving keeps the token as Settings
-/// does, and the start goes ahead.
+/// "Gemini on devbox needs a key" (043, contracts/ui.md § 3; Gemini's alone since 056): asked
+/// before a server agent starts, rather than starting one that will fail. Saving keeps the
+/// key as Settings does, and the start goes ahead.
 struct TokenAskCard: View {
     @Environment(AppModel.self) private var model
     let ask: TokenAsk
@@ -16,19 +16,19 @@ struct TokenAskCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("\(name) on \(ask.label) needs a token").appText(.reading).fontWeight(.semibold)
-            Text("\(ask.label) has no \(name) sign-in of its own. Paste a token and Agents keeps it in this Mac’s Keychain, and lends it to \(ask.label) only while an agent runs there.")
+            Text("\(name) on \(ask.label) needs a key").appText(.reading).fontWeight(.semibold)
+            Text("\(ask.label) has no \(name) sign-in of its own. Paste a key and Agents keeps it in this Mac’s Keychain, and lends it to \(ask.label) only while an agent runs there.")
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            SecureField("Paste a \(name) token", text: $text)
+            SecureField("Paste a \(name) key", text: $text)
                 .textFieldStyle(.roundedBorder)
                 .focused($focused)
                 .onSubmit(save)
             if notACredential {
-                Text("That isn’t a Claude token or API key. They start sk-ant-oat or sk-ant-api.")
+                Text(CredentialKind.pasteRefusal(for: ask.runtimeID))
                     .appText(.fine).tinted(.failure)
             }
-            Text("Make one with `claude setup-token` on this Mac.")
+            Text(CredentialKind.whereToGet(for: ask.runtimeID))
                 .appText(.fine).foregroundStyle(.secondary)
             HStack {
                 Spacer()
