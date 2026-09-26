@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .t { fill:#1d1d1f; }
+    .s { fill:#6e6e73; }
+    .q { fill:#aeaeb2; }
+    .title { font-size:20px; font-weight:600; }
+    .h { font-size:13px; font-weight:600; fill:#6e6e73; letter-spacing:.3px; }
+    .r { font-size:14px; }
+    .rb { font-size:14px; font-weight:600; }
+    .f { font-size:12px; }
+    .fb { font-size:12px; font-weight:600; }
+    .btn { fill:#fff; stroke:#c7c7cc; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+    .out { fill:#c93400; }
+  </style>
+
+  <!-- dimmed window behind -->
+  <rect x="0.5" y="0.5" width="1119" height="759" rx="12" fill="#e9e9ec" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#e0e0e4"/>
+  <text x="330" y="78" class="title q">Spec 051</text>
+
+  <!-- sheet -->
+  <rect x="190" y="60" width="740" height="640" rx="14" fill="#fff" stroke="#c7c7cc"/>
+  <text x="214" y="98" class="title t">Continue “Spec 051” with</text>
+  <rect x="470" y="78" width="120" height="28" rx="6" class="btn"/><text x="482" y="97" class="r t">Codex</text><text x="580" y="97" class="f q" text-anchor="end">▾</text>
+  <text x="600" y="97" class="f s">Available</text>
+  <text x="214" y="124" class="f s">Codex starts a new conversation and is given this one so far. Nothing is sent until you write to it.</text>
+
+  <!-- columns -->
+  <text x="214" y="162" class="fb s">SETTING</text>
+  <text x="350" y="162" class="fb s">NOW, ON CLAUDE</text>
+  <text x="530" y="162" class="fb s">ON CODEX</text>
+  <text x="740" y="162" class="fb s">WHERE IT CAME FROM</text>
+  <line x1="214" y1="172" x2="906" y2="172" stroke="#e5e5ea"/>
+
+  <text x="214" y="202" class="rb t">Model</text>
+  <text x="350" y="202" class="r t">Sonnet 4.5</text>
+  <rect x="530" y="184" width="190" height="28" rx="6" class="btn"/><text x="542" y="203" class="r t">GPT-5 Codex</text><text x="710" y="203" class="f q" text-anchor="end">▾</text>
+  <text x="740" y="202" class="f s">Codex's default: Sonnet 4.5</text><text x="740" y="216" class="f s">is in none of your levels</text>
+  <line x1="214" y1="222" x2="906" y2="222" stroke="#f2f2f7"/>
+
+  <text x="214" y="252" class="rb t">Effort</text>
+  <text x="350" y="252" class="r t">Medium</text>
+  <rect x="530" y="234" width="190" height="28" rx="6" class="btn"/><text x="542" y="253" class="r t">Medium</text><text x="710" y="253" class="f q" text-anchor="end">▾</text>
+  <text x="740" y="252" class="f s">same value</text>
+  <line x1="214" y1="272" x2="906" y2="272" stroke="#f2f2f7"/>
+
+  <text x="214" y="302" class="rb t">Mode</text>
+  <text x="350" y="302" class="r t">Accept edits</text>
+  <rect x="530" y="284" width="190" height="28" rx="6" class="btn"/><text x="542" y="303" class="r t">Agent</text><text x="710" y="303" class="f q" text-anchor="end">▾</text>
+  <text x="740" y="302" class="f s">closest that is no looser</text>
+  <line x1="214" y1="322" x2="906" y2="322" stroke="#f2f2f7"/>
+
+  <text x="214" y="352" class="rb t">Reasoning</text>
+  <text x="214" y="368" class="rb t">summary</text>
+  <text x="350" y="352" class="r q">—</text>
+  <rect x="530" y="334" width="190" height="28" rx="6" class="btn"/><text x="542" y="353" class="r t">Auto</text><text x="710" y="353" class="f q" text-anchor="end">▾</text>
+  <text x="740" y="352" class="f s">Codex's default: Claude</text>
+  <text x="740" y="368" class="f s">has no such setting</text>
+  <line x1="214" y1="382" x2="906" y2="382" stroke="#f2f2f7"/>
+
+  <!-- mode menu open -->
+  <rect x="530" y="314" width="190" height="0" fill="none"/>
+
+  <!-- not carried -->
+  <text x="214" y="416" class="fb s">WON'T CARRY OVER</text>
+  <rect x="214" y="426" width="692" height="92" rx="8" fill="#fafafa" stroke="#e5e5ea"/>
+  <text x="230" y="450" class="f t">Extra arguments <tspan font-family="Menlo, monospace">--verbose</tspan>: they were for Claude only.</text>
+  <text x="230" y="472" class="f t">2 “always allow” answers you gave Claude. Codex may ask again.</text>
+  <text x="230" y="494" class="f t">A queued prompt starting <tspan font-family="Menlo, monospace">/compact</tspan>: Codex has no such command. It stays queued, held, until you edit it.</text>
+
+  <!-- remember -->
+  <rect x="214" y="544" width="18" height="18" rx="4" fill="#1d1d1f"/><text x="217" y="558" class="f" fill="#fff">✓</text>
+  <text x="242" y="558" class="r t">Remember this for next time</text>
+  <text x="242" y="580" class="f s">Put Sonnet 4.5 on Claude beside GPT-5 Codex · medium in</text><rect x="566" y="566" width="120" height="24" rx="6" class="btn"/><text x="576" y="582" class="f t">Everyday</text><text x="676" y="582" class="f q" text-anchor="end">▾</text><text x="694" y="580" class="f s">or a new level.</text>
+
+  <!-- buttons -->
+  <rect x="690" y="640" width="80" height="32" rx="8" class="btn"/><text x="730" y="661" class="r t" text-anchor="middle">Cancel</text>
+  <rect x="780" y="640" width="126" height="32" rx="8" fill="#1d1d1f"/><text x="843" y="661" class="r" fill="#fff" text-anchor="middle">Continue on Codex</text>
+
+  <!-- notes -->
+  <text x="214" y="616" class="note">Picking a different runtime at the top refills the right-hand column. Every value is changeable (FR-026).</text>
+  <text x="20" y="730" class="note">Mode's menu offers Codex's modes no looser than Accept edits: Read only, Agent. “Full access” is not in it (FR-027).</text>
+  <text x="20" y="746" class="note">Opened from a switch note, the title is “Change what Fix login carried on with”, the runtime is fixed, and the button reads Apply from the next turn (FR-029).</text>
+</svg>

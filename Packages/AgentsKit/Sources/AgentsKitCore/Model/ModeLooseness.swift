@@ -15,10 +15,12 @@ public enum ModeLooseness {
     /// as URLs, so the part after `#` is what is looked up.
     static let ranks: [String: Int] = [
         "plan": 0, "ask": 0,
-        "default": 1,
+        // Codex's "read-only" is named for its sandbox but asks before anything
+        // outside the workspace, which is what `default` means elsewhere (052).
+        "default": 1, "read-only": 1,
         "acceptEdits": 2, "agent": 2,
         "auto": 3,
-        "bypassPermissions": 4, "autopilot": 4,
+        "bypassPermissions": 4, "autopilot": 4, "agent-full-access": 4,
     ]
 
     public static func rank(_ mode: String) -> Int? {

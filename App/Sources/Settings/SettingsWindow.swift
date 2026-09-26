@@ -28,6 +28,12 @@ struct SettingsWindow: View {
         .background(Paper.ground)
         .navigationTitle(pane.title)
         .task { await refreshShared() }
+        // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
+        .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
+            guard let asked else { return }
+            pane = asked
+            model.settingsPaneAsked = nil
+        }
         .onChange(of: pane) { _, chosen in
             if chosen == .shared { Task { await refreshShared() } }
         }
@@ -44,6 +50,7 @@ struct SettingsWindow: View {
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage)
         case .spending: FormColumn { CostSettingsView() }
+        case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
         case .servers: FormColumn { ServersSettingsView() }
         }
@@ -55,7 +62,7 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: Hashable, CaseIterable {
-    case appearance, agents, runtimes, shared, spending, devices, servers
+    case appearance, agents, runtimes, shared, spending, pool, devices, servers
 
     var title: String {
         switch self {
@@ -64,6 +71,7 @@ enum SettingsPane: Hashable, CaseIterable {
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
+        case .pool: "Pool"
         case .devices: "Devices"
         case .servers: "Servers"
         }
@@ -76,13 +84,14 @@ enum SettingsPane: Hashable, CaseIterable {
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
+        case .pool: "arrow.triangle.swap"
         case .devices: "iphone"
         case .servers: "server.rack"
         }
     }
 
     /// Appearance on its own; the panes about agents; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.appearance], [.agents, .runtimes, .shared, .spending], [.devices, .servers]]
+    static let groups: [[SettingsPane]] = [[.appearance], [.agents, .runtimes, .shared, .spending, .pool], [.devices, .servers]]
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one

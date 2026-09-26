@@ -14,4 +14,6 @@ enum SidebarItem: Hashable {
     case resources
     /// What happened, and what came of it (042).
     case events
+    /// The runtimes a chat carries on with, and which are out (052).
+    case pool
 }

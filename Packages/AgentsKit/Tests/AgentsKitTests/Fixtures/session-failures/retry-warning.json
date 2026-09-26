@@ -1,0 +1,17 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:warning",
+        "revision": 1,
+        "category": "service",
+        "severity": "warning",
+        "title": "Retrying after an API error (attempt 2 of 10).",
+        "actions": [
+          "retry"
+        ]
+      }
+    }
+  }
+}

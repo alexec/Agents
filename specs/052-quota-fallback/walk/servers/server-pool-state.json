@@ -1,0 +1,162 @@
+{
+  "at": 812139641.3231384,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      "state": {
+        "credentialKey": "grok:sign-in",
+        "entryID": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812139593.156496,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812143193.156496,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    },
+    {
+      "chats": 1,
+      "entry": {
+        "id": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812139633.2366363,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812143233.2366363,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      {
+        "id": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "shared": [
+    {
+      "credentialKey": "copilot:sign-in",
+      "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+      "learnedFrom": "typedFailure",
+      "rateLimitStreak": [],
+      "since": 812139633.2366363,
+      "spent": {
+        "known": {}
+      },
+      "status": {
+        "out": {
+          "retryAfter": 812143233.2366363,
+          "why": "allowanceSpent"
+        }
+      }
+    },
+    {
+      "credentialKey": "grok:sign-in",
+      "entryID": "F7CA85CF-CB2D-4437-839D-FED5E3E21A7E",
+      "learnedFrom": "typedFailure",
+      "rateLimitStreak": [],
+      "since": 812139593.156496,
+      "spent": {
+        "known": {}
+      },
+      "status": {
+        "out": {
+          "retryAfter": 812143193.156496,
+          "why": "allowanceSpent"
+        }
+      }
+    }
+  ],
+  "switches": [
+    {
+      "agentID": "6858BAEB-FED9-43CB-9D60-B52AEF46A550",
+      "at": 812139612.421,
+      "billing": {
+        "allowance": {}
+      },
+      "carried": [
+        {
+          "from": "grok-smart",
+          "name": "Model",
+          "optionID": "model",
+          "source": {
+            "runtimeDefault": {}
+          },
+          "to": "copilot-smart"
+        },
+        {
+          "from": "default",
+          "name": "Mode",
+          "optionID": "mode",
+          "source": {
+            "sameValue": {}
+          },
+          "to": "default"
+        }
+      ],
+      "dropped": [],
+      "from": {
+        "model": "grok-smart",
+        "runtimeID": "grok"
+      },
+      "fromReturnsAt": 812143193.156,
+      "id": "0FE1328E-935C-47FB-B569-83042B6E48D6",
+      "reason": "allowanceSpent",
+      "to": {
+        "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+        "mode": "default",
+        "runtimeID": "copilot"
+      }
+    }
+  ],
+  "titles": [
+    "6858BAEB-FED9-43CB-9D60-B52AEF46A550",
+    "Tidy the README."
+  ],
+  "waiting": []
+}

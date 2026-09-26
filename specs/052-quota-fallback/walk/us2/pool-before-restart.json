@@ -1,0 +1,1 @@
+{"entries":[{"id":"DC5E6CFD-C006-4A1E-9B6B-A69DFE5ECF83","payment":{"allowance":{}},"runtimeID":"copilot"},{"credentialRef":"openAIAPIKey","id":"D99A902A-FDFB-47C0-A80F-71DB8A452B55","payment":{"prepaid":{"amount":{"amount":10,"currency":"USD"}}},"runtimeID":"codex"}],"isOn":true,"levels":[]}

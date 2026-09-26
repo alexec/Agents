@@ -1,0 +1,11 @@
+{
+  "_claude/rateLimit": {
+    "status": "allowed",
+    "resetsAt": 1790007200,
+    "rateLimitType": "five_hour",
+    "utilization": 1.02,
+    "overageStatus": "allowed",
+    "isUsingOverage": true,
+    "overageInUse": true
+  }
+}

@@ -104,6 +104,11 @@ public enum ACP {
         /// `subagent_*`, and everything it says and does arrives under its own session id.
         /// The Agent tool card stops coming, so this is only on where those are routed.
         public var subagentSessions: Bool
+        /// JetBrains' AIR session-failure extension (052, R1). Asked for only where every
+        /// kind of typed failure is read: once asked, Claude and Codex end a refused turn
+        /// with `end_turn` and the failure under `_meta`, and a client that does not read
+        /// it would call the turn done.
+        public var sessionFailures: Bool
 
         public init(readTextFile: Bool = false,
                     writeTextFile: Bool = false,
@@ -116,7 +121,8 @@ public enum ACP {
                     elicitationURL: Bool = false,
                     notices: Bool = false,
                     backgroundTasks: Bool = false,
-                    subagentSessions: Bool = false) {
+                    subagentSessions: Bool = false,
+                    sessionFailures: Bool = false) {
             self.readTextFile = readTextFile
             self.writeTextFile = writeTextFile
             self.terminal = terminal
@@ -129,6 +135,7 @@ public enum ACP {
             self.notices = notices
             self.backgroundTasks = backgroundTasks
             self.subagentSessions = subagentSessions
+            self.sessionFailures = sessionFailures
         }
 
         /// What 001 sent. Kept as a named thing so the change that turns a flag on is
@@ -156,7 +163,8 @@ public enum ACP {
             elicitationURL: true,
             notices: true,
             backgroundTasks: true,
-            subagentSessions: true)
+            subagentSessions: true,
+            sessionFailures: true)
 
         public var wire: JSONValue {
             var caps: [String: JSONValue] = [
@@ -174,9 +182,12 @@ public enum ACP {
             if elicitationForm { elicitation["form"] = .object([:]) }
             if elicitationURL { elicitation["url"] = .object([:]) }
             if !elicitation.isEmpty { caps["elicitation"] = .object(elicitation) }
+            // All of JetBrains' AIR extensions asked for go in one list: 057's background
+            // tasks and subagents, and 052's typed session failures.
             var air: [JSONValue] = []
             if backgroundTasks { air.append("asyncTasks") }
             if subagentSessions { air.append("nativeSubagentSessions") }
+            if sessionFailures { air.append("sessionFailure") }
             if !air.isEmpty {
                 // Version 1 is the only one either adapter reads, and each checks for
                 // `>= 1`, so this is the floor rather than a guess.

@@ -41,6 +41,22 @@ In every column:
   Settings, Agents installs that runtime on the server itself and signs it in with it. See
   [Add a Linux server](../how-to/add-a-linux-server.md).
 
+## When an allowance runs out
+
+With a pool set up, a chat whose runtime's allowance runs out carries on with the next runtime
+in it (see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)).
+That needs the app to recognise the refusal, which it does per runtime:
+
+| Runtime | Spent allowance | Rate limit | When it is back |
+| --- | --- | --- | --- |
+| **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same runtime: after 30 seconds, then 2 minutes. Three in ten minutes counts as spent. | The time Claude's plan window gives. |
+| **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | When Codex says; otherwise it is tried again after an hour. |
+| **Gemini** | Recognised from Google's sentence about the daily quota. On free or prepaid credit, also when the app's count of what it cost reaches the amount, or the credit's date passes. | Recognised from Google's 429. | The free tier: midnight Pacific. Credit: when you mark it available or raise the amount. |
+| **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Tried again after an hour. |
+| **Copilot**, **Cursor**, **Grok** | **Not yet recognised.** A chat on them stops when its allowance runs out, as it always has. They can still be carried on to. | Not yet recognised. | — |
+
+An error the app does not recognise never moves a chat: it stops, as before.
+
 ## What each gets from `~/.agents`
 
 Your own skills, instructions, MCP servers and plugins in `~/.agents` reach each runtime the

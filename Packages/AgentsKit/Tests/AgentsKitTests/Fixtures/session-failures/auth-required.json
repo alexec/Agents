@@ -1,0 +1,17 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:error",
+        "revision": 1,
+        "category": "access",
+        "severity": "error",
+        "title": "Sign in to continue using Claude.",
+        "actions": [
+          "login"
+        ]
+      }
+    }
+  }
+}

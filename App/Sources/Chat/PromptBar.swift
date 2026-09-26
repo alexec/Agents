@@ -87,6 +87,7 @@ struct PromptBar: View {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
                 atItsLimit
+                startingOnOut
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: attachments,
                                     refusal: { $0.refusal(from: model.promptCapabilities) },
@@ -187,6 +188,25 @@ struct PromptBar: View {
         }
     }
 
+    /// A new chat about to start on a runtime that is out (052, US3): said before the
+    /// first prompt, with the first runtime in the pool that is not out.
+    @ViewBuilder
+    private var startingOnOut: some View {
+        if agent == nil, let runtimeID = model.draftRuntimeID,
+           let notice = model.poolStatus?.startingOnOut(runtimeID) {
+            HStack(spacing: 10) {
+                Text(notice.sentence)
+                    .appText(.fine)
+                    .foregroundStyle(StateTint.attention.style(or: .primary))
+                if let instead = notice.instead {
+                    Button("Use \(PoolWords.runtimeName(instead)) instead") { chooseRuntime(instead) }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                }
+            }
+        }
+    }
+
     // MARK: The folder, and what runs in it
 
     /// What a row over the prompt does on a Mac (057): Stop, the subagent's steps in
@@ -217,6 +237,8 @@ struct PromptBar: View {
                 }
                 .task(id: "\(agent.id)-\(agent.state)") { await model.loadProjectFolderBranch(of: agent) }
                 .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
+                Spacer(minLength: 8)
+                ContinueWithMenu(agent: agent)
             } else {
                 Button(action: chooseFolder) {
                     HStack(spacing: 5) {

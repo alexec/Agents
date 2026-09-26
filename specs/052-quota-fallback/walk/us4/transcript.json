@@ -1,0 +1,250 @@
+{
+  "entries": [
+    {
+      "at": 812134684.903,
+      "id": "FB483A0C-EEED-4D1E-960D-49F5883BE853",
+      "kind": {
+        "userMessage": {
+          "_0": "Tidy the README."
+        }
+      }
+    },
+    {
+      "at": 812134684.905,
+      "id": "95921A2C-2E8D-4FDE-9E5F-F13C06C46FCE",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812134684.908,
+      "id": "E63FAD41-ABC5-40BA-94F6-70C6BCC4C97C",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Grok: You've used your plan's allowance for now"
+        }
+      }
+    },
+    {
+      "at": 812134684.911,
+      "id": "EB2FB113-CEA9-43F1-95E3-BC6E0562D885",
+      "kind": {
+        "stateChanged": {
+          "_0": "stopped",
+          "reason": "allowanceSpent"
+        }
+      }
+    },
+    {
+      "at": 812134685.217,
+      "id": "C3D26F40-4F07-4F4A-AC0F-FBE41899E60B",
+      "kind": {
+        "poolSwitch": {
+          "_0": {
+            "agentID": "B2AAA2A7-96E7-41B8-891C-39D774C36618",
+            "at": 812134684.983693,
+            "billing": {
+              "allowance": {}
+            },
+            "carried": [],
+            "dropped": [],
+            "from": {
+              "runtimeID": "grok"
+            },
+            "fromReturnsAt": 812134804,
+            "id": "DF503505-E349-436E-AC35-5357603E5D77",
+            "reason": "allowanceSpent",
+            "to": {
+              "entryID": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+              "runtimeID": "copilot"
+            }
+          }
+        }
+      }
+    },
+    {
+      "at": 812134685.221,
+      "id": "FED5CC64-3F66-427C-BF52-F0672F19C276",
+      "kind": {
+        "handoff": {
+          "characters": 211,
+          "markdown": "# Conversation so far\n\nThis conversation is carried over from Grok, because its allowance ran out. You are continuing it. The files are already as described below: nothing was undone.\n\n**You:** Tidy the README.\n"
+        }
+      }
+    },
+    {
+      "at": 812134685.238,
+      "id": "7B67011B-AA40-4911-BCF0-88CB34A556DC",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812134685.239,
+      "id": "ED412559-E002-4931-8617-55F9FD25EAB7",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Copilot: You've used your plan's allowance for now"
+        }
+      }
+    },
+    {
+      "at": 812134685.248,
+      "id": "250AD678-B442-4939-B12F-CEB3D2E6AA07",
+      "kind": {
+        "stateChanged": {
+          "_0": "stopped",
+          "reason": "allowanceSpent"
+        }
+      }
+    },
+    {
+      "at": 812134685.336,
+      "id": "1445A460-11F8-4687-BAA7-F33F35E53621",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Copilot\u2019s allowance ran out, until 10:58\u202fAM."
+        }
+      }
+    },
+    {
+      "at": 812134685.34,
+      "id": "A27AD56D-BC06-4134-876E-5CB080A18F4F",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Every runtime in the pool is out. This chat waits, and carries on with Grok at 10:00\u202fAM."
+        }
+      }
+    },
+    {
+      "at": 812134806.294,
+      "id": "A675D52D-5BC9-42A4-8CE8-E7972D3E81D4",
+      "kind": {
+        "poolSwitch": {
+          "_0": {
+            "agentID": "B2AAA2A7-96E7-41B8-891C-39D774C36618",
+            "at": 812134806.241912,
+            "billing": {
+              "allowance": {
+                "label": "SuperGrok"
+              }
+            },
+            "carried": [],
+            "dropped": [],
+            "from": {
+              "entryID": "7EB96568-1FA6-46EE-8FB7-61F1B2582F5F",
+              "runtimeID": "copilot"
+            },
+            "fromReturnsAt": 812138285.244074,
+            "id": "8C268505-E914-466D-9D0C-E21116F2565C",
+            "reason": "everyoneOutResumed",
+            "to": {
+              "entryID": "6BDEBAAC-A8F7-4D67-AB83-73A999DB8C75",
+              "runtimeID": "grok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "at": 812134806.295,
+      "id": "E39400FF-6DA8-4EFA-81B6-F10C2831DDE2",
+      "kind": {
+        "handoff": {
+          "characters": 214,
+          "markdown": "# Conversation so far\n\nThis conversation is carried over from Copilot, because its allowance ran out. You are continuing it. The files are already as described below: nothing was undone.\n\n**You:** Tidy the README.\n"
+        }
+      }
+    },
+    {
+      "at": 812134806.297,
+      "id": "3912DB42-40FD-4F85-ACE3-EA2115A43647",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812134806.297,
+      "id": "7DD0F137-FA19-4DAF-951C-5A1E9F135F39",
+      "kind": {
+        "agentMessage": {
+          "text": "grok here. I was handed the conversation so far (214 characters).\n\nYou said: Tidy the README."
+        }
+      }
+    },
+    {
+      "at": 812134806.298,
+      "id": "0514FAC4-1657-48F1-B402-3E7EFB1FB8DC",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    },
+    {
+      "at": 812134806.379,
+      "id": "1259A9DF-C87E-46B3-9869-F8E60156E2C6",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Starting Grok\u2026"
+        }
+      }
+    },
+    {
+      "at": 812134806.398,
+      "id": "32FEBF72-5607-42B2-BF8D-D29982CA1C5C",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Grok no longer has this conversation. Carrying on in a new one; everything above is kept."
+        }
+      }
+    },
+    {
+      "at": 812134806.398,
+      "id": "1318A60C-7664-4388-99E3-77E2D74DEEDE",
+      "kind": {
+        "userMessage": {
+          "_0": "That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done.",
+          "from": "app"
+        }
+      }
+    },
+    {
+      "at": 812134806.399,
+      "id": "DF7B5985-B90A-45E0-9BE8-233DB60A443F",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812134806.399,
+      "id": "E4FD4384-1AB5-43DF-B41B-FF3B5576F45B",
+      "kind": {
+        "agentMessage": {
+          "text": "You said: That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done."
+        }
+      }
+    },
+    {
+      "at": 812134806.4,
+      "id": "4582A608-A202-4AE5-8F37-EF450C96478C",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    }
+  ],
+  "firstIndex": 0,
+  "total": 22
+}

@@ -73,6 +73,12 @@ extension TranscriptEntry.Kind {
             return .stateChanged(state, reason: try? payload["reason"]?.decode(EndedReason.self))
         case "runtimeNote":
             return .runtimeNote(payload["_0"]?.stringValue ?? "")
+        case "poolSwitch", "settingsChanged":
+            guard let record = try? payload["_0"]?.decode(SwitchRecord.self) else { return nil }
+            return name == "poolSwitch" ? .poolSwitch(record) : .settingsChanged(record)
+        case "handoff":
+            return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
+                            characters: payload["characters"]?.intValue ?? 0)
         case "background":
             guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
             return .background(item)
@@ -146,6 +152,12 @@ extension TranscriptEntry.Kind {
             return ["background": ["_0": (try? JSONValue.encoding(item)) ?? .null]]
         case .workReported(let report):
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
+        case .poolSwitch(let record):
+            return ["poolSwitch": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .settingsChanged(let record):
+            return ["settingsChanged": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .handoff(let markdown, let characters):
+            return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.
