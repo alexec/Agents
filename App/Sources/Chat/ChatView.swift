@@ -32,6 +32,13 @@ struct ChatView: View {
                                 OfflineStrip(host: agent.host)
                                 actions(for: agent)
                             }
+                            // On the page's own paper, across the whole pane: the
+                            // transcript scrolls under this strip, and without a ground
+                            // of its own its words showed through between the buttons.
+                            // Kept to the strip's own bounds: a colour's background fills
+                            // the safe area too by default, which here is the transcript.
+                            .frame(maxWidth: .infinity)
+                            .background(Paper.ground, ignoresSafeAreaEdges: [])
                         }
                     form
                 }

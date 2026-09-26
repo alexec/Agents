@@ -94,6 +94,14 @@ struct ChatTranscript: View {
                 .chatColumn()
                 .padding(.vertical, 20)
             }
+            // Open at the foot. A lazy stack built from the top and then jumped to the
+            // end placed the rows it made on the way (the accessibility tree had them,
+            // on screen) but never drew them: a transcript taller than the pane opened
+            // blank until something scrolled it. Starting at the end is what `settle`
+            // was reaching for, and a plain VStack drew it — the laziness is the part
+            // that did not survive the jump. Only where it opens: a transcript shorter
+            // than the pane still sits at the top of it.
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
             // The text stops above the floating prompt, and so does the scrollbar.
             // Insetting the content alone left the bar running the whole height of the
             // pane and disappearing under the glass, where it could be neither read nor

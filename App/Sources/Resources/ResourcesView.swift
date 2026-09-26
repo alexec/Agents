@@ -217,9 +217,6 @@ private struct ResourceRow: View {
 /// comes and goes: absent when nothing is held or waited for.
 struct ResourcesRow: View {
     @Environment(AppModel.self) private var model
-    @Binding var selection: SidebarItem?
-
-    private var isPicked: Bool { selection == .resources }
 
     private var counts: String? {
         guard let resources = model.leases?.resources else { return nil }
@@ -230,24 +227,16 @@ struct ResourcesRow: View {
     }
 
     var body: some View {
-        Button {
-            selection = .resources
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Resources")
-                Spacer()
-                if let counts { Text(counts).monospacedDigit() }
+        HStack(alignment: .firstTextBaseline) {
+            Label("Resources", systemImage: "lock")
+            Spacer()
+            if let counts {
+                Text(counts)
+                    .monospacedDigit()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
             }
-            .appText(.fine)
-            .foregroundStyle(isPicked ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isPicked ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
         .help("Who holds the simulators, browsers and screen, and who is waiting")
     }
 }

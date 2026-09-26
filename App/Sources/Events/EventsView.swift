@@ -254,31 +254,18 @@ private struct WaitingNow: View {
 /// the last thing happened. There is no count: the log is read, it does not ask.
 struct EventsRow: View {
     @Environment(AppModel.self) private var model
-    @Binding var selection: SidebarItem?
-
-    private var isPicked: Bool { selection == .events }
 
     var body: some View {
-        Button {
-            selection = .events
-        } label: {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Events")
-                Spacer()
-                if let last = model.work.lastEventAt {
-                    Text("Last \(LeaseWords.clock(last))").monospacedDigit()
-                }
+        HStack(alignment: .firstTextBaseline) {
+            Label("Events", systemImage: "bolt")
+            Spacer()
+            if let last = model.work.lastEventAt {
+                Text("Last \(LeaseWords.clock(last))")
+                    .monospacedDigit()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
             }
-            .appText(.fine)
-            .foregroundStyle(isPicked ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isPicked ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(Paper.sidebar)
         .help("What happened, what came of it, and who is waiting")
     }
 }
