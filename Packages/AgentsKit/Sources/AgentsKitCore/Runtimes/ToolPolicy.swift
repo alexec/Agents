@@ -208,6 +208,12 @@ public struct ToolPolicy: Hashable, Sendable {
     /// Codex puts ChatGPT before an API key, D1). Methods not named keep their order after
     /// these. Empty keeps the rule for everyone else: the first one without a terminal.
     public var preferredAuthMethods: [String]
+    /// Not offered the client's file reading, so the runtime reads from disk itself; writes
+    /// still come through the app (046). Gemini's `write_file` reads first and treats only
+    /// an error carrying code `ENOENT` as "a new file", which a JSON-RPC error over ACP can
+    /// never carry: every new file it tried to write through the app failed (walk,
+    /// 2026-09-25).
+    public var readsFilesItself: Bool
 
     public init(runtimeID: String,
                 removed: [RemovedTool] = [],
@@ -216,7 +222,8 @@ public struct ToolPolicy: Hashable, Sendable {
                 lever: Lever,
                 environmentFiles: [EnvironmentFile] = [],
                 escalationTool: String? = nil,
-                preferredAuthMethods: [String] = []) {
+                preferredAuthMethods: [String] = [],
+                readsFilesItself: Bool = false) {
         self.runtimeID = runtimeID
         self.removed = removed
         self.kept = kept
@@ -225,6 +232,7 @@ public struct ToolPolicy: Hashable, Sendable {
         self.environmentFiles = environmentFiles
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods
+        self.readsFilesItself = readsFilesItself
     }
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.

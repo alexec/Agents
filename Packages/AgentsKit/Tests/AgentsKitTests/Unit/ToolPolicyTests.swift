@@ -313,4 +313,15 @@ struct ToolPolicyTests {
         #expect(RuntimeCatalog.gemini.usesAppCopyOnly)
         #expect(RuntimeCatalog.gemini.install == .toolset(runtimeID: "gemini"))
     }
+
+    /// Gemini reads files itself, since a missing file over ACP can never read as ENOENT to
+    /// it; it still writes through the app. Nobody else changes (046).
+    @Test func onlyGeminiReadsFilesItself() {
+        let gemini = ProcessSessionLauncher.capabilities(for: ToolPolicyCatalog.gemini)
+        #expect(!gemini.readTextFile)
+        #expect(gemini.writeTextFile)
+        for policy in ToolPolicyCatalog.builtIn where policy.runtimeID != RuntimeCatalog.gemini.id {
+            #expect(ProcessSessionLauncher.capabilities(for: policy) == .app, "\(policy.runtimeID)")
+        }
+    }
 }

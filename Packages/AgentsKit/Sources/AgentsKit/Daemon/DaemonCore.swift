@@ -1091,7 +1091,15 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: LoginShellPath.environment()),
-                                     capabilities: .app)
+                                     capabilities: Self.capabilities(for: policy))
+    }
+
+    /// What the app offers a runtime at the handshake: everything it can serve, less file
+    /// reading for a runtime that must read files itself (046: Gemini).
+    static func capabilities(for policy: ToolPolicy) -> ACP.ClientCapabilities {
+        var capabilities = ACP.ClientCapabilities.app
+        if policy.readsFilesItself { capabilities.readTextFile = false }
+        return capabilities
     }
 
     /// What a runtime is started with: `base` with anything lent (043), the policy's files
