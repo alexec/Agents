@@ -324,4 +324,13 @@ struct ToolPolicyTests {
             #expect(ProcessSessionLauncher.capabilities(for: policy) == .app, "\(policy.runtimeID)")
         }
     }
+
+    /// Claude's own worktree tools would move a session where the app cannot follow (053).
+    @Test func claudeCannotMoveItselfExceptThroughTheApp() throws {
+        let meta = try #require(ToolPolicyCatalog.claude.sessionMeta)
+        let names = try #require(meta["claudeCode"]?["options"]?["disallowedTools"]?.arrayValue).compactMap(\.stringValue)
+        #expect(names.contains("EnterWorktree"))
+        #expect(names.contains("ExitWorktree"))
+        #expect(RemitCategory.workingFolder.instead.contains(AppTool.enterWorktree))
+    }
 }

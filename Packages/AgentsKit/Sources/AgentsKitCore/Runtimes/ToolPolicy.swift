@@ -37,6 +37,8 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
     case artefacts
     /// Offering the person a follow-up prompt.
     case suggestions
+    /// Changing the folder the session works in, or making a worktree to move into (053).
+    case workingFolder
 
     /// What to do instead, said in the one sentence an agent is given.
     ///
@@ -59,6 +61,8 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
             "Put it in the conversation or in a file in this project."
         case .suggestions:
             "Use `\(AppTool.finishTurn)` at the end of the turn."
+        case .workingFolder:
+            "Use `\(AppTool.enterWorktree)` or `\(AppTool.exitWorktree)` to change where you work."
         }
     }
 }

@@ -78,7 +78,8 @@ POLICIES = {
         "removed": ["Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup",
                     "Monitor", "RemoteTrigger", "PushNotification", "Agent", "ListAgents",
                     "SendMessage", "TaskOutput", "TaskStop", "ReportFindings", "DesignSync",
-                    "mcp__claude_ai_Claude_Docs", "mcp__claude_ai_Google_Drive"],
+                    "mcp__claude_ai_Claude_Docs", "mcp__claude_ai_Google_Drive",
+                    "EnterWorktree", "ExitWorktree"],
         "kept": ["AskUserQuestion"],
         "residue": [],
         "meta": {"claudeCode": {"options": {"disallowedTools": None}}},  # filled from removed

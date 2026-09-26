@@ -649,4 +649,49 @@ struct MoveTests {
         #expect(shared?.code == DaemonAPI.Failure.worktreeInUse)
         #expect(FileManager.default.fileExists(atPath: root.path))
     }
+
+    // MARK: The person moves an agent (US3)
+
+    @Test func thePersonsMoveOfAnIdleAgentStartsNoTurn() async throws {
+        let repo = try await repository()
+        let launcher = FakeLauncher()
+        let core = try await makeCore(repo, launcher)
+        let id = try await idleAgent(core, repo)
+        let launchesBefore = launcher.launchCount
+
+        _ = try await personMove(core, id, .newWorktree(name: "quiet"))
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(launcher.launchCount == launchesBefore)
+        #expect(try await appPrompts(core, id).contains(DaemonCore.carryOn) == false)
+        #expect(await core.agent(id)?.state == .finished)
+    }
+
+    @Test func aWaitingMoveCanBeTakenBack() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, _) = try await busyAgent(core, repo, gate, launcher)
+
+        let asked = try await personMove(core, id, .newWorktree(name: "second-thoughts"))
+        #expect(asked.when == .afterTurn)
+        #expect(await core.agent(id)?.pendingMove?.askedBy == .person)
+
+        let cancelled = try await personMove(core, id, nil)
+        #expect(cancelled.message == "Move cancelled.")
+        #expect(await core.agent(id)?.pendingMove == nil)
+        gate.open()
+        await settled(core, id)
+        #expect(await core.agent(id)?.cwd == repo.project)
+        #expect(worktreesMade(repo).isEmpty)
+    }
+
+    @Test func anArchivedAgentIsNotMoved() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let id = try await idleAgent(core, repo)
+        try await core.archive(id)
+        let error = await failure { try await personMove(core, id, .newWorktree(name: nil)) }
+        #expect(error?.message.contains("archived") == true)
+    }
 }

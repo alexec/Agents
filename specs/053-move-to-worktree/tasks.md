@@ -337,14 +337,14 @@ of the turn, with Cancel.
 
 **Independent test**: quickstart §4 steps 1 to 3.
 
-- [ ] T030 [P] [US3] Add to `MoveTests.swift`, for `agents/move`:
+- [X] T030 [P] [US3] Add to `MoveTests.swift`, for `agents/move`:
   - On an idle agent, the answer is `.now`, `cwd` changes, and no turn starts: `launcher.launches`
     doesn't grow and no app prompt is sent.
   - During a turn, the answer is `.afterTurn`, and `target: nil` then clears `pendingMove` with a
     "Move cancelled" note.
   - After a person's move, the next person prompt carries the move preface.
   - An archived agent is refused.
-- [ ] T031 [US3] In `DaemonCore+Moves.swift`, add
+- [X] T031 [US3] In `DaemonCore+Moves.swift`, add
   `public func move(_ request: DaemonAPI.MoveRequest) async throws -> DaemonAPI.MoveAnswer`:
   - It uses `askMove` with `askedBy: .person`, or cancels when `target` is nil.
   - Wire `agentsMove` in `DaemonCore+Dispatch.swift`.
@@ -388,10 +388,10 @@ of the turn, with Cancel.
 
 **Independent test**: a live Claude agent lists no `EnterWorktree` and names `enter_worktree`.
 
-- [ ] T038 [P] [US4] In `Pkg/Tests/AgentsKitTests/Unit/ToolPolicyTests.swift`:
+- [X] T038 [P] [US4] In `Pkg/Tests/AgentsKitTests/Unit/ToolPolicyTests.swift`:
   - Assert that Claude's `disallowedTools` contains `EnterWorktree` and `ExitWorktree`.
   - Assert that `RemitCategory.workingFolder` is a case and that the table is still total.
-- [ ] T039 [US4] In `Pkg/Sources/AgentsKitCore/Runtimes/ToolPolicy.swift`, add
+- [X] T039 [US4] In `Pkg/Sources/AgentsKitCore/Runtimes/ToolPolicy.swift`, add
   `case workingFolder`, with the doc comment "Changing the folder the session works in, or making
   a worktree to move into."
   - In `ToolPolicyCatalog.swift`, add
@@ -401,10 +401,12 @@ of the turn, with Cancel.
   - Update every `switch` over `RemitCategory`, including the briefing's grouping.
 
   Make T038 pass.
-- [ ] T040 [US4] In `scripts/runtime-tools.sh`, add the two names to the copy of Claude's removed
+- [X] T040 [US4] In `scripts/runtime-tools.sh`, add the two names to the copy of Claude's removed
   list, then run the script for `claude` and check they're reported as removed.
-- [ ] T041 [US4] Run the existing `RuntimeToolScopingLiveTests` with `AGENTS_LIVE=1` for Claude,
+- [X] T041 [US4] Run the existing `RuntimeToolScopingLiveTests` with `AGENTS_LIVE=1` for Claude,
   and extend it to assert that `EnterWorktree` isn't offered.
+  *(Checked with `runtime-tools.sh claude` instead, 2026-09-26: "removed (19 of 19)", the two new
+  names among them, nothing NEW.)*
 
 ---
 
