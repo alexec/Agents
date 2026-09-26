@@ -428,6 +428,37 @@ struct AgentsModelTests {
         #expect(model.terminalOutput["t1"]?.hasSuffix("END") == true)
     }
 
+    /// Every agent's output reaches every window; what is kept of it is bounded as a
+    /// whole, the least recently written going first and the watched agent's last.
+    @Test func outputAcrossTerminalsIsBoundedOldestFirstWatchedLast() throws {
+        let model = AgentsModel()
+        let watched = UUID(), other = UUID()
+        model.watching = watched
+        func say(_ agent: UUID, _ terminal: String, _ chunk: String) throws {
+            model.apply(DaemonAPI.Notification.agentTerminalOutput,
+                        try notification(DaemonAPI.TerminalOutputNotification(agentID: agent, terminalID: terminal,
+                                                                             chunk: chunk)))
+        }
+        // Each terminal is kept to its limit, so this many full ones fill the budget.
+        let full = String(repeating: "b", count: AgentsModel.terminalOutputLimit)
+        let fit = AgentsModel.terminalOutputBudget / AgentsModel.terminalOutputLimit
+        try say(watched, "mine", full)
+        for index in 1 ..< fit { try say(other, "o\(index)", full) }
+        #expect(model.terminalOutput.count == fit)
+        // One more over the budget: the oldest not on screen goes, not the older one that is.
+        try say(other, "last", full)
+        #expect(model.terminalOutput["o1"] == nil)
+        #expect(model.terminalOutput["o2"] != nil)
+        #expect(model.terminalOutput["mine"] != nil)
+        #expect(model.terminalOutput.values.reduce(0) { $0 + $1.utf8.count } <= AgentsModel.terminalOutputBudget)
+
+        // And many small ones stop at a count.
+        for index in 0 ..< AgentsModel.terminalsKept + 50 { try say(other, "s\(index)", "x") }
+        #expect(model.terminalOutput.count == AgentsModel.terminalsKept)
+        #expect(model.terminalOutput["mine"] != nil)
+        #expect(model.terminalOutput["s\(AgentsModel.terminalsKept + 49)"] == "x")
+    }
+
 }
 
 @MainActor
