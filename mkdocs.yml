@@ -72,6 +72,8 @@ nav:
       - how-to/archive-park-stop.md
       - how-to/attach-files.md
       - how-to/read-an-agents-changes.md
+      - how-to/follow-a-live-document.md
+      - how-to/wait-for-something.md
   - Reference:
       - reference/index.md
       - reference/statuses.md
@@ -79,6 +81,7 @@ nav:
       - reference/agent-tools.md
       - reference/settings.md
       - reference/workflows.md
+      - reference/events.md
       - reference/keyboard-shortcuts.md
   - Explanation:
       - explanation/index.md
