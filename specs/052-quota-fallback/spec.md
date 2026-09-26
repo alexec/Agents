@@ -128,6 +128,12 @@ the ones they are happy to fall back to and drag them into the order they prefer
 model for an entry where the runtime offers a choice. A runtime that is not installed or not signed
 in cannot be added. With fewer than two runtimes in the pool, nothing switches.
 
+Each entry says how it is paid for. Codex signed in with a ChatGPT plan reads **Allowance**. Gemini
+on an API key reads **Billed per token**. **Add a runtime** offers allowances first. A keyed
+entry is under **Add one billed per token…**, which says plainly that falling back to it costs
+money. The same runtime can be added twice with different credentials, for example Codex on its
+plan early in the list and Codex on a key as a last resort.
+
 **Why this priority**: Without a pool there is nothing to switch to. It ships with Story 1.
 
 **Independent Test**: In Settings, add three runtimes, reorder them, remove one, relaunch the app,
@@ -141,6 +147,13 @@ and check the pool is as it was left. Check an uninstalled runtime is offered as
    new order.
 3. **Given** a runtime in the pool is later signed out or uninstalled, **When** a switch would pick
    it, **Then** it is skipped and the next one is tried.
+4. **Given** the person opens Add a runtime, **When** the list appears, **Then** only allowance
+   entries are offered directly. A keyed entry needs the separate billed-per-token choice, and it
+   shows as Billed per token from then on (FR-001a).
+5. **Given** a pool with Codex on its plan and Codex on a key, **When** the plan runs out, **Then**
+   the plan entry is marked out, the next usable entry in the order is tried (the key entry only
+   when it is reached), and a switch onto the key says in its note that the chat is now billed
+   per token.
 
 ---
 
@@ -148,8 +161,10 @@ and check the pool is as it was left. Check an uninstalled runtime is offered as
 
 The person wants one place to look at the state of their allowances. Beside Events, Resources and
 Spending in the sidebar's Activity section there is a **Pool** row. Its page lists the pool in
-order. Each runtime has a line that reads plainly: *Available*, *Out until 07:00*, *Out since
-02:14, trying again after 03:14*, or *Can't be used: not signed in*. Next to each runtime is how
+order. Each entry shows whether it is an allowance or billed per token, and has a line that reads
+plainly: *Available*, *Rate limited · trying again at 02:21*, *Out until 07:00*, *Out since 02:14,
+trying again after 03:14*, or *Can't be used: not signed in*. A rate limit is not "out": the
+chat stays where it is and nothing moves (FR-006a). Next to each runtime is how
 many chats are on it now. Under the list are the recent switches, newest first: when, which chat,
 from which runtime to which, and why. Each one opens its chat. Any chats waiting for an allowance
 to come back are listed at the top, each with the time it will resume.

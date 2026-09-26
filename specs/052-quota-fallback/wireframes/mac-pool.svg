@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="940" viewBox="0 0 1120 940" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="998" viewBox="0 0 1120 998" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
   <style>
     .t { fill:#1d1d1f; }
     .s { fill:#6e6e73; }
@@ -15,122 +15,129 @@
   </style>
 
   <!-- window -->
-  <rect x="0.5" y="0.5" width="1119" height="939" rx="12" fill="#fff" stroke="#c7c7cc"/>
+  <rect x="0.5" y="0.5" width="1119" height="997" rx="12" fill="#fff" stroke="#c7c7cc"/>
   <rect x="0.5" y="0.5" width="1119" height="40" rx="12" fill="#f5f5f7"/>
   <circle cx="22" cy="20" r="6" fill="#d1d1d6"/><circle cx="42" cy="20" r="6" fill="#d1d1d6"/><circle cx="62" cy="20" r="6" fill="#d1d1d6"/>
 
   <!-- sidebar -->
-  <rect x="0.5" y="40" width="250" height="899" fill="#f5f5f7" stroke="#e5e5ea"/>
+  <rect x="0.5" y="40" width="250" height="957" fill="#f5f5f7" stroke="#e5e5ea"/>
   <text x="20" y="72" class="h">PROJECTS</text>
   <text x="24" y="104" class="r t">Agents</text><text x="220" y="104" class="f s" text-anchor="end">3</text>
   <text x="24" y="136" class="r t">Paper site</text><text x="220" y="136" class="f s" text-anchor="end">1</text>
   <text x="24" y="168" class="r t">alexecollins.com</text><text x="220" y="168" class="f s" text-anchor="end">—</text>
 
-  <text x="20" y="736" class="h">ACTIVITY</text>
-  <text x="24" y="766" class="r t">Events</text>
-  <text x="24" y="798" class="r t">Resources</text>
-  <text x="24" y="830" class="r t">Spending</text>
-  <rect x="12" y="846" width="226" height="44" rx="8" fill="#dcdce1"/>
-  <text x="24" y="865" class="rb t">Pool</text>
-  <circle cx="226" cy="861" r="5" class="out"/>
-  <text x="24" y="882" class="f s">2 out · 3 chats on Codex</text>
-  <text x="20" y="676" class="note">New row, last in Activity. The dot shows</text>
-  <text x="20" y="692" class="note">whenever any runtime in the pool is out</text>
-  <text x="20" y="708" class="note">(FR-024). No count line when none is.</text>
+  <text x="20" y="794" class="h">ACTIVITY</text>
+  <text x="24" y="824" class="r t">Events</text>
+  <text x="24" y="856" class="r t">Resources</text>
+  <text x="24" y="888" class="r t">Spending</text>
+  <rect x="12" y="904" width="226" height="44" rx="8" fill="#dcdce1"/>
+  <text x="24" y="923" class="rb t">Pool</text>
+  <circle cx="226" cy="919" r="5" class="out"/>
+  <text x="24" y="940" class="f s">2 out · 3 chats on Codex</text>
+  <text x="20" y="734" class="note">New row, last in Activity. The dot shows</text>
+  <text x="20" y="750" class="note">whenever any runtime in the pool is out</text>
+  <text x="20" y="766" class="note">(FR-024). No count line when none is.</text>
 
   <!-- detail -->
   <text x="290" y="84" class="title t">Pool</text>
   <text x="1090" y="84" class="f t" text-anchor="end" text-decoration="underline">Edit the pool in Settings ›</text>
-  <text x="290" y="108" class="f s">When a runtime's allowance runs out, its chats carry on with the next one here that isn't out. Nothing is ever paid for by use.</text>
+  <text x="290" y="108" class="f s">When a runtime's allowance runs out, its chats carry on with the next one here that isn't out. Only entries marked Billed per token cost money by use.</text>
 
   <!-- RUNTIMES -->
   <text x="290" y="146" class="h">RUNTIMES, IN ORDER</text>
-  <rect x="290" y="156" width="800" height="224" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <rect x="290" y="156" width="800" height="282" rx="10" fill="#fff" stroke="#e5e5ea"/>
 
   <text x="306" y="186" class="f q">1</text>
   <circle cx="330" cy="181" r="5" class="out"/>
-  <text x="344" y="186" class="rb t">Claude</text>
+  <text x="344" y="186" class="rb t">Claude</text><rect x="400" y="173" width="140" height="18" rx="9" fill="#f2f2f7"/><text x="407" y="186" class="f" fill="#6e6e73">Allowance · Max plan</text>
   <text x="344" y="206" class="f s"><tspan class="out">Out until 07:00</tspan> · ran out 02:03, said so itself · no chats on it</text>
   <rect x="966" y="172" width="108" height="26" rx="6" class="btn"/><text x="1020" y="190" class="f t" text-anchor="middle">Mark available</text>
   <line x1="306" y1="222" x2="1074" y2="222" stroke="#f2f2f7"/>
 
   <text x="306" y="244" class="f q">2</text>
   <circle cx="330" cy="239" r="5" class="out"/>
-  <text x="344" y="244" class="rb t">Copilot</text>
+  <text x="344" y="244" class="rb t">Copilot</text><rect x="404" y="231" width="159" height="18" rx="9" fill="#f2f2f7"/><text x="411" y="244" class="f" fill="#6e6e73">Allowance · Copilot Pro</text>
   <text x="344" y="264" class="f s"><tspan class="out">Out since 02:14</tspan> · gave no time, trying again after 03:14 · no chats on it</text>
   <rect x="966" y="230" width="108" height="26" rx="6" class="btn"/><text x="1020" y="248" class="f t" text-anchor="middle">Mark available</text>
   <line x1="306" y1="280" x2="1074" y2="280" stroke="#f2f2f7"/>
 
   <text x="306" y="302" class="f q">3</text>
   <circle cx="330" cy="297" r="5" fill="#34c759"/>
-  <text x="344" y="302" class="rb t">Codex</text>
+  <text x="344" y="302" class="rb t">Codex</text><rect x="394" y="289" width="165" height="18" rx="9" fill="#f2f2f7"/><text x="401" y="302" class="f" fill="#6e6e73">Allowance · ChatGPT plan</text>
   <text x="344" y="322" class="f s">Available · <tspan class="t" text-decoration="underline">3 chats on it</tspan></text>
   <line x1="306" y1="338" x2="1074" y2="338" stroke="#f2f2f7"/>
 
   <text x="306" y="360" class="f q">4</text>
   <circle cx="330" cy="355" r="5" fill="none" stroke="#aeaeb2"/>
   <text x="344" y="360" class="rb q">Cursor</text>
-  <text x="420" y="360" class="f s">Can't be used: not signed in · skipped</text>
+  <text x="400" y="360" class="f s">Can't be used: not signed in · skipped</text>
   <rect x="990" y="344" width="84" height="26" rx="6" class="btn"/><text x="1032" y="362" class="f t" text-anchor="middle">Sign in…</text>
 
-  <text x="290" y="400" class="note">Chats waiting for an allowance to come back get a card of their own above this list, only while every runtime</text>
-  <text x="290" y="416" class="note">is out: “Fix login · resumes on Claude at 07:00 · Stop waiting”. None now, because Codex is available (FR-022).</text>
+  <line x1="306" y1="378" x2="1074" y2="378" stroke="#f2f2f7"/>
+  <text x="306" y="402" class="f q">5</text>
+  <circle cx="330" cy="397" r="5" fill="#34c759"/>
+  <text x="344" y="402" class="rb t">Codex</text><rect x="394" y="389" width="222" height="18" rx="9" fill="#fdecdf"/><text x="401" y="402" class="f" fill="#c93400">Billed per token · OpenAI API key</text>
+  <text x="344" y="422" class="f s">Available · last resort: only reached when every allowance above is out · no chats on it</text>
+
+  <text x="290" y="458" class="note">Chats waiting for an allowance to come back get a card of their own above this list, only while every runtime</text>
+  <text x="290" y="474" class="note">is out: “Fix login · resumes on Claude at 07:00 · Stop waiting”. None now, because Codex is available (FR-022).</text>
+  <text x="290" y="490" class="note">A short rate limit reads “Rate limited · trying again at 02:21” in place of the state line. It is not out: no dot, nothing moves (FR-006a).</text>
 
   <!-- MATCHING MODELS -->
-  <text x="290" y="456" class="h">MATCHING MODELS</text>
-  <text x="1090" y="456" class="f s" text-anchor="end">A chat switching keeps its row: the new runtime gets that row's model.</text>
-  <rect x="290" y="466" width="800" height="200" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <text x="290" y="514" class="h">MATCHING MODELS</text>
+  <text x="1090" y="514" class="f s" text-anchor="end">Codex on its plan and on a key share one column: same models.</text>
+  <rect x="290" y="524" width="800" height="200" rx="10" fill="#fff" stroke="#e5e5ea"/>
   <!-- header -->
-  <text x="306" y="492" class="fb s">LEVEL</text>
-  <text x="456" y="492" class="fb s">CLAUDE</text>
-  <text x="614" y="492" class="fb s">COPILOT</text>
-  <text x="772" y="492" class="fb s">CODEX</text>
-  <text x="930" y="492" class="fb q">CURSOR</text>
-  <line x1="306" y1="502" x2="1074" y2="502" stroke="#e5e5ea"/>
+  <text x="306" y="550" class="fb s">LEVEL</text>
+  <text x="456" y="550" class="fb s">CLAUDE</text>
+  <text x="614" y="550" class="fb s">COPILOT</text>
+  <text x="772" y="550" class="fb s">CODEX</text>
+  <text x="930" y="550" class="fb q">CURSOR</text>
+  <line x1="306" y1="560" x2="1074" y2="560" stroke="#e5e5ea"/>
   <!-- row 1 -->
-  <text x="306" y="528" class="rb t">Strongest</text>
-  <rect x="450" y="512" width="148" height="28" rx="6" class="btn"/><text x="460" y="530" class="f t">Opus 5.5 · high</text><text x="588" y="530" class="f q" text-anchor="end">▾</text>
-  <rect x="608" y="512" width="148" height="28" rx="6" class="btn"/><text x="618" y="530" class="f t">Opus 5.5 (Copilot)</text><text x="746" y="530" class="f q" text-anchor="end">▾</text>
-  <rect x="766" y="512" width="148" height="28" rx="6" class="btn"/><text x="776" y="530" class="f t">GPT-5 Codex · high</text><text x="904" y="530" class="f q" text-anchor="end">▾</text>
-  <rect x="924" y="512" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="530" class="f q">Choose…</text>
-  <line x1="306" y1="550" x2="1074" y2="550" stroke="#f2f2f7"/>
+  <text x="306" y="586" class="rb t">Strongest</text>
+  <rect x="450" y="570" width="148" height="28" rx="6" class="btn"/><text x="460" y="588" class="f t">Opus 5.5 · high</text><text x="588" y="588" class="f q" text-anchor="end">▾</text>
+  <rect x="608" y="570" width="148" height="28" rx="6" class="btn"/><text x="618" y="588" class="f t">Opus 5.5 (Copilot)</text><text x="746" y="588" class="f q" text-anchor="end">▾</text>
+  <rect x="766" y="570" width="148" height="28" rx="6" class="btn"/><text x="776" y="588" class="f t">GPT-5 Codex · high</text><text x="904" y="588" class="f q" text-anchor="end">▾</text>
+  <rect x="924" y="570" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="588" class="f q">Choose…</text>
+  <line x1="306" y1="608" x2="1074" y2="608" stroke="#f2f2f7"/>
   <!-- row 2 -->
-  <text x="306" y="576" class="rb t">Everyday</text>
-  <rect x="450" y="560" width="148" height="28" rx="6" class="btn"/><text x="460" y="578" class="f t">Sonnet 5</text><text x="588" y="578" class="f q" text-anchor="end">▾</text>
-  <rect x="608" y="560" width="148" height="28" rx="6" class="btn"/><text x="618" y="578" class="f t">GPT-5</text><text x="746" y="578" class="f q" text-anchor="end">▾</text>
-  <rect x="766" y="560" width="148" height="28" rx="6" class="btn"/><text x="776" y="578" class="f t">GPT-5 Codex · medium</text><text x="904" y="578" class="f q" text-anchor="end">▾</text>
-  <rect x="924" y="560" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="578" class="f q">Choose…</text>
-  <line x1="306" y1="598" x2="1074" y2="598" stroke="#f2f2f7"/>
+  <text x="306" y="634" class="rb t">Everyday</text>
+  <rect x="450" y="618" width="148" height="28" rx="6" class="btn"/><text x="460" y="636" class="f t">Sonnet 5</text><text x="588" y="636" class="f q" text-anchor="end">▾</text>
+  <rect x="608" y="618" width="148" height="28" rx="6" class="btn"/><text x="618" y="636" class="f t">GPT-5</text><text x="746" y="636" class="f q" text-anchor="end">▾</text>
+  <rect x="766" y="618" width="148" height="28" rx="6" class="btn"/><text x="776" y="636" class="f t">GPT-5 Codex · medium</text><text x="904" y="636" class="f q" text-anchor="end">▾</text>
+  <rect x="924" y="618" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="636" class="f q">Choose…</text>
+  <line x1="306" y1="656" x2="1074" y2="656" stroke="#f2f2f7"/>
   <!-- row 3 -->
-  <text x="306" y="624" class="rb t">Cheap and fast</text>
-  <rect x="450" y="608" width="148" height="28" rx="6" class="btn"/><text x="460" y="626" class="f t">Haiku 4.5</text><text x="588" y="626" class="f q" text-anchor="end">▾</text>
-  <rect x="608" y="608" width="148" height="28" rx="6" fill="#fafafa" stroke="#e5e5ea"/><text x="618" y="626" class="f q" text-decoration="line-through">GPT-4.1</text><text x="672" y="626" class="f out">gone</text>
-  <rect x="766" y="608" width="148" height="28" rx="6" class="btn"/><text x="776" y="626" class="f t">GPT-5 Codex · low</text><text x="904" y="626" class="f q" text-anchor="end">▾</text>
-  <rect x="924" y="608" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="626" class="f q">Choose…</text>
-  <text x="306" y="656" class="f t" text-decoration="underline">+ Add a level</text>
-  <text x="450" y="656" class="f s">Levels drag to reorder. A model sits in one level per runtime.</text>
+  <text x="306" y="682" class="rb t">Cheap and fast</text>
+  <rect x="450" y="666" width="148" height="28" rx="6" class="btn"/><text x="460" y="684" class="f t">Haiku 4.5</text><text x="588" y="684" class="f q" text-anchor="end">▾</text>
+  <rect x="608" y="666" width="148" height="28" rx="6" fill="#fafafa" stroke="#e5e5ea"/><text x="618" y="684" class="f q" text-decoration="line-through">GPT-4.1</text><text x="672" y="684" class="f out">gone</text>
+  <rect x="766" y="666" width="148" height="28" rx="6" class="btn"/><text x="776" y="684" class="f t">GPT-5 Codex · low</text><text x="904" y="684" class="f q" text-anchor="end">▾</text>
+  <rect x="924" y="666" width="148" height="28" rx="6" fill="#fff" stroke="#e5e5ea" stroke-dasharray="3 3"/><text x="934" y="684" class="f q">Choose…</text>
+  <text x="306" y="714" class="f t" text-decoration="underline">+ Add a level</text>
+  <text x="450" y="714" class="f s">Levels drag to reorder. A model sits in one level per runtime.</text>
 
-  <text x="290" y="686" class="note">Columns follow the pool's order and gain one when a runtime is added (FR-033). Menus list what each runtime</text>
-  <text x="290" y="702" class="note">offers, asked for without starting a chat; Cursor's can still be filled in while it is signed out, from its last list.</text>
-  <text x="290" y="718" class="note">“gone”: Copilot stopped offering GPT-4.1. The cell is kept so the person sees it, and never used (FR-031).</text>
+  <text x="290" y="744" class="note">Columns follow the pool's order and gain one when a runtime is added (FR-033). Menus list what each runtime</text>
+  <text x="290" y="760" class="note">offers, asked for without starting a chat; Cursor's can still be filled in while it is signed out, from its last list.</text>
+  <text x="290" y="776" class="note">“gone”: Copilot stopped offering GPT-4.1. The cell is kept so the person sees it, and never used (FR-031).</text>
 
   <!-- RECENT SWITCHES -->
-  <text x="290" y="756" class="h">RECENT SWITCHES</text>
-  <rect x="290" y="766" width="800" height="130" rx="10" fill="#fff" stroke="#e5e5ea"/>
-  <text x="306" y="792" class="f s">02:14</text>
-  <text x="360" y="792" class="rb t" text-decoration="underline">Docs pass</text>
-  <text x="440" y="792" class="r t">Copilot → Codex</text>
-  <text x="560" y="792" class="f s">Copilot's allowance ran out · GPT-5 Codex · medium, from Everyday</text>
-  <line x1="306" y1="806" x2="1074" y2="806" stroke="#f2f2f7"/>
-  <text x="306" y="830" class="f s">02:03</text>
-  <text x="360" y="830" class="rb t" text-decoration="underline">Fix login</text>
-  <text x="440" y="830" class="r t">Claude → Codex</text>
-  <text x="560" y="830" class="f s">Claude's allowance ran out · GPT-5 Codex · high, from Strongest</text>
-  <line x1="306" y1="844" x2="1074" y2="844" stroke="#f2f2f7"/>
-  <text x="306" y="868" class="f s">Yesterday</text>
-  <text x="378" y="868" class="rb t" text-decoration="underline">Spec 051</text>
-  <text x="450" y="868" class="r t">Codex → Claude</text>
-  <text x="570" y="868" class="f s">By you · Opus 5.5 · high, chosen on the sheet</text>
-  <text x="306" y="918" class="f t" text-decoration="underline">Show the last 30 days</text>
-  <text x="480" y="918" class="note">Each chat name opens its chat (FR-021).</text>
+  <text x="290" y="814" class="h">RECENT SWITCHES</text>
+  <rect x="290" y="824" width="800" height="130" rx="10" fill="#fff" stroke="#e5e5ea"/>
+  <text x="306" y="850" class="f s">02:14</text>
+  <text x="360" y="850" class="rb t" text-decoration="underline">Docs pass</text>
+  <text x="440" y="850" class="r t">Copilot → Codex</text>
+  <text x="560" y="850" class="f s">Copilot's allowance ran out · GPT-5 Codex · medium, from Everyday</text>
+  <line x1="306" y1="864" x2="1074" y2="864" stroke="#f2f2f7"/>
+  <text x="306" y="888" class="f s">02:03</text>
+  <text x="360" y="888" class="rb t" text-decoration="underline">Fix login</text>
+  <text x="440" y="888" class="r t">Claude → Codex</text>
+  <text x="560" y="888" class="f s">Claude's allowance ran out · GPT-5 Codex · high, from Strongest</text>
+  <line x1="306" y1="902" x2="1074" y2="902" stroke="#f2f2f7"/>
+  <text x="306" y="926" class="f s">Yesterday</text>
+  <text x="378" y="926" class="rb t" text-decoration="underline">Spec 051</text>
+  <text x="450" y="926" class="r t">Codex → Claude</text>
+  <text x="570" y="926" class="f s">By you · Opus 5.5 · high, chosen on the sheet</text>
+  <text x="306" y="976" class="f t" text-decoration="underline">Show the last 30 days</text>
+  <text x="480" y="976" class="note">Each chat name opens its chat (FR-021).</text>
 </svg>
