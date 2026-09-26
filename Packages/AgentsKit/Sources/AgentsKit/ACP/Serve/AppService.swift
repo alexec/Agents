@@ -90,13 +90,18 @@ public actor AppService {
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
     /// refused here if it is not, so the agent hears it before the call goes further.
+    /// And, on `finish_turn` alone, where the agent asked to be put once the turn is
+    /// over — carried here so the sink's shape stays as it was.
     public struct BlockWords: Sendable, Equatable {
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
+        public var afterwards: AfterTurn?
 
-        public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
+        public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
+                    afterwards: AfterTurn? = nil) {
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
+            self.afterwards = afterwards
         }
 
         public static let none = BlockWords()
@@ -284,9 +289,13 @@ public actor AppService {
                 let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
                 let prompts = SuggestedPrompt.next(one: arguments?["next_prompt"],
                                                    orFirstOf: arguments?["next_prompts"])
-                let words: BlockWords
+                var words: BlockWords
                 switch Self.blockWords(raw, arguments) {
                 case .success(let read): words = read
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                }
+                switch Self.afterwards(raw, arguments) {
+                case .success(let read): words.afterwards = read
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 }
                 return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
@@ -546,6 +555,21 @@ public actor AppService {
         }
         return .success(BlockWords(waitingOn: names, checkAgainInMinutes: minutes))
     }
+    /// Where the agent asked to be put once the turn is over, read and checked against
+    /// the outcome — here and again at the daemon, as the block's words are. Left out,
+    /// or null, is where its ending puts it.
+    static func afterwards(_ outcome: String, _ arguments: JSONValue?)
+        -> Result<AfterTurn?, AgentCallProblem> {
+        guard let value = arguments?["afterwards"], value != .null else { return .success(nil) }
+        guard let after = value.stringValue.flatMap(AfterTurn.init(wire:)) else {
+            return .failure(AgentCallProblem(stringLiteral: AfterTurn.unknown))
+        }
+        guard let ending = WorkOutcome(wire: outcome), after.goes(with: ending) else {
+            return .failure(AgentCallProblem(stringLiteral: after.refusal))
+        }
+        return .success(after)
+    }
+
     static let noWords = """
         Nothing was recorded: say in a sentence how it went. An outcome with no words \
         is no more use than the turn simply ending.
@@ -625,6 +649,13 @@ public actor AppService {
             Leave it out only if there is genuinely nothing worth asking next. Say \
             nothing in your reply about having called this.
 
+            When you have finished and cleaned up after yourself — merged, removed \
+            what you made — you may ask to be parked (put down, to come back to) or \
+            archived (over, put away) once this turn ends, with afterwards. Archive \
+            goes only with done or nothing_to_do; park also with partly_done. Leave \
+            it out and the conversation stays where its ending puts it. If the person \
+            sends something before the turn is over, the ask is dropped.
+
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
             wait. It is how you end.
@@ -669,6 +700,16 @@ public actor AppService {
                     "description": """
                         Only with blocked. When to be resumed anyway, to check on \
                         something the app can't see, like a CI run or a review.
+                        """,
+                ],
+                "afterwards": [
+                    "type": "string",
+                    "enum": .array(["park", "archive"]),
+                    "description": """
+                        Once this turn ends: park to put the conversation down to come \
+                        back to, archive when it is over and cleaned up. Archive only \
+                        with done or nothing_to_do; park also with partly_done. Leave \
+                        out to stay where the ending puts it.
                         """,
                 ],
                 // One, since 031. The list this replaced is still read by the

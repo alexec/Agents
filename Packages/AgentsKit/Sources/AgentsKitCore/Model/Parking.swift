@@ -39,3 +39,42 @@ public extension Agent {
         return state == .archived ? nil : .park
     }
 }
+
+/// Where an agent asked, on the call that ended its turn, to be put once the turn is
+/// over: parked, to come back to, or archived, because it is over. Asked by the agent
+/// and done by the daemon, only once the turn has really ended — never cutting it off.
+public enum AfterTurn: String, Codable, Hashable, Sendable {
+    case park
+    case archive
+
+    /// What an agent sent, if it is one of the two. Anything else is refused rather
+    /// than read as neither: an ask the agent thinks it made and did not is worse
+    /// than being told.
+    public init?(wire: String) {
+        self.init(rawValue: wire.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Whether it may go with an ending. Archiving hides the chat, so only an ending
+    /// that leaves nothing for anyone may ask for it. Parking keeps it to come back
+    /// to, so `partly_done` may too — but not an ending that asks the person for
+    /// something (a parked chat asks for nothing), nor `blocked` (a parked chat never
+    /// wakes, and a blocked one has to).
+    public func goes(with outcome: WorkOutcome) -> Bool {
+        switch (self, outcome) {
+        case (.archive, .done), (.archive, .nothingToDo): return true
+        case (.park, .done), (.park, .nothingToDo), (.park, .partlyDone): return true
+        default: return false
+        }
+    }
+
+    /// Said when `goes(with:)` is false, by both the service and the daemon.
+    public var refusal: String {
+        switch self {
+        case .archive: return "Nothing was recorded: archive only goes with done or nothing_to_do."
+        case .park: return "Nothing was recorded: park only goes with done, nothing_to_do or partly_done."
+        }
+    }
+
+    /// Said when `afterwards` is neither word.
+    public static let unknown = "Nothing was recorded: afterwards has to be park or archive."
+}

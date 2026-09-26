@@ -25,6 +25,27 @@ struct ParkingRecordTests {
         #expect(try StoreCoding.decoder.decode(Agent.self, from: written).parking == nil)
     }
 
+    @Test(arguments: [AfterTurn.park, .archive])
+    func anAskToBePutAwaySurvivesBeingSaved(_ after: AfterTurn) throws {
+        var agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"))
+        agent.afterTurn = after
+        let read = try StoreCoding.decoder.decode(Agent.self, from: StoreCoding.encoder.encode(agent))
+        #expect(read.afterTurn == after)
+        #expect(read.unknownFields.isEmpty, "a known key, not a stray one")
+    }
+
+    @Test func aRecordWithNoAskOrOneFromANewerBuildAskedForNothing() throws {
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp"))
+        let written = try StoreCoding.encoder.encode(agent)
+        var json = try #require(try JSONSerialization.jsonObject(with: written) as? [String: Any])
+        #expect(json["afterTurn"] == nil, "written only when there is one")
+        #expect(try StoreCoding.decoder.decode(Agent.self, from: written).afterTurn == nil)
+
+        json["afterTurn"] = "somethingNewer"
+        let newer = try StoreCoding.decoder.decode(Agent.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(newer.afterTurn == nil)
+    }
+
     /// A group this build has never heard of is dropped, not fatal — a plain
     /// `[AgentGroup: Int]` decode throws, and took every project with it (R7).
     @Test func projectCountsWithAGroupFromANewerBuildStillOpen() throws {

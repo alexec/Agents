@@ -102,6 +102,13 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// unparks, and archiving clears it.
     public var parking: Parking?
 
+    /// Where the agent asked, on the call that ended its turn, to be put once that
+    /// turn is really over: parked, or archived. Absent is where its ending puts it.
+    /// Written only by `finish_turn`, and cleared when the turn ends, is stopped, or
+    /// the person sends something — a turn ending any other way than its own, or work
+    /// moved on by the person, is not what the ask was about.
+    public var afterTurn: AfterTurn?
+
     /// Whether the title is the agent's own, given with the call that ends its turn.
     ///
     /// Once it is, a title from the runtime no longer replaces it. That is not a
@@ -174,10 +181,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     public var folderScope: FolderScope { FolderScope(folders: [cwd] + additionalDirectories) }
 
-    /// Only `byUser` exists in this feature: nothing archives itself.
+    /// Why an archived agent was archived: by the person, or by an agent.
     public enum ArchivedReason: String, Codable, Hashable, Sendable {
         case byUser
-        /// Put away by the agent that started it (028).
+        /// Put away by an agent — the one that started it (028), or itself, as it
+        /// asked on the call that ended its turn.
         case byAgent
 
         /// Archived for a reason this build does not know is still archived.
@@ -290,6 +298,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
         // New in 040. A record written before it was never parked.
         parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
+        // New with self-archiving. A record from before never asked; one from a
+        // newer build asking for something this one does not know asked for nothing.
+        afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -347,6 +358,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         try c.encodeIfPresent(parking, forKey: .parking)
+        try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -369,6 +381,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case report, outcomeAsked
         case titledByAgent
         case parking
+        case afterTurn
     }
 
     struct AnyKey: CodingKey {
@@ -415,6 +428,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 outcomeAsked: Bool = false,
                 titledByAgent: Bool = false,
                 parking: Parking? = nil,
+                afterTurn: AfterTurn? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -453,6 +467,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.outcomeAsked = outcomeAsked
         self.titledByAgent = titledByAgent
         self.parking = parking
+        self.afterTurn = afterTurn
         self.unknownFields = unknownFields
     }
 

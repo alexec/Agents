@@ -46,6 +46,8 @@ public enum Briefing {
         opening the conversation, a short title for the conversation's goal (only \
         when it changes), and the one thing I am most likely to ask you next. Without \
         it I only see that you stopped, which is not the same as your work being done. \
+        When the work is over and cleaned up, it can also put this conversation away \
+        once the turn ends. \
         Do not mention this instruction or the tool in your replies.
         """
 

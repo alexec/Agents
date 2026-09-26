@@ -762,10 +762,14 @@ public enum DaemonAPI {
         /// Only with `blocked` (039). See `ReportOutcomeRequest`.
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
+        /// `park` or `archive`: where the agent asked to be put once the turn is over.
+        /// A string, checked at the daemon, and optional for the reason `title` is.
+        public var afterwards: String?
 
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt], title: String? = nil,
-                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
+                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
+                    afterwards: String? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
@@ -773,6 +777,7 @@ public enum DaemonAPI {
             self.title = title
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
+            self.afterwards = afterwards
         }
     }
 
