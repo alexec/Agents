@@ -42,25 +42,25 @@ public struct ToolsetInstaller: Sendable {
 
     /// Whether a whole toolset with this id is already on the server, beside `current` or
     /// as it: an update installed earlier and still waiting to be swapped in.
-    public func isInstalled(_ id: String) async -> Bool {
+    public func isInstalled(_ id: String, runtimeID: String = RuntimeCatalog.claude.id) async -> Bool {
         let out = try? await ssh.run(ssh.runArguments(
-            "[ -f \"$HOME/\(Toolset.serverFolder(runtimeID: "claude"))/\(id)/ok\" ]"))
+            "[ -f \"$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))/\(id)/ok\" ]"))
         return out?.status == 0
     }
 
     /// Point `current` at an installed toolset. Last, and on its own, so an update can wait
     /// for a turn to end between installing and swapping.
-    public func swap(to id: String) async throws {
+    public func swap(to id: String, runtimeID: String = RuntimeCatalog.claude.id) async throws {
         try await check("""
-            set -e; T="$HOME/\(Toolset.serverFolder(runtimeID: "claude"))"; \
+            set -e; T="$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))"; \
             [ -f "$T/\(id)/ok" ]; ln -sfn \(ServerInstaller.quote(id)) "$T/current"
             """)
     }
 
     /// Remove every toolset but this one. After a good start on it, never with the swap.
-    public func removeOthers(except id: String) async throws {
+    public func removeOthers(except id: String, runtimeID: String = RuntimeCatalog.claude.id) async throws {
         try await check("""
-            T="$HOME/\(Toolset.serverFolder(runtimeID: "claude"))"; cd "$T" 2>/dev/null || exit 0; \
+            T="$HOME/\(Toolset.serverFolder(runtimeID: runtimeID))"; cd "$T" 2>/dev/null || exit 0; \
             for d in */ .part-*; do d=${d%/}; [ -e "$d" ] || continue; \
             [ "$d" = \(ServerInstaller.quote(id)) ] || [ "$d" = current ] || rm -rf -- "$d"; done
             """)
@@ -79,7 +79,7 @@ public struct ToolsetInstaller: Sendable {
         let npm = Toolset.npmCIArguments.joined(separator: " ")
         let shim = toolset.shimLines.map { "'\($0)'" }.joined(separator: " ")
         return """
-            set -e; umask 077; T="$HOME/\(Toolset.serverFolder(runtimeID: "claude"))"; P="$T/.part-\(id)"; \
+            set -e; umask 077; T="$HOME/\(Toolset.serverFolder(runtimeID: manifest.runtimeID))"; P="$T/.part-\(id)"; \
             mkdir -p "$T"; chmod 700 "$HOME/.agents-server" "$HOME/.agents-server/tools" "$T" 2>/dev/null || true; \
             rm -rf "$P"; mkdir -p "$P/lib"; trap 'rm -rf "$P"' EXIT; cd "$P"; \
             tar -xf - -C lib; mv lib/\(Toolset.manifestFile) .; \
@@ -90,8 +90,8 @@ public struct ToolsetInstaller: Sendable {
             PATH="$P/node/bin:$PATH" npm \(npm) --prefix "$P/lib" \
             --cache "$P/.npm" >"$P/npm.log" 2>&1 || { tail -5 "$P/npm.log" >&2; exit 23; }; \
             rm -rf "$P/.npm" "$P/npm.log"; mkdir "$P/bin"; \
-            printf '%s\\n' \(shim) > "$P/bin/npx"; \
-            chmod 700 "$P/bin/npx"; : > "$P/ok"; \
+            printf '%s\\n' \(shim) > "$P/bin/\(toolset.shimName)"; \
+            chmod 700 "$P/bin/\(toolset.shimName)"; : > "$P/ok"; \
             rm -rf "$T/\(id)"; trap - EXIT; mv "$P" "$T/\(id)"
             """
     }

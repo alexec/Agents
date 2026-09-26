@@ -2,8 +2,8 @@ import Foundation
 
 /// Reading and writing files on an agent's behalf.
 ///
-/// Only Grok asks for this today, and only once the app says it can: with the
-/// capability off it does its own file IO and we see nothing. That is the whole reason
+/// Grok and Gemini ask for this, and only once the app says it can: with the capability
+/// off they do their own file IO and we see nothing. That is the whole reason
 /// to serve it, and it is also why every path goes through `FolderScope` first.
 public struct FileService: Sendable {
     public enum ReadOutcome: Sendable {
@@ -41,6 +41,10 @@ public struct FileService: Sendable {
     public func read(path: String, line: Int?, limit: Int?) -> ReadOutcome {
         guard scope.allows(path) else { return .refused(scope.refusal(for: path)) }
         guard let contents = try? String(contentsOf: URL(filePath: path), encoding: .utf8) else {
+            // A file that is not there yet is said in the protocol's own words: Gemini's
+            // write_file reads first and takes "Resource not found" to mean a new file,
+            // where anything else fails the write (046, walk 2026-09-25).
+            guard FileManager.default.fileExists(atPath: path) else { return .failed("Resource not found: \(path)") }
             return .failed("There is nothing readable at \(path)")
         }
         guard line != nil || limit != nil else { return .read(contents) }

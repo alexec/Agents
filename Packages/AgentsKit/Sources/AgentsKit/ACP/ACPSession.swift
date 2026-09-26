@@ -71,6 +71,12 @@ public actor ACPSession {
     /// says we can serve one.
     public let capabilities: ACP.ClientCapabilities
 
+    /// Signed in with this method when picking a conversation back up is refused as not
+    /// signed in, then tried once more (046). Gemini CLI answers `session/load` with
+    /// "Authentication required" until `authenticate` has been called, key in the
+    /// environment or not, where `session/new` needs no such call.
+    public let authMethodBeforeContinuing: String?
+
     public private(set) var sessionID: String?
     public private(set) var options: [ConfigOption] = []
     public private(set) var commands: [SlashCommand] = []
@@ -111,9 +117,11 @@ public actor ACPSession {
 
     public init(transport: any LineTransport,
                 process: RuntimeProcess? = nil,
-                capabilities: ACP.ClientCapabilities = .none) {
+                capabilities: ACP.ClientCapabilities = .none,
+                authMethodBeforeContinuing: String? = nil) {
         let box = self.box
         self.capabilities = capabilities
+        self.authMethodBeforeContinuing = authMethodBeforeContinuing
         self.connection = JSONRPCConnection(transport: transport) { method, params in
             await box.handle(method: method, params: params)
         }
@@ -161,7 +169,7 @@ public actor ACPSession {
         sessionID = decoded.sessionId
         // Read outside the decode on purpose: a shape we cannot read inside the
         // options list costs that option, never the session.
-        options = ConfigOption.list(in: result["configOptions"])
+        adoptOptions(from: result)
         return decoded
     }
 
@@ -183,17 +191,31 @@ public actor ACPSession {
         let canResume = initializeResult?.supportsResume ?? false
         let canLoad = initializeResult?.supportsLoad ?? false
         guard canResume || canLoad else { throw ACPSessionError.cannotResumeOrLoad }
-
         do {
-            if canResume {
-                _ = try await connection.call(ACP.Method.resumeSession, params)
-            } else {
-                try await load(params)
+            try await pickUp(params, resuming: canResume)
+        } catch let error as JSONRPCError where error.code == -32000 && authMethodBeforeContinuing != nil {
+            // Signed in only when refused, and then once (Alex, 2026-09-25): Gemini records
+            // the sign-in type in its own settings when asked to sign in, so someone who
+            // never needed it is never touched.
+            do {
+                try await authenticate(methodID: authMethodBeforeContinuing!)
+                try await pickUp(params, resuming: canResume)
+            } catch let error as JSONRPCError {
+                throw ACPSessionError.sessionGone(error)
             }
         } catch let error as JSONRPCError {
             throw ACPSessionError.sessionGone(error)
         }
         sessionID = id
+    }
+
+    private func pickUp(_ params: JSONValue, resuming: Bool) async throws {
+        if resuming {
+            let result = try await connection.call(ACP.Method.resumeSession, params)
+            adoptOptions(from: result)
+        } else {
+            try await load(params)
+        }
     }
 
     /// Load, with the replay it brings suppressed until the last of it has been dealt
@@ -216,7 +238,8 @@ public actor ACPSession {
         isReplaying = true
         defer { isReplaying = false }
         do {
-            _ = try await connection.call(ACP.Method.loadSession, params)
+            let result = try await connection.call(ACP.Method.loadSession, params)
+            adoptOptions(from: result)
         } catch {
             // Drained on the way out too: whatever the runtime managed to replay
             // before it gave up is still in the stream, and is still not ours to keep.
@@ -369,7 +392,7 @@ public actor ACPSession {
         let raw = decoded?.stopReason
         return TurnResult(reason: raw.flatMap(EndedReason.init(stopReason:)),
                           rawStopReason: raw,
-                          usage: Self.turnUsage(in: result["usage"]))
+                          usage: Self.turnUsage(in: result["usage"]) ?? Self.quotaUsage(in: result["_meta"]?["quota"]))
     }
 
     /// What the turn consumed, where the runtime said. Read from the raw value rather
@@ -380,6 +403,17 @@ public actor ACPSession {
         return usage
     }
 
+    /// Gemini's way (046, R7): no `usage`, but `_meta.quota.token_count` with its input and
+    /// output tokens on every ending. Tokens only; Gemini names no cost, so none is made up.
+    static func quotaUsage(in quota: JSONValue?) -> TurnUsage? {
+        guard let count = quota?["token_count"],
+              let input = count["input_tokens"]?.intValue,
+              let output = count["output_tokens"]?.intValue else { return nil }
+        // A slash command Gemini handled itself reports zeros: nothing was consumed.
+        guard input + output > 0 else { return nil }
+        return TurnUsage(totalTokens: input + output, inputTokens: input, outputTokens: output)
+    }
+
     /// A notification: the turn's own reply comes back as `cancelled` once the runtime
     /// has stopped what it was doing.
     public func cancel() async {
@@ -387,9 +421,72 @@ public actor ACPSession {
         try? connection.notify(ACP.Method.cancel, ["sessionId": .string(sessionID)])
     }
 
+    /// The options a session answer carries: its `configOptions`, or, from a runtime that
+    /// sends none, its older `models` and `modes` made into the same two menus (046:
+    /// Gemini CLI advertises only those, and sets them with `session/set_model` and
+    /// `session/set_mode`).
+    private func adoptOptions(from result: JSONValue) {
+        let advertised = ConfigOption.list(in: result["configOptions"])
+        if !advertised.isEmpty {
+            options = advertised
+            olderStyle = []
+            return
+        }
+        let older = Self.olderStyleOptions(in: result)
+        if !older.isEmpty {
+            options = older
+            olderStyle = Set(older.map(\.id))
+        }
+    }
+
+    /// The ids in `options` that are set the older way, not with `set_config_option`.
+    private var olderStyle: Set<String> = []
+
+    static let modelOption = "model"
+    static let modeOption = "mode"
+
+    /// A session answer's `models` and `modes` as options, for a runtime that advertises
+    /// no `configOptions`. Keyed `model` and `mode`, in those categories, as the menus
+    /// and the workflow settings already look for.
+    static func olderStyleOptions(in result: JSONValue) -> [ConfigOption] {
+        var made: [ConfigOption] = []
+        if let modes = result["modes"], case .array(let available)? = modes["availableModes"] {
+            let choices = available.compactMap { mode -> ConfigChoice? in
+                guard let id = mode["id"]?.stringValue else { return nil }
+                return ConfigChoice(value: .string(id), name: mode["name"]?.stringValue ?? id,
+                                    description: mode["description"]?.stringValue)
+            }
+            if !choices.isEmpty {
+                made.append(ConfigOption(id: modeOption, name: "Mode", category: "mode", type: "select",
+                                         currentValue: modes["currentModeId"], options: choices))
+            }
+        }
+        if let models = result["models"], case .array(let available)? = models["availableModels"] {
+            let choices = available.compactMap { model -> ConfigChoice? in
+                guard let id = model["modelId"]?.stringValue else { return nil }
+                return ConfigChoice(value: .string(id), name: model["name"]?.stringValue ?? id,
+                                    description: model["description"]?.stringValue)
+            }
+            if !choices.isEmpty {
+                made.append(ConfigOption(id: modelOption, name: "Model", category: "model", type: "select",
+                                         currentValue: models["currentModelId"], options: choices))
+            }
+        }
+        return made
+    }
+
     @discardableResult
     public func setOption(id: String, value: JSONValue) async throws -> [ConfigOption] {
         guard let sessionID else { throw ACPSessionError.noSession }
+        if olderStyle.contains(id), let chosen = value.stringValue {
+            let (method, key) = id == Self.modelOption ? ("session/set_model", "modelId") : ("session/set_mode", "modeId")
+            _ = try await connection.call(method, ["sessionId": .string(sessionID), key: .string(chosen)])
+            if let index = options.firstIndex(where: { $0.id == id }) { options[index].currentValue = value }
+            // Said the way a runtime's own `config_option_update` would be: the older calls
+            // answer with nothing, so the menus hear of the change from here.
+            eventsContinuation.yield(.optionsChanged(options))
+            return options
+        }
         var params: [String: JSONValue] = ["sessionId": .string(sessionID),
                                            "configId": .string(id),
                                            "value": value]
