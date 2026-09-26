@@ -94,6 +94,39 @@ struct LinkChooserTests {
         #expect(chooser.link == .none)
     }
 
+    /// A CloudKit call on a poor network waits rather than failing. The model runs one
+    /// attempt at a time, so a leg that never came back held every later reconnect.
+    @Test func aRelayThatNeverAnswersIsGivenUpOn() async throws {
+        let chooser = LinkChooser(direct: Self.failing(after: .milliseconds(10)),
+                                  relay: Self.after(.seconds(3600), Probe("relay")),
+                                  window: .milliseconds(50), patience: .milliseconds(200))
+        let started = ContinuousClock.now
+        await #expect(throws: LinkChooser.Failure.noAnswer) { _ = try await chooser.transport() }
+        #expect(ContinuousClock.now - started < .seconds(30))
+        #expect(chooser.link == .none)
+    }
+
+    @Test func aRelayThatAnswersAfterItWasGivenUpOnIsClosed() async throws {
+        let relay = Probe("relay")
+        let chooser = LinkChooser(direct: Self.failing(after: .milliseconds(10)),
+                                  relay: { try? await Task.sleep(for: .milliseconds(400)); return relay },
+                                  window: .milliseconds(50), patience: .milliseconds(100))
+        await #expect(throws: LinkChooser.Failure.noAnswer) { _ = try await chooser.transport() }
+        await eventually("the late relay is closed rather than left open") { relay.closed.isSet }
+    }
+
+    @Test func aCancelledAttemptClosesWhateverAnswersLate() async throws {
+        let direct = Probe("direct")
+        let chooser = LinkChooser(direct: { try? await Task.sleep(for: .milliseconds(300)); return direct },
+                                  relay: Self.failing(after: .seconds(3600)),
+                                  window: .seconds(10), patience: .seconds(3600))
+        let attempt = Task { try await chooser.transport() }
+        try await Task.sleep(for: .milliseconds(50))
+        attempt.cancel()
+        _ = try? await attempt.value
+        await eventually("the late direct link is closed") { direct.closed.isSet }
+    }
+
     @Test func theLinkIsHeardAsItChanges() async throws {
         let relay = Probe("relay")
         let chooser = LinkChooser(direct: Self.failing(after: .milliseconds(5)),
