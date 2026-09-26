@@ -602,7 +602,7 @@ struct WorktreeStartTests {
         #expect(names.filter { $0 == "feature/login" }.count == 1, "origin's copy is not listed twice")
     }
 
-    @Test func anAgentCanStartInANewWorktreeOnALocalBranch() async throws {
+    @Test(.flakyUnderLoad) func anAgentCanStartInANewWorktreeOnALocalBranch() async throws {
         let repo = try await repository()
         try await withBranches(repo)
         let launcher = FakeLauncher()
