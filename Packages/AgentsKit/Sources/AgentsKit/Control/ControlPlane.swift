@@ -58,6 +58,7 @@ public final class ControlPlane: @unchecked Sendable {
         self.router = ControlRouter(handler: methods, knownHosts: store.loadHosts().map(\.id),
                                     homeHost: settings.homeHost)
         self.name = settings.name
+        self.servers = SSHHosts(root: root, installedBy: settings.name)
         #if canImport(Network) && canImport(CryptoKit)
         if let port {
             do {
@@ -71,6 +72,8 @@ public final class ControlPlane: @unchecked Sendable {
     }
 
     private let name: String
+    /// Servers reached over ssh (US3).
+    let servers: SSHHosts
     #if canImport(Network) && canImport(CryptoKit)
     /// The control plane on the network, when it was given a port.
     public private(set) var net: ControlNet?
@@ -78,19 +81,31 @@ public final class ControlPlane: @unchecked Sendable {
 
     public func start() async throws {
         await methods.attach(router)
+        let servers = self.servers
+        let methods = self.methods
+        await servers.attach(self)
+        var hooks = ControlMethods.Hooks(
+            install: { try await servers.install($0) },
+            update: { try await servers.checkAgain($0) },
+            checkAgain: { try await servers.checkAgain($0) },
+            hostsChanged: { await servers.sync(await methods.allHosts) })
         #if canImport(Network) && canImport(CryptoKit)
         if let net {
             await net.attach(methods: methods, plane: self)
             let name = self.name
-            await methods.setHooks(ControlMethods.Hooks(
-                startPairing: { grant in try JSONValue.encoding(await net.startCode(.client(grant), name: name)) },
-                stopPairing: { await net.stopCodes() },
-                startEnroll: { try JSONValue.encoding(await net.startCode(.host, name: name)) },
-                clientsChanged: { _ in await net.relisten() },
-                hostsChanged: { await net.relisten() }))
+            hooks.startPairing = { grant in try JSONValue.encoding(await net.startCode(.client(grant), name: name)) }
+            hooks.stopPairing = { await net.stopCodes() }
+            hooks.startEnroll = { try JSONValue.encoding(await net.startCode(.host, name: name)) }
+            hooks.clientsChanged = { _ in await net.relisten() }
+            hooks.hostsChanged = {
+                await net.relisten()
+                await servers.sync(await methods.allHosts)
+            }
             await net.start()
         }
         #endif
+        await methods.setHooks(hooks)
+        await servers.reconnectAll(await methods.allHosts)
         let roles = RolePolicy.forControl(root: root)
         DaemonLog.shared.write("control: \(roles.summary)")
         let clients = UnixSocketListener(url: Self.clientSocket(root: root), roles: roles) { [weak self] transport, role, peer in

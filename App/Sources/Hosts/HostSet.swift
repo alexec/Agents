@@ -70,8 +70,12 @@ final class HostSet {
     func host(_ id: HostID) -> ServerHost? { hosts[id] }
 
     func label(_ id: HostID) -> String {
-        id == .mac ? "This Mac" : hosts[id]?.label ?? "a server"
+        id == .mac ? "This Mac" : hosts[id]?.label ?? controlled[id]?.label ?? "a server"
     }
+
+    /// Hosts the control plane reaches for this window (058, US3): their names, and
+    /// whether each is online. They have no ssh connection here; the control plane has it.
+    var controlled: [HostID: (label: String, online: Bool)] = [:]
 
     /// Since when a server that was connected has been gone. Kept through the retries,
     /// so the heading says Offline and since when rather than flickering to a spinner
@@ -84,6 +88,7 @@ final class HostSet {
 
     func state(_ id: HostID) -> ServerConnection.State {
         guard id != .mac else { return .connected }
+        if let controlled = controlled[id] { return controlled.online ? .connected : .offline(since: Date()) }
         let state = states[id] ?? .idle
         if case .connecting = state, let since = offlineSince[id] { return .offline(since: since) }
         return state

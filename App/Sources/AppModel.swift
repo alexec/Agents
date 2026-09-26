@@ -389,7 +389,15 @@ final class AppModel {
 
     /// This Mac's host: through the control plane when the window has one (058). Set
     /// once more when first run chooses one.
-    private var client = ControlConfig.macClient()
+    private var client = ControlConfig.endpoint.flatMap(ControlConfig.link).map { DaemonClient(link: $0.link(for: .mac)) }
+        ?? DaemonClient()
+    /// The one connection to the control plane every host's client is carried on (058).
+    private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
+    /// Every host the control plane has besides this Mac's, each with a client of its own
+    /// over `controlLink` (058, US3): what `HostSet` is for servers reached by ssh from
+    /// here, with the ssh on the control plane's side.
+    @ObservationIgnored private var controlHosts: [HostID: DaemonClient] = [:]
+    @ObservationIgnored private var controlWatch: Task<Void, Never>?
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
@@ -405,7 +413,7 @@ final class AppModel {
     /// The client for work on a host. A server that is not connected answers with an
     /// error straight away, never with the Mac's daemon.
     func client(for host: HostID) -> DaemonClient {
-        host == .mac ? client : hosts.client(for: host) ?? Self.unreachable
+        host == .mac ? client : controlHosts[host] ?? hosts.client(for: host) ?? Self.unreachable
     }
 
     private func client(forAgent id: UUID?) -> DaemonClient {
@@ -1135,6 +1143,7 @@ final class AppModel {
     /// First run has paired with a control plane elsewhere (058, frame C).
     func adopt(_ endpoint: ControlConfig.Endpoint) async {
         guard let link = ControlConfig.link(endpoint) else { return }
+        controlLink = link
         client = DaemonClient(link: link.link(for: .mac))
         needsFirstRun = false
         await stayConnected()
@@ -1178,6 +1187,7 @@ final class AppModel {
             presence?.connected()
             await refreshEverything()
             startHosts()
+            watchControlHosts()
         } catch {
             isConnected = false
             problem = describe(error)
@@ -1331,6 +1341,49 @@ final class AppModel {
                                             returning: Event.self)
         }
         hosts.start()
+    }
+
+    /// Follow the control plane's hosts: a client for each one other than this Mac's,
+    /// listed now and kept as hosts come and go (058, US3).
+    private func watchControlHosts() {
+        guard let controlLink, controlWatch == nil else { return }
+        controlWatch = Task { [weak self] in
+            let control = DaemonClient(link: controlLink.controlLink)
+            while !Task.isCancelled {
+                if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
+                    await self?.syncControlHosts(control)
+                    for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                        await self?.syncControlHosts(control)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    private func syncControlHosts(_ control: DaemonClient) async {
+        guard let controlLink,
+              let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self),
+              let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+        else { return }
+        let others = listed.filter { $0.id != .mac && $0.id != status.homeHost }
+        hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
+        for host in others where host.state == "online" {
+            let server = controlHosts[host.id] ?? DaemonClient(link: controlLink.link(for: host.id))
+            controlHosts[host.id] = server
+            guard await !server.isConnected else { continue }
+            guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
+            let id = host.id
+            Task.detached(priority: .userInitiated) { [weak self] in
+                for await note in server.notifications() {
+                    await self?.receivedFromServer(id, note.method, note.params)
+                }
+            }
+            await refreshServer(id)
+        }
+        for id in controlHosts.keys where !others.contains(where: { $0.id == id }) {
+            await controlHosts.removeValue(forKey: id)?.disconnect()
+        }
     }
 
     private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?) async {

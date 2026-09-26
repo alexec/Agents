@@ -184,6 +184,7 @@ struct ControlHostsPage: View {
     let control: ControlSettingsModel
     @State private var removing: DaemonAPI.ControlHost?
     @State private var addingByCode = false
+    @State private var addingServer = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -203,14 +204,15 @@ struct ControlHostsPage: View {
                 }
             }
             HStack(spacing: 8) {
-                Button("Add a Server…") {}.buttonStyle(.paper).disabled(true)
+                Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
                 Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
             }
-            Text("Add by Code gives another Mac a code to join with. Installing on a server over ssh comes next. Removing a host stops it connecting. Its agents are left running where they are.")
+            Text("Add a Server installs Agents on it over your ssh, from the control plane, so every window and device sees it. Add by Code gives another Mac a code to join with. Removing a host stops it connecting. Its agents are left running where they are.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
+        .sheet(isPresented: $addingServer) { AddServerThroughControlSheet(control: control).paperSheet() }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { host in
@@ -349,6 +351,97 @@ struct ControlClientsPage: View {
         var parts = [device.kind == .iPad ? "iPad" : "iPhone", "paired to this Mac’s agents"]
         if let seen = device.lastSeenAt { parts.append("seen \(seen.formatted(.relative(presentation: .named)))") }
         return parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - Add a Server, through the control plane (US3)
+
+/// Today's Add a Server, run by the control plane rather than this window: the control
+/// plane uses its machine's ssh, so the server is every client's. The host key's first
+/// trust comes back here as a question.
+struct AddServerThroughControlSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let control: ControlSettingsModel
+    @State private var destination = ""
+    @State private var working = false
+    @State private var fingerprint: String?
+    @State private var outcome: ControlSettingsModel.InstallOutcome?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add a server").appText(.reading).fontWeight(.semibold)
+            TextField("user@server", text: $destination)
+                .textFieldStyle(.roundedBorder)
+                .appText(.code)
+                .disabled(working || fingerprint != nil)
+                .accessibilityLabel("Server")
+            Text("Anything ssh on the control plane’s machine can reach: a name from its ssh config, or user@host:port.")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let fingerprint {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("This server is new to the control plane’s Mac. Its key is:").appText(.supporting)
+                    Text(fingerprint).appText(.code).textSelection(.enabled)
+                    Text("Trust it only if this is the key the server shows (ssh-keygen -lf on its host key).")
+                        .appText(.supporting).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if working {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(stepWords(control.installStep)).appText(.supporting).foregroundStyle(.secondary)
+                }
+            }
+            switch outcome {
+            case .added(let name)?:
+                Text("\(name) is a host now. Every window and device sees it.").appText(.supporting).tinted(.vouched)
+            case .failed(let why)?:
+                Text(why).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            default:
+                EmptyView()
+            }
+            HStack {
+                Spacer()
+                Button(isDone ? "Done" : "Cancel") { dismiss() }
+                if !isDone {
+                    Button(fingerprint == nil ? "Connect" : "Trust and continue") { go() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
+    }
+
+    private var isDone: Bool { if case .added = outcome { true } else { false } }
+
+    private func go() {
+        working = true
+        outcome = nil
+        let trusting = fingerprint
+        Task {
+            let result = await control.install(destination: destination.trimmingCharacters(in: .whitespaces), trust: trusting)
+            working = false
+            if case .needsTrust(let shown) = result {
+                fingerprint = shown
+            } else {
+                fingerprint = nil
+                outcome = result
+            }
+        }
+    }
+
+    private func stepWords(_ step: String?) -> String {
+        switch step {
+        case "connect": "Connecting…"
+        case "checkSystem": "Checking the system…"
+        case "setUp": "Installing Agents…"
+        case "installClaude": "Installing Claude…"
+        case "findRuntimes", "connected": "Finding its agents…"
+        default: "Working…"
+        }
     }
 }
 

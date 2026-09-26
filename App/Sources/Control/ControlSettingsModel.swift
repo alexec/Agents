@@ -51,6 +51,10 @@ final class ControlSettingsModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 for await note in self.client.notifications() where note.method.hasPrefix("control/") {
+                    if note.method == DaemonAPI.Notification.controlInstallProgress {
+                        self.installStep = note.params?["step"]?.stringValue
+                        continue
+                    }
                     await self.refresh()
                 }
                 // The control plane went; come back when it does.
@@ -96,6 +100,33 @@ final class ControlSettingsModel {
 
     func remove(_ host: HostID) async {
         await perform(DaemonAPI.Method.hostsRemove, DaemonAPI.HostRequest(host: host))
+    }
+
+    /// The step the control plane says an install is at (`control/installProgress`).
+    private(set) var installStep: String?
+
+    enum InstallOutcome: Equatable {
+        case added(name: String)
+        /// The server's key is new to this Mac: the person looks at it and says so.
+        case needsTrust(fingerprint: String)
+        case failed(String)
+    }
+
+    /// Add a server: the control plane installs it over ssh and makes it a host (US3).
+    func install(destination: String, trust: String? = nil) async -> InstallOutcome {
+        installStep = nil
+        var params: [String: JSONValue] = ["destination": .string(destination)]
+        if let trust { params["trust"] = .string(trust) }
+        do {
+            let answer = try await client.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
+            await refresh()
+            if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
+            return .added(name: answer["name"]?.stringValue ?? destination)
+        } catch let error as JSONRPCError {
+            return .failed(error.message)
+        } catch {
+            return .failed("The control plane can’t be reached.")
+        }
     }
 
     /// A code for a new client with `grant`, or for a new host (frame G, Add by Code).
