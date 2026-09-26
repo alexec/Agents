@@ -154,7 +154,7 @@ struct SkillInstaller: Sendable {
         var side = CatalogSidecar.load(from: sidecar)
         side.skills[CatalogSidecar.key(place.destination, name: preview.name)] = .init(
             commit: preview.commit, committedAt: preview.committedAt, treeSHA: preview.treeSHA,
-            catalogue: "skills.sh", addedAt: now)
+            catalogue: "skills.sh", addedAt: now, folderHash: try? SkillHashes.computedHash(folder: target))
         try? side.save(to: sidecar) { _ in true }
 
         return DaemonAPI.ManagedSkill(
@@ -179,7 +179,8 @@ struct SkillInstaller: Sendable {
             out[name] = DaemonAPI.ManagedSkill(
                 destination: place.destination, name: name, source: entry.source, skillPath: entry.skillPath,
                 recordedHash: entry.recordedHash, commit: record?.commit, committedAt: record?.committedAt,
-                catalogue: record?.catalogue, edited: edited(folder, entry: entry, kind: place.lockKind), update: .unknown)
+                catalogue: record?.catalogue, edited: edited(folder, entry: entry, kind: place.lockKind, record: record),
+                update: .unknown)
         }
         return out
     }
@@ -200,11 +201,18 @@ struct SkillInstaller: Sendable {
         return skills
     }
 
-    /// The folder no longer hashes to what its lock recorded (research R6).
-    func edited(_ folder: URL, entry: SkillLock.Entry, kind: SkillLock.Kind) -> Bool {
-        guard let recorded = entry.recordedHash, !recorded.isEmpty else { return false }
-        let now = kind == .personal ? try? SkillHashes.treeSHA(folder: folder) : try? SkillHashes.computedHash(folder: folder)
-        return now != nil && now != recorded
+    /// The folder no longer hashes to what was written there (research R6): the sidecar's
+    /// hash of the folder as added, or for a project the lock's `computedHash`, which the CLI
+    /// also takes of the folder as written. A personal skill the CLI added has only a tree
+    /// SHA, which a folder with a followed symbolic link never matches, so it is never called
+    /// edited: saying so would be a false alarm, and Update still shows what would change.
+    func edited(_ folder: URL, entry: SkillLock.Entry, kind: SkillLock.Kind, record: CatalogSidecar.Record? = nil) -> Bool {
+        let written: String?
+        if let hash = record?.folderHash { written = hash }
+        else if kind == .project { written = entry.computedHash }
+        else { written = nil }
+        guard let written, !written.isEmpty, let now = try? SkillHashes.computedHash(folder: folder) else { return false }
+        return now != written
     }
 
     // MARK: Remove

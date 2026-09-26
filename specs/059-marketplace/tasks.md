@@ -303,7 +303,7 @@ any.
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T055 Interop walk, quickstart §5, on a throwaway `HOME` against the real skills.sh and GitHub:
+- [X] T055 Interop walk, quickstart §5, on a throwaway `HOME` against the real skills.sh and GitHub:
   - `npx skills add … -g` is shown as managed in the app;
   - an app add is listed by `npx skills list -g`;
   - a project add is listed by `npx skills list` and restored by `npx skills experimental_install` (SC-005).

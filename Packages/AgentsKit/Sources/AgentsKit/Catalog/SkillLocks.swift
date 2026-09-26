@@ -158,6 +158,10 @@ struct CatalogSidecar: Codable, Equatable, Sendable {
         var treeSHA: String
         var catalogue: String
         var addedAt: Date
+        /// The CLI's hash of the folder as written, which is what "edited since it was added"
+        /// is judged against. Not the tree SHA: a repository's symbolic links are followed by
+        /// the CLI and left out by the app, so the folder on disk need not hash to the tree.
+        var folderHash: String?
     }
 
     var version = 1

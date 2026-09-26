@@ -120,6 +120,21 @@ struct SkillUpdateRemoveTests {
         #expect(w.installer.managed(at: w.personal)["plain"]?.edited == false)
     }
 
+    /// A personal skill the CLI added, whose folder was copied through a symbolic link, has
+    /// a tree SHA its folder never matches; it is not called edited on that alone.
+    @Test func aCLISkillWhoseFolderDiffersFromItsTreeIsNotCalledEdited() async throws {
+        let w = try world()
+        let folder = w.personal.skills.appending(path: "cli-skill")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "---\nname: cli-skill\ndescription: From the CLI.\n---\n"
+            .write(to: folder.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+        var lock = try SkillLock.load(.personal, at: w.personal.lock)
+        lock.upsert(name: "cli-skill", source: "someone/skills", skillPath: "cli-skill/SKILL.md",
+                    hash: "09b8fff9743cfc94eea3ada3727e3ec369ff10fb")
+        try lock.write()
+        #expect(w.installer.managed(at: w.personal)["cli-skill"]?.edited == false)
+    }
+
     // MARK: Remove
 
     @Test func removingTrashesTheFolderAndDropsItsRecords() async throws {
