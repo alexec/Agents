@@ -143,6 +143,29 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     }
 }
 
+/// One heading on the panel and the agents under it.
+public struct AgentHeading: Identifiable, Sendable {
+    public let title: String
+    public let agents: [Agent]
+    public var id: String { title }
+}
+
+public extension AgentGroup {
+    /// The headings this group is drawn under, empty ones left out.
+    ///
+    /// Complete is drawn as two: Unread, the finished chats nobody has looked at since
+    /// they finished, above Read, the ones somebody has. Only on the panel — the group
+    /// itself stays one, so counts, badges and the daemon's summaries are unchanged,
+    /// and reading a chat moves it between headings without changing its group.
+    func headings(_ agents: [Agent]) -> [AgentHeading] {
+        let split: [AgentHeading] = self == .finished
+            ? [AgentHeading(title: "Unread", agents: agents.filter(\.isUnread)),
+               AgentHeading(title: "Read", agents: agents.filter { !$0.isUnread })]
+            : [AgentHeading(title: title, agents: agents)]
+        return split.filter { !$0.agents.isEmpty }
+    }
+}
+
 /// So that `[AgentGroup: Int]` is a JSON object keyed by the group's name rather than a
 /// flat array of alternating keys and values, which is what Swift does otherwise and
 /// which nothing reading the file by eye would forgive.
