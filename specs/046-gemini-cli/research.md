@@ -227,8 +227,8 @@ is a sentence and not a stack.
     `ServerFacts.canInstallClaude`
 - **Overlap with 047 (Codex)**, planned in another lane: it needs the same generalisation.
   Whichever lands first does it once, as its own phase (Phase 2 here), and the other merges
-  it. Nothing in this plan depends on 047's start-up installer, because Gemini on the Mac is
-  npx (D1).
+  it. Both also depend on the start-up installer lane for the Mac (D1); the servers half of
+  this plan does not.
 
 ## R11. Nothing on the person's PATH changes
 
