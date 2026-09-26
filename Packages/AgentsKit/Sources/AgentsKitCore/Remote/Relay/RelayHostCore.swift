@@ -176,7 +176,9 @@ public actor RelayHostCore {
     /// session is open.
     private func open(_ session: Session) async {
         do {
-            let daemon = try await openDaemon()
+            // The device's connection, never the bridge's: bound before the session's
+            // first line is carried, to the device whose key opened the frame.
+            let daemon = try await DeviceBinder.bind(try await openDaemon(), device: session.device)
             session.daemon = daemon
             let id = session.id
             let device = session.device

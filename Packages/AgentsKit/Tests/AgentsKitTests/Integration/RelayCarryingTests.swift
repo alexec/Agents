@@ -31,6 +31,13 @@ struct RelayCarryingTests {
                                  openDaemon: {
                                      let (near, far) = PairedTransport.pair()
                                      pipes.add(far)
+                                     // The daemon agreeing that this is the phone's
+                                     // connection, as the real one does first.
+                                     Task {
+                                         for try await line in far.lines() where line.contains(DeviceBinder.requestID) {
+                                             try far.write(line: #"{"jsonrpc":"2.0","id":"\#(DeviceBinder.requestID)","result":{}}"#)
+                                         }
+                                     }
                                      return near
                                  },
                                  window: window, livePoll: 0.02, idlePoll: 0.02)

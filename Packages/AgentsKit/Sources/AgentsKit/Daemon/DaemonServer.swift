@@ -39,20 +39,51 @@ public final class DaemonServer: @unchecked Sendable {
     final class ConnectionIdentity: @unchecked Sendable {
         let id = UUID()
         let peer: Int32?
-        /// What this connection may ask for, decided once from who made it.
-        let role: ConnectionRole
 
         init(peer: Int32?, role: ConnectionRole = .control) {
             self.peer = peer
-            self.role = role
+            _role = role
         }
 
         private let lock = NSLock()
         private var _surface: Surface? = .mac
+        private var _role: ConnectionRole
+        private var _device: UUID?
 
         var surface: Surface? {
             get { lock.lock(); defer { lock.unlock() }; return _surface }
             set { lock.lock(); defer { lock.unlock() }; _surface = newValue }
+        }
+
+        /// What this connection may ask for: decided from who made it, and lowered to a
+        /// device's once the bridge says it carries one. Never raised.
+        var role: ConnectionRole {
+            lock.lock(); defer { lock.unlock() }; return _role
+        }
+
+        /// A window's connection becomes a device's, for good. Only a window's may: a
+        /// helper or a stranger that could say this would be choosing its own rights.
+        func bindDevice(_ device: UUID?) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard _role == .control else { return false }
+            _role = .device
+            if let device {
+                _device = device
+                _surface = .device(device)
+            }
+            return true
+        }
+
+        /// Whether a device's connection may call itself `claimed`. The first id a bound
+        /// connection names is the only one it may ever use; a window may name any, as
+        /// it always could.
+        func mayClaim(_ claimed: UUID) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard _role == .device else { return true }
+            if let _device { return _device == claimed }
+            _device = claimed
+            _surface = .device(claimed)
+            return true
         }
 
         var context: ConnectionContext { ConnectionContext(id: id, surface: surface, peer: peer) }
@@ -170,9 +201,30 @@ public final class DaemonServer: @unchecked Sendable {
         let connection = JSONRPCConnection(transport: transport) { method, params in
             // Refused by the server, before the daemon hears of it: a helper asking for
             // what only a window may, or a shell asking for anything at all.
+            let role = identity.role
             guard role.allows(method) else {
                 return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                              message: "\(method) is not open to this connection (\(role.rawValue))."))
+            }
+            // The bridge saying this connection carries a device. The server's business
+            // alone: the daemon never hears it, only the rights that follow from it.
+            if method == DaemonAPI.Method.connectionBindDevice {
+                let binding = (try? params?.decode(DaemonAPI.DeviceBinding.self)) ?? DaemonAPI.DeviceBinding(id: nil)
+                guard identity.bindDevice(binding.id) else {
+                    return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                                 message: "Only a window's connection can be given to a device."))
+                }
+                DaemonLog.shared.write("socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
+                return .success([:])
+            }
+            // A device naming itself, by saying which it is or announcing its key. On a
+            // device's connection the first name is the only one: a phone cannot speak
+            // as another phone, or announce a key under another phone's id.
+            if method == DaemonAPI.Method.surfaceIdentify || method == DaemonAPI.Method.devicesAnnounce,
+               let claimed = (try? params?.decode(ClaimedDevice.self))?.id,
+               !identity.mayClaim(claimed) {
+                return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                             message: "This connection is another device's."))
             }
             // A device saying which it is. The server sets the identity here, once,
             // and only then hands the request on — so what the daemon registers under
@@ -289,6 +341,11 @@ public final class DaemonServer: @unchecked Sendable {
             Task { await connection.close() }
         }
     }
+}
+
+/// The one field `surface/identify` and `devices/announce` share: which device.
+private struct ClaimedDevice: Decodable {
+    var id: UUID
 }
 
 final class ConnectionSet: @unchecked Sendable {
