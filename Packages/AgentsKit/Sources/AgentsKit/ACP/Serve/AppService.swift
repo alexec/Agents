@@ -701,7 +701,10 @@ public actor AppService {
 
             For blocked, name the agents in waiting_on and you will be resumed, with \
             how each one ended, once they have all finished; for something the app \
-            can't see, say what it is and give check_again_in_minutes. It is not for a \
+            can't see, say what it is and give check_again_in_minutes. Either way the \
+            person sees you under Waiting, knowing you will carry on by yourself; name \
+            nothing and give no time and you sit under Blocked until they carry you on. \
+            It is not for a \
             question to the person (that is needs_answer) or a dead end (that is stuck). \
             Your turn ends and costs nothing while you wait — and anything you started \
             in the background stops with it, so never block on a command of your own: \

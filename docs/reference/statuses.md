@@ -8,7 +8,7 @@ description: Every status an agent can have, the group it is listed under, and w
 
 This page lists every status an agent can show, and the group it sits under on its
 project's page. The groups appear in this order: **Needs attention**, **Blocked**,
-**Working**, **Complete**, **Stopped**, **Parked**. A group with no agents in it is not
+**Waiting**, **Working**, **Complete**, **Stopped**, **Parked**. A group with no agents in it is not
 shown. **Archived** is folded away at the bottom until you open it.
 
 The status is what the agent's icon says when you hover over it, and what a screen reader
@@ -25,7 +25,8 @@ colour.
 | **Partly done** | Needs attention | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Stuck** | Needs attention | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | Any status but Stopped, Parked or Archived, once the agent has shown you a file | Needs attention | The agent opened a file for you to look at, and you have not looked. | Open the conversation. |
-| **Blocked** | Blocked | The turn ended waiting on something other than you: agents it started, another agent's change, or a check it will come back to. The card says what it is waiting on. It carries on by itself when that is done. | **Carry on**, to tell it the wait is over. **Stop**, so it does not carry on. **Park**, **Archive**, **Branch**. |
+| **Blocked** | Blocked | The turn ended blocked on something the app cannot watch, such as a review, and the agent named no agents and gave no time to check again. Nothing carries it on but you. Its icon is a raised hand. | **Carry on**, once the block has gone. **Stop**, **Park**, **Archive**, **Branch**. |
+| **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is an hourglass. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Park**, **Archive**, **Branch**. |
 | **Complete** | Complete | The agent did what was asked. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Nothing to do** | Complete | The agent looked and found nothing that needed doing. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Finished** | Complete | The turn ended and the agent has not said how it went. | Reply in the prompt. **Park**, **Archive**, **Branch**. |

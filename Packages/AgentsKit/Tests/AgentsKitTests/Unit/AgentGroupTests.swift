@@ -36,28 +36,31 @@ struct AgentGroupTests {
         #expect(Self.group(.archived) == .archived)
     }
 
-    /// Every group but Blocked is reachable from a state alone. Blocked needs a report,
-    /// because it is a thing an agent says rather than a state it is in (039).
+    /// Every group but Blocked and Waiting is reachable from a state alone. Both need a
+    /// report or a wait, because they are things an agent says rather than states it is
+    /// in (039, 042).
     @Test("every group is reachable from some state")
     func everyGroupReachable() {
         let reached = Set(AgentState.allCases.flatMap { [Self.group($0), Self.group($0, parked: true)] })
-        #expect(reached == Set(AgentGroup.allCases).subtracting([.blocked]))
+        #expect(reached == Set(AgentGroup.allCases).subtracting([.blocked, .waiting]))
         #expect(Self.group(.finished, .blocked) == .blocked)
-        #expect(AgentGroup.allCases.count == 7)
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: nil, outcomeAsked: false,
+                           parked: false, waitingOnEvents: true) == .waiting)
+        #expect(AgentGroup.allCases.count == 8)
         #expect(AgentState.allCases.count == 6)
     }
 
     @Test("the live groups are in the order the panel draws them")
     func liveOrder() {
-        #expect(AgentGroup.live == [.needsAttention, .blocked, .running, .finished, .stopped, .parked])
+        #expect(AgentGroup.live == [.needsAttention, .blocked, .waiting, .running, .finished, .stopped, .parked])
         #expect(!AgentGroup.live.contains(.archived))
     }
 
     /// FR-022 of 019 and FR-023 of 020, stated as a test so it cannot be lost quietly.
-    /// Two headings added since, on purpose: Blocked (039) and Parked (040).
+    /// Three headings added since, on purpose: Blocked (039), Parked (040) and Waiting.
     @Test func noHeadingWasRenamedOrRemoved() {
         #expect(AgentGroup.live.map(\.title)
-            == ["Needs attention", "Blocked", "Working", "Complete", "Stopped", "Parked"])
+            == ["Needs attention", "Blocked", "Waiting", "Working", "Complete", "Stopped", "Parked"])
         #expect(AgentGroup.archived.title == "Archived")
     }
 
@@ -128,15 +131,31 @@ struct AgentGroupTests {
                                 clearedBy: cleared ? .waits : nil))
     }
 
-    /// Settled and waiting on something that is not a person: its own group, not
-    /// Needs attention and not Complete.
-    @Test func aFinishedAgentWithAnOpenBlockIsBlocked() {
+    /// Settled and waiting on something the app watches: Waiting, not Needs attention
+    /// and not Complete — it carries on by itself.
+    @Test func aFinishedAgentWithAnOpenBlockOnAgentsIsWaiting() {
         for asked in [false, true] {
             #expect(AgentGroup(for: .finished, wantsEyes: false, report: Self.blocked(cleared: false),
-                               outcomeAsked: asked, parked: false) == .blocked)
+                               outcomeAsked: asked, parked: false) == .waiting)
         }
-        // A blocked report that named nothing and gave no time is still blocked.
+        let later = WorkReport(outcome: .blocked, message: "waiting on CI", at: Date(),
+                               block: Block(checkAgainAt: Date().addingTimeInterval(600)))
+        #expect(later.resumesByItself)
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: later, outcomeAsked: false,
+                           parked: false) == .waiting)
+    }
+
+    /// Named nothing and gave no time: nothing will carry it on but the person, so it
+    /// is Blocked, which is what tells it apart from Waiting.
+    @Test func aBlockOnNothingIsBlocked() {
         #expect(Self.group(.finished, .blocked) == .blocked)
+        let nothing = WorkReport(outcome: .blocked, message: "waiting on a review", at: Date(), block: Block())
+        #expect(!nothing.resumesByItself)
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: nothing, outcomeAsked: false,
+                           parked: false) == .blocked)
+        // An event wait on top of it is something the app watches: Waiting.
+        #expect(AgentGroup(for: .finished, wantsEyes: false, report: nothing, outcomeAsked: false,
+                           parked: false, waitingOnEvents: true) == .waiting)
     }
 
     /// A block that cleared is not waiting on anything. The agent is being resumed or was

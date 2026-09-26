@@ -144,9 +144,17 @@ public struct WorkReport: Codable, Hashable, Sendable {
                   block: block)
     }
 
-    /// A blocked report whose block has not yet cleared: the one kind that sits under
-    /// Blocked, and the only kind the app will resume.
+    /// A blocked report whose block has not yet cleared: under Waiting when the app will
+    /// resume it (`resumesByItself`), and under Blocked when only the person can.
     public var isOpenBlock: Bool {
         outcome == .blocked && block?.isOpen != false
+    }
+
+    /// An open block the app will clear by itself: it names agents to wait for, or a
+    /// time to check again. The rest — a block that named nothing and gave no time —
+    /// waits for the person, and is the only kind still called Blocked.
+    public var resumesByItself: Bool {
+        guard isOpenBlock, let block else { return false }
+        return !block.waits.isEmpty || block.checkAgainAt != nil
     }
 }
