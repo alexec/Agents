@@ -363,7 +363,7 @@ state on archive.
 - [ ] T057 Run quickstart §2 in full on `/tmp/run-051` against a scratch daemon, and record each bullet's result in `walk/README.md`.
 - [ ] T058 Run quickstart §4, the kill test, ten times, and record each outcome (SC-006).
 - [ ] T059 Run quickstart §5 with the run-app skill on `/tmp/run-051`, and screenshot each Mac item into `walk/`.
-- [ ] T060 [P] Write the docs:
+- [X] T060 [P] Write the docs:
   - A new section in `docs/how-to/archive-park-stop.md`: "How long archived agents are kept", covering the time, the cap, Forever, the notes, Retire now and what a retired agent leaves.
   - The two settings in `docs/reference/settings.md`.
   - `agent.retired` in `docs/reference/events.md`.
