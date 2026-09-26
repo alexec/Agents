@@ -545,6 +545,13 @@ public actor DaemonCore {
         // Providers are asked for separately, so a previous answer is kept.
         account.providers = accounts[runtimeID]?.providers ?? []
         account.currentProviderID = accounts[runtimeID]?.currentProviderID
+        // A handshake does not prove a sign-in (see `RuntimeAccount.init`), so it does
+        // not take back a refusal: a window warming up a draft would otherwise put the
+        // runtime back to ready a second after it refused. A turn that works does.
+        if accounts[runtimeID]?.state == .needsSignIn {
+            account.state = .needsSignIn
+            account.checkedAt = accounts[runtimeID]?.checkedAt ?? account.checkedAt
+        }
         guard accounts[runtimeID] != account else { return }
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
@@ -554,6 +561,15 @@ public actor DaemonCore {
     func markNeedsSignIn(runtimeID: String) {
         var account = accounts[runtimeID] ?? RuntimeAccount(runtimeID: runtimeID)
         account.state = .needsSignIn
+        account.checkedAt = Date()
+        accounts[runtimeID] = account
+        broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
+    }
+
+    /// A runtime that just did a turn, which is the proof a handshake is not.
+    func markSignedIn(runtimeID: String) {
+        guard var account = accounts[runtimeID], account.state == .needsSignIn else { return }
+        account.state = .ready
         account.checkedAt = Date()
         accounts[runtimeID] = account
         broadcast(DaemonAPI.Notification.runtimeAccountChanged, account)
