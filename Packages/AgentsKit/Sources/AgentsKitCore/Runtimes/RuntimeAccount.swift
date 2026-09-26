@@ -14,6 +14,9 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
     /// What this runtime will take in a prompt. A runtime fact, so the composer can
     /// refuse a picture before it is sent rather than after.
     public var promptCapabilities: ACP.PromptCapabilities
+    /// Whether words queued behind a turn can be sent into it instead (`_session/steering`).
+    /// What the runtime advertised, so a queued prompt offers Send now only where it works.
+    public var canSteer: Bool
     public var checkedAt: Date
 
     public var id: String { runtimeID }
@@ -32,6 +35,7 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
                 providers: [ACP.ProviderInfo] = [],
                 currentProviderID: String? = nil,
                 promptCapabilities: ACP.PromptCapabilities = .init(),
+                canSteer: Bool = false,
                 checkedAt: Date = Date()) {
         self.runtimeID = runtimeID
         self.state = state
@@ -40,6 +44,7 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
         self.providers = providers
         self.currentProviderID = currentProviderID
         self.promptCapabilities = promptCapabilities
+        self.canSteer = canSteer
         self.checkedAt = checkedAt
     }
 
@@ -53,7 +58,22 @@ public struct RuntimeAccount: Codable, Hashable, Sendable, Identifiable {
                   canLogOut: handshake.supportsLogout,
                   providers: [],
                   currentProviderID: nil,
-                  promptCapabilities: handshake.accepts)
+                  promptCapabilities: handshake.accepts,
+                  canSteer: handshake.supportsSteering)
+    }
+
+    /// Absent is false: an account from a daemon that predates steering never offers it.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        runtimeID = try c.decode(String.self, forKey: .runtimeID)
+        state = try c.decode(State.self, forKey: .state)
+        authMethods = try c.decode([ACP.AuthMethod].self, forKey: .authMethods)
+        canLogOut = try c.decode(Bool.self, forKey: .canLogOut)
+        providers = try c.decode([ACP.ProviderInfo].self, forKey: .providers)
+        currentProviderID = try c.decodeIfPresent(String.self, forKey: .currentProviderID)
+        promptCapabilities = try c.decode(ACP.PromptCapabilities.self, forKey: .promptCapabilities)
+        canSteer = try c.decodeIfPresent(Bool.self, forKey: .canSteer) ?? false
+        checkedAt = try c.decode(Date.self, forKey: .checkedAt)
     }
 
     /// The methods in the order to offer them: the runtime's own order where its policy

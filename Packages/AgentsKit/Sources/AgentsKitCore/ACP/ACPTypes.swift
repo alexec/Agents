@@ -36,6 +36,10 @@ public enum ACP {
         /// `set_config_option` is used wherever the runtime offers it.
         public static let setSessionMode = "session/set_mode"
         public static let setSessionModel = "session/set_model"
+        /// A vendor extension shared by the Claude adapter and codex-acp: words put into
+        /// the turn that is running rather than queued behind it. Advertised by
+        /// `initialize`'s root `_meta.steering.supported`, and only used where it is.
+        public static let steering = "_session/steering"
     }
 
     /// Named so that "we chose not to" and "we forgot" stay different things. Each of
@@ -154,6 +158,8 @@ public enum ACP {
         public var agentCapabilities: AgentCapabilities?
         public var agentInfo: AgentInfo?
         public var authMethods: [AuthMethod]?
+        /// Vendor extensions the agent advertises beside its capabilities, not in them.
+        public var _meta: JSONValue?
 
         /// Whether the version the agent answered with is one we speak. An agent that
         /// omits it is taken at its word, which is what every runtime here does.
@@ -170,6 +176,9 @@ public enum ACP {
         }
         public var supportsLogout: Bool { agentCapabilities?.auth?.logout != nil }
         public var supportsProviders: Bool { agentCapabilities?.providers != nil }
+        /// Whether words can be put into a running turn (`_session/steering`). Read off
+        /// what the agent said, never off which runtime it is.
+        public var supportsSteering: Bool { _meta?["steering"]?["supported"]?.boolValue ?? false }
 
         public var accepts: PromptCapabilities { agentCapabilities?.promptCapabilities ?? PromptCapabilities() }
     }
@@ -294,6 +303,17 @@ public enum ACP {
 
     public struct PromptResult: Decodable, Sendable {
         public var stopReason: String?
+    }
+
+    /// What `_session/steering` did with the words. The Claude adapter answers
+    /// `promptRequired` when asked to and no turn is running; codex-acp does not know
+    /// that ask and starts a turn of its own instead, or answers `failed`.
+    public enum SteeringOutcome: String, Decodable, Sendable {
+        case injected, startedNewTurn, promptRequired, failed
+    }
+
+    public struct SteeringResult: Decodable, Sendable {
+        public var outcome: SteeringOutcome
     }
 
     public struct SessionListResult: Decodable, Sendable {

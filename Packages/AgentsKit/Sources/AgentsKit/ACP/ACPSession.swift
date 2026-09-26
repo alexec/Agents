@@ -439,6 +439,25 @@ public actor ACPSession {
 
     /// A notification: the turn's own reply comes back as `cancelled` once the runtime
     /// has stopped what it was doing.
+    /// Put words into the turn that is running (`_session/steering`).
+    ///
+    /// Always with `idleBehavior: promptRequired`: if no turn is running the words
+    /// stay ours, and go as an ordinary `session/prompt` whose turn the daemon owns.
+    /// An outcome that cannot be read is `failed`, so the caller keeps the words.
+    public func steer(_ blocks: [ContentBlock]) async throws -> ACP.SteeringOutcome {
+        guard initializeResult?.supportsSteering ?? false else {
+            throw ACPSessionError.notSupported(ACP.Method.steering)
+        }
+        guard let sessionID else { throw ACPSessionError.noSession }
+        let params: JSONValue = [
+            "sessionId": .string(sessionID),
+            "prompt": blocks.wire,
+            "_meta": ["steering": ["idleBehavior": "promptRequired"]],
+        ]
+        let result = try await connection.call(ACP.Method.steering, params)
+        return (try? result.decode(ACP.SteeringResult.self))?.outcome ?? .failed
+    }
+
     public func cancel() async {
         guard let sessionID else { return }
         try? connection.notify(ACP.Method.cancel, ["sessionId": .string(sessionID)])
