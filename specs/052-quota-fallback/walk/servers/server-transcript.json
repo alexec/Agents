@@ -1,0 +1,250 @@
+{
+  "entries": [
+    {
+      "at": 812139483.574,
+      "id": "270AA1E9-F18F-40EB-A1FF-B60E59127F8B",
+      "kind": {
+        "userMessage": {
+          "_0": "Tidy the README."
+        }
+      }
+    },
+    {
+      "at": 812139483.575,
+      "id": "20297E5B-193A-4BDE-92F4-8FE1853AB5CA",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812139483.577,
+      "id": "27F9E297-3CEA-4540-8BC8-AACC5F8F9E03",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    },
+    {
+      "at": 812139483.577,
+      "id": "E1E11F4A-F6FA-4C94-A02F-689A2DB9DA4E",
+      "kind": {
+        "agentMessage": {
+          "text": "You said: Tidy the README."
+        }
+      }
+    },
+    {
+      "at": 812139486.624,
+      "id": "B4AB31F1-79BD-4E47-B9F5-6A73727B79C0",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Starting Grok\u2026"
+        }
+      }
+    },
+    {
+      "at": 812139486.655,
+      "id": "CA7C3FC1-A0DD-4ADC-AE16-5F71650CE2F2",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Grok no longer has this conversation. Carrying on in a new one; everything above is kept."
+        }
+      }
+    },
+    {
+      "at": 812139486.658,
+      "id": "A1DD944A-6680-4FE1-AF6F-F4164F76E419",
+      "kind": {
+        "userMessage": {
+          "_0": "That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done.",
+          "from": "app"
+        }
+      }
+    },
+    {
+      "at": 812139486.659,
+      "id": "DC065E10-73E9-46AE-8E2C-11AB6A9E1CC6",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812139486.66,
+      "id": "F11A1B01-66CB-4E03-817C-F605BA73FA25",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    },
+    {
+      "at": 812139486.66,
+      "id": "34CEEB15-AD04-4DEB-89F7-FBA74F5AFD2F",
+      "kind": {
+        "agentMessage": {
+          "text": "You said: That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done."
+        }
+      }
+    },
+    {
+      "at": 812139612.454,
+      "id": "A059618A-9114-4378-9431-193625292CB7",
+      "kind": {
+        "poolSwitch": {
+          "_0": {
+            "agentID": "6858BAEB-FED9-43CB-9D60-B52AEF46A550",
+            "at": 812139612.4206629,
+            "billing": {
+              "allowance": {}
+            },
+            "carried": [
+              {
+                "from": "grok-smart",
+                "name": "Model",
+                "optionID": "model",
+                "source": {
+                  "runtimeDefault": {}
+                },
+                "to": "copilot-smart"
+              },
+              {
+                "from": "default",
+                "name": "Mode",
+                "optionID": "mode",
+                "source": {
+                  "sameValue": {}
+                },
+                "to": "default"
+              }
+            ],
+            "dropped": [],
+            "from": {
+              "model": "grok-smart",
+              "runtimeID": "grok"
+            },
+            "fromReturnsAt": 812143193.156496,
+            "id": "0FE1328E-935C-47FB-B569-83042B6E48D6",
+            "reason": "allowanceSpent",
+            "to": {
+              "entryID": "91205B15-FE1B-419B-BE9E-A7E03340B51C",
+              "mode": "default",
+              "runtimeID": "copilot"
+            }
+          }
+        }
+      }
+    },
+    {
+      "at": 812139612.456,
+      "id": "C38A7A9C-F24D-4C23-B3FA-4876203F4259",
+      "kind": {
+        "handoff": {
+          "characters": 516,
+          "markdown": "# Conversation so far\n\nThis conversation is carried over from Grok, because its allowance ran out. You are continuing it. The files are already as described below: nothing was undone.\n\n**You:** Tidy the README.\n**Grok:** You said: Tidy the README.\n\n**The app:** That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done.\n**Grok:** You said: That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done.\n"
+        }
+      }
+    },
+    {
+      "at": 812139612.458,
+      "id": "8D1229EA-00C1-4FBA-AF04-8674F6157175",
+      "kind": {
+        "userMessage": {
+          "_0": "Now make the change."
+        }
+      }
+    },
+    {
+      "at": 812139612.459,
+      "id": "EEAE6B14-F91D-4F82-903F-35502AF930FF",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812139612.46,
+      "id": "43864835-0AC6-4153-887E-386ADE348ABF",
+      "kind": {
+        "agentMessage": {
+          "text": "copilot here. I was handed the conversation so far (516 characters).\n\nYou said: Now make the change."
+        }
+      }
+    },
+    {
+      "at": 812139612.461,
+      "id": "719FC2AB-19E9-43BB-B53D-BB84C600F637",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    },
+    {
+      "at": 812139615.504,
+      "id": "3A6A6378-6D3E-4A9B-BD21-98C694A8E1F1",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Starting Copilot\u2026"
+        }
+      }
+    },
+    {
+      "at": 812139615.529,
+      "id": "19618826-2B1A-4994-A1FC-5B271AE2CD64",
+      "kind": {
+        "runtimeNote": {
+          "_0": "Copilot no longer has this conversation. Carrying on in a new one; everything above is kept."
+        }
+      }
+    },
+    {
+      "at": 812139615.532,
+      "id": "42310201-B118-4B37-8482-6E08A23C9A26",
+      "kind": {
+        "userMessage": {
+          "_0": "That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done.",
+          "from": "app"
+        }
+      }
+    },
+    {
+      "at": 812139615.533,
+      "id": "F06A5FBA-C8B4-42B3-BBA5-90A9E1D88DD2",
+      "kind": {
+        "stateChanged": {
+          "_0": "running"
+        }
+      }
+    },
+    {
+      "at": 812139615.534,
+      "id": "F7009F67-A19E-4232-A065-7C1C835D125C",
+      "kind": {
+        "stateChanged": {
+          "_0": "finished",
+          "reason": "endTurn"
+        }
+      }
+    },
+    {
+      "at": 812139615.534,
+      "id": "6748B564-FB54-4C57-8BBF-B71025058B10",
+      "kind": {
+        "agentMessage": {
+          "text": "You said: That turn ended without a report. Call finish_turn now with how it actually went. If the work is done, that is done."
+        }
+      }
+    }
+  ],
+  "firstIndex": 0,
+  "total": 22
+}

@@ -304,6 +304,39 @@ public actor DaemonCore {
     /// draining. In memory and not on the record: it exists only to keep an agent at
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
+
+    // MARK: The pool (052)
+
+    lazy var poolStore = PoolStore(locations: locations)
+    /// The person's pool, read once and kept in step with `pool.json`.
+    lazy var pool: PoolSettings = poolStore.load()
+    /// Each credential's state, keyed by `AllowanceState.credentialKey`.
+    lazy var allowances: [String: AllowanceState] = Dictionary(
+        poolStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
+    /// The prompt each agent's current turn was sent, for a retry or a carry-on.
+    var lastPrompts: [UUID: SentPrompt] = [:]
+    /// Rate-limit retries so far for each agent's current prompt (R7).
+    var rateLimitAttempts: [UUID: Int] = [:]
+    /// The latest plan window each agent's runtime reported (R2).
+    var latestRateLimit: [UUID: RateLimitInfo] = [:]
+    /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
+    /// before it carries on (052). `resend` is whether the turn failed and its prompt
+    /// goes again.
+    var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
+    /// When `pool/changed` last went out, and whether one is held back to go at the end
+    /// of the second (052 US3): a burst of changes is one broadcast.
+    var poolBroadcastAt: ContinuousClock.Instant?
+    var poolBroadcastHeld = false
+    /// When each runtime was last started just to see its models (US6): at most once in
+    /// ten minutes, so an open Pool page never keeps starting runtimes.
+    var modelsProbedAt: [String: Date] = [:]
+    /// Credentials already tried for the prompt a chat is carrying (052): never gone back
+    /// to for the same prompt. Cleared by a turn that works.
+    var carryTried: [UUID: Set<String>] = [:]
+    /// A handoff to send with the chat's next prompt, when the switch did not re-send one.
+    var pendingHandoff: [UUID: String] = [:]
+    /// How rate limits are retried. A test shortens the waits; nothing else changes it.
+    var rateLimitPolicy = RateLimitPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
     ///
     /// A runtime's cost is a **running total for its session**, not what the last turn
@@ -1050,6 +1083,7 @@ public actor DaemonCore {
             changed(agent)
 
         case .usageChanged(let usage):
+            if let window = usage.rateLimit { notePlanWindow(window, agentID: agentID) }
             guard var agent = agents[agentID] else { return }
             agent.usage = usage
             // The only place a cost ever arrives. The turn's own reply carries tokens
@@ -1159,6 +1193,10 @@ public actor DaemonCore {
         case .unknownNotification(let method):
             DaemonLog.shared.write("agent \(agentID) sent a notification we do not know: \(method)")
 
+        // A failure the runtime reported with no turn running (052): said once in the
+        // conversation, and nothing about the agent's state changes.
+        case .sessionFailure(let failure):
+            await noteFailure(failure, for: agentID)
         case .unknownRequest(let method):
             DaemonLog.shared.write("agent \(agentID) sent a request we do not know, declined: \(method)")
         }

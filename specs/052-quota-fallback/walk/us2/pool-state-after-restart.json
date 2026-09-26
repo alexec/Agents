@@ -1,0 +1,87 @@
+{
+  "at": 812132019.575736,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "DC5E6CFD-C006-4A1E-9B6B-A69DFE5ECF83",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "DC5E6CFD-C006-4A1E-9B6B-A69DFE5ECF83",
+        "learnedFrom": "person",
+        "rateLimitStreak": [],
+        "since": 812132019.575736,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "available": {}
+        }
+      }
+    },
+    {
+      "chats": 0,
+      "entry": {
+        "credentialRef": "openAIAPIKey",
+        "id": "D99A902A-FDFB-47C0-A80F-71DB8A452B55",
+        "payment": {
+          "prepaid": {
+            "amount": {
+              "amount": 10,
+              "currency": "USD"
+            }
+          }
+        },
+        "runtimeID": "codex"
+      },
+      "state": {
+        "credentialKey": "codex:openAIAPIKey",
+        "entryID": "D99A902A-FDFB-47C0-A80F-71DB8A452B55",
+        "learnedFrom": "person",
+        "rateLimitStreak": [],
+        "since": 812132019.575736,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "available": {}
+        }
+      },
+      "unusable": "not installed"
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "DC5E6CFD-C006-4A1E-9B6B-A69DFE5ECF83",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      {
+        "credentialRef": "openAIAPIKey",
+        "id": "D99A902A-FDFB-47C0-A80F-71DB8A452B55",
+        "payment": {
+          "prepaid": {
+            "amount": {
+              "amount": 10,
+              "currency": "USD"
+            }
+          }
+        },
+        "runtimeID": "codex"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "switches": [],
+  "titles": [],
+  "waiting": []
+}

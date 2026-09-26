@@ -137,7 +137,8 @@ struct BackgroundWorkTests {
     @Test func theAppOptsInAndNothingElseDoes() {
         let air = ACP.ClientCapabilities.app.wire["_meta"]?["jetbrains"]?["air"]
         #expect(air?["version"]?.intValue == 1)
-        #expect(air?["capabilities"] == ["asyncTasks", "nativeSubagentSessions"])
+        // 052's typed session failures ride in the same list.
+        #expect(air?["capabilities"] == ["asyncTasks", "nativeSubagentSessions", "sessionFailure"])
         #expect(ACP.ClientCapabilities.none.wire["_meta"] == nil)
         // Every runtime the daemon starts gets the same offer, Gemini's policy included:
         // what arrives is decided by what the runtime does with it, not by its name.

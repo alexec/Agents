@@ -266,6 +266,10 @@ extension DaemonCore {
             appToken = made.appToken
         }
 
+        // What it offers in this folder, for Continue with's preview, which starts
+        // nothing (052, US5), and for the next form.
+        remember(OptionCache.Entry(options: await session.options, commands: await session.commands),
+                 for: OptionCache.key(runtimeID: request.runtimeID, cwd: cwd, mcpServers: request.mcpServers))
         var agent = Agent(runtimeID: request.runtimeID,
                           cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
@@ -489,6 +493,8 @@ extension DaemonCore {
     /// runtime's, because a `session/prompt` sent mid-turn means something different
     /// to each of the three and none of that belongs in the window.
     public func prompt(_ request: DaemonAPI.PromptRequest) async throws {
+        // New words go first: a chat waiting for an allowance waits no more (052, FR-017).
+        dropAllowanceWait(request.agentID)
         try await enqueue(request, first: false)
     }
 
@@ -694,7 +700,9 @@ extension DaemonCore {
     private func sendClaimed(_ next: QueuedPrompt, to agent: Agent) async throws {
         let agentID = agent.id
         let stopsBefore = stops[agentID, default: 0]
-        let session = try await liveSession(for: agent)
+        // On a runtime already known to be out, it moves first (052, FR-012).
+        await moveFirstIfOut(agentID)
+        let session = try await liveSession(for: agents[agentID] ?? agent)
         // Stopped or archived while the runtime was starting. `stop` found nothing
         // to cancel then — no runtime yet, no turn — so this is where it is heard:
         // the runtime goes back and the words stay queued, as stop promises.
@@ -852,7 +860,7 @@ extension DaemonCore {
     ///
     /// This is picking an agent up: same agent, same folder, same conversation, with a
     /// new process behind it and possibly a new runtime session recorded against it.
-    private func liveSession(for agent: Agent) async throws -> ACPSession {
+    func liveSession(for agent: Agent) async throws -> ACPSession {
         if let existing = live[agent.id] { return existing }
         guard let runtime = RuntimeCatalog.runtime(id: agent.runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
@@ -965,6 +973,10 @@ extension DaemonCore {
         if let newSessionID { updated.runtimeSessionID = newSessionID }
         if !refreshed.isEmpty { updated.advertisedOptions = refreshed }
         if !commands.isEmpty { updated.availableCommands = commands }
+        // What it offers in this folder, for the next form, and for Continue with's
+        // preview, which starts nothing (052, US5).
+        remember(OptionCache.Entry(options: refreshed, commands: commands),
+                 for: OptionCache.key(runtimeID: updated.runtimeID, cwd: updated.cwd, mcpServers: updated.mcpServers))
         changed(updated)
         await session.apply(updated.startOptions)
         live[agent.id] = session
@@ -978,7 +990,7 @@ extension DaemonCore {
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
                    from: PromptOrigin = .person, session: ACPSession,
                    unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil,
-                   preface: String? = nil) async {
+                   preface: String? = nil, recorded: Bool = true) async {
         let blocks = blocks ?? [.text(text)]
         // Whatever was suggested has been answered now, by being taken or by being
         // typed past. Either way it is about the turn before this one.
@@ -986,10 +998,16 @@ extension DaemonCore {
         // Only by them. The app's own question is not an answer to a suggestion, and
         // taking the chips away would lose the person something they never acted on
         // over a turn they did not ask for (FR-031).
-        if from == .person { clearSuggestions(for: agentID) }
+        if from == .person, recorded { clearSuggestions(for: agentID) }
         // The text is kept beside the blocks so the record reads the way it always has.
-        await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
-                     for: agentID)
+        // A prompt sent again after a rate limit (052) is already on the record.
+        if recorded {
+            await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
+                         for: agentID)
+            rateLimitAttempts[agentID] = nil
+        }
+        lastPrompts[agentID] = SentPrompt(text: text, blocks: blocks, from: from, preface: preface,
+                                          costBefore: agents[agentID]?.costToDate ?? [:])
         // Stopped or archived while that was written. The move below would otherwise
         // take an archived agent straight back out of the archive — the app's own
         // question to a silent agent did, and started it in a worktree the archive had
@@ -1016,6 +1034,12 @@ extension DaemonCore {
         // above is the user's words alone either way: the transcript says what was
         // said, not what we added to it.
         var outgoing = blocks
+        // A chat moved to this runtime with nothing re-sent carries its handoff on the
+        // first prompt it sends here (052, R4).
+        if let handoff = pendingHandoff.removeValue(forKey: agentID) {
+            outgoing.insert(Self.handoffBlock(handoff, agentID: agentID,
+                                              embedded: await session.initializeResult?.accepts.embeddedContext == true), at: 0)
+        }
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { outgoing.insert(.text(preface), at: 0) }
         // Where it now works, when it has just been moved (053): first of all, so what
@@ -1049,6 +1073,15 @@ extension DaemonCore {
                 await self.turnFailed(agentID: agentID, error: error)
             }
         }
+    }
+
+    /// A typed failure's own sentence, in the conversation (052). A warning is a retry
+    /// in progress: said, and nothing else. The details are the debugger's.
+    func noteFailure(_ failure: SessionFailure, for agentID: UUID) async {
+        let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+        await record(.runtimeNote("\(runtimeName): \(failure.title)"), for: agentID)
+        DaemonLog.shared.write("agent \(agentID): \(failure.severity) \(failure.category) \(failure.actions) "
+                               + "\(failure.reason ?? "") \(failure.details ?? "")")
     }
 
     private func finishTurn(agentID: UUID, result: TurnResult) async {
@@ -1089,8 +1122,16 @@ extension DaemonCore {
                 if usage.cost != nil { broadcastCostState() }
             }
         }
+        // A warning is a retry the runtime is making: said, and the turn's own ending stands.
+        if let warning = result.failure, !warning.isError { await noteFailure(warning, for: agentID) }
         var reason: EndedReason
-        if let failure = result.runtimeError {
+        if let failure = result.failure, failure.isError {
+            // Said in a shape (052, R1): a refused turn now ends `end_turn` with the
+            // failure beside it, and read as a plain `end_turn` it would call the agent
+            // done. Its own sentence goes in the conversation; the ending says it failed.
+            await noteFailure(failure, for: agentID)
+            reason = .runtimeError
+        } else if let failure = result.runtimeError {
             // It said in words that the turn failed and then ended it normally (049).
             // Its words are in the conversation already; this says what they mean, and
             // keeps the row from reading as done.
@@ -1108,6 +1149,17 @@ extension DaemonCore {
                          for: agentID)
             reason = .unrecognised
         }
+        // What the ending says about the runtime's allowance (052): spent, rate limited,
+        // paid overage begun, or nothing. A turn that worked counts against credit.
+        let recognition = recognise(agentID: agentID, failure: result.failure,
+                                    runtimeError: result.runtimeError?.sentence, rateLimit: result.rateLimit)
+        var retrying = false
+        if case .none = recognition, reason == .endTurn {
+            await allowanceWorked(agentID: agentID)
+        } else {
+            retrying = await applyRecognition(recognition, agentID: agentID, reason: &reason)
+        }
+        _ = retrying
         if crossedItsLimit {
             // The limit is what this agent stopped for, whatever the turn's own
             // reason was. Said in the app's voice and with the figure it actually
@@ -1141,7 +1193,9 @@ extension DaemonCore {
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
-        guard stops[agentID, default: 0] == stopsBefore else { return }
+        guard stops[agentID, default: 0] == stopsBefore else { pendingCarry[agentID] = nil; return }
+        // Its allowance ran out and the pool has somewhere else to go (052).
+        if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
         // The agent asked to be archived once this turn was over, and it is over as it
         // said. Not when something was queued while the runtime was let go: the person
         // has moved the work on, and the ask is dropped.
@@ -1262,6 +1316,7 @@ extension DaemonCore {
         let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
         let refused = credentialRefusal(agentID: agentID, error: error)
         let signIn = refused == nil ? Self.signInReason(error) : nil
+        let limit = refused == nil && signIn == nil ? recognise(agentID: agentID, error: error) : .none
         if let refused {
             // Not "stopped answering": it answered, and said no to the sign-in (043, FR-016).
             await record(.runtimeNote(refused.lent
@@ -1273,18 +1328,23 @@ extension DaemonCore {
             markNeedsSignIn(runtimeID: runtimeID)
             askForSignIn(runtimeID: runtimeID, agentID: agentID)
             await record(.runtimeNote("\(runtimeName) needs signing in: \(signIn)"), for: agentID)
-        } else if let limit = Self.usageLimit(error) {
-            // Not "stopped answering" either: the provider said the quota or rate limit
-            // was reached, in a sentence of its own (046, FR-018; Gemini's free tier).
-            await record(.runtimeNote("\(runtimeName) hit its provider’s limit: \(limit)"), for: agentID)
+        } else if limit.moves || { if case .rateLimited = limit { return true } else { return false } }() {
+            // Not "stopped answering" either: the provider said the allowance is spent or
+            // the rate limit reached (046 FR-018, 052). `applyRecognition` below says which.
         } else {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        let limited = refused == nil && signIn == nil && Self.usageLimit(error) != nil
-        await move(agentID, on: refused != nil || signIn != nil ? .turnEnded(.signInRefused)
-                                : limited ? .turnEnded(.refusal) : .processDied)
+        var ending: AgentEvent = refused != nil || signIn != nil ? .turnEnded(.signInRefused) : .processDied
+        var limitReason = EndedReason.refusal
+        if refused == nil, signIn == nil,
+           await applyRecognition(limit, agentID: agentID, reason: &limitReason) || limitReason != .refusal {
+            ending = .turnEnded(limitReason)
+        }
+        await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
+        // Its allowance ran out and the pool has somewhere else to go (052).
+        if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
         // A move asked for before the runtime fell over is still made, but nothing starts
         // by itself: the runtime failing is for the person to see first (053).
         await applyPendingMove(agentID)
@@ -1293,16 +1353,6 @@ extension DaemonCore {
         await drainQueue(after: agentID)
     }
 
-    /// The provider's own sentence when a turn was refused for a quota or rate limit: a
-    /// JSON-RPC 429, or an error that says so. Gemini answers a spent free tier with
-    /// `429 "You have exhausted your daily quota on this model."` (research R13).
-    static func usageLimit(_ error: any Error) -> String? {
-        guard let error = error as? JSONRPCError else { return nil }
-        let words = error.message.lowercased()
-        guard error.code == 429 || words.contains("quota") || words.contains("rate limit")
-                || words.contains("resource_exhausted") else { return nil }
-        return error.message
-    }
 
     /// Close every question this agent has open, because the runtime that asked them has
     /// gone and none of them can be answered now.
@@ -1383,6 +1433,7 @@ extension DaemonCore {
         // stops the pick-up, but `resuming` must go too or the daemon stays alive for
         // a chat nobody is bringing back.
         stops[agentID, default: 0] += 1
+        dropAllowanceWait(agentID)
         let hadPickUpPending = interrupted.removeValue(forKey: agentID) != nil
             || resuming.contains(agentID)
         leaveTheQueue(agentID)
@@ -1482,6 +1533,7 @@ extension DaemonCore {
         // and so does a wait on events (042).
         dropBlock(agentID)
         endWait(agentID, by: .archived)
+        dropAllowanceWait(agentID)
         shownPlanFiles.removeValue(forKey: agentID)
         // And a move still waiting: taken back before the stop below ends the turn it was
         // waiting on, which would otherwise make it on the way into the archive (053).
@@ -1561,6 +1613,8 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         guard agent.state != .archived else { return }
+        dropAllowanceWait(agentID)
+        agent = agents[agentID] ?? agent
         let inFlight = agent.state.hasTurnInFlight
         switch (agent.parking, inFlight) {
         case (.parked, _), (.whenTurnEnds, true): return

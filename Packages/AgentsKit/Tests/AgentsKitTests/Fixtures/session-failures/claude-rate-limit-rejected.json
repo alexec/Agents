@@ -1,0 +1,11 @@
+{
+  "_claude/rateLimit": {
+    "status": "rejected",
+    "resetsAt": 1790000000,
+    "rateLimitType": "five_hour",
+    "utilization": 1.0,
+    "overageStatus": "rejected",
+    "isUsingOverage": false,
+    "overageDisabledReason": "out_of_credits"
+  }
+}

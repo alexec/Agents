@@ -74,6 +74,7 @@ final class AppModel {
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
+    var poolStatus: PoolStatus? { work.poolStatus }
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -119,6 +120,7 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsResources = false
             showsEvents = false
+            showsPool = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -136,6 +138,7 @@ final class AppModel {
             guard showsResources, showsResources != oldValue else { return }
             showsSpending = false
             showsEvents = false
+            showsPool = false
             selection = nil
             openWorkflow = nil
         }
@@ -148,6 +151,25 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsResources = false
+            showsPool = false
+            selection = nil
+            openWorkflow = nil
+        }
+    }
+
+    /// The switch whose settings the person is changing from its note (052, FR-029).
+    var adjustingSwitch: SwitchRecord?
+    /// A chat the person is moving to another runtime by hand (052, US5).
+    var continuingWith: ContinueWith?
+
+    /// Whether the window is showing the Pool page (052). A page like Resources, and not
+    /// persisted for the same reason.
+    var showsPool = false {
+        didSet {
+            guard showsPool, showsPool != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
             selection = nil
             openWorkflow = nil
         }
@@ -189,6 +211,7 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsPool = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         } else if let gone = work.tombstones[agentID] {
@@ -214,7 +237,7 @@ final class AppModel {
     /// the list is driven by.
     var sidebarItem: SidebarItem? {
         get {
-            showsEvents ? .events : showsResources ? .resources
+            showsPool ? .pool : showsEvents ? .events : showsResources ? .resources
                 : showsSpending ? .spending : selectedProjectKey.map(SidebarItem.project)
         }
         set {
@@ -225,10 +248,13 @@ final class AppModel {
                 showResources()
             case .events:
                 showEvents()
+            case .pool:
+                showsPool = true
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
+                showsPool = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -258,6 +284,7 @@ final class AppModel {
         showsSpending = false
         showsResources = false
         showsEvents = false
+        showsPool = false
         select(key)
         selection = nil
         openWorkflow = nil
@@ -773,6 +800,110 @@ final class AppModel {
     /// workflow can reach calls this.
     // MARK: Retiring archived agents (051)
 
+    /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
+    /// by the Settings window.
+    var settingsPaneAsked: SettingsPane?
+
+    /// The pool and each credential's state (052).
+    func refreshPoolStatus(days: Int? = nil) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
+
+    /// Keep a new pool. Returns the daemon's sentence when it will not (FR-001a, FR-032).
+    func setPool(_ pool: PoolSettings) async -> String? {
+        do {
+            let status = try await client.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
+            work.replacePoolStatus(status)
+            // Every connected server carries its chats on by the same pool (052, R6).
+            for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+                _ = try? await client(for: host.id).call(DaemonAPI.Method.poolSet, status.settings,
+                                                         returning: PoolStatus.self)
+            }
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "\(error)"
+        }
+    }
+
+    /// What moving a chat would carry, or what an automatic switch carried (052, US5).
+    /// Nothing changes.
+    func previewContinue(_ request: ContinueWith, choices: [String: JSONValue] = [:])
+        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
+        await continueWith(request, choices: choices, confirmed: false)
+    }
+
+    /// Move the chat, or change what it carried on with. The daemon's sentence when it
+    /// will not.
+    func applyContinue(_ request: ContinueWith, choices: [String: JSONValue],
+                       remember: DaemonAPI.ContinueWithRequest.Remember? = nil) async -> String? {
+        switch await continueWith(request, choices: choices, confirmed: true, remember: remember) {
+        case .success: return nil
+        case .failure(let error): return error.message
+        }
+    }
+
+    private func continueWith(_ request: ContinueWith, choices: [String: JSONValue], confirmed: Bool,
+                              remember: DaemonAPI.ContinueWithRequest.Remember? = nil)
+        async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
+        let call = DaemonAPI.ContinueWithRequest(
+            agentID: request.agentID,
+            entryID: request.adjust ? nil : request.entry.id,
+            runtimeID: request.adjust ? nil : request.entry.runtimeID,
+            adjust: request.adjust, choices: choices, confirmed: confirmed, remember: remember)
+        do {
+            let result = try await client.call(DaemonAPI.Method.agentsContinueWith, call,
+                                               returning: DaemonAPI.ContinueWithResult.self)
+            return .success(result)
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(JSONRPCError(code: -32603, message: "\(error)"))
+        }
+    }
+
+    /// The model options each runtime offers, for Matching models' menus (052, US6).
+    func poolModels(_ runtimeIDs: [String]) async -> [String: [ConfigOption]] {
+        (try? await client.call(DaemonAPI.Method.poolModels, DaemonAPI.PoolModelsRequest(runtimeIDs: runtimeIDs),
+                                returning: [String: [ConfigOption]].self)) ?? [:]
+    }
+
+    /// A chat's own "carry on when this runs out" (052, FR-003).
+    func setSwitching(_ agentID: UUID, isOn: Bool) async {
+        _ = try? await client.call(DaemonAPI.Method.agentsSetSwitching,
+                                   DaemonAPI.SetSwitchingRequest(agentID: agentID, isOn: isOn),
+                                   returning: Agent?.self)
+    }
+
+    /// The Mac's word on the plans it relays, to every connected server (052, R6).
+    private func sendSharedAllowances(_ status: PoolStatus) async {
+        let shared = status.shared ?? []
+        guard !shared.isEmpty else { return }
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.poolApplyAllowances,
+                                                     DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+        }
+    }
+
+    /// A chat stops waiting for an allowance (052, US4).
+    func stopWaiting(_ agentID: UUID) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
+                                                  DaemonAPI.PoolStopWaiting(agentID: agentID),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
+
+    /// The person says a runtime is back: bought more credit, a new month began (FR-023).
+    func markPoolEntryAvailable(_ entryID: UUID) async {
+        guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,
+                                                  DaemonAPI.PoolMarkAvailable(entryID: entryID),
+                                                  returning: PoolStatus.self) else { return }
+        work.replacePoolStatus(status)
+    }
+
     func refreshRetentionState() async {
         guard let state = try? await client.call(DaemonAPI.Method.retentionState,
                                                  Optional<String>.none,
@@ -1055,6 +1186,9 @@ final class AppModel {
         if let update {
             work.apply(update)
             if case .projectChanged = update { settleProjectSelection() }
+            // And the other way: every server hears what the Mac learned about a plan it
+            // relays (052, R6). Only a newer word changes anything there.
+            if case .poolChanged(let status) = update { await sendSharedAllowances(status) }
             if case .attention(let change) = update { await notifier.apply(change) }
             return
         }
@@ -1192,6 +1326,18 @@ final class AppModel {
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged:
             return
+        case DaemonAPI.Notification.poolChanged:
+            // A server's pool page is not this window's. What it learned about a plan the
+            // Mac relays to it is the Mac's to know too (052, R6): its Codex spends the
+            // Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
+            if let status = try? params?.decode(PoolStatus.self) {
+                let shared = status.shared ?? []
+                if !shared.isEmpty {
+                    _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
+                                               DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+                }
+            }
+            return
         default:
             break
         }
@@ -1240,6 +1386,16 @@ final class AppModel {
             _ = try? await server.call(DaemonAPI.Method.retentionSet,
                                        DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                                        returning: DaemonAPI.RetentionSetResult.self)
+        }
+        // And the pool, so a server chat carries on as a Mac one does (052, R6), with
+        // what the Mac knows of the plans it relays.
+        if let status = work.poolStatus {
+            _ = try? await server.call(DaemonAPI.Method.poolSet, status.settings, returning: PoolStatus.self)
+            let shared = status.shared ?? []
+            if !shared.isEmpty {
+                _ = try? await server.call(DaemonAPI.Method.poolApplyAllowances,
+                                           DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
+            }
         }
         // The Mac's limits hold on every server too; each keeps to them on its own.
         if let limits = work.costState?.limits {
@@ -1290,6 +1446,7 @@ final class AppModel {
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
+        async let pool: Void = refreshPoolStatus()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let leases: Void = refreshLeases()
@@ -1298,7 +1455,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
                    elicitations, attention, resuming, cost, retention, cloning, wake, leases, events, modes,
-                   transcript)
+                   transcript, pool)
         #if DEBUG
         openFromLaunchArguments()
         #endif

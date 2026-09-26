@@ -10,6 +10,9 @@ public enum SessionUpdate: Sendable {
     case commands([SlashCommand])
     case modeChanged(String)
     case title(String)
+    /// A typed failure on a `session_info_update`, with the title the same update gave
+    /// the session if it gave one (052).
+    case failure(SessionFailure, title: String?)
     case usage(Usage)
     case plan(Plan)
     case planRemoved(String)
@@ -54,7 +57,9 @@ public enum SessionUpdate: Sendable {
             guard let mode = update["currentModeId"]?.stringValue else { return .unknown(kind) }
             return .modeChanged(mode)
         case "session_info_update":
-            guard let title = update["title"]?.stringValue else { return .ignored(kind) }
+            let title = update["title"]?.stringValue
+            if let failure = SessionFailure.from(meta: update["_meta"]) { return .failure(failure, title: title) }
+            guard let title else { return .ignored(kind) }
             return .title(title)
         case "available_commands_update":
             let listed = update["availableCommands"]?.arrayValue ?? []
@@ -64,7 +69,10 @@ public enum SessionUpdate: Sendable {
             // No size is a window we do not know, which the meter hides itself for. It
             // is not a reason to drop the update: the cost rides in on it.
             let size = update["size"]?.intValue ?? 0
-            return .usage(Usage(used: used, size: size, cost: Cost(wire: update["cost"])))
+            var usage = Usage(used: used, size: size, cost: Cost(wire: update["cost"]))
+            // Claude's plan window rides on the same update (052, R2).
+            usage.rateLimit = RateLimitInfo.from(meta: update["_meta"])
+            return .usage(usage)
         case "compaction_update":
             return .entry(.compaction(status: update["status"]?.stringValue ?? "in_progress",
                                       summary: [ContentBlock](wire: update["summary"])))

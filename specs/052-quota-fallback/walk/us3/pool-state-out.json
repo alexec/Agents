@@ -1,0 +1,104 @@
+{
+  "at": 812132773.770317,
+  "rows": [
+    {
+      "chats": 0,
+      "entry": {
+        "id": "4A8FEE2D-01C0-4293-BD60-A1F3D3577932",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      "state": {
+        "credentialKey": "grok:sign-in",
+        "entryID": "4A8FEE2D-01C0-4293-BD60-A1F3D3577932",
+        "learnedFrom": "typedFailure",
+        "rateLimitStreak": [],
+        "since": 812132772.501818,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "out": {
+            "retryAfter": 812136372.501818,
+            "why": "allowanceSpent"
+          }
+        }
+      }
+    },
+    {
+      "chats": 1,
+      "entry": {
+        "id": "795D3094-B3E6-49C0-B078-E83F62789260",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      },
+      "state": {
+        "credentialKey": "copilot:sign-in",
+        "entryID": "795D3094-B3E6-49C0-B078-E83F62789260",
+        "learnedFrom": "person",
+        "rateLimitStreak": [],
+        "since": 812132773.770317,
+        "spent": {
+          "known": {}
+        },
+        "status": {
+          "available": {}
+        }
+      }
+    }
+  ],
+  "settings": {
+    "entries": [
+      {
+        "id": "4A8FEE2D-01C0-4293-BD60-A1F3D3577932",
+        "payment": {
+          "allowance": {
+            "label": "SuperGrok"
+          }
+        },
+        "runtimeID": "grok"
+      },
+      {
+        "id": "795D3094-B3E6-49C0-B078-E83F62789260",
+        "payment": {
+          "allowance": {}
+        },
+        "runtimeID": "copilot"
+      }
+    ],
+    "isOn": true,
+    "levels": []
+  },
+  "switches": [
+    {
+      "agentID": "F92C024E-EAD8-4E93-B910-9755461CAAAC",
+      "at": 812132772.579,
+      "billing": {
+        "allowance": {}
+      },
+      "carried": [],
+      "dropped": [],
+      "from": {
+        "runtimeID": "grok"
+      },
+      "fromReturnsAt": 812136372.502,
+      "id": "D0B44572-CD52-4BBB-B344-86D56D4E9172",
+      "reason": "allowanceSpent",
+      "to": {
+        "entryID": "795D3094-B3E6-49C0-B078-E83F62789260",
+        "runtimeID": "copilot"
+      }
+    }
+  ],
+  "titles": [
+    "F92C024E-EAD8-4E93-B910-9755461CAAAC",
+    "Tidy the README."
+  ],
+  "waiting": []
+}

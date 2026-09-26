@@ -1,0 +1,17 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:error",
+        "revision": 1,
+        "category": "service",
+        "severity": "error",
+        "title": "Claude is temporarily overloaded.",
+        "actions": [
+          "retry"
+        ]
+      }
+    }
+  }
+}

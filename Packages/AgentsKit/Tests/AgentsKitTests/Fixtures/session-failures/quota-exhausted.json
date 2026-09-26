@@ -1,0 +1,15 @@
+{
+  "jetbrains": {
+    "air": {
+      "version": 1,
+      "sessionFailure": {
+        "id": "turn-1:error",
+        "revision": 1,
+        "category": "limit",
+        "severity": "error",
+        "title": "You've hit your session limit \u00b7 resets 7am (Europe/London)",
+        "actions": []
+      }
+    }
+  }
+}
