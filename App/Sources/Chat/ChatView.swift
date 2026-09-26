@@ -42,8 +42,6 @@ struct ChatView: View {
                         }
                     form
                 }
-                // Back to the project the way Safari goes back a page.
-                .swipeBack { model.selection = nil }
             } else {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)

@@ -14,6 +14,9 @@ import SwiftUI
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
+    /// False where the sessions have a column of their own beside this page (the Mac's
+    /// three columns): the page is then the project's overview, without its chats.
+    var showsSessions = true
 
     @AppStorage("showsArchivedAgents") private var showsArchived = false
     /// How many archived agents are shown. Raised ten at a time, in the view, because
@@ -146,7 +149,7 @@ struct ProjectAgentsView: View {
     private var agents: some View {
         GlassEffectContainer(spacing: Self.cardSpacing) {
             LazyVStack(alignment: .leading, spacing: Self.cardSpacing) {
-                if folder != nil {
+                if folder != nil, showsSessions {
                     SectionHeading(title: "Sessions")
                     if !hasSessions {
                         Text("No sessions")
@@ -155,7 +158,7 @@ struct ProjectAgentsView: View {
                             .padding(.vertical, 6)
                     }
                 }
-                ForEach(AgentGroup.live, id: \.self) { group in
+                ForEach(showsSessions ? AgentGroup.live : [], id: \.self) { group in
                     ForEach(group.headings(model.agents(in: model.selectedProjectKey, group: group))) { heading in
                         GroupHeading(title: heading.title, count: heading.agents.count)
                         ForEach(heading.agents) { agent in
@@ -168,7 +171,7 @@ struct ProjectAgentsView: View {
                 }
 
                 // The archive closes the chats, before the workflows start.
-                archivedSection
+                if showsSessions { archivedSection }
 
                 // What the work is on, between what is happening and what will (038).
                 // Absent on a project that is not on GitHub.
