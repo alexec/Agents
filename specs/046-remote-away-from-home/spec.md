@@ -27,9 +27,11 @@ they use the direct link, as now. The person never chooses between them.
 
 ## Defaults taken *(Alex to confirm or overturn)*
 
+**Look gate approved by Alex 2026-09-25** on `look/away-mock.png` (away mark, needs-the-same-network pane, never-paired projects).
+
 Each has a default so the spec is complete; each is marked where it is used as *(default Dn)*.
 
-- **D1. Pairing is automatic on the same network.** The first time a device connects on the direct
+- **D1. Pairing is automatic on the same network.** *(Confirmed by Alex 2026-09-25.)* The first time a device connects on the direct
   link, it and the Mac swap public keys, and from then on it may use the relayed link. There is no
   code to type and no approval step at the Mac. This keeps today's direct-link trust (anyone on the
   home network can already drive agents) and adds nothing weaker. *Alternative: the Mac shows the
