@@ -298,7 +298,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
   - Its agents already get `mcp.json` servers through `sessionServers`, since R10 goes by the handshake (049 measured `mcpCapabilities {http, sse}`). Prove it with `probe/acp.py` using 049's command line.
   - 049's D7 gives it a home of the app's own (`GEMINI_HOME=<root>/runtimes/antigravity/home`), so links in `~` never reach it. Probe where it reads skills, instructions and plugins under that home, and add an Antigravity rule to the table that places links **inside the app's own home**, not `~/.gemini`.
   - Add its column to the Shared tab's reach.
-- [ ] T054 Update `specs/054-user-dotagents/tasks.md` ticks and the memory note. Do not merge: merging is Alex's call.
+- [X] T054 Update `specs/054-user-dotagents/tasks.md` ticks and the memory note. Do not merge: merging is Alex's call.
 
 ---
 
