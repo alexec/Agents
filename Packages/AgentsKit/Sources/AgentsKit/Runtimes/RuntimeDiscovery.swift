@@ -94,10 +94,14 @@ public struct RuntimeDiscovery: Sendable {
     /// actually fails is not documented and has not been confirmed.
     public func probe(_ runtime: Runtime, at path: String, cwd: URL) async -> RuntimeAvailability {
         do {
+            // The runtime's own launch variables too, so a probe of Antigravity never falls
+            // back to the person's `~/.gemini` (049). Its home is the daemon's, beside `tools/`.
+            let root = macToolsHome.map { ($0 as NSString).deletingLastPathComponent } ?? NSTemporaryDirectory()
             let session = try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                                 arguments: runtime.arguments,
                                                 cwd: cwd,
-                                                environment: LoginShellPath.environment())
+                                                environment: RuntimeLaunchCatalog.launch(for: runtime.id)
+                                                    .environment(over: LoginShellPath.environment(), root: root))
             let result = try await session.initialize()
             await session.end(gracePeriod: .seconds(2))
             return .available(path: path, supportsResume: result.supportsResume)

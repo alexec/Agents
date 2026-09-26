@@ -976,7 +976,14 @@ extension DaemonCore {
             }
         }
         var reason: EndedReason
-        if let known = result.reason {
+        if let failure = result.runtimeError {
+            // It said in words that the turn failed and then ended it normally (049).
+            // Its words are in the conversation already; this says what they mean, and
+            // keeps the row from reading as done.
+            let runtimeName = agents[agentID].flatMap { RuntimeCatalog.runtime(id: $0.runtimeID)?.name } ?? "The runtime"
+            await record(.runtimeNote("\(runtimeName) could not do this turn: \(failure.sentence)"), for: agentID)
+            reason = .runtimeError
+        } else if let known = result.reason {
             reason = known
         } else {
             // Written down as given. The ending line says only that the reason is

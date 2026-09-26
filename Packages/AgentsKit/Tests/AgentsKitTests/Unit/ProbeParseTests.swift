@@ -35,6 +35,25 @@ struct ProbeParseTests {
         signin:file
         """
 
+    /// 047: a line per app toolset, so Codex's is known beside Claude's.
+    @Test func everyAppToolsetIsReadByItsRuntime() throws {
+        let text = Self.devbox.replacingOccurrences(of: "toolset:dcc7e847c9890e9d",
+            with: "toolset:dcc7e847c9890e9d\ntoolset.claude:dcc7e847c9890e9d\ntoolset.codex:bfaa3f9fe30fc00f")
+        let facts = try ServerInstaller.parseProbe(text)
+        #expect(facts.toolsetIDs == ["claude": "dcc7e847c9890e9d", "codex": "bfaa3f9fe30fc00f"])
+        #expect(facts.toolsetID(for: "codex") == "bfaa3f9fe30fc00f")
+        #expect(facts.toolsetID(for: "claude") == "dcc7e847c9890e9d")
+        #expect(try ServerInstaller.parseProbe(Self.bare).toolsetID(for: "codex") == nil)
+    }
+
+    @Test func factsFromBefore047StillSayClaudesToolset() throws {
+        var facts = try ServerInstaller.parseProbe(Self.devbox)
+        facts.toolsetIDs = [:]
+        let old = try JSONDecoder().decode(ServerFacts.self, from: try JSONEncoder().encode(facts))
+        #expect(old.toolsetID(for: "claude") == "dcc7e847c9890e9d")
+        #expect(old.toolsetID(for: "codex") == nil)
+    }
+
     @Test func aBareServerHasCurlAndNothingElse() throws {
         let facts = try ServerInstaller.parseProbe(Self.bare)
         #expect(facts.libc == .glibc(major: 2, minor: 36))
@@ -105,5 +124,15 @@ struct ProbeParseTests {
     @Test func theProbeAsksAboutEveryToolsetRuntime() {
         #expect(ServerInstaller.toolsetRuntimes.split(separator: " ").contains("gemini"))
         #expect(ServerInstaller.probeScript.contains("signin.gemini"))
+        #expect(ServerInstaller.toolsetRuntimes.split(separator: " ").contains("codex"))
+        #expect(ServerInstaller.probeScript.contains("signin.codex"))
+    }
+
+    /// Codex's own sign-in on a server is the file its own `codex login` saved (047).
+    @Test func codexsOwnSignInIsItsSavedFile() throws {
+        let with = try ServerInstaller.parseProbe(Self.bare + "\nsignin.codex:file")
+        #expect(with.hasOwnSignIn("codex"))
+        let without = try ServerInstaller.parseProbe(Self.bare + "\nsignin.codex:none")
+        #expect(!without.hasOwnSignIn("codex"))
     }
 }

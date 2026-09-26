@@ -25,9 +25,87 @@
 #
 # `--platform-package` is the name every per-platform package starts with; the lock must hold
 # one for linux-x64, linux-arm64, darwin-x64 and darwin-arm64, or nothing is written.
+#
+# Or a runtime the vendor ships as a signed archive per platform (049), from the ACP registry:
+#
+#   ./scripts/update-toolset.sh --archive <runtime> <registry-id> [--min-free-bytes N]
+#   ./scripts/update-toolset.sh --archive antigravity antigravity-acp --min-free-bytes 1000000000
+#
+# Writes App/Resources/toolsets/<runtime>/manifest.json only: each platform's URL (dl.google.com
+# and nothing else), size, SHA-256 (the registry has none, so every archive is downloaded and
+# hashed here), command and arguments. `knownBroken` reasons already in the manifest are kept.
+# The id is the SHA-256 of that file. The archives themselves are never kept or committed.
 set -euo pipefail
 
 root=${0:A:h:h}
+
+if [[ ${1:-} == --archive ]]; then
+  runtime=${2:?runtime id, e.g. antigravity}
+  registry_id=${3:?ACP registry id, e.g. antigravity-acp}
+  shift 3
+  min_free=1000000000
+  while (( $# )); do
+    case $1 in
+      --min-free-bytes) min_free=$2; shift 2 ;;
+      *) print -u2 "unknown option $1"; exit 2 ;;
+    esac
+  done
+  out=$root/App/Resources/toolsets/$runtime
+  work=$(mktemp -d /tmp/$runtime-archive.XXXX)
+  trap 'rm -rf $work' EXIT
+  curl -fsSL "https://raw.githubusercontent.com/agentclientprotocol/registry/main/$registry_id/agent.json" \
+    -o $work/agent.json
+  mkdir -p $out
+  RUNTIME=$runtime REGISTRY_ID=$registry_id MIN_FREE=$min_free WORK=$work OUT=$out python3 - <<'PY'
+import hashlib, json, os, subprocess, sys
+work, out = os.environ["WORK"], os.environ["OUT"]
+agent = json.load(open(f"{work}/agent.json"))
+old = {}
+try:
+    old = json.load(open(f"{out}/manifest.json")).get("platforms", {})
+except FileNotFoundError:
+    pass
+platforms = {}
+for name, entry in sorted(agent["distribution"]["binary"].items()):
+    if not (name.startswith("darwin-") or name.startswith("linux-")):
+        continue
+    url = entry["archive"]
+    if not url.startswith("https://dl.google.com/"):
+        sys.exit(f"refusing {url}: not on dl.google.com")
+    path = f"{work}/{name}.zip"
+    print(f"downloading {name}…", file=sys.stderr)
+    subprocess.run(["curl", "-fsSL", "-o", path, url], check=True)
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    platform = {
+        "url": url,
+        "sha256": digest.hexdigest(),
+        "size": os.path.getsize(path),
+        "command": entry["cmd"].removeprefix("./"),
+        "arguments": entry.get("args", []),
+    }
+    if old.get(name, {}).get("knownBroken"):
+        platform["knownBroken"] = old[name]["knownBroken"]
+    platforms[name] = platform
+    os.remove(path)
+manifest = {
+    "runtimeID": os.environ["RUNTIME"],
+    "kind": "archive",
+    "version": agent["version"],
+    "source": f"acp-registry:{os.environ['REGISTRY_ID']}",
+    "minFreeBytes": int(os.environ["MIN_FREE"]),
+    "platforms": platforms,
+}
+with open(f"{out}/manifest.json", "w") as f:
+    json.dump(manifest, f, indent=2, sort_keys=True)
+    f.write("\n")
+PY
+  print "Wrote $out/manifest.json ($(python3 -c "import json;print(json.load(open('$out/manifest.json'))['version'])"))"
+  exit 0
+fi
+
 runtime=${1:?runtime id, e.g. codex}
 node_version=${2:?node version, e.g. v24.21.0}
 package=${3:?npm package, e.g. @agentclientprotocol/codex-acp}
