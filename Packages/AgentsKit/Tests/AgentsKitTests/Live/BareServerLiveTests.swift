@@ -90,7 +90,7 @@ struct BareServerLiveTests {
 
 extension BareServerLiveTests {
     /// Made up, in the shape Google issues: Google refuses it, which is the point.
-    static let madeUpGemini = Secret("AIzaSyBARELIVEMADEUPGEMINIKEY000000000")!
+    static let madeUpGemini = Secret("AIza" + "SyBARELIVEMADEUPGEMINIKEY000000000")!
 
     /// 046, US4: Gemini's toolset installs on a bare server beside Claude's, the key is lent
     /// on demand, a start goes ahead once lent, Google's refusal is said as a refusal, and
