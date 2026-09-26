@@ -17,9 +17,9 @@ struct ServersSettingsView: View {
                                   name: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)
                 }
             } header: {
-                Text("Signing in on servers")
+                Text("Runtime credentials")
             } footer: {
-                Text("Used only by agents on servers; agents on this Mac use this Mac’s own sign-in. Kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
+                Text("Claude’s is used only by agents on servers; Claude on this Mac uses this Mac’s own sign-in. Gemini’s is used by Gemini agents here and on servers. Kept in this Mac’s Keychain and never written on a server — though any program running as you on a server can read it while an agent runs there.")
             }
             .paperListRow()
             Section {

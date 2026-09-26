@@ -79,6 +79,26 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// What Settings calls one when it cannot say which kind: "token" for Claude's two,
+    /// "key" for Gemini's.
+    public static func noun(for runtimeID: String) -> String {
+        kinds(for: runtimeID).contains(.geminiAPIKey) ? "key" : "token"
+    }
+
+    /// Where to get one, under the paste field.
+    public static func whereToGet(for runtimeID: String) -> String {
+        kinds(for: runtimeID).contains(.geminiAPIKey)
+            ? "Get one at aistudio.google.com/apikey. Gemini agents on this Mac use it too: Google’s own sign-in is closed to individuals."
+            : "Make one with `claude setup-token` on this Mac, or use an API key from console.anthropic.com."
+    }
+
+    /// What is said when the pasted text is not one.
+    public static func pasteRefusal(for runtimeID: String) -> String {
+        kinds(for: runtimeID).contains(.geminiAPIKey)
+            ? "That isn’t a Gemini API key. They start AIza or AQ."
+            : "That isn’t a Claude token or API key. They start sk-ant-oat or sk-ant-api."
+    }
+
     var prefixes: [String] {
         switch self {
         case .oauthToken: ["sk-ant-oat"]

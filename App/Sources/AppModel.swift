@@ -888,6 +888,10 @@ final class AppModel {
             try await client.connect()
             isConnected = true
             problem = nil
+            await client.setCredentialLender { [weak self] wanted in
+                await self?.answerMacCredentialWanted(wanted) ?? false
+            }
+            await lendToThisMac()
             listen()
             startPresence()
             presence?.connected()
