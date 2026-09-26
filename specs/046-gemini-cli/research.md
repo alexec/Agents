@@ -316,5 +316,5 @@ stub stdio MCP server named `agents` offering `finish_turn`.
   as on servers (D3 revised); a `GEMINI_API_KEY` already in the person's environment is used
   when Settings has none. The sheet's Google choice stays (Gemini offers it; Workspace and
   paid accounts may still work) and its refusal is shown as Gemini words it.
-- **Quota (R9)**: not provoked; the free tier did not run out in five turns. Left to the walk.
+- **Quota (R9)**: measured on the walk: the spent free tier answers `session/prompt` with JSON-RPC `429` "You have exhausted your daily quota on this model."; the process lives on.
 - **Modes**: `default`, `autoEdit`, `yolo`, `plan` (ids differ from the help text's `auto_edit`).

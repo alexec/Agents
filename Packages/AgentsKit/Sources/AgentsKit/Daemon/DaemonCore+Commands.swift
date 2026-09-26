@@ -1098,15 +1098,31 @@ extension DaemonCore {
                 ? "\(runtimeName) refused the token in Settings. Replace it in Settings ▸ Servers."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
+        } else if let limit = Self.usageLimit(error) {
+            // Not "stopped answering" either: the provider said the quota or rate limit
+            // was reached, in a sentence of its own (046, FR-018; Gemini's free tier).
+            await record(.runtimeNote("\(runtimeName) hit its provider’s limit: \(limit)"), for: agentID)
         } else {
             await record(.runtimeNote("\(runtimeName) stopped answering."), for: agentID)
         }
         DaemonLog.shared.write("agent \(agentID): the runtime stopped answering: \(error)")
-        await move(agentID, on: refused == nil ? .processDied : .turnEnded(.signInRefused))
+        let limited = refused == nil && Self.usageLimit(error) != nil
+        await move(agentID, on: refused != nil ? .turnEnded(.signInRefused) : limited ? .turnEnded(.refusal) : .processDied)
         await releaseRuntime(for: agentID)
         // Picking the agent back up is what any prompt does, so what was queued still
         // goes. A runtime that fell over is not a reason to lose what somebody typed.
         await drainQueue(after: agentID)
+    }
+
+    /// The provider's own sentence when a turn was refused for a quota or rate limit: a
+    /// JSON-RPC 429, or an error that says so. Gemini answers a spent free tier with
+    /// `429 "You have exhausted your daily quota on this model."` (research R13).
+    static func usageLimit(_ error: any Error) -> String? {
+        guard let error = error as? JSONRPCError else { return nil }
+        let words = error.message.lowercased()
+        guard error.code == 429 || words.contains("quota") || words.contains("rate limit")
+                || words.contains("resource_exhausted") else { return nil }
+        return error.message
     }
 
     /// Close every question this agent has open, because the runtime that asked them has
