@@ -339,3 +339,27 @@ Still unprobed: no Gemini sign-in on this Mac. R9 saw it load a plugin's MCP ser
 once Alex's Gemini key is in Settings (046's key row). Until then Gemini gets the extension link
 and `mcpServers` (both harmless if unused), no instruction or skill links (R1), and shows as
 "not checked yet" in the tab.
+
+## R15 — Antigravity (T055, 2026-09-26)
+
+**Method.** The built `agentsd` on a scratch root, running Antigravity as the app does
+(`GEMINI_HOME=<root>/runtimes/antigravity/home`, 049's D7), with the live app's file sign-in
+copied into that scratch home for the probe and deleted afterwards. A different probe word was
+placed in each candidate location, and the model was asked for the words. MCP evidence is the
+probe server's own log, as in R9. Where to look came from the path strings in the vendored
+server (`resolve_skills_paths`, `load_global_mcp_configs`, the harness's "customization root").
+
+| What | Where it was tried | Read? |
+|---|---|---|
+| Skills | `<home>/config/skills/<name>`, a real folder (KITE-4) | **yes** |
+| Skills | `<home>/config/skills/<name>`, an absolute link to a folder elsewhere (HERON-7) | **yes** |
+| Instructions | `<home>/AGENTS.md`, `<home>/GEMINI.md`, `<home>/config/AGENTS.md`, `<home>/config/GEMINI.md`, `<home>/config/rules/*.md` | no |
+| Instructions | `$HOME/.gemini/GEMINI.md`, `$HOME/.gemini/config/{AGENTS,GEMINI}.md`, `$HOME/.gemini/config/rules/*.md` (a probe `HOME`) | no |
+| Plugins | `<home>/config/plugins/<name>` linked to a Claude-shaped plugin (`.mcp.json`) and to one with `mcp_config.json` | no: neither skill offered, neither server started |
+| MCP servers | `~/.agents/mcp.json`, sent in `session/new` by `sessionServers` | **yes**: `heron-mcp` initialize, tools/list, tools/call |
+
+**Decision.** An Antigravity rule: skills are linked, with absolute links, into
+`<its home>/config/skills` inside the app's own root, never `~/.gemini`. The links are recorded
+by absolute path and swept like the others. It gets no instructions ("reads no personal
+instructions file when the app starts it") and no plugins. Its column shows in the Shared tab
+with the dot **A**.

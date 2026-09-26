@@ -53,6 +53,11 @@ public enum PersonalDotAgents {
         /// Whether it takes a stdio MCP server from the client (R9: Copilot does not).
         public var takesStdioServers: Bool
         public var pluginHandover: PluginHandover
+        /// Where its skill links go inside the home the app gives it, for a runtime that
+        /// never reads the person's (Antigravity, 049's D7): relative to that home.
+        public var appHomeSkillsFolder: String? = nil
+        /// Why it gets no personal instructions, once measured; nil while unmeasured.
+        public var noInstructions: String? = nil
     }
 
     /// Gemini has no skills or instructions rule until it is probed (R14), so it gets no
@@ -69,13 +74,21 @@ public enum PersonalDotAgents {
              adopts: false, takesStdioServers: true, pluginHandover: .sessionMetaWithServers),
         Rule(runtimeID: "cursor", configFolder: ".cursor", readsSharedSkills: true,
              skillsFolder: nil, instructionsFile: nil,
-             adopts: false, takesStdioServers: true, pluginHandover: .none),
+             adopts: false, takesStdioServers: true, pluginHandover: .none,
+             noInstructions: "Cursor keeps User Rules in its own settings"),
         Rule(runtimeID: "copilot", configFolder: ".copilot", readsSharedSkills: true,
              skillsFolder: nil, instructionsFile: ".copilot/copilot-instructions.md",
              adopts: false, takesStdioServers: false, pluginHandover: .none),
         Rule(runtimeID: "gemini", configFolder: ".gemini", readsSharedSkills: false,
              skillsFolder: nil, instructionsFile: nil,
              adopts: false, takesStdioServers: true, pluginHandover: .extensionLink),
+        // Its home is the app's, never `~/.gemini` (049's D7), so its skills are linked
+        // in there. Over ACP it read no instructions file and no plugin folder (T055).
+        Rule(runtimeID: "antigravity", configFolder: "", readsSharedSkills: false,
+             skillsFolder: nil, instructionsFile: nil,
+             adopts: false, takesStdioServers: true, pluginHandover: .none,
+             appHomeSkillsFolder: "config/skills",
+             noInstructions: "Antigravity reads no personal instructions file when the app starts it"),
     ]
 
     public static func rule(for runtimeID: String) -> Rule? {
@@ -120,7 +133,8 @@ public enum PersonalDotAgents {
     /// Bring the home in line with `~/.agents`, for the runtimes that are installed.
     /// Every step is its own attempt (FR-012), and running it twice with nothing changed
     /// changes nothing (FR-011).
-    public static func reconcile(home: URL, installed: Set<String>, record: inout Record) {
+    public static func reconcile(home: URL, installed: Set<String>, record: inout Record,
+                                 appHomes: [String: URL] = [:]) {
         let shared = home.appending(path: folder, directoryHint: .isDirectory)
         for name in [skills, personas] {
             attempt("create \(folder)/\(name)") {
@@ -147,6 +161,10 @@ public enum PersonalDotAgents {
             }
             if rule.pluginHandover == .extensionLink {
                 linkGeminiExtensions(home: home, record: &record)
+            }
+            if let folder = rule.appHomeSkillsFolder, let appHome = appHomes[rule.runtimeID] {
+                linkSkills(home: home, intoAppFolder: appHome.appending(path: folder, directoryHint: .isDirectory),
+                           record: &record)
             }
         }
     }
@@ -194,6 +212,41 @@ public enum PersonalDotAgents {
             try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: destination)
             record.links[path] = destination
+        }
+    }
+
+    /// One absolute link per skill in a folder of the app's own (Antigravity's home is
+    /// in the app's root, so a relative link would climb out of it), recorded by its
+    /// absolute path. The same table as `placeLink`, and the same sweep afterwards.
+    static func linkSkills(home: URL, intoAppFolder folderURL: URL, record: inout Record) {
+        let fileManager = FileManager.default
+        let shared = home.appending(path: "\(folder)/\(skills)", directoryHint: .isDirectory)
+        let present = Set(sharedSkills(home: home))
+        let prefix = folderURL.path + "/"
+        if let entries = try? fileManager.contentsOfDirectory(atPath: folderURL.path) {
+            for name in entries {
+                let url = folderURL.appending(path: name)
+                guard let destination = try? fileManager.destinationOfSymbolicLink(atPath: url.path),
+                      destination.hasPrefix(shared.path + "/"), !fileManager.fileExists(atPath: destination) else { continue }
+                attempt("remove the dangling link \(url.path)") { try fileManager.removeItem(at: url) }
+            }
+        }
+        for key in record.links.keys where key.hasPrefix(prefix) && !present.contains(String(key.dropFirst(prefix.count))) {
+            record.links.removeValue(forKey: key)
+        }
+        for skill in present.sorted() {
+            let url = folderURL.appending(path: skill)
+            let target = shared.appending(path: skill).path
+            if let existing = try? fileManager.destinationOfSymbolicLink(atPath: url.path) {
+                if existing == target { record.links[url.path] = record.links[url.path] ?? existing }
+                continue
+            }
+            if DotAgents.exists(url) || record.links[url.path] != nil { continue }
+            attempt("link \(url.path)") {
+                try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
+                try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: target)
+                record.links[url.path] = target
+            }
         }
     }
 

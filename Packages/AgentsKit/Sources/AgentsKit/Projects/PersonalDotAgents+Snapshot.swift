@@ -21,7 +21,8 @@ extension PersonalDotAgents {
         "copilot": ".copilot/mcp-config.json", "gemini": ".gemini/settings.json",
     ]
 
-    public static func snapshot(home: URL?, installed: Set<String>, record: Record) -> DaemonAPI.SharedSnapshot {
+    public static func snapshot(home: URL?, installed: Set<String>, record: Record,
+                                appHomes: [String: URL] = [:]) -> DaemonAPI.SharedSnapshot {
         guard let home else { return Snapshot(home: "", laidOut: false) }
         let shared = home.appending(path: folder, directoryHint: .isDirectory)
         let present = rules.filter { installed.contains($0.runtimeID) }
@@ -32,14 +33,16 @@ extension PersonalDotAgents {
         var looks: [DaemonAPI.Look] = []
         snapshot.instructions = instructions(home: home, present: present, looks: &looks)
         let plugins = personalPluginFolders(home: home)
-        snapshot.skills = skills(home: home, present: present, plugins: plugins, record: record, looks: &looks)
+        snapshot.skills = skills(home: home, present: present, plugins: plugins, record: record, appHomes: appHomes,
+                                 looks: &looks)
         snapshot.mcp = mcp(home: home, present: present, looks: &looks)
         snapshot.plugins = plugins.map { plugin(home: home, $0, present: present, record: record) }
         if !plugins.isEmpty {
             let none = present.filter { $0.pluginHandover == .none }.map(\.runtimeID)
             if !none.isEmpty {
+                let who = none.count == 1 ? "It takes" : none.count == 2 ? "Neither takes" : "None of them takes"
                 looks.append(.init(kind: .noWay, page: .plugins, item: names(none),
-                                   text: "\(none.count == 1 ? "It takes" : "Neither takes") no plugin from the app. Their own installs still work in their own sessions."))
+                                   text: "\(who) a plugin from the app. Their own installs still work in their own sessions."))
             }
         }
         snapshot.otherFiles = otherFiles(shared)
@@ -60,10 +63,10 @@ extension PersonalDotAgents {
         var reach: [String: Reach] = [:]
         for rule in present {
             guard let file = rule.instructionsFile else {
-                if rule.runtimeID == "cursor" {
-                    reach[rule.runtimeID] = .noWay("Cursor keeps User Rules in its own settings")
-                    looks.append(.init(kind: .noFile, page: .instructions, item: "Cursor",
-                                       text: "Cursor has no personal instructions file; it keeps User Rules in its own settings."))
+                if let why = rule.noInstructions {
+                    reach[rule.runtimeID] = .noWay(why)
+                    looks.append(.init(kind: .noFile, page: .instructions, item: names([rule.runtimeID]),
+                                       text: "No personal instructions file: \(why.prefix(1).lowercased() + why.dropFirst())."))
                 } else {
                     reach[rule.runtimeID] = .unchecked(nil)
                 }
@@ -84,7 +87,7 @@ extension PersonalDotAgents {
 
     // MARK: Skills
 
-    private static func skills(home: URL, present: [Rule], plugins: [URL], record: Record,
+    private static func skills(home: URL, present: [Rule], plugins: [URL], record: Record, appHomes: [String: URL],
                                looks: inout [DaemonAPI.Look]) -> [DaemonAPI.Skill] {
         let folderURL = home.appending(path: "\(folder)/\(skills)", directoryHint: .isDirectory)
         var list: [DaemonAPI.Skill] = []
@@ -108,6 +111,15 @@ extension PersonalDotAgents {
                     }
                 } else if rule.readsSharedSkills {
                     reach[rule.runtimeID] = .gets("reads ~/.agents/skills")
+                } else if let appFolder = rule.appHomeSkillsFolder, let appHome = appHomes[rule.runtimeID] {
+                    let link = appHome.appending(path: "\(appFolder)/\(name)")
+                    if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) == url.path {
+                        reach[rule.runtimeID] = .gets("through a link in the home the app gives it")
+                    } else if DotAgents.exists(link) {
+                        reach[rule.runtimeID] = .ownCopy(link.path)
+                    } else {
+                        reach[rule.runtimeID] = .leftOut("its link in the home the app gives it was removed")
+                    }
                 } else {
                     reach[rule.runtimeID] = .unchecked(nil)
                 }

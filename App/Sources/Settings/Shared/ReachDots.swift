@@ -2,7 +2,7 @@ import AgentsKit
 import SwiftUI
 
 /// One dot per installed runtime, in the rule table's order (C Claude · X Codex · G Grok ·
-/// U Cursor · P Copilot · M Gemini): filled when it gets the thing, struck through and
+/// U Cursor · P Copilot · M Gemini · A Antigravity): filled when it gets the thing, struck through and
 /// faint when it does not, dashed when nobody has checked.
 ///
 /// Hidden from accessibility: every row it sits in says the same in its one label, and a
@@ -21,7 +21,7 @@ struct ReachDots: View {
     }
 
     static func letter(_ runtimeID: String) -> String {
-        ["claude": "C", "codex": "X", "grok": "G", "cursor": "U", "copilot": "P", "gemini": "M"][runtimeID]
+        ["claude": "C", "codex": "X", "grok": "G", "cursor": "U", "copilot": "P", "gemini": "M", "antigravity": "A"][runtimeID]
             ?? String(runtimeID.prefix(1)).uppercased()
     }
 

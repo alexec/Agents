@@ -294,7 +294,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 - [ ] T051 [P] Write `docs/how-to/share-skills-across-agents.md` (skills, AGENTS.md, `mcp.json`, plugins, what moves the first time, opting a skill out) and update `docs/explanation/projects-hosts-worktrees.md`, `docs/reference/runtimes.md` (per runtime: skills, instructions, MCP transports, plugins, the bridge) and `docs/reference/settings.md` (the Shared tab). Run `scripts/docs-check.py`.
 - [ ] T052 Run the full quickstart (steps 1–6) and record the results in `walk/README.md`. Run `swift test` six times, and compare the failures with T001's baseline before blaming this branch.
 - [ ] T053 Build both schemes and the Linux gate. Confirm `MCPBridge` is compiled out of the Linux build. Check that no `/tmp/dotagents-probe`, scratch root or borrowed sign-in is left behind (`probe/run.sh clean`).
-- [ ] T055 [P] Antigravity (049, branch `agents/speckit-specify-support-antigravity`), once it is merged:
+- [X] T055 [P] Antigravity (049, branch `agents/speckit-specify-support-antigravity`), once it is merged:
   - Its agents already get `mcp.json` servers through `sessionServers`, since R10 goes by the handshake (049 measured `mcpCapabilities {http, sse}`). Prove it with `probe/acp.py` using 049's command line.
   - 049's D7 gives it a home of the app's own (`GEMINI_HOME=<root>/runtimes/antigravity/home`), so links in `~` never reach it. Probe where it reads skills, instructions and plugins under that home, and add an Antigravity rule to the table that places links **inside the app's own home**, not `~/.gemini`.
   - Add its column to the Shared tab's reach.

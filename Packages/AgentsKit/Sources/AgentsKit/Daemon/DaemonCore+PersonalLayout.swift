@@ -13,11 +13,23 @@ extension DaemonCore {
         guard let home = locations.personalHome else { return }
         var record = PersonalDotAgents.Record.load(from: locations.personalLayout, home: home)
         let before = record
-        PersonalDotAgents.reconcile(home: home, installed: installedRuntimeIDs(), record: &record)
+        PersonalDotAgents.reconcile(home: home, installed: installedRuntimeIDs(), record: &record, appHomes: appHomes())
         guard record != before else { return }
         PersonalDotAgents.attempt("save \(locations.personalLayout.lastPathComponent)") {
             try record.save(to: locations.personalLayout)
         }
+    }
+
+    /// The homes the app gives runtimes of its own, from their launch environment's
+    /// `<root>` value (Antigravity's `GEMINI_HOME`, 049's D7).
+    func appHomes() -> [String: URL] {
+        var homes: [String: URL] = [:]
+        for launch in RuntimeLaunchCatalog.builtIn {
+            guard let value = launch.environment.values.compactMap({ $0 }).first(where: { $0.hasPrefix("<root>") })
+            else { continue }
+            homes[launch.runtimeID] = URL(filePath: value.replacingOccurrences(of: "<root>", with: locations.root.path))
+        }
+        return homes
     }
 
     /// The runtimes this Mac can start. A runtime's folder alone is not proof: Antigravity
@@ -144,6 +156,7 @@ extension DaemonCore {
     func sharedSnapshot() -> DaemonAPI.SharedSnapshot {
         guard let home = locations.personalHome else { return PersonalDotAgents.snapshot(home: nil, installed: [], record: .init(home: "")) }
         return PersonalDotAgents.snapshot(home: home, installed: installedRuntimeIDs(),
-                                          record: .load(from: locations.personalLayout, home: home))
+                                          record: .load(from: locations.personalLayout, home: home),
+                                          appHomes: appHomes())
     }
 }
