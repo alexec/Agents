@@ -101,4 +101,36 @@ struct HandshakeTests {
         #expect(current.id == "main")
         #expect(!current.canBeDisabled, "required means the client must not call providers/disable")
     }
+
+    /// Steering is advertised in `initialize`'s root `_meta`, beside the capabilities
+    /// rather than in them, as the Claude adapter and codex-acp both put it.
+    @Test func steeringIsReadOffTheRootMeta() throws {
+        let said: JSONValue = ["protocolVersion": 1, "agentCapabilities": [:],
+                               "_meta": ["steering": ["supported": true]]]
+        let result = try said.decode(ACP.InitializeResult.self)
+        #expect(result.supportsSteering)
+        #expect(RuntimeAccount(runtimeID: "anything", handshake: result).canSteer)
+        let silent = try JSONValue.object(["protocolVersion": 1]).decode(ACP.InitializeResult.self)
+        #expect(!silent.supportsSteering)
+    }
+
+    @Test func steeringIsNotAskedOfARuntimeThatNeverOfferedIt() async throws {
+        let (mine, theirs) = PairedTransport.pair()
+        let agent = FakeACPAgent(script: .init(), transport: theirs)
+        let session = ACPSession(transport: mine)
+        _ = try await session.initialize()
+        await #expect(throws: ACPSessionError.self) { _ = try await session.steer([.text("now")]) }
+        #expect(await agent.steers.isEmpty)
+        await agent.stop()
+    }
+
+    /// An account from a daemon that predates steering still reads, and never offers it.
+    @Test func anOlderAccountReadsWithoutSteering() throws {
+        var encoded = try JSONValue.encoding(RuntimeAccount(runtimeID: "claude", canSteer: true))
+        if case .object(var object) = encoded {
+            object.removeValue(forKey: "canSteer")
+            encoded = .object(object)
+        }
+        #expect(try encoded.decode(RuntimeAccount.self).canSteer == false)
+    }
 }

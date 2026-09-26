@@ -546,6 +546,70 @@ extension DaemonCore {
         changed(agent)
     }
 
+    /// Sending one queued prompt now, into the turn that is running, rather than after it.
+    ///
+    /// Only where the runtime advertised `_session/steering`; the row offers it nowhere
+    /// else. Asked with `idleBehavior: promptRequired`, so a turn that ended before the
+    /// words reached it hands them back and they go as an ordinary prompt, first in the
+    /// queue. A permission card waiting on the person is left alone: the Claude adapter
+    /// delivers the words `later` then, once the card is answered, rather than cancel it.
+    ///
+    /// No turn of ours in flight — starting, or already over — is the ordinary path:
+    /// the words go to the front of the queue and out, which is what "now" means then.
+    public func sendNow(_ request: DaemonAPI.UnqueueRequest) async throws {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        // Gone already: it went out as the turn ended, or was taken back.
+        guard let index = agent.queuedPrompts.firstIndex(where: { $0.id == request.promptID }) else { return }
+        let queued = agent.queuedPrompts.remove(at: index)
+        guard turnTasks[agent.id] != nil, let session = live[agent.id] else {
+            agent.queuedPrompts.insert(queued, at: 0)
+            changed(agent)
+            try await sendNextQueued(to: agent.id)
+            return
+        }
+        guard await session.initializeResult?.supportsSteering == true else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
+                               message: "This agent's runtime cannot take words in the middle of a turn.")
+        }
+        // Off the queue before the wait, so the turn ending in it does not send the
+        // same words a second time behind this.
+        changed(agent)
+        var outgoing = queued.blocks
+        if let preface = queued.preface { outgoing.insert(.text(preface), at: 0) }
+        let outcome: ACP.SteeringOutcome
+        do {
+            outcome = try await session.steer(outgoing)
+        } catch {
+            await putBack(queued, on: request.agentID)
+            await record(.runtimeNote("Could not send that now: \(reason(error)) It is still waiting."),
+                         for: request.agentID)
+            return
+        }
+        switch outcome {
+        case .injected, .startedNewTurn:
+            // `startedNewTurn` is codex-acp, which does not know `promptRequired`, in the
+            // moment a turn ended under the words. They were said either way.
+            await record(.userMessage(queued.text, blocks: queued.blocks.count > 1 ? queued.blocks : [],
+                                      from: queued.from),
+                         for: request.agentID)
+        case .promptRequired:
+            await putBack(queued, on: request.agentID)
+            try await sendNextQueued(to: request.agentID)
+        case .failed:
+            await putBack(queued, on: request.agentID)
+            await record(.runtimeNote("Could not send that now. It is still waiting."), for: request.agentID)
+        }
+    }
+
+    /// Words that did not go into the turn, back where they will go next.
+    private func putBack(_ queued: QueuedPrompt, on agentID: UUID) async {
+        guard var agent = agents[agentID] else { return }
+        agent.queuedPrompts.insert(queued, at: 0)
+        changed(agent)
+    }
+
     /// Files under this agent's folders worth offering for what follows an `@` (033).
     ///
     /// The Mac's window walks the disk itself; a phone cannot, so it asks here, and the

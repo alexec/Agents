@@ -87,6 +87,9 @@ actor FakeACPAgent {
         var sessions: [JSONValue] = []
         /// What `initialize` offers as ways to sign in.
         var authMethods: [JSONValue] = []
+        /// Advertise `_meta.steering.supported`, and answer `_session/steering` with
+        /// this outcome. Nil advertises nothing, and the method is not found.
+        var steering: String?
     }
 
     private var script: Script
@@ -104,6 +107,8 @@ actor FakeACPAgent {
     private(set) var promptContent: JSONValue?
     private(set) var deletedSessions: [String] = []
     private(set) var disabledProviders: [String] = []
+    /// Every `_session/steering` request, as it arrived.
+    private(set) var steers: [JSONValue] = []
     /// What `session/new` was asked for, so a test can see what we attached to a
     /// session rather than only what we recorded against the agent.
     private(set) var newSessionParams: JSONValue?
@@ -135,12 +140,18 @@ actor FakeACPAgent {
             // What every runtime the app starts says, unless a test says otherwise.
             if capabilities["mcpCapabilities"] == nil { capabilities["mcpCapabilities"] = ["http": true, "sse": true] }
             capabilities["sessionCapabilities"] = .object(sessionCapabilities)
-            return .success([
+            var result: [String: JSONValue] = [
                 "protocolVersion": .int(script.protocolVersion),
                 "agentCapabilities": .object(capabilities),
                 "agentInfo": ["name": "FakeACPAgent", "version": "1.0"],
                 "authMethods": .array(script.authMethods),
-            ])
+            ]
+            if script.steering != nil { result["_meta"] = ["steering": ["supported": true]] }
+            return .success(.object(result))
+
+        case ACP.Method.steering where script.steering != nil:
+            steers.append(params ?? .null)
+            return .success(["outcome": .string(script.steering ?? "")])
 
         case ACP.Method.newSession:
             newSessionParams = params
