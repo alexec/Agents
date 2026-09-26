@@ -24,6 +24,19 @@ import Network
 // nested and signed the way it is, read and write a record in the CloudKit private
 // database? It answers by doing it and prints the answer, and it exists so that the
 // question is settled by running something rather than by reading Apple's forum.
+if CommandLine.arguments.contains("--spike-relay") {
+    Task {
+        do {
+            try await RelaySpike.run()
+            exit(0)
+        } catch {
+            log("relay spike failed: \(error)")
+            exit(2)
+        }
+    }
+    dispatchMain()
+}
+
 if CommandLine.arguments.contains("--spike") || CommandLine.arguments.contains("--peek") {
     Task {
         do {

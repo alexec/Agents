@@ -213,3 +213,36 @@ Two things this plan rests on and no test on this Mac can settle:
 
 If (1) fails, take R3's fallback. If (2) is regularly over 3 s, lower the Mac's poll interval
 and tell Alex the figure before building US2.
+
+### R13 results (2026-09-25)
+
+**(1) Secure Enclave keys in HPKE auth mode — works, on this Mac's enclave.** A throwaway
+`swiftc` program made a `SecureEnclave.P256.KeyAgreement.PrivateKey` and used it as both
+the authenticating *sender* (sealed to a software key) and the authenticating *recipient*
+(opened a frame from a software key). Both opened. CryptoKit's enclave API is the same on
+iOS, so R3's fallback is not expected to be needed; the phone confirms it on first use
+(T006).
+
+**(2) Round trips through the real iCloud — under 3 s.** `agents-bridge --spike-relay` runs
+a phone end and a Mac end in one process against the private database of
+`iCloud.com.alexecollins.agents` (DEVELOPMENT), with a pretend daemon that answers. It uses
+the shipped timings.
+
+| Run | Opening a session | Median of 10 | Worst of 10 | 3 MB reply (as an asset) |
+|---|---|---|---|---|
+| First build (Mac polls 1 s after asking which zones changed; replies batched 400 ms; phone polls 1 s) | 6.9 s | 3.35 s | 3.53 s | 2.7 s |
+| After tightening (below) | 6.3 s | **2.57 s** | **2.90 s** | 2.6 s |
+
+What changed, all timing and none of it parsing:
+- the Mac reads a live session's zone directly every 0.5 s, and asks which zones changed
+  only every 3 s while a session is live (that question is a round trip of its own);
+- the first thing the daemon says after a device's request goes after 50 ms, not 400 ms;
+- for 5 s after asking, the phone looks for the answer every 250 ms, not every second.
+
+The budget is still small: about 2 requests a second from the Mac while a session is live,
+and up to 4 a second from the phone for the few seconds after it asks. That is against
+CloudKit's roughly 40 per user.
+
+What this does not measure is the phone's own radio on mobile data, which adds its own
+latency to each of the phone's requests. That is T006, on Alex's phone.
+

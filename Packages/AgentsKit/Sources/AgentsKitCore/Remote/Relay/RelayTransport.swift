@@ -136,6 +136,9 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
         var ready = false
         var finished = false
         var readyWaiters: [CheckedContinuation<Void, any Error>] = []
+        /// When the phone last asked something. For a few seconds after, it looks for the
+        /// answer four times a second rather than once (R7).
+        var askedAt: Date = .distantPast
 
         init(channel: any RelayChannel, device: UUID, session: UUID, key: any RelayKey, macKey: Data,
              lines: AsyncThrowingStream<String, any Error>.Continuation, patience: TimeInterval,
@@ -189,7 +192,9 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
                 guard !finished else { return }
                 let frame: Frame
                 switch item {
-                case .line(let line): frame = Frame(session: session, direction: .toMac, seq: take(), lines: [line])
+                case .line(let line):
+                    askedAt = Date()
+                    frame = Frame(session: session, direction: .toMac, seq: take(), lines: [line])
                 case .keepAlive: frame = Frame(session: session, direction: .toMac, seq: take())
                 case .end: frame = Frame(session: session, direction: .toMac, seq: take(), end: true)
                 }
@@ -221,7 +226,8 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
             let ticker = Task {
                 // A tick is a poke on a timer; the loop below cannot tell them apart.
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: every)
+                    let waiting = await self.isWaitingOnAnAnswer
+                    try? await Task.sleep(for: waiting ? min(every, .milliseconds(250)) : every)
                     await self.tick()
                 }
             }
@@ -231,6 +237,8 @@ public final class RelayTransport: LineTransport, @unchecked Sendable {
                 await fetch()
             }
         }
+
+        var isWaitingOnAnAnswer: Bool { Date().timeIntervalSince(askedAt) < 5 }
 
         private func tick() async {
             guard !finished else { return }

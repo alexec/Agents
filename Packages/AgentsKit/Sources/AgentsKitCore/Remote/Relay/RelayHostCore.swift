@@ -32,6 +32,10 @@ public actor RelayHostCore {
     private var paired: [UUID: Data] = [:]
     private var sessions: [UUID: Session] = [:]
     private var lastLive: Date = .distantPast
+    private var lookedForNewSessionsAt: Date = .distantPast
+    /// How soon an answer goes after the device asked: long enough to catch a reply and
+    /// the notifications that come with it in one frame, short enough not to be felt.
+    private let answerWindow: TimeInterval = 0.05
 
     final class Session {
         let id: UUID
@@ -42,6 +46,10 @@ public actor RelayHostCore {
         var lastHeard: Date
         var daemon: (any LineTransport)?
         var reading: Task<Void, Never>?
+        /// The device has just asked something: the next thing the daemon says is very
+        /// likely the answer, and a person is waiting on it, so it goes without the
+        /// batching window. Nothing is parsed to know this — it is only timing.
+        var askedAt: Date?
 
         init(id: UUID, device: UUID, patience: TimeInterval, window: TimeInterval, now: Date) {
             self.id = id
@@ -54,7 +62,7 @@ public actor RelayHostCore {
 
     public init(channel: any RelayChannel, key: any RelayKey, openDaemon: @escaping OpenDaemon,
                 window: TimeInterval = 0.4, silence: TimeInterval = 120, patience: TimeInterval = 10,
-                livePoll: TimeInterval = 1, idlePoll: TimeInterval = 5,
+                livePoll: TimeInterval = 0.5, idlePoll: TimeInterval = 5,
                 clock: @escaping @Sendable () -> Date = { Date() }) {
         self.livePoll = livePoll
         self.idlePoll = idlePoll
@@ -101,8 +109,14 @@ public actor RelayHostCore {
 
     /// One pass: what has arrived, then whatever is due to go.
     public func poll() async throws {
-        var devices = Set(try await channel.changedDevices())
-        devices.formUnion(sessions.keys)
+        // A live session's zone is read directly every pass. Asking which zones changed is
+        // a round trip of its own, so while anybody is here it is only asked every few
+        // seconds, for a device that is starting a session (R7).
+        var devices = Set(sessions.keys)
+        if sessions.isEmpty || clock().timeIntervalSince(lookedForNewSessionsAt) > 3 {
+            lookedForNewSessionsAt = clock()
+            devices.formUnion(try await channel.changedDevices())
+        }
         for device in devices where paired[device] != nil {
             let records: [FrameRecord]
             do {
@@ -148,6 +162,7 @@ public actor RelayHostCore {
                 sessions[device] = session
             }
             session.lastHeard = clock()
+            if !frame.lines.isEmpty { session.askedAt = clock() }
             for ready in session.order.accept(frame, now: clock()) {
                 if ready.seq == 0 { await open(session) }
                 for line in ready.lines { try? session.daemon?.write(line: line) }
@@ -179,7 +194,21 @@ public actor RelayHostCore {
 
     private func daemonSaid(_ line: String, session id: UUID, device: UUID) async {
         guard let session = sessions[device], session.id == id else { return }
-        if let full = session.batcher.append(line, now: clock()) { await post(full, in: session) }
+        let now = clock()
+        if let full = session.batcher.append(line, now: now) { await post(full, in: session) }
+        if let asked = session.askedAt, now.timeIntervalSince(asked) < 5 {
+            session.askedAt = nil
+            // Wait only a moment for what comes with it, then send.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(self?.answerWindow ?? 0.05))
+                await self?.flush(session: id, device: device)
+            }
+        }
+    }
+
+    private func flush(session id: UUID, device: UUID) async {
+        guard let session = sessions[device], session.id == id, let lines = session.batcher.flush() else { return }
+        await post(lines, in: session)
     }
 
     private func daemonWent(session id: UUID, device: UUID) async {
