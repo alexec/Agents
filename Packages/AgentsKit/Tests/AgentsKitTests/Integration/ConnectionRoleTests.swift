@@ -13,7 +13,9 @@ import Testing
 struct ConnectionRoleTests {
     private func path() -> String { "/tmp/ag-role-\(UUID().uuidString.prefix(8)).sock" }
 
-    private func connect(_ path: String) -> Int32 {
+    /// `waiting` bounds each raw read below; a transport handed the socket must not have
+    /// it, or a slow answer reads as the socket closing.
+    private func connect(_ path: String, waiting: Bool = true) -> Int32 {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -25,6 +27,7 @@ struct ConnectionRoleTests {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, size) }
         }
         precondition(result == 0, "could not connect: \(errno)")
+        guard waiting else { return fd }
         var wait = timeval(tv_sec: 0, tv_usec: 200_000)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &wait, socklen_t(MemoryLayout<timeval>.size))
         return fd
@@ -216,7 +219,7 @@ struct ConnectionRoleTests {
         let server = try server(.control, at: path, heard: heard)
         defer { server.stop() }
 
-        let bound = try await DeviceBinder.bind(FDTransport(socket: connect(path)), device: UUID())
+        let bound = try await DeviceBinder.bind(FDTransport(socket: connect(path, waiting: false)), device: UUID())
         defer { bound.close() }
         let client = JSONRPCConnection(transport: bound)
         await client.start()
@@ -232,7 +235,7 @@ struct ConnectionRoleTests {
         let server = try server(.agent, at: path, heard: Heard())
         defer { server.stop() }
         await #expect(throws: DeviceBinder.Failure.self) {
-            _ = try await DeviceBinder.bind(FDTransport(socket: connect(path)), device: nil)
+            _ = try await DeviceBinder.bind(FDTransport(socket: connect(path, waiting: false)), device: nil)
         }
     }
 

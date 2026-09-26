@@ -26,6 +26,8 @@
 	<array>
 		<string>_agents._tcp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>To read the pairing code your Mac shows, so only your own phone or iPad can connect to it.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Alex Collins</string>
 	<key>NSLocalNetworkUsageDescription</key>

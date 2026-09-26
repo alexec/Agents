@@ -94,6 +94,12 @@ public extension DaemonAPI {
             self.scope = scope
             self.groups = groups
         }
+
+        /// A page narrowed as the filter says, before `before` when given.
+        public init(before: EventPosition? = nil, _ filter: EventFilter) {
+            self.init(before: before, scope: filter.scope,
+                      groups: filter.groups.isEmpty ? nil : EventGroup.allCases.filter(filter.groups.contains))
+        }
     }
 
     struct CancelWaitRequest: Codable, Sendable, Hashable {

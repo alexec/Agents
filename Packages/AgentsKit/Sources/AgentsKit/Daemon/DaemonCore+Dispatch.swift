@@ -12,12 +12,12 @@ extension DaemonCore {
     /// not say, and nil only for a caller inside this process.
     public func handle(method: String, params: JSONValue?,
                        from surface: Surface? = nil, connection: UUID? = nil,
-                       peer: Int32? = nil) async -> Result<JSONValue, JSONRPCError> {
+                       peer: Int32? = nil, role: ConnectionRole = .control) async -> Result<JSONValue, JSONRPCError> {
         if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
         return await RequestConnection.$current.withValue(connection) {
-            await dispatch(method: method, params: params, from: surface, connection: connection)
+            await dispatch(method: method, params: params, from: surface, connection: connection, role: role)
         }
     }
 
@@ -40,7 +40,8 @@ extension DaemonCore {
     }
 
     private func dispatch(method: String, params: JSONValue?,
-                          from surface: Surface?, connection: UUID?) async -> Result<JSONValue, JSONRPCError> {
+                          from surface: Surface?, connection: UUID?,
+                          role: ConnectionRole) async -> Result<JSONValue, JSONRPCError> {
         do {
             switch method {
             case DaemonAPI.Method.ping:
@@ -95,7 +96,17 @@ extension DaemonCore {
             case DaemonAPI.Method.devicesAnnounce:
                 let announcement = try require(params, as: DaemonAPI.DeviceAnnouncement.self)
                 return .success(try JSONValue.encoding(
-                    DaemonAPI.AnnounceReply(device: try announce(announcement), macKey: relayKey())))
+                    DaemonAPI.AnnounceReply(device: try announce(announcement, role: role), macKey: relayKey())))
+
+            case DaemonAPI.Method.devicesStartPairing:
+                return .success(try JSONValue.encoding(try startPairing()))
+
+            case DaemonAPI.Method.devicesStopPairing:
+                stopPairing()
+                return .success([:])
+
+            case DaemonAPI.Method.pairingCurrent:
+                return .success(try JSONValue.encoding(currentPairing()))
 
             case DaemonAPI.Method.devicesForget:
                 let request = try require(params, as: DaemonAPI.DeviceForget.self)

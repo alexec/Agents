@@ -452,8 +452,20 @@ final class AppModel {
         devices.sort { $0.announcedAt < $1.announcedAt }
     }
 
-    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac from away
-    /// until it is next on the same network, where it pairs again by itself.
+    /// Settings ▸ Devices ▸ Pair a Device (security review, Phase 3): a code for the
+    /// phone to scan, good for five minutes or one device.
+    func startPairing() async throws -> DaemonAPI.PairingCode {
+        try await client.call(DaemonAPI.Method.devicesStartPairing, Optional<String>.none,
+                              returning: DaemonAPI.PairingCode.self)
+    }
+
+    /// The pairing sheet closed: the code it showed stops working at once.
+    func stopPairing() async {
+        _ = try? await client.call(DaemonAPI.Method.devicesStopPairing, Optional<String>.none)
+    }
+
+    /// Settings ▸ Devices ▸ Forget (046): the device stops reaching this Mac, at home
+    /// and away, until it is paired again with a new code.
     func forgetDevice(_ id: UUID) async {
         do {
             try await client.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
@@ -668,21 +680,25 @@ final class AppModel {
         work.replaceLeases(snapshot)
     }
 
-    /// The newest page of events and who is waiting (042). A daemon too old to know the
-    /// method leaves the list empty, and the Events page says there is nothing yet.
-    func refreshEvents() async {
-        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(),
+    /// The newest page of events and who is waiting (042), narrowed by `filter`, or as
+    /// the page last narrowed it. A daemon too old to know the method leaves the list
+    /// empty, and the Events page says there is nothing yet.
+    func refreshEvents(_ filter: EventFilter? = nil) async {
+        let filter = filter ?? work.eventsFilter
+        work.eventsFilter = filter
+        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
-        work.takeEvents(page)
+        work.takeEvents(page, for: filter)
     }
 
     /// The page before the oldest event the window has, for scrolling back.
     func loadOlderEvents() async {
+        let filter = work.eventsFilter
         guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
         guard let page = try? await client.call(DaemonAPI.Method.eventsList,
-                                                DaemonAPI.EventsListRequest(before: oldest),
+                                                DaemonAPI.EventsListRequest(before: oldest, filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
-        work.takeEvents(page, appending: true)
+        work.takeEvents(page, for: filter, appending: true)
     }
 
     /// The person cancelling an agent's wait (042 FR-013). The Mac only.
