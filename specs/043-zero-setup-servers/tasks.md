@@ -59,7 +59,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 ## Phase 3: Look gate (settle the UX before depth)
 
 - [X] T017 Build the five screens of contracts/ui.md as views over stub state, against the fake-ssh host on a scratch root: `App/Sources/Settings/CredentialRow.swift` (§ 1), the per-server toggle and Claude line in `App/Sources/Settings/ServersSettingsView.swift` (§ 2), `App/Sources/Chat/TokenAskCard.swift` (§ 3), the Install Claude step in `App/Sources/Hosts/AddServerFlow.swift` (§ 4), `App/Sources/Hosts/RebuiltServerSheet.swift` (§ 5), and gone rows in `App/Sources/Projects/ProjectListView.swift` (§ 6)
-- [ ] T018 (walked 2026-09-25, screenshots in walk/look/; Alex's approval open) Walk them with the run-app skill (scratch root, screenshots of each into `specs/043-zero-setup-servers/walk/look/`) and ask Alex to approve the look before Phase 4; lease the screen while driving it
+- [X] T018 (walked 2026-09-25, screenshots in walk/look/; approved by Alex 2026-09-25) Walk them with the run-app skill (scratch root, screenshots of each into `specs/043-zero-setup-servers/walk/look/`) and ask Alex to approve the look before Phase 4; lease the screen while driving it
 
 ---
 
