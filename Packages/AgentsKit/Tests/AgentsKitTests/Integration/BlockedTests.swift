@@ -39,10 +39,11 @@ struct BlockedTests {
         return core
     }
 
-    /// A turn that lasts, so a test can report while it is still going.
-    private static func slow(_ delay: Duration) -> FakeACPAgent.Script {
+    /// A turn that lasts until the test opens `gate`, so a test can report while it is
+    /// still going however slow the machine.
+    private static func held(_ gate: TurnGate) -> FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
-        script.turnDelay = delay
+        script.gate = gate
         return script
     }
 
@@ -115,12 +116,13 @@ struct BlockedTests {
 
     /// The P1 case, whole: one helper reports, one ends silently, and the agent that
     /// waited on both is resumed once, after the second, told how each ended.
-    @Test(.flakyUnderLoad) func twoHelpersFinishingGiveOneResumeNamingEach() async throws {
+    @Test func twoHelpersFinishingGiveOneResumeNamingEach() async throws {
         let (locations, work) = try temporary()
         // The helpers first, so the lead's quick turn — and the question after it —
-        // cannot take a helper's slow script.
+        // cannot take a helper's held script.
+        let firstGate = TurnGate(), secondGate = TurnGate()
         let launcher = FakeLauncher(script: .init(),
-                                    then: [Self.slow(.milliseconds(700)), Self.slow(.milliseconds(1_400))])
+                                    then: [Self.held(firstGate), Self.held(secondGate)])
         let core = try await makeCore(locations, launcher)
         let (first, firstToken) = try await agent(core, in: work, "Port the model")
         let (second, _) = try await agent(core, in: work, "Update the tests")
@@ -132,6 +134,7 @@ struct BlockedTests {
         #expect(note.contains("Blocked"))
         #expect(await core.agent(lead)?.group(wantsEyes: false) == .blocked)
         try await finish(core, firstToken, "done", "Ported.")
+        firstGate.open()
 
         await settled(core, first, "the first helper finished")
         try await quiet()
@@ -139,6 +142,7 @@ struct BlockedTests {
         let waits = try #require(await core.agent(lead)?.report?.block?.waits)
         #expect(waits.filter { $0.ending != nil }.map(\.agentID) == [first])
 
+        secondGate.open()
         await settled(core, second, "the second helper finished, and was asked how")
         await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
         await settled(core, lead, "the lead's resumed turn ended")
@@ -152,16 +156,19 @@ struct BlockedTests {
 
     /// Reported mid-turn, with what it named already over by the time its own turn
     /// ends: resumed then, once.
-    @Test(.flakyUnderLoad) func aBlockWhoseWaitsClosedBeforeItsTurnEndedIsResumedWhenItEnds() async throws {
+    @Test func aBlockWhoseWaitsClosedBeforeItsTurnEndedIsResumedWhenItEnds() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(900)), Self.slow(.milliseconds(200))])
+        let leadGate = TurnGate(), helperGate = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(leadGate), Self.held(helperGate)])
         let core = try await makeCore(locations, launcher)
         let (lead, leadToken) = try await agent(core, in: work, "Lead")
         let (helper, helperToken) = try await agent(core, in: work, "Helper")
         try await finish(core, leadToken, "blocked", "Waiting on the helper.", waitingOn: [helper.uuidString])
         try await finish(core, helperToken, "done", "Done.")
+        helperGate.open()
         await settled(core, helper)
         #expect(await core.agent(lead)?.state == .running, "the lead's own turn is still going")
+        leadGate.open()
         await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
         await settled(core, lead)
         try await quiet()
@@ -210,7 +217,7 @@ struct BlockedTests {
     /// A circle is refused however long it is, and names the agents in it.
     @Test func aCircleIsRefused() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: Self.slow(.seconds(20)))
+        let launcher = FakeLauncher(script: Self.held(TurnGate()))
         let core = try await makeCore(locations, launcher)
         let (a, aToken) = try await agent(core, in: work, "A")
         let (b, bToken) = try await agent(core, in: work, "B")
@@ -238,9 +245,10 @@ struct BlockedTests {
 
     // MARK: US3 — the person can unblock it
 
-    @Test(.flakyUnderLoad) func aPersonsPromptEndsTheBlockAndNothingIsSentLater() async throws {
+    @Test func aPersonsPromptEndsTheBlockAndNothingIsSentLater() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
+        let helperGate = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(helperGate)])
         let core = try await makeCore(locations, launcher)
         let (helper, helperToken) = try await agent(core, in: work, "Helper")
         let (lead, leadToken) = try await agent(core, in: work, "Lead")
@@ -249,15 +257,17 @@ struct BlockedTests {
         try await core.prompt(.init(agentID: lead, text: Block.carryOnPrompt))
         #expect(await core.agent(lead)?.report == nil)
         try await finish(core, helperToken, "done", "Done.")
+        helperGate.open()
         await settled(core, helper)
         await settled(core, lead)
         try await quiet()
         #expect(try await resumes(core, lead).isEmpty)
     }
 
-    @Test(.flakyUnderLoad) func stoppingABlockedAgentStopsItAndNothingIsSentLater() async throws {
+    @Test func stoppingABlockedAgentStopsItAndNothingIsSentLater() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
+        let helperGate = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(helperGate)])
         let core = try await makeCore(locations, launcher)
         let (helper, helperToken) = try await agent(core, in: work, "Helper")
         let (lead, leadToken) = try await agent(core, in: work, "Lead")
@@ -269,15 +279,17 @@ struct BlockedTests {
         #expect(stopped.endedReason == .cancelled)
         #expect(stopped.group(wantsEyes: false) == .stopped)
         try await finish(core, helperToken, "done", "Done.")
+        helperGate.open()
         await settled(core, helper)
         try await quiet()
         #expect(await core.agent(lead)?.state == .stopped)
         #expect(try await resumes(core, lead).isEmpty)
     }
 
-    @Test(.flakyUnderLoad) func archivingABlockedAgentIsNeverUndoneByAResume() async throws {
+    @Test func archivingABlockedAgentIsNeverUndoneByAResume() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: .init(), then: [Self.slow(.milliseconds(800))])
+        let helperGate = TurnGate()
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(helperGate)])
         let core = try await makeCore(locations, launcher)
         let (helper, helperToken) = try await agent(core, in: work, "Helper")
         let (lead, leadToken) = try await agent(core, in: work, "Lead")
@@ -285,6 +297,7 @@ struct BlockedTests {
         try await finish(core, leadToken, "blocked", "Waiting.", waitingOn: [helper.uuidString])
         try await core.archive(lead)
         try await finish(core, helperToken, "done", "Done.")
+        helperGate.open()
         await settled(core, helper)
         try await quiet()
         #expect(await core.agent(lead)?.state == .archived)
@@ -294,7 +307,7 @@ struct BlockedTests {
     /// Stopping the agent waited on counts as its ending.
     @Test func aWaitedOnAgentThatIsStoppedClearsTheBlock() async throws {
         let (locations, work) = try temporary()
-        let launcher = FakeLauncher(script: .init(), then: [Self.slow(.seconds(20))])
+        let launcher = FakeLauncher(script: .init(), then: [Self.held(TurnGate())])
         let core = try await makeCore(locations, launcher)
         let (helper, _) = try await agent(core, in: work, "Helper")
         let (lead, leadToken) = try await agent(core, in: work, "Lead")
