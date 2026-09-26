@@ -858,23 +858,34 @@ struct PromptBar: View {
             }
             .disabled(!listed.canMakeNew)
             let others = listed.worktrees.filter { !$0.isProjectFolder }
-            if !others.isEmpty {
+            if !others.isEmpty || !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
-                ForEach(others) { worktree in
-                    SelectChoice(title: worktree.name,
-                                 description: worktreeDescription(worktree),
-                                 isChosen: model.draftWorktree == .existing(worktree.root)) {
-                        model.chooseWorktree(.existing(worktree.root))
-                        dismiss()
+                ScrollingChoices {
+                    ForEach(others) { worktree in
+                        SelectChoice(title: worktree.name,
+                                     description: worktreeDescription(worktree),
+                                     isChosen: model.draftWorktree == .existing(worktree.root)) {
+                            model.chooseWorktree(.existing(worktree.root))
+                            dismiss()
+                        }
+                        .disabled(!worktree.exists)
                     }
-                    .disabled(!worktree.exists)
-                }
-            }
-            if !listed.branches.isEmpty {
-                Divider().padding(.vertical, 4)
-                BranchChoices(branches: listed.branches, chosen: chosenBranch) { name in
-                    model.chooseWorktree(.branch(name))
-                    dismiss()
+                    if !listed.branches.isEmpty {
+                        if !others.isEmpty { Divider().padding(.vertical, 4) }
+                        Text("New worktree on a branch")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 4)
+                        ForEach(listed.branches) { branch in
+                            SelectChoice(title: branch.name,
+                                         description: branch.remote.map { "From \($0)" },
+                                         isChosen: chosenBranch == branch.name) {
+                                model.chooseWorktree(.branch(branch.name))
+                                dismiss()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -924,54 +935,22 @@ struct PromptBar: View {
     }
 }
 
-/// Branches a new worktree can be made on, in the Worktree chooser. A repository can
-/// have hundreds, so they scroll, and past a handful there is a field to find one.
-private struct BranchChoices: View {
-    let branches: [DaemonAPI.BranchSummary]
-    let chosen: String?
-    let choose: (String) -> Void
+/// The worktrees and branches in the Worktree chooser, which can outgrow the screen:
+/// a repository can have hundreds of branches, so past a height they scroll.
+private struct ScrollingChoices<Content: View>: View {
+    static var tallest: CGFloat { 320 }
 
-    @State private var filter = ""
+    @ViewBuilder let content: Content
 
-    private var shown: [DaemonAPI.BranchSummary] {
-        let words = filter.trimmingCharacters(in: .whitespaces)
-        guard !words.isEmpty else { return branches }
-        return branches.filter { $0.name.localizedCaseInsensitiveContains(words) }
-    }
+    @State private var contentHeight: CGFloat = 0
 
+    // A popover sizes to what is in it, and a scroll view has no size of its own,
+    // so it is given the height of its rows, up to the tallest it may be.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("New worktree on a branch")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 4)
-            if branches.count > 6 {
-                TextField("Find a branch", text: $filter)
-                    .textFieldStyle(.roundedBorder)
-                    .appText(.fine)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-            // A popover sizes to what is in it, and a scroll view has no size of its
-            // own, so a short list is laid out as it is and a long one given a height.
-            if branches.count > 6 {
-                ScrollView { rows }.frame(height: 220)
-            } else {
-                rows
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) { content }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-    }
-
-    private var rows: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(shown) { branch in
-                SelectChoice(title: branch.name,
-                             description: branch.remote.map { "From \($0)" },
-                             isChosen: chosen == branch.name) {
-                    choose(branch.name)
-                }
-            }
-        }
+        .frame(height: min(contentHeight, Self.tallest))
     }
 }

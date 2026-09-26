@@ -21,6 +21,16 @@ public enum LoginShellPath {
     /// answer does not change while the app is running.
     public static func directories() -> [String] {
         if let cached = cache.value { return cached }
+        #if DEBUG
+        // A scratch run that needs every agent to look missing (048's walk) points this at
+        // an empty folder. The system's own folders stay, as they would on any PATH: none
+        // holds an agent, and the toolset's shim needs `dirname`. Debug builds only.
+        if let override = ProcessInfo.processInfo.environment[testSearchPathsVariable] {
+            let directories = override.split(separator: ":").map(String.init) + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+            cache.value = directories
+            return directories
+        }
+        #endif
         // First place wins, as it does for the shell. A login PATH often names a
         // directory twice (a profile that prepends what path_helper already put there).
         var directories: [String] = []
@@ -52,6 +62,21 @@ public enum LoginShellPath {
         let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         return text.split(separator: ":").map(String.init)
+    }
+
+    public static let testSearchPathsVariable = "AGENTS_TEST_SEARCH_PATHS"
+
+    /// What an installer runs with (048): the runtime's environment, with the system's own
+    /// folders on the end if the PATH lacks them, because a vendor's script needs `uname`,
+    /// `mkdir` and `tar` however narrow a PATH was asked for.
+    public static func installEnvironment() -> [String: String] {
+        var environment = environment()
+        var path = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
+        for system in ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] where !path.contains(system) {
+            path.append(system)
+        }
+        environment["PATH"] = path.joined(separator: ":")
+        return environment
     }
 
     /// The environment a runtime is started with: the app's own, with the shell's PATH

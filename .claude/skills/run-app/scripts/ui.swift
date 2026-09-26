@@ -3,7 +3,8 @@
 //   swift ui.swift windows <pid>              window ids and bounds (for screencapture -l)
 //   swift ui.swift dump <pid> [depth]         the accessibility tree, indented
 //   swift ui.swift find <pid> <text>          every element whose label holds <text>
-//   swift ui.swift press <pid> <text>         AXPress the first one that matches
+//   swift ui.swift press <pid> <text>         AXPress the LAST one that matches (innermost);
+//                                             make <text> unique, `find` lists them in order
 //   swift ui.swift set <pid> <text> <value>   type into the field labelled <text>
 //
 // AX actions go to the element, not to the pointer, so nothing is stolen from

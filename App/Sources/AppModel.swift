@@ -25,6 +25,10 @@ final class AppModel {
     let work = AgentsModel()
 
     private(set) var runtimes: [RuntimeStatus] = []
+    /// The start-up sheet offering to install what is missing (048). Raised once per
+    /// launch, and only for a runtime not already offered on this root.
+    var isOfferingInstall = false
+    private var hasWeighedInstallOffer = false
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
@@ -583,6 +587,23 @@ final class AppModel {
                                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                                 workflowID: summary.workflowID,
                                                                 archived: archived))
+    }
+
+    /// Approve a workflow's file as the row showed it. Said when it fails: the likely
+    /// reason is that the file changed after the person looked, and they should look again.
+    func approveWorkflow(_ summary: WorkflowSummary) async {
+        guard let waiting = summary.awaitingApproval else { return }
+        do {
+            let updated: WorkflowSummary = try await client.call(
+                DaemonAPI.Method.workflowsApprove,
+                DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                 digest: waiting.digest),
+                returning: WorkflowSummary.self)
+            work.upsert(updated)
+        } catch {
+            problem = describe(error)
+            await refreshWorkflows()
+        }
     }
 
     /// Change what a workflow is allowed to do. The daemon writes the file.
@@ -1172,11 +1193,44 @@ final class AppModel {
     }
 
     func refreshRuntimes() async {
-        await attempt {
+        let listed = await attempt {
             self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,
                                                        Optional<String>.none,
                                                        returning: [RuntimeStatus].self)
         }
+        if listed { weighInstallOffer() }
+    }
+
+    /// Install a missing runtime on this Mac (048). Answers at once; the rest arrives on
+    /// `runtime/changed`, which refreshes the list, so every view drawing a runtime moves
+    /// with it and the new-agent menu has it the moment it is there.
+    func installRuntime(_ runtimeID: String) async {
+        await attempt {
+            let status = try await self.client.call(DaemonAPI.Method.runtimesInstall,
+                                                    DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
+                                                    returning: RuntimeStatus.self)
+            if let index = self.runtimes.firstIndex(where: { $0.id == status.id }) {
+                self.runtimes[index] = status
+            }
+        }
+    }
+
+    /// The runtimes the start-up sheet is about: not on this Mac, installing, or failed.
+    var missingRuntimes: [RuntimeStatus] {
+        runtimes.filter { InstallOffer.isMissing($0.availability) }
+    }
+
+    /// Whatever is missing now has been offered, whichever way the sheet was closed.
+    func rememberInstallOffer() {
+        InstallOffer.remember(missingRuntimes.map(\.id))
+        isOfferingInstall = false
+    }
+
+    private func weighInstallOffer() {
+        guard !hasWeighedInstallOffer, !runtimes.isEmpty else { return }
+        hasWeighedInstallOffer = true
+        let offered = InstallOffer.offered
+        if missingRuntimes.contains(where: { !offered.contains($0.id) }) { isOfferingInstall = true }
     }
 
     /// What wants a person and where each is showing, on connect and on coming to the

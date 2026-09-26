@@ -40,6 +40,7 @@ struct AgentsApp: App {
         Settings {
             TabView {
                 Tab("Appearance", systemImage: "circle.lefthalf.filled") { AppearanceSettingsView() }
+                Tab("Agents", systemImage: "cpu") { AgentsSettingsView() }
                 Tab("Spending", systemImage: "dollarsign.circle") { CostSettingsView() }
                 Tab("Devices", systemImage: "iphone") { DevicesPane() }
                 Tab("Servers", systemImage: "server.rack") { ServersSettingsView() }

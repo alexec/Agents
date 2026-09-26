@@ -18,7 +18,8 @@ public final class Daemon: @unchecked Sendable {
     public init(locations: StoreLocations = .default,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
                 launcher: (any SessionLauncher)? = nil,
-                serve: Bool = false) throws {
+                serve: Bool = false,
+                toolsetFolder: URL? = nil) throws {
         self.locations = locations
         try locations.createDirectories()
         guard let lock = DaemonLock(at: locations.lock) else { throw StartError.alreadyRunning }
@@ -27,7 +28,17 @@ public final class Daemon: @unchecked Sendable {
         let store = try AgentStore(locations: locations)
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
-        self.core = DaemonCore(store: store, locations: locations, discovery: discovery, launcher: launcher)
+        // The Mac installs what is missing (048); a server keeps 043's way.
+        var installer: RuntimeInstaller?
+        if !serve {
+            if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
+            let toolset = toolsetFolder.flatMap { try? Toolset.load(from: $0) }
+            installer = RuntimeInstaller(
+                discovery: discovery,
+                toolset: toolset.map { MacToolsetInstaller(toolset: $0, tools: locations.tools) })
+        }
+        self.core = DaemonCore(store: store, locations: locations, discovery: discovery,
+                               installer: installer, launcher: launcher)
         self.serve = serve
     }
 
@@ -49,6 +60,9 @@ public final class Daemon: @unchecked Sendable {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")
         }
         let core = self.core
+        // Who may ask for what on the socket, from the caller's code signature.
+        let roles = RolePolicy.forDaemon(at: locations)
+        DaemonLog.shared.write("socket: \(roles.summary)")
         let server = DaemonServer(
             url: locations.socket,
             onConnectionCountChanged: { count in
@@ -68,9 +82,10 @@ public final class Daemon: @unchecked Sendable {
                     await core.connectionEnded(connection)
                 }
             },
+            roles: roles,
             handler: { context, method, params in
                 await core.handle(method: method, params: params,
-                                  from: context.surface, connection: context.id)
+                                  from: context.surface, connection: context.id, peer: context.peer ?? -1)
             })
         self.server = server
         await core.setBroadcaster { method, params in

@@ -77,6 +77,9 @@ public struct StoreLocations: Sendable {
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// What the app installs for this daemon (048): `tools/<runtime>/<id>/`, with
+    /// `current` pointing at the one in use. Per root, so a scratch copy installs its own.
+    public var tools: URL { root.appendingPathComponent("tools", isDirectory: true) }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
     /// Every project we have been told about. One file, because the only things in it
     /// are the two a project's folder cannot tell us: that it is archived, and that it

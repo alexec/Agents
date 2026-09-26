@@ -79,6 +79,11 @@ A workflow does not run, and its page says why, when:
 
 - a run of it is still going;
 - it is archived;
+- its file is new, or has changed since you approved it, and you have not approved it.
+  Its row and page say **waiting for your OK** and offer **Approve**. Approval is of the
+  file as you saw it: a file that changes afterwards waits again. Changes made on the
+  workflow's page in Agents count as approved unless the workflow was already waiting,
+  and workflows that existed before this version were approved as they stood;
 - it is not one of the first three workflows in its project that are not archived, taken
   in order of file name, or not one of the first ten of those across every project.
   Archiving one makes room;
@@ -95,8 +100,9 @@ A workflow does not run, and its page says why, when:
 
 Pull requests are checked every five minutes.
 
-On the Mac, each workflow on the project page has **Open**, **Run now**, **Archive**
-(**Restore** once archived) and **Show in Finder**.
+On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
+while it is waiting for your OK), **Archive** (**Restore** once archived) and **Show in
+Finder**.
 
 ## See also
 

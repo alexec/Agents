@@ -8,6 +8,13 @@ public actor DaemonCore {
     let store: AgentStore
     let locations: StoreLocations
     let discovery: RuntimeDiscovery
+    /// What installs a missing runtime (048). Nil on a server, which keeps 043's own way.
+    let installer: (any RuntimeInstalling)?
+    /// Installs under way, by runtime id. A second `runtimes/install` joins the first.
+    var installs: [String: Task<Void, Never>] = [:]
+    /// What an install says over what discovery sees: `.installing` while it runs, and
+    /// `.installFailed` after, until the runtime turns up some other way.
+    var installStates: [String: RuntimeAvailability] = [:]
     /// Swapped in tests for a fake runtime, so the whole daemon is exercised without a
     /// CLI, a credential or a network.
     let launcher: any SessionLauncher
@@ -449,6 +456,7 @@ public actor DaemonCore {
     public init(store: AgentStore,
                 locations: StoreLocations,
                 discovery: RuntimeDiscovery = RuntimeDiscovery(),
+                installer: (any RuntimeInstalling)? = nil,
                 launcher: (any SessionLauncher)? = nil,
                 now: (@Sendable () -> Date)? = nil,
                 thresholds: AttentionThresholds = .standard,
@@ -460,6 +468,7 @@ public actor DaemonCore {
         self.draftGracePeriod = draftGracePeriod
         self.locations = locations
         self.discovery = discovery
+        self.installer = installer
         self.launcher = launcher ?? ProcessSessionLauncher(locations: locations)
         self.now = now ?? { Date() }
         self.thresholds = thresholds
@@ -792,7 +801,7 @@ public actor DaemonCore {
     public func agent(_ id: UUID) -> Agent? { agents[id] }
 
     public func runtimeStatuses() -> [RuntimeStatus] {
-        discovery.statuses()
+        discovery.statuses().map(overlaid)
     }
 
     public func pendingPermissionRequests() -> [PermissionRequest] {

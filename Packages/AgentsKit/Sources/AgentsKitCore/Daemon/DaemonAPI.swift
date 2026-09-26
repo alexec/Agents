@@ -6,6 +6,10 @@ import Foundation
 public enum DaemonAPI {
     public enum Method {
         public static let runtimesList = "runtimes/list"
+        /// Install a missing runtime on this Mac (048). `RuntimeRequest` → `RuntimeStatus`,
+        /// answered at once; progress and the result follow on `runtime/changed`. The
+        /// Mac's daemon only, and only for the app itself: it runs a vendor's script.
+        public static let runtimesInstall = "runtimes/install"
         public static let runtimesAccounts = "runtimes/accounts"
         public static let runtimeAuthenticate = "runtimes/authenticate"
         public static let runtimeLogOut = "runtimes/logout"
@@ -146,6 +150,8 @@ public enum DaemonAPI {
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.
         public static let workflowsArchive = "workflows/archive"
+        /// Approve a workflow file as the person was shown it (security review).
+        public static let workflowsApprove = "workflows/approve"
         /// Change what a workflow is allowed to do, by writing its own file. The daemon
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
@@ -263,6 +269,8 @@ public enum DaemonAPI {
         /// A server's runtime refused the credential it was started with, or found none
         /// (043, FR-016). `CredentialRefused`.
         public static let credentialRefused = "credentials/refused"
+        /// A runtime's status moved: installed, installing, or an install failed (048).
+        /// Carries the `RuntimeStatus`; a window may just ask `runtimes/list` again.
         public static let runtimeChanged = "runtime/changed"
         public static let runtimeAccountChanged = "runtime/account"
         public static let agentUsage = "agent/usage"
@@ -1452,6 +1460,9 @@ public enum DaemonAPI {
         public static let babysitterExists = -32043
         /// A pull request number that is not in the project's list.
         public static let noSuchPullRequest = -32044
+        /// A method this connection's role may not call: an agent's helper asking for
+        /// something only a window may, or a process that is neither (security review).
+        public static let notPermitted = -32045
     }
 
     // MARK: Workflows
@@ -1493,6 +1504,19 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.archived = archived
+        }
+    }
+
+    /// Approve a workflow's file: `digest` is the one the row carried, so only the file
+    /// the person was shown is approved.
+    public struct WorkflowApproveRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var digest: String
+        public init(folder: URL, workflowID: String, digest: String) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.digest = digest
         }
     }
 

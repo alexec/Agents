@@ -225,8 +225,9 @@ private struct EmptyProjectList: View {
             if model.macRuntimesAvailable.isEmpty {
                 Text("No agent runtime found")
                     .appText(.reading).fontWeight(.semibold)
-                Text("Agents runs the coding CLIs you already have. Install one and it appears here.")
+                Text("Agents runs the coding CLIs on this Mac. Install one here, or from its own page.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 ForEach(model.runtimes) { status in
                     RuntimeMissingLine(status: status)
                 }
@@ -246,17 +247,13 @@ private struct EmptyProjectList: View {
     }
 }
 
-/// Why a runtime this app knows about is not usable, in the runtime's own terms.
+/// Why a runtime this app knows about is not usable, and the way to get it (048): the
+/// same row as the start-up sheet's.
 private struct RuntimeMissingLine: View {
     let status: RuntimeStatus
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(status.runtime.name).appText(.reading).fontWeight(.medium)
-            if let reason = status.unavailableReason {
-                Text(reason).appText(.fine).foregroundStyle(.secondary)
-            }
-        }
+        RuntimeInstallRow(status: status)
     }
 }
 

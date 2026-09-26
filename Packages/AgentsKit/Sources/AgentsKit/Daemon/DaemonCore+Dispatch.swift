@@ -7,13 +7,36 @@ extension DaemonCore {
     /// `surface` and `connection` are who is asking, taken from the connection by the
     /// server and never from the parameters: a presence report has to belong to
     /// somebody, and the one thing a caller must not be able to say is who it is.
+    ///
+    /// `peer` is the process on the other end of the socket, `-1` when the kernel would
+    /// not say, and nil only for a caller inside this process.
     public func handle(method: String, params: JSONValue?,
-                       from surface: Surface? = nil, connection: UUID? = nil) async -> Result<JSONValue, JSONRPCError> {
+                       from surface: Surface? = nil, connection: UUID? = nil,
+                       peer: Int32? = nil) async -> Result<JSONValue, JSONRPCError> {
+        if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
         // Who asked travels with the work, so a runtime started deep inside it is started
         // with what that connection lent (043).
-        await RequestConnection.$current.withValue(connection) {
+        return await RequestConnection.$current.withValue(connection) {
             await dispatch(method: method, params: params, from: surface, connection: connection)
         }
+    }
+
+    /// A token speaks for its agent only from inside that agent's runtime.
+    ///
+    /// The token is on the helper's command line, where every process of this account
+    /// can read it. So a call carrying one has to come from a process the agent's own
+    /// runtime started — the helper, through `npx` or a shell at most — or it is turned
+    /// away as if the token meant nothing. A token nobody holds is left for the method
+    /// to refuse in its own words.
+    func tokenRefusal(_ params: JSONValue?, peer: Int32?) async -> JSONRPCError? {
+        guard let peer, let token = params?["token"]?.stringValue,
+              let agentID = appTokens[token] else { return nil }
+        if let runtime = await live[agentID]?.processIdentifier, PeerCredentials.descends(peer, from: runtime) {
+            return nil
+        }
+        DaemonLog.shared.write("refused a token call from pid \(peer): not started by that agent's runtime")
+        return JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
+                            message: "That conversation is not open to this process, so nothing was done.")
     }
 
     private func dispatch(method: String, params: JSONValue?,
@@ -116,6 +139,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))
 
+            case DaemonAPI.Method.workflowsApprove:
+                let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)
+                return .success(try JSONValue.encoding(try approveWorkflow(request)))
+
             case DaemonAPI.Method.workflowsArchive:
                 let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
                 return .success(try JSONValue.encoding(try archiveWorkflow(request)))
@@ -126,6 +153,10 @@ extension DaemonCore {
 
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
+
+            case DaemonAPI.Method.runtimesInstall:
+                let request = try require(params, as: DaemonAPI.RuntimeRequest.self)
+                return .success(try JSONValue.encoding(try installRuntime(request.runtimeID, from: surface)))
 
             case DaemonAPI.Method.runtimesAccounts:
                 return .success(try JSONValue.encoding(allAccounts()))
