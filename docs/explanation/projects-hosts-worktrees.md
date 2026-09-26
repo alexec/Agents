@@ -120,11 +120,14 @@ committed or a branch that is not merged.
 ## Your own set, and a project's
 
 A project can carry its own `.agents` folder, with skills, instructions and plugins that
-belong to that project and apply only inside it. `~/.agents` in your home folder is the same
-idea one level up: your own set, which every agent the app starts gets, in every project and
-on every runtime. The app lays it out on your Mac only; a project on a server gets the
-project's own folder, and the runtimes on the server keep whatever they were set up with
-there.
+belong to that project and apply only inside it. A plugin there that is new or has changed
+waits for your OK on the project's page before any agent is handed it — the same check as
+a workflow file — because it can run hooks and MCP servers when a session starts. See
+[A project's own plugins](../how-to/share-skills-across-agents.md#a-projects-own-plugins).
+`~/.agents` in your home folder is the same idea one level up: your own set, which every
+agent the app starts gets, in every project and on every runtime. The app lays it out on
+your Mac only; a project on a server gets the project's own folder, and the runtimes on
+the server keep whatever they were set up with there.
 
 Your set goes to each runtime the way that runtime can take it, which differs. Some read
 `~/.agents/skills` themselves; for others the app places links, which it never puts back

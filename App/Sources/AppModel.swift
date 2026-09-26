@@ -666,6 +666,33 @@ final class AppModel {
                                                                 archived: archived))
     }
 
+    /// A project's plugins, asked for when its page opens; kept current after that by
+    /// `plugins/changed`.
+    func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }
+
+    func refreshPlugins(in folder: URL) async {
+        guard let list: DaemonAPI.PluginsList = try? await client.call(
+            DaemonAPI.Method.pluginsList, DaemonAPI.PluginsListRequest(folder: folder),
+            returning: DaemonAPI.PluginsList.self) else { return }
+        work.replacePlugins(list)
+    }
+
+    /// Approve a plugin's folder as the row showed it. Said when it fails: most likely the
+    /// folder changed after the person looked.
+    func approvePlugin(_ plugin: ProjectPlugin) async {
+        guard let waiting = plugin.awaitingApproval else { return }
+        do {
+            let list: DaemonAPI.PluginsList = try await client.call(
+                DaemonAPI.Method.pluginsApprove,
+                DaemonAPI.PluginApproveRequest(plugin: plugin.folder, digest: waiting.digest),
+                returning: DaemonAPI.PluginsList.self)
+            work.replacePlugins(list)
+        } catch {
+            problem = describe(error)
+            await refreshPlugins(in: plugin.project)
+        }
+    }
+
     /// Approve a workflow's file as the row showed it. Said when it fails: the likely
     /// reason is that the file changed after the person looked, and they should look again.
     func approveWorkflow(_ summary: WorkflowSummary) async {

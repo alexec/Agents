@@ -97,6 +97,19 @@ its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 To remove a plugin, delete its folder. The next agent starts without it, and the app takes
 it out of Codex and removes its Gemini link.
 
+## A project's own plugins
+
+A project can also keep plugins in `.agents/plugins` inside the project folder. Those
+apply only in that project. Because a plugin can run hooks and start MCP servers when a
+session begins, a new or changed project plugin does not reach any agent until you approve
+it on the project's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
+
+On the Mac, open the project. Under **Plugins**, each plugin lists what it carries. One
+that is new or has changed since you approved it says it is waiting; click **Approve**
+(or **Show in Finder** first if you want to look). Plugins that were already there when
+this version began were approved as they stood. Your own plugins in `~/.agents/plugins`
+are never asked about: that folder is yours.
+
 ## What the app moves in the first time
 
 The first time it lays out `~/.agents`, the app takes in what Claude already has, so that
