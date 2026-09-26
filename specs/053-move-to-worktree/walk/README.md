@@ -41,3 +41,16 @@ Open:
   shows the Worktree choice disabled with the reason (`grok-choice-disabled.png`: "main",
   greyed, tooltip "Grok can't carry its conversation into another folder, so this agent stays
   where it is. Start a new one in a worktree instead.").
+
+## Quickstart §4, Mac walk (T045), 2026-09-26
+
+- The Worktree choice on an agent's page: open (`capsule-project-folder-open.png`), after an
+  idle move (`capsule-after-move.png`: chat line, files pane on the worktree, row badge), and
+  with a move waiting during a turn (`capsule-move-waiting.png`, `capsule-waiting-open.png`
+  with **Cancel move**).
+- A Grok agent's choice, disabled with the reason (`grok-choice-disabled.png`).
+- The terminal: a shell opened before the move stays in the project folder, and the strip says
+  so (`terminal-strip.png`); **Type cd there** typed the `cd` and the strip went
+  (`terminal-after-cd.png`).
+- Left for Alex: the phone look (quickstart §5), where a moved agent's row badge and chat lines
+  come from the record alone.

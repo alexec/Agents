@@ -434,9 +434,9 @@ of the turn, with Cancel.
   `.tinted(.failure)`, fixed), and once each `aPairedPhoneGetsThroughAndIsKnownByItsKey`,
   `aPhoneThatComesStraightBackIsKnownAgain`, `twoHundredFilesAreQuickToList`: pairing and a timing
   test, none touching moves, all failing only once in three.
-- [ ] T045 Run quickstart §4 in full on a scratch root, with screenshots in
+- [X] T045 Run quickstart §4 in full on a scratch root, with screenshots in
   `specs/053-move-to-worktree/walk/`, and note what's left for Alex: the phone look, quickstart §5.
-- [ ] T046 Update the spec-queue memory entry for 053 with the commits, what was walked and
+- [X] T046 Update the spec-queue memory entry for 053 with the commits, what was walked and
   what's open.
 
 ---
