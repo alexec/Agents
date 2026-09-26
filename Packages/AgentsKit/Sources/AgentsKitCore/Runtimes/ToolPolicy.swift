@@ -146,29 +146,6 @@ public struct EnvironmentFile: Codable, Hashable, Sendable {
     }
 }
 
-/// A home of the app's own for a runtime started with a lent key (047): a folder under
-/// `<root>/runtimes/`, a config file the app writes into it, the variable that points the
-/// runtime there, and anything else the sign-in needs.
-public struct LentKeyHome: Codable, Hashable, Sendable {
-    /// The lent variable that calls for this home: a relayed sign-in brings its own.
-    public var whenLent: String
-    public var variable: String
-    public var folder: String
-    public var configFile: String
-    public var config: String
-    public var environment: [String: String]
-
-    public init(whenLent: String, variable: String, folder: String, configFile: String, config: String,
-                environment: [String: String] = [:]) {
-        self.whenLent = whenLent
-        self.variable = variable
-        self.folder = folder
-        self.configFile = configFile
-        self.config = config
-        self.environment = environment
-    }
-}
-
 /// A runtime's sign-in relayed from the Mac to a server (047, research R12): on the server
 /// it gets a home of the app's own holding a stand-in sign-in (no secret) and a config that
 /// sends its sign-in traffic to the relay gate on loopback, over TLS it is told to trust.
@@ -271,10 +248,6 @@ public struct ToolPolicy: Hashable, Sendable {
     /// Added to its environment by a server's daemon only (047: Codex's `NO_BROWSER`, so a
     /// ChatGPT sign-in is never offered on a server).
     public var serverEnvironment: [String: String]
-    /// What a lent key needs besides itself (047, research T008): Codex saves an API-key
-    /// sign-in into its home, so a server running it with a lent key points it at a home
-    /// of the app's own that says to keep sign-ins in memory only.
-    public var lentKeyHome: LentKeyHome?
     /// How this runtime's sign-in is relayed from the Mac to a server (047), or nil when it
     /// is not.
     public var relay: SignInRelay?
@@ -299,7 +272,6 @@ public struct ToolPolicy: Hashable, Sendable {
                 escalationTool: String? = nil,
                 preferredAuthMethods: [String] = [],
                 serverEnvironment: [String: String] = [:],
-                lentKeyHome: LentKeyHome? = nil,
                 relay: SignInRelay? = nil,
                 readsFilesItself: Bool = false,
                 authMethodBeforeContinuing: String? = nil) {
@@ -312,7 +284,6 @@ public struct ToolPolicy: Hashable, Sendable {
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods
         self.serverEnvironment = serverEnvironment
-        self.lentKeyHome = lentKeyHome
         self.relay = relay
         self.readsFilesItself = readsFilesItself
         self.authMethodBeforeContinuing = authMethodBeforeContinuing

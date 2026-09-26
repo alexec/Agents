@@ -1269,28 +1269,6 @@ public struct ProcessSessionLauncher: SessionLauncher {
             .merging(policy.launchEnvironment) { _, policy in policy }
         guard onServer else { return environment }
         environment.merge(policy.serverEnvironment) { _, server in server }
-        // A key lent for this runtime: its own home, whose config keeps the sign-in in
-        // memory, so the key is never written to the server's disk (047, FR-019).
-        if let home = policy.lentKeyHome, LentEnvironment.value[home.whenLent] != nil,
-           let folder = Self.lentKeyHome(home, locations: locations) {
-            environment[home.variable] = folder.path
-            environment.merge(home.environment) { _, home in home }
-        }
         return environment
-    }
-
-    /// Write the home's config (and only that) under `<root>/runtimes/`, private to this
-    /// account. Nil when it cannot be written: then the runtime is not pointed there.
-    static func lentKeyHome(_ home: LentKeyHome, locations: StoreLocations) -> URL? {
-        let folder = locations.root.appendingPathComponent("runtimes/\(home.folder)", isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
-            try home.config.write(to: folder.appendingPathComponent(home.configFile), atomically: true, encoding: .utf8)
-            return folder
-        } catch {
-            DaemonLog.shared.write("could not write \(home.folder)/\(home.configFile): \(error)")
-            return nil
-        }
     }
 }
