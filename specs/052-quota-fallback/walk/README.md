@@ -52,4 +52,38 @@ AM/PM (now the Mac's own setting); the switch note did not draw from seeded data
 record inside a transcript entry keeps dates as numbers, which the seed now does too; the shared
 switch note used a macOS-only link style (the Remote now builds too).
 
-Still to do from T026: the "⇄ Carried on from …" line on the agent row.
+The "⇄ Carried on from …" line on the agent row was added with US1 (2b6592d). It shows while
+the chat is still on the runtime it moved to. Hiding it after the person's next prompt (as the
+wireframe says) waits on the record keeping when that prompt was sent.
+
+## US1: the automatic switch (T042), 2026-09-26
+
+The run was on scratch root `/tmp/run-052-us1`, with `scripts/install-fake-runtimes.sh` stand-ins
+as `grok` and `copilot` (`AGENTS_TEST_SEARCH_PATHS`). The pool was Grok (SuperGrok) then Copilot
+(Copilot Pro). The steps were driven over `daemon.sock`, and nothing touched the real daemon.
+
+1. Started a chat on Grok: "Plan the login redirect fix." Grok answered. The app's ask for a
+   report ran on Grok too.
+2. Wrote `spent` to `grok.behaviour` and prompted "Now make the change." Grok ended the turn
+   with the typed failure (limit, no actions). The chat stopped as `allowanceSpent` with no "ran
+   out" note, and then went on:
+   `.poolSwitch` (Grok → Copilot, allowanceSpent), then `.handoff` (571 characters), then
+   Copilot's reply: "copilot here. I was handed the conversation so far (571 characters).
+   You said: Now make the change." That is one turn, with the handoff embedded and the prompt
+   once. The person's words are on the record once.
+3. `pool/state`: Grok out, `retryAfter` +1 h; Copilot available; one switch.
+   `switches.jsonl` has one line.
+4. The event log has `cost.allowance_out` (grok, until +1 h), then `agent.runtime_switched`
+   (grok → copilot, allowanceSpent, with the agent and its title).
+5. `pool/markAvailable` on Grok: state available, and `cost.allowance_back` (how: person).
+
+Saved here: `us1/transcript.json`, `us1/pool-state.json` (taken before step 5),
+`us1/switches.jsonl` and `us1/events.jsonl`.
+
+There is no screenshot of the switch note from this run: the Mac was locked, and a locked screen
+refuses window captures. The note is drawn by `SwitchNote` from the same record as the look gate's
+`2-chat-switch-note.png`, which Alex approved.
+
+A stand-in with no `loadSession` is started afresh on each later turn, with "… no longer has this
+conversation" notes. That comes from the stand-in, not from the switch.
+

@@ -70,7 +70,12 @@
   - `failTimes: Int`, for failing that many prompts (with the existing `promptError` or `promptResultMeta`) and then succeeding.
 
   Record every prompt's content blocks in order, so a test can assert what the runtime was sent and how many times.
-- [ ] T005 [P] Add the test-only executable `Tools/fake-acp-runtime/main.swift`, and its target in `Pkg/Package.swift` or a separate `Tools/Package.swift`. It must never be linked into the app or `agentsd`. It speaks ACP over stdio and plays a `FakeACPAgent.Script` read from the JSON file named by `AGENTS_TEST_FAKE_SCRIPT_<NAME>`, where `<NAME>` is the uppercased basename it was started as. Add `scripts/install-fake-runtimes.sh <dir>`, which copies it as `grok` and `copilot` into `<dir>` for `AGENTS_TEST_SEARCH_PATHS`, and refuses any `<dir>` under `~/Library` or `~/.local`.
+- [X] T005 [P] Add the test-only executable `Tools/fake-acp-runtime/main.swift`, and its target in `Pkg/Package.swift` or a separate `Tools/Package.swift`. It must never be linked into the app or `agentsd`. It speaks ACP over stdio and plays a `FakeACPAgent.Script` read from the JSON file named by `AGENTS_TEST_FAKE_SCRIPT_<NAME>`, where `<NAME>` is the uppercased basename it was started as. Add `scripts/install-fake-runtimes.sh <dir>`, which copies it as `grok` and `copilot` into `<dir>` for `AGENTS_TEST_SEARCH_PATHS`, and refuses any `<dir>` under `~/Library` or `~/.local`.
+
+  *Done 2026-09-26 as `scripts/fake-acp-runtime.py`: Python, test-only, and never built into
+  anything.* It plays `spent` or `ok`, read each turn from `<dir>/<name>.behaviour`, so a walk
+  can spend a runtime and bring it back by rewriting one file. Moving the Swift `FakeACPAgent`
+  out of the test target was more churn than a walk harness needs.
 
 ---
 
@@ -251,7 +256,7 @@
 
   Before any turn on a runtime whose credential is out, move first (FR-012). Clear `triedForPrompt` on the first real reply. This makes T038 and T039 pass.
 - [X] T041 [US1] Add `agent.runtime_switched`, `cost.allowance_out` and `cost.allowance_back` to `Pkg/Sources/AgentsKitCore/Model/EventCatalogue.swift`, with the fields in `contracts/daemon-api.md`, and make sure `events/list` shows them. Extend the events test that walks the catalogue.
-- [ ] T042 [US1] Walk quickstart §2–§5 on `/tmp/run-052-us1`, with the stand-ins from T005, using the run-app skill. Save the transcript, `pool/state`, the event lines and a screenshot of the switch note to `specs/052-quota-fallback/walk/us1/`, and record the result in `walk/README.md`.
+- [X] T042 [US1] Walk quickstart §2–§5 on `/tmp/run-052-us1`, with the stand-ins from T005, using the run-app skill. Save the transcript, `pool/state`, the event lines and a screenshot of the switch note to `specs/052-quota-fallback/walk/us1/`, and record the result in `walk/README.md`.
 
 **Checkpoint**: With a pool set by `pool/set` on the socket, chats move by themselves. This is the MVP.
 
