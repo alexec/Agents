@@ -958,7 +958,7 @@ struct PromptBar: View {
             if let problem = model.moveProblems[agent.id] {
                 Text(problem)
                     .appText(.fine)
-                    .foregroundStyle(.red)
+                    .tinted(.failure)
                     .lineLimit(3)
                     .frame(maxWidth: 360, alignment: .leading)
             }

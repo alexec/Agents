@@ -426,9 +426,14 @@ of the turn, with Cancel.
   worktree badge and the chat's runtime notes show a moved agent from the record alone. There's
   no phone UI for moving. Build the Remote for the generic simulator only (memory: no throwaway
   simulators).
-- [ ] T044 Run the full suite three times on this branch and three times on `5f9b974`, and compare
+- [X] T044 Run the full suite three times on this branch and three times on `5f9b974`, and compare
   them by test name. Only failures on this branch that the base doesn't have count (memory: the
   suite is broadly flaky under load).
+  **2026-09-26**: branch 2391 tests (4, 2, 2 issues); merge base 2337 tests (1, 0, 19 issues). Only on the
+  branch: `noCallSiteNamesAStateColourItself` 3/3 (the move-problem line named `.red`; now
+  `.tinted(.failure)`, fixed), and once each `aPairedPhoneGetsThroughAndIsKnownByItsKey`,
+  `aPhoneThatComesStraightBackIsKnownAgain`, `twoHundredFilesAreQuickToList`: pairing and a timing
+  test, none touching moves, all failing only once in three.
 - [ ] T045 Run quickstart §4 in full on a scratch root, with screenshots in
   `specs/053-move-to-worktree/walk/`, and note what's left for Alex: the phone look, quickstart §5.
 - [ ] T046 Update the spec-queue memory entry for 053 with the commits, what was walked and
