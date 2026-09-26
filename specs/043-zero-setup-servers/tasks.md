@@ -38,10 +38,10 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 ### Spike on `agents-bare` (by hand over ssh; notes in `specs/043-zero-setup-servers/walk/spike.md`)
 
 - [X] T006 Run contracts/ssh.md § 2 by hand on `agents-bare` with the T005 files: download Node, check its sha256, `npm ci --ignore-scripts --omit=dev`; record whether the SDK's native binary is present and runs with scripts ignored (R2)
-- [ ] T007 Start `node …/claude-agent-acp/dist/index.js` on `agents-bare` with `CLAUDE_CODE_OAUTH_TOKEN` set (Alex's token, pasted by him into a one-off env, never into a file) and drive one ACP turn through the forwarded Linux `agentsd`; record time from download to first reply (SC-001 budget)
-- [ ] T008 On `agents-devbox` (which has Alex's `claude login`), start with a *different* token in the env and confirm which sign-in is used (R5: env must win)
+- [X] T007 Start `node …/claude-agent-acp/dist/index.js` on `agents-bare` with `CLAUDE_CODE_OAUTH_TOKEN` set (Alex's token, pasted by him into a one-off env, never into a file) and drive one ACP turn through the forwarded Linux `agentsd`; record time from download to first reply (SC-001 budget)
+- [X] T008 On `agents-devbox` (which has Alex's `claude login`), start with a *different* token in the env and confirm which sign-in is used (R5: env must win)
 - [X] T009 Revoke or corrupt the token and record exactly what arrives over ACP (initialize/authenticate/prompt error shape and text) for R7's matcher
-- [ ] T010 From the Mac, call `GET https://api.anthropic.com/v1/models` with an API key and with the OAuth token (Bearer + beta header) and record which answer 200/401 (R9); update research.md R2/R5/R7/R9 with the findings and commit
+- [X] T010 From the Mac, call `GET https://api.anthropic.com/v1/models` with an API key and with the OAuth token (Bearer + beta header) and record which answer 200/401 (R9); update research.md R2/R5/R7/R9 with the findings and commit
 
 ### Shared records and plumbing
 
@@ -74,7 +74,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 - [X] T021 [P] [US2] `CredentialCheck` (Mac only): `GET /v1/models` with the header T010 proved for each kind, 10 s timeout; 200 → works, 401/403 → refused, else → can't check; injectable `URLSession` for tests, in `Packages/AgentsKit/Sources/AgentsKit/Credentials/CredentialCheck.swift` with tests in `Tests/AgentsKitTests/Unit/CredentialCheckTests.swift`
 - [X] T022 [US2] Wire `CredentialRow` to T019/T021: paste → kind check → save → spinner → Works / refused (field kept) / "Can't check right now — saved…"; masked view with added/last worked; Replace and Remove, in `App/Sources/Settings/CredentialRow.swift` and `App/Sources/Settings/ServersSettingsView.swift`
 - [X] T023 [US2] Make sure no log line, `print`, crash annotation or `DaemonClient` request log can carry a `Secret` (grep for interpolation of the store's values; route through `Secret.description`) in `App/Sources/Settings/` and `Packages/AgentsKit/Sources/AgentsKit/Credentials/`
-- [ ] T024 [US2] Walk US2's Independent Test on a scratch root (run-app skill); record in `specs/043-zero-setup-servers/walk/US2.md`
+- [X] T024 [US2] Walk US2's Independent Test on a scratch root (run-app skill); record in `specs/043-zero-setup-servers/walk/US2.md`
 
 **Checkpoint**: Settings holds and checks a token; nothing reaches a server yet.
 
@@ -116,8 +116,8 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 ### Proof
 
 - [X] T040 [US1] Linux build gate for both architectures (`scripts/build-linux-agentsd.sh`), and rebuild the bundled Linux binaries
-- [ ] T041 [US1] Walk quickstart § 3 steps 1–4 on `agents-bare` with the test-servers skill on a scratch root: time from Add a server to first reply (SC-001 ≤ 5 min), the file on the box, and a re-connect's added time (SC-002 ≤ 5 s); notes in `specs/043-zero-setup-servers/walk/US1.md`
-- [ ] T042 [US1] Walk quickstart step 6 (refused token) and step 7 (own sign-in only on `agents-devbox`, confirming no `credentials/lend` in its daemon log); add to `walk/US1.md`
+- [X] T041 [US1] Walk quickstart § 3 steps 1–4 on `agents-bare` with the test-servers skill on a scratch root: time from Add a server to first reply (SC-001 ≤ 5 min), the file on the box, and a re-connect's added time (SC-002 ≤ 5 s); notes in `specs/043-zero-setup-servers/walk/US1.md`
+- [ ] T042 (refused token walked in the window; own-sign-in-only proven by LendTests, not in the window) [US1] Walk quickstart step 6 (refused token) and step 7 (own sign-in only on `agents-devbox`, confirming no `credentials/lend` in its daemon log); add to `walk/US1.md`
 
 **Checkpoint**: MVP — a bare server runs Claude with a token from Settings.
 
@@ -154,7 +154,7 @@ are both P1 and ship together; US2 goes first because the token is what US1's wa
 ## Phase 8: Polish & cross-cutting
 
 - [X] T053 [P] `scripts/leak-check.sh <token>`: grep the scratch root, `~/Library/Preferences/*Agents*`, the app's logs, `/usr/bin/log show --info` for the last day, and each server's home over ssh for the full token; exit non-zero on any hit
-- [ ] T054 Run T053 after the walks (SC-003) and quickstart step 9 (purge leaves no `~/.agents-server`, and the person's own Node untouched on `agents-devbox`) (FR-008); notes in `specs/043-zero-setup-servers/walk/README.md`
+- [ ] T054 (leak search after real use: clean; purge not walked) Run T053 after the walks (SC-003) and quickstart step 9 (purge leaves no `~/.agents-server`, and the person's own Node untouched on `agents-devbox`) (FR-008); notes in `specs/043-zero-setup-servers/walk/README.md`
 - [X] T055 [P] Update the test-servers skill (`.claude/skills/test-servers/`) with `agents-bare`, the token step and the rebuilt walk
 - [X] T056 [P] Update 037's `specs/037-cloud-agents/spec.md` Assumptions to point at 043 for runtimes on servers (D4)
 - [X] T057 (see walk/baseline.md: two timing tests fail under load on the branch, cause open) Six full suite runs compared with T002's baseline; both schemes build; Linux gate passes

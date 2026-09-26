@@ -44,7 +44,13 @@ arrives, late.
 So the endpoint recognises both kinds and refuses a bad one; **a 200 for a real subscription token
 is not yet seen** — that needs Alex's token.
 
-## Still waiting on a real token (Alex's)
+## With a real token (2026-09-25, through the window)
+
+- T007: a real turn on `agents-bare` through the forwarded Linux `agentsd`, token lent by the window: answered, file written, 4 s from Send (walk/README.md #11).
+- T008: env wins over `claude login` (a made-up env token was refused on the signed-in devbox).
+- T010: `/v1/models` answers 200 for a real subscription token with `Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`.
+
+## Was waiting on a real token
 
 - T007: one turn on `agents-bare` with the token in the environment only.
 - T008: on `agents-devbox` (signed in with `claude login`), a *different* token in the environment — which wins.

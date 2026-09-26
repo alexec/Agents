@@ -21,7 +21,22 @@ Rough edges seen:
 - The app wrote the bare box's key into `~/.ssh/known_hosts` as `[127.0.0.1]:2223` (037's
   behaviour, by design); the rebuild replaced it with `ssh-keygen -R`.
 
-Not yet seen (needs Alex's real token, handed over through the Keychain item
-`agents-043-walk`): Settings saying **Works**, a turn that answers on the bare box (SC-001), the
-token-ask card (§ 3, only with no token in Settings), own-sign-in-only on the devbox, and the
-leak search after real use (SC-003).
+## With Alex's real token (pasted by him into the scratch Settings; the Keychain handoff item never appeared)
+
+| # | What | Seen |
+|---|---|---|
+| 9 | Save | **Works** (`8-settings-works.png`): a real subscription token answers 200 on `/v1/models` with Bearer + `oauth-2025-04-20` (T010) |
+| 10 | `bare.sh rebuild`, This server was rebuilt | set up again with Claude in **12 s** from the rebuild |
+| 11 | Project, prompt typed in the window, Send | `hello.txt` on the box **4 s** after Send; Claude ran `uname -a`, answered, and ended **Complete** through `finish_turn` (`10-real-turn.png`). The box has no sign-in of its own: the lent token is what answered (SC-001, well under 5 minutes) |
+| 12 | Leak search after real use | no `sk-ant-oat01-…` anywhere in the scratch root, preferences, crash reports, the last hour of the unified log, or the box's `$HOME` and `/tmp`; no `~/.claude/.credentials.json` on the box (SC-003) |
+| 13 | Env over a server's own login (T008) | on the devbox, signed in with `claude login`, a made-up `CLAUDE_CODE_OAUTH_TOKEN` was refused (401): the lent token wins (D1) |
+
+Found along the way:
+- A gone project's page still offers **New session**; sending from it fails with "…is not there any
+  more" in an alert (`9-gone-page-send.png`). A gone project should open no page.
+- While replacing a token, the row says "No token" though one is saved.
+- AX typing into sheets is unreliable from outside (keystrokes went to the chat's prompt box), so
+  own-sign-in-only on the devbox was not walked in the window; it is covered by `LendTests`.
+
+Still open: own-sign-in-only walked in the window, the token-ask card (§ 3) seen on screen,
+Remove + purge (T054), the toolset update seen in the window (T052), and Alex's look approval (T018).
