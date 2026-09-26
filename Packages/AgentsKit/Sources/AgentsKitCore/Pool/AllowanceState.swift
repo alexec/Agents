@@ -150,9 +150,12 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         rateLimitStreak = []
     }
 
-    /// The person says it is back: bought more credit, a new month began (FR-023).
+    /// The person says it is back: bought more credit, a new month began (FR-023). What
+    /// was spent is counted from nothing again, since what it was spent from is gone:
+    /// otherwise the ledger would call new credit used up at once.
     public mutating func markAvailable(now: Date) {
         status = .available
+        spent = .known(nil)
         since = now
         learnedFrom = .person
         rateLimitStreak = []
@@ -181,6 +184,42 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public mutating func checkExpiry(payment: Payment, now: Date) -> Bool {
         guard let expires = payment.expires, expires <= now, !isOut else { return false }
         markOut(.creditExpired, until: nil, payment: payment, now: now, from: .expiry)
+        return true
+    }
+
+    /// Bring credit's state in line with what the entry now says (US2-AS7, AS8): a grant
+    /// past its date is out at once, credit already spent past a lowered amount is used
+    /// up, and a raised amount or a later date brings it back. Nothing but credit is
+    /// touched, and a timer never resets used-up credit: only this, when the person
+    /// changes the entry, or Mark available. Returns whether anything changed.
+    @discardableResult
+    public mutating func reconcile(payment: Payment, now: Date) -> Bool {
+        guard payment.isCredit else { return false }
+        let expired = payment.expires.map { $0 <= now } ?? false
+        let spentAll: Bool = {
+            guard case .known(let total?) = spent, let amount = payment.amount,
+                  amount.currency == total.currency else { return false }
+            return total.amount >= amount.amount
+        }()
+        switch status {
+        case .out(_, _, .creditExpired) where !expired:
+            status = spentAll ? .out(until: nil, retryAfter: nil, why: .creditUsedUp) : .available
+        case .out(_, _, .creditUsedUp) where !spentAll:
+            status = expired ? .out(until: nil, retryAfter: nil, why: .creditExpired) : .available
+        case .out:
+            return false
+        default:
+            if expired {
+                status = .out(until: nil, retryAfter: nil, why: .creditExpired)
+            } else if spentAll {
+                status = .out(until: nil, retryAfter: nil, why: .creditUsedUp)
+            } else {
+                return false
+            }
+        }
+        since = now
+        learnedFrom = expired ? .expiry : .ledger
+        rateLimitStreak = []
         return true
     }
 

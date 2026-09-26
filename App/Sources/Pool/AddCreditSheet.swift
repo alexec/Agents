@@ -9,6 +9,7 @@ import SwiftUI
 /// takes the person's word for it and says so.
 struct AddCreditSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
     let add: (PoolEntry) -> Void
 
     enum Kind: Hashable { case freeTier, freeCredit, prepaid }
@@ -25,6 +26,13 @@ struct AddCreditSheet: View {
     ]
 
     private var credential: CredentialKind? { Self.keyed.first { $0.runtimeID == runtimeID }?.kind }
+
+    /// The key saved for this runtime, when it is the kind the pool can use. A Claude
+    /// sign-in token is not a key billed by use, so it is not one of these.
+    private var saved: CredentialStore.Record? {
+        guard let record = model.credentials.record(runtimeID), record.kind == credential else { return nil }
+        return record
+    }
 
     private var payment: Payment? {
         let cost = Decimal(string: amount.trimmingCharacters(in: .whitespaces)).map { Cost(amount: $0, currency: "USD") }
@@ -45,9 +53,16 @@ struct AddCreditSheet: View {
             Picker("Runtime", selection: $runtimeID) {
                 ForEach(Self.keyed, id: \.runtimeID) { Text(PoolWords.runtimeName($0.runtimeID)).tag($0.runtimeID) }
             }
-            if let credential {
-                Text("Uses the \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) in Settings ▸ Agents.")
+            // A Gemini key with no billing account is the free tier, which is most of them.
+            .onChange(of: runtimeID, initial: true) { _, id in
+                if id == RuntimeCatalog.gemini.id, kind == nil { kind = .freeTier }
+            }
+            if let saved {
+                Text("Uses the \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) \(saved.mask), from Settings ▸ Agents.")
                     .appText(.fine).foregroundStyle(.secondary)
+            } else {
+                Text("No \(PoolWords.runtimeName(runtimeID)) \(CredentialKind.noun(for: runtimeID)) is saved. Add one in Settings ▸ Agents first.")
+                    .appText(.fine).foregroundStyle(StateTint.attention.style(or: .primary))
             }
 
             Text("WHAT KIND OF CREDIT IS IT?").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
@@ -95,7 +110,7 @@ struct AddCreditSheet: View {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(payment == nil)
+                .disabled(payment == nil || saved == nil)
             }
         }
         .padding(24)

@@ -87,3 +87,34 @@ refuses window captures. The note is drawn by `SwitchNote` from the same record 
 A stand-in with no `loadSession` is started afresh on each later turn, with "… no longer has this
 conversation" notes. That comes from the stand-in, not from the switch.
 
+
+## US2: setting the pool and the credit ledger (T049), 2026-09-26
+
+Driven over `daemon.sock` on the scratch root `/tmp/run-052-us2`. Alex was at the keyboard, so
+nothing was clicked.
+
+1. `pool/set` with Grok (SuperGrok), Copilot and a Codex key on $10 of prepaid credit: three
+   entries, in that order.
+2. The same pool reordered to Copilot, Grok, Codex: kept in that order.
+3. Grok removed: Copilot, Codex.
+4. A Codex key marked as an allowance was refused with -32602: "Codex on an API key is paid by
+   use, so it cannot be an allowance." The pool was left as it was.
+5. The app was stopped, keeping its root, and started again on the same root. `pool/state` then
+   gave the same entries, byte for byte (`us2/pool-before-restart.json`,
+   `us2/pool-state-after-restart.json`).
+
+The ledger was not walked live: the stand-ins report no cost, and Codex runs only from the app's
+own copy. `CreditLedgerTests` covers quickstart §6 end to end, with an injected clock:
+- prepaid credit used up by what the turns cost, before any refusal;
+- a used-up entry never reset by a clock;
+- a grant past its date out at once, and never tried;
+- Gemini's free tier back at midnight Pacific;
+- spending not known;
+- Mark available starting the count over;
+- a raised amount bringing an entry back.
+
+The walk found one bug, now fixed: Mark available kept the old spending, so the ledger called
+new credit used up at once.
+
+Not yet seen on screen: the Settings ▸ Pool Model menu, which is new, and the Add credit sheet's
+key line and refusal. Both build, and are to be looked at when the screen is free.

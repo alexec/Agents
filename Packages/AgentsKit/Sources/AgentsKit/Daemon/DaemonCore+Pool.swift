@@ -210,8 +210,7 @@ extension DaemonCore {
         var tried = carryTried[agentID, default: []]
         tried.insert(AllowanceState.credentialKey(for: current))
         let at = now()
-        var states = allowances
-        for key in states.keys { states[key]?.settle(now: at) }
+        let states = settledStates(at: at)
         let decision = PoolPlan.next(current: current, pool: pool, switchingOff: agent.switchingOff,
                                      states: states, tried: tried, unusable: { self.unusable($0) }, now: at)
         guard case .switchTo(let entry) = decision else {
@@ -325,11 +324,8 @@ extension DaemonCore {
         guard pool.isEffective, let agent = agents[agentID], !agent.switchingOff else { return }
         let current = poolEntry(for: agent)
         let at = now()
-        guard var state = allowances[AllowanceState.credentialKey(for: current)] else { return }
-        _ = state.settle(now: at)
-        guard state.isOut else { return }
-        var states = allowances
-        for key in states.keys { _ = states[key]?.settle(now: at) }
+        let states = settledStates(at: at)
+        guard let state = states[AllowanceState.credentialKey(for: current)], state.isOut else { return }
         let decision = PoolPlan.next(current: current, pool: pool, switchingOff: false, states: states,
                                      tried: [AllowanceState.credentialKey(for: current)],
                                      unusable: { self.unusable($0) }, now: at)
@@ -376,11 +372,11 @@ extension DaemonCore {
     /// What the Pool page draws (US3). An entry nobody has used yet is available.
     public func poolStatus(days: Int? = nil) -> PoolStatus {
         let at = now()
+        let states = settledStates(at: at)
         let live = agents.values.filter { $0.state != .archived }
         let rows = pool.entries.map { entry -> PoolStatus.Row in
             let key = AllowanceState.credentialKey(for: entry)
-            var state = allowances[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
-            state.settle(now: at)
+            let state = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
             let chats = live.filter { AllowanceState.credentialKey(for: poolEntry(for: $0)) == key }.count
             return PoolStatus.Row(entry: entry, state: state, chats: chats, unusable: unusable(entry))
         }
@@ -403,8 +399,33 @@ extension DaemonCore {
         }
         pool = next
         try poolStore.save(next)
+        // A changed amount or date counts now, not at the next turn (US2-AS7, AS8).
+        let at = now()
+        for entry in next.entries where entry.payment.isCredit {
+            var state = allowanceState(for: entry)
+            let wasOut = state.isOut
+            guard state.reconcile(payment: entry.payment, now: at) else { continue }
+            setAllowanceState(state)
+            if wasOut, !state.isOut { raiseAllowanceBack(entry, how: "person") }
+        }
         broadcastPool()
         return poolStatus()
+    }
+
+    /// Every credential's state as of `at`, for deciding and for showing: return times
+    /// that have passed are over, and credit is judged against what its entry says now.
+    /// An entry nobody has used yet is in it too, so an expired grant is out before it is
+    /// ever tried. Nothing is written.
+    func settledStates(at: Date) -> [String: AllowanceState] {
+        var states = allowances
+        for key in states.keys { states[key]?.settle(now: at) }
+        for entry in pool.entries {
+            let key = AllowanceState.credentialKey(for: entry)
+            var state = states[key] ?? AllowanceState(credentialKey: key, entryID: entry.id, since: at)
+            state.reconcile(payment: entry.payment, now: at)
+            states[key] = state
+        }
+        return states
     }
 
     /// The person says a credential is back (FR-023). Idempotent; open to paired devices.

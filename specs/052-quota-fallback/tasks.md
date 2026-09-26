@@ -268,25 +268,29 @@
 
 **Independent Test**: Spec US2 test and AS1–AS8; quickstart §6.
 
-- [ ] T043 [P] [US2] Write `Pkg/Tests/AgentsKitTests/Integration/PoolSetTests.swift` for `pool/set`, following `contracts/daemon-api.md`. Cover:
+- [X] T043 [P] [US2] Write `Pkg/Tests/AgentsKitTests/Integration/PoolSetTests.swift` for `pool/set`, following `contracts/daemon-api.md`. Cover:
   - each rejection, with its sentence;
   - the whole-replace semantics;
   - the `pool/changed` broadcast;
   - owner-only access: a paired device is refused;
   - persistence across a daemon restart on the same root;
   - an entry whose runtime is signed out afterwards stays in the pool and is skipped.
-- [ ] T044 [US2] Implement `pool/set` in `DaemonCore+Pool.swift`, and the `DaemonAPI` method and types, so that T043 passes. Add push to servers on connect beside the cost limits' push (037 R7), in the host connection code under `Pkg/Sources/AgentsKit/Hosts/`.
-- [ ] T045 [P] [US2] Write `Pkg/Tests/AgentsKitTests/Integration/CreditLedgerTests.swift`, following quickstart §6. Cover:
+
+  *Done 2026-09-26.* Owner-only access is checked on `ConnectionRole`, not over a paired
+  socket. `pool/set` itself was built in slice 2. The app pushes the pool to every connected
+  server on set, and to each server when it connects (T044).
+- [X] T044 [US2] Implement `pool/set` in `DaemonCore+Pool.swift`, and the `DaemonAPI` method and types, so that T043 passes. Add push to servers on connect beside the cost limits' push (037 R7), in the host connection code under `Pkg/Sources/AgentsKit/Hosts/`.
+- [X] T045 [P] [US2] Write `Pkg/Tests/AgentsKitTests/Integration/CreditLedgerTests.swift`, following quickstart §6. Cover:
   - a `.prepaid(amount: $0.05)` entry becomes *Credit used up* after turns reporting $0.03 each, before any refusal;
   - `.freeCredit(expires: yesterday)` is out at once;
   - a `.freeTier` Gemini entry is out until the next midnight Pacific after the daily-quota 429, then available;
   - a runtime reporting no cost gives `spent: .unknown`;
   - a used-up entry marked available is tried again, and never reset by a timer;
   - raising the amount brings it back.
-- [ ] T046 [US2] Implement the ledger: add each turn's `TurnUsage.cost` to the chat's entry in `allowances.json`, and check the amount and expiry at the end of every turn, in `DaemonCore+Pool.swift`. This makes T045 pass.
-- [ ] T047 [US2] Make `App/Sources/Settings/PoolSettingsView.swift` from T028 live. Add AppModel calls for `pool/state` and `pool/set` in `App/Sources/AppModel.swift`, and wire up the switch, drag to reorder, the Model menu, Remove, and **Add a runtime**. Add a runtime lists only installed, signed-in runtimes on an allowance, using `model.accounts`.
-- [ ] T048 [US2] Make `App/Sources/Pool/AddCreditSheet.swift` from T029 live. It lists lent keys from Settings ▸ Servers credentials (`CredentialKind.openAIAPIKey`, `.geminiAPIKey`, `.apiKey`), defaults Gemini to **Free tier**, adds the entry last, and makes *Billed with no limit* impossible to pick.
-- [ ] T049 [US2] Walk quickstart §6 and the US2 independent test in the scratch window, following the memory note "drive a scratch window by pid with AX". Add three entries, reorder them, remove one, add a prepaid key, relaunch, and check that everything is as it was left. Put screenshots in `specs/052-quota-fallback/walk/us2/`.
+- [X] T046 [US2] Implement the ledger: add each turn's `TurnUsage.cost` to the chat's entry in `allowances.json`, and check the amount and expiry at the end of every turn, in `DaemonCore+Pool.swift`. This makes T045 pass.
+- [X] T047 [US2] Make `App/Sources/Settings/PoolSettingsView.swift` from T028 live. Add AppModel calls for `pool/state` and `pool/set` in `App/Sources/AppModel.swift`, and wire up the switch, drag to reorder, the Model menu, Remove, and **Add a runtime**. Add a runtime lists only installed, signed-in runtimes on an allowance, using `model.accounts`.
+- [X] T048 [US2] Make `App/Sources/Pool/AddCreditSheet.swift` from T029 live. It lists lent keys from Settings ▸ Servers credentials (`CredentialKind.openAIAPIKey`, `.geminiAPIKey`, `.apiKey`), defaults Gemini to **Free tier**, adds the entry last, and makes *Billed with no limit* impossible to pick.
+- [X] T049 [US2] *(Done over the socket 2026-09-26. The screenshots are still open: Alex was at the keyboard. See `walk/README.md`.)* Walk quickstart §6 and the US2 independent test in the scratch window, following the memory note "drive a scratch window by pid with AX". Add three entries, reorder them, remove one, add a prepaid key, relaunch, and check that everything is as it was left. Put screenshots in `specs/052-quota-fallback/walk/us2/`.
 
 ---
 

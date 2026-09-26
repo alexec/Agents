@@ -812,6 +812,11 @@ final class AppModel {
         do {
             let status = try await client.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
             work.replacePoolStatus(status)
+            // Every connected server carries its chats on by the same pool (052, R6).
+            for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+                _ = try? await client(for: host.id).call(DaemonAPI.Method.poolSet, status.settings,
+                                                         returning: PoolStatus.self)
+            }
             return nil
         } catch let error as JSONRPCError {
             return error.message
@@ -1295,6 +1300,10 @@ final class AppModel {
             _ = try? await server.call(DaemonAPI.Method.retentionSet,
                                        DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                                        returning: DaemonAPI.RetentionSetResult.self)
+        }
+        // And the pool, so a server chat carries on as a Mac one does (052, R6).
+        if let pool = work.poolStatus?.settings {
+            _ = try? await server.call(DaemonAPI.Method.poolSet, pool, returning: PoolStatus.self)
         }
         // The Mac's limits hold on every server too; each keeps to them on its own.
         if let limits = work.costState?.limits {
