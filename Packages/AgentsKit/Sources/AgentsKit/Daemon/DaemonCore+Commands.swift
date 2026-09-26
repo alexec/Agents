@@ -403,8 +403,10 @@ extension DaemonCore {
             // then is "needs signing in", and the ways to sign in are in the handshake.
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
+            let servers = await bridged(mcpServers + [appServer(token: token, managesAgents: managesAgents)],
+                                        runtimeID: runtimeID, token: token, cwd: cwd)
             let result = try await session.newSession(cwd: cwd,
-                                                      mcpServers: mcpServers + [appServer(token: token, managesAgents: managesAgents)],
+                                                      mcpServers: servers,
                                                       meta: sessionMeta(runtimeID: runtimeID, cwd: cwd))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
@@ -803,8 +805,9 @@ extension DaemonCore {
         let token = mintAppToken()
         // Picked back up as what it was: an agent another agent started still has no
         // tools for starting agents (028).
-        let servers = agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil)]
         bindAppToken(token, to: agent.id)
+        let servers = await bridged(agent.mcpServers + [appServer(token: token, managesAgents: agent.startedByAgent == nil)],
+                                    runtimeID: agent.runtimeID, token: token, cwd: agent.cwd)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
         // quietly wider than one started this minute (FR-012).

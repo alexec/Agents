@@ -84,7 +84,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", "Renamed the call sites; tests pass.", "A", "B")
         try await settle(core, id)
@@ -102,7 +102,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "needs_answer", "Drop the old index first?")
         try await settle(core, id)
@@ -119,7 +119,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let both = try await finish(core, launcher, "done", "All done.", "A", "B")
         #expect(both.hasPrefix("Noted."))
@@ -136,7 +136,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "partly_done", "Five of six.", "Do the sixth")
         try await settle(core, id)
@@ -166,7 +166,7 @@ struct FinishTurnTests {
                                           "kind": "reject_once"]]]
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         await eventually("the agent is blocked on the question") {
             await core.agent(id)?.state == .waitingOnUser
@@ -185,7 +185,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher()
         let core = try core(launcher, locations: locations)
-        _ = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let error = await #expect(throws: JSONRPCError.self) {
             _ = try await core.finishTurn(.init(token: "not-a-token", outcome: "done",
@@ -202,7 +202,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "partly_done", "Five of six.", "A", "B")
         try await finish(core, launcher, "done", "Got the sixth after all.")
@@ -229,7 +229,7 @@ struct FinishTurnTests {
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         await eventually("our own tool's question was answered for us") {
             await launcher.lastAgent?.permissionOutcome != nil
         }
@@ -276,16 +276,16 @@ struct FinishTurnTests {
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
 
-        let one = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let one = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         try await finish(core, launcher, "partly_done", "Five of six.", "A", "B")
         try await settle(core, one)
 
-        let suggestThenReport = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let suggestThenReport = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         try await suggest(core, launcher, "A", "B")
         try await report(core, launcher, "partly_done", "Five of six.")
         try await settle(core, suggestThenReport)
 
-        let reportThenSuggest = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let reportThenSuggest = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         try await report(core, launcher, "partly_done", "Five of six.")
         try await suggest(core, launcher, "A", "B")
         try await settle(core, reportThenSuggest)
@@ -302,7 +302,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", "All done.", "A", "B")
         try await suggest(core, launcher, "C")
@@ -317,7 +317,7 @@ struct FinishTurnTests {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         try await finish(core, launcher, "done", "All done.", "A", "B")
         try await report(core, launcher, "stuck", "No signing certificate.")

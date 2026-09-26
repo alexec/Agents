@@ -61,4 +61,25 @@ adapter does load the user's `~/.claude/skills`. The other runtimes over ACP com
 
 ## 5. MCP servers and plugins reach each runtime
 
+### The bridge spike (T020)
+
+2026-09-26, the built `agentsd` (this branch, `build/DD`) on scratch root `/tmp/run-054b`, a real
+Copilot agent (`copilot --acp`, as the app starts it), with `bridged(...)` wired into both places
+a session is made.
+
+- **The app's own tools.** Copilot was given `agents` as an http route on the bridge, listed its
+  tools and called `finish_turn`. The first run showed a gap the spike was for: the daemon
+  refused the call (`refused a token call from pid …: not started by that agent's runtime`),
+  because the helper is now the daemon's child, not Copilot's. A helper the bridge started for
+  the token's own route now counts too (`tokenRefusal` → `isBridged`): the bridge starts it only
+  for a request carrying that route's bearer, which only the runtime was sent. Second run: the
+  turn ended with `workReported {outcome: done}` and no refusal.
+- **A chosen stdio server.** `probe/mcp-server.py heron-mcp`, given as the agent's stdio server,
+  went through its own route. `mcp.log`: `initialize`, `notifications/initialized`, `tools/list`,
+  `tools/call`, all from the bridge's child, and the model answered HERON-MCP-9.
+- Both routes ended, and their processes with them, when the agent's turn settled and its token
+  was dropped. Nothing but route ids, server names and pids is in `daemon.log`.
+
+Copilot accepts the route, so Phase 8 goes on as planned.
+
 ## 6. Settings ▸ Shared

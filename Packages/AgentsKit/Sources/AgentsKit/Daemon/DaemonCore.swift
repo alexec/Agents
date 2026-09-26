@@ -124,6 +124,11 @@ public actor DaemonCore {
     var terminalServices: [UUID: TerminalService] = [:]
     /// Which agent each live suggestion token speaks for. See `DaemonCore+Suggestions`.
     var appTokens: [String: UUID] = [:]
+    #if canImport(Network) && canImport(Security)
+    /// Stdio MCP servers over loopback http, for a runtime that takes none from the client
+    /// (054, research R11). It listens only once a session needs it.
+    let bridge = MCPBridge()
+    #endif
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the

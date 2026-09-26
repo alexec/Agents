@@ -144,7 +144,7 @@ others produce. The look gate has passed, so no screenshot gate stands before th
 
 **Goal**: prove Copilot takes an http server from the bridge and calls a tool through it before the bridge is built properly.
 
-- [ ] T020 Spike `Src/MCP/MCPBridge.swift` at its barest:
+- [X] T020 Spike `Src/MCP/MCPBridge.swift` at its barest:
   - `NWListener` on `127.0.0.1:0`;
   - one hard-coded route that runs the app's own `agentsd mcp <token>` helper;
   - POST → stdin, stdout line → the matching response.
