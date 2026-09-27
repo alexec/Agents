@@ -45,12 +45,15 @@ ones every Mac app has.
 | Option-Command-P | **View ▸ Pool** | Opens the Pool page. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
 | Command-F | **View ▸ Find Session** | Puts the keyboard in the sessions column's search field. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
-| Command-, | **Agents ▸ Settings…** | Opens [Settings](settings.md). |
+| Command-, | **Agents ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |
 | Return, Escape | In a sheet or dialog | Takes the highlighted button, or cancels. |
 | Return | On a permission or question card | Takes the first allowing answer, or **Submit** on a multi-step form. |
 | Command-1 to Command-9 | On a permission or question card | Picks that option by position. |
 
 ## See also
 
-- [How-to guides](../how-to/index.md)
-- [Explanation](../explanation/index.md)
+- [Read an agent's changes](../how-to/read-an-agents-changes.md)
+- [Use a shell in an agent's folder](../how-to/use-a-shell.md)
+- [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
+- [Settings and the Resources page](settings.md)
+- [Statuses and groups](statuses.md)

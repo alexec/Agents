@@ -12,7 +12,7 @@ Mac; your iPhone and iPad show the same list.
 ## Before you start
 
 - At least one runtime installed on this Mac. If the list says **No agent runtime found**,
-  install one first; see [Reference](../reference/index.md) for what each runtime needs.
+  install one first; see [Runtimes](../reference/runtimes.md) for what each needs.
 - To clone, the Git address of the repository, and access to it from this Mac (the same
   access `git clone` would need in Terminal).
 
@@ -68,3 +68,10 @@ if you no longer want it. **Show in Finder** on the same menu takes you there.
   Paste the HTTPS or SSH address from the repository's **Clone** button.
 - **Folder is missing** under a project's name means the folder was moved or deleted
   outside the app. Put it back, or archive the project.
+
+## See also
+
+- [Add a Linux server](add-a-linux-server.md)
+- [Start an agent in its own worktree](start-in-a-worktree.md)
+- [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
+- [Runtimes](../reference/runtimes.md)

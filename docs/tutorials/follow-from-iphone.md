@@ -74,7 +74,7 @@ agent's explanation, and the fix it suggests you commit next.
 
 ## 5. Start an agent from the phone
 
-1. Go back to the project and tap **+** at the top right, for a new agent.
+1. Go back to the project and tap **+** at the top right, for a new session.
 2. Leave **Runtime** as it is. It is the runtime your Mac has set up.
 3. In **What should it do?**, type:
 

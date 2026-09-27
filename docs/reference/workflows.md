@@ -106,5 +106,8 @@ Finder**.
 
 ## See also
 
-- [How-to guides](../how-to/index.md)
-- [Explanation](../explanation/index.md)
+- [Set up a workflow](../how-to/set-up-a-workflow.md)
+- [Have an agent watch a pull request](../how-to/watch-a-pull-request.md)
+- [Have an agent wait for something](../how-to/wait-for-something.md)
+- [Events](events.md)
+- [Tools the app gives agents](agent-tools.md)

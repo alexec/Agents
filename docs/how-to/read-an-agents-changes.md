@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: See what an agent changed, file by file and edit by edit, in the Changes pane, the conversation and the files pane.
+description: See what an agent changed, open a local page in the Browser pane, and browse its folder.
 ---
 
 # Read an agent's changes
@@ -54,6 +54,13 @@ Click **Files** in the sidebar to browse the agent's folder. Files the agent cha
 marked. Click one to read it; code is shown with its syntax coloured, and pictures and
 Markdown are shown as they look.
 
+**Open a local page (Mac)**
+
+Click **Browser** in the sidebar, or press Command-4. Type a URL and press Return, or
+paste one. The pane is for local servers and documentation you want beside the
+conversation: it keeps its page and history per agent, and the agent cannot drive it.
+There are no tabs, bookmarks or downloads — use Safari for those.
+
 **On iPhone and iPad**
 
 1. In the conversation, each edit is shown where it happened, as on the Mac.
@@ -73,3 +80,9 @@ Markdown are shown as they look.
   it is now.
 - A very large change says how many lines changed instead of drawing them. Click **Show
   changes** to draw it anyway.
+
+## See also
+
+- [Follow a live document](follow-a-live-document.md)
+- [Use a shell in an agent's folder](use-a-shell.md)
+- [Keyboard shortcuts](../reference/keyboard-shortcuts.md)

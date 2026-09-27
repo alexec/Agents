@@ -33,9 +33,10 @@ each of these things: its own.
 
 The app gives each agent a small set of tools of its own. With them an agent can say how
 its turn went, show you a file, suggest what you might say next, start and stop other
-agents in the project, set up a workflow, take a turn on a shared resource, and work on a
-pull request. Everything these tools do shows up in the window and on your phone. The
-[Reference](../reference/index.md) lists them all.
+agents in the project, set up a workflow, take a turn on a shared resource, wait for an
+event or publish one, move into a worktree and back, and work on a pull request.
+Everything these tools do shows up in the window and on your phone. The
+[tools reference](../reference/agent-tools.md) lists them all.
 
 Every runtime gets them. Copilot takes no MCP server it would have to start itself, so the
 app runs its own tools for it and hands them to Copilot over a local http address that
@@ -99,5 +100,8 @@ every tool it always had, with your own settings, schedules and connectors.
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for signing a runtime in and setting up workflows.
-- [Reference](../reference/index.md), for the runtimes and the tools the app gives agents.
+- [Tools the app gives agents](../reference/agent-tools.md), for the full list.
+- [Events](../reference/events.md), for what an agent can wait on and publish.
+- [Sign a runtime in](../how-to/sign-a-runtime-in.md) and
+  [Set up a workflow](../how-to/set-up-a-workflow.md).
+- [Runtimes](../reference/runtimes.md), for what each runtime keeps and loses.

@@ -49,7 +49,7 @@ prompt opens Settings. Raise it, then send a prompt to carry on. **What the limi
 stopped**, in the same pane, lists every agent a limit has stopped.
 
 Each server keeps to the per-day limit on its own. For every control in the pane, see
-[Settings](../reference/settings.md).
+[Settings and the Resources page](../reference/settings.md).
 
 ## If it doesn't work
 
@@ -57,3 +57,10 @@ Each server keeps to the per-day limit on its own. For every control in the pane
   crosses it finishes.
 - **The figure stays at nothing, and a limit does not stop the agent.** Its runtime
   reports no price; hover over the figure and it says so.
+
+## See also
+
+- [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md)
+- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
+- [Settings and the Resources page](../reference/settings.md)
+- [Statuses and groups](../reference/statuses.md)

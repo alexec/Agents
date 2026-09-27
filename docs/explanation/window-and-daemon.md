@@ -87,5 +87,5 @@ the conversation and everything around it are still there.
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for starting, stopping and archiving agents.
-- [Reference](../reference/index.md), for what each status and group means.
+- [Stop, park and archive agents](../how-to/archive-park-stop.md).
+- [Statuses and groups](../reference/statuses.md).
