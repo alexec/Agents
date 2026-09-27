@@ -30,6 +30,7 @@ struct LocalServices {
 
     static let controlPlist = "com.alexecollins.agents.control.plist"
     static let hostPlist = "com.alexecollins.agents.host.plist"
+    static let hostOnlyPlist = "com.alexecollins.agents.hostonly.plist"
 
     enum Approval: Equatable {
         case enabled
@@ -48,8 +49,9 @@ struct LocalServices {
     /// Takes both away again. Only walks and tests call this for now.
     func remove() async {
         if scratch {
-            for label in [controlLabel, hostLabel] { _ = await Self.launchctl(["bootout", "gui/\(getuid())/\(label)"]) }
+            for label in [controlLabel, hostLabel, hostOnlyLabel] { _ = await Self.launchctl(["bootout", "gui/\(getuid())/\(label)"]) }
         } else {
+            try? await SMAppService.agent(plistName: Self.hostOnlyPlist).unregister()
             try? await SMAppService.agent(plistName: Self.hostPlist).unregister()
             try? await SMAppService.agent(plistName: Self.controlPlist).unregister()
         }
@@ -61,9 +63,20 @@ struct LocalServices {
         await Self.launchctl(["kickstart", "-k", "gui/\(getuid())/\(controlLabel)"]) == 0
     }
 
-    private func registerWithSystem() -> Approval {
+    /// Only this Mac's host, for a control plane elsewhere (058, US7). The membership is
+    /// already in the host root; the daemon dials out with it.
+    func registerHostOnly() async -> Approval {
+        scratch ? await bootstrapScratch(hostOnly: true) : registerWithSystem([Self.hostOnlyPlist])
+    }
+
+    /// Which machine this host says it is. A scratch root stands in for another Mac, so
+    /// it says a machine of its own, or the control plane would take it for this one's.
+    var machineID: String { scratch ? "scratch-\(suffix)" : MachineID.current }
+    var hostName: String { scratch ? "Scratch Mac \(suffix.prefix(4))" : Host.current().localizedName ?? "A Mac" }
+
+    private func registerWithSystem(_ names: [String] = [Self.controlPlist, Self.hostPlist]) -> Approval {
         var needsApproval = false
-        for name in [Self.controlPlist, Self.hostPlist] {
+        for name in names {
             let service = SMAppService.agent(plistName: name)
             switch service.status {
             case .enabled: continue
@@ -90,8 +103,9 @@ struct LocalServices {
 
     var controlLabel: String { scratch ? "com.alexecollins.agents.control.scratch-\(suffix)" : "com.alexecollins.agents.control" }
     var hostLabel: String { scratch ? "com.alexecollins.agents.host.scratch-\(suffix)" : "com.alexecollins.agents.host" }
+    var hostOnlyLabel: String { scratch ? "com.alexecollins.agents.hostonly.scratch-\(suffix)" : "com.alexecollins.agents.hostonly" }
 
-    private func bootstrapScratch() async -> Approval {
+    private func bootstrapScratch(hostOnly: Bool = false) async -> Approval {
         let helpers = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers")
         let bridge = helpers.appendingPathComponent("agents-bridge.app/Contents/MacOS/agents-bridge").path
         let agentsd = helpers.appendingPathComponent("agentsd").path
@@ -100,7 +114,11 @@ struct LocalServices {
         }
         try? FileManager.default.createDirectory(at: controlRoot, withIntermediateDirectories: true)
         let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        let jobs: [(String, [String], [String: String], String)] = [
+        let jobs: [(String, [String], [String: String], String)] = hostOnly ? [
+            (hostOnlyLabel, [agentsd, "--control-network", "--host-name", hostName],
+             ["AGENTS_ROOT": hostRoot.path, "AGENTS_MACHINE_ID": machineID, "PATH": path],
+             "host.out"),
+        ] : [
             (controlLabel, [bridge],
              ["AGENTS_ROOT": hostRoot.path, ControlPlane.rootVariable: controlRoot.path,
               // Off the ordinary port, off Bonjour and out of iCloud: a walk is nobody's

@@ -133,6 +133,10 @@ public struct StoreLocations: Sendable {
     /// The servers the window reaches over ssh (037). Written by the window only; the
     /// daemon at this root never reads it.
     public var hosts: URL { root.appendingPathComponent("hosts.json") }
+    /// A host of a control plane elsewhere (058): what enrolling told it, and its own key.
+    /// Written by the daemon given `--control-code`, or by the window's Run a Host Here.
+    public var controlHostMembership: URL { root.appendingPathComponent("control-host.json") }
+    public var controlHostKey: URL { root.appendingPathComponent("control-host-key") }
     /// Each connected server's ssh control socket and forwarded daemon socket,
     /// `<id>.ctl` and `<id>.sock`. Short names, because both count against the same
     /// 104 bytes as `daemon.sock`.

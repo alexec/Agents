@@ -401,6 +401,9 @@ final class AppModel {
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
+    /// The control plane this Mac's agents run for, when that is all it does here (US7).
+    private(set) var hostOnlyOf: String? = ControlConfig.hostOnly?.name
+    func becameHost(of name: String) { hostOnlyOf = name }
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).

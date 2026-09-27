@@ -36,16 +36,32 @@ struct FirstRunView: View {
              + Text(": a small program on a machine you own. This window, your iPhone and your iPad all connect to it, and it reaches every Mac and server your agents work on."))
                 .appText(.reading).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if let host = model.hostOnlyOf {
+                // This Mac already runs agents for a control plane elsewhere (US7). A
+                // control plane here too would put a second daemon on the same agents.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "checkmark").tinted(.vouched)
+                    Text("This Mac runs agents for \(host). Its projects are listed wherever that control plane is used. To use them from this window too, connect it with a code from Pair a Mac.")
+                        .appText(.reading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.25)) }
+            }
             HStack(alignment: .top, spacing: 16) {
-                card(title: "Run one on this Mac",
-                     body: "Sets up the control plane and this Mac’s agents here. macOS keeps them running, even with this window closed. Your agents stop while this Mac sleeps.",
-                     usual: true) {
-                    Button("Run One Here") { runHere() }
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.defaultAction)
+                if model.hostOnlyOf == nil {
+                    card(title: "Run one on this Mac",
+                         body: "Sets up the control plane and this Mac’s agents here. macOS keeps them running, even with this window closed. Your agents stop while this Mac sleeps.",
+                         usual: true) {
+                        Button("Run One Here") { runHere() }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                    }
                 }
                 card(title: "Connect to a control plane",
-                     body: "You already run one, on another Mac or a server. You’ll need a pairing code from it.",
+                     body: "You already run one, on another Mac or a server. You’ll need a pairing code from it: from Pair a Mac to use it from this window, or from Add by Code to run only this Mac’s agents for it.",
                      usual: false) {
                     Button("Connect…") { connecting = true }
                 }

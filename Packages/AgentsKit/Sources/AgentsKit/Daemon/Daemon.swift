@@ -192,9 +192,9 @@ public final class Daemon: @unchecked Sendable {
     /// then dialled with its own key, kept beside it in this root.
     private func joinOverTheNetwork(_ control: Control, server: DaemonServer, hello: DaemonAPI.HostHello) async {
         #if canImport(Network) && canImport(CryptoKit)
-        let membershipFile = locations.root.appendingPathComponent("control-host.json")
+        let membershipFile = locations.controlHostMembership
         do {
-            let key = try DeviceKey.load(file: locations.root.appendingPathComponent("control-host-key"))
+            let key = try DeviceKey.load(file: locations.controlHostKey)
             var membership = ControlMembership.load(membershipFile)
             if membership == nil, let text = control.code {
                 guard let code = ControlCode(text: text) else {
@@ -238,11 +238,11 @@ public final class Daemon: @unchecked Sendable {
         lock.release()
     }
 
-    static var version: String {
+    public static var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
     }
 
-    static var platform: String {
+    public static var platform: String {
         #if os(macOS)
         let os = "macOS"
         #else

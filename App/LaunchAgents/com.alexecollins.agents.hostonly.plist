@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- This Mac's agents, run for a control plane on another machine (058, US7): the
+     daemon dials out with the membership Run a Host Here kept in its root. No control
+     plane runs here. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.alexecollins.agents.hostonly</string>
+    <key>BundleProgram</key>
+    <string>Contents/Helpers/agentsd</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>agentsd</string>
+        <string>--control-network</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

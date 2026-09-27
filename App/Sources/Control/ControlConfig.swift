@@ -1,6 +1,7 @@
 import AgentsKit
 import AgentsKitCore
 import Foundation
+import ServiceManagement
 
 /// Where this window's control plane is, when it has one (058).
 ///
@@ -46,6 +47,8 @@ enum ControlConfig {
     /// way until it is moved across (US6).
     static var needsFirstRun: Bool {
         guard endpoint == nil else { return false }
+        // Its agents run for a control plane elsewhere, and this window isn't paired.
+        if hostOnly != nil { return true }
         let locations = StoreLocations.default
         let files = FileManager.default
         if files.fileExists(atPath: locations.projects.path) || files.fileExists(atPath: locations.socket.path) {
@@ -54,6 +57,34 @@ enum ControlConfig {
         let agents = (try? files.contentsOfDirectory(atPath: locations.agents.path)) ?? []
         return agents.isEmpty
     }
+
+    /// This Mac as only a host of a control plane elsewhere (058, US7): what enrolling
+    /// kept in the root, for the daemon to dial out with.
+    static var hostOnly: ControlMembership? {
+        guard root == nil else { return nil }
+        return ControlMembership.load(StoreLocations.default.controlHostMembership)
+    }
+
+    /// Run a Host Here: enrol this Mac's host with a host code, keep the membership in
+    /// the root, then let launchd run the daemon that dials out with it. The code is
+    /// used here, once, and never written down.
+    static func runHostHere(with code: ControlCode, services: LocalServices) async throws -> ControlMembership {
+        let locations = StoreLocations.default
+        let key = try DeviceKey.load(file: locations.controlHostKey)
+        let membership = try await ControlDialling.enroll(code, announce: DaemonAPI.HostAnnounce(
+            publicKey: key.publicKey, name: services.hostName, platform: Daemon.platform,
+            version: Daemon.version, machineID: services.machineID))
+        try membership.save(locations.controlHostMembership)
+        switch await services.registerHostOnly() {
+        case .enabled: return membership
+        case .needsApproval:
+            SMAppService.openSystemSettingsLoginItems()
+            throw HostOnlyFailure(description: "Allow Agents in System Settings ▸ Login Items, then press Run a Host Here again.")
+        case .failed(let why): throw HostOnlyFailure(description: why)
+        }
+    }
+
+    struct HostOnlyFailure: Error, CustomStringConvertible { let description: String }
 
     /// One connection for every host's client, to a control plane on this Mac.
     static func link(root: URL) -> ControlLink {
