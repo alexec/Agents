@@ -49,6 +49,37 @@ struct PoolSwitchTests {
         }
     }
 
+    @Test func copilotMonthlyQuotaInChatMovesToTheNextRuntime() async throws {
+        var script = FakeACPAgent.Script()
+        script.updates = ["Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
+            ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
+        }
+        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex])
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "finish the change"))
+        await eventually("Copilot handed over to Codex") { await core.agent(id)?.runtimeID == "codex" }
+        await eventually("Codex answered") { await core.agent(id)?.endedReason == .endTurn }
+        #expect(launcher.launches.prefix(2).map(\.runtime) == ["copilot", "codex"])
+        #expect(await core.allowanceStates().contains { $0.credentialKey == "copilot:sign-in" && $0.isOut })
+        let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
+        #expect(switches.count == 1)
+        #expect(switches.first?.reason == .allowanceSpent)
+        let next = try #require(launcher.allAgents.dropFirst().first)
+        let prompts = await promptText(next)
+        #expect(prompts.count == 1)
+        #expect(prompts.first?.contains("# Conversation so far") == true)
+        #expect(prompts.first?.contains("finish the change") == true)
+    }
+
+    @Test func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
+        var script = FakeACPAgent.Script()
+        script.updates = [["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "Error: You have exceeded your monthly quota (Request ID: captured)"]]]
+        let (core, work, launcher, _) = try await core([script], pool: [copilot, codex], isOn: false)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        await eventually("the quota refusal stopped") { await core.agent(id)?.endedReason == .allowanceSpent }
+        #expect(await core.agent(id)?.state != .finished)
+        #expect(launcher.launchCount == 1)
+    }
+
     @Test func aSpentAllowanceMovesTheChatWithItsConversation() async throws {
         let (core, work, launcher, locations) = try await core([try spent()])
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))

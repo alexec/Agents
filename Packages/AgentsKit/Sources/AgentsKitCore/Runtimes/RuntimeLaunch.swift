@@ -141,7 +141,11 @@ public enum RuntimeLaunchCatalog {
             linkTitle: "Read Google’s terms",
             methods: ["oauth-personal", "oauth-business"]))
 
-    public static let builtIn: [RuntimeLaunch] = [antigravity]
+    /// Copilot reports failures as `Error: …` chat text followed by `end_turn`.
+    /// Observed on 2026-09-26 for its exhausted monthly quota.
+    public static let copilot = RuntimeLaunch(runtimeID: "copilot", turnErrorPrefix: "Error:")
+
+    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {

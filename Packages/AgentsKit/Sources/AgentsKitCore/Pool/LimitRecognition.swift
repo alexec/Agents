@@ -43,6 +43,9 @@ public enum LimitRecognition {
     /// Gemini's spent free tier (046, research R13).
     public static let geminiDailyQuota = "exhausted your daily quota"
 
+    /// Copilot's monthly allowance refusal, captured on 2026-09-26.
+    public static let copilotMonthlyQuota = "You have exceeded your monthly quota"
+
     /// A key's credit gone: OpenAI's code and Anthropic's sentence.
     public static let creditGoneWords = ["insufficient_quota", "credit balance is too low"]
 
@@ -70,7 +73,14 @@ public enum LimitRecognition {
         if case .allowance = payment, rateLimit?.isPayingOverage == true {
             return .overage(resetsAt: rateLimit?.overageResetsAt ?? rateLimit?.resetsAt)
         }
-        // Layer 2: words that have been seen.
+        // Layer 2: words that have been seen. Copilot can send its refusal as a
+        // normal message ending in end_turn, or as a rejected prompt.
+        if runtimeID == RuntimeCatalog.copilot.id,
+           [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
+               $0.hasPrefix(copilotMonthlyQuota) || $0.hasPrefix("Error: " + copilotMonthlyQuota)
+           }) {
+            return .spent(resetsAt: resets)
+        }
         if let (code, message) = error {
             let lower = message.lowercased()
             if creditGoneWords.contains(where: { lower.contains($0) }) { return .creditGone }
