@@ -455,11 +455,12 @@ struct PromptBar: View {
             HStack {
                 Spacer()
                 Button("Not now") { isPrimingDictation = false }
+                    .keyboardShortcut(.cancelAction)
                 Button("Continue") {
                     isPrimingDictation = false
                     beginDictation()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.paperProminent)
                 .keyboardShortcut(.defaultAction)
             }
         }

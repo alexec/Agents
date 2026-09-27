@@ -38,7 +38,7 @@ import AppKit
 /// to choose wrongly.
 enum TextStep {
     /// A page's own title, and the one number a page exists to report. Nothing else:
-    /// a section header is `fine` with a weight, not a small title.
+    /// a section header is `reading` with a weight (`SectionHeading`), not a small title.
     case title
 
     /// The size everything is read at unless there is a reason otherwise — messages,
@@ -51,7 +51,8 @@ enum TextStep {
     case supporting
 
     /// Two steps down, and as far down as anything goes: timestamps, counts, badge
-    /// text, section headers, and the chrome on the small buttons around the prompt.
+    /// text, and the chrome on the small buttons around the prompt. A section heading
+    /// is `reading` with a weight (`SectionHeading`), not this step.
     case fine
 
     /// Code, diffs, command names and file paths. Drawn at `supporting`'s size rather

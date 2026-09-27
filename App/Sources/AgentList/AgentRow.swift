@@ -93,7 +93,7 @@ struct AgentRow: View {
                     // line added then is cut in half.
                     if isCompact, let wait = agent.allowanceWait {
                         let words = PoolWords.waitingLine(wait, now: Date())
-                        Image(systemName: "hourglass")
+                        Image(systemName: PoolWords.waitingSymbol)
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .help(words)
@@ -192,10 +192,10 @@ struct AgentRow: View {
                             .lineLimit(1)
                     }
                     Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.paper)
                         .controlSize(.small)
                         .padding(.top, 3)
-                        .help("Tell it the block has cleared, and let it carry on")
+                        .help(AgentsModel.carryOnHelp(for: agent))
                 }
                 // Parked, and since when; or that it will park when this turn ends
                 // (040). How it ended stays the icon's to say.

@@ -87,8 +87,7 @@ private struct PluginDetail: View {
                 .padding(12)
             }
             .frame(maxHeight: 180)
-            .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+            .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             SharedSectionLabel("How each gets it")
             SharedReachList(runtimes: runtimes, reach: plugin.reach)
             Spacer()

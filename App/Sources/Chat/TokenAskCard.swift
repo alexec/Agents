@@ -34,7 +34,7 @@ struct TokenAskCard: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { model.finishTokenAsk(saved: false) }
                     .keyboardShortcut(.cancelAction)
-                Button("Save and Start", action: save)
+                Button("Save and start", action: save)
                     .keyboardShortcut(.defaultAction)
                     .disabled(text.isEmpty || saving)
             }

@@ -6,7 +6,7 @@ These are screenshots of the real app (the `three-columns` branch) on a scratch 
 
 ![Project overview](1-project-overview.png)
 
-The middle column lists the project's sessions under the same headings as before: Needs attention, Unread/Read, Parked, and Archived (collapsed). On the right is the project on its own: New session, then pull requests, workflows and worktrees. The compose button in the toolbar and ⌘N both come here.
+The middle column lists the project's sessions under the same headings as before: Needs attention, Unread/Read, Parked, and Archived (collapsed). On the right is the project on its own: New session, then pull requests, workflows and worktrees. **New session** at the top of the sessions column and ⌘N both start one here.
 
 ## 2. A session picked
 

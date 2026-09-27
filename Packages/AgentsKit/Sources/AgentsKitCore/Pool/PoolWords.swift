@@ -200,6 +200,9 @@ public enum PoolWords {
 
     public static let stoppedWaiting = "Stopped waiting for an allowance. It carries on when you next prompt it."
 
+    /// Mark on a session waiting for an allowance — not the Waiting group's hourglass.
+    public static let waitingSymbol = "banknote"
+
     /// The agent row's line while it waits (US4).
     public static func waitingLine(_ wait: AllowanceWait, now: Date) -> String {
         "Waiting for an allowance · carries on with \(runtimeName(wait.runtimeID)) at \(time(wait.resumeAt, now: now))"

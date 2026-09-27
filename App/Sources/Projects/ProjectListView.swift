@@ -239,8 +239,9 @@ private struct EmptyProjectList: View {
                     .foregroundStyle(.secondary)
                 HStack {
                     Button("Add Folder…") { isChoosingFolder = true }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                     Button("Clone Git URL…") { isCloning = true }
+                        .buttonStyle(.paper)
                 }
             }
         }

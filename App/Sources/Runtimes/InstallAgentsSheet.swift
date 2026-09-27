@@ -11,8 +11,7 @@ struct InstallAgentsSheet: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Install your agents").appText(.reading).fontWeight(.semibold)
+        PaperSheet(title: "Install your agents") {
             Text(summary)
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -23,15 +22,13 @@ struct InstallAgentsSheet: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            HStack {
-                Spacer()
-                Button("Not now") { model.rememberInstallOffer() }
-                Button("Done") { model.rememberInstallOffer() }
-                    .keyboardShortcut(.defaultAction)
-            }
+            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
+        } actions: {
+            Button("Not now") { model.rememberInstallOffer() }
+                .keyboardShortcut(.cancelAction)
+            Button("Done") { model.rememberInstallOffer() }
+                .keyboardShortcut(.defaultAction)
         }
-        .padding(20)
         .frame(width: 480)
     }
 

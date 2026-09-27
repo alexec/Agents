@@ -54,8 +54,7 @@ struct ChatView: View {
             }
         }
         .animation(.snappy(duration: 0.28), value: model.selection)
-        .navigationTitle(agent?.title ?? "New session")
-        .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
+        // Title stays on SessionsColumn: one owner for the window title.
         .environment(\.chatActions, chatActions)
     }
 
@@ -130,7 +129,7 @@ struct ChatView: View {
                     }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                    .help("Tell it the block has cleared, and let it carry on")
+                    .help(AgentsModel.carryOnHelp(for: agent))
                 }
                 if model.canStop(agent) {
                     Button {

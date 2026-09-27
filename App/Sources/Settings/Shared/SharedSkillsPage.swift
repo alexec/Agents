@@ -108,8 +108,7 @@ private struct SkillDetail: View {
                 }
                 .padding(14)
             }
-            .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+            .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             HStack {
                 Button("Reveal in Finder") { SharedFiles.reveal(skill.path) }.buttonStyle(.paper)
                 Button("Edit SKILL.md") { SharedFiles.open(skill.path + "/SKILL.md") }.buttonStyle(.paper)

@@ -29,7 +29,7 @@ struct OfflineStrip: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             .chatColumn()
             .padding(.top, 8)
         }

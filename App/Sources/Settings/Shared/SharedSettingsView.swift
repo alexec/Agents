@@ -51,7 +51,7 @@ enum SharedInk {
     static var attention: Color { StateTint.attention.color ?? .secondary }
 }
 
-enum SharedPage: Hashable {
+enum SharedPage: String, Hashable {
     case overview, instructions, skills, mcp, plugins, other
 
     init(_ page: DaemonAPI.Look.Page) {
@@ -204,10 +204,10 @@ struct SharedRow<Content: View>: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9)
-                    .strokeBorder(chosen ? SharedInk.reach : Paper.rule, lineWidth: chosen ? 2 : 1))
-                .contentShape(RoundedRectangle(cornerRadius: 9))
+                .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+                .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control)
+                    .strokeBorder(chosen ? SharedInk.reach : .clear, lineWidth: chosen ? 2 : 0))
+                .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

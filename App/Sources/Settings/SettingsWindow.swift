@@ -8,8 +8,8 @@ import SwiftUI
 /// than in a column of their own, so there is one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @State private var pane: SettingsPane = .general
-    @State private var sharedPage: SharedPage = .overview
+    @AppStorage("settingsPane") private var paneRaw = SettingsPane.general.rawValue
+    @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
@@ -17,24 +17,36 @@ struct SettingsWindow: View {
 
     static let size = CGSize(width: 1_000, height: 640)
 
+    private var pane: Binding<SettingsPane> {
+        Binding(
+            get: { SettingsPane(rawValue: paneRaw) ?? .general },
+            set: { paneRaw = $0.rawValue })
+    }
+
+    private var sharedPage: Binding<SharedPage> {
+        Binding(
+            get: { SharedPage(rawValue: sharedPageRaw) ?? .overview },
+            set: { sharedPageRaw = $0.rawValue })
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: $pane, sharedPage: $sharedPage, snapshot: sharedSnapshot)
+            SettingsRail(pane: pane, sharedPage: sharedPage, snapshot: sharedSnapshot)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Paper.ground)
-        .navigationTitle(pane.title)
+        .navigationTitle(pane.wrappedValue.title)
         .task { await refreshShared() }
         // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
-            pane = asked
+            pane.wrappedValue = asked
             model.settingsPaneAsked = nil
         }
-        .onChange(of: pane) { _, chosen in
+        .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .shared { Task { await refreshShared() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -44,11 +56,11 @@ struct SettingsWindow: View {
 
     @ViewBuilder
     private var content: some View {
-        switch pane {
+        switch pane.wrappedValue {
         case .general: FormColumn { AppearanceSettingsView() }
         case .agents: FormColumn { AgentsSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
-        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage)
+        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage)
         case .spending: FormColumn { CostSettingsView() }
         case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }
@@ -61,7 +73,7 @@ struct SettingsWindow: View {
     }
 }
 
-enum SettingsPane: Hashable, CaseIterable {
+enum SettingsPane: String, Hashable, CaseIterable {
     case general, agents, runtimes, shared, spending, pool, devices, servers
 
     var title: String {
@@ -210,12 +222,12 @@ private struct RailButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
-                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .foregroundStyle(lit ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.primary))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(lit ? SharedInk.reach : .clear, in: RoundedRectangle(cornerRadius: 7))
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+                .background(lit ? Paper.ink : .clear, in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+                .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
         }
         .buttonStyle(.plain)
         // A button is already one element: `children: .ignore` would swap it for one

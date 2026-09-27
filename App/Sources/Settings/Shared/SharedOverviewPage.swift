@@ -53,8 +53,7 @@ struct SharedOverviewPage: View {
             Divider()
             row("Plugins", count: snapshot.plugins.count) { countCell(snapshot.plugins.map(\.reach), runtime: $0) }
         }
-        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+        .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
     }
 
     private func row(_ title: String, count: Int?, cell: @escaping (String) -> Cell) -> some View {

@@ -57,7 +57,7 @@ struct AddServerSheet: View {
             .appText(.fine)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             step("Check the system", .waiting)
             buttons {
                 Button("Trust and continue") { Task { await flow.trust() } }
