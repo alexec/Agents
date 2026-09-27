@@ -10,25 +10,29 @@ import SwiftUI
 /// The answers stack rather than sitting in a row. Approving a plan offers five, each a
 /// sentence ("Yes, clear context and use auto mode"), and a row of those is five
 /// truncated words: an answer the person cannot read is one they cannot give.
+///
+/// The question itself scrolls when it is tall. Drawn all at once, a long command or
+/// plan pushes the answers off the foot of the window — the card becomes unanswerable
+/// by being too big to answer. So the question is capped, the way an elicitation page
+/// is, and the buttons stay under it.
 struct PermissionView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
     let request: PermissionRequest
 
+    /// How tall the question wants to be, measured, so a short one is not padded out
+    /// to the cap and a long one scrolls rather than pushing the buttons off screen.
+    @State private var questionHeight: CGFloat = 0
+
+    /// As tall as the question may get before it scrolls — beside the caps a long
+    /// diff and an elicitation page keep.
+    private static let questionCap: CGFloat = 260
+
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 10) {
-                // Its subagent asking, not the agent itself (057). Still the agent's
-                // question to answer, so it is asked here and not somewhere else.
-                if let subagent = request.subagent {
-                    Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
-                }
-                Text(request.toolCall.title).appText(.reading).fontWeight(.semibold)
-                if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
-                    Text(kind).appText(.fine).foregroundStyle(.secondary)
-                }
-                plan
+                question
                 VStack(alignment: .leading, spacing: 6) {
                     // The agent's own wording, on the agent's own options.
                     // Return takes the first allowing answer; ⌘1…n pick by position
@@ -55,9 +59,33 @@ struct PermissionView: View {
         .chatColumn()
     }
 
+    /// Title, kind and plan — everything above the answers. Scrolls when tall so the
+    /// buttons stay reachable.
+    private var question: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                // Its subagent asking, not the agent itself (057). Still the agent's
+                // question to answer, so it is asked here and not somewhere else.
+                if let subagent = request.subagent {
+                    Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
+                }
+                Text(request.toolCall.title).appText(.reading).fontWeight(.semibold)
+                if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
+                    Text(kind).appText(.fine).foregroundStyle(.secondary)
+                }
+                plan
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: questionHeight > 0 ? min(questionHeight, Self.questionCap) : nil)
+    }
+
     /// The plan being approved. As a page in the files pane when the runtime wrote it
     /// to a file — opened there by the daemon when it was asked — and here, in the
-    /// card, when it only sent the text.
+    /// card, when it only sent the text. The card's own scroll is what keeps a long
+    /// plan from pushing the answers off; no second scroller inside.
     @ViewBuilder
     private var plan: some View {
         if let file = request.toolCall.planFile {
@@ -68,14 +96,11 @@ struct PermissionView: View {
                     .buttonStyle(.paper)
             }
         } else if let text = request.toolCall.planText {
-            ScrollView {
-                Text((try? AttributedString(markdown: text, options: .init(
-                    interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
-                    .appText(.reading)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 280)
+            Text((try? AttributedString(markdown: text, options: .init(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
+                .appText(.reading)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
