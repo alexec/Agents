@@ -15,13 +15,16 @@ struct SessionsColumn: View {
 
     @AppStorage("showsArchivedAgents") private var showsArchived = false
     @State private var query = ""
+    /// What the list has highlighted — one or several (⌘-click). Drives bulk Archive;
+    /// `selection` is still the one chat the right-hand column is reading.
+    @State private var picked: Set<UUID> = []
 
     /// Enough archived chats to find last week's; the rest are on the phone's archive
     /// and in Events. A list of every chat ever is the thing projects replaced.
     private static let archivedShown = 50
 
     var body: some View {
-        List(selection: $selection) {
+        List(selection: $picked) {
             // The same headings the project page drew, Complete split into Unread and
             // Read and all.
             ForEach(AgentGroup.live, id: \.self) { group in
@@ -59,8 +62,7 @@ struct SessionsColumn: View {
         .background(Paper.ground)
         .overlay {
             if model.selectedProjectSummary == nil {
-                ContentUnavailableView("No project", systemImage: "folder",
-                                       description: Text("Pick one on the left."))
+                EmptyState.noProject
             } else if !hasAny {
                 ContentUnavailableView(query.isEmpty ? "No sessions yet" : "No matches",
                                        systemImage: "bubble.left.and.bubble.right",
@@ -69,42 +71,80 @@ struct SessionsColumn: View {
                                                          : "Nothing here says “\(query)”."))
             }
         }
-        // ⌫ (Edit ▸ Delete) archives the picked session, as it deletes the picked
-        // message in Mail. Archived is not gone: Bring Back is on its row.
-        .onDeleteCommand {
-            guard let id = selection, let agent = model.agents.first(where: { $0.id == id }),
-                  agent.state != .archived else { return }
-            Task { await model.archive(id, andLeave: true) }
-        }
+        // ⌫ archives every highlighted session that is not already archived (one or many).
+        .onDeleteCommand { archivePicked() }
         // The window's title is this column's: whatever the right-hand side is reading.
         .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
-        // Over the list it adds to, not in the window's toolbar: up there it sat at the
-        // far right, over the chat, a long way from the sessions it starts.
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.selectedProjectSummary != nil {
                 NewSessionRow {
+                    picked = []
                     selection = nil
                     requests.focusPrompt()
                 }
             }
         }
         .toolbar {
-            // A search field of our own rather than `.searchable`, which pins its field
-            // to the window's far right edge whatever the order: the chat's sidebar
-            // toggle belongs to the right of the search, beside the sidebar it opens.
             ToolbarSpacer(.fixed)
             ToolbarItem {
-                SessionSearchField(text: $query)
+                SessionSearchField(text: $query, wantsFocus: Binding(
+                    get: { requests.wantsSessionSearchFocus },
+                    set: { if !$0 { requests.wantsSessionSearchFocus = false } }))
                     .frame(width: 240)
             }
-            // Only while a chat is showing: a workflow or project page has no sidebar.
+            if picked.count > 1 {
+                ToolbarSpacer(.fixed)
+                ToolbarItem {
+                    Button("Archive \(picked.count)") { archivePicked() }
+                        .help("Archive the highlighted sessions")
+                }
+            }
             if model.selection != nil, model.openWorkflow == nil {
                 ToolbarSpacer(.fixed)
                 ToolbarItem {
                     SidebarToggle(windowWidth: frame.windowWidth)
                 }
             }
+        }
+        .onChange(of: picked) { _, ids in applyPicked(ids) }
+        .onChange(of: selection) { _, id in applySelection(id) }
+        .onAppear { applySelection(selection) }
+    }
+
+    /// One pick opens that chat; several keep the open chat only if it is among them.
+    private func applyPicked(_ ids: Set<UUID>) {
+        switch ids.count {
+        case 0:
+            break
+        case 1:
+            if selection != ids.first { selection = ids.first }
+        default:
+            if let current = selection, !ids.contains(current) { selection = nil }
+        }
+    }
+
+    /// Opening a chat from the menu or Go replaces a multi-pick with that one row.
+    private func applySelection(_ id: UUID?) {
+        if let id {
+            if picked.count <= 1 || !picked.contains(id) { picked = [id] }
+        } else if picked.count == 1 {
+            picked = []
+        }
+    }
+
+    private func archivePicked() {
+        let ids = picked.isEmpty ? Set(selection.map { [$0] } ?? []) : picked
+        let toArchive = ids.filter { id in
+            model.agents.first(where: { $0.id == id })?.state != .archived
+        }
+        guard !toArchive.isEmpty else { return }
+        Task {
+            for id in toArchive {
+                await model.archive(id, andLeave: false)
+            }
+            if let open = selection, toArchive.contains(open) { selection = nil }
+            picked.subtract(toArchive)
         }
     }
 
@@ -161,8 +201,8 @@ private struct NewSessionRow: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .contentShape(.rect)
-                .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
-                            in: .rect(cornerRadius: 8))
+                .background(isHovered ? Paper.wash : .clear,
+                            in: RoundedRectangle(cornerRadius: Paper.Radius.card))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -176,6 +216,7 @@ private struct NewSessionRow: View {
 /// The Mac's own search field, as the toolbar's search item draws it.
 private struct SessionSearchField: NSViewRepresentable {
     @Binding var text: String
+    @Binding var wantsFocus: Bool
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
@@ -187,6 +228,10 @@ private struct SessionSearchField: NSViewRepresentable {
 
     func updateNSView(_ field: NSSearchField, context: Context) {
         if field.stringValue != text { field.stringValue = text }
+        if wantsFocus {
+            field.window?.makeFirstResponder(field)
+            DispatchQueue.main.async { wantsFocus = false }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }

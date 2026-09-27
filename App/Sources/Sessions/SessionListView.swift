@@ -40,6 +40,8 @@ struct SessionListView: View {
 
             HStack {
                 Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
                 Button("Done") { dismiss() }
                     .buttonStyle(.paper)
                     .keyboardShortcut(.defaultAction)

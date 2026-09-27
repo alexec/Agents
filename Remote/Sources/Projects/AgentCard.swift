@@ -118,6 +118,7 @@ struct AgentCard: View {
                 } label: {
                     Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                 }
+                .help(AgentsModel.carryOnHelp(for: agent))
             }
         }
         .accessibilityElement(children: .combine)

@@ -141,7 +141,7 @@ struct ContinueWithSheet: View {
         .fixedSize()
         .appText(.reading)
         .padding(.horizontal, 10).padding(.vertical, 4)
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.rule))
     }
 
     private var wontCarry: some View {

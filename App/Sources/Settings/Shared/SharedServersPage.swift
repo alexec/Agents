@@ -111,8 +111,7 @@ private struct RuntimeOnlyRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
-        .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Paper.rule, lineWidth: 1))
+        .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
     }
 }
 

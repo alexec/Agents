@@ -132,7 +132,7 @@ struct RemoteChatView: View {
                         Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                     }
                     .disabled(model.isStale)
-                    .accessibilityHint("Tells it the block has cleared, and lets it carry on")
+                    .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
                 }
             }
             if let agent, model.canStop(agent) {

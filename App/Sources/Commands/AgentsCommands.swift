@@ -23,7 +23,11 @@ final class WindowRequests {
     /// asks before the project page — and its prompt — exists.
     var wantsPromptFocus = false
 
+    /// Set to put the keyboard in the sessions column's search field.
+    var wantsSessionSearchFocus = false
+
     func focusPrompt() { wantsPromptFocus = true }
+    func focusSessionSearch() { wantsSessionSearchFocus = true }
 }
 
 /// The menu bar: every action the window offers on a button or a context menu, in
@@ -56,6 +60,7 @@ struct AgentsCommands: Commands {
             Button("Clone Git URL…") { requests.projectSheet = .clone }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Add Server…") { requests.projectSheet = .addServer }
+                .keyboardShortcut("o", modifiers: [.command, .control])
             Divider()
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
@@ -81,6 +86,7 @@ struct AgentsCommands: Commands {
             Button("Spending") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Pool") { model.showsPool = true }
+                .keyboardShortcut("p", modifiers: [.command, .option])
             Divider()
             // A menu item rather than a shortcut on the button. The button only
             // exists while you are scrolled away from the end, which is precisely
@@ -89,6 +95,9 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(model.selectedAgent == nil)
             Divider()
+            Button("Find Session") { requests.focusSessionSearch() }
+                .keyboardShortcut("f")
+                .disabled(model.selectedProjectSummary == nil)
         }
 
         CommandMenu("Session") {

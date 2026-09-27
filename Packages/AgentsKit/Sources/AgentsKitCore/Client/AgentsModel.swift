@@ -782,6 +782,13 @@ public final class AgentsModel {
     /// The name of the button that ends a block by hand.
     public static let carryOnLabel = "Carry on"
 
+    /// Help for Carry on: Waiting (the app would resume itself) vs Blocked (only the person).
+    public static func carryOnHelp(for agent: Agent) -> String {
+        agent.isWaiting
+            ? "Stop waiting and carry on now"
+            : "Tell it the block has cleared, and let it carry on"
+    }
+
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
     /// it, or is about to pick it back up. The window's toolbar, the card's menu and
     /// the phone's menu all ask this, so no two of them can disagree about it.

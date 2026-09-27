@@ -22,8 +22,7 @@ struct SharedInstructionsPage: View {
                     .lineLimit(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+                    .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
                 Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
                     GridRow {
                         Text("Runtime"); Text("Reads"); Text("Gets AGENTS.md")
@@ -101,8 +100,7 @@ struct SharedOtherFilesPage: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Paper.raised, in: RoundedRectangle(cornerRadius: 9))
-                    .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Paper.rule, lineWidth: 1))
+                    .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.control))
                 }
             }
             .padding(20)

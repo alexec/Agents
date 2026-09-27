@@ -84,14 +84,15 @@ struct WorktreeRow: View {
     }
 
     /// Branch, git status, who is in it. One concatenated `Text`, so the row stays a
-    /// single element to accessibility; work that would be lost is orange.
+    /// single element to accessibility; uncommitted work is secondary, not orange —
+    /// colour is reserved for when a person is needed.
     private var detail: Text {
         let branch = worktree.branch ?? "detached"
         guard worktree.exists else { return Text("\(branch) · its folder is gone") }
         var text = Text(branch)
         if let status = worktree.status {
             let summary = Text(status.summary)
-            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundStyle(StateTint.attention.style(or: .secondary)) : summary)
+            text = text + Text(" · ") + (status.hasPendingWork ? summary.foregroundStyle(.secondary) : summary)
         }
         switch worktree.agents.count {
         case 0: return text

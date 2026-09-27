@@ -15,7 +15,7 @@ struct WorkflowsSection: View {
     /// Put away by the person, and kept out of the count, the pause-all switch and
     /// the list itself. An agent may write a workflow without asking now, so this is
     /// the reply: it goes under a heading you have to open, and it never runs.
-    @State private var showsArchived = false
+    @AppStorage("showsArchivedWorkflows") private var showsArchived = false
 
     private var workflows: [WorkflowSummary] {
         model.workflows(in: folder).filter { !$0.isArchived }

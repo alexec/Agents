@@ -37,10 +37,10 @@ struct OpenElsewhere: View {
             HStack(spacing: 8) {
                 if let app = defaultApp {
                     Button("Open in \(app)") { NSWorkspace.shared.open(url) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                 }
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.paper)
             }
             .padding(.top, 10)
             }

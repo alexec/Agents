@@ -160,8 +160,7 @@ private struct SkillDetail: View {
                 }
                 .padding(14)
             }
-            .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.rule, lineWidth: 1))
+            .paperRaised(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             if let removeFailure {
                 Text(removeFailure).appText(.fine).foregroundStyle(SharedInk.attention)
             }

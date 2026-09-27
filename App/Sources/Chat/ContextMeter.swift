@@ -67,7 +67,7 @@ struct ContextMeter: View {
     private func meter(_ usage: Usage, _ fraction: Double) -> some View {
         ZStack {
             Circle()
-                .stroke(.quaternary, lineWidth: 2)
+                .stroke(Paper.rule, lineWidth: 2)
             Circle()
                 .trim(from: 0, to: fraction)
                 .stroke((usage.isCloseToFull ? StateTint.failure : .none).style(or: .secondary),

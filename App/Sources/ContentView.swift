@@ -163,10 +163,11 @@ struct ContentView: View {
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
         .onChange(of: model.selection) { showWhatWasAskedFor() }
-        .alert("That did not work",
+        .alert("Could not finish that",
                isPresented: Binding(get: { model.problem != nil },
                                     set: { if !$0 { model.dismissProblem() } })) {
             Button("OK") { model.dismissProblem() }
+                .keyboardShortcut(.defaultAction)
         } message: {
             Text(model.problem ?? "")
         }
