@@ -96,6 +96,15 @@ struct LimitRecognitionTests {
                                           runtimeID: "antigravity") == .none)
     }
 
+    @Test func copilotMonthlyQuotaIsSpentInEitherFailureChannel() {
+        let text = "You have exceeded your monthly quota (Request ID: captured)"
+        #expect(LimitRecognition.classify(runtimeError: text, runtimeID: "copilot") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, "Error: " + text), runtimeID: "copilot") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: text, runtimeID: "claude") == .none)
+        #expect(LimitRecognition.classify(runtimeError: "An unrelated error", runtimeID: "copilot") == .none)
+        #expect(RuntimeLaunchCatalog.copilot.turnError(in: "I saw Error: " + text) == nil)
+    }
+
     // MARK: Layer 3
 
     @Test func anythingElseIsNothing() {
