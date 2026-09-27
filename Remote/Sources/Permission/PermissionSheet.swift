@@ -11,6 +11,11 @@ import SwiftUI
 /// The choices stack rather than sitting in a row. A row of three buttons at the
 /// largest Dynamic Type sizes is three truncated words, and a permission the user
 /// cannot read in full is one they cannot answer.
+///
+/// The question itself scrolls when it is tall. A long command or a tall diff would
+/// otherwise push the answers off the foot of the phone — the card becomes unanswerable
+/// by being too big to answer. So the question is capped, the way a form page is, and
+/// the buttons stay under it.
 struct PermissionSheet: View {
     @Environment(RemoteModel.self) private var model
     let request: PermissionRequest
@@ -19,23 +24,17 @@ struct PermissionSheet: View {
     /// so nothing is tapped twice, and what replaces them says which way it went.
     @State private var chosen: PermissionOption?
 
+    /// How tall the question wants to be, measured, so a short one is not padded out
+    /// to the cap and a long one scrolls rather than pushing the buttons off screen.
+    @State private var questionHeight: CGFloat = 0
+
+    /// As tall as the question may get before it scrolls: enough for a command and a
+    /// short diff, and short enough to leave the answers and the conversation above.
+    private static let questionCap: CGFloat = 380
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                // Its subagent asking, not the agent itself (057). Still the agent's
-                // question to answer, so it is asked here and not somewhere else.
-                if let subagent = request.subagent {
-                    Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
-                }
-                Text(request.toolCall.title)
-                    .appText(.reading).fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
-                    Text(kind).appText(.fine).foregroundStyle(.secondary)
-                }
-            }
-
-            detail
+            question
 
             if let chosen {
                 Sending(option: chosen)
@@ -50,6 +49,33 @@ struct PermissionSheet: View {
         // above, as on the Mac (033).
         .chatColumn()
         .animation(.snappy(duration: 0.2), value: chosen)
+    }
+
+    /// Title, kind and what it wants to do — everything above the answers. Scrolls
+    /// when tall so the buttons stay reachable.
+    private var question: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    // Its subagent asking, not the agent itself (057). Still the agent's
+                    // question to answer, so it is asked here and not somewhere else.
+                    if let subagent = request.subagent {
+                        Text("Subagent “\(subagent)” asks").appText(.fine).foregroundStyle(.secondary)
+                    }
+                    Text(request.toolCall.title)
+                        .appText(.reading).fontWeight(.semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
+                        Text(kind).appText(.fine).foregroundStyle(.secondary)
+                    }
+                }
+                detail
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { questionHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: questionHeight > 0 ? min(questionHeight, Self.questionCap) : nil)
     }
 
     /// What it actually wants to do: the command, or the change. Shown, not summarised
