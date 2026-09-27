@@ -62,7 +62,7 @@ struct WorkflowRow: View {
             Button("Open") { model.openWorkflow = summary.id }
             Divider()
             if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
                 if summary.awaitingApproval != nil {
                     Button("Approve") { Task { await model.approveWorkflow(summary) } }
@@ -159,7 +159,7 @@ struct WorkflowRow: View {
             // else on this row does anything while it is put away, and offering to run
             // a thing that will not run would be offering a lie.
             if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paper)
                     .appText(.fine)
             } else if summary.awaitingApproval != nil {

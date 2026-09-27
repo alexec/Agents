@@ -19,7 +19,7 @@ agent, in the project folder.
 
 1. Open the project's page.
 
-   On iPhone or iPad, open the project and tap **New agent**.
+   On iPhone or iPad, open the project and tap **New session**.
 2. Before you send the first prompt, open the **Worktree** choice. On the Mac it sits
    above the prompt, beside the folder, and says **Project folder** until you change it.
    On iPhone and iPad it is the **Worktree** row of the start form.

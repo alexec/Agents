@@ -35,7 +35,7 @@ colour.
 | **Waiting for an allowance** | Stopped | Every runtime in the pool was out, and the chat waits for the first that said when it is back, then carries on by itself. Its icon is grey, with an hourglass, and the Pool page lists it. | **Stop waiting** on the Pool page, or reply in the prompt. **Stop**, **Park** or **Archive** end the wait too. |
 | **Parked** | Parked | You put the conversation down to come back to later. The card says when, such as **Parked 3 days ago**. It stays parked even if its turn ends wanting you, unless it asks you something mid-turn. | **Unpark**, to put it back in its group. **Archive**, **Branch**. |
 | **Parks when this turn ends** | Where it is now | You parked a conversation while its turn was still going. It moves to **Parked** when the turn ends. | **Unpark**, to cancel. **Stop**, **Archive**, **Branch**. |
-| **Archived** | Archived | You, or the agent that started it, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring back**. |
+| **Archived** | Archived | You, or the agent that started it, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
 
 **Show in Finder** is on every agent's menu on the Mac.
 

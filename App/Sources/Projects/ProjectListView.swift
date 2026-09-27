@@ -118,11 +118,11 @@ struct ProjectListView: View {
                         }
                     }
                     Divider()
-                    Button("Add a server…") { isAddingServer = true }
+                    Button("Add Server…") { isAddingServer = true }
                 } label: {
                     Label("New project", systemImage: "plus")
                 }
-                .help("Add a folder, or clone a repository, as a project")
+                .help("Add Folder…, or Clone Git URL…, as a project")
             }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
@@ -132,8 +132,8 @@ struct ProjectListView: View {
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isAddingServer) { AddServerSheet().paperSheet() }
-        // File ▸ Add Project Folder…, Clone Repository… and Add Server…: the same
-        // sheets as the + menu, on this Mac.
+        // File ▸ Add Folder…, Clone Git URL… and Add Server…: the same sheets as the +
+        // menu, on this Mac.
         .onChange(of: requests.projectSheet) { _, sheet in
             guard let sheet else { return }
             requests.projectSheet = nil
@@ -159,7 +159,7 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private func newProjectItems(on host: HostID) -> some View {
-        Button("Choose Folder…") {
+        Button("Add Folder…") {
             targetHost = host
             if host == .mac { isChoosingFolder = true } else { isChoosingServerFolder = true }
         }
@@ -201,14 +201,14 @@ private struct ArchivedProjectRow: View {
                 }
             }
             Spacer()
-            Button("Unarchive") {
+            Button("Bring Back") {
                 Task { await model.unarchiveProject(summary.key) }
             }
             .buttonStyle(.link)
             .appText(.fine)
         }
         .contextMenu {
-            Button("Unarchive") {
+            Button("Bring Back") {
                 Task { await model.unarchiveProject(summary.key) }
             }
         }
@@ -238,9 +238,9 @@ private struct EmptyProjectList: View {
                 Text("A project is a folder you work in. Pick one and say what you want done.")
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button("Add a folder") { isChoosingFolder = true }
+                    Button("Add Folder…") { isChoosingFolder = true }
                         .buttonStyle(.borderedProminent)
-                    Button("Clone a Git URL") { isCloning = true }
+                    Button("Clone Git URL…") { isCloning = true }
                 }
             }
         }

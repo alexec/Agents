@@ -29,7 +29,7 @@ struct AddServerSheet: View {
         @Bindable var flow = flow
         switch flow.phase {
         case .name:
-            Text("Add a server").appText(.reading).fontWeight(.semibold)
+            Text("Add Server").appText(.reading).fontWeight(.semibold)
             TextField("devbox", text: $flow.name)
                 .textFieldStyle(.roundedBorder)
                 .focused($isFocused)

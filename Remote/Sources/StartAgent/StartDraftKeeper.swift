@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// What was half-typed into New agent, per project, until it becomes an agent (029),
+/// What was half-typed into New session, per project, until it becomes an agent (029),
 /// and into each conversation until it is sent (033).
 ///
 /// The rules — what is kept, for how long, a picture too big to keep — are
