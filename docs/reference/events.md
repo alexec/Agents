@@ -39,7 +39,7 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `agent.finished` | agent, outcome | An agent ended a turn having done its work. |
 | `agent.asked_permission` | agent | An agent is asking for permission. |
 | `agent.asked_form` | agent | An agent raised a form to fill in. |
-| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. |
+| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. The same event covers both the **Waiting** and **Blocked** groups: when `waiting_on` names agents or a time to check again, the agent sits under **Waiting** and carries on by itself; when `waiting_on` is missing, it sits under **Blocked** until you carry it on. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | agent, by | An agent was stopped before finishing. |
 | `agent.failed` | agent, reason | An agent ended in an error. |
 | `agent.runtime_switched` | agent, from, to, reason | A chat carried on with another runtime: `from` and `to` are runtime ids, and `reason` is `allowanceSpent`, `creditUsedUp`, `overage`, `rateLimitPersisted`, `everyoneOutResumed` or `byHand`. |
@@ -92,7 +92,7 @@ These belong to the Mac, not to a project. Any agent can wait for them.
 | `mac.wake` | | The Mac woke up. |
 | `person.away` | why | You locked the screen or stepped away for 5 minutes. |
 | `person.back` | why | You unlocked the screen or came back. |
-| `cost.limit_reached` | limit, agent | A spending limit was reached. See [Settings](settings.md). |
+| `cost.limit_reached` | limit, agent | A spending limit was reached. See [Settings and the Resources page](settings.md). |
 | `cost.allowance_out` | runtime, until, retry_after, reason | A runtime's allowance ran out, or its credit was used up or expired. `until` is the time the provider gave, when it gave one; otherwise `retry_after` is when the app tries it again. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
 | `cost.allowance_back` | runtime, how | A runtime's allowance came back: `time` (its return time passed), `person` (Mark available, or a raised amount), `worked` (a turn on it worked) or `another host` (a server said so). |
 | `server.offline` | server | A server's connection dropped. Raised once, while the Agents window is open. |
@@ -151,5 +151,7 @@ no **Waiting now**.
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)
+- [Set up a workflow](../how-to/set-up-a-workflow.md)
 - [Workflow triggers and actions](workflows.md)
 - [Tools the app gives agents](agent-tools.md)
+- [Statuses and groups](statuses.md)

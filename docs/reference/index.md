@@ -14,8 +14,8 @@ something up, not for reading through.
   in the app.
 - [Tools the app gives agents](agent-tools.md): every tool an agent gets from the app, and
   whether you are asked before it runs.
-- [Settings](settings.md): every control in Settings on the Mac, and what iPhone and iPad
-  need.
+- [Settings and the Resources page](settings.md): every control in Settings on the Mac, the
+  Resources page, and what iPhone and iPad need.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the

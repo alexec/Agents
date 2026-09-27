@@ -96,5 +96,8 @@ has everything it always had.
 
 ## See also
 
-- [How-to guides](../how-to/index.md)
-- [Explanation](../explanation/index.md)
+- [Sign a runtime in](../how-to/sign-a-runtime-in.md)
+- [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
+- [Why agents' own tools are taken away](../explanation/scoped-tools.md)
+- [Tools the app gives agents](agent-tools.md)
+- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)

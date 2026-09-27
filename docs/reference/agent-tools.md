@@ -31,8 +31,8 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `wait_for_event` | Waits until something happens in this project or on this Mac, such as `pull_request.checks_passed`, `agent.finished`, `mac.wake` or a `custom.` event, optionally narrowed by details and with a time limit of 1 minute to 24 hours. The call waits up to 45 s; after that the agent can end its turn, which costs nothing, and it is started again when the event happens or the time runs out. One wait per agent; a new one replaces the old. Also lists recent events and every name it can wait for. See [Events](events.md). | The runtime decides. |
 | `cancel_wait` | Stops the agent's wait, so nothing starts it again for it. | The runtime decides. |
 | `publish_event` | Says that something happened, as a `custom.` event such as `custom.build_green`, with a short message and up to 10 details. Agents waiting on it are started and workflows that trigger on it run, and the agent is told which. At most 30 an hour per agent. | The runtime decides. |
-| `enter_worktree` | Moves the agent into a git worktree of the project: a new one (named, or named from the conversation's title) or one that already exists. The move happens when the turn ends, and the agent is started again there to carry on. Nothing uncommitted comes along. Not given on runtimes that can't carry the conversation into another folder. | The runtime decides. |
-| `exit_worktree` | Moves the agent back to the project folder when the turn ends, keeping the worktree or removing it. Removing is refused for a worktree the app did not make or another agent works in, and, unless the agent says to discard, when anything in it is uncommitted or unmerged. Not given on runtimes that can't carry the conversation into another folder. | The runtime decides. |
+| `enter_worktree` | Moves the agent into a git worktree of the project: a new one (named, or named from the conversation's title) or one that already exists. The move happens when the turn ends, and the agent is started again there to carry on. Nothing uncommitted comes along. Given only on Claude, Copilot, Cursor and Codex — the runtimes that can carry the conversation into another folder. | The runtime decides. |
+| `exit_worktree` | Moves the agent back to the project folder when the turn ends, keeping the worktree or removing it. Removing is refused for a worktree the app did not make or another agent works in, and, unless the agent says to discard, when anything in it is uncommitted or unmerged. Given only on Claude, Copilot, Cursor and Codex. | The runtime decides. |
 | `push_pull_request` | Pushes the agent's commits to the pull request its run was started for. Never force-pushes. Only works in a run a pull-request workflow started. | No. The app answers. |
 | `reply_on_pull_request` | Replies on the pull request its run was started for, either in a review comment's thread or on the pull request itself. Only works in a run a pull-request workflow started. | No. The app answers. |
 | `suggest_next_prompts` | The older name for the suggestion half of `finish_turn`, kept for conversations started before it. | No. The app answers. |
@@ -44,5 +44,10 @@ agents of its own.
 
 ## See also
 
-- [How-to guides](../how-to/index.md)
-- [Explanation](../explanation/index.md)
+- [Have an agent wait for something](../how-to/wait-for-something.md)
+- [Start an agent in its own worktree](../how-to/start-in-a-worktree.md)
+- [Events](events.md)
+- [Leases on shared resources](../explanation/leases.md)
+- [Why agents' own tools are taken away](../explanation/scoped-tools.md)
+- [Runtimes](runtimes.md)
+- [Statuses and groups](statuses.md)

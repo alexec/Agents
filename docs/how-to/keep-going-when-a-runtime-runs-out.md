@@ -129,3 +129,10 @@ On the iPhone and iPad, **Continue with** is on the chat's menu, with the same s
 The pool is the Mac's, and each connected server uses it. A server's Codex signs in through this
 Mac's ChatGPT sign-in, so it spends this Mac's plan. When that plan runs out on either side, the
 other knows at once, while the Agents window is open: a chat there moves before it is refused.
+
+## See also
+
+- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
+- [Limit what agents spend](limit-spending.md)
+- [Sign a runtime in](sign-a-runtime-in.md)
+- [Statuses and groups](../reference/statuses.md)

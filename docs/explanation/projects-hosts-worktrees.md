@@ -148,6 +148,7 @@ the commit it took, and checks each file against GitHub's own record of it at th
 
 ## Related
 
-- [How-to guides](../how-to/index.md), for adding a project, adding a Linux server and
-  starting an agent in its own worktree.
-- [Reference](../reference/index.md), for the settings that go with servers and projects.
+- [Add a project](../how-to/add-a-project.md), [Add a Linux server](../how-to/add-a-linux-server.md)
+  and [Start an agent in its own worktree](../how-to/start-in-a-worktree.md).
+- [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
+- [Settings and the Resources page](../reference/settings.md).

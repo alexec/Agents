@@ -13,7 +13,8 @@ an agent finishes.
 ## Before you start
 
 - A project with a runtime that works in it. See [Add a project](add-a-project.md).
-- For the full list of triggers and settings, see [Reference](../reference/index.md).
+- For the full list of triggers and settings, see
+  [Workflow triggers and actions](../reference/workflows.md).
 
 ## Steps
 
@@ -108,3 +109,10 @@ A workflow that did not run says why on its row and its page, for example:
   know. Check the spelling.
 - A line naming a problem with the file itself, such as **The metadata does not say what
   makes this run**. Fix the file; the page updates as soon as it is saved.
+
+## See also
+
+- [Workflow triggers and actions](../reference/workflows.md)
+- [Events](../reference/events.md)
+- [Have an agent wait for something](wait-for-something.md)
+- [Have an agent watch a pull request](watch-a-pull-request.md)

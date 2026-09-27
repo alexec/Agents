@@ -12,8 +12,8 @@ signing in** beside it, and you can sign it in from there.
 
 ## Before you start
 
-- The runtime installed on this Mac. See [Reference](../reference/index.md) for what each
-  runtime needs.
+- The runtime installed on this Mac. See [Runtimes](../reference/runtimes.md) for what each
+  one needs and how it signs in.
 
 ## Steps
 
@@ -98,3 +98,9 @@ any other runtime on a server, sign in on the server itself; see
 - **The runtime is not in the menu at all.** It is not installed, or not where the app
   looks. With no runtime at all, the project list says **No agent runtime found** and
   what each one needs.
+
+## See also
+
+- [Runtimes](../reference/runtimes.md)
+- [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md)
+- [Add a Linux server](add-a-linux-server.md)

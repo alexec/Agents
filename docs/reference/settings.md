@@ -1,13 +1,14 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: Every control in Agents ▸ Settings on the Mac, and the system settings Agents uses on iPhone and iPad.
+description: Every control in Agents ▸ Settings on the Mac, the Resources page, and the system settings Agents uses on iPhone and iPad.
 ---
 
-# Settings
+# Settings and the Resources page
 
 This page lists every control in the Mac's Settings window, **Agents ▸ Settings…**, pane
-by pane, and the system settings the app on iPhone and iPad depends on.
+by pane, the **Resources** page (not in that window), and the system settings the app on
+iPhone and iPad depends on.
 
 The Mac's Settings window has eight panes, chosen from one rail down its left side:
 **General**; then **Agents**, **Agent Runtimes**, **Spending** and **Pool**; then **Shared**,
@@ -46,10 +47,23 @@ own; it follows the Mac it is paired with.
 | iPhone and iPad | Settings ▸ Agents | **Local Network** | Lets the app find your Mac on the network you are both on. Without it, the app cannot reach your Mac. |
 | iPhone and iPad | Settings ▸ Agents | **Notifications** | Lets the Mac tell this device when an agent needs you. When it is off, the Mac's **Devices** pane says so and the device is not chosen. |
 
+## Resources
+
+**Resources** is not a Settings pane. It is a page of its own, opened from **View ▸
+Resources** (Option-Command-L) or the **Resources** row at the foot of the projects
+column. It lists every shared resource on this Mac — each simulator, each installed
+browser, and the screen — whether it is free, who holds it and since when, when the
+lease runs out, and who is waiting. You can end a lease or take an agent out of a line
+from here. See [Leases on shared resources](../explanation/leases.md).
+
 When an agent reaches a spending limit, **Raise the limit** above the prompt opens the
 Settings window.
 
 ## See also
 
-- [How-to guides](../how-to/index.md)
-- [Explanation](../explanation/index.md)
+- [Limit what agents spend](../how-to/limit-spending.md)
+- [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
+- [Add a Linux server](../how-to/add-a-linux-server.md)
+- [Leases on shared resources](../explanation/leases.md)
+- [Statuses and groups](statuses.md)
+- [Runtimes](runtimes.md)
