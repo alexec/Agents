@@ -38,12 +38,24 @@ struct SessionsColumn: View {
                 }
             }
             let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
+            // The three archived latest today stay out of the disclosure. A session that
+            // archives itself would otherwise vanish into a section that starts closed.
+            let archives = VisibleArchives.split(archived, now: Date())
+            if !archives.kept.isEmpty {
+                Section {
+                    ForEach(archives.kept) { agent in
+                        row(agent)
+                    }
+                } header: {
+                    heading(VisibleArchives.todayTitle, count: archives.kept.count)
+                }
+            }
             // What has been retired from here (051), as the section's last line.
             let retiredLine = query.isEmpty
                 ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
-            if !archived.isEmpty || retiredLine != nil {
+            if !archives.hidden.isEmpty || retiredLine != nil {
                 Section(isExpanded: $showsArchived) {
-                    ForEach(archived.prefix(Self.archivedShown)) { agent in
+                    ForEach(archives.hidden.prefix(Self.archivedShown)) { agent in
                         row(agent)
                     }
                     if let retiredLine {
@@ -52,7 +64,7 @@ struct SessionsColumn: View {
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    heading("Archived", count: archived.count)
+                    heading("Archived", count: archives.hidden.count)
                 }
             }
         }
