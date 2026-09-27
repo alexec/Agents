@@ -46,6 +46,11 @@ public enum LimitRecognition {
     /// Copilot's monthly allowance refusal, captured on 2026-09-26.
     public static let copilotMonthlyQuota = "You have exceeded your monthly quota"
 
+    /// Antigravity's spent-plan title and body, captured on 2026-09-27 from “hi Antigravity”:
+    /// `Usage Limit Reached\n\nYou have reached your current quota for this period…`
+    public static let antigravityUsageLimitTitle = "Usage Limit Reached"
+    public static let antigravityUsageLimitBody = "You have reached your current quota"
+
     /// A key's credit gone: OpenAI's code and Anthropic's sentence.
     public static let creditGoneWords = ["insufficient_quota", "credit balance is too low"]
 
@@ -73,12 +78,16 @@ public enum LimitRecognition {
         if case .allowance = payment, rateLimit?.isPayingOverage == true {
             return .overage(resetsAt: rateLimit?.overageResetsAt ?? rateLimit?.resetsAt)
         }
-        // Layer 2: words that have been seen. Copilot can send its refusal as a
-        // normal message ending in end_turn, or as a rejected prompt.
+        // Layer 2: words that have been seen. Copilot and Antigravity can send a spent
+        // refusal as a normal message ending in end_turn, or as a rejected prompt.
         if runtimeID == RuntimeCatalog.copilot.id,
            [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
                $0.hasPrefix(copilotMonthlyQuota) || $0.hasPrefix("Error: " + copilotMonthlyQuota)
            }) {
+            return .spent(resetsAt: resets)
+        }
+        if runtimeID == RuntimeCatalog.antigravity.id,
+           [error?.message, runtimeError].compactMap({ $0 }).contains(where: isAntigravityUsageLimit) {
             return .spent(resetsAt: resets)
         }
         if let (code, message) = error {
@@ -104,5 +113,12 @@ public enum LimitRecognition {
         }
         // Layer 3: nothing.
         return .none
+    }
+
+    /// Whether `text` is Antigravity's spent-plan message, with or without the title
+    /// still on (turnError strips `Usage Limit Reached` when that is the matched prefix).
+    public static func isAntigravityUsageLimit(_ text: String) -> Bool {
+        let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return said.hasPrefix(antigravityUsageLimitTitle) || said.hasPrefix(antigravityUsageLimitBody)
     }
 }

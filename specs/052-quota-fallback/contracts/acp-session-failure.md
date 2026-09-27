@@ -67,5 +67,5 @@ captured text:
 |---|---|---|
 | claude (no extension) | error text starts with any `USAGE_LIMIT_ERROR_PREFIXES` entry (SDK list, copied with its version) | — |
 | gemini | 429 and "exhausted your daily quota": out until the entry's reset (free tier: next midnight Pacific) | other 429s; `RESOURCE_EXHAUSTED` with "rate limit" |
-| antigravity (049) | a `runtimeError` sentence (after "Agent execution error:") matching its captured quota words: **none captured yet**, so nothing switches | same, not captured |
+| antigravity (049) | chat text starting `Usage Limit Reached` / `You have reached your current quota` (captured 2026-09-27), via `turnError` then `runtimeError` → `.spent` | `Resource has been exhausted` / `check quota` as `runtimeError` → rate-limited first (R7) |
 | keyed OpenAI / Anthropic | `insufficient_quota`; "credit balance is too low" → `.creditGone` | 429 without those |

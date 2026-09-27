@@ -15,9 +15,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// and Agent Platform, because Antigravity signs in with a Google account only). Left
     /// off every sign-in sheet, the Mac's and the phone's.
     public var hiddenAuthMethods: [String] = []
-    /// The start of an agent message that means the turn failed, for a runtime that says
-    /// so in words and then ends the turn normally.
-    public var turnErrorPrefix: String?
+    /// The starts of an agent message that mean the turn failed, for a runtime that says
+    /// so in words and then ends the turn normally. First match wins.
+    public var turnErrorPrefixes: [String] = []
+    /// The first of `turnErrorPrefixes`, for callers that only need to know whether any
+    /// failure prefix is configured (so they collect turn text).
+    public var turnErrorPrefix: String? { turnErrorPrefixes.first }
     /// An anchored runtime notice that may precede a failure in the concatenated
     /// message chunks. Never search arbitrary assistant prose for error words.
     public var turnNoticePattern: String?
@@ -41,27 +44,29 @@ public struct RuntimeLaunch: Hashable, Sendable {
     }
 
     public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
-                turnErrorPrefix: String? = nil, turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil) {
+                turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
+                turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil) {
         self.runtimeID = runtimeID
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
-        self.turnErrorPrefix = turnErrorPrefix
+        self.turnErrorPrefixes = !turnErrorPrefixes.isEmpty ? turnErrorPrefixes
+            : turnErrorPrefix.map { [$0] } ?? []
         self.turnNoticePattern = turnNoticePattern
         self.signInNotice = signInNotice
     }
 
-    /// What a turn's own words say about how it failed, when they start with
-    /// `turnErrorPrefix`; nil when they do not.
+    /// What a turn's own words say about how it failed, when they start with one of
+    /// `turnErrorPrefixes`; nil when they do not.
     public func turnError(in text: String) -> TurnError? {
-        guard let turnErrorPrefix else { return nil }
+        guard !turnErrorPrefixes.isEmpty else { return nil }
         var said = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let turnNoticePattern,
            let notice = said.range(of: turnNoticePattern, options: [.regularExpression, .anchored]) {
             said.removeSubrange(notice)
             said = said.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard said.hasPrefix(turnErrorPrefix) else { return nil }
-        return TurnError(sentence: Self.innermost(said, after: turnErrorPrefix))
+        guard let prefix = turnErrorPrefixes.first(where: { said.hasPrefix($0) }) else { return nil }
+        return TurnError(sentence: Self.innermost(said, after: prefix))
     }
 
     public struct TurnError: Hashable, Sendable {
@@ -74,7 +79,7 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// there is one, without a `request failed (code N):` in front; otherwise what follows
     /// the prefix.
     static func innermost(_ text: String, after prefix: String) -> String {
-        var said = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+        var said = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
         if let open = said.range(of: "(\"", options: .backwards),
            let close = said.range(of: "\")", options: .backwards), open.upperBound <= close.lowerBound {
             said = String(said[open.upperBound..<close.lowerBound])
@@ -128,7 +133,8 @@ public enum RuntimeLaunchCatalog {
     ///   with a Google account only, and the Gemini key in Settings is Gemini's (Alex,
     ///   2026-09-26: not shared).
     /// - A failed turn arrives as an agent message, `Agent execution error: …`, then
-    ///   `end_turn` (R9).
+    ///   `end_turn` (R9). A spent plan arrives the same way as `Usage Limit Reached` plus
+    ///   the quota sentence (captured 2026-09-27 from “hi Antigravity”).
     public static let antigravity = RuntimeLaunch(
         runtimeID: "antigravity",
         environment: [
@@ -142,7 +148,10 @@ public enum RuntimeLaunchCatalog {
             "GEMINI_API_KEY": nil,
         ],
         hiddenAuthMethods: ["gemini-api-key", "agent-platform"],
-        turnErrorPrefix: "Agent execution error:",
+        turnErrorPrefixes: [
+            "Agent execution error:",
+            LimitRecognition.antigravityUsageLimitTitle,
+        ],
         signInNotice: RuntimeLaunch.SignInNotice(
             text: "“Using third party software, tools, or services to access the Service (e.g. using "
                 + "OpenClaw with Antigravity OAuth) is a breach of this Agreement.”",
