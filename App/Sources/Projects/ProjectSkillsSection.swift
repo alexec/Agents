@@ -2,7 +2,7 @@ import AgentsKit
 import AppKit
 import SwiftUI
 
-/// A project's own skills, on its page between Workflows and Worktrees (059, look/ frame D):
+/// A project's own skills, on its configuration page:
 /// what the project gives every agent working in it. They live in `.agents/skills`, which is
 /// committed, so the line under the heading says a skill added here reaches everyone who
 /// clones the project. Add skill… opens the catalogue sheet pointed at this project.

@@ -34,8 +34,8 @@ written, and it takes the skill at a fixed commit.
 
 ## Add a skill to a project
 
-1. Open the project. Its page has a **Skills** section, under Workflows, listing the skills in
-   the project's `.agents/skills`.
+1. Open the project, then choose **Project configuration** in its toolbar. The **Skills**
+   section lists the skills in the project's `.agents/skills`.
 2. Choose **Add skill…** there, and search and choose as above. **Add to** starts on the
    project; the button reads **Add to** and the project's name.
 3. The skill goes into `<project>/.agents/skills/<name>`, and is recorded in
@@ -51,7 +51,7 @@ fetched again.
 ## Keep a skill up to date
 
 When a skill's source has changed since it was added, it is marked **update** in
-**Settings ▸ Shared ▸ Skills** or on the project page. The app asks GitHub at most once an hour
+**Settings ▸ Shared ▸ Skills** or in Project configuration. The app asks GitHub at most once an hour
 for each repository.
 
 1. Choose **Update…**. The sheet lists what changes, file by file, and shows the new
@@ -63,7 +63,7 @@ your edits go.
 
 ## Take a skill out
 
-Choose **Remove…** in the skill's detail, or **Remove** on the project page, and confirm. The
+Choose **Remove…** in the skill's detail, or **Remove** in Project configuration, and confirm. The
 folder goes to the Trash and its record is dropped. No agent started after that has it.
 
 ## What the app will not touch

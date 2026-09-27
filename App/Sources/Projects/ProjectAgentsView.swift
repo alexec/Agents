@@ -15,6 +15,7 @@ import SwiftUI
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
+    @State private var showingConfiguration = false
 
     static let cardSpacing: CGFloat = 2
 
@@ -22,15 +23,20 @@ struct ProjectAgentsView: View {
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
     var body: some View {
-        if summary == nil {
-            // No project: one that was selected has gone (a rebuilt server, 043) or there
-            // are none yet. A page with a prompt here would start an agent nowhere.
-            EmptyState.noProject
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("")
-        } else {
-            page
+        Group {
+            if summary == nil {
+                // No project: one that was selected has gone (a rebuilt server, 043) or there
+                // are none yet. A page with a prompt here would start an agent nowhere.
+                EmptyState.noProject
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("")
+            } else if showingConfiguration {
+                ProjectConfigurationView(folder: folder) { showingConfiguration = false }
+            } else {
+                page
+            }
         }
+        .onChange(of: model.selectedProjectKey) { showingConfiguration = false }
     }
 
     private var page: some View {
@@ -49,6 +55,14 @@ struct ProjectAgentsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(summary?.name ?? "Project")
+        .toolbar {
+            ToolbarItem {
+                Button { showingConfiguration = true } label: {
+                    Label("Project configuration", systemImage: "gearshape")
+                }
+                .help("Configure this project")
+            }
+        }
         .onAppear { adopt(folder) }
         .onChange(of: folder) { _, folder in
             adopt(folder)
@@ -145,9 +159,6 @@ struct ProjectAgentsView: View {
                 // Under the agents: what will happen, after what is happening. See
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
-
-                // What the project gives every agent working in it (059, frame D).
-                ProjectSkillsSection(folder: folder)
 
                 // What this project's agents are handed, and which wait for your OK (S2).
                 PluginsSection(folder: folder)

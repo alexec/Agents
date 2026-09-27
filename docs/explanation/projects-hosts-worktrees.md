@@ -135,11 +135,12 @@ once you delete them; MCP servers go with each conversation as it starts, so not
 written into a runtime's own config. **Settings ▸ Shared** shows what each runtime ends up
 with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
 
-A project's own skills are listed on its page, in a **Skills** section, where you can also
-add one from skills.sh. Because the project's `.agents` folder is committed, a skill added
+A project's own skills are listed under **Project configuration ▸ Skills**, opened from the
+project page's toolbar, where you can also add one from skills.sh. Because the project's
+`.agents` folder is committed, a skill added
 there reaches everyone who clones the project; one added in **Settings ▸ Shared** is yours
 alone. A worktree has its own `.agents`, so a skill added on a worktree's page stays on that
-branch until it is merged. Projects on a server don't show the section yet. See
+branch until it is merged. Project skills on servers are not available yet. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
 Nothing from a catalogue is taken on trust. skills.sh does not review what it lists, so the

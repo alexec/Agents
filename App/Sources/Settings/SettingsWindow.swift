@@ -136,7 +136,7 @@ private struct SettingsRail: View {
             }
             Spacer()
             if pane == .shared {
-                Text("Your own set, for every project. A project’s own .agents folder is on its project page.")
+                Text("Your own set, for every project. A project’s own .agents folder is under Project configuration.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
