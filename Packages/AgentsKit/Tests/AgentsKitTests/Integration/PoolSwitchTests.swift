@@ -51,7 +51,7 @@ struct PoolSwitchTests {
 
     @Test func copilotMonthlyQuotaInChatMovesToTheNextRuntime() async throws {
         var script = FakeACPAgent.Script()
-        script.updates = ["Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
+        script.updates = ["Info: Disabled tools: list_agents, read_agent, task, write_agent", "Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
             ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
         }
         let (core, work, launcher, _) = try await core([script], pool: [copilot, codex])
@@ -72,12 +72,21 @@ struct PoolSwitchTests {
 
     @Test func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
         var script = FakeACPAgent.Script()
-        script.updates = [["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "Error: You have exceeded your monthly quota (Request ID: captured)"]]]
+        // Captured from “hi Copilot”, 2026-09-27: a notice and six refusals,
+        // each a separate chunk with no newline, followed by end_turn.
+        script.updates = (["Info: Disabled tools: list_agents, read_agent, task, write_agent"]
+            + Array(repeating: "Error: You have exceeded your monthly quota (Request ID: captured)", count: 6)).map {
+                ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
+            }
         let (core, work, launcher, _) = try await core([script], pool: [copilot, codex], isOn: false)
         let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
         await eventually("the quota refusal stopped") { await core.agent(id)?.endedReason == .allowanceSpent }
         #expect(await core.agent(id)?.state != .finished)
         #expect(launcher.launchCount == 1)
+        #expect(await core.agent(id)?.outcomeAsked == false)
+        let entries = try await kinds(core, id)
+        #expect(!entries.contains { if case .stateChanged(.finished, _) = $0 { true } else { false } })
+        #expect(!entries.contains { if case .userMessage(_, _, .app) = $0 { true } else { false } })
     }
 
     @Test func aSpentAllowanceMovesTheChatWithItsConversation() async throws {

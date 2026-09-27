@@ -18,6 +18,9 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// The start of an agent message that means the turn failed, for a runtime that says
     /// so in words and then ends the turn normally.
     public var turnErrorPrefix: String?
+    /// An anchored runtime notice that may precede a failure in the concatenated
+    /// message chunks. Never search arbitrary assistant prose for error words.
+    public var turnNoticePattern: String?
     /// Words the sign-in sheet shows beside some of the runtime's own sign-in methods.
     public var signInNotice: SignInNotice?
 
@@ -38,11 +41,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
     }
 
     public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
-                turnErrorPrefix: String? = nil, signInNotice: SignInNotice? = nil) {
+                turnErrorPrefix: String? = nil, turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil) {
         self.runtimeID = runtimeID
         self.environment = environment
         self.hiddenAuthMethods = hiddenAuthMethods
         self.turnErrorPrefix = turnErrorPrefix
+        self.turnNoticePattern = turnNoticePattern
         self.signInNotice = signInNotice
     }
 
@@ -50,7 +54,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// `turnErrorPrefix`; nil when they do not.
     public func turnError(in text: String) -> TurnError? {
         guard let turnErrorPrefix else { return nil }
-        let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let turnNoticePattern,
+           let notice = said.range(of: turnNoticePattern, options: [.regularExpression, .anchored]) {
+            said.removeSubrange(notice)
+            said = said.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         guard said.hasPrefix(turnErrorPrefix) else { return nil }
         return TurnError(sentence: Self.innermost(said, after: turnErrorPrefix))
     }
@@ -143,7 +152,10 @@ public enum RuntimeLaunchCatalog {
 
     /// Copilot reports failures as `Error: …` chat text followed by `end_turn`.
     /// Observed on 2026-09-26 for its exhausted monthly quota.
-    public static let copilot = RuntimeLaunch(runtimeID: "copilot", turnErrorPrefix: "Error:")
+    public static let copilot = RuntimeLaunch(
+        runtimeID: "copilot", turnErrorPrefix: "Error:",
+        // ACP sends this notice without a trailing newline, before any error chunks.
+        turnNoticePattern: #"^Info: Disabled tools: [a-z_][a-z_0-9]*(?:, [a-z_][a-z_0-9]*)*"#)
 
     public static let builtIn: [RuntimeLaunch] = [antigravity, copilot]
 
