@@ -232,7 +232,7 @@ struct ParkingTests {
         try await core.unarchive(seed.id)
         let back = try #require(await core.agent(seed.id))
         #expect(back.parking == nil)
-        #expect(back.group(wantsEyes: false) == .finished)
+        #expect(back.group(wantsEyes: false) == .needsAttention)
     }
 
     @Test func aParkedChatStillHoldsItsProjectsSpending() async throws {

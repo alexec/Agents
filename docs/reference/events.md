@@ -39,7 +39,7 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `agent.finished` | agent, outcome | An agent ended a turn having done its work. |
 | `agent.asked_permission` | agent | An agent is asking for permission. |
 | `agent.asked_form` | agent | An agent raised a form to fill in. |
-| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. The same event covers both the **Waiting** and **Blocked** groups: when `waiting_on` names agents or a time to check again, the agent sits under **Waiting** and carries on by itself; when `waiting_on` is missing, it sits under **Blocked** until you carry it on. See [Statuses and groups](statuses.md). |
+| `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. An unread ending appears under **Needs you** until opened, even if it will resume by itself. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | agent, by | An agent was stopped before finishing. |
 | `agent.failed` | agent, reason | An agent ended in an error. |
 | `agent.runtime_switched` | agent, from, to, reason | A chat carried on with another runtime: `from` and `to` are runtime ids, and `reason` is `allowanceSpent`, `creditUsedUp`, `overage`, `rateLimitPersisted`, `everyoneOutResumed` or `byHand`. |

@@ -58,28 +58,19 @@ struct ProjectRow: View {
     /// moment, by construction (FR-007, FR-009).
     private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
-    /// Whether this project wants the person: Needs attention or Blocked (FR-008).
-    /// Both only clear when someone acts; counting Needs attention alone left Blocked
-    /// invisible above the project page.
+    /// Whether a session in this project needs the person to read or act.
     private var needsPerson: Bool {
-        (counts[.needsAttention] ?? 0) > 0 || (counts[.blocked] ?? 0) > 0
+        (counts[.needsAttention] ?? 0) > 0
     }
 
     /// What is going on in there, in as few words as it takes.
     ///
     /// Urgency first, and only ever two facts: this is a caption on one line in a
     /// column that can be 200pt wide, and a third would be the one that truncates.
-    /// Needs attention and Blocked are the ones asking for something.
+    /// Needs you includes unread endings as well as sessions asking for action.
     private var subtitle: String? {
         if needsPerson {
-            let attention = counts[.needsAttention] ?? 0
-            let blocked = counts[.blocked] ?? 0
-            var parts: [String] = []
-            if attention > 0 { parts.append("Needs attention") }
-            if blocked > 0 {
-                parts.append(blocked == 1 ? "Blocked" : "\(blocked) blocked")
-            }
-            return parts.joined(separator: " · ")
+            return "Needs you"
         }
         // Every chat that is not archived is something: the agent working, the agent
         // waiting, or the person meaning to do something with it. So the row always

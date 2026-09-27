@@ -7,14 +7,14 @@ import Foundation
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case needsAttention
-    /// Its turn ended blocked on something the app cannot watch, so only the person can
-    /// clear it (039).
+    /// Legacy wire value, retained so an older project summary still decodes.
     case blocked
     /// Waiting on something the app watches — agents, a time, events — and will carry
     /// on by itself when it comes. Nobody has to do anything.
     case waiting
     case running
     case finished
+    /// A turn deliberately stopped by a person or its parent agent.
     case stopped
     /// Put down by the person to come back to (040). Below the others and always open.
     case parked
@@ -23,101 +23,28 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// The heading this group is drawn under.
     public var title: String {
         switch self {
-        case .needsAttention: return "Needs attention"
+        case .needsAttention: return "Needs you"
         case .blocked: return "Blocked"
         case .waiting: return "Waiting"
         case .running: return "Working"
-        case .finished: return "Complete"
-        case .stopped: return "Stopped"
+        case .finished: return "Done"
+        case .stopped: return "Paused"
         case .parked: return "Parked"
         case .archived: return "Archived"
         }
     }
 
-    /// The ones the panel shows when they have anybody in them, in the order it shows
-    /// them. `archived` is not here because it is only drawn when the user asks for it.
-    /// Blocked sits under Needs attention, because only the person can clear it, and
-    /// Waiting under Blocked and above Working: nearer the top than Working, because it
-    /// is waiting, but below the two that need you to act (039).
-    /// Parked is last, below Stopped, so every window draws its heading in the same
-    /// place (040).
-    public static let live: [AgentGroup] = [.needsAttention, .blocked, .waiting, .running, .finished, .stopped, .parked]
+    /// The groups shown in the panel. Archived is revealed on demand; the legacy
+    /// Blocked value is decoded but no longer assigned to a session.
+    public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped, .parked]
 
-    /// One state in, exactly one group out.
-    ///
-    /// One group per state, which is the simplest thing that can be true and the
-    /// easiest to read: a run that ended cleanly and one that was stopped short are
-    /// different news, and putting them under one heading made the reader do the
-    /// sorting. `waitingOnUser` is the whole of "Needs attention" because both things
-    /// that block an agent on the user — a permission question and an elicitation form
-    /// — already put it in that state.
-    ///
-    /// The other three arguments are the other ways an agent comes to want a person, or
-    /// not to: it asked them to look at something; it said, at the end of its turn, that
-    /// it cannot get further without them; or the only thing it is doing is answering
-    /// this app's own question, which is not work anybody asked for.
-    ///
-    /// None of them defaults, on purpose. A default of `false` on `wantsEyes` is how
-    /// the daemon's project counts came to disagree with the window's list: the daemon
-    /// took the free answer, the window supplied the real one, and the badge and the
-    /// panel answered the same question differently. A caller that cannot know a fact
-    /// has to say so where a reader can see it — `wantsEyes: false` with a reason
-    /// beside it — rather than be handed "no" by the signature (FR-004). The compiler
-    /// then lists every caller, which is the whole of how "one grouping" is kept.
-    ///
-    /// `wantsEyes` is not a state and must never become one. `waitingOnUser` carries
-    /// `holdsRuntime` and `hasTurnInFlight` with it, so an agent put there for showing
-    /// a file would start queueing prompts, and the transition table has no way back
-    /// out of it except answering a permission. Showing a file blocks nothing: the
-    /// agent asked and carried on working.
-    ///
-    /// An agent that is not going anywhere is not waiting on you, so the settled states
-    /// ignore it.
-    ///
-    /// A report is not a state either, and for a sharper reason than `wantsEyes`: it
-    /// describes a turn that is already over. `needsAnswer`, `partlyDone` and `stuck`
-    /// each mean somebody has to do something, so a finished agent carrying one of them
-    /// belongs in the one group a person actually reads — but it holds no runtime, queues
-    /// no prompts, and is answered by prompting it rather than by filling in a form.
-    ///
-    /// `stopped` and `archived` ignore the report entirely. How a turn *ended* outranks
-    /// what the agent said about the work: an agent the person put away is not waiting on
-    /// them whatever it last claimed, and a run cut short is news of its own.
-    ///
-    /// `outcomeAsked` is the one fact the daemon already keeps to tell this app's turn
-    /// from a person's: it goes up before the question after a silent ending is
-    /// enqueued, and only a person's prompt takes it down — the question itself never
-    /// does, because not clearing it is how the two are told apart at all. So an agent
-    /// that is `running` with it set is answering the app, and nothing else. That turn
-    /// is real and costs money, but it is work nobody asked for and it lasts seconds,
-    /// and a panel that slides an agent into Working and back unbidden is worse than
-    /// one that is briefly incomplete: the agent stays grouped as the finished one it
-    /// was a moment ago, with the same eyes and report arms (FR-014, FR-018). A person's
-    /// prompt clears the flag and the same agent is Working (FR-016). One that never
-    /// answers ends `finished` with the flag still up, which is the unaccounted ending
-    /// 014 already draws (FR-017).
-    ///
-    /// A blocked report (039) is the one report that is neither settled nor, quite, a
-    /// person's: it gets Waiting when the app will resume it by itself and Blocked when
-    /// nothing will but the person, under the same arms — settled, or answering the
-    /// app — and loses to anything that wants a person.
-    ///
-    /// `parked` is the person saying "later" (040). It outranks every ending and every
-    /// arm above, because the person has seen the chat and chosen not to look at it now
-    /// — including a report that wants them, and a workflow's turn that wakes it. Two
-    /// things outrank it: `archived`, which is a firmer word than parking, and a
-    /// question asked mid-turn, which blocks the agent on the person whatever else is
-    /// true. A chat only marked to park when its turn ends is not parked yet, and the
-    /// caller passes `false` for it.
-    ///
-    /// Still total over `(AgentState, Bool, WorkReport?, Bool, Bool)`, so an agent is in
-    /// exactly one group and never in none.
-    ///
-    /// `waitingOnEvents` is an open wait on events (042): Waiting, since an event is
-    /// something the app watches, and under the same arms — settled, and outranked by
-    /// wanting a person.
+    /// Place a session by what happens next. Questions, unread endings, unresolved
+    /// blocks, and unexpected stops need the person; watched waits resume on their
+    /// own. A deliberate stop is Paused. Parked and Archived remain explicit choices.
+    /// The runtime state stays intact while this presentation changes.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
-                parked: Bool, waitingOnEvents: Bool = false) {
+                parked: Bool, waitingOnEvents: Bool = false, isUnread: Bool = false,
+                endedReason: EndedReason? = nil, waitingForAllowance: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         if parked, state != .archived, state != .waitingOnUser {
             self = .parked
@@ -131,25 +58,24 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .waitingOnUser: self = .needsAttention
         // Answering the app's question: where it was, not Working. See above.
         case .running where outcomeAsked:
-            self = Self.settled(wantsEyes || wantsAnswer, report, waitingOnEvents: waitingOnEvents)
+            self = Self.settled(wantsEyes || wantsAnswer || isUnread || report == nil, report,
+                                waitingOnEvents: waitingOnEvents)
         case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = Self.settled(wantsEyes || wantsAnswer, report, waitingOnEvents: waitingOnEvents)
-        case .stopped: self = .stopped
+        case .finished: self = Self.settled(wantsEyes || wantsAnswer || isUnread || (outcomeAsked && report == nil), report,
+                                            waitingOnEvents: waitingOnEvents)
+        case .stopped where waitingForAllowance: self = .waiting
+        case .stopped: self = endedReason == .cancelled || endedReason == .stoppedByAgent ? .stopped : .needsAttention
         case .archived: self = .archived
         }
     }
 
-    /// Where a settled agent goes: Needs attention if somebody has to act, Waiting if
-    /// the app will carry it on by itself, Blocked if it is blocked on something only
-    /// the person can clear (039), and Complete otherwise. Wanting a person outranks
-    /// both — an agent that asked to be looked at is asking you, whatever else it is
-    /// waiting on — and waiting outranks blocked, because something is still coming
-    /// that will wake it.
+    /// A finished turn needs review before it can be Done. An automatic wait only
+    /// wins when nobody needs to read or answer it.
     private static func settled(_ wantsAPerson: Bool, _ report: WorkReport?,
                                 waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
         if report?.resumesByItself == true || waitingOnEvents { return .waiting }
-        if report?.isOpenBlock == true { return .blocked }
+        if report?.isOpenBlock == true { return .needsAttention }
         return .finished
     }
 }
@@ -164,16 +90,10 @@ public struct AgentHeading: Identifiable, Sendable {
 public extension AgentGroup {
     /// The headings this group is drawn under, empty ones left out.
     ///
-    /// Complete is drawn as two: Unread, the finished chats nobody has looked at since
-    /// they finished, above Read, the ones somebody has. Only on the panel — the group
-    /// itself stays one, so counts, badges and the daemon's summaries are unchanged,
-    /// and reading a chat moves it between headings without changing its group.
+    /// Every displayed group has one heading. Reading a finished chat can move it
+    /// from Needs you to Done without changing its stored state.
     func headings(_ agents: [Agent]) -> [AgentHeading] {
-        let split: [AgentHeading] = self == .finished
-            ? [AgentHeading(title: "Unread", agents: agents.filter(\.isUnread)),
-               AgentHeading(title: "Read", agents: agents.filter { !$0.isUnread })]
-            : [AgentHeading(title: title, agents: agents)]
-        return split.filter { !$0.agents.isEmpty }
+        agents.isEmpty ? [] : [AgentHeading(title: title, agents: agents)]
     }
 }
 
@@ -205,10 +125,11 @@ public extension Agent {
     /// because the version without it was the bug (FR-001, FR-004).
     func group(wantsEyes: Bool) -> AgentGroup {
         AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
-                   parked: parking?.isParked == true, waitingOnEvents: eventWait?.isOpen == true)
+                   parked: parking?.isParked == true, waitingOnEvents: eventWait?.isOpen == true,
+                   isUnread: isUnread, endedReason: endedReason, waitingForAllowance: allowanceWait != nil)
     }
 
-    /// Whether somebody has to do something about this agent.
+    /// Whether the agent explicitly asked for an answer.
     ///
     /// The two ways that becomes true: a question asked mid-turn, which holds the
     /// runtime, and an outcome reported at the end of one, which does not. Both reach
@@ -218,7 +139,7 @@ public extension Agent {
     }
 
     /// Whether the app will carry this agent on by itself: an open wait on events, or a
-    /// block naming agents or a time. What tells Waiting from Blocked.
+    /// block naming agents or a time. Unread endings can still place it under Needs you.
     var isWaiting: Bool {
         eventWait?.isOpen == true || report?.resumesByItself == true
     }
@@ -231,9 +152,7 @@ public extension Agent {
 
     /// A turn that ended cleanly, was asked how it went, and still said nothing.
     ///
-    /// Not a completion — nothing vouched for it. It stays under Complete rather than
-    /// competing for attention with the agents that asked for it, and is marked so the
-    /// person can see which endings they can trust.
+    /// Not a completion — nothing vouched for it. It needs review even after being read.
     var endingIsUnaccountedFor: Bool {
         state == .finished && endedReason == .endTurn && report == nil && outcomeAsked
     }

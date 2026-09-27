@@ -8,7 +8,7 @@ description: Answer an agent's permission request or question from the Mac, the 
 
 An agent stops and waits for you in three ways: it asks permission to do something, it
 asks a question with answers to pick from, or it ends its turn with a question in words.
-Whichever it is, the agent and its project say **Needs attention** until you answer.
+Whichever it is, the agent and its project say **Needs you** until you answer.
 
 ## Before you start
 
@@ -19,7 +19,7 @@ Whichever it is, the agent and its project say **Needs attention** until you ans
 
 1. Find the agent that is waiting. Any of these takes you to it:
    - On the Mac, a project with a dot beside it in the list; on its page, the agent under
-     **Needs attention**.
+     **Needs you**.
    - On iPhone or iPad, the same, in the project list and on the project's page.
    - A notification. It names the agent, the project and what is wanted; click or tap it
      to open the conversation with the question in front of you. You get one

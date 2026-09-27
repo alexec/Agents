@@ -65,7 +65,7 @@ writing and takes your typing in the same way as on the Mac.
 ## Things to know
 
 - **A page the agent opens asks for you.** Until you have looked, the agent is listed
-  under **Needs attention**. See [Statuses and groups](../reference/statuses.md).
+  under **Needs you**. See [Statuses and groups](../reference/statuses.md).
 - **Any Markdown file can be read this way.** Click one in the files pane to open it as a
   page.
 - **Only files the agent can reach.** An agent can open a page only inside the folders it

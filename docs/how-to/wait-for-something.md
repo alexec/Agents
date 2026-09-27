@@ -84,5 +84,5 @@ The publishing agent is told who it woke. A workflow can start on the same event
 ## See also
 
 - [Events](../reference/events.md), for every name and its details
-- [Statuses and groups](../reference/statuses.md), for **Waiting** and **Blocked**
+- [Statuses and groups](../reference/statuses.md), for **Waiting** and blocks under **Needs you**
 - [Set up a workflow](set-up-a-workflow.md), to start a new agent when something happens

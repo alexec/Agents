@@ -859,7 +859,7 @@ public final class AgentsModel {
         guard let key else { return 0 }
         let wanted = Project.standardize(key.folder)
         return agents.filter {
-            $0.host == key.host && projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread
+            $0.host == key.host && projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread
         }.count
     }
 
@@ -934,7 +934,7 @@ public final class AgentsModel {
     public func unreadCount(in folder: URL?) -> Int {
         guard let folder else { return 0 }
         let wanted = Project.standardize(folder)
-        return agents.filter { projectFolder(of: $0) == wanted && group(of: $0) == .finished && $0.isUnread }.count
+        return agents.filter { projectFolder(of: $0) == wanted && $0.state == .finished && $0.isUnread }.count
     }
 
     /// The question this agent is blocked on, if it still is.

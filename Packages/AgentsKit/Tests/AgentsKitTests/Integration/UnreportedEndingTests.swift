@@ -136,7 +136,7 @@ struct UnreportedEndingTests {
         // Left honestly: not accounted for, still under Complete, and no colour.
         #expect(agent.endingIsUnaccountedFor)
         #expect(agent.report == nil)
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         #expect(agent.needsAPerson == false)
     }
 
@@ -168,7 +168,7 @@ struct UnreportedEndingTests {
         #expect(agent.report?.outcome == .done)
         // Nothing about it reads as an agent that had to be asked.
         #expect(agent.endingIsUnaccountedFor == false)
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
     }
 
     // MARK: When nothing is asked at all
@@ -196,7 +196,7 @@ struct UnreportedEndingTests {
         #expect(asked.outcomeAsked)
         // Whether the question's turn is still in flight or already over, the group is
         // the one it had before the app spoke (US3-1, US3-5).
-        #expect(asked.group(wantsEyes: false) == .finished)
+        #expect(asked.group(wantsEyes: false) == .needsAttention)
 
         // A person's prompt is work they asked for: the flag comes down at once, and
         // with it the agent is Working (US3-4).

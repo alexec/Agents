@@ -98,11 +98,11 @@ struct OutcomeReportTests {
         try await settle(core, id)
 
         let agent = try #require(await core.agent(id))
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         #expect(agent.report?.outcome == .done)
         #expect(agent.needsAPerson == false)
         let project = await core.allProjects().first { Project.standardize($0.folder) == Project.standardize(work) }
-        #expect(project?.needsInput == false)
+        #expect(project?.needsInput == true)
     }
 
     /// An agent that reports twice in one turn has changed its mind. The last stands;
@@ -193,7 +193,7 @@ struct OutcomeReportTests {
 
             let agent = try #require(await core.agent(id))
             #expect(agent.report?.outcome == outcome)
-            #expect(agent.group(wantsEyes: false) == (outcome.needsAPerson ? .needsAttention : .finished))
+            #expect(agent.group(wantsEyes: false) == .needsAttention)
             // Whatever the outcome, the row reads the agent's own words.
             #expect(agent.report?.message == "what the agent said about \(wire)")
         }
