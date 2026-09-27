@@ -27,12 +27,12 @@ struct ProjectListView: View {
                 Section { projectRows(model.liveProjects.filter { $0.host == .mac }) } header: {
                     HostHeading(host: .mac)
                 }
-                ForEach(model.hosts.hosts.all) { host in
+                ForEach(model.hosts.servers, id: \.self) { host in
                     Section {
-                        projectRows(model.liveProjects.filter { $0.host == host.id })
-                        GoneProjectRows(host: host.id)
+                        projectRows(model.liveProjects.filter { $0.host == host })
+                        GoneProjectRows(host: host)
                     } header: {
-                        HostHeading(host: host.id)
+                        HostHeading(host: host)
                     }
                 }
             }
@@ -109,10 +109,11 @@ struct ProjectListView: View {
                         newProjectItems(on: .mac)
                     } else {
                         Menu("This Mac") { newProjectItems(on: .mac) }
-                        ForEach(model.hosts.hosts.all) { host in
-                            let offline = model.hosts.isOffline(host.id)
-                            Menu(offline ? "\(host.label) — Offline" : host.label) {
-                                newProjectItems(on: host.id)
+                        ForEach(model.hosts.servers, id: \.self) { host in
+                            let offline = model.hosts.isOffline(host)
+                            let label = model.hosts.label(host)
+                            Menu(offline ? "\(label) — Offline" : label) {
+                                newProjectItems(on: host)
                             }
                             .disabled(offline)
                         }

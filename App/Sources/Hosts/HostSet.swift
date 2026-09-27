@@ -82,7 +82,14 @@ final class HostSet {
         self.hosts = store.load()
     }
 
-    var isEmpty: Bool { hosts.all.isEmpty }
+    var isEmpty: Bool { hosts.all.isEmpty && controlled.isEmpty }
+
+    /// Every server the window lists, its own and the control plane's (058), in the
+    /// order they were added, then by name.
+    var servers: [HostID] {
+        hosts.all.map(\.id) + controlled.filter { $0.key != .mac && hosts[$0.key] == nil }
+            .sorted { $0.value.label.localizedStandardCompare($1.value.label) == .orderedAscending }.map(\.key)
+    }
 
     func host(_ id: HostID) -> ServerHost? { hosts[id] }
 

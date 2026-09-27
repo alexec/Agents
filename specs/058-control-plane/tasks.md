@@ -205,15 +205,15 @@ or on Alex's paired devices.
 
 **Independent test**: a scratch root seeded with agents, a paired fake device and the devbox added the old way. Move it; everything is present, the device connects with its old key, and the devbox is a host.
 
-- [ ] T058 [US6] Write `Control/Sources/Migrate.swift`, following R7 steps 1–7:
+- [x] T058 (built as `ControlMove` in `Packages/AgentsKit/Sources/AgentsKit/Control/ControlMove.swift`, run by the window rather than an `agents-control migrate` command) [US6] Write `Control/Sources/Migrate.swift`, following R7 steps 1–7:
   - Refuse a control root that already has clients or hosts.
   - `devices.json` becomes `clients.json` with `grant: device`, keeping `relay-mac-key`.
   - The old root becomes the home host `mac`, and no files move.
   - Each server in `hosts.json` goes through `hosts/install`, with failures listed with their reasons. `hosts.json` is renamed `hosts.json.moved`.
   - On any failure before the launch agents are registered, nothing in the old root changes.
-- [ ] T059 [US6] Build frame I in `App/Sources/Control/MoveSheet.swift`. It is offered from a banner when a legacy root has data and there is no `ControlConfig`. It says what is kept, runs the migrate, registers `LocalServices`, pairs, then switches `AppModel` to `ControlLink`.
-- [ ] T060 [P] [US6] Migrate tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/MigrateTests.swift` (with the core of the move in AgentsKitCore): device keys unchanged, idempotent refusal, and a failure part-way leaves the old root intact.
-- [ ] T061 [US6] Walk the move on the seeded scratch root. Record in `specs/058-control-plane/walks/us6.md`.
+- [x] T059 (built as `App/Sources/Control/MoveAcross.swift`: strip above the columns, sheet on the window) [US6] Build frame I in `App/Sources/Control/MoveSheet.swift`. It is offered from a banner when a legacy root has data and there is no `ControlConfig`. It says what is kept, runs the migrate, registers `LocalServices`, pairs, then switches `AppModel` to `ControlLink`.
+- [x] T060 (`ControlMoveTests`, 4; the move lives in AgentsKit beside `GrantStore`) [P] [US6] Migrate tests in `Packages/AgentsKit/Tests/AgentsKitTests/Control/MigrateTests.swift` (with the core of the move in AgentsKitCore): device keys unchanged, idempotent refusal, and a failure part-way leaves the old root intact.
+- [x] T061 (walked on `/tmp/run-mw` with an old-way window, devbox and fake iPhone; `walks/us6.md`) [US6] Walk the move on the seeded scratch root. Record in `specs/058-control-plane/walks/us6.md`.
 
 **Alex's live set-up is moved only on his go-ahead, once, deliberately. There is no task for it here.**
 

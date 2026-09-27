@@ -211,7 +211,7 @@ struct AgentsCommands: Commands {
         let live = model.liveProjects
         guard !model.hosts.isEmpty else { return live }
         return live.filter { $0.host == .mac }
-            + model.hosts.hosts.all.flatMap { host in live.filter { $0.host == host.id } }
+            + model.hosts.servers.flatMap { host in live.filter { $0.host == host } }
     }
 
     /// The selected project's live sessions, in the order its page draws them.
