@@ -75,6 +75,8 @@ final class AppModel {
     /// How long archived agents are kept (051). Nil from a daemon before 051.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
     var poolStatus: PoolStatus? { work.poolStatus }
+    /// Cursor and Grok permission mode (061). Defaults until the daemon answers.
+    private(set) var clientPermissions = ClientPermissionSettings()
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -971,6 +973,28 @@ final class AppModel {
         }
     }
 
+    func refreshClientPermissions() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.clientPermissionsState,
+                                                    Optional<String>.none,
+                                                    returning: ClientPermissionSettings.self) else { return }
+        clientPermissions = settings
+    }
+
+    /// Save Cursor/Grok permission mode and copy it to every connected server (061).
+    func setClientPermissions(_ settings: ClientPermissionSettings) async {
+        guard let saved = try? await client.call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                                 returning: ClientPermissionSettings.self) else { return }
+        clientPermissions = saved
+        await pushClientPermissionsToServers(saved)
+    }
+
+    func pushClientPermissionsToServers(_ settings: ClientPermissionSettings) async {
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                                     returning: ClientPermissionSettings.self)
+        }
+    }
+
     /// Retire one archived agent now (051, US7). Unconfirmed, the size it frees, or why it
     /// cannot go yet; confirmed, it is retired and leaves the list by `agent/removed`.
     func retireNow(_ agentID: UUID, confirmed: Bool) async -> Result<DaemonAPI.RetirePreview, JSONRPCError> {
@@ -1276,6 +1300,10 @@ final class AppModel {
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
 
+        case DaemonAPI.Notification.clientPermissionsChanged:
+            guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
+            clientPermissions = settings
+
         default:
             break
         }
@@ -1427,6 +1455,9 @@ final class AppModel {
                                        DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                                        returning: DaemonAPI.RetentionSetResult.self)
         }
+        // And Cursor/Grok permission mode (061).
+        _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
+                                   returning: ClientPermissionSettings.self)
         // And the pool, so a server chat carries on as a Mac one does (052, R6), with
         // what the Mac knows of the plans it relays.
         if let status = work.poolStatus {
@@ -1486,6 +1517,7 @@ final class AppModel {
         async let resuming: Void = refreshResuming()
         async let cost: Void = refreshCostState()
         async let retention: Void = refreshRetentionState()
+        async let clientPermissions: Void = refreshClientPermissions()
         async let pool: Void = refreshPoolStatus()
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
@@ -1494,7 +1526,7 @@ final class AppModel {
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, devices, permissions,
-                   elicitations, attention, resuming, cost, retention, cloning, wake, leases, events, modes,
+                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, pool)
         #if DEBUG
         openFromLaunchArguments()

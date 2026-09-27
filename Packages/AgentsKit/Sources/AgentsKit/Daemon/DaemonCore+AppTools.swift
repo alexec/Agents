@@ -372,6 +372,16 @@ extension DaemonCore {
             ?? request.options.first { $0.kind == .allowOnce }
     }
 
+    /// Cursor and Grok (061): only the tools that end or annotate a turn, never the ones
+    /// that start agents, change workflows, take leases or publish.
+    func autoAllowedTurnTool(_ request: PermissionRequest) -> PermissionOption? {
+        let call = request.toolCall
+        guard call.isFinishingTurn || call.isSuggestingPrompts
+                || call.isShowingFile || call.isReportingOutcome else { return nil }
+        return request.options.first { $0.kind == .allowAlways }
+            ?? request.options.first { $0.kind == .allowOnce }
+    }
+
     /// And refuse, ourselves, the ones this app could not take away.
     ///
     /// Three of the four runtimes let the app remove its rivals outright, and what is

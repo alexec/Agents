@@ -463,6 +463,13 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RetiredRequest.self)
                 return .success(try JSONValue.encoding(await retiredTombstones(request)))
 
+            case DaemonAPI.Method.clientPermissionsState:
+                return .success(try JSONValue.encoding(clientPermissionState()))
+
+            case DaemonAPI.Method.clientPermissionsSet:
+                let settings = try require(params, as: ClientPermissionSettings.self)
+                return .success(try JSONValue.encoding(try setClientPermissions(settings)))
+
             case DaemonAPI.Method.poolState:
                 let request = (try? require(params, as: DaemonAPI.PoolStateRequest.self)) ?? .init()
                 return .success(try JSONValue.encoding(await poolStatus(days: request.days)))

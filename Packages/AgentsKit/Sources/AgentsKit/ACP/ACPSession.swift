@@ -1061,11 +1061,13 @@ public actor ACPSession {
         let toolCallValue = params?["toolCall"]
         let toolCall = ToolCall(toolCallID: toolCallValue?["toolCallId"]?.stringValue,
                                 title: toolCallValue?["title"]?.stringValue ?? "Do something",
+                                name: toolCallValue?["name"]?.stringValue
+                                    ?? toolCallValue?["_meta"]?["x.ai/tool"]?["name"]?.stringValue,
                                 kind: toolCallValue?["kind"]?.stringValue,
                                 status: toolCallValue?["status"]?.stringValue,
                                 rawInput: toolCallValue?["rawInput"],
                                 rawOutput: toolCallValue?["rawOutput"],
-                                raw: ToolCall.trimmingParsedFields(toolCallValue))
+                                raw: toolCallValue)
         let options = (params?["options"]?.arrayValue ?? []).compactMap { option -> PermissionOption? in
             guard let id = option["optionId"]?.stringValue else { return nil }
             return PermissionOption(optionID: id,

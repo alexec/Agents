@@ -301,6 +301,9 @@ public enum DaemonAPI {
         // limit is not stopped.
         public static let costState = "cost/state"
         public static let costSetLimits = "cost/setLimits"
+        /// Cursor and Grok permission mode (061). Control only.
+        public static let clientPermissionsState = "clientPermissions/state"
+        public static let clientPermissionsSet = "clientPermissions/set"
         /// The pool of runtimes a chat can carry on with, and each one's state (052).
         public static let poolState = "pool/state"
         public static let poolSet = "pool/set"
@@ -408,6 +411,8 @@ public enum DaemonAPI {
         /// `project/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
+        /// Cursor and Grok permission mode changed (061).
+        public static let clientPermissionsChanged = "clientPermissions/changed"
         /// The pool, its states or its switches changed (052). Debounced to one a second.
         public static let poolChanged = "pool/changed"
         /// The retention settings, or what the archive holds, changed (051). A
