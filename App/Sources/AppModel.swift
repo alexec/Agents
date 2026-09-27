@@ -1674,6 +1674,58 @@ final class AppModel {
         }
     }
 
+    /// A project's servers, for its page (060, frame D). Nil when they could not be read,
+    /// so the section keeps what it last had.
+    func projectMCPServers(_ folder: URL) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: .project(folder: folder.path)),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    func mcpServers(at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: destination),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    /// Write one name into `secrets.env`. The value is not kept here.
+    func mcpSetSecret(name: String, value: String) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpSetSecret,
+                                     DaemonAPI.MCPSetSecretRequest(name: name, value: value),
+                                     returning: DaemonAPI.MCPSetSecretAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
+                   forgetSecret: String?) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpRemove,
+                                     DaemonAPI.MCPRemoveRequest(destination: destination, name: name,
+                                                               forgetSecret: forgetSecret),
+                                     returning: DaemonAPI.MCPRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
+    func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpApprove,
+                                      DaemonAPI.MCPApproveRequest(destination: .project(folder: folder.path),
+                                                                  name: name, digest: digest),
+                                      returning: DaemonAPI.MCPListAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
     func mcpAdd(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
                 secrets: [String: String], plain: [String: String],
                 replace: Bool) async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {

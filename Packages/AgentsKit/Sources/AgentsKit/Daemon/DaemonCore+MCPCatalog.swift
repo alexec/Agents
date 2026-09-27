@@ -71,6 +71,7 @@ extension DaemonCore {
     }
 
     func mcpAdd(_ request: DaemonAPI.MCPAddRequest) async throws -> DaemonAPI.MCPAddAnswer {
+        try requireMCPProject(request.destination)
         guard let staged = await mcpPreviewStore.take(request.previewID) else {
             throw Self.mcpRefusal(.previewExpired)
         }
@@ -84,6 +85,98 @@ extension DaemonCore {
         } catch let error as DaemonAPI.MCPCatalogError {
             DaemonLog.shared.write("mcp: add refused: \(error)")
             throw Self.mcpRefusal(error)
+        }
+    }
+
+    func mcpList(_ request: DaemonAPI.MCPListRequest) throws -> DaemonAPI.MCPListAnswer {
+        try requireMCPProject(request.destination)
+        let listed = MCPProjectListing.list(destination: request.destination,
+                                            personalHome: locations.personalHome,
+                                            sidecar: MCPCatalogSidecar.load(from: mcpInstaller.sidecarURL),
+                                            approvals: mcpApprovalStore.load())
+        let kind = Self.mcpDestinationKind(request.destination)
+        DaemonLog.shared.write("mcp: list \(kind) → \(listed.servers.count)")
+        return .init(servers: listed.servers, problem: listed.problem)
+    }
+
+    func mcpApprove(_ request: DaemonAPI.MCPApproveRequest) throws -> DaemonAPI.MCPListAnswer {
+        guard case .project(let path) = request.destination else {
+            throw Self.mcpRefusal(.failed("Only a project's server waits for approval."))
+        }
+        try requireMCPProject(request.destination)
+        let folder = URL(filePath: path)
+        let url = MCPJSONFile.projectURL(folder: folder)
+        let entry: OrderedJSON
+        do {
+            guard let found = try MCPJSONFile.entry(named: request.name, at: url) else {
+                throw Self.mcpRefusal(.staleDigest)
+            }
+            entry = found
+        } catch let error as JSONRPCError {
+            throw error
+        } catch {
+            throw Self.mcpRefusal(.mcpUnreadable(path: url.path))
+        }
+        var records = mcpApprovalStore.load()
+        do {
+            try records.approve(folder: folder, name: request.name, digest: request.digest, entry: entry)
+            try mcpApprovalStore.save(records)
+        } catch let error as DaemonAPI.MCPCatalogError {
+            throw Self.mcpRefusal(error)
+        }
+        DaemonLog.shared.write("mcp: approve \(request.name) in project")
+        return try mcpList(.init(destination: request.destination))
+    }
+
+    func mcpSetSecret(_ request: DaemonAPI.MCPSetSecretRequest) throws -> DaemonAPI.MCPSetSecretAnswer {
+        do {
+            try mcpInstaller.setSecret(name: request.name, value: request.value, personalHome: locations.personalHome)
+        } catch let error as DaemonAPI.MCPCatalogError {
+            DaemonLog.shared.write("mcp: set-secret refused \(request.name)")
+            throw Self.mcpRefusal(error)
+        } catch {
+            DaemonLog.shared.write("mcp: set-secret refused \(request.name)")
+            throw Self.mcpRefusal(.failed("secrets.env could not be written."))
+        }
+        DaemonLog.shared.write("mcp: set-secret \(request.name)")
+        return .init(set: true)
+    }
+
+    func mcpRemove(_ request: DaemonAPI.MCPRemoveRequest) throws -> DaemonAPI.MCPRemoveAnswer {
+        try requireMCPProject(request.destination)
+        let extra = allProjects(includeArchived: true).map { MCPJSONFile.projectURL(folder: $0.folder) }
+        let forget = request.forgetSecret?.isEmpty == false ? request.forgetSecret : nil
+        do {
+            try mcpInstaller.remove(request.name, destination: request.destination,
+                                    personalHome: locations.personalHome, forgetSecret: forget, alsoScan: extra)
+        } catch let error as DaemonAPI.MCPCatalogError {
+            DaemonLog.shared.write("mcp: remove refused \(request.name)")
+            throw Self.mcpRefusal(error)
+        } catch {
+            DaemonLog.shared.write("mcp: remove refused \(request.name)")
+            throw Self.mcpRefusal(.failed("mcp.json could not be written."))
+        }
+        DaemonLog.shared.write("mcp: remove \(request.name)")
+        return .init(ok: true)
+    }
+
+    /// A project destination has to be a project on this Mac. Personal is always fine.
+    func requireMCPProject(_ destination: DaemonAPI.SkillDestination) throws {
+        guard case .project(let path) = destination else { return }
+        let folder = URL(filePath: path)
+        var isDirectory: ObjCBool = false
+        let known = Self.isProjectFolder(folder, records: projectRecords(),
+                                         agentFolders: Set(agents.values.map(\.projectFolder)))
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
+              isDirectory.boolValue, known else {
+            throw Self.mcpRefusal(.notAProject(path: path))
+        }
+    }
+
+    private static func mcpDestinationKind(_ destination: DaemonAPI.SkillDestination) -> String {
+        switch destination {
+        case .personal: "personal"
+        case .project: "project"
         }
     }
 

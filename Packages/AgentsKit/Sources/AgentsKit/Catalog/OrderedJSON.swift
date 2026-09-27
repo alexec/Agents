@@ -65,6 +65,28 @@ enum OrderedJSON: Equatable, Sendable {
         self = .object(pairs)
     }
 
+    /// One server entry as canonical JSON: keys sorted, no insignificant whitespace.
+    /// Two writings of the same entry share a digest (060, contracts/mcp-json.md).
+    func canonicalJSON() -> String {
+        switch self {
+        case .null: return "null"
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let n): return n
+        case .string(let s):
+            var out = ""
+            Self.quote(s, into: &out)
+            return out
+        case .array(let items):
+            return "[" + items.map { $0.canonicalJSON() }.joined(separator: ",") + "]"
+        case .object(let pairs):
+            return "{" + pairs.sorted { $0.0 < $1.0 }.map { key, value in
+                var out = ""
+                Self.quote(key, into: &out)
+                return out + ":" + value.canonicalJSON()
+            }.joined(separator: ",") + "}"
+        }
+    }
+
     // MARK: Writing, as JSON.stringify(value, null, 2)
 
     func stringified() -> String {

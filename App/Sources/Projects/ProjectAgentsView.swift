@@ -152,6 +152,9 @@ struct ProjectAgentsView: View {
                 // What the project gives every agent working in it (059, frame D).
                 ProjectSkillsSection(folder: folder)
 
+                // Servers in .agents/mcp.json, approved before a session gets them (060, frame D).
+                ProjectMCPSection(folder: folder)
+
                 // What this project's agents are handed, and which wait for your OK (S2).
                 PluginsSection(folder: folder)
 

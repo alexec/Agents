@@ -138,17 +138,17 @@ missing secrets on the project page.
 
 **Independent test**: quickstart §2 rows 5–7.
 
-- [ ] T024 [P] [US2] Write failing tests in `Tests/Catalog/MCPProjectTests.swift`: add to project
+- [X] T024 [P] [US2] Write failing tests in `Tests/Catalog/MCPProjectTests.swift`: add to project
   auto-approves; hand-written entry waits; approve with digest; merge order project before
   personal; missing secret listed and omitted from session
-- [ ] T025 [US2] Implement `Src/Catalog/MCPApprovals.swift` and wire approve into installer +
+- [X] T025 [US2] Implement `Src/Catalog/MCPApprovals.swift` and wire approve into installer +
   `mcp/list` / `mcp/approve`
-- [ ] T026 [US2] Change `DaemonCore+SessionServers.swift` merge order per
+- [X] T026 [US2] Change `DaemonCore+SessionServers.swift` merge order per
   `contracts/mcp-json.md` (app → chosen → project approved → personal → plugins)
-- [ ] T027 [US2] Add `App/Projects/ProjectMCPSection.swift` and insert it in
+- [X] T027 [US2] Add `App/Projects/ProjectMCPSection.swift` and insert it in
   `ProjectAgentsView.swift` after Skills, before Plugins (frame D); sheet opens with project
   destination; skip section on server projects
-- [ ] T028 [US2] Walk frame D; notes in `specs/060-marketplace-mcp/walk/us2/README.md`
+- [X] T028 [US2] Walk frame D; notes in `specs/060-marketplace-mcp/walk/us2/README.md`
 
 **Checkpoint**: US1 + US2 both work.
 
@@ -160,14 +160,14 @@ missing secrets on the project page.
 
 **Independent test**: quickstart §2 rows 8–9; frame E.
 
-- [ ] T029 [P] [US3] Write failing tests in `Tests/Catalog/MCPRemoveSecretTests.swift`: set-secret;
+- [X] T029 [P] [US3] Write failing tests in `Tests/Catalog/MCPRemoveSecretTests.swift`: set-secret;
   remove managed; refuse remove unmanaged; forgetSecret only when unused; refuse when still
   referenced
-- [ ] T030 [US3] Implement `mcp/set-secret` and `mcp/remove` in `DaemonCore+MCPCatalog.swift` +
+- [X] T030 [US3] Implement `mcp/set-secret` and `mcp/remove` in `DaemonCore+MCPCatalog.swift` +
   installer
-- [ ] T031 [US3] Add `App/Catalog/SetSecretSheet.swift` and `RemoveMCPServerSheet.swift` (frame E);
+- [X] T031 [US3] Add `App/Catalog/SetSecretSheet.swift` and `RemoveMCPServerSheet.swift` (frame E);
   wire Set… / Replace… / Remove… from Shared and the project section
-- [ ] T032 [US3] Walk frame E and offline (quickstart row 10); notes in
+- [X] T032 [US3] Walk frame E and offline (quickstart row 10); notes in
   `specs/060-marketplace-mcp/walk/us3/README.md`
 
 **Checkpoint**: all three stories independently usable.
@@ -176,17 +176,17 @@ missing secrets on the project page.
 
 ## Phase 6: Polish
 
-- [ ] T033 [P] Write `docs/how-to/add-an-mcp-server-from-the-registry.md`
-- [ ] T034 [P] Update `docs/how-to/share-skills-across-agents.md` for `secrets.env` / `${NAME}`
+- [X] T033 [P] Write `docs/how-to/add-an-mcp-server-from-the-registry.md`
+- [X] T034 [P] Update `docs/how-to/share-skills-across-agents.md` for `secrets.env` / `${NAME}`
   and link the new how-to
-- [ ] T035 [P] Update `docs/reference/settings.md` (Add server…, Remove, Set…)
-- [ ] T036 [P] Update `docs/explanation/projects-hosts-worktrees.md` for project servers,
+- [X] T035 [P] Update `docs/reference/settings.md` (Add server…, Remove, Set…)
+- [X] T036 [P] Update `docs/explanation/projects-hosts-worktrees.md` for project servers,
   approval, whose secrets
-- [ ] T037 Write `specs/060-marketplace-mcp/checklists/requirements.md` confirming spec quality
+- [X] T037 Write `specs/060-marketplace-mcp/checklists/requirements.md` confirming spec quality
   after look + plan
-- [ ] T038 Run quickstart §2 end to end on a scratch root; record in
+- [X] T038 Run quickstart §2 end to end on a scratch root; record in
   `specs/060-marketplace-mcp/walk/final.md`
-- [ ] T039 Confirm `swift test` (Catalog / MCP filters) green and the Mac app scheme builds
+- [X] T039 Confirm `swift test` (Catalog / MCP filters) green and the Mac app scheme builds
 
 ---
 

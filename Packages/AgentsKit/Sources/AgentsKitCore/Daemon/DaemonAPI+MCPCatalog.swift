@@ -189,6 +189,83 @@ extension DaemonAPI {
         public var value: String
         public init(name: String, value: String) { self.name = name; self.value = value }
     }
+
+    public struct MCPSetSecretAnswer: Codable, Sendable {
+        public var set: Bool
+        public init(set: Bool) { self.set = set }
+    }
+
+    public struct MCPRemoveRequest: Codable, Sendable {
+        public var destination: SkillDestination
+        public var name: String
+        public var forgetSecret: String?
+        public init(destination: SkillDestination, name: String, forgetSecret: String? = nil) {
+            self.destination = destination
+            self.name = name
+            self.forgetSecret = forgetSecret
+        }
+    }
+
+    public struct MCPRemoveAnswer: Codable, Sendable {
+        public var ok: Bool
+        public init(ok: Bool) { self.ok = ok }
+    }
+
+    /// A project entry is approved, or waiting on the digest the person was shown.
+    public enum MCPApprovalState: Codable, Hashable, Sendable {
+        case approved
+        case waiting(digest: String, isNew: Bool)
+    }
+
+    /// One server on the project page, or in `mcp/list` (060, frame D).
+    public struct ProjectMCPServer: Codable, Hashable, Sendable, Identifiable {
+        public var name: String
+        public var summary: String
+        public var managed: ManagedMCPServer?
+        public var approval: MCPApprovalState
+        public var missingSecrets: [String]
+        /// Every `${NAME}` the entry names, set or not.
+        public var secretNames: [String]
+        public var entryDigest: String
+
+        public var id: String { name }
+
+        public init(name: String, summary: String, managed: ManagedMCPServer?, approval: MCPApprovalState,
+                    missingSecrets: [String], secretNames: [String] = [], entryDigest: String) {
+            self.name = name
+            self.summary = summary
+            self.managed = managed
+            self.approval = approval
+            self.missingSecrets = missingSecrets
+            self.secretNames = secretNames
+            self.entryDigest = entryDigest
+        }
+    }
+
+    public struct MCPListRequest: Codable, Sendable {
+        public var destination: SkillDestination
+        public init(destination: SkillDestination) { self.destination = destination }
+    }
+
+    public struct MCPListAnswer: Codable, Sendable {
+        public var servers: [ProjectMCPServer]
+        public var problem: String?
+        public init(servers: [ProjectMCPServer], problem: String? = nil) {
+            self.servers = servers
+            self.problem = problem
+        }
+    }
+
+    public struct MCPApproveRequest: Codable, Sendable {
+        public var destination: SkillDestination
+        public var name: String
+        public var digest: String
+        public init(destination: SkillDestination, name: String, digest: String) {
+            self.destination = destination
+            self.name = name
+            self.digest = digest
+        }
+    }
 }
 
 /// Failure payload for MCP catalogue calls. Reuses catalogRefused.
