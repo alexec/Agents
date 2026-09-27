@@ -157,7 +157,7 @@ struct RemoteChatView: View {
                         Label("Archive", systemImage: "archivebox")
                     }
                     .disabled(model.isStale)
-                    .accessibilityHint("Archives this chat and goes back to the project")
+                    .accessibilityHint("Archives this session and goes back to the project")
                 }
             }
             if let agent {
@@ -276,7 +276,7 @@ private struct ChatMenu: View {
             }
             if agent.state == .archived {
                 Divider()
-                Button("Bring back", systemImage: "tray.and.arrow.up") {
+                Button("Bring Back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
                 }
                 .disabled(model.isStale)

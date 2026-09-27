@@ -58,7 +58,7 @@ Three ways to put an agent down, each keeping its whole conversation:
    archiving also removes the worktree. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
 3. To bring it back, open **Archived** on the project's page, then right-click the card
-   and choose **Bring back**. On iPhone and iPad, open it and choose **Bring back** from
+   and choose **Bring Back**. On iPhone and iPad, open it and choose **Bring Back** from
    the **Actions** menu.
 
 **What each keeps**
@@ -70,7 +70,7 @@ Three ways to put an agent down, each keeping its whole conversation:
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
 | Afterwards | | | Retired after 30 days, or sooner when archived agents take more than 2 GB |
-| Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring back** |
+| Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring Back** |
 
 ## How long archived chats are kept
 

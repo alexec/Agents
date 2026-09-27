@@ -38,7 +38,7 @@ struct ServersSettingsView: View {
                     Button {
                         isAdding = true
                     } label: {
-                        Label("Add a server", systemImage: "plus")
+                        Label("Add Server", systemImage: "plus")
                     }
                     Spacer()
                 }

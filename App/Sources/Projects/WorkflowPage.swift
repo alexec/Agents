@@ -145,7 +145,7 @@ struct WorkflowPage: View {
     private func actions(_ summary: WorkflowSummary) -> some View {
         HStack(spacing: 8) {
             if summary.isArchived {
-                Button("Restore") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paperProminent)
             } else {
                 if summary.awaitingApproval != nil {

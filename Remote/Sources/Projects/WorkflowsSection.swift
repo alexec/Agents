@@ -4,7 +4,7 @@ import SwiftUI
 /// A project's standing arrangements, under the agents working on it.
 ///
 /// Each row opens the workflow's page, where it can be read whole and driven as on the
-/// Mac: Run now, Archive or Restore, and what it is allowed to do. The rows say what
+/// Mac: Run now, Archive or Bring Back, and what it is allowed to do. The rows say what
 /// is arranged, when it next fires, and what the last fire produced (FR-021) — a
 /// workflow being refused every night looks exactly like one whose trigger never
 /// matched unless somebody says so.
@@ -61,7 +61,7 @@ private struct WorkflowRow: View {
                 Button {
                     Task { await model.setWorkflowArchived(summary, false) }
                 } label: {
-                    Label("Restore", systemImage: "arrow.uturn.backward")
+                    Label("Bring Back", systemImage: "arrow.uturn.backward")
                 }
             } else {
                 // Approving is the Mac's, for now; running a file nobody has approved

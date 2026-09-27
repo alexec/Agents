@@ -86,7 +86,7 @@ were approved as they stood.
 
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived** and
-  does not run until you click **Restore**. The file is kept.
+  does not run until you click **Bring Back**. The file is kept.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
 ## If it doesn't work

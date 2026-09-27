@@ -101,7 +101,7 @@ A workflow does not run, and its page says why, when:
 Pull requests are checked every five minutes.
 
 On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
-while it is waiting for your OK), **Archive** (**Restore** once archived) and **Show in
+while it is waiting for your OK), **Archive** (**Bring Back** once archived) and **Show in
 Finder**.
 
 ## See also

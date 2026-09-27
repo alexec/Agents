@@ -54,7 +54,7 @@ struct ChatView: View {
             }
         }
         .animation(.snappy(duration: 0.28), value: model.selection)
-        .navigationTitle(agent?.title ?? "New agent")
+        .navigationTitle(agent?.title ?? "New session")
         .navigationSubtitle(agent.map { $0.cwd.lastPathComponent } ?? "")
         .environment(\.chatActions, chatActions)
     }
@@ -104,7 +104,7 @@ struct ChatView: View {
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .help("Bring this chat back from the archive (⌥⌘⌫)")
+                .help("Bring this session back from the archive (⌥⌘⌫)")
             }
             .chatColumn()
             .padding(.vertical, 8)
@@ -171,7 +171,7 @@ struct ChatView: View {
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .help("Archive this chat and go back to the project")
+                .help("Archive this session and go back to the project")
             }
             .chatColumn()
             .padding(.vertical, 8)

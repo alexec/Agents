@@ -23,14 +23,14 @@ ones every Mac app has.
 | Escape | In the prompt, with a list of commands or files showing | Closes the list. |
 | Command-N | **File ▸ New Session** | Starts a new session in the selected project, the same as **New session** at the top of the sessions column. |
 | Option-Command-N | **File ▸ New Session in a Worktree** | Starts a new session in the selected project, in a new worktree. |
-| Command-O | **File ▸ Add Project Folder…** | Adds a folder as a project. |
-| Shift-Command-O | **File ▸ Clone Repository…** | Clones a Git URL as a project. |
+| Command-O | **File ▸ Add Folder…** | Adds a folder as a project. |
+| Shift-Command-O | **File ▸ Clone Git URL…** | Clones a Git URL as a project. |
 | None | **File ▸ Add Server…** | Adds a Linux server. |
 | Shift-Command-R | **File ▸ Show in Finder** | Shows the agent's or project's folder in Finder. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
 | Shift-Command-Return | **Session ▸ Carry On** | Tells a **Blocked** agent its block has gone, or a **Waiting** one that its wait is over early. |
-| Control-Command-P | **Session ▸ Park** or **Unpark** | Puts the chat down to come back to later, or puts it back where it was. |
-| Option-Command-Delete | **Session ▸ Archive** or **Bring Back** | Archives the agent, or brings an archived one back. |
+| Control-Command-P | **Session ▸ Park** or **Unpark** | Puts the session down to come back to later, or puts it back where it was. |
+| Option-Command-Delete | **Session ▸ Archive** or **Bring Back** | Archives the session, or brings an archived one back. |
 | Delete | Selected session in the sessions list | Archives the selected session (same as **Archive**), and leaves it. |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |
 | Option-Command-Down Arrow, Option-Command-Up Arrow | **Go ▸ Next Session**, **Previous Session** | Moves through the sessions in the list. |

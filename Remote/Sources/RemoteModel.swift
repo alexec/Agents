@@ -312,7 +312,7 @@ final class RemoteModel {
 
     // MARK: Starting an agent (029)
 
-    /// The project a New agent sheet is open on, if one is. On the model rather than in
+    /// The project a New session sheet is open on, if one is. On the model rather than in
     /// the page's `@State` so a launch argument can open it, and so the sheet can close
     /// itself when the agent it started is ready to be looked at.
     var startingIn: URL? {
@@ -1746,7 +1746,7 @@ final class RemoteModel {
         if let name = value("-project"),
            let summary = work.projects.first(where: { $0.name == name }) {
             selectedProject = summary.folder
-            // `-start` opens New agent on that project: the sheet is the one screen in
+            // `-start` opens New session on that project: the sheet is the one screen in
             // this app that cannot be reached by naming what to look at.
             if arguments.contains("-start") {
                 try? await Task.sleep(for: .milliseconds(600))

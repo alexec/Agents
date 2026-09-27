@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// New agent, on a phone: a runtime, what it offers, and what to ask it (029).
+/// New session, on a phone: a runtime, what it offers, and what to ask it (029).
 ///
 /// The choices sit above and the prompt sits at the bottom, over the keyboard, so that
 /// with the keyboard up the words and Send are what is in view, and the choices are a
@@ -26,7 +26,7 @@ struct StartAgentView: View {
                 ChoiceRows()
             }
             .paperForm()
-            .navigationTitle(model.work.project(project)?.name ?? "New agent")
+            .navigationTitle(model.work.project(project)?.name ?? "New session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

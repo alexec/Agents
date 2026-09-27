@@ -51,9 +51,9 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
             Divider()
-            Button("Add Project Folder…") { requests.projectSheet = .chooseFolder }
+            Button("Add Folder…") { requests.projectSheet = .chooseFolder }
                 .keyboardShortcut("o")
-            Button("Clone Repository…") { requests.projectSheet = .clone }
+            Button("Clone Git URL…") { requests.projectSheet = .clone }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Add Server…") { requests.projectSheet = .addServer }
             Divider()
