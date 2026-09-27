@@ -1,0 +1,45 @@
+{
+  "server": {
+    "name": "io.github.gitHubDujianfeng/duke-book",
+    "description": "Manage Duke Bookmark notes, categories, and plan-enabled knowledge search over MCP.",
+    "title": "duke-book",
+    "repository": {
+      "url": "https://github.com/gitHubDujianfeng/duke-book",
+      "source": "github"
+    },
+    "version": "0.1.5",
+    "packages": [
+      {
+        "registryType": "npm",
+        "identifier": "duke-book",
+        "version": "0.1.5",
+        "transport": {
+          "type": "stdio"
+        },
+        "environmentVariables": [
+          {
+            "description": "Base URL of the Duke Bookmark service.",
+            "format": "string",
+            "name": "DUKE_API_BASE_URL"
+          },
+          {
+            "description": "Explicit-scope Duke Bookmark API token whose plan enables API_ACCESS and MCP_ACCESS; knowledge search also requires AI_RAG.",
+            "isRequired": true,
+            "format": "string",
+            "isSecret": true,
+            "name": "DUKE_API_TOKEN"
+          }
+        ]
+      }
+    ]
+  },
+  "_meta": {
+    "io.modelcontextprotocol.registry/official": {
+      "status": "active",
+      "statusChangedAt": "2026-07-28T07:29:43.58431Z",
+      "publishedAt": "2026-07-28T07:29:43.58431Z",
+      "updatedAt": "2026-07-28T07:29:43.58431Z",
+      "isLatest": true
+    }
+  }
+}

@@ -1,0 +1,292 @@
+<!doctype html><html><head><meta charset="utf-8"><title>060 wireframes</title><style>
+/* Wireframes for 060, search the MCP Registry and add servers. Built on 059's kit. Lo-fi, in 054 and 055's hand: paper ground, one accent.
+   One window size for every pane, 1000 × 640. Open with #a … #h to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system;color:#333}
+.sub{font:13px -apple-system;color:#666;max-width:960px;line-height:1.4}
+.win{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex}
+/* The rail runs the full height, under the traffic lights, as System Settings has it. */
+.rail{width:200px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.lights{height:38px;display:flex;align-items:center;gap:8px;padding:0 6px}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc}
+.ri{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;color:#1d1d1d}
+.ri i{font-style:normal;width:22px;height:22px;border-radius:6px;background:#dcd8cf;color:#555;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.ri.on{background:#3d5a80;color:#fff}.ri.on i{background:rgba(255,255,255,.2);color:#fff}
+.ri.open{font-weight:600}
+.ri .d{margin-left:auto;color:#8a877f;font-size:10px}
+.sub-i{display:flex;align-items:center;padding:4px 8px 4px 38px;border-radius:6px;color:#333}
+.sub-i .n{margin-left:auto;color:#8a877f;font-size:12px}
+.sub-i .warn{margin-left:auto;color:#b5651d}
+.sub-i.on{background:#3d5a80;color:#fff}.sub-i.on .n{color:#dfe6ef}.sub-i.on .warn{color:#ffd9b0}
+.gap{height:10px}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.bar{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)}
+.bar .t{font:600 14px -apple-system}.bar .p{color:#8a877f;font:12px "SF Mono",Menlo,monospace}
+.bar .sp{flex:1}.bar .crumb{color:#8a877f;font-weight:400}
+.body{flex:1;display:flex;min-height:0}
+/* A form pane: one reading column, left-aligned, never stretched past 560. */
+.col{width:560px;padding:18px 28px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.sh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 4px 2px}
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:9px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f0eb}
+.line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}.line .s{color:#8a877f;font-size:11.5px;margin-top:2px}
+.line.indent{padding-left:34px}
+.foot{color:#8a877f;font-size:11.5px;line-height:1.4;padding:4px 4px 2px}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}.link{color:#3d5a80;font-size:12px}
+.seg{display:inline-flex;border:1px solid #cfcac0;border-radius:6px;overflow:hidden;font-size:12px}
+.seg span{padding:3px 14px;border-right:1px solid #cfcac0}.seg span:last-child{border-right:none}.seg .on{background:#3d5a80;color:#fff}
+.pop{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+.pop:after{content:" ⌄";color:#8a877f}
+.field{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:2px 8px;width:80px;text-align:right;font-size:12px}
+.cdot{width:8px;height:8px;border-radius:4px;flex:none}
+.g{background:#5b8a5b}.o{background:#b5651d}.x{background:#c2beb6}
+.ic{width:22px;text-align:center;color:#8a877f}
+/* Shared's own pieces, as 054 drew them. */
+.lst{flex:1;overflow:hidden;padding:14px 18px 0;min-width:0}
+.lst.fixed{flex:none;width:440px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e3dfd6;margin-bottom:6px}
+.row.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.row .nm{font-weight:600;white-space:nowrap}
+.row .ds{color:#6d6a64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
+.mono{font:12px "SF Mono",Menlo,monospace}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}.chip.w{background:#f7e7d6;color:#9a4f10}
+.reach{display:flex;gap:3px}
+.r{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px -apple-system;background:#e3eaf3;color:#3d5a80}
+.r.no{background:#f0eeea;color:#b9b5ad;text-decoration:line-through}
+.r.q{background:#f0eeea;color:#999;border:1px dashed #bbb;width:16px;height:16px}
+.detail{flex:1;min-width:0;border-left:1px solid rgba(0,0,0,.08);padding:14px;display:flex;flex-direction:column;gap:10px;background:#fbfaf7;overflow:hidden}
+.detail .t{font:600 15px -apple-system}
+.kv{display:grid;grid-template-columns:70px 1fr;gap:4px 8px;font-size:12px}.kv b{font-weight:400;color:#8a877f}
+.doc{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:10px 12px;font:14px "Iowan Old Style",Georgia,serif;line-height:1.4;color:#333;flex:1;overflow:hidden}
+.doc .m{font:11px "SF Mono",Menlo,monospace;color:#999}
+.search{margin-bottom:10px;background:#fff;border:1px solid #dcd8cf;border-radius:7px;padding:4px 8px;color:#aaa}
+table.m{border-collapse:separate;border-spacing:0;width:100%;background:#fff;border:1px solid #e3dfd6;border-radius:8px;overflow:hidden}
+table.m th{font:600 11px -apple-system;color:#8a877f;text-align:center;padding:7px 4px;border-bottom:1px solid #eee}
+table.m th:first-child,table.m td:first-child{text-align:left;padding-left:12px}
+table.m td{text-align:center;padding:8px 4px;border-bottom:1px solid #f2f0eb}table.m tr:last-child td{border-bottom:none}
+.ok{color:#3d5a80;font-weight:600}.part{color:#9a4f10}.none{color:#c2beb6}.qq{color:#999}
+.sec{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
+/* H only: Shared keeping a column of its own beside the rail. */
+.inner{width:170px;flex:none;border-right:1px solid rgba(0,0,0,.08);padding:12px 8px;background:#f4f1eb;display:flex;flex-direction:column;gap:1px}
+.inner .si{padding:5px 8px;border-radius:6px;display:flex}.inner .si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.inner .si.on{background:#3d5a80;color:#fff}.inner .si .warn{margin-left:auto;color:#b5651d}.inner .si.on .warn{color:#ffd9b0}
+/* 059's own pieces: a sheet over a window, and the main window's project page. */
+.stage{position:relative}
+.veil{position:absolute;inset:0;background:rgba(40,36,30,.28);border-radius:12px;display:flex;justify-content:center;align-items:flex-start;padding-top:38px}
+.sheet{width:720px;height:540px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.2),0 18px 40px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.sheet .top{display:flex;align-items:center;gap:10px;padding:14px 18px 10px}
+.sheet .top .t{font:600 15px -apple-system}
+.sheet .top .sp{flex:1}
+.sheet .q{margin:0 18px 10px;background:#fff;border:1px solid #3d5a80;box-shadow:0 0 0 2px #cdd8e6;border-radius:7px;padding:5px 9px;color:#1d1d1d}
+.sheet .q .ph{color:#aaa}
+.sheet .res{flex:1;overflow:hidden;padding:0 18px}
+.sheet .bot{display:flex;align-items:center;gap:8px;padding:10px 18px;border-top:1px solid rgba(0,0,0,.08);background:#f1eee8}
+.sheet .bot .sp{flex:1}.sheet .bot .note{color:#8a877f;font-size:11.5px}
+.res .row{align-items:flex-start}
+.res .row .col2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.res .row .col2 .src{color:#8a877f;font:11.5px "SF Mono",Menlo,monospace}
+.res .row .col2 .ds{white-space:normal}
+.res .row .n{color:#6d6a64;font-size:12px;white-space:nowrap;text-align:right;min-width:72px}
+.back{color:#3d5a80;font-size:12px}
+.warnbox{background:#f7e7d6;color:#6b3a0c;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.infobox{background:#e3eaf3;color:#27405f;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.files{font:12px/1.6 "SF Mono",Menlo,monospace;color:#333;background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:8px 12px}
+.files .c{color:#9a4f10;font-family:-apple-system;font-size:11.5px}
+/* The main window: projects down the left, the project page beside them. */
+.side{width:230px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.side .h{font:600 11px -apple-system;color:#8a877f;padding:10px 8px 4px;text-transform:uppercase;letter-spacing:.04em}
+.page{flex:1;overflow:hidden;padding:26px 60px 0}
+.page .pt{font:600 20px -apple-system}.page .ps{color:#8a877f;font-size:12px;margin-top:2px}
+.sh2{display:flex;align-items:center;gap:10px;font:600 14px -apple-system;margin:20px 2px 8px}
+.sh2 .sp{flex:1}
+.gh{font:600 11px -apple-system;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:4px 2px 6px}
+.muted{color:#8a877f}
+.anno{color:#c0305a;font:italic 13px Georgia,serif;max-width:960px;line-height:1.35}
+.bar .btn.p{font:12px -apple-system,"SF Pro Text",sans-serif}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+/* 060's own pieces. Shared is a heading over its pages now (f634e1ce), not a button. */
+.shh{display:flex;align-items:center;gap:8px;padding:5px 10px 2px;font:600 11.5px -apple-system;color:#8a877f}
+.sub-i .tri{margin-left:auto;color:#b5651d;font-size:11px}.sub-i .tri+.n{margin-left:6px}
+.sub-i.on .tri{color:#ffd9b0}
+.runs{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.pub{color:#6d6a64;font-size:11.5px}
+.code{font:11px/1.5 "SF Mono",Menlo,monospace;background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:8px 11px;color:#333;white-space:pre;overflow:hidden}
+.code .v{color:#3d5a80;font-weight:600}
+.var{display:flex;flex-direction:column;gap:3px;background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:8px 11px}
+.var .h{display:flex;align-items:center;gap:6px}.var .h .sp{flex:1}
+.var .s{color:#8a877f;font-size:11.5px;line-height:1.35}
+.in{border:1px solid #cfcac0;background:#fff;border-radius:5px;padding:3px 8px;font:12px "SF Mono",Menlo,monospace;color:#1d1d1d}
+.in.focus{border-color:#3d5a80;box-shadow:0 0 0 2px #cdd8e6}
+.in .ph{color:#aaa;font-family:-apple-system}
+.row.wait{border-color:#e3b98c;background:#fdf8f2}
+.row .ico{width:18px;text-align:center;color:#8a877f}.row.wait .ico{color:#b5651d}
+.row .stack{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.row .stack .s{color:#6d6a64;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .stack .m2{font:11.5px "SF Mono",Menlo,monospace;color:#6d6a64;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.4}
+.tick .bx{width:13px;height:13px;border:1px solid #aaa;border-radius:3px;background:#fff;flex:none;margin-top:2px}
+.btn.dim{opacity:.45}
+.btn.danger{color:#b0302a}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+
+<!-- A — Shared ▸ MCP servers, with Add -->
+<div class="frame" id="a"><div class="cap">A · Shared ▸ MCP servers: an Add button, and where a server came from</div>
+<div class="sub">The page 054 built, with three changes. <b>Add server…</b> goes in the bar beside Edit mcp.json and opens the sheet (B) aimed at ~/.agents. A server that came from the registry says so, with the version it was added at and <b>Remove</b>. A secret it names is shown only as <b>set</b> or <b>missing</b>, never its value; a missing one warns on the row and in the rail, and has <b>Set…</b> (E).</div>
+<div class="win">
+ <div class="rail">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="ri"><i>⚙</i>General</div><div class="gap"></div>
+  <div class="ri"><i>▣</i>Agents</div><div class="ri"><i>▦</i>Agent Runtimes</div>
+  <div class="shh">⧉ Shared</div>
+  <div class="sub-i">Overview</div><div class="sub-i">Instructions <span class="n">1</span></div>
+  <div class="sub-i">Skills <span class="n">5</span></div>
+  <div class="sub-i on">MCP servers <span class="tri">⚠</span><span class="n">3</span></div><div class="sub-i">Plugins <span class="n">2</span></div><div class="sub-i">Other files <span class="n">4</span></div>
+  <div class="ri"><i>$</i>Spending</div><div class="ri"><i>⇄</i>Pool</div><div class="gap"></div>
+  <div class="ri"><i>▯</i>Devices</div><div class="ri"><i>≡</i>Servers</div>
+ </div>
+ <div class="main">
+  <div class="bar"><span class="t">Shared <span class="crumb">› MCP servers</span></span><span class="p">~/.agents/mcp.json</span><span class="sp"></span><span class="btn">Edit mcp.json</span><span class="btn p">Add server…</span></div>
+  <div class="body">
+   <div class="lst fixed">
+    <div class="sec">Yours · every agent the app starts</div>
+    <div class="row sel"><span class="nm">context7</span><span class="chip a">registry</span><span class="chip">http</span><span class="ds mono">mcp.context7.com/mcp</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="row"><span class="nm">sentry</span><span class="chip a">registry</span><span class="chip w">missing</span><span class="ds mono">npx @sentry/mcp-server</span><span class="reach"><span class="r no">C</span><span class="r no">X</span><span class="r no">G</span><span class="r no">U</span><span class="r no">P</span><span class="r no">M</span></span></div>
+    <div class="row"><span class="nm">notes</span><span class="chip">stdio</span><span class="ds mono">node ~/bin/notes-mcp.js</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+    <div class="sec">From the app · always there, always wins a name</div>
+    <div class="row"><span class="nm">agents</span><span class="chip">stdio</span><span class="ds mono">agentsd mcp</span><span class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span></span></div>
+   </div>
+   <div class="detail">
+    <div class="t">context7</div>
+    <div class="kv" style="grid-template-columns:80px 1fr"><b>From</b><span>MCP Registry · <span class="link">upstash on GitHub</span></span><b>Name</b><span class="mono">io.github.upstash/context7</span><b>Version</b><span class="mono">1.0.14 · added 2 days ago</span><b>At</b><span class="mono">https://mcp.context7.com/mcp</span><b>Host</b><span>mcp.context7.com · the publisher's own</span><b>Headers</b><span class="mono">CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}</span></div>
+    <div class="sec" style="margin:4px 0 0">Secrets</div>
+    <div class="var"><div class="h"><span class="mono">CONTEXT7_API_KEY</span><span class="chip">set</span><span class="sp"></span><span class="btn">Replace…</span></div><div class="s">In ~/.agents/secrets.env, readable only by you. Not shown again.</div></div>
+    <div class="sec" style="margin:4px 0 0">Reach</div>
+    <div class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span><span class="muted" style="margin-left:6px;font-size:12px">every agent the app starts</span></div>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:8px"><span class="btn">Edit mcp.json</span><span style="flex:1"></span><span class="btn">Remove…</span></div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="anno">"notes" is one you wrote by hand: no registry chip, no Remove, kept byte for byte. "sentry" names SENTRY_AUTH_TOKEN, which secrets.env doesn't have, so every dot is struck: agents start without it rather than with an empty key. Its detail has Set… in place of Replace….</div>
+</div>
+
+<!-- B — the sheet, MCP servers, searching -->
+<div class="frame" id="b"><div class="cap">B · Add: the same sheet, on MCP servers</div>
+<div class="sub">059's sheet gains a kind switch, <b>Skills | MCP servers</b>, and opens on the kind of page it came from. <b>Add to</b> works as for skills. Results come from the official MCP Registry, in its own order: it has no install counts, so nothing is ranked by popularity. Every row shows the <b>publisher</b> the registry has checked (a GitHub org, or a domain it verified), the description, the latest version, and how the server runs. Only one row per server, whatever versions it has.</div>
+<div class="win stage">
+ <div class="rail">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="ri"><i>⚙</i>General</div><div class="gap"></div><div class="ri"><i>▣</i>Agents</div><div class="ri"><i>▦</i>Agent Runtimes</div>
+  <div class="shh">⧉ Shared</div><div class="sub-i">Overview</div><div class="sub-i">Skills</div><div class="sub-i on">MCP servers</div>
+ </div>
+ <div class="main"><div class="bar"><span class="t">Shared <span class="crumb">› MCP servers</span></span></div></div>
+ <div class="veil"><div class="sheet">
+  <div class="top"><span class="seg"><span>Skills</span><span class="on">MCP servers</span></span><span class="sp"></span><span class="muted">Add to</span><span class="seg"><span class="on">You</span><span>Agents (project)</span></span></div>
+  <div class="q">⌕ github</div>
+  <div class="res">
+   <div class="row sel"><div class="col2"><div><span class="nm">GitHub</span> <span class="chip a">known</span> <span class="pub">github on GitHub</span></div><div class="ds">GitHub's official server: repositories, issues, pull requests and Actions.</div></div><div class="col2" style="flex:none;align-items:flex-end"><span class="mono muted">0.18.0</span><span class="runs"><span class="chip">remote</span><span class="chip">docker</span></span></div></div>
+   <div class="row"><div class="col2"><div><span class="nm">git</span> <span class="chip a">known</span> <span class="pub">modelcontextprotocol on GitHub</span></div><div class="ds">Read, search and change a local Git repository.</div></div><div class="col2" style="flex:none;align-items:flex-end"><span class="mono muted">2025.7.1</span><span class="runs"><span class="chip">uvx</span><span class="chip">docker</span></span></div></div>
+   <div class="row"><div class="col2"><div><span class="nm">github-projects</span> <span class="pub">kaz-dev on GitHub</span></div><div class="ds">Boards, fields and iterations in GitHub Projects (v2).</div></div><div class="col2" style="flex:none;align-items:flex-end"><span class="mono muted">0.4.2</span><span class="runs"><span class="chip">npx</span></span></div></div>
+   <div class="row"><div class="col2"><div><span class="nm">GitHub (hosted)</span> <span class="pub">smithery.ai</span></div><div class="ds">GitHub tools, hosted on Smithery. Needs a Smithery key as well as a GitHub token.</div></div><div class="col2" style="flex:none;align-items:flex-end"><span class="mono muted">1.2.0</span><span class="runs"><span class="chip w">remote · server.smithery.ai</span></span></div></div>
+   <div class="row"><div class="col2"><div><span class="nm">gh-actions-lens</span> <span class="pub">example.dev</span></div><div class="ds">Read workflow runs and logs from GitHub Actions.</div></div><div class="col2" style="flex:none;align-items:flex-end"><span class="mono muted">0.2.0</span><span class="runs"><span class="chip x" style="background:#f0eeea;color:#b9b5ad">docker · not on this Mac</span></span></div></div>
+  </div>
+  <div class="bot"><span class="note">From registry.modelcontextprotocol.io. Choose one to see exactly what would run before adding.</span><span class="sp"></span><span class="btn">Cancel</span></div>
+ </div></div>
+</div>
+<div class="anno">"known" marks a publisher on the app's short list, as for skills; it is a mark, not a gate. A remote on someone else's host names the host on the row. A way of running that isn't on this Mac (no docker here) is greyed; a server with no way to run here says so when opened.</div>
+</div>
+
+<!-- C — the sheet, one server -->
+<div class="frame" id="c"><div class="cap">C · Add: what would run, before it goes in</div>
+<div class="sub">Nothing is added from the list. The detail shows what will run, exactly: the URL, or the full command with its version pinned. It also says where a remote runs, and each variable the server takes, with the secrets marked. Where there is more than one way to run it, <b>Run with</b> chooses between them, and everything below follows. What gets written to mcp.json is shown as it will be, with <span class="mono">${NAME}</span> in place of each secret. <b>Add</b> stays unavailable until every required secret has a value.</div>
+<div class="win stage">
+ <div class="rail"><div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="ri"><i>⚙</i>General</div><div class="gap"></div><div class="ri"><i>▣</i>Agents</div><div class="shh">⧉ Shared</div><div class="sub-i on">MCP servers</div></div>
+ <div class="main"><div class="bar"><span class="t">Shared <span class="crumb">› MCP servers</span></span></div></div>
+ <div class="veil"><div class="sheet">
+  <div class="top"><span class="back">‹ Results</span><span class="t">GitHub</span><span class="chip a">known</span><span class="sp"></span><span class="muted">Add to</span><span class="seg"><span class="on">You</span><span>Agents (project)</span></span></div>
+  <div style="display:flex;gap:14px;padding:0 18px;flex:1;min-height:0">
+   <div style="width:350px;display:flex;flex-direction:column;gap:10px">
+    <div class="kv" style="grid-template-columns:74px 1fr"><b>Publisher</b><span><span class="link">github on GitHub</span> · checked by the registry</span><b>Name</b><span class="mono">io.github.github/github-mcp-server</span><b>Version</b><span class="mono">0.18.0</span><b>Run with</b><span><span class="seg"><span class="on">remote</span><span>docker</span></span></span><b>At</b><span class="mono">https://api.githubcopilot.com/mcp/</span><b>Host</b><span>api.githubcopilot.com · GitHub's own</span><b>Name here</b><span class="mono">github</span></div>
+    <div class="sec" style="margin:2px 0 0">Written to ~/.agents/mcp.json</div>
+<div class="code">"github": {
+  "type": "http",
+  "url": "https://api.githubcopilot.com/mcp/",
+  "headers": {
+    "Authorization": "Bearer <span class="v">${GITHUB_TOKEN}</span>"
+  }
+}</div>
+    <div class="reach"><span class="r">C</span><span class="r">X</span><span class="r">G</span><span class="r">U</span><span class="r">P</span><span class="r">M</span><span class="muted" style="margin-left:6px;font-size:12px">every agent you start</span></div>
+   </div>
+   <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+    <div class="sec" style="margin:0">What it needs</div>
+    <div class="var"><div class="h"><span class="mono">GITHUB_TOKEN</span><span class="chip w">secret</span><span class="chip">required</span></div><div class="s">A GitHub personal access token. Its scopes decide what the server can do.</div><div class="in focus">••••••••••••••••••••</div><div class="s">Goes to ~/.agents/secrets.env, readable only by you. Never shown again, logged, or sent to your phone.</div></div>
+    <div class="var"><div class="h"><span class="mono">X-MCP-Toolsets</span><span class="chip">optional</span></div><div class="s">Which groups of tools to turn on, comma-separated.</div><div class="in"><span class="ph">all</span></div></div>
+    <div class="var"><div class="h"><span class="mono">X-MCP-Readonly</span><span class="chip">optional</span></div><div class="s">Only offer tools that read.</div><div class="in"><span class="ph">false</span></div></div>
+   </div>
+  </div>
+  <div class="bot"><span class="note">From registry.modelcontextprotocol.io, as listed today.</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Add to ~/.agents</span></div>
+ </div></div>
+</div>
+<div class="anno">Docker chosen: "At" becomes "Runs", the pinned docker command, with the token in env. A remote on another host (Smithery, in B) has Host in orange and that host's key under What it needs. A runtime that can't take the transport is struck here, before adding. A secret already set shows "set".</div>
+</div>
+
+<!-- D — the project page -->
+<div class="frame" id="d"><div class="cap">D · A project page: its MCP servers</div>
+<div class="sub">A project gets an <b>MCP servers</b> section after Skills and before Plugins, from <span class="mono">.agents/mcp.json</span>. <b>Add server…</b> opens the same sheet, aimed at the project. The line under the heading says what is different about this file: it is committed, but secrets are not. The file holds only names, and each person sets their own values. Servers that are waiting come first: a server that arrived with a pull runs a command on this Mac, so no session gets it until it has been approved.</div>
+<div class="win">
+ <div class="side">
+  <div class="lights"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="h">Projects</div>
+  <div class="ri on">Agents</div><div class="ri">work</div><div class="ri">website</div>
+  <div class="h">Activity</div><div class="ri">Events</div><div class="ri">Resources</div><div class="ri">Spending</div>
+ </div>
+ <div class="main" style="overflow:hidden">
+  <div class="page">
+   <div class="pt">Agents</div><div class="ps">~/Agents · $412.30 all time</div>
+   <div class="sh2">Skills <span class="chip">5</span><span class="sp"></span><span class="btn">Reveal in Finder</span><span class="btn">Add skill…</span></div>
+   <div class="row"><span class="nm">run-app</span><span class="ds">Build, launch and drive this Mac app on a scratch daemon…</span></div>
+   <div class="sh2">MCP servers <span class="chip">3</span><span class="sp"></span><span class="btn">Reveal mcp.json</span><span class="btn p">Add server…</span></div>
+   <div class="gh" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:12px">In .agents/mcp.json, committed with the project. Secrets aren't: it names them, and each person sets their own.</div>
+   <div class="row wait"><span class="ico">✋</span><div class="stack"><div><span class="nm">postgres</span> <span class="chip w">waiting for your OK</span></div><div class="m2">npx -y @modelcontextprotocol/server-postgres@0.6.2 ${DATABASE_URL}</div><div class="s">New with the last pull. No agent is given it until you approve it.</div></div><span class="btn">Show entry</span><span class="btn">Approve</span></div>
+   <div class="row"><span class="ico">⚠</span><div class="stack"><div><span class="nm">sentry</span> <span class="chip a">registry</span> <span class="chip w">SENTRY_AUTH_TOKEN not set</span></div><div class="m2">npx -y @sentry/mcp-server@0.20.1</div><div class="s">Agents here start without it until you set the token.</div></div><span class="btn">Set…</span><span class="btn">Remove…</span></div>
+   <div class="row"><span class="ico">⌁</span><div class="stack"><div><span class="nm">github</span> <span class="chip a">registry</span> <span class="chip">http</span></div><div class="m2">https://api.githubcopilot.com/mcp/ · 0.18.0</div></div><span class="btn">Remove…</span></div>
+   <div class="sh2">Plugins</div>
+  </div>
+ </div>
+</div>
+<div class="anno">Approved by a digest of the entry, like plugins and workflow files: a pull that changes it makes it wait again. One added from the sheet is approved as it goes in. The file is written, not committed. A name in both wins for the project.</div>
+</div>
+
+<!-- E — set a secret, and remove -->
+<div class="frame" id="e"><div class="cap">E · Set a missing secret, and Remove</div>
+<div class="sub">Left: <b>Set…</b> from a row whose secret isn't in secrets.env, on the project page (D) or in Settings (A). It names the server that needs the value and where the value will be kept. Once saved, the field is never filled back in. Right: <b>Remove…</b> on a server the app added. It takes the entry out of mcp.json. The secret stays unless you tick to forget it, and that box is offered only when no other server names it.</div>
+<div style="display:flex;gap:24px">
+ <div class="sheet" style="width:488px;height:360px">
+  <div class="top"><span class="t">Set SENTRY_AUTH_TOKEN</span></div>
+  <div style="padding:0 18px;display:flex;flex-direction:column;gap:10px;flex:1">
+   <div style="line-height:1.4">Needed by <b>sentry</b> in Agents (.agents/mcp.json). Agents in that project start without sentry until it's set.</div>
+   <div class="var"><div class="h"><span class="mono">SENTRY_AUTH_TOKEN</span><span class="chip w">secret</span></div><div class="s">A Sentry user auth token with the project:read scope. (From the registry entry.)</div><div class="in focus">••••••••••••••••</div></div>
+   <div class="infobox">Kept in ~/.agents/secrets.env on this Mac, readable only by you. Never committed, shown again, logged, or sent to your phone. Every server that names SENTRY_AUTH_TOKEN, yours or a project's, gets this value.</div>
+  </div>
+  <div class="bot"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+ </div>
+ <div class="sheet" style="width:488px;height:360px">
+  <div class="top"><span class="t">Remove context7?</span></div>
+  <div style="padding:0 18px;display:flex;flex-direction:column;gap:12px;flex:1">
+   <div style="line-height:1.4">Takes <span class="mono">context7</span> out of ~/.agents/mcp.json. Agents you start after this won't have it; ones already running keep it until they end.</div>
+   <div class="tick"><span class="bx"></span><span>Also forget <span class="mono">CONTEXT7_API_KEY</span><br><span class="muted" style="font-size:11.5px">No other server names it. Left unticked, it stays in secrets.env for next time.</span></span></div>
+   <div class="muted" style="font-size:11.5px;line-height:1.4">Everything else in mcp.json, including servers you wrote yourself, is left exactly as it is.</div>
+  </div>
+  <div class="bot"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Remove</span></div>
+ </div>
+</div>
+<div class="anno">A server you wrote by hand has no Remove: the app edits only what it added (its sidecar says which). If the name is already taken by one of yours, the sheet says where it is and suggests the project instead, as with skills (059 E). If mcp.json can't be read, the sheet says so and Add is refused, and nothing is written. When the registry can't be reached, it is 059's offline screen with "the MCP Registry" in place of skills.sh.</div>
+</div>
+
+</body></html>

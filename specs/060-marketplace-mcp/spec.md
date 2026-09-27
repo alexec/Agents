@@ -4,8 +4,8 @@
 
 **Created**: 2026-09-26
 
-**Status**: Draft. The two decisions below are Alex's (2026-09-26). The look gate is next:
-[look/](look/README.md), frames A–E.
+**Status**: Spec, look (approved 2026-09-26 as drawn), plan, research, data-model, contracts,
+quickstart and tasks are ready. Implement next ([tasks.md](tasks.md)).
 
 **Input**: the next slice of 059 ("I'd like the user to be able to search and install skills,
 plugins, and MCPs … add these to their project or user config"). 059 did skills. This slice
