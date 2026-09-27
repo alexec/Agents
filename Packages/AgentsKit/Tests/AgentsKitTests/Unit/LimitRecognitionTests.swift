@@ -96,6 +96,16 @@ struct LimitRecognitionTests {
                                           runtimeID: "antigravity") == .none)
     }
 
+    @Test func antigravityUsageLimitInChatIsSpent() {
+        let body = "You have reached your current quota for this period. Your limit will reset in 5 days, 14 hours."
+        let full = "Usage Limit Reached\n\n" + body
+        #expect(LimitRecognition.classify(runtimeError: body, runtimeID: "antigravity") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: full, runtimeID: "antigravity") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(runtimeError: body, runtimeID: "claude") == .none)
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: full)?.sentence == body)
+        #expect(RuntimeLaunchCatalog.antigravity.turnError(in: "I saw " + full) == nil)
+    }
+
     @Test func copilotMonthlyQuotaIsSpentInEitherFailureChannel() {
         let text = "You have exceeded your monthly quota (Request ID: captured)"
         #expect(LimitRecognition.classify(runtimeError: text, runtimeID: "copilot") == .spent(resetsAt: nil))
