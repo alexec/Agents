@@ -305,6 +305,11 @@ public actor DaemonCore {
     /// its limit from filling its own transcript saying so on every drain attempt.
     var held: Set<UUID> = []
 
+    // MARK: Client permission mode (061)
+
+    lazy var clientPermissionStore = ClientPermissionStore(locations: locations)
+    lazy var clientPermissions = clientPermissionStore.load()
+
     // MARK: The pool (052)
 
     lazy var poolStore = PoolStore(locations: locations)
@@ -1151,9 +1156,14 @@ public actor DaemonCore {
 
         case .permissionRequested(var request):
             request.agentID = agentID
+            let runtimeID = agents[agentID]?.runtimeID
+            let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show
-            // the app's own suggestions.
-            if let option = autoAllowed(request) {
+            // the app's own suggestions. Cursor and Grok keep only the turn-ending
+            // ones automatic (061): workflows, agents, leases and publishing still ask.
+            if let option = reviewsClientSide
+                ? autoAllowedTurnTool(request)
+                : autoAllowed(request) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
@@ -1168,6 +1178,16 @@ public actor DaemonCore {
             if let refusal = autoRefused(request) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: refusal.option.optionID)
                 await record(.runtimeNote(refusal.note), for: agentID)
+                return
+            }
+            // Auto-review for Cursor and Grok (061): ordinary in-reach work is answered
+            // once, before any card or attention event. Pending cards are never touched.
+            if reviewsClientSide,
+               let runtimeID,
+               clientPermissions.mode(for: runtimeID) == .autoReview,
+               let agent = agents[agentID],
+               let option = ClientPermissionReview.allowOnce(for: request, scope: agent.folderScope) {
+                await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
             pendingPermissions[request.id] = Pending(request: request, agentID: agentID)

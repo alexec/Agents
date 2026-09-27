@@ -41,7 +41,9 @@ public enum RuntimeCatalog {
         id: "grok",
         name: "Grok",
         executable: "grok",
-        arguments: ["agent", "stdio"],
+        // `--permission-mode default` forces Grok to ask despite a saved always-approve
+        // mode in the person's own config (061). Process-scoped; the overlay cannot set it.
+        arguments: ["--permission-mode", "default", "agent", "stdio"],
         install: .script(url: URL(string: "https://x.ai/cli/install.sh")!),
         installPage: URL(string: "https://x.ai/cli")!)
 
