@@ -191,11 +191,11 @@ or on Alex's paired devices.
 
 **Independent test**: a fake device lists projects and sees the devbox's project, and starting an agent there works. The Remote is built for the generic simulator only; the phone look is Alex's.
 
-- [ ] T053 [US4] In `Remote/Sources/RemoteModel.swift`, move from one `DaemonClient` to one per host over `ControlLink`, fed by `hosts/list` and `control/hostChanged`. Keep the legacy path for a control plane that answers no `control/status`.
+- [x] T053 (one more connection over the same link when `control/status` answers; routed by what a call names; walks/us4.md) [US4] In `Remote/Sources/RemoteModel.swift`, move from one `DaemonClient` to one per host over `ControlLink`, fed by `hosts/list` and `control/hostChanged`. Keep the legacy path for a control plane that answers no `control/status`.
 - [ ] T054 [P] [US4] Add host headers in the Remote's project list in `Shared/UI/`, following frame H's sidebar.
-- [ ] T055 [US4] Relay (R6): `Control/Sources/RelayHost.swift` attaches a relay session to the router as that device's client session, speaking the client wire.
+- [x] T055 (`RelayHostCore.setOpenDevice` → `ControlPlane.attachDevice`; not walked) [US4] Relay (R6): `Control/Sources/RelayHost.swift` attaches a relay session to the router as that device's client session, speaking the client wire.
 - [ ] T056 [US4] Notices (R6): hosts send `attention/need` unsealed over channel 0. `Control/Sources/MailboxTransport.swift` picks the device by presence across hosts and seals with `Envelope.seal`. Wire it in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Attention.swift` for when the daemon runs under `--control`.
-- [ ] T057 [US4] Build Remote for the generic iOS simulator. Walk with the fake device: projects from every host, an agent started on the devbox, and operator calls refused at the control plane and at the host. Record in `specs/058-control-plane/walks/us4.md`, and ask Alex to look on the phone.
+- [x] T057 (fake device: `FakeDeviceLiveTests`; Remote built for the generic simulator; the phone look is Alex's) [US4] Build Remote for the generic iOS simulator. Walk with the fake device: projects from every host, an agent started on the devbox, and operator calls refused at the control plane and at the host. Record in `specs/058-control-plane/walks/us4.md`, and ask Alex to look on the phone.
 
 ---
 

@@ -270,7 +270,9 @@ struct ControlClientsPage: View {
                 }
                 // Phones paired today still reach this Mac's host straight through the
                 // bridge; they move onto the control plane with US4, and get a grant then.
-                ForEach(model.devices) { device in
+                // Only those the control plane has not met yet: one that has connected
+                // since is its client, listed above with a grant of its own.
+                ForEach(model.devices.filter { device in !control.clients.contains { $0.id == device.id } }) { device in
                     Divider()
                     ControlRow(dot: .none, title: device.name, detail: deviceLine(device)) {
                         HStack(spacing: 8) {

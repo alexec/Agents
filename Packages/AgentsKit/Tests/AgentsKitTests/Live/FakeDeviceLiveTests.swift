@@ -46,7 +46,13 @@ struct FakeDeviceLiveTests {
         // 2. Announce a new iPhone over the pairing identity, as the Remote does after a scan.
         let key = DeviceKey.ephemeral()
         let id = UUID()
-        let pairing = try await dial(identity: LinkKey.pairingIdentity(code.secret), key: LinkKey.pairing(code.secret))
+        // The bridge takes the code's key once it has heard of it, a moment after.
+        var opened: NWTransport?
+        for _ in 0..<20 where opened == nil {
+            opened = try? await dial(identity: LinkKey.pairingIdentity(code.secret), key: LinkKey.pairing(code.secret))
+            if opened == nil { try await Task.sleep(for: .milliseconds(300)) }
+        }
+        let pairing = try #require(opened, "the bridge never took the pairing code's key")
         let announcing = DaemonClient(link: Fixed { pairing })
         try await announcing.connect(startIfNeeded: false)
         _ = try await announcing.call(DaemonAPI.Method.devicesAnnounce,
