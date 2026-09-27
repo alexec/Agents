@@ -57,16 +57,17 @@ struct AppServiceTests {
         // The one call that ends a turn first, the two that act mid-turn after it,
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
-        // The four agent tools (028) sit after the workflow tool, before the older
-        // names, for an agent that may use them — which is the default. The three lease
-        // tools (036) follow them, for every agent, then the three event tools (042),
-        // and the two pull-request tools (038) after those, also for every agent.
-        // The two move tools (053) sit between the event and pull-request tools.
+        // The three agent tools (028) sit after the workflow tool, before the older
+        // names, for an agent that may use them — which is the default. archive_agent
+        // is no longer offered. The three lease tools (036) follow them, for every
+        // agent, then the three event tools (042), and the two pull-request tools
+        // (038) after those, also for every agent. The two move tools (053) sit
+        // between the event and pull-request tools.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.archiveAgentToolName, AppService.listMyAgentsToolName,
+                AppService.listMyAgentsToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
@@ -513,12 +514,27 @@ struct AppServiceTests {
 
     @Test func afterwardsIsOfferedOnTheOneCallAlone() async throws {
         let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
-        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park", "archive"])
+        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park"])
         #expect(AppService.reportOutcomeTool["inputSchema"]?["properties"]?["afterwards"] == nil)
         #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("afterwards") == true)
     }
 
     @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
+                          "afterwards": "park"],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.words.afterwards == .park)
+        await service.close()
+    }
+
+    /// An older conversation may still send archive. The call reaches the sink; the
+    /// daemon keeps the outcome and declines the ask.
+    @Test func anArchiveAskStillReachesTheSink() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let result = try await client.call("tools/call", [
@@ -531,14 +547,13 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// A word that is neither, and each pairing that would hide or bury something,
+    /// A word that is neither, and each park pairing that would bury something,
     /// refused before the daemon is asked.
     @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
         let box = FinishBox()
         let (client, service) = await pair(sink: neverCalled(), finishTurn: finishing(box))
         let cases: [(JSONValue, String)] = [
             (["outcome": "done", "message": "m", "afterwards": "delete"], AfterTurn.unknown),
-            (["outcome": "partly_done", "message": "m", "afterwards": "archive"], AfterTurn.archive.refusal),
             (["outcome": "needs_answer", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
             (["outcome": "stuck", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
             (["outcome": "blocked", "message": "m", "check_again_in_minutes": 5, "afterwards": "park"],

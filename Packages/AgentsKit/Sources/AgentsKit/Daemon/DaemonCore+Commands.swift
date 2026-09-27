@@ -1179,10 +1179,6 @@ extension DaemonCore {
             }
         }
         await move(agentID, on: .turnEnded(reason))
-        // Taken whatever happens next, so an ask to be archived never outlives the turn
-        // it was made in. `move` has already dropped it for any ending but the asked-for
-        // one.
-        let archiveAsked = takeArchiveAsk(agentID)
         // A finished agent's process is let go: every runtime hands the session back,
         // so holding one open buys nothing and works against the daemon's exit rule.
         await releaseRuntime(for: agentID)
@@ -1196,14 +1192,6 @@ extension DaemonCore {
         guard stops[agentID, default: 0] == stopsBefore else { pendingCarry[agentID] = nil; return }
         // Its allowance ran out and the pool has somewhere else to go (052).
         if pendingCarry[agentID] != nil, await carryOnIfPending(agentID) { return }
-        // The agent asked to be archived once this turn was over, and it is over as it
-        // said. Not when something was queued while the runtime was let go: the person
-        // has moved the work on, and the ask is dropped.
-        if archiveAsked, agents[agentID]?.state == .finished,
-           agents[agentID]?.queuedPrompts.isEmpty == true {
-            try? await archive(agentID, by: .itself)
-            return
-        }
         // A turn that crossed its limit leaves its queue exactly where it is, whatever
         // the limit says by the time the runtime has gone. Letting the agent go on is
         // the reader's second act (FR-018), and a ceiling raised in the seconds the
@@ -1556,7 +1544,8 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         case .itself:
-            await record(.runtimeNote(Self.archivedItself), for: agentID)
+            // Unreachable. An agent used to archive its own session when its turn
+            // ended; that ask is now dropped, and only the person archives.
             await move(agentID, on: .archivedByAgent)
         }
         await removeWorktreeIfDone(archiving: agentID)
@@ -1565,18 +1554,6 @@ extension DaemonCore {
         lastWhole[agentID] = now()
         dropLiveState(for: agentID)
         checkSoonAfterArchiving()
-    }
-
-    /// The line an agent that archived itself leaves in its transcript.
-    static let archivedItself = "This agent archived itself, as it asked."
-
-    /// Read and clear an agent's ask to be archived once its turn is over. Whether it
-    /// asked, as the ask stood when the turn ended.
-    private func takeArchiveAsk(_ agentID: UUID) -> Bool {
-        guard var agent = agents[agentID], let after = agent.afterTurn else { return false }
-        agent.afterTurn = nil
-        changed(agent)
-        return after == .archive
     }
 
     /// Drop an agent's ask to be put away once its turn is over. The person has sent

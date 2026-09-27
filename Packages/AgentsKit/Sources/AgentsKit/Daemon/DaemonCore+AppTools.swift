@@ -140,14 +140,22 @@ extension DaemonCore {
         // wrong hears about that first; and before either write, so a refused ask
         // leaves nothing behind (the whole call is refused).
         var afterwards: AfterTurn?
+        // `archive` is a word an older conversation was told it could send. The
+        // outcome still lands — that is how the person knows whether the session was
+        // useful — and the session stays in the list.
+        var declinedArchive = false
         if let written = request.afterwards {
             guard let after = AfterTurn(wire: written) else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: AfterTurn.unknown)
             }
-            guard after.goes(with: checked.report.outcome) else {
-                throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
+            if after == .archive {
+                declinedArchive = true
+            } else {
+                guard after.goes(with: checked.report.outcome) else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
+                }
+                afterwards = after
             }
-            afterwards = after
         }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         // Cleaned again here, not trusted from the helper: the daemon is what writes
@@ -158,7 +166,8 @@ extension DaemonCore {
                                afterwards: afterwards,
                                on: checked.agent, id: checked.agentID)
         let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
-        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked
+        let kept = declinedArchive ? " " + AfterTurn.keptVisible : ""
+        return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + kept
     }
 
     /// The refusals a report can meet, in the order it meets them, each a sentence the

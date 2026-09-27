@@ -504,7 +504,7 @@ struct HelperAgentTests {
         #expect(await core.agent(helper)?.state == .finished)
     }
 
-    @Test func archivingOneStopsItFirstAndGivesThePlaceBack() async throws {
+    @Test func archivingIsRefusedAndOnlyThePersonCan() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let core = try await makeCore(locations, longTurns())
@@ -512,13 +512,12 @@ struct HelperAgentTests {
         let helper = try await start(core, token)
         _ = await eventually("the helper is working") { await core.agent(helper)?.state == .running }
 
-        let note = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) }
+        let error = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
 
-        let archived = try #require(await core.agent(helper))
-        #expect(archived.state == .archived)
-        #expect(archived.archivedReason == .byAgent)
-        #expect(archived.endedReason == .stoppedByAgent)
-        #expect(note.hasSuffix("0 of 5 places in this project are now in use."))
+        #expect(error?.message == AfterTurn.cannotArchiveAnother)
+        let still = try #require(await core.agent(helper))
+        #expect(still.state == .running, "nothing moved")
+        #expect(still.archivedReason == nil)
     }
 
     @Test func anArchivedOneIsSaidToBeArchived() async throws {
@@ -563,9 +562,7 @@ struct HelperAgentTests {
             let stopped = await refusal { _ = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: target)) } }
             #expect(stopped?.message == expected, "stop \(target)")
             let archived = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: target)) } }
-            #expect(archived?.message == expected.replacingOccurrences(of: "cannot stop itself",
-                                                                        with: "cannot archive itself"),
-                    "archive \(target)")
+            #expect(archived?.message == AfterTurn.cannotArchiveAnother, "archive \(target)")
         }
 
         let after = await core.allAgents().map { "\($0.id) \($0.state) \(String(describing: $0.endedReason))" }.sorted()

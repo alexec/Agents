@@ -11,7 +11,7 @@ import Foundation
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
-/// agents — `start_agent`, `stop_agent`, `archive_agent` and `list_my_agents` (028) —
+/// agents — `start_agent`, `stop_agent` and `list_my_agents` (028) —
 /// and are offered only to an agent the person or a workflow started. Two older names
 /// for the halves of the first are still served, for conversations briefed with them.
 ///
@@ -174,7 +174,7 @@ public actor AppService {
     private let eventsSink: EventsSink
     private let pullRequestsSink: PullRequestsSink
     private let movesSink: MovesSink
-    /// Whether the four agent tools are offered. False for an agent another agent
+    /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
     /// Whether the two move tools are offered. False for an agent on a runtime that cannot
@@ -411,7 +411,10 @@ public actor AppService {
         }
     }
 
-    /// Which of the four agent calls a tool name is, with its arguments read — or the
+    /// Which of the agent calls a tool name is, with its arguments read — or the
+    /// refusal for a call that is missing what it needs. `archive_agent` is still
+    /// recognised so an older conversation is refused at the daemon rather than
+    /// told the word is unknown.
     /// sentence saying what was missing. `nil` when the name is none of them.
     static func agentCall(named name: String,
                           _ arguments: JSONValue?) -> Result<AgentCall, AgentCallProblem>? {
@@ -529,10 +532,12 @@ public actor AppService {
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
         // The one that ends a turn first, the two that act mid-turn, and the two
         // older names last, described as such (023).
-        // The four agent tools after the workflow tool, and only for an agent that
+        // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
+        // archive_agent is no longer offered: only the person archives. An older
+        // conversation that still calls it is refused at the daemon.
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.archiveAgentTool, Self.listMyAgentsTool]
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.listMyAgentsTool]
             : []
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
@@ -643,6 +648,10 @@ public actor AppService {
         guard let after = value.stringValue.flatMap(AfterTurn.init(wire:)) else {
             return .failure(AgentCallProblem(stringLiteral: AfterTurn.unknown))
         }
+        // `archive` is a word an older conversation was told it could send. Pass it
+        // through: the daemon keeps the outcome and declines the ask, so the person
+        // still sees whether the session was useful.
+        if after == .archive { return .success(after) }
         guard let ending = WorkOutcome(wire: outcome), after.goes(with: ending) else {
             return .failure(AgentCallProblem(stringLiteral: after.refusal))
         }
@@ -732,11 +741,11 @@ public actor AppService {
             nothing in your reply about having called this.
 
             When you have finished and cleaned up after yourself — merged, removed \
-            what you made — you may ask to be parked (put down, to come back to) or \
-            archived (over, put away) once this turn ends, with afterwards. Archive \
-            goes only with done or nothing_to_do; park also with partly_done. Leave \
-            it out and the conversation stays where its ending puts it. If the person \
-            sends something before the turn is over, the ask is dropped.
+            what you made — you may ask to be parked (put down, to come back to) once \
+            this turn ends, with afterwards set to park. Park goes with done, \
+            nothing_to_do or partly_done. Leave it out and the conversation stays \
+            where its ending puts it. If the person sends something before the turn \
+            is over, the ask is dropped. You cannot archive: only the person can.
 
             If you can carry on once you have an answer, do not use this: ask with your \
             question or form tool, which stops and waits for them. This one does not \
@@ -786,12 +795,12 @@ public actor AppService {
                 ],
                 "afterwards": [
                     "type": "string",
-                    "enum": .array(["park", "archive"]),
+                    "enum": .array(["park"]),
                     "description": """
                         Once this turn ends: park to put the conversation down to come \
-                        back to, archive when it is over and cleaned up. Archive only \
-                        with done or nothing_to_do; park also with partly_done. Leave \
-                        out to stay where the ending puts it.
+                        back to. Goes with done, nothing_to_do or partly_done. Leave \
+                        out to stay where the ending puts it. Only the person can \
+                        archive a session.
                         """,
                 ],
                 // One, since 031. The list this replaced is still read by the
@@ -1005,9 +1014,10 @@ public actor AppService {
     /// Start an agent in this project (028).
     ///
     /// The description carries the limits because the agent needs them before it
-    /// calls, not in a refusal after: this project only, three at once across the
-    /// project, archiving gives a place back. And the restraint, as the workflow tool
-    /// carries its own — an agent told it can start agents will start agents.
+    /// calls, not in a refusal after: this project only, five at once across the
+    /// project, and only the person frees a place by archiving. And the restraint,
+    /// as the workflow tool carries its own — an agent told it can start agents will
+    /// start agents.
     static let startAgentTool: JSONValue = [
         "name": .string(startAgentToolName),
         "title": "Start an agent in this project",
@@ -1019,15 +1029,16 @@ public actor AppService {
             talk to it, stop it or archive it at any time.
 
             At most five agents started by agents can exist in this project at once, \
-            counting every agent here, and stopped or finished ones still count. \
-            Archiving one with archive_agent frees its place. Use list_my_agents to see \
-            yours and how many places are in use.
+            counting every agent here, and stopped or finished ones still count. Only \
+            the person can archive one to free its place. Use list_my_agents to see \
+            yours and how many places are in use. Stop one with stop_agent when its \
+            part is done; it keeps its place until they archive it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
             Do not start one for work you could simply do yourself. The agent you \
             start cannot start agents of its own.
 
-            Returns the new agent's id, which stop_agent and archive_agent take.
+            Returns the new agent's id, which stop_agent takes.
             """,
         "inputSchema": [
             "type": "object",

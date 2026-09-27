@@ -812,8 +812,9 @@ public actor DaemonCore {
         // An agent's own ask to be parked, made on the call that ended its turn, is the
         // same park at the same moment — but only for the ending it asked about: the
         // turn it made the ask in, ended by its own hand, with nothing the person has
-        // queued since. Any other ending drops the ask. An ask to be archived is left
-        // for `finishTurn`, which archives once the runtime is let go.
+        // queued since. Any other ending drops the ask. An ask to be archived, from a
+        // conversation told it could, is dropped with it: an agent cannot put a session
+        // away.
         switch next {
         case .finished, .stopped:
             let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
@@ -828,7 +829,7 @@ public actor DaemonCore {
                     agent.parking = .parked(at: now())
                     agent.isUnread = false
                 }
-                if !(after == .archive && endedAsAsked) { agent.afterTurn = nil }
+                agent.afterTurn = nil
             }
         case .archived:
             agent.parking = nil
