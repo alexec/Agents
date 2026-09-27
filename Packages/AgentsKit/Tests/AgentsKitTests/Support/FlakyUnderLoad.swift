@@ -26,6 +26,10 @@ extension Trait where Self == ConditionTrait {
     ///   runner 2026-09-26, still choosing the relay.
     /// - AttentionTests.theSettlingPauseIsNotStartedAgainByARestart — a 2 s pause, 1.5 s
     ///   slept through it, and delivery looked for within the next 1 s.
+    /// - PoolSwitchTests.copilotMonthlyQuotaInChatMovesToTheNextRuntime and
+    ///   copilotQuotaWithPoolOffStopsWithoutClaimingSuccess — quota handling timed out
+    ///   after 10 s in full local runs; the PoolSwitch suite passed in isolation. Keep
+    ///   them out of the parallel run and run them with the quarantine step in CI.
 
     /// And one that is not a budget but a bug, here until it is fixed rather than hidden
     /// by a longer wait:

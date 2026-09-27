@@ -49,7 +49,7 @@ struct PoolSwitchTests {
         }
     }
 
-    @Test func copilotMonthlyQuotaInChatMovesToTheNextRuntime() async throws {
+    @Test(.flakyUnderLoad) func copilotMonthlyQuotaInChatMovesToTheNextRuntime() async throws {
         var script = FakeACPAgent.Script()
         script.updates = ["Error: You have exceeded your monthly ", "quota (Request ID: E423:33BD0C:51E9CCB:612237C:6AB86604)"].map {
             ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string($0)]]
@@ -70,7 +70,7 @@ struct PoolSwitchTests {
         #expect(prompts.first?.contains("finish the change") == true)
     }
 
-    @Test func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
+    @Test(.flakyUnderLoad) func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
         var script = FakeACPAgent.Script()
         script.updates = [["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "Error: You have exceeded your monthly quota (Request ID: captured)"]]]
         let (core, work, launcher, _) = try await core([script], pool: [copilot, codex], isOn: false)
