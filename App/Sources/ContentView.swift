@@ -13,6 +13,7 @@ struct ContentView: View {
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
+    @State private var offeringMove = false
 
     /// Put the file the selected agent asked about in front of the user.
     ///
@@ -124,6 +125,11 @@ struct ContentView: View {
         // sessions in the one picked, and what is being read. Picking a session shows
         // its chat beside the list rather than pushing it over the project, so moving
         // between two chats is one click, and the list stays in sight.
+        // Today's set-up, offered the move to a control plane, never moved on its own
+        // (058, frame I). Above the columns, not an inset: a split view's columns run
+        // under an inset and hide their first rows behind it.
+        VStack(spacing: 0) {
+        if model.offersMoveAcross { MoveAcrossStrip(offering: $offeringMove) }
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no
@@ -153,11 +159,8 @@ struct ContentView: View {
                 }
             }
         }
-        // Today's set-up, offered the move to a control plane, never moved on its own
-        // (058, frame I).
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if model.offersMoveAcross { MoveAcrossStrip() }
         }
+        .sheet(isPresented: $offeringMove) { MoveAcrossSheet().paperSheet() }
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)

@@ -98,9 +98,10 @@ enum SMAppServiceOpener {
 }
 
 /// The strip that offers the move, never the move itself (frame I).
+/// The sheet hangs off the window, not the strip: the strip goes as soon as the window
+/// adopts the control plane, and the sheet still has the end of the move to say.
 struct MoveAcrossStrip: View {
-    @Environment(AppModel.self) private var model
-    @State private var offering = false
+    @Binding var offering: Bool
 
     var body: some View {
         HStack {
@@ -112,7 +113,6 @@ struct MoveAcrossStrip: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Paper.wash)
-        .sheet(isPresented: $offering) { MoveAcrossSheet().paperSheet() }
     }
 }
 
@@ -129,12 +129,14 @@ struct MoveAcrossSheet: View {
                 Text("This sets up a control plane on this Mac and keeps everything you have:")
                     .appText(.supporting).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 8) {
-                    kept("All \(count(move.summary.agents, "agent")) and their conversations stay on this Mac, as this Mac’s host")
+                    kept(move.summary.agents == 1
+                         ? "Your agent and its conversation stay on this Mac, as this Mac’s host"
+                         : "All \(move.summary.agents) agents and their conversations stay on this Mac, as this Mac’s host")
                     if !move.summary.devices.isEmpty {
-                        kept("\(ListFormatter.localizedString(byJoining: move.summary.devices)) keep working, without pairing again")
+                        kept("\(ListFormatter.localizedString(byJoining: move.summary.devices)) \(move.summary.devices.count == 1 ? "keeps" : "keep") working, without pairing again")
                     }
                     if !move.summary.servers.isEmpty {
-                        kept("\(ListFormatter.localizedString(byJoining: move.summary.servers)) are added as hosts, over your ssh as now")
+                        kept("\(ListFormatter.localizedString(byJoining: move.summary.servers)) \(move.summary.servers.count == 1 ? "is added as a host" : "are added as hosts"), over your ssh as now")
                     }
                     kept("Work on this Mac carries on after a restart, without opening Agents")
                 }

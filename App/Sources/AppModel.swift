@@ -1175,6 +1175,10 @@ final class AppModel {
         ControlConfig.save(root)
         holdingForMove = false
         moved = true
+        for id in hosts.handOver() {
+            work.replaceProjects([], from: id)
+            work.replaceAgents([], from: id)
+        }
         await adopt(.local(root))
     }
 

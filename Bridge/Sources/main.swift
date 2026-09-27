@@ -274,6 +274,17 @@ controlPlane?.onClientForgotten = { id in
 let directLink = DirectLink(port: port)
 directLink.start()
 
+// launchd ends the bridge with SIGTERM. With a control plane, its ssh masters go with it.
+signal(SIGTERM, SIG_IGN)
+let terminating = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+terminating.setEventHandler {
+    Task {
+        await controlPlane?.stop()
+        exit(0)
+    }
+}
+terminating.resume()
+
 // The mailbox, unless told not to: a Mac with no iCloud account, or a walk that wants
 // the LAN alone, sets AGENTS_BRIDGE_NO_MAILBOX and the bridge is what it was.
 let mailboxTransport = MailboxTransport()

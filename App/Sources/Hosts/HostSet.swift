@@ -54,6 +54,23 @@ final class HostSet {
         for connection in connections.values { connection.stopForQuit() }
     }
 
+    /// The move across (058, US6): the control plane reaches these servers now, so the
+    /// window lets go of its own ssh to each and forgets them. Their daemons, and the
+    /// agents on them, carry on, and their list is kept beside, renamed, by the move.
+    func handOver() -> [HostID] {
+        let ids = hosts.all.map(\.id)
+        for id in ids {
+            listening[id]?.cancel()
+            retrying[id]?.cancel()
+            connections[id]?.stopForQuit()
+            connections[id] = nil
+            states[id] = nil
+            reachability.forget(id)
+            hosts.remove(id)
+        }
+        return ids
+    }
+
     /// What a server said, and which one said it.
     @ObservationIgnored var onNotification: ((HostID, String, JSONValue?) async -> Void)?
     /// A server has just become reachable: the window lists what it has.

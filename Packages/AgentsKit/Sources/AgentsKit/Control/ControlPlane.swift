@@ -79,6 +79,12 @@ public final class ControlPlane: @unchecked Sendable {
     public private(set) var net: ControlNet?
     #endif
 
+    /// Going away (launchd's SIGTERM): the ssh master to each server stops with the
+    /// control plane rather than outliving it. The servers' daemons carry on.
+    public func stop() async {
+        await servers.sync([])
+    }
+
     public func start() async throws {
         await methods.attach(router)
         let servers = self.servers
