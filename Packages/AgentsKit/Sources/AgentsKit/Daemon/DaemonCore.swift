@@ -409,6 +409,10 @@ public actor DaemonCore {
     /// Between an add's rename and its lock write, for the test that an add stopped there
     /// leaves nothing behind. Nil everywhere else.
     var catalogAfterRename: (@Sendable () throws -> Void)? = DaemonCore.catalogPause(ProcessInfo.processInfo.environment)
+    /// MCP Registry (060). A test points the session at `MCPRegistryStub`.
+    var mcpRegistrySession: URLSession = .shared
+    var mcpRegistryEndpoints = MCPRegistryEndpoints.from(environment: ProcessInfo.processInfo.environment)
+    lazy var mcpPreviewStore = MCPPreviewStore()
     #endif
     /// Projects due a look sooner than their five minutes, because a pull request's run
     /// just ended there (FR-014), and from when.

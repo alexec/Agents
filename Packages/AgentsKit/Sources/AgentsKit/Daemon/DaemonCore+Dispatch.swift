@@ -214,6 +214,9 @@ extension DaemonCore {
             #if canImport(CryptoKit)
             case DaemonAPI.Method.catalogSearch:
                 let request = try require(params, as: DaemonAPI.CatalogSearchRequest.self)
+                if request.kind == .mcp {
+                    return .success(try JSONValue.encoding(await mcpSearchResults(request.query)))
+                }
                 return .success(try JSONValue.encoding(await catalogSearch(request)))
 
             case DaemonAPI.Method.catalogPreview:
@@ -243,6 +246,14 @@ extension DaemonCore {
             case DaemonAPI.Method.skillsRemove:
                 let request = try require(params, as: DaemonAPI.SkillNameRequest.self)
                 return .success(try JSONValue.encoding(try skillsRemove(request)))
+
+            case DaemonAPI.Method.mcpPreview:
+                let request = try require(params, as: DaemonAPI.MCPPreviewRequest.self)
+                return .success(try JSONValue.encoding(await mcpPreview(request)))
+
+            case DaemonAPI.Method.mcpAdd:
+                let request = try require(params, as: DaemonAPI.MCPAddRequest.self)
+                return .success(try JSONValue.encoding(try await mcpAdd(request)))
             #endif
 
             case DaemonAPI.Method.runtimesInstall:

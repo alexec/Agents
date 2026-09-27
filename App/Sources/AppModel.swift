@@ -1650,6 +1650,53 @@ final class AppModel {
         return .failed(String(describing: error))
     }
 
+    // MARK: MCP catalogue (060)
+
+    func mcpSearch(_ query: String) async -> DaemonAPI.MCPSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp),
+                                         returning: DaemonAPI.MCPSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.mcpError(error))
+        }
+    }
+
+    func mcpPreview(_ result: DaemonAPI.MCPCatalogResult,
+                    for destination: DaemonAPI.SkillDestination,
+                    run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpPreview,
+                                         DaemonAPI.MCPPreviewRequest(result: result, destination: destination, run: run),
+                                         returning: DaemonAPI.MCPPreviewAnswer.self)
+        } catch {
+            return .init(error: Self.mcpError(error))
+        }
+    }
+
+    func mcpAdd(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                secrets: [String: String], plain: [String: String],
+                replace: Bool) async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.mcpAdd,
+                                               DaemonAPI.MCPAddRequest(previewID: previewID, destination: destination,
+                                                                       secrets: secrets, plain: plain, replace: replace),
+                                               returning: DaemonAPI.MCPAddAnswer.self)
+            if let server = answer.server { return .success(server) }
+            return .failure(answer.error ?? .failed("no server"))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
+    private static func mcpError(_ error: any Error) -> DaemonAPI.MCPCatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.mcpCatalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
+    }
+
     func refreshRuntimes() async {
         let listed = await attempt {
             self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,

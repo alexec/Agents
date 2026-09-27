@@ -6,7 +6,9 @@ import SwiftUI
 /// not" has an answer. Env and header values are never here, only their names (FR-023).
 struct SharedServersPage: View {
     let snapshot: DaemonAPI.SharedSnapshot
+    var onChanged: () -> Void = {}
     @State private var chosenID: String?
+    @State private var adding = false
 
     private var mcp: DaemonAPI.MCP { snapshot.mcp }
 
@@ -16,6 +18,7 @@ struct SharedServersPage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     SharedPageHeader(title: "MCP servers", path: mcp.file) {
                         Button("Edit mcp.json") { SharedFiles.open(mcp.file) }.buttonStyle(.paper)
+                        Button("Add server…") { adding = true }.buttonStyle(.paperProminent)
                     }
                     if let problem = mcp.problem { ProblemBanner(problem: problem, file: mcp.file) }
                     if !mcp.servers.isEmpty {
@@ -41,6 +44,9 @@ struct SharedServersPage: View {
             } else {
                 Text("Choose a server").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .sheet(isPresented: $adding) {
+            AddMCPSheet(destination: .personal, onAdded: onChanged)
         }
     }
 

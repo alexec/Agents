@@ -11,6 +11,8 @@ public struct SessionServers: Equatable, Sendable {
         case transportNotAdvertised(String)
         /// `mcp.json` could not be read, so none of the person's servers go.
         case mcpFileProblem
+        /// A `${NAME}` in the entry was not in `secrets.env` (060).
+        case missingSecret
     }
 
     public var servers: [MCPServer]
@@ -53,6 +55,22 @@ public struct SessionServers: Equatable, Sendable {
         }
         return plan
     }
+
+    /// Fill `${NAME}` from `secrets.env`. Servers that still have a missing name are listed
+    /// in `dropped` as `.missingSecret` and left out.
+    static func fillSecrets(_ servers: [MCPServer], with secrets: SecretsEnv)
+        -> (filled: [MCPServer], missing: [String]) {
+        var filled: [MCPServer] = []
+        var missing: [String] = []
+        for server in servers {
+            if let done = secrets.filled(server) {
+                filled.append(done)
+            } else {
+                missing.append(server.name)
+            }
+        }
+        return (filled, missing)
+    }
 }
 
 extension DaemonCore {
@@ -62,12 +80,32 @@ extension DaemonCore {
     /// nothing read from it is kept (R10, FR-023).
     func sessionServers(runtimeID: String, chosen: [MCPServer], token: String, managesAgents: Bool,
                         cwd: URL, capabilities: ACP.MCPCapabilities?) async -> [MCPServer] {
-        let personal = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
+        let personalRaw = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
+        let secrets: SecretsEnv = {
+            guard let home = locations.personalHome else { return SecretsEnv(lines: []) }
+            return SecretsEnv.load(from: SecretsEnv.url(home: home))
+        }()
+        let personal: Result<[MCPServer], PersonalDotAgents.MCPFileProblem>
+        switch personalRaw {
+        case .failure(let problem):
+            personal = .failure(problem)
+        case .success(let servers):
+            let (filled, missing) = SessionServers.fillSecrets(servers, with: secrets)
+            for name in missing {
+                DaemonLog.shared.write("session servers: \(name) left out: missing secret")
+            }
+            personal = .success(filled)
+        }
         // Grok loads a plugin's skills and commands from `pluginDirs` but never starts its
         // servers, so they go here too (R9, R12).
         var pluginServers: [MCPServer] = []
         if PersonalDotAgents.rule(for: runtimeID)?.pluginHandover == .sessionMetaWithServers, let home = locations.personalHome {
-            pluginServers = PersonalDotAgents.personalPluginServers(home: home)
+            let raw = PersonalDotAgents.personalPluginServers(home: home)
+            let (filled, missing) = SessionServers.fillSecrets(raw, with: secrets)
+            for name in missing {
+                DaemonLog.shared.write("session servers: \(name) left out: missing secret")
+            }
+            pluginServers = filled
         }
         if case .failure(let problem) = personal {
             DaemonLog.shared.write("personal servers: left out, \(problem.message)"

@@ -108,23 +108,23 @@ on Shared ▸ MCP servers, and have the next session receive it filled in.
 
 **Independent test**: quickstart §2 rows 1–4 on a scratch root.
 
-- [ ] T016 [P] [US1] Write failing tests in `Tests/Catalog/MCPPreviewAndAddTests.swift`: preview
+- [X] T016 [P] [US1] Write failing tests in `Tests/Catalog/MCPPreviewAndAddTests.swift`: preview
   builds entry; add writes mcp.json + secrets.env + sidecar; session fill substitutes `${NAME}`;
   missing secret drops the server
-- [ ] T017 [US1] Implement `Src/Catalog/MCPInstaller.swift` (add / replace personal) and fill
+- [X] T017 [US1] Implement `Src/Catalog/MCPInstaller.swift` (add / replace personal) and fill
   logic used by session start (`SecretsEnv.fill`)
-- [ ] T018 [US1] Change `Src/Daemon/DaemonCore+SessionServers.swift` to fill `${NAME}` on personal
+- [X] T018 [US1] Change `Src/Daemon/DaemonCore+SessionServers.swift` to fill `${NAME}` on personal
   servers before `plan` (project merge comes in US2); log drops by name only
-- [ ] T019 [US1] Implement `Src/Daemon/DaemonCore+MCPCatalog.swift` for `mcp/preview`, `mcp/add`
+- [X] T019 [US1] Implement `Src/Daemon/DaemonCore+MCPCatalog.swift` for `mcp/preview`, `mcp/add`
   (personal), and `catalog/search` with `kind:"mcp"`; route in `DaemonCore+Dispatch.swift`
-- [ ] T020 [US1] Change `App/Catalog/AddSkillSheet.swift` for the Skills | MCP servers kind
+- [X] T020 [US1] Change `App/Catalog/AddSkillSheet.swift` for the Skills | MCP servers kind
   switch (frame B): MCP search rows with publisher, known, runs, remoteHost
-- [ ] T021 [US1] Add `App/Catalog/MCPServerDetailView.swift` (frame C): Run with, entry preview,
+- [X] T021 [US1] Add `App/Catalog/MCPServerDetailView.swift` (frame C): Run with, entry preview,
   secret fields, Add disabled until required secrets filled or already set
-- [ ] T022 [US1] Change `App/Settings/Shared/SharedServersPage.swift` (frame A): **Add server…**,
+- [X] T022 [US1] Change `App/Settings/Shared/SharedServersPage.swift` (frame A): **Add server…**,
   registry chip + version, set/missing, Remove only when managed (Remove UI can be stubbed until
   US3 if needed — prefer wiring remove call once T028 exists; until then hide Remove)
-- [ ] T023 [US1] Walk frame A–C on a scratch app with the fixture registry; notes in
+- [X] T023 [US1] Walk frame A–C on a scratch app with the fixture registry; notes in
   `specs/060-marketplace-mcp/walk/us1/README.md`
 
 **Checkpoint**: US1 works alone — add for You end to end.

@@ -176,6 +176,14 @@ extension DaemonAPI {
         }
     }
 
+    public struct MCPSearchAnswer: Codable, Sendable, Equatable {
+        public var results: [MCPCatalogResult]
+        public var error: MCPCatalogError?
+        public init(results: [MCPCatalogResult], error: MCPCatalogError? = nil) {
+            self.results = results; self.error = error
+        }
+    }
+
     public struct MCPSetSecretRequest: Codable, Sendable {
         public var name: String
         public var value: String
