@@ -171,8 +171,7 @@ struct StatusIcon: View {
                     .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                ProgressView()
-                    .controlSize(.small)
+                SyncedSpinner(diameter: 18)
             }
         }
         .frame(width: 20, height: 20)

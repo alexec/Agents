@@ -485,13 +485,13 @@ private extension JSONEncoder {
 }
 
 /// The agent is at work and the person is waiting: the same small spinner the
-/// sidebar row shows, at the foot of the conversation, so the chat itself moves while
-/// nothing else on it does. Live rather than recorded — it is there exactly as long
-/// as the wait is, and it rides the end of the transcript as the reply arrives.
+/// sidebar row shows, turning in step with it (`SyncedSpinner`), at the foot of the
+/// conversation, so the chat itself moves while nothing else on it does. Live rather
+/// than recorded — it is there exactly as long as the wait is, and it rides the end of
+/// the transcript as the reply arrives.
 struct WorkingLine: View {
     var body: some View {
-        ProgressView()
-            .controlSize(.small)
+        SyncedSpinner(diameter: 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 2)
             .accessibilityLabel("Working")
