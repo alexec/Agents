@@ -187,12 +187,18 @@ struct ChatView: View {
 
     private var form: some View {
         VStack(spacing: 12) {
-            if let request = model.permissionForSelection {
-                // Shown while its server is offline, but not answerable: the answer
-                // would go nowhere (037).
-                PermissionView(request: request)
-                    .disabled(selectedHostOffline)
-                    .help(selectedHostOffline ? offlineHelp : "")
+            if !model.permissionsForSelection.isEmpty {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(model.permissionsForSelection) { request in
+                            PermissionView(request: request)
+                                .disabled(selectedHostOffline)
+                                .help(selectedHostOffline ? offlineHelp : "")
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+                .fixedSize(horizontal: false, vertical: true)
             }
             // A form waits the same way a permission question does, and floats with it.
             if let request = model.elicitationForSelection {

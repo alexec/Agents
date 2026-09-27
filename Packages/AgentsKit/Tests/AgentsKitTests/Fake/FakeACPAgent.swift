@@ -75,6 +75,9 @@ actor FakeACPAgent {
         /// client serves is tested through here, because only one runtime on this Mac
         /// uses the file methods and none sends an elicitation form.
         var clientRequests: [(method: String, params: JSONValue)] = []
+        /// The same shape as `clientRequests`, but fired together rather than one after
+        /// another — what a runtime does when it asks about several edits at once.
+        var concurrentClientRequests: [(method: String, params: JSONValue)] = []
         /// Notifications under a method of the runtime's own invention, sent during the
         /// turn. A real one is `_auth/status_update`. Nothing is expected back, which is
         /// exactly why they used to vanish without trace. (Cursor's `cursor/*` methods
@@ -312,19 +315,21 @@ actor FakeACPAgent {
             try? connection.notify(notification.method, notification.params)
         }
         for request in script.clientRequests {
-            var params = request.params
-            if case .object(var object) = params, object["sessionId"] == nil {
-                object["sessionId"] = .string(sessionID)
-                params = .object(object)
+            await askClient(request.method, request.params)
+        }
+        if !script.concurrentClientRequests.isEmpty {
+            let answers = await withTaskGroup(
+                of: (String, Result<JSONValue, JSONRPCError>).self,
+                returning: [(String, Result<JSONValue, JSONRPCError>)].self
+            ) { group in
+                for request in script.concurrentClientRequests {
+                    group.addTask { await self.askClientResult(request.method, request.params) }
+                }
+                var collected: [(String, Result<JSONValue, JSONRPCError>)] = []
+                for await answer in group { collected.append(answer) }
+                return collected
             }
-            do {
-                let result = try await connection.call(request.method, params)
-                clientAnswers.append((request.method, .success(result)))
-            } catch let error as JSONRPCError {
-                clientAnswers.append((request.method, .failure(error)))
-            } catch {
-                clientAnswers.append((request.method, .failure(.internalError("\(error)"))))
-            }
+            clientAnswers.append(contentsOf: answers)
         }
         if let permission = script.permission {
             permissionOutcome = try? await connection.call(ACP.ClientMethod.requestPermission, permission)
@@ -347,6 +352,27 @@ actor FakeACPAgent {
     private func send(update: JSONValue, as session: String? = nil) async {
         try? connection.notify(ACP.ClientMethod.sessionUpdate,
                                      ["sessionId": .string(session ?? sessionID), "update": update])
+    }
+
+    private func askClient(_ method: String, _ params: JSONValue) async {
+        let answer = await askClientResult(method, params)
+        clientAnswers.append(answer)
+    }
+
+    private func askClientResult(_ method: String, _ params: JSONValue) async
+        -> (String, Result<JSONValue, JSONRPCError>) {
+        var params = params
+        if case .object(var object) = params, object["sessionId"] == nil {
+            object["sessionId"] = .string(sessionID)
+            params = .object(object)
+        }
+        do {
+            return (method, .success(try await connection.call(method, params)))
+        } catch let error as JSONRPCError {
+            return (method, .failure(error))
+        } catch {
+            return (method, .failure(.internalError("\(error)")))
+        }
     }
 
     /// Whether the client listed this JetBrains "AIR" capability, read the way both

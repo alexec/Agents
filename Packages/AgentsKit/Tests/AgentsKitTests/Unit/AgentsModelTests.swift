@@ -44,9 +44,9 @@ struct AgentsModelTests {
         #expect(model.agents.first?.id == new.id)
     }
 
-    /// The case this file exists for. A withdrawal carries no request, and a client
-    /// that read it as "nothing to do" would leave the question on screen for somebody
-    /// to answer a second time.
+    /// A withdrawal carries no request, and a client that read it as "nothing to do"
+    /// would leave the question on screen for somebody to answer a second time. Without
+    /// a request identity, every question for that agent goes — the legacy shape.
     @Test func aWithdrawnQuestionTakesTheOneThatWasWaiting() throws {
         let model = AgentsModel()
         let id = UUID()
@@ -64,20 +64,26 @@ struct AgentsModelTests {
         #expect(model.permissions.isEmpty)
     }
 
-    /// One question per agent. A second one replaces the first rather than stacking up
-    /// behind it, because the runtime is blocked on the newest.
-    @Test func oneAgentHasOneQuestion() throws {
+    /// Several questions can wait on one agent at once. Answering one leaves the others.
+    @Test func oneAgentKeepsEveryOutstandingQuestion() throws {
         let model = AgentsModel()
         let id = UUID()
-        for title in ["First", "Second"] {
-            model.apply(DaemonAPI.Notification.agentPermission,
-                        try notification(DaemonAPI.PermissionNotification(
-                            agentID: id,
-                            request: PermissionRequest(agentID: id,
-                                                       toolCall: ToolCall(title: title),
-                                                       options: []))))
-        }
-        #expect(model.permissions.count == 1)
+        let first = PermissionRequest(
+            agentID: id, toolCall: ToolCall(title: "First"), options: [],
+            askedAt: Date(timeIntervalSince1970: 1))
+        let second = PermissionRequest(
+            agentID: id, toolCall: ToolCall(title: "Second"), options: [],
+            askedAt: Date(timeIntervalSince1970: 2))
+        model.apply(DaemonAPI.Notification.agentPermission,
+                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: first)))
+        model.apply(DaemonAPI.Notification.agentPermission,
+                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: second)))
+        #expect(model.permissions(for: id).map(\.toolCall.title) == ["First", "Second"])
+
+        model.apply(DaemonAPI.Notification.agentPermission,
+                    try notification(DaemonAPI.PermissionNotification(
+                        agentID: id, request: nil, requestID: first.id)))
+        #expect(model.permissions(for: id).map(\.toolCall.title) == ["Second"])
         #expect(model.permission(for: id)?.toolCall.title == "Second")
     }
 

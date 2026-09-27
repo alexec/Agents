@@ -1374,7 +1374,7 @@ extension DaemonCore {
             pendingPermissions.removeValue(forKey: id)
             await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             broadcast(DaemonAPI.Notification.agentPermission,
-                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil, requestID: id))
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
             elicitations.removeValue(forKey: id)
@@ -1455,7 +1455,7 @@ extension DaemonCore {
                 await session.answerPermission(id: pending.request.id, optionID: nil)
             }
             broadcast(DaemonAPI.Notification.agentPermission,
-                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil))
+                      DaemonAPI.PermissionNotification(agentID: agentID, request: nil, requestID: id))
         }
         for (id, pending) in elicitations where pending.agentID == agentID {
             elicitations.removeValue(forKey: id)
@@ -1684,9 +1684,12 @@ extension DaemonCore {
             await session.answerPermission(id: pending.request.id, optionID: request.optionID)
         }
         await record(.permissionAnswered(optionID: request.optionID, optionName: name), for: pending.agentID)
-        await move(pending.agentID, on: .permissionAnswered)
+        if !pendingPermissions.values.contains(where: { $0.agentID == pending.agentID }) {
+            await move(pending.agentID, on: .permissionAnswered)
+        }
         broadcast(DaemonAPI.Notification.agentPermission,
-                  DaemonAPI.PermissionNotification(agentID: pending.agentID, request: nil))
+                  DaemonAPI.PermissionNotification(agentID: pending.agentID, request: nil,
+                                                   requestID: request.permissionID))
         reconsider()
     }
 

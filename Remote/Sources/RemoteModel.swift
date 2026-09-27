@@ -707,6 +707,7 @@ final class RemoteModel {
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// The question the open conversation is blocked on, if it still is.
+    var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
     var questionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// The form it is blocked on instead, if it is one of those.
@@ -715,7 +716,7 @@ final class RemoteModel {
     /// exist: it is the one the runtime is most likely to be sitting on, and two
     /// blocking cards at once on a phone is a card nobody can read.
     var formForSelection: ElicitationRequest? {
-        questionForSelection == nil ? work.elicitation(for: selection) : nil
+        questionsForSelection.isEmpty ? work.elicitation(for: selection) : nil
     }
 
     /// A file being read, by path, or nothing.
