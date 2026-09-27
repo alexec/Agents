@@ -84,10 +84,12 @@ public final class ControlPlane: @unchecked Sendable {
         let servers = self.servers
         let methods = self.methods
         await servers.attach(self)
+        knownClients = Set(await methods.allClients.map(\.id))
         var hooks = ControlMethods.Hooks(
             install: { try await servers.install($0) },
             update: { try await servers.checkAgain($0) },
             checkAgain: { try await servers.checkAgain($0) },
+            clientsChanged: { [weak self] now in await self?.clientsChanged(now) },
             hostsChanged: { await servers.sync(await methods.allHosts) })
         #if canImport(Network) && canImport(CryptoKit)
         if let net {
@@ -96,7 +98,10 @@ public final class ControlPlane: @unchecked Sendable {
             hooks.startPairing = { grant in try JSONValue.encoding(await net.startCode(.client(grant), name: name)) }
             hooks.stopPairing = { await net.stopCodes() }
             hooks.startEnroll = { try JSONValue.encoding(await net.startCode(.host, name: name)) }
-            hooks.clientsChanged = { _ in await net.relisten() }
+            hooks.clientsChanged = { [weak self] now in
+                await net.relisten()
+                await self?.clientsChanged(now)
+            }
             hooks.hostsChanged = {
                 await net.relisten()
                 await servers.sync(await methods.allHosts)
@@ -122,6 +127,34 @@ public final class ControlPlane: @unchecked Sendable {
 
     public func stop() {
         for listener in listeners { listener.stop() }
+    }
+
+    /// A phone or iPad the bridge let in, on the direct link or through the relay (058,
+    /// US4): a client of the router like any other, with the grant the control plane
+    /// keeps for it — a device's until somebody says otherwise in Settings. Returns the
+    /// device's end; what it writes is the client wire, or today's bare lines, which go
+    /// to this Mac's host.
+    public func attachDevice(_ id: UUID, name: String, kind: ClientRecord.Kind) async -> any LineTransport {
+        var record = await methods.client(id)
+            ?? ClientRecord(id: id, name: name, kind: kind, publicKey: Data(), grant: .device, paired: Date())
+        record.name = name
+        try? await methods.admit(record)
+        let (ours, theirs) = PairedTransport.pair()
+        await router.attachClient(await methods.client(id) ?? record, transport: ours)
+        return theirs
+    }
+
+    /// A client forgotten in Settings: the bridge forgets it on this Mac's host too, so
+    /// its key stops opening the direct link and the relay (FR-008).
+    public var onClientForgotten: (@Sendable (UUID) async -> Void)?
+    private var knownClients: Set<UUID> = []
+
+    func clientsChanged(_ now: [ClientRecord]) async {
+        let ids = Set(now.map(\.id))
+        let gone = knownClients.subtracting(ids)
+        knownClients = ids
+        guard let onClientForgotten else { return }
+        for id in gone { await onClientForgotten(id) }
     }
 
     /// This Mac's window: an operator, because only the app is `control` by signature.

@@ -71,6 +71,7 @@ final class DirectLink {
     private func refreshDevices() async throws {
         let listed = try await client.call(DaemonAPI.Method.devicesList, Optional<String>.none, returning: [Device].self)
         devices = Dictionary(listed.map { ($0.id, $0.publicKey) }, uniquingKeysWith: { first, _ in first })
+        KnownDevices.all = Dictionary(listed.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         relisten()
     }
 

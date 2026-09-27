@@ -102,7 +102,17 @@ final class RemoteModel {
     @ObservationIgnored private var watchingLink: Task<Void, Never>?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
 
+    /// The link the Mac is reached by, kept so a second connection can be made over it
+    /// to a control plane's other hosts (058, US4).
+    @ObservationIgnored private let baseLink: any DaemonLink
+    /// Every host a control plane has besides the one this phone paired with, each with
+    /// a client of its own over one more connection (058, US4). Empty against a bridge
+    /// with no control plane.
+    @ObservationIgnored private var otherHosts: [HostID: DaemonClient] = [:]
+    @ObservationIgnored private var hostWatch: Task<Void, Never>?
+
     init(link: any DaemonLink) {
+        baseLink = link
         client = DaemonClient(link: link)
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
@@ -902,10 +912,91 @@ final class RemoteModel {
             if link == .relayed || away?.chooser.link == .relayed { relayTrouble = nil }
             await files.reconnected()
             await refreshEverything()
+            watchOtherHosts()
             return true
         } catch {
             isConnected = false
             return false
+        }
+    }
+
+    // MARK: A control plane's other hosts (058, US4)
+
+    /// The client a call belongs to: another host's for an agent or a folder there,
+    /// this phone's own host's for everything else. Worked out from what the call names,
+    /// so no call site has to know there is more than one host.
+    private func client(for params: some Encodable) -> DaemonClient {
+        guard !otherHosts.isEmpty, let value = try? JSONValue.encoding(params) else { return client }
+        if let id = (value["agentID"] ?? value["id"])?.stringValue.flatMap(UUID.init(uuidString:)),
+           let host = work.agent(id)?.host, let other = otherHosts[host] {
+            return other
+        }
+        for key in ["folder", "cwd"] {
+            guard let folder = value[key]?.stringValue else { continue }
+            if let project = work.projects.first(where: { $0.folder.absoluteString == folder && $0.host != .mac }),
+               let other = otherHosts[project.host] {
+                return other
+            }
+        }
+        return client
+    }
+
+    /// Ask whether a control plane is on the other end, and follow its other hosts if so.
+    /// A bridge with no control plane answers `control/status` with methodNotFound, and
+    /// nothing more happens.
+    private func watchOtherHosts() {
+        guard hostWatch == nil else { return }
+        hostWatch = Task { [weak self] in
+            guard let self else { return }
+            guard (try? await self.client.call(DaemonAPI.Method.controlStatus)) != nil else {
+                self.hostWatch = nil
+                return
+            }
+            let base = self.baseLink
+            let link = ControlLink { try await base.transport() }
+            let control = DaemonClient(link: link.controlLink)
+            while !Task.isCancelled {
+                if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
+                    await self.syncOtherHosts(control, link: link)
+                    for await note in control.notifications() where note.method == DaemonAPI.Notification.controlHostChanged {
+                        await self.syncOtherHosts(control, link: link)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    private func syncOtherHosts(_ control: DaemonClient, link: ControlLink) async {
+        guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
+              let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+        else { return }
+        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" }
+        for host in others {
+            let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
+            otherHosts[host.id] = other
+            guard await !other.isConnected,
+                  (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
+            let id = host.id
+            if let projects = try? await other.call(DaemonAPI.Method.projectsList,
+                                                    DaemonAPI.ProjectsListRequest(includeArchived: false),
+                                                    returning: [DaemonAPI.ProjectSummary].self) {
+                work.replaceProjects(projects, from: id)
+            }
+            if let agents = try? await other.call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest(includeArchived: false),
+                                                  returning: [Agent].self) {
+                work.replaceAgents(agents, from: id)
+            }
+            let notes = other.notifications()
+            Task { [weak self] in
+                for await note in notes { _ = self?.work.apply(note.method, note.params, from: id) }
+            }
+        }
+        // A host gone from the control plane, or offline, leaves the lists.
+        for id in otherHosts.keys where !others.contains(where: { $0.id == id }) {
+            await otherHosts.removeValue(forKey: id)?.disconnect()
+            work.replaceProjects([], from: id)
+            work.replaceAgents([], from: id)
         }
     }
 
@@ -1004,6 +1095,7 @@ final class RemoteModel {
     /// as the Mac is back.
     @discardableResult
     private func sendOnce(_ method: String, _ params: some Encodable & Sendable) async throws -> JSONValue {
+        let client = client(for: params)
         do {
             return try await client.call(method, params)
         } catch is JSONRPCTransportError {
@@ -1212,7 +1304,9 @@ final class RemoteModel {
                                                   DaemonAPI.ListRequest(includeArchived: false),
                                                   returning: [Agent].self) else { return }
         let live = Set(listed.map(\.id))
-        work.replaceAgents(listed + work.agents.filter { $0.state == .archived && !live.contains($0.id) })
+        // Only this host's: another host's agents come from that host (058, US4).
+        work.replaceAgents(listed + work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) },
+                           from: .mac)
     }
 
     /// The newest `limit` archived agents in a project, for its Archived section when
@@ -1351,7 +1445,7 @@ final class RemoteModel {
                                                   DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                   returning: [DaemonAPI.ProjectSummary].self)
         else { return }
-        work.replaceProjects(listed)
+        work.replaceProjects(listed, from: .mac)
     }
 
     private func refreshPermissions() async {
@@ -1479,9 +1573,9 @@ final class RemoteModel {
 
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
-        guard let page = try? await client.call(DaemonAPI.Method.agentsTranscript,
-                                                DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize),
-                                                returning: TranscriptPage.self) else { return }
+        let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self) else { return }
         // A chat left before its page arrived does not get that page shown under the
         // next one's name.
         guard self.selection == selection else { return }
@@ -1494,11 +1588,9 @@ final class RemoteModel {
         guard let selection, work.hasMoreBefore, !isLoadingEarlier else { return }
         isLoadingEarlier = true
         defer { isLoadingEarlier = false }
-        guard let page = try? await client.call(
-            DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
-                                        limit: firstPageSize),
-            returning: TranscriptPage.self) else { return }
+        let request = DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex, limit: firstPageSize)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self) else { return }
         guard self.selection == selection else { return }
         work.prepend(page)
     }

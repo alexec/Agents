@@ -21,7 +21,7 @@ final class RelayHost {
     private var carrying: Task<Void, Never>?
     private var sweeping: Task<Void, Never>?
 
-    func start() {
+    func start(controlPlane: ControlPlane? = nil) {
         let key: DeviceKey
         do {
             key = try DeviceKey.load(account: "relay-mac-key", enclave: false)
@@ -32,6 +32,23 @@ final class RelayHost {
         let host = RelayHostCore(channel: CloudKitRelayChannel(), key: key,
                                  openDaemon: { try await SocketLink().transport() })
         self.host = host
+        // With a control plane, a device away from home is one of its clients too (058,
+        // US4, R6): every host, as its grant allows.
+        if let controlPlane {
+            Task {
+                await host.setOpenDevice { id in
+                    let known = await MainActor.run { KnownDevices.all[id] }
+                    return await controlPlane.attachDevice(id, name: known?.name ?? "A device",
+                                                           kind: known.map { device in
+                                                               switch device.kind {
+                                                               case .iPhone: .iPhone
+                                                               case .iPad: .iPad
+                                                               case .unknown: .unknown
+                                                               }
+                                                           } ?? .unknown)
+                }
+            }
+        }
         carrying = Task { await host.run() }
         sweeping = Task {
             while !Task.isCancelled {

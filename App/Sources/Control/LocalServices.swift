@@ -103,8 +103,10 @@ struct LocalServices {
         let jobs: [(String, [String], [String: String], String)] = [
             (controlLabel, [bridge],
              ["AGENTS_ROOT": hostRoot.path, ControlPlane.rootVariable: controlRoot.path,
-              // Off the ordinary port and out of iCloud: a walk is nobody's phone.
-              "AGENTS_BRIDGE_PORT": "8799", "AGENTS_BRIDGE_NO_MAILBOX": "1",
+              // Off the ordinary port, off Bonjour and out of iCloud: a walk is nobody's
+              // phone, and a scratch bridge named like this Mac must never be the one the
+              // person's phone finds first.
+              "AGENTS_BRIDGE_PORT": "8799", "AGENTS_BRIDGE_NO_MAILBOX": "1", "AGENTS_BRIDGE_NO_BONJOUR": "1",
               ControlNet.portVariable: "8798", "PATH": path],
              "control.out"),
             (hostLabel, [agentsd, DaemonCommandLine.controlFlag, ControlPlane.hostSocket(root: controlRoot).path],

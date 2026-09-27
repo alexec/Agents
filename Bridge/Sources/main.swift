@@ -134,8 +134,17 @@ final class Relay {
         do {
             // A device's connection, not a window's: the daemon hears nothing from the
             // device until it has agreed, and then only as that device.
-            let transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: id,
+            // With a control plane, a paired device is one of its clients (058, US4): it
+            // sees every host, as its grant allows. Pairing is still this Mac's host's.
+            let transport: any LineTransport
+            if let controlPlane, !pairing, let id {
+                let known = KnownDevices.all[id]
+                transport = await controlPlane.attachDevice(id, name: known?.name ?? "A device",
+                                                            kind: known.map(KnownDevices.kind) ?? .unknown)
+            } else {
+                transport = try await DeviceBinder.bind(try await SocketLink().transport(), device: id,
                                                         pairing: pairing)
+            }
             // The device can go while the daemon is being reached.
             guard !stopped else { transport.close(); return }
             daemon = transport
@@ -206,6 +215,21 @@ final class Relay {
     }
 }
 
+/// The devices this Mac's host has paired, by id, as the direct link last heard: what a
+/// control plane calls a device when it first becomes its client.
+@MainActor
+enum KnownDevices {
+    static var all: [UUID: Device] = [:]
+
+    static func kind(_ device: Device) -> ClientRecord.Kind {
+        switch device.kind {
+        case .iPhone: .iPhone
+        case .iPad: .iPad
+        case .unknown: .unknown
+        }
+    }
+}
+
 /// Held so a relay is not collected the moment it is made. Each takes itself out when
 /// it stops; until 2026-09-25 none did, and every reconnect of a phone stayed here.
 @MainActor
@@ -238,6 +262,15 @@ if let controlPlane {
     }
 }
 
+// A device forgotten in Settings ▸ Control plane is forgotten by this Mac's host as well,
+// which is what takes its key off the direct link and the relay.
+controlPlane?.onClientForgotten = { id in
+    let host = DaemonClient(link: SocketLink())
+    guard (try? await host.connect(startIfNeeded: false)) != nil else { return }
+    _ = try? await host.call(DaemonAPI.Method.devicesForget, DaemonAPI.DeviceForget(id: id))
+    await host.disconnect()
+}
+
 let directLink = DirectLink(port: port)
 directLink.start()
 
@@ -248,7 +281,7 @@ let mailboxTransport = MailboxTransport()
 let relayHost = RelayHost()
 if ProcessInfo.processInfo.environment["AGENTS_BRIDGE_NO_MAILBOX"] == nil {
     mailboxTransport.start()
-    relayHost.start()
+    relayHost.start(controlPlane: controlPlane)
 }
 
 dispatchMain()
