@@ -1,12 +1,18 @@
 import AgentsKit
+import AppKit
 import SwiftUI
 
 /// Frames C and D: the person's servers from `~/.agents/mcp.json`, the app's own, and
 /// those set up only in one runtime's own config, so "why does Codex have this and Claude
 /// not" has an answer. Env and header values are never here, only their names (FR-023).
+/// A registry server can be removed, and a missing secret set, from its detail (060, frame A).
 struct SharedServersPage: View {
+    @Environment(AppModel.self) private var model
     let snapshot: DaemonAPI.SharedSnapshot
+    var onChanged: () -> Void = {}
     @State private var chosenID: String?
+    @State private var adding = false
+    @State private var listed: [DaemonAPI.ProjectMCPServer] = []
 
     private var mcp: DaemonAPI.MCP { snapshot.mcp }
 
@@ -16,6 +22,7 @@ struct SharedServersPage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     SharedPageHeader(title: "MCP servers", path: mcp.file) {
                         Button("Edit mcp.json") { SharedFiles.open(mcp.file) }.buttonStyle(.paper)
+                        Button("Add server…") { adding = true }.buttonStyle(.paperProminent)
                     }
                     if let problem = mcp.problem { ProblemBanner(problem: problem, file: mcp.file) }
                     if !mcp.servers.isEmpty {
@@ -37,11 +44,28 @@ struct SharedServersPage: View {
             .frame(width: 440)
             Divider()
             if let (server, isApp) = chosen {
-                ServerDetail(server: server, isApp: isApp, file: mcp.file, runtimes: snapshot.runtimes)
+                ServerDetail(server: server, isApp: isApp, file: mcp.file, runtimes: snapshot.runtimes,
+                             meta: listed.first { $0.name == server.name }, listed: listed, onChanged: changed)
             } else {
                 Text("Choose a server").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .sheet(isPresented: $adding) {
+            AddMCPSheet(destination: .personal, onAdded: changed)
+        }
+        .task { await loadListed() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await loadListed() }
+        }
+    }
+
+    private func changed() {
+        onChanged()
+        Task { await loadListed() }
+    }
+
+    private func loadListed() async {
+        if let fresh = await model.mcpServers(at: .personal) { listed = fresh.servers }
     }
 
     private var chosen: (DaemonAPI.Server, Bool)? {
@@ -65,6 +89,12 @@ struct SharedServersPage: View {
             HStack(spacing: 8) {
                 Text(server.name).fontWeight(.semibold).lineLimit(1).fixedSize()
                 SharedChip(text: server.transport)
+                if let meta = listed.first(where: { $0.name == server.name }) {
+                    if meta.managed != nil { SharedChip(text: "registry", tone: .source) }
+                    ForEach(meta.missingSecrets, id: \.self) { name in
+                        SharedChip(text: "\(name) not set", tone: .attention)
+                    }
+                }
                 Text(server.summary).appText(.code).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 if !server.clash.isEmpty { SharedChip(text: "clash", tone: .attention) }
                 Spacer(minLength: 6)
@@ -120,6 +150,18 @@ private struct ServerDetail: View {
     let isApp: Bool
     let file: String
     let runtimes: [DaemonAPI.RuntimeName]
+    var meta: DaemonAPI.ProjectMCPServer?
+    var listed: [DaemonAPI.ProjectMCPServer] = []
+    var onChanged: () -> Void = {}
+
+    @State private var setting: [String] = []
+    @State private var replacing = false
+    @State private var removing = false
+
+    private var setSecrets: [String] {
+        guard let meta else { return [] }
+        return meta.secretNames.filter { !meta.missingSecrets.contains($0) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -133,6 +175,9 @@ private struct ServerDetail: View {
                     SharedFact(label: "Headers", value: server.headerNames.map { "\($0) ••••••" }.joined(separator: "\n"), code: true)
                 }
             }
+            if let managed = meta?.managed {
+                SharedFact(label: "From the registry", value: "\(managed.registryName) · \(managed.version)")
+            }
             SharedSectionLabel("Reach")
             SharedReachList(runtimes: runtimes, reach: server.reach)
             Text(isApp ? "The app’s own tools: finishing a turn, showing a file, leasing the screen and the rest. Every agent the app starts has them."
@@ -140,10 +185,39 @@ private struct ServerDetail: View {
                 .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Spacer()
             if !isApp {
-                Button("Edit mcp.json") { SharedFiles.open(file) }.buttonStyle(.paper)
+                HStack(spacing: 8) {
+                    Button("Edit mcp.json") { SharedFiles.open(file) }.buttonStyle(.paper)
+                    if let meta, !meta.missingSecrets.isEmpty {
+                        Button("Set…") {
+                            replacing = false
+                            setting = meta.missingSecrets
+                        }
+                        .buttonStyle(.paper)
+                    }
+                    if !setSecrets.isEmpty {
+                        Button("Replace…") {
+                            replacing = true
+                            setting = setSecrets
+                        }
+                        .buttonStyle(.paper)
+                    }
+                    if meta?.managed != nil, let meta {
+                        Button("Remove…") { removing = true }.buttonStyle(.paper)
+                            .sheet(isPresented: $removing) {
+                                RemoveMCPServerSheet(
+                                    server: meta, destination: .personal,
+                                    forgettable: RemoveMCPServerSheet.forgettable(meta, among: listed),
+                                    keptSecret: RemoveMCPServerSheet.keptBecauseShared(meta, among: listed),
+                                    onRemoved: onChanged)
+                            }
+                    }
+                }
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .sheet(isPresented: Binding(get: { !setting.isEmpty }, set: { if !$0 { setting = [] } })) {
+            SetSecretSheet(serverName: server.name, names: setting, replacing: replacing, onSaved: onChanged)
+        }
     }
 }

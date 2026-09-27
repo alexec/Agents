@@ -37,7 +37,7 @@ struct SharedSettingsView: View {
         case .overview: SharedOverviewPage(snapshot: snapshot, page: $page)
         case .instructions: SharedInstructionsPage(snapshot: snapshot)
         case .skills: SharedSkillsPage(snapshot: snapshot, refresh: refresh)
-        case .mcp: SharedServersPage(snapshot: snapshot)
+        case .mcp: SharedServersPage(snapshot: snapshot, onChanged: { Task { await refresh() } })
         case .plugins: SharedPluginsPage(snapshot: snapshot)
         case .other: SharedOtherFilesPage(snapshot: snapshot)
         }

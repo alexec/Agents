@@ -143,6 +143,16 @@ alone. A worktree has its own `.agents`, so a skill added on a worktree's page s
 branch until it is merged. Project skills on servers are not available yet. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
+A project's MCP servers live in `.agents/mcp.json`, listed on its page in an **MCP servers**
+section after Skills. The file is committed, so it names each secret as `${NAME}` and never
+holds the value. Each person sets their own in `~/.agents/secrets.env`. A server added from
+the sheet is approved as it goes in. One that arrives with a pull waits, marked **waiting
+for your OK**, until you choose **Approve**; no agent is given it before that. Where you and
+the project both have a server of the same name, agents in the project get the project's. A
+missing secret is named on the row, and agents start without that server rather than with an
+empty key. Projects on a server don't show the section. See
+[Add an MCP server from the registry](../how-to/add-an-mcp-server-from-the-registry.md).
+
 Nothing from a catalogue is taken on trust. skills.sh does not review what it lists, so the
 app shows every file before anything is written, points out scripts an agent could run, pins
 the commit it took, and checks each file against GitHub's own record of it at that commit.

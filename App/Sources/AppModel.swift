@@ -1683,6 +1683,105 @@ final class AppModel {
         return .failed(String(describing: error))
     }
 
+    // MARK: MCP catalogue (060)
+
+    func mcpSearch(_ query: String) async -> DaemonAPI.MCPSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp),
+                                         returning: DaemonAPI.MCPSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.mcpError(error))
+        }
+    }
+
+    func mcpPreview(_ result: DaemonAPI.MCPCatalogResult,
+                    for destination: DaemonAPI.SkillDestination,
+                    run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpPreview,
+                                         DaemonAPI.MCPPreviewRequest(result: result, destination: destination, run: run),
+                                         returning: DaemonAPI.MCPPreviewAnswer.self)
+        } catch {
+            return .init(error: Self.mcpError(error))
+        }
+    }
+
+    /// A project's servers, for its page (060, frame D). Nil when they could not be read,
+    /// so the section keeps what it last had.
+    func projectMCPServers(_ folder: URL) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: .project(folder: folder.path)),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    func mcpServers(at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPListAnswer? {
+        try? await client.call(DaemonAPI.Method.mcpList,
+                               DaemonAPI.MCPListRequest(destination: destination),
+                               returning: DaemonAPI.MCPListAnswer.self)
+    }
+
+    /// Write one name into `secrets.env`. The value is not kept here.
+    func mcpSetSecret(name: String, value: String) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpSetSecret,
+                                     DaemonAPI.MCPSetSecretRequest(name: name, value: value),
+                                     returning: DaemonAPI.MCPSetSecretAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
+                   forgetSecret: String?) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpRemove,
+                                     DaemonAPI.MCPRemoveRequest(destination: destination, name: name,
+                                                               forgetSecret: forgetSecret),
+                                     returning: DaemonAPI.MCPRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
+    func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpApprove,
+                                      DaemonAPI.MCPApproveRequest(destination: .project(folder: folder.path),
+                                                                  name: name, digest: digest),
+                                      returning: DaemonAPI.MCPListAnswer.self)
+            return nil
+        } catch {
+            return Self.mcpError(error)
+        }
+    }
+
+    func mcpAdd(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                secrets: [String: String], plain: [String: String],
+                replace: Bool) async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.mcpAdd,
+                                               DaemonAPI.MCPAddRequest(previewID: previewID, destination: destination,
+                                                                       secrets: secrets, plain: plain, replace: replace),
+                                               returning: DaemonAPI.MCPAddAnswer.self)
+            if let server = answer.server { return .success(server) }
+            return .failure(answer.error ?? .failed("no server"))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
+    private static func mcpError(_ error: any Error) -> DaemonAPI.MCPCatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.mcpCatalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
+    }
+
     func refreshRuntimes() async {
         let listed = await attempt {
             self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,

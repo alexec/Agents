@@ -50,7 +50,17 @@ extension PersonalDotAgents {
     /// The servers in `~/.agents/mcp.json`, in the file's order. A missing file is no
     /// servers and no problem.
     public static func personalServers(home: URL) -> Result<[MCPServer], MCPFileProblem> {
-        guard let data = try? Data(contentsOf: mcpURL(home: home)) else { return .success([]) }
+        servers(at: mcpURL(home: home))
+    }
+
+    /// The servers in a project's `<folder>/.agents/mcp.json`. A missing file is no servers.
+    public static func projectServers(in folder: URL) -> Result<[MCPServer], MCPFileProblem> {
+        servers(at: MCPJSONFile.projectURL(folder: folder))
+    }
+
+    /// The servers in one `mcp.json`. A missing file is no servers and no problem.
+    static func servers(at url: URL) -> Result<[MCPServer], MCPFileProblem> {
+        guard let data = try? Data(contentsOf: url) else { return .success([]) }
         return parseServers(data)
     }
 

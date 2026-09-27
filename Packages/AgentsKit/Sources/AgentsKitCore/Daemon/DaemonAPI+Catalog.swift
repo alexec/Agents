@@ -113,7 +113,20 @@ extension DaemonAPI {
 
     public struct CatalogSearchRequest: Codable, Sendable {
         public var query: String
-        public init(query: String) { self.query = query }
+        /// `skills` (default, 059) or `mcp` (060).
+        public var kind: CatalogKind
+        public init(query: String, kind: CatalogKind = .skills) {
+            self.query = query
+            self.kind = kind
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            query = try c.decode(String.self, forKey: .query)
+            kind = try c.decodeIfPresent(CatalogKind.self, forKey: .kind) ?? .skills
+        }
+
+        private enum CodingKeys: String, CodingKey { case query, kind }
     }
 
     public struct CatalogSearchAnswer: Codable, Sendable, Equatable {

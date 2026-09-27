@@ -51,7 +51,15 @@ Antigravity reads no instructions file when the app starts it, so neither gets i
 
 ## Add an MCP server
 
-Add it to `~/.agents/mcp.json`, in the same shape Claude Code and Cursor use:
+To find one on the MCP Registry and add it from the app, see
+[Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md). The entry it
+writes names each secret as `${NAME}`, and the value goes in `~/.agents/secrets.env`, which
+is yours alone, readable only by you, and never committed. When an agent starts, the app
+fills each `${NAME}` from that file. A name that is not set means that server is left out
+of the session, and **Settings ▸ Shared** says which name is missing. The value is never
+shown or logged.
+
+To add one by hand, edit `~/.agents/mcp.json`, in the same shape Claude Code and Cursor use:
 
 ```json
 {

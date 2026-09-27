@@ -11,6 +11,8 @@ public struct SessionServers: Equatable, Sendable {
         case transportNotAdvertised(String)
         /// `mcp.json` could not be read, so none of the person's servers go.
         case mcpFileProblem
+        /// A `${NAME}` in the entry was not in `secrets.env` (060).
+        case missingSecret
     }
 
     public var servers: [MCPServer]
@@ -21,10 +23,12 @@ public struct SessionServers: Equatable, Sendable {
             && a.dropped.map(\.reason) == b.dropped.map(\.reason)
     }
 
-    /// R10 steps 1 to 3. The app's own first, then the agent's chosen servers, then the
-    /// person's, then (Grok only) the ones inside the person's plugins. The first of a
-    /// name is kept. An http or sse server the handshake does not advertise is left out.
+    /// The app's own first, then the agent's chosen servers, then the project's approved
+    /// ones, then the person's, then (Grok only) the ones inside the person's plugins
+    /// (060, R6). The first of a name is kept. An http or sse server the handshake does
+    /// not advertise is left out.
     public static func plan(app: MCPServer, chosen: [MCPServer],
+                            project: [MCPServer] = [],
                             personal: Result<[MCPServer], PersonalDotAgents.MCPFileProblem>,
                             pluginServers: [MCPServer] = [],
                             http: Bool, sse: Bool) -> SessionServers {
@@ -35,7 +39,7 @@ public struct SessionServers: Equatable, Sendable {
         case .failure: mine = []; plan.dropped.append((PersonalDotAgents.mcpFile, .mcpFileProblem))
         }
         var names = Set<String>()
-        for server in [app] + chosen + mine + pluginServers {
+        for server in [app] + chosen + project + mine + pluginServers {
             switch server.transport {
             case .http where !http:
                 plan.dropped.append((server.name, .transportNotAdvertised("http")))
@@ -53,6 +57,49 @@ public struct SessionServers: Equatable, Sendable {
         }
         return plan
     }
+
+    /// Fill `${NAME}` from `secrets.env`. A server that still has a missing name is left
+    /// out, with the names it needed.
+    static func fillSecrets(_ servers: [MCPServer], with secrets: SecretsEnv)
+        -> (filled: [MCPServer], missing: [(name: String, secrets: [String])]) {
+        var filled: [MCPServer] = []
+        var missing: [(name: String, secrets: [String])] = []
+        for server in servers {
+            if let done = secrets.filled(server) {
+                filled.append(done)
+            } else {
+                let names = SecretsEnv.referencedNames(in: server).filter { secrets.value(of: $0) == nil }
+                var seen = Set<String>()
+                missing.append((server.name, names.filter { seen.insert($0).inserted }))
+            }
+        }
+        return (filled, missing)
+    }
+
+    /// Project servers a session may be given: approved entries, with secrets filled.
+    /// Unapproved names are `waiting`. Unfilled ones are `missing` and not in `servers`.
+    static func projectContribution(in folder: URL, approvals: MCPApprovals, secrets: SecretsEnv)
+        -> (servers: [MCPServer], waiting: [String], missing: [(name: String, secrets: [String])],
+            unreadable: PersonalDotAgents.MCPFileProblem?) {
+        switch PersonalDotAgents.projectServers(in: folder) {
+        case .failure(let problem):
+            return ([], [], [], problem)
+        case .success(let all):
+            let root = try? MCPJSONFile.loadOrEmpty(at: MCPJSONFile.projectURL(folder: folder))
+            var kept: [MCPServer] = []
+            var waiting: [String] = []
+            for server in all {
+                guard let entry = root?["mcpServers"]?[server.name] else { continue }
+                if approvals.isApproved(folder: folder, name: server.name, entry: entry) {
+                    kept.append(server)
+                } else {
+                    waiting.append(server.name)
+                }
+            }
+            let (filled, missing) = fillSecrets(kept, with: secrets)
+            return (filled, waiting, missing, nil)
+        }
+    }
 }
 
 extension DaemonCore {
@@ -62,12 +109,39 @@ extension DaemonCore {
     /// nothing read from it is kept (R10, FR-023).
     func sessionServers(runtimeID: String, chosen: [MCPServer], token: String, managesAgents: Bool,
                         cwd: URL, capabilities: ACP.MCPCapabilities?) async -> [MCPServer] {
-        let personal = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
+        let personalRaw = locations.personalHome.map { PersonalDotAgents.personalServers(home: $0) } ?? .success([])
+        let secrets: SecretsEnv = {
+            guard let home = locations.personalHome else { return SecretsEnv(lines: []) }
+            return SecretsEnv.load(from: SecretsEnv.url(home: home))
+        }()
+        let personal: Result<[MCPServer], PersonalDotAgents.MCPFileProblem>
+        switch personalRaw {
+        case .failure(let problem):
+            personal = .failure(problem)
+        case .success(let servers):
+            let (filled, missing) = SessionServers.fillSecrets(servers, with: secrets)
+            for item in missing { Self.logMissingSecret(item) }
+            personal = .success(filled)
+        }
+        let projectFolder = Project.standardize(cwd)
+        let contribution = SessionServers.projectContribution(
+            in: projectFolder, approvals: mcpApprovalStore.load(), secrets: secrets)
+        for name in contribution.waiting {
+            DaemonLog.shared.write("session servers: \(name) left out: waiting for approval")
+        }
+        for item in contribution.missing { Self.logMissingSecret(item) }
+        if let problem = contribution.unreadable {
+            DaemonLog.shared.write("project servers: left out, \(problem.message)"
+                                   + (problem.line.map { " (line \($0))" } ?? ""))
+        }
         // Grok loads a plugin's skills and commands from `pluginDirs` but never starts its
         // servers, so they go here too (R9, R12).
         var pluginServers: [MCPServer] = []
         if PersonalDotAgents.rule(for: runtimeID)?.pluginHandover == .sessionMetaWithServers, let home = locations.personalHome {
-            pluginServers = PersonalDotAgents.personalPluginServers(home: home)
+            let raw = PersonalDotAgents.personalPluginServers(home: home)
+            let (filled, missing) = SessionServers.fillSecrets(raw, with: secrets)
+            for item in missing { Self.logMissingSecret(item) }
+            pluginServers = filled
         }
         if case .failure(let problem) = personal {
             DaemonLog.shared.write("personal servers: left out, \(problem.message)"
@@ -77,13 +151,18 @@ extension DaemonCore {
         // in another folder (053).
         let app = appServer(token: token, managesAgents: managesAgents,
                             movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))
-        let plan = SessionServers.plan(app: app,
-                                       chosen: chosen, personal: personal, pluginServers: pluginServers,
+        let plan = SessionServers.plan(app: app, chosen: chosen, project: contribution.servers,
+                                       personal: personal, pluginServers: pluginServers,
                                        http: capabilities?.http ?? false, sse: capabilities?.sse ?? false)
         for (name, reason) in plan.dropped where reason != .mcpFileProblem {
             DaemonLog.shared.write("session servers: \(name) left out of a \(runtimeID) session: \(reason)")
         }
         return await bridged(plan.servers, runtimeID: runtimeID, token: token, cwd: cwd)
+    }
+
+    private static func logMissingSecret(_ item: (name: String, secrets: [String])) {
+        let names = item.secrets.isEmpty ? "" : " \(item.secrets.joined(separator: ", "))"
+        DaemonLog.shared.write("session servers: \(item.name) left out: missing secret\(names)")
     }
 
     /// For a runtime that takes no stdio server from the client (Copilot, research R9),
