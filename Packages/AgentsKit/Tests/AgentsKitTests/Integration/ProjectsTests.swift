@@ -31,7 +31,8 @@ struct ProjectsTests {
                        lastTurnUsage: TurnUsage? = nil,
                        costToDate: [String: Decimal] = [:]) -> Agent {
         Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
-              createdAt: created, lastActivityAt: activity, endedReason: .endTurn,
+              createdAt: created, lastActivityAt: activity,
+              endedReason: state == .stopped ? .cancelled : .endTurn,
               lastTurnUsage: lastTurnUsage, costToDate: costToDate)
     }
 

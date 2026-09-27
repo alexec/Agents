@@ -47,8 +47,8 @@ that agent, so it carries on. It can still ask you a question, and the question 
 you. If you have set up your iPhone, the question reaches it there.
 
 When the agent finishes and nothing else is going on, the daemon exits. When you open
-Agents again, a new daemon starts, reads the records, and the agent is under **Complete**
-with its summary, as if you had watched it finish.
+Agents again, a new daemon starts, reads the records, and the unread agent is under
+**Needs you** with its summary. Once you open it, completed work moves to **Done**.
 
 While any agent has a turn in flight, the daemon keeps the Mac from going to sleep because
 it has been left alone. It lets go as soon as no turn is in flight. An agent waiting for

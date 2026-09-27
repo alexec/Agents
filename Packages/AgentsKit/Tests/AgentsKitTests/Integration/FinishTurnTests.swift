@@ -92,7 +92,7 @@ struct FinishTurnTests {
         #expect(agent.report?.outcome == .done)
         #expect(agent.report?.message == "Renamed the call sites; tests pass.")
         #expect(agent.suggestedPrompts.map(\.label) == ["A"])
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         // One record of it, at the foot, as a report alone leaves.
         #expect(try await reported(core, id).map(\.outcome) == [.done])
     }

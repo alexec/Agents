@@ -25,8 +25,7 @@ struct SessionsColumn: View {
 
     var body: some View {
         List(selection: $picked) {
-            // The same headings the project page drew, Complete split into Unread and
-            // Read and all.
+            // The same headings the project page draws.
             ForEach(AgentGroup.live, id: \.self) { group in
                 ForEach(group.headings(matching(model.agents(in: model.selectedProjectKey, group: group)))) { part in
                     Section {

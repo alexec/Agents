@@ -59,6 +59,8 @@ struct AgentRow: View {
                        isWaiting: agent.isWaiting,
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
+                       endedReason: agent.endedReason,
+                       isUnread: agent.isUnread,
                        isParked: agent.parking?.isParked == true,
                        isWaitingForAllowance: agent.allowanceWait != nil)
                 .padding(.top, 1)
@@ -292,6 +294,8 @@ struct StatusIcon: View {
     var isUnaccountedFor = false
     /// Why it stopped, where it did, in `EndedReason`'s words.
     var ending: String?
+    var endedReason: EndedReason?
+    var isUnread = false
     /// Parked (040): the shape still says how it ended, but it is not orange, because
     /// the person has seen it and chosen later.
     var isParked = false
@@ -300,7 +304,10 @@ struct StatusIcon: View {
     var isWaitingForAllowance = false
 
     private var shape: StatusShape {
-        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack)
+        StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
+                    isUnread: isUnread, endedReason: endedReason,
+                    waitingForAllowance: isWaitingForAllowance,
+                    outcomeUnknown: isUnaccountedFor)
     }
 
     var body: some View {
@@ -332,6 +339,7 @@ struct StatusIcon: View {
     /// reads too, and a stopped agent says why.
     private var description: String {
         if isComingBack { return AgentsModel.comingBackDescription }
+        if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
         if shape == .waiting { return StatusShape.waitingLabel }
         if let settledOutcome { return settledOutcome.heading }

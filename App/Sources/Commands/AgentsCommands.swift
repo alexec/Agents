@@ -245,12 +245,10 @@ struct AgentsCommands: Commands {
         model.openAgent(ids[next])
     }
 
-    /// Every session waiting on the person — Needs attention and Blocked — project by
-    /// project in the list's order, Needs attention first within each.
+    /// Every session needing the person, project by project in the list's order.
     private var needingAttention: [UUID] {
         projectsInListOrder.flatMap { summary in
             model.agents(in: summary.key, group: .needsAttention)
-                + model.agents(in: summary.key, group: .blocked)
         }.map(\.id)
     }
 

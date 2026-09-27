@@ -195,14 +195,15 @@ struct AgentsModelTests {
         model.apply(DaemonAPI.Notification.agentShowFile,
                     try notification(DaemonAPI.ShowFileNotification(
                         agentID: wanted.id, file: ShownFile(path: "/tmp/work/api/main.swift"))))
-        #expect(model.unreadCount(in: folder) == 1)
+        #expect(model.unreadCount(in: folder) == 2)
     }
 
     /// US2: an agent that asked to be looked at and was then stopped wants nobody,
     /// because the grouping consults its state and the count is the grouping.
     @Test func aStoppedAgentThatAskedToBeLookedAtIsNotWanted() throws {
         let model = AgentsModel()
-        let stopped = agent(state: .stopped)
+        var stopped = agent(state: .stopped)
+        stopped.endedReason = .cancelled
         model.apply(DaemonAPI.Notification.agentChanged, try notification(stopped))
         model.apply(DaemonAPI.Notification.agentShowFile,
                     try notification(DaemonAPI.ShowFileNotification(

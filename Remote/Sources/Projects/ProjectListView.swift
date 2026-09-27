@@ -73,7 +73,7 @@ struct ProjectRow: View {
     /// uses the phone's. The Mac's row does the same, for the same reason.
     private var counts: [AgentGroup: Int] { model.counts(in: summary.folder) }
 
-    /// Exactly when something in it is under Needs attention on its page.
+    /// Exactly when something in it is under Needs you on its page.
     private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
     var body: some View {
@@ -110,7 +110,7 @@ struct ProjectRow: View {
     /// Mac shows, in the same order.
     private var subtitle: String? {
         let working = counts[.running] ?? 0
-        if needsPerson { return "Needs attention" }
+        if needsPerson { return "Needs you" }
         if working > 0 { return working == 1 ? "1 working" : "\(working) working" }
         return nil
     }
