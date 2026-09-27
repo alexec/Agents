@@ -9,7 +9,7 @@ import Testing
 /// suite holds is that the worktree is made before any runtime and the runtime is
 /// started inside it, that the agent stays filed under its project, that the project's
 /// own checkout is left alone, and that a worktree that cannot be had starts nothing.
-@Suite("Agents in worktrees", .timeLimit(.minutes(1)))
+@Suite("Agents in worktrees", .serialized, .timeLimit(.minutes(1)))
 struct WorktreeStartTests {
     // MARK: A repository to work in
 
@@ -158,19 +158,19 @@ struct WorktreeStartTests {
         #expect(launcher.launchCount == 0)
     }
 
-    @Test func aHookThatRefusesStartsNothingAndSaysWhy() async throws {
+    @Test func aRepositoryHookDoesNotRunWhenMakingAWorktree() async throws {
         let repo = try await repository()
         let hook = repo.top.appending(path: ".git/hooks/post-checkout")
-        try "#!/bin/sh\necho 'the hook says no' >&2\nexit 1\n".write(to: hook, atomically: true, encoding: .utf8)
+        try "#!/bin/sh\ntouch hook-ran\nexit 1\n".write(to: hook, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
         let launcher = FakeLauncher()
         let core = try await makeCore(repo, launcher)
 
-        let error = await failure { try await startNew(core, repo) }
-        #expect(error?.code == DaemonAPI.Failure.worktreeFailed)
-        #expect(error?.message.contains("the hook says no") == true)
-        #expect(await core.allAgents().isEmpty)
-        #expect(launcher.launchCount == 0)
+        let id = try await startNew(core, repo)
+        let agent = try #require(await core.agent(id))
+        let marker = agent.worktree?.root.appending(path: "hook-ran")
+        #expect(marker.map { !FileManager.default.fileExists(atPath: $0.path) } == true)
+        #expect(launcher.launchCount == 1)
     }
 
     @Test func twoStartsFromTheSameWordsGetTwoWorktrees() async throws {
