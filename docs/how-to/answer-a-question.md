@@ -26,7 +26,9 @@ Whichever it is, the agent and its project say **Needs you** until you answer.
      notification, on the device you used last: the Mac if you are at it, otherwise the
      iPhone or iPad you touched most recently. None comes if you are already reading
      that conversation.
-2. Answer the card above the prompt.
+2. Answer the card above the prompt. When the agent asks about several things at once —
+   several file edits, for example — each question stays as its own card, stacked above
+   the prompt, until you answer it. Answering one leaves the others.
    - **Permission.** The card names what the agent wants to do, such as the command it
      wants to run or the file it wants to change. The buttons are the agent's own
      choices, usually **Yes**, **Yes, and don't ask again…** (the rest of the button

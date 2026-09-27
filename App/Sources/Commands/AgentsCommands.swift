@@ -217,7 +217,7 @@ struct AgentsCommands: Commands {
     /// A permission or elicitation card is on the open chat: ⌘1…n belong to its
     /// answers, not to the inspector panes.
     private var answeringCard: Bool {
-        model.permissionForSelection != nil || model.elicitationForSelection != nil
+        !model.permissionsForSelection.isEmpty || model.elicitationForSelection != nil
     }
 
     /// The project list's order: this Mac's projects, then each server's (037).

@@ -438,6 +438,7 @@ final class AppModel {
         return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
     }
 
+    var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
     var permissionForSelection: PermissionRequest? { work.permission(for: selection) }
 
     /// What a new agent can be started with, on the machine it would start on: the

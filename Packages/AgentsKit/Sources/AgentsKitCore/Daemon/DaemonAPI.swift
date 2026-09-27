@@ -1283,8 +1283,12 @@ public enum DaemonAPI {
         public var agentID: UUID
         /// Nil when the question has been answered and is no longer waiting.
         public var request: PermissionRequest?
-        public init(agentID: UUID, request: PermissionRequest?) {
+        /// Identifies a single withdrawn question. Nil supports older daemons
+        /// and an explicit withdrawal of all questions for an agent.
+        public var requestID: UUID?
+        public init(agentID: UUID, request: PermissionRequest?, requestID: UUID? = nil) {
             self.agentID = agentID
+            self.requestID = requestID ?? request?.id
             self.request = request
         }
     }

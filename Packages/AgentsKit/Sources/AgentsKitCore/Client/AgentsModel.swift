@@ -332,10 +332,14 @@ public final class AgentsModel {
             }
 
         case .permission(let notification):
-            // One question per agent at a time, so the agent's old one goes whether
-            // this is a new question or the news that it was answered.
-            permissions.removeAll { $0.agentID == notification.agentID }
+            if let id = notification.requestID ?? notification.request?.id {
+                permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
+            } else {
+                // Legacy withdrawal, without a request identity.
+                permissions.removeAll { $0.agentID == notification.agentID }
+            }
             if let request = notification.request { permissions.append(request) }
+            permissions.sort { $0.askedAt < $1.askedAt }
 
         case .elicitation(let notification):
             elicitations.removeAll { $0.id == notification.requestID }
@@ -938,6 +942,10 @@ public final class AgentsModel {
     }
 
     /// The question this agent is blocked on, if it still is.
+    public func permissions(for agentID: UUID?) -> [PermissionRequest] {
+        permissions.filter { $0.agentID == agentID }
+    }
+
     public func permission(for agentID: UUID?) -> PermissionRequest? {
         guard let agentID else { return nil }
         return permissions.first { $0.agentID == agentID }
