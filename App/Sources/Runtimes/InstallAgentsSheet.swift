@@ -164,9 +164,8 @@ private struct RuntimeStatusIcon: View {
     var body: some View {
         Group {
             if availability.isInstalling {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.7)
+                // The agent's row, at the same size, so a list of installs turns with it.
+                SyncedSpinner(diameter: 12)
             } else {
                 Image(systemName: symbol)
                     // Decorative: the row's status glyph, held to its 18-point frame.

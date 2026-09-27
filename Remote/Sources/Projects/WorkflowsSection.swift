@@ -148,7 +148,8 @@ private struct StatusMark: View {
     var body: some View {
         Group {
             if summary.isRunning {
-                ProgressView().controlSize(.small)
+                // The card's wheel, so a running workflow turns with the agents beside it.
+                SyncedSpinner(diameter: 18)
             } else {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).

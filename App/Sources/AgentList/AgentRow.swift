@@ -312,9 +312,7 @@ struct StatusIcon: View {
                     .foregroundStyle((shape.wantsAPerson && !isParked && !isWaitingForAllowance ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.7)
+                SyncedSpinner(diameter: 12)
             }
         }
         .frame(width: 18, height: 18)
