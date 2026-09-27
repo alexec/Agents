@@ -1559,6 +1559,97 @@ final class AppModel {
         return snapshot
     }
 
+    // MARK: The catalogue (059)
+
+    /// What a catalogue call said, or why it could not: the sheet shows either, so these
+    /// do not go through `attempt`, which would put a failure in the window's banner too.
+    func catalogSearch(_ query: String) async -> DaemonAPI.CatalogSearchAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogSearch, DaemonAPI.CatalogSearchRequest(query: query),
+                                         returning: DaemonAPI.CatalogSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.catalogError(error))
+        }
+    }
+
+    func catalogPreview(_ result: DaemonAPI.CatalogResult,
+                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogPreviewAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.catalogPreview,
+                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
+                                         returning: DaemonAPI.CatalogPreviewAnswer.self)
+        } catch {
+            return .init(preview: nil, error: Self.catalogError(error))
+        }
+    }
+
+    func catalogDestinationState(_ previewID: UUID,
+                                 for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.DestinationState? {
+        try? await client.call(DaemonAPI.Method.catalogDestinationState,
+                               DaemonAPI.DestinationStateRequest(previewID: previewID, destination: destination),
+                               returning: DaemonAPI.DestinationStateAnswer.self).destinationState
+    }
+
+    func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                  replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.skillsAdd,
+                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
+                                                                         replace: replace),
+                                               returning: DaemonAPI.SkillAddAnswer.self)
+            return .success(answer.skill)
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// A project's (or worktree's) own skills, for its page (frame D). Nil when they could
+    /// not be read, so the section keeps what it last had.
+    func projectSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
+        try? await client.call(DaemonAPI.Method.skillsList,
+                               DaemonAPI.SkillsListRequest(destination: .project(folder: folder.path)),
+                               returning: DaemonAPI.SkillsListAnswer.self).skills
+    }
+
+    /// Whether each added skill at a destination has an update (FR-018). Nil when it could
+    /// not be asked; the page then shows no marks rather than wrong ones.
+    func skillUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
+        try? await client.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
+    }
+
+    func skillUpdatePreview(_ name: String, at destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.SkillUpdatePreviewAnswer, DaemonAPI.CatalogError> {
+        do {
+            return .success(try await client.call(DaemonAPI.Method.skillsUpdatePreview,
+                                                  DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                                  returning: DaemonAPI.SkillUpdatePreviewAnswer.self))
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// Take out a skill the app or the skills tool added; its folder goes to the Trash.
+    func removeSkill(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.skillsRemove,
+                                      DaemonAPI.SkillNameRequest(destination: destination, name: name),
+                                      returning: DaemonAPI.SkillRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.catalogError(error)
+        }
+    }
+
+    /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
+    private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
+        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
+           let reason = try? rpc.data?.decode(DaemonAPI.CatalogError.self) {
+            return reason
+        }
+        return .failed(String(describing: error))
+    }
+
     func refreshRuntimes() async {
         let listed = await attempt {
             self.runtimes = try await self.client.call(DaemonAPI.Method.runtimesList,

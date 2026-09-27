@@ -149,6 +149,9 @@ struct ProjectAgentsView: View {
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
 
+                // What the project gives every agent working in it (059, frame D).
+                ProjectSkillsSection(folder: folder)
+
                 // What this project's agents are handed, and which wait for your OK (S2).
                 PluginsSection(folder: folder)
 

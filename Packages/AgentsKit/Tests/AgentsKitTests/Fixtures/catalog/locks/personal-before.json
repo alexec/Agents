@@ -1,0 +1,34 @@
+{
+  "version": 3,
+  "skills": {
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "76a98a285cb0434f3d39e1a873823556330e398b",
+      "installedAt": "2026-09-17T14:59:25.092Z",
+      "updatedAt": "2026-09-17T14:59:25.092Z"
+    },
+    "zapier-thing": {
+      "source": "zapier/connectors",
+      "sourceType": "well-known",
+      "sourceUrl": "https://connectors-skills.zapier.com/x",
+      "skillFolderHash": "",
+      "wellKnownDigest": "abc\u0001\"quoted\"",
+      "installedAt": "2026-09-18T10:00:00.000Z",
+      "updatedAt": "2026-09-18T10:00:00.000Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "claude-code",
+    "codex"
+  ],
+  "futureKey": {
+    "ratio": 1.50,
+    "big": 1e3
+  }
+}

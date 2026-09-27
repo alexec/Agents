@@ -48,7 +48,7 @@ struct SettingsWindow: View {
         case .general: FormColumn { AppearanceSettingsView() }
         case .agents: FormColumn { AgentsSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
-        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage)
+        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: $sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .pool: FormColumn { PoolSettingsView() }
         case .devices: FormColumn { DevicesPane() }

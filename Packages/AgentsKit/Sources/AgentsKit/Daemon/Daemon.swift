@@ -89,6 +89,10 @@ public final class Daemon: @unchecked Sendable {
         #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
+        // An add the last daemon died in the middle of is undone before anyone looks (059).
+        #if canImport(CryptoKit)
+        await core.recoverCatalog()
+        #endif
         // Off the start: it runs Codex's own command, which takes a moment (054, R12).
         Task { await core.syncCodexPlugins() }
         let recovered = await core.recover()

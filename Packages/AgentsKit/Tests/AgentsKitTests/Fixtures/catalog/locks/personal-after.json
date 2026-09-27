@@ -1,0 +1,43 @@
+{
+  "version": 3,
+  "skills": {
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "1111111111111111111111111111111111111111",
+      "installedAt": "2026-09-17T14:59:25.092Z",
+      "updatedAt": "2026-09-26T15:10:00.000Z"
+    },
+    "zapier-thing": {
+      "source": "zapier/connectors",
+      "sourceType": "well-known",
+      "sourceUrl": "https://connectors-skills.zapier.com/x",
+      "skillFolderHash": "",
+      "wellKnownDigest": "abc\u0001\"quoted\"",
+      "installedAt": "2026-09-18T10:00:00.000Z",
+      "updatedAt": "2026-09-18T10:00:00.000Z"
+    },
+    "nested": {
+      "source": "fixture-owner/fixture-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/fixture-owner/fixture-skills.git",
+      "skillPath": "skills/nested/SKILL.md",
+      "skillFolderHash": "b4146b99df32f406302cf36ff69949f3b394ea01",
+      "installedAt": "2026-09-26T15:10:00.000Z",
+      "updatedAt": "2026-09-26T15:10:00.000Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "claude-code",
+    "codex"
+  ],
+  "futureKey": {
+    "ratio": 1.5,
+    "big": 1000
+  }
+}

@@ -135,6 +135,17 @@ once you delete them; MCP servers go with each conversation as it starts, so not
 written into a runtime's own config. **Settings ▸ Shared** shows what each runtime ends up
 with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
 
+A project's own skills are listed on its page, in a **Skills** section, where you can also
+add one from skills.sh. Because the project's `.agents` folder is committed, a skill added
+there reaches everyone who clones the project; one added in **Settings ▸ Shared** is yours
+alone. A worktree has its own `.agents`, so a skill added on a worktree's page stays on that
+branch until it is merged. Projects on a server don't show the section yet. See
+[Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
+
+Nothing from a catalogue is taken on trust. skills.sh does not review what it lists, so the
+app shows every file before anything is written, points out scripts an agent could run, pins
+the commit it took, and checks each file against GitHub's own record of it at that commit.
+
 ## Related
 
 - [How-to guides](../how-to/index.md), for adding a project, adding a Linux server and

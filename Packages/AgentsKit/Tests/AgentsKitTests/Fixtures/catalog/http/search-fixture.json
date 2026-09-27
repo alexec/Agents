@@ -1,0 +1,35 @@
+{
+  "query": "fixture",
+  "searchType": "fuzzy",
+  "skills": [
+    {
+      "id": "fixture-owner/fixture-skills/nested",
+      "source": "fixture-owner/fixture-skills",
+      "skillId": "nested",
+      "name": "nested",
+      "installs": 5120
+    },
+    {
+      "id": "fixture-owner/fixture-skills/plain",
+      "source": "fixture-owner/fixture-skills",
+      "skillId": "plain",
+      "name": "plain",
+      "installs": 812
+    },
+    {
+      "id": "notion/notion-skill",
+      "source": "https://www.notion.so/.well-known/skills",
+      "skillId": "notion-skill",
+      "name": "Notion",
+      "installs": 700
+    },
+    {
+      "id": "Anthropics/skills/mixed",
+      "source": "Anthropics/skills",
+      "skillId": "mixed",
+      "name": "mixed",
+      "installs": 42
+    }
+  ],
+  "count": 4
+}
