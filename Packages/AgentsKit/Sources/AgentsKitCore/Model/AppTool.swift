@@ -23,9 +23,10 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
-    // Four more that act on other agents (028): start one in this project, and stop,
-    // archive or list the ones this agent started. Never offered to an agent another
-    // agent started.
+    // Three that act on other agents (028): start one in this project, and stop or
+    // list the ones this agent started. archive_agent is still a name a transcript
+    // or older conversation may carry, but it is no longer offered — only the person
+    // archives. Never offered to an agent another agent started.
 
     /// Start an agent in the caller's own project.
     public static let startAgent = "start_agent"

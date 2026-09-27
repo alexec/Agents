@@ -36,7 +36,7 @@ extension DaemonCore {
             throw JSONRPCError(
                 code: DaemonAPI.Failure.notYours,
                 message: "Nothing was started: this project already has \(HelperLimit.perProject) "
-                    + "agents started by agents\(naming). Archive one to free its place.")
+                    + "agents started by agents\(naming). The person archives one to free its place.")
         }
         // A mode it names may be its own or stricter, never looser: otherwise an agent
         // kept on a short lead starts one on none and hands it the work.
@@ -153,13 +153,11 @@ extension DaemonCore {
     }
 
     public func archiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
-        let (caller, target) = try helperTarget(request, doing: "archive")
-        let folder = caller.projectFolder
-        try await archive(target.id, by: .agent(caller.id))
-        let now = HelperLimit.placesInUse(in: folder, agents: agents.values,
-                                          reserved: reservedStarts[folder, default: 0])
-        return "Archived \u{201C}\(target.title ?? "Untitled")\u{201D}. "
-            + "\(now) of \(HelperLimit.perProject) places in this project are now in use."
+        // An older conversation may still call archive_agent. The outcome of who may
+        // archive did not change with the tool still being known: only the person can.
+        _ = try helperCaller(token: request.token, refusing: "Nothing was archived")
+        throw JSONRPCError(code: DaemonAPI.Failure.notYours,
+                           message: AfterTurn.cannotArchiveAnother)
     }
 
     // MARK: Listing
