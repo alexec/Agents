@@ -153,6 +153,11 @@ struct ContentView: View {
                 }
             }
         }
+        // Today's set-up, offered the move to a control plane, never moved on its own
+        // (058, frame I).
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if model.offersMoveAcross { MoveAcrossStrip() }
+        }
         .environment(frame)
         .environment(requests)
         .environment(sidebarStates)

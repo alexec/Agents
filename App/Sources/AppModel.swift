@@ -1133,10 +1133,48 @@ final class AppModel {
         if !isConnected { await reconnect() }
     }
 
+    /// The move across (058, US6) is letting the old daemon go: the window does not go
+    /// back for it, or it would start it again under the host launchd is starting.
+    @ObservationIgnored private var holdingForMove = false
+
+    /// A window working the old way, with something to move, and no control plane yet:
+    /// the strip that offers the move (frame I).
+    var offersMoveAcross: Bool { ControlConfig.endpoint == nil && !needsFirstRun && !moved }
+    private var moved = false
+
+    /// Step two of the move: the window's own daemon quits, leaving its agents to be
+    /// picked up by the host that replaces it, and the window does not start another.
+    /// A turn in flight refuses the quit, and nothing has changed.
+    func letTheOldDaemonGo() async throws {
+        holdingForMove = true
+        do {
+            _ = try await client.call(DaemonAPI.Method.daemonQuit, DaemonAPI.QuitRequest(stopAgents: false))
+        } catch let error as JSONRPCError {
+            holdingForMove = false
+            throw MoveAcross.Failure("an agent is working. Let its turn finish, then try again. (\(error.message))")
+        }
+        await client.disconnect()
+        let lock = StoreLocations.default.lock
+        for _ in 0..<60 where FileManager.default.fileExists(atPath: lock.path) {
+            // The lock file stays; the lock is a flock held while the daemon lives.
+            guard DaemonLock(at: lock).map({ $0.release(); return true }) == nil else { return }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+    }
+
+    /// The move stopped before the window adopted the control plane: back to the old way.
+    func resumeTheOldWay() async {
+        holdingForMove = false
+        guard ControlConfig.endpoint == nil else { return }
+        await stayConnected()
+    }
+
     /// First run has a control plane (058): from here the window is its client, and
     /// this Mac's host is reached through it.
     func adoptControlPlane(root: URL) async {
         ControlConfig.save(root)
+        holdingForMove = false
+        moved = true
         await adopt(.local(root))
     }
 
@@ -1172,8 +1210,9 @@ final class AppModel {
     }
 
     func connect() async {
-        // Never the old way's daemon while first run is still deciding the new way.
-        guard !needsFirstRun else { return }
+        // Never the old way's daemon while first run is still deciding the new way, or
+        // while the move across is handing it to launchd.
+        guard !needsFirstRun, !holdingForMove else { return }
         do {
             try await client.connect()
             isConnected = true
