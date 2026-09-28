@@ -382,10 +382,16 @@ private struct WakefulnessRow: View {
     /// The sidebar already shows which agents are working; this row says only why
     /// the Mac is awake.
     private func detail(_ state: DaemonAPI.WakeState) -> String? {
-        state.isHolding ? nil : state.batteryPercent.map { "\($0)%" }
+        if state.isHolding, let until = state.graceUntil {
+            return WakeWords.untilLine(until)
+        }
+        return state.isHolding ? nil : state.batteryPercent.map { "\($0)%" }
     }
 
     private func help(_ state: DaemonAPI.WakeState) -> String {
+        if state.isHolding, let until = state.graceUntil {
+            return WakeWords.graceHelp(until)
+        }
         if state.isHolding {
             return "This Mac will not sleep while an agent is mid-turn."
         }

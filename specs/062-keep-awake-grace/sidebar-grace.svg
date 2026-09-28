@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="580" viewBox="0 0 520 580" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif">
+  <style>
+    .ink { fill:#1F1D1A; }
+    .sec { fill:#6F6A62; }
+    .fine { fill:#8A8478; }
+    .h { font-size:11px; font-weight:600; letter-spacing:.4px; fill:#6F6A62; }
+    .r { font-size:14px; fill:#1F1D1A; }
+    .f { font-size:12px; fill:#6F6A62; }
+    .note { font-size:12px; fill:#b0006a; font-style:italic; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="279" height="479" rx="12" fill="#F3F0E8" stroke="#E2DCCF"/>
+  <text x="20" y="36" class="h">PROJECTS</text>
+  <text x="20" y="72" class="r">Agents</text>
+  <text x="248" y="72" text-anchor="end" class="f">2</text>
+  <text x="20" y="104" class="r">Paper site</text>
+  <text x="248" y="104" text-anchor="end" class="f">1</text>
+
+  <line x1="14" y1="360" x2="266" y2="360" stroke="#E2DCCF"/>
+
+  <circle cx="28" cy="392" r="7" fill="none" stroke="#6F6A62" stroke-width="1.4"/>
+  <line x1="28" y1="380" x2="28" y2="384" stroke="#6F6A62" stroke-width="1.4"/>
+  <line x1="28" y1="400" x2="28" y2="404" stroke="#6F6A62" stroke-width="1.4"/>
+  <line x1="16" y1="392" x2="20" y2="392" stroke="#6F6A62" stroke-width="1.4"/>
+  <line x1="36" y1="392" x2="40" y2="392" stroke="#6F6A62" stroke-width="1.4"/>
+  <text x="48" y="390" class="f">Keeping this Mac awake</text>
+  <text x="48" y="408" class="fine" font-size="12">Until 3:40 pm</text>
+
+  <text x="20" y="448" class="r">Spending</text>
+
+  <text x="300" y="386" class="note">New line.</text>
+  <text x="300" y="406" class="note">The clock is</text>
+  <text x="300" y="424" class="note">when the hold</text>
+  <text x="300" y="442" class="note">ends. It does</text>
+  <text x="300" y="460" class="note">not count down.</text>
+
+  <text x="8" y="516" class="note">Hover: “The last agent stopped. This Mac stays awake until</text>
+  <text x="8" y="534" class="note">3:40 pm so you can reply.”</text>
+  <text x="8" y="558" class="note">While an agent is still working, this row has no clock.</text>
+</svg>

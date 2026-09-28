@@ -57,7 +57,7 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
-        case .general: FormColumn { AppearanceSettingsView() }
+        case .general: FormColumn { GeneralSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }

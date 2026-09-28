@@ -473,6 +473,13 @@ extension DaemonCore {
             case DaemonAPI.Method.wakeState:
                 return .success(try JSONValue.encoding(await wakeState()))
 
+            case DaemonAPI.Method.wakeSettings:
+                return .success(try JSONValue.encoding(await readWakeSettings()))
+
+            case DaemonAPI.Method.wakeSet:
+                let settings = try require(params, as: WakeSettings.self)
+                return .success(try JSONValue.encoding(await setWakeSettings(settings)))
+
             // Retiring archived agents (051). The two writes are the person's; the
             // role table keeps devices and agents to the reads.
             case DaemonAPI.Method.retentionState:
