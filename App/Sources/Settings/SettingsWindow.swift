@@ -11,6 +11,7 @@ struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsPane") private var paneRaw = SettingsPane.appearance.rawValue
     @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
+    @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
     /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
     /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
@@ -33,9 +34,20 @@ struct SettingsWindow: View {
             set: { sharedPageRaw = $0.rawValue })
     }
 
+    private var runtimeID: Binding<String> {
+        Binding(
+            get: {
+                let known = Set(model.runtimes.map(\.id))
+                if known.contains(runtimeIDRaw) { return runtimeIDRaw }
+                return model.runtimes.first?.id ?? RuntimeCatalog.claude.id
+            },
+            set: { runtimeIDRaw = $0 })
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: pane, sharedPage: sharedPage, snapshot: sharedSnapshot)
+            SettingsRail(pane: pane, sharedPage: sharedPage, runtimeID: runtimeID,
+                         snapshot: sharedSnapshot)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -50,7 +62,11 @@ struct SettingsWindow: View {
         // windowResizability, so the mask is set on the window itself.
         .background(SettingsGrowBox())
         .navigationTitle(pane.wrappedValue.title)
-        .task { await refreshShared() }
+        .navigationTitle(title)
+        .task {
+            await model.refreshRuntimes()
+            await refreshShared()
+        }
         // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
@@ -59,17 +75,27 @@ struct SettingsWindow: View {
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .shared { Task { await refreshShared() } }
+            if chosen == .runtimes { Task { await model.refreshRuntimes() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await refreshShared() }
+            Task {
+                await refreshShared()
+                if pane.wrappedValue == .runtimes { await model.refreshRuntimes() }
+            }
         }
+    }
+
+    private var title: String {
+        guard pane.wrappedValue == .runtimes else { return pane.wrappedValue.title }
+        return model.runtimes.first { $0.id == runtimeID.wrappedValue }?.runtime.name
+            ?? SettingsPane.runtimes.title
     }
 
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
         case .appearance: FormColumn { GeneralSettingsView() }
-        case .runtimes: FormColumn { AgentRuntimesSettingsView() }
+        case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .pool: FormColumn { PoolSettingsView() }
@@ -183,8 +209,10 @@ private struct FormColumn<Content: View>: View {
 // MARK: - The rail
 
 private struct SettingsRail: View {
+    @Environment(AppModel.self) private var model
     @Binding var pane: SettingsPane
     @Binding var sharedPage: SharedPage
+    @Binding var runtimeID: String
     let snapshot: DaemonAPI.SharedSnapshot?
 
     var body: some View {
@@ -192,12 +220,21 @@ private struct SettingsRail: View {
             ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
                 if index > 0 { Spacer().frame(height: 10) }
                 ForEach(group, id: \.self) { each in
-                    if each == .shared { sharedGroup } else { paneItem(each) }
+                    switch each {
+                    case .shared: sharedGroup
+                    case .runtimes: runtimesGroup
+                    default: paneItem(each)
+                    }
                 }
             }
             Spacer()
             if pane == .shared {
                 Text("Your own set, for every project. A project’s own .agents folder is under Project configuration.")
+                    .appText(.fine).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+            } else if pane == .runtimes {
+                Text("Each runtime on this Mac: where it is, how it signs in, and how it asks permission.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
@@ -207,6 +244,33 @@ private struct SettingsRail: View {
         .frame(width: 200)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
+    }
+
+    @ViewBuilder
+    private var runtimesGroup: some View {
+        HStack(spacing: 8) {
+            Image(systemName: SettingsPane.runtimes.symbol)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(SettingsPane.runtimes.title)
+        }
+        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        ForEach(model.runtimes) { status in
+            let chosen = pane == .runtimes && runtimeID == status.id
+            RailButton(lit: chosen, label: status.runtime.name,
+                       selected: chosen,
+                       action: { pane = .runtimes; runtimeID = status.id }) {
+                HStack(spacing: 6) {
+                    Text(status.runtime.name)
+                    Spacer()
+                }
+                .padding(.leading, 28)
+            }
+        }
     }
 
     private func paneItem(_ each: SettingsPane) -> some View {
