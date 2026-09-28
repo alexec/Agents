@@ -32,9 +32,9 @@ each of these things: its own.
 ## What the app offers instead
 
 The app gives each agent a small set of tools of its own. With them an agent can say how
-its turn went, show you a file, suggest what you might say next, start and stop other
-agents in the project, set up a workflow, take a turn on a shared resource, wait for an
-event or publish one, move into a worktree and back, and work on a pull request.
+its turn went, show you a file, suggest what you might say next, start, stop and park
+other agents in the project, set up a workflow, take a turn on a shared resource, wait
+for an event or publish one, move into a worktree and back, and work on a pull request.
 Everything these tools do shows up in the window and on your phone. The
 [tools reference](../reference/agent-tools.md) lists them all.
 
@@ -75,11 +75,15 @@ each one has.
   subagents. Two of its tools, `workflow` and `monitor`, cannot be removed this way, so the
   agent is told in its briefing not to use them. Grok keeps its question tool too, but
   that tool has no way to reach the app, so Grok asks by ending its turn with the question
-  as its summary, and waits for your reply.
+  as its summary, and waits for your reply. Grok also hides this app's own tools behind a
+  search, so each Grok session is handed those tools by name, with their arguments, and
+  told to call them directly.
 - **Copilot** takes options when it starts. It loses its subagents and its session store,
   and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
-  agent's briefing names them and says what to use instead.
+  agent's briefing names them and says what to use instead. The first briefing points
+  Cursor directly to the Agents app's MCP tools, whose schemas are available from the
+  server.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its long-running goals, its automations, its memories and its
   ChatGPT connectors. Its sub-agents are switched on, and the app shows them as it does

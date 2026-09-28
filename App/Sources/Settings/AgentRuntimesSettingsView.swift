@@ -1,33 +1,34 @@
 import AgentsKit
 import SwiftUI
 
-/// Settings ▸ Agent Runtimes (048): the start-up sheet's list, for any time after it.
+/// A runtime's Settings pane, selected from the Agent Runtimes rail heading.
 struct AgentRuntimesSettingsView: View {
     @Environment(AppModel.self) private var model
+    let runtimeID: String
+
+    private var status: RuntimeStatus? {
+        model.runtimes.first { $0.id == runtimeID }
+    }
 
     var body: some View {
         Form {
-            Section {
-                ForEach(model.runtimes) { status in
+            if let status {
+                Section {
                     RuntimeInstallRow(status: status)
                     // A runtime whose only way in is a key from Settings (Gemini, 046) takes
                     // it here, beside where it is installed. The same key is lent to servers.
                     if CredentialKind.kinds(for: status.id).contains(where: \.isLentOnTheMac) {
                         CredentialRow(runtimeID: status.id, name: status.runtime.name)
-                            .padding(.leading, 12)
                     }
                     // Cursor and Grok: permission mode lives here, not under the prompt (061).
                     if ClientPermissionSettings.supports(status.id) {
                         ClientPermissionModeRow(runtimeID: status.id, name: status.runtime.name)
-                            .padding(.leading, 12)
                     }
+                } footer: {
+                    if let note = footer(for: status) { Text(note) }
                 }
-            } header: {
-                Text("Agent runtimes on this Mac")
-            } footer: {
-                Text(footer)
+                .paperListRow()
             }
-            .paperListRow()
         }
         .paperForm()
         .task {
@@ -36,21 +37,20 @@ struct AgentRuntimesSettingsView: View {
         }
     }
 
-    /// Where Claude actually is: the person's own Node is used whenever there is one, so
+    /// Claude's install note only: the person's own Node is used whenever there is one, so
     /// "installed into the app's own folder" is only true of the app's copy (or a promise
-    /// about the install button).
-    private var footer: String {
-        let others = "The others use their makers’ own installers."
-        guard let claude = model.runtimes.first(where: { $0.id == RuntimeCatalog.claude.id }) else {
-            return others
+    /// about the install button). Other runtimes use their makers' own installers.
+    private func footer(for status: RuntimeStatus) -> String? {
+        guard status.id == RuntimeCatalog.claude.id else {
+            return status.runtime.install == nil ? "Uses its maker’s own installer." : nil
         }
-        if case .available(let path, _) = claude.availability {
+        if case .available(let path, _) = status.availability {
             let tools = StoreLocations.default.tools.path
             return path.hasPrefix(tools + "/")
-                ? "Claude is installed in the app’s own folder, with nothing added to your PATH. \(others)"
-                : "Claude runs through your own Node (\(path)). \(others)"
+                ? "Installed in the app’s own folder, with nothing added to your PATH."
+                : "Runs through your own Node (\(path))."
         }
-        return "Installing Claude puts it in the app’s own folder, with nothing added to your PATH. \(others)"
+        return "Installing puts it in the app’s own folder, with nothing added to your PATH."
     }
 }
 
@@ -64,7 +64,7 @@ private struct ClientPermissionModeRow: View {
     var body: some View {
         Picker("\(name) permission mode", selection: binding) {
             Text("Default").tag(ClientPermissionMode.default)
-            Text("Auto-review").tag(ClientPermissionMode.autoReview)
+            Text("Always-approve").tag(ClientPermissionMode.alwaysApprove)
         }
         Text(description)
             .appText(.supporting)
@@ -90,8 +90,8 @@ private struct ClientPermissionModeRow: View {
         switch model.clientPermissions.mode(for: runtimeID) {
         case .default:
             return "Asks before \(name) does something that needs permission."
-        case .autoReview:
-            return "Allows ordinary work inside the project; asks before anything that leaves it, publishes, or needs extra privilege."
+        case .alwaysApprove:
+            return "Answers every permission request for you. Questions that are not permission still wait."
         }
     }
 }

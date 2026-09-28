@@ -57,17 +57,17 @@ struct AppServiceTests {
         // The one call that ends a turn first, the two that act mid-turn after it,
         // and the two older names last: listed, so a runtime that checks a name
         // against the list before calling it still finds what it was told (023).
-        // The three agent tools (028) sit after the workflow tool, before the older
-        // names, for an agent that may use them — which is the default. archive_agent
-        // is no longer offered. The three lease tools (036) follow them, for every
-        // agent, then the three event tools (042), and the two pull-request tools
-        // (038) after those, also for every agent. The two move tools (053) sit
-        // between the event and pull-request tools.
+        // The four agent tools (028 + park) sit after the workflow tool, before the
+        // older names, for an agent that may use them — which is the default.
+        // archive_agent is no longer offered. The three lease tools (036) follow
+        // them, for every agent, then the three event tools (042), and the two
+        // pull-request tools (038) after those, also for every agent. The two move
+        // tools (053) sit between the event and pull-request tools.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.listMyAgentsToolName,
+                AppService.parkAgentToolName, AppService.listMyAgentsToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
@@ -803,7 +803,7 @@ struct AppServiceTests {
     /// once ended with lease_resource, and every release became an extension.
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.startAgent,
-                     AppTool.stopAgent, AppTool.archiveAgent, AppTool.listMyAgents,
+                     AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent, AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
                      AppTool.listResources, AppTool.pushPullRequest, AppTool.replyOnPullRequest]
         for name in names {

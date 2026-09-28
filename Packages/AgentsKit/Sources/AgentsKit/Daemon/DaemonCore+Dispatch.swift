@@ -473,6 +473,13 @@ extension DaemonCore {
             case DaemonAPI.Method.wakeState:
                 return .success(try JSONValue.encoding(await wakeState()))
 
+            case DaemonAPI.Method.wakeSettings:
+                return .success(try JSONValue.encoding(await readWakeSettings()))
+
+            case DaemonAPI.Method.wakeSet:
+                let settings = try require(params, as: WakeSettings.self)
+                return .success(try JSONValue.encoding(await setWakeSettings(settings)))
+
             // Retiring archived agents (051). The two writes are the person's; the
             // role table keeps devices and agents to the reads.
             case DaemonAPI.Method.retentionState:
@@ -629,6 +636,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
 
+            case DaemonAPI.Method.agentsParkHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try parkHelper(request))])
+
             case DaemonAPI.Method.agentsArchiveHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await archiveHelper(request))])
@@ -665,6 +676,24 @@ extension DaemonCore {
             case DaemonAPI.Method.pullRequestsCheckout:
                 let request = try require(params, as: DaemonAPI.PullRequestRequest.self)
                 return .success(try JSONValue.encoding(try await checkOutPullRequest(request.number, in: request.folder)))
+
+            // GitHub Projects issue board (063). This is the Mac project's view and its
+            // assignment action; the device role intentionally has no access.
+            case DaemonAPI.Method.projectIssuesList:
+                let request = try require(params, as: GitHubProjectBoardRequest.self)
+                return .success(try JSONValue.encoding(await githubProjectBoard(for: request.folder)))
+
+            case DaemonAPI.Method.projectIssuesRefresh:
+                let request = try require(params, as: GitHubProjectBoardRequest.self)
+                return .success(try JSONValue.encoding(await refreshGitHubProjectBoard(in: request.folder)))
+
+            case DaemonAPI.Method.projectIssuesAssign:
+                let request = try require(params, as: GitHubIssueAssignmentRequest.self)
+                return .success(try JSONValue.encoding(try await assignGitHubIssue(request)))
+
+            case DaemonAPI.Method.projectIssuesSyncStatus:
+                let request = try require(params, as: GitHubProjectStatusSyncRequest.self)
+                return .success(try JSONValue.encoding(try await syncGitHubIssueStatus(request)))
 
             case DaemonAPI.Method.agentsListHelpers:
                 let request = try require(params, as: DaemonAPI.ListHelpersRequest.self)

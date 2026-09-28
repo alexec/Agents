@@ -190,7 +190,8 @@ extension DaemonCore {
         try await session.continueSession(id: sessionID, cwd: agent.cwd)
         let forked = try await session.forkSession(cwd: agent.cwd,
                                                    additionalDirectories: agent.additionalDirectories,
-                                                   meta: sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd))
+                                                   meta: sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd,
+                                                                     managesAgents: agent.startedByAgent == nil))
 
         // A new agent carrying the conversation, not a copy of the record. What the
         // original was doing, owes, has queued or was started by is the original's: a

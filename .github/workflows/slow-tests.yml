@@ -23,7 +23,6 @@ jobs:
         run: |
           filter=$(scripts/slow-tests.sh Packages/AgentsKit)
           swift test --package-path Packages/AgentsKit --filter "$filter"
-
       - name: Run quarantined flaky tests
         continue-on-error: true
         env:

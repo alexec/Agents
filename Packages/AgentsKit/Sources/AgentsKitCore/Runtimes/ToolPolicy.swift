@@ -241,6 +241,13 @@ public enum Lever: Hashable, Sendable {
     case words
 }
 
+/// How a runtime is directed to the app's MCP tool schemas.
+public enum AppToolSchemaDelivery: Hashable, Sendable {
+    case none
+    case sessionRules
+    case firstPrompt
+}
+
 /// One runtime's policy: what goes, what deliberately stays, and what we could not move.
 public struct ToolPolicy: Hashable, Sendable {
     public var runtimeID: String
@@ -248,6 +255,9 @@ public struct ToolPolicy: Hashable, Sendable {
     public var kept: [KeptTool] = []
     public var residue: [ResidualTool] = []
     public var lever: Lever
+    /// Some runtimes need the app's tools written out because they do not reliably
+    /// discover them from the MCP catalog. The delivery point is runtime-specific.
+    public var appToolSchemaDelivery: AppToolSchemaDelivery
     public var environmentFiles: [EnvironmentFile] = []
     /// This runtime's own name for a tool that can actually put a question to the person,
     /// where there is one — the one tool in `kept` the briefing may name out loud.
@@ -298,6 +308,7 @@ public struct ToolPolicy: Hashable, Sendable {
                 kept: [KeptTool] = [],
                 residue: [ResidualTool] = [],
                 lever: Lever,
+                appToolSchemaDelivery: AppToolSchemaDelivery = .none,
                 environmentFiles: [EnvironmentFile] = [],
                 escalationTool: String? = nil,
                 preferredAuthMethods: [String] = [],
@@ -310,6 +321,7 @@ public struct ToolPolicy: Hashable, Sendable {
         self.kept = kept
         self.residue = residue
         self.lever = lever
+        self.appToolSchemaDelivery = appToolSchemaDelivery
         self.environmentFiles = environmentFiles
         self.escalationTool = escalationTool
         self.preferredAuthMethods = preferredAuthMethods

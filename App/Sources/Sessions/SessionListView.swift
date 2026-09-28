@@ -88,6 +88,7 @@ struct SessionListView: View {
                 }
                 .appText(.fine)
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             if !session.isHeld {
@@ -108,6 +109,6 @@ struct SessionListView: View {
             .foregroundStyle(.secondary)
             .help("Delete this conversation from \(name)")
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 }

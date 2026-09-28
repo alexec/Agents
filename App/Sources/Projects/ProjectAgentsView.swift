@@ -70,7 +70,10 @@ struct ProjectAgentsView: View {
         // The pull requests the daemon has, then a refresh, each time a project opens
         // (038 FR-008). Never polled from here.
         .task(id: folder) {
-            if let folder { await model.loadPullRequests(for: folder) }
+            if let folder {
+                await model.loadPullRequests(for: folder)
+                await model.loadGitHubProjectBoard(for: folder)
+            }
         }
     }
 
@@ -155,6 +158,7 @@ struct ProjectAgentsView: View {
                 // What the work is on, between what is happening and what will (038).
                 // Absent on a project that is not on GitHub.
                 PullRequestsSection(folder: folder, selection: $selection)
+                GitHubProjectBoardSection(selection: $selection, folder: folder)
 
                 // Under the agents: what will happen, after what is happening. See
                 // `WorkflowsSection` for why that order.

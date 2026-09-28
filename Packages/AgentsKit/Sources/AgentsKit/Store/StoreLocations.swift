@@ -127,6 +127,8 @@ public struct StoreLocations: Sendable {
     /// What the app remembers about the person's pull requests (038): which changes
     /// have fired, the babysitting counts, and the last good list for each project.
     public var pullRequests: URL { root.appendingPathComponent("pull-requests.json") }
+    /// Cached GitHub Projects boards and their app-owned issue-to-agent assignments (063).
+    public var githubProjects: URL { root.appendingPathComponent("github-projects.json") }
     /// Every device that has announced itself to this daemon.
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.
@@ -177,6 +179,8 @@ public struct StoreLocations: Sendable {
     public var events: URL { root.appendingPathComponent("events.jsonl") }
     /// How long archived agents are kept and the clock that counts it (051).
     public var retention: URL { root.appendingPathComponent("retention.json") }
+    /// Whether this Mac stays awake for agents, and for how long after they stop.
+    public var wakeSettings: URL { root.appendingPathComponent("wake.json") }
     /// What is left of retired agents, one per line, never rewritten (051).
     public var retired: URL { root.appendingPathComponent("retired.jsonl") }
     /// The person's pool of runtimes to carry a chat on with (052).

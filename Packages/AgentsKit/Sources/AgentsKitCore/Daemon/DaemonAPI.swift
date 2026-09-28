@@ -194,10 +194,12 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `archive_agent` or `list_my_agents` (028). The caller is the
-        /// token, and the token alone decides the project and what it may touch.
+        /// `stop_agent`, `park_agent`, `archive_agent` or `list_my_agents` (028). The
+        /// caller is the token, and the token alone decides the project and what it
+        /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
+        public static let agentsParkHelper = "agents/parkHelper"
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
@@ -238,6 +240,14 @@ public enum DaemonAPI {
         public static let pullRequestsCheckout = "pullRequests/checkout"
         /// Write the starter babysitting workflow (FR-026).
         public static let pullRequestsAddBabysitter = "pullRequests/addBabysitter"
+        /// The first Projects v2 board linked to a repository, from the daemon cache.
+        public static let projectIssuesList = "projectIssues/list"
+        /// Refresh the linked board from GitHub now.
+        public static let projectIssuesRefresh = "projectIssues/refresh"
+        /// Start a fresh agent for a Ready issue and move the issue to In Progress.
+        public static let projectIssuesAssign = "projectIssues/assign"
+        /// Retry only the Project status update for an existing assignment.
+        public static let projectIssuesSyncStatus = "projectIssues/syncStatus"
         /// The helper relaying `push_pull_request` (038 R7).
         public static let agentsPushPullRequest = "agents/pushPullRequest"
         /// The helper relaying `reply_on_pull_request` (038 R7).
@@ -329,6 +339,9 @@ public enum DaemonAPI {
         /// has heard no broadcast, and for a long turn would otherwise show nothing
         /// for half an hour.
         public static let wakeState = "wake/state"
+        /// The switch and the grace. The window's, like retention: a phone does not set it.
+        public static let wakeSettings = "wake/settings"
+        public static let wakeSet = "wake/set"
     }
 
     public enum Notification {
@@ -398,6 +411,8 @@ public enum DaemonAPI {
         /// ending (038). The whole `PullRequestList`, for the reason `workflow/changed`
         /// carries the whole summary. Mac windows only (FR-010).
         public static let pullRequestsChanged = "pullRequests/changed"
+        /// A linked GitHub Project board changed or refreshed.
+        public static let projectIssuesChanged = "projectIssues/changed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -1717,6 +1732,9 @@ public enum DaemonAPI {
         /// and there was no relay, the server is not "own sign-in only", and it has no
         /// sign-in of its own. Nothing was started. `data`: `SignInWanted`.
         public static let signInWanted = -32070
+        /// A GitHub Project issue cannot be assigned in its current state, or the item
+        /// already has an agent assignment (063).
+        public static let issueAssignmentRefused = -32080
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.
@@ -1937,8 +1955,9 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent` or `archive_agent`. The id is a string
-    /// so one that is not a UUID is refused in words rather than failing to decode.
+    /// What an agent passes to `stop_agent`, `park_agent` or `archive_agent`. The id
+    /// is a string so one that is not a UUID is refused in words rather than failing
+    /// to decode.
     public struct HelperRequest: Codable, Sendable {
         public var token: String
         public var agentID: String

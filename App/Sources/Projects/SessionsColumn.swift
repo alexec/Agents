@@ -38,24 +38,12 @@ struct SessionsColumn: View {
                 }
             }
             let archived = matching(model.agents(in: model.selectedProjectKey, group: .archived))
-            // The three archived latest today stay out of the disclosure. A session that
-            // archives itself would otherwise vanish into a section that starts closed.
-            let archives = VisibleArchives.split(archived, now: Date())
-            if !archives.kept.isEmpty {
-                Section {
-                    ForEach(archives.kept) { agent in
-                        row(agent)
-                    }
-                } header: {
-                    heading(VisibleArchives.todayTitle, count: archives.kept.count)
-                }
-            }
             // What has been retired from here (051), as the section's last line.
             let retiredLine = query.isEmpty
                 ? RetirementWords.retiredLine(model.selectedProjectSummary?.retiredCount) : nil
-            if !archives.hidden.isEmpty || retiredLine != nil {
+            if !archived.isEmpty || retiredLine != nil {
                 Section(isExpanded: $showsArchived) {
-                    ForEach(archives.hidden.prefix(Self.archivedShown)) { agent in
+                    ForEach(archived.prefix(Self.archivedShown)) { agent in
                         row(agent)
                     }
                     if let retiredLine {
@@ -64,7 +52,7 @@ struct SessionsColumn: View {
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    heading("Archived", count: archives.hidden.count)
+                    heading("Archived", count: archived.count)
                 }
             }
         }
@@ -84,8 +72,9 @@ struct SessionsColumn: View {
         }
         // ⌫ archives every highlighted session that is not already archived (one or many).
         .onDeleteCommand { archivePicked() }
-        // The window's title is this column's: whatever the right-hand side is reading.
-        .navigationTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name ?? "Agents")
+        // The window's title is this column's: the worktree this build came from, then
+        // whatever the right-hand side is reading. The primary checkout is "main".
+        .navigationTitle(AppCheckout.windowTitle(model.selectedAgent?.title ?? model.selectedProjectSummary?.name))
         .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.selectedProjectSummary != nil {
@@ -161,7 +150,10 @@ struct SessionsColumn: View {
 
     private func row(_ agent: Agent) -> some View {
         AgentRow(agent: agent, isCompact: true)
-            .padding(.vertical, 3)
+            // Title plus the line under it (what it said); list rows that start too short
+            // clip that second line once it arrives.
+            .padding(.vertical, 6)
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
             .tag(agent.id)
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {

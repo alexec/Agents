@@ -23,8 +23,8 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
-    // Three that act on other agents (028): start one in this project, and stop or
-    // list the ones this agent started. archive_agent is still a name a transcript
+    // Four that act on other agents (028): start one in this project, and stop, park
+    // or list the ones this agent started. archive_agent is still a name a transcript
     // or older conversation may carry, but it is no longer offered — only the person
     // archives. Never offered to an agent another agent started.
 
@@ -33,6 +33,9 @@ public enum AppTool {
 
     /// Stop an agent the caller started.
     public static let stopAgent = "stop_agent"
+
+    /// Park an agent the caller started, to come back to later.
+    public static let parkAgent = "park_agent"
 
     /// Archive an agent the caller started, which gives its place back.
     public static let archiveAgent = "archive_agent"
@@ -103,9 +106,9 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, startAgent, stopAgent, archiveAgent, listMyAgents,
-        leaseResource, releaseResource, listResources, waitForEvent, cancelWait, publishEvent,
-        pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
+        finishTurn, showFile, manageWorkflows, startAgent, stopAgent, parkAgent, archiveAgent,
+        listMyAgents, leaseResource, releaseResource, listResources, waitForEvent, cancelWait,
+        publishEvent, pushPullRequest, replyOnPullRequest, suggestPrompts, reportOutcome,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

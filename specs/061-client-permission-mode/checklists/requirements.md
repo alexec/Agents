@@ -34,5 +34,5 @@
 - Re-validated on 2026-09-26 after the scope grew from Cursor to Cursor and Grok. No [NEEDS CLARIFICATION] markers.
 - Each runtime has its own control. A single switch that moves both is recorded as out of scope in Assumptions.
 - For agents the app starts, Grok's control wins over a permission mode saved in Grok's own settings. Grok in a terminal is unchanged. Read-only actions Grok already runs without asking stay that way under both values.
-- A mode that approves every request is out of scope for both runtimes.
+- A mode that answers every permission request (**Always-approve**) is in scope for Cursor and Grok; questions that are not permission still wait.
 - The directory is `specs/061-client-permission-mode`. No git branch was created.
