@@ -43,6 +43,10 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
+				# Quarantine annotations and their inventory do not change test behavior.
+				Packages/AgentsKit/Tests/AgentsKitTests/Support/FlakyUnderLoad.swift)
+					agentskit_touched=true
+					;;
 				Packages/AgentsKit/Tests/*)
 					agentskit_touched=true
 					name=${path##*/}
