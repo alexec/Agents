@@ -30,7 +30,11 @@ def main() -> None:
 
     current = current_metal_root()
     with sqlite3.connect(DATABASE) as connection:
-        keys = connection.execute("SELECT id, key FROM key_names").fetchall()
+        # Most rule keys are binary and are not valid UTF-8; restrict the query before
+        # Python asks sqlite to decode the TEXT column.
+        keys = connection.execute(
+            "SELECT id, key FROM key_names WHERE key LIKE '%MobileAsset.MetalToolchain-%'"
+        ).fetchall()
         roots = {
             match.group(0).decode()
             for _, key in keys
