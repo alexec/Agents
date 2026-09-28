@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sqlite3
@@ -17,11 +18,24 @@ OLD_ROOT = re.compile(
     rb"/(?:private/)?var/run/com\.apple\.security\.cryptexd/mnt/"
     rb"com\.apple\.MobileAsset\.MetalToolchain-[^/]+(?=/Metal\.xctoolchain)"
 )
+SOURCE_EPOCH = 946684800  # 2000-01-01 UTC; exact-content cache key guards freshness.
 
 
 def current_metal_root() -> str:
     metal = Path(subprocess.check_output(["xcrun", "--find", "metal"], text=True).strip()).resolve()
     return str(metal.parents[3])
+
+
+def normalize_source_timestamps(package: Path) -> None:
+    paths = [package / "Package.swift", package / "Package.resolved"]
+    for name in ("Sources", "Tests", "Plugins"):
+        paths.extend((package / name).rglob("*"))
+    for path in paths:
+        if path.is_file():
+            try:
+                os.utime(path, (SOURCE_EPOCH, SOURCE_EPOCH))
+            except OSError:
+                pass
 
 
 def main() -> None:
@@ -41,7 +55,7 @@ def main() -> None:
             if (match := OLD_ROOT.search(key.encode())) is not None
         }
 
-        if not roots or roots == {current}:
+        if not roots:
             return
 
         # The suffix after the component version is generated for each runner. The
@@ -76,7 +90,8 @@ def main() -> None:
             rewritten = rewritten.replace(old, new)
         if rewritten != data:
             path.write_bytes(rewritten)
-    print("Updated restored AgentsKit build graph for this runner's MetalToolchain mount")
+    normalize_source_timestamps(BUILD.parent)
+    print("Prepared the restored AgentsKit build graph for this runner")
 
 
 if __name__ == "__main__":
