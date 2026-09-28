@@ -238,6 +238,10 @@ public enum Briefing {
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static func text(for policy: ToolPolicy, managesAgents: Bool = true) -> String {
-        lines(for: policy, managesAgents: managesAgents).joined(separator: "\n\n")
+        var blocks = lines(for: policy, managesAgents: managesAgents)
+        if policy.appToolSchemaDelivery == .firstPrompt {
+            blocks.append(AppToolPreface.firstPrompt)
+        }
+        return blocks.joined(separator: "\n\n")
     }
 }

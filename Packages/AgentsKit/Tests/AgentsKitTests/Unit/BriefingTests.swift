@@ -28,6 +28,12 @@ struct BriefingTests {
         #expect(Briefing.workflows(scheduling: true).contains(AppTool.manageWorkflows))
     }
 
+    @Test func cursorIsPointedToItsLiveMCPToolSchemas() {
+        let text = Briefing.text(for: ToolPolicyCatalog.cursor)
+        #expect(text.contains(AppToolPreface.firstPrompt))
+        #expect(!text.contains("agents__\(AppTool.finishTurn)"))
+    }
+
     /// The older names are for conversations that were told them; a fresh one is told
     /// the one tool and nothing older (023 FR-016).
     @Test func theFinishLineNamesNeitherOldName() {
