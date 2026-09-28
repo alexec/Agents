@@ -49,6 +49,13 @@ jobs:
             Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
+      - name: Restore AgentsKit build cache
+        id: agentskit-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved') }}
+
       - name: Tools
         run: |
           xcodebuild -version
@@ -57,6 +64,21 @@ jobs:
           # The runner's Xcode comes without it, and the app's build compiles Metal.
           xcodebuild -downloadComponent MetalToolchain
           wait "$xcodegen_pid"
+
+      # SwiftPM's build graph records the random cryptex mount name for MetalToolchain.
+      # Rewrite that mount in a restored graph when the component version matches.
+      - name: Normalize AgentsKit build cache
+        run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
+
+      - name: Build AgentsKit tests
+        run: swift build --build-tests --package-path Packages/AgentsKit
+
+      - name: Save AgentsKit build cache
+        if: ${{ steps.agentskit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved') }}
 
       - name: Generate the project
         run: xcodegen generate
@@ -98,8 +120,7 @@ jobs:
       - name: Time the login shell
         run: time zsh -lc 'printf %s "$PATH"' > /dev/null
 
-      # Build test targets before execution so the cache can be saved before any
-      # slow test hits the job timeout.
+      # Build CodeText tests before execution so the cache can be saved before tests.
       - name: Build CodeText tests
         run: swift build --build-tests --package-path Packages/CodeText
 
@@ -111,13 +132,6 @@ jobs:
             Daemon/.build
             Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
-
-      # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
-      # past the question about a silent ending (`settled`), and `eventually` waits
-      # 45 s where CI is set rather than 10, since a test on a three-core runner can
-      # wait that long for its first turn on the pool.
-      - name: Build AgentsKit tests
-        run: swift build --build-tests --package-path Packages/AgentsKit
 
       - name: Test CodeText
         run: swift test --skip-build --package-path Packages/CodeText
