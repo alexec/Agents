@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  build:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
@@ -60,9 +60,19 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
-      # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
-      # a whole Swift build inside the test run, holding a test thread for minutes,
-      # which on a shared runner stalls everything else. Built here instead.
+  test:
+    # Keep the package tests on their own runner alongside the Xcode builds. The
+    # integration suite runs real processes and takes several minutes by itself;
+    # serializing it behind both app builds pushes the required check over 10 min.
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+
+      # ServerLinkTests needs agentsd, and building it inside a test holds a test
+      # thread for minutes. Build it before starting the package suites.
       - name: Build agentsd for the tests
         run: swift build --package-path Daemon --product agentsd
 
