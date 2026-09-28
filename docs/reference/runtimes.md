@@ -71,7 +71,7 @@ That needs the app to recognise the refusal, which it does per runtime:
 | **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Tried again after an hour. |
 | **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Tried again after an hour when spent without a window. |
 | **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Tried again after an hour when spent without a window. |
-| **Cursor** | **Not yet recognised.** A chat on it stops when its allowance runs out, as it always has. It can still be carried on to. | Not yet recognised. | — |
+| **Cursor** | Recognised from "Upgrade your plan to continue". | Not yet recognised. | Tried again after an hour when spent without a window. |
 
 An error the app does not recognise never moves a chat: it stops, as before.
 

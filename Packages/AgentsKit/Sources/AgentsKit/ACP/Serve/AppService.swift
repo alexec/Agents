@@ -11,7 +11,7 @@ import Foundation
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Four more act on other
-/// agents — `start_agent`, `stop_agent` and `list_my_agents` (028) —
+/// agents — `start_agent`, `stop_agent`, `park_agent` and `list_my_agents` (028) —
 /// and are offered only to an agent the person or a workflow started. Two older names
 /// for the halves of the first are still served, for conversations briefed with them.
 ///
@@ -38,10 +38,12 @@ public actor AppService {
     public static let reportOutcomeToolName = AppTool.reportOutcome
 
     /// And four that act on other agents (028), offered only to an agent the person or
-    /// a workflow started: start one in this project, and stop, archive or list the
-    /// ones this agent started.
+    /// a workflow started: start one in this project, and stop, park or list the ones
+    /// this agent started. archive_agent is still recognised so an older conversation
+    /// is refused rather than told the word is unknown.
     public static let startAgentToolName = AppTool.startAgent
     public static let stopAgentToolName = AppTool.stopAgent
+    public static let parkAgentToolName = AppTool.parkAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let pushPullRequestToolName = AppTool.pushPullRequest
@@ -109,13 +111,14 @@ public actor AppService {
         public static let none = BlockWords()
     }
 
-    /// One of the four calls that act on other agents (028), as the agent made it.
+    /// One of the calls that act on other agents (028), as the agent made it.
     /// Nothing is decided here beyond whether the words are there at all: the daemon
     /// is what knows whose agent is whose.
     public enum AgentCall: Sendable, Equatable {
         case start(prompt: String, runtime: String?, model: String?, permissionMode: String?,
                    worktree: String? = nil)
         case stop(agentID: String)
+        case park(agentID: String)
         case archive(agentID: String)
         case list
     }
@@ -373,7 +376,7 @@ public actor AppService {
                 guard managesAgents else {
                     return .success(Self.reply("""
                         Nothing was done: an agent that another agent started cannot \
-                        start, stop, archive or list agents of its own.
+                        start, stop, park, archive or list agents of its own.
                         """, isError: true))
                 }
                 switch call {
@@ -430,11 +433,15 @@ public actor AppService {
                                    permissionMode: text("permission_mode"),
                                    worktree: text("worktree")))
         }
-        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(archiveAgentToolName) {
+        if name.hasSuffix(stopAgentToolName)
+            || name.hasSuffix(parkAgentToolName)
+            || name.hasSuffix(archiveAgentToolName) {
             guard let id = text("id") else {
                 return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
             }
-            return .success(name.hasSuffix(stopAgentToolName) ? .stop(agentID: id) : .archive(agentID: id))
+            if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
+            if name.hasSuffix(parkAgentToolName) { return .success(.park(agentID: id)) }
+            return .success(.archive(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
@@ -537,7 +544,7 @@ public actor AppService {
         // archive_agent is no longer offered: only the person archives. An older
         // conversation that still calls it is refused at the daemon.
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.listMyAgentsTool]
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.listMyAgentsTool]
             : []
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
@@ -1026,19 +1033,19 @@ public actor AppService {
             of the work that can run alongside the rest. It starts in this project's \
             folder — there is no way to start one anywhere else — and appears in the \
             person's list of agents, marked as started by you. The person can open it, \
-            talk to it, stop it or archive it at any time.
+            talk to it, stop it, park it or archive it at any time.
 
             At most five agents started by agents can exist in this project at once, \
-            counting every agent here, and stopped or finished ones still count. Only \
-            the person can archive one to free its place. Use list_my_agents to see \
-            yours and how many places are in use. Stop one with stop_agent when its \
-            part is done; it keeps its place until they archive it.
+            counting every agent here, and stopped, parked or finished ones still count. \
+            Only the person can archive one to free its place. Use list_my_agents to see \
+            yours and how many places are in use. Stop one with stop_agent, or park one \
+            with park_agent, when its part is done; it keeps its place until they archive it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
             Do not start one for work you could simply do yourself. The agent you \
             start cannot start agents of its own.
 
-            Returns the new agent's id, which stop_agent takes.
+            Returns the new agent's id, which stop_agent and park_agent take.
             """,
         "inputSchema": [
             "type": "object",
@@ -1081,7 +1088,7 @@ public actor AppService {
         ],
     ]
 
-    /// The id schema stop and archive share.
+    /// The id schema stop, park and archive share.
     private static let agentIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1101,6 +1108,20 @@ public actor AppService {
             It stays in the list with its conversation, and keeps its place until it is \
             archived. Only agents you started can be stopped this way; not yourself, \
             and not anyone else's.
+            """,
+        "inputSchema": agentIDSchema,
+    ]
+
+    static let parkAgentTool: JSONValue = [
+        "name": .string(parkAgentToolName),
+        "title": "Park an agent you started",
+        "description": """
+            Park an agent you started with start_agent, as the person's own Park would: \
+            put it down to come back to later. If it is still working, the turn finishes \
+            first and it parks when that ends. It stays in the list under Parked, and \
+            keeps its place until it is archived. Only agents you started can be parked \
+            this way; not yourself (set afterwards to park on finish_turn), and not \
+            anyone else's.
             """,
         "inputSchema": agentIDSchema,
     ]

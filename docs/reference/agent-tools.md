@@ -23,7 +23,7 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `manage_workflows` | Lists, reads, writes and removes this project's workflows. A workflow an agent writes or changes appears on the project page straight away, waiting for your OK: it does not run until you click **Approve**, and you can archive it instead. See [Workflow triggers and actions](workflows.md). | No. The app answers. |
 | `start_agent` | Starts another agent in this project with a prompt of its own, marked as started by this agent. It can choose the runtime, model, a permission mode no looser than its own, and whether to work in the project folder, a new worktree, an existing worktree or a branch. At most five agents started by agents can exist in a project at once, until one is archived. | The runtime decides. |
 | `stop_agent` | Stops an agent this agent started, as your **Stop** would. | The runtime decides. |
-| `archive_agent` | Archives an agent this agent started, stopping it first, which frees its place. | The runtime decides. |
+| `park_agent` | Parks an agent this agent started, as your **Park** would. If it is still working, it finishes its turn first. It stays listed under **Parked** and keeps its place until you archive it. | The runtime decides. |
 | `list_my_agents` | Lists the agents this agent started that are not archived, what each is doing and last said, and how many of the five places are in use. | The runtime decides. |
 | `lease_resource` | Takes a turn with something only one agent should use at a time: a simulator, a browser, the screen, or anything it names. Waits up to 45 seconds if someone else holds it, then keeps the agent's place in line. A lease lasts 30 minutes unless the agent asks for up to 240, and calling it again extends it. | The runtime decides. |
 | `release_resource` | Gives back a lease, or leaves the line for one. | The runtime decides. |
@@ -38,9 +38,9 @@ if the runtime asks; Claude and Cursor ask, and Copilot asks before every tool c
 | `suggest_next_prompts` | The older name for the suggestion half of `finish_turn`, kept for conversations started before it. | No. The app answers. |
 | `report_outcome` | The older name for the outcome half of `finish_turn`, kept for conversations started before it. | No. The app answers. |
 
-`start_agent`, `stop_agent`, `archive_agent` and `list_my_agents` are given only to an
+`start_agent`, `stop_agent`, `park_agent` and `list_my_agents` are given only to an
 agent that you or a workflow started. An agent started by another agent cannot start
-agents of its own.
+agents of its own. Only you can archive an agent.
 
 ## See also
 

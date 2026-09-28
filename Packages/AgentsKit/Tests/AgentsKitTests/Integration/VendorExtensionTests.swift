@@ -90,10 +90,11 @@ struct VendorExtensionTests {
 
     private func askedAndAnswered(_ answer: DaemonAPI.AnswerElicitationRequest.Action,
                                   content: [String: JSONValue] = [:],
+                                  questions request: JSONValue? = nil,
                                   check: (ElicitationRequest) -> Void = { _ in }) async throws -> JSONValue? {
         let (locations, work) = try temporary()
         var script = FakeACPAgent.Script()
-        script.clientRequests = [(ACP.ExtensionMethod.askQuestion, questions)]
+        script.clientRequests = [(ACP.ExtensionMethod.askQuestion, request ?? questions)]
         let launcher = FakeLauncher(script: script, capabilities: .app)
         let core = try core(launcher, locations: locations)
 
@@ -143,24 +144,21 @@ struct VendorExtensionTests {
         #expect(result?["outcome"]?["outcome"]?.stringValue == "skipped")
     }
 
-    @Test func aCursorQuestionWithNoOptionsIsLeftToCursorsFallback() async throws {
-        let (locations, work) = try temporary()
-        var script = FakeACPAgent.Script()
-        script.clientRequests = [(ACP.ExtensionMethod.askQuestion,
-                                  ["questions": [["id": "q", "prompt": "Anything?", "options": []]]])]
-        let launcher = FakeLauncher(script: script, capabilities: .app)
-        let core = try core(launcher, locations: locations)
-
-        _ = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
-        let reply = await eventuallySome("Cursor was answered") {
-            await launcher.lastAgent?.answer(to: ACP.ExtensionMethod.askQuestion)
+    @Test func cursorFreeTextQuestionsAreShownAndReturnedAsSelectedAnswers() async throws {
+        let result = try await askedAndAnswered(.accept,
+                                                content: ["other": "Rust"],
+                                                questions: ["questions": [["id": "other", "prompt": "Which language?", "options": []]]]) { request in
+            guard case .form(let schema) = request.mode,
+                  case .string(_, _, _, let choices) = schema.properties.first?.kind else {
+                Issue.record("expected a free-text form field")
+                return
+            }
+            #expect(choices == nil)
         }
-        guard case .failure(let error)? = reply else {
-            Issue.record("a question we cannot draw was answered")
-            return
-        }
-        #expect(error.code == -32601)
-        #expect(await core.pendingElicitations().isEmpty)
+        #expect(result?["outcome"]?["outcome"]?.stringValue == "answered")
+        let answer = result?["outcome"]?["answers"]?.arrayValue?.first
+        #expect(answer?["questionId"]?.stringValue == "other")
+        #expect(answer?["selectedOptionIds"]?.arrayValue?.compactMap(\.stringValue) == ["Rust"])
     }
 
     // MARK: _auth/status_update

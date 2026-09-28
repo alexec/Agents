@@ -32,21 +32,26 @@ public final class ProcessInfoWakefulness: Wakefulness, @unchecked Sendable {
     /// on its own terms rather than by assumption.
     private let lock = NSLock()
     private var token: (any NSObjectProtocol)?
+    private var heldReason: String?
 
     public init() {}
 
     public func hold(reason: String) {
         lock.lock()
         defer { lock.unlock() }
-        // Holding while already held does nothing. `reviseWakefulness` leans on this
-        // and on the matching no-op in `release`: without them, the second call would
-        // begin a second activity and drop the first token on the floor, and the
-        // assertion would leak for the lifetime of the process.
-        guard token == nil else { return }
+        // The same reason, while already held, does nothing. A second call must not
+        // begin another activity and drop the first token: the assertion would leak
+        // for the lifetime of the process. A different reason — the
+        // grace, once the work has stopped — ends this activity and begins another, so
+        // `pmset` says why the Mac is still awake. The gap is at a moment when nothing
+        // is computing; the Mac's own idle timer is minutes.
+        if token != nil, heldReason == reason { return }
         #if canImport(Darwin)
+        if let held = token { ProcessInfo.processInfo.endActivity(held) }
         token = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled], reason: reason)
         #endif
+        heldReason = reason
         // A Linux server has no idle sleep to hold off (037): nothing to take.
     }
 
@@ -55,6 +60,7 @@ public final class ProcessInfoWakefulness: Wakefulness, @unchecked Sendable {
         defer { lock.unlock() }
         guard let held = token else { return }
         token = nil
+        heldReason = nil
         #if canImport(Darwin)
         ProcessInfo.processInfo.endActivity(held)
         #endif
