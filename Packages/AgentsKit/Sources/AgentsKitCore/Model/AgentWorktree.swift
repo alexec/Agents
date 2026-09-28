@@ -41,6 +41,8 @@ public enum WorktreeChoice: Codable, Hashable, Sendable {
     case new
     /// A worktree of the same repository that is already there.
     case existing(URL)
+    /// Make a fresh worktree with a name chosen by the caller, rather than from its prompt.
+    case named(String)
     /// Make a fresh worktree on a branch that is already there: a local one not
     /// checked out anywhere, or one only a remote has, which git then tracks.
     case branch(String)
@@ -69,6 +71,11 @@ public enum WorktreeName {
     ]
 
     public static func branch(for name: String) -> String { branchPrefix + name }
+
+    /// A stable, readable worktree name for an issue assignment.
+    public static func issue(number: Int, title: String, now: Date = Date()) -> String {
+        from(prompt: "issue-\(number)-\(title)", keepingFiller: true, now: now)
+    }
 
     /// The folder a worktree on someone's branch goes in: the branch, less the app's
     /// own prefix, with every `/` a `-`, so `feature/login` is `feature-login`.

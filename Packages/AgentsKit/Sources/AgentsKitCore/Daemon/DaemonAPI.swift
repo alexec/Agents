@@ -238,6 +238,14 @@ public enum DaemonAPI {
         public static let pullRequestsCheckout = "pullRequests/checkout"
         /// Write the starter babysitting workflow (FR-026).
         public static let pullRequestsAddBabysitter = "pullRequests/addBabysitter"
+        /// The first Projects v2 board linked to a repository, from the daemon cache.
+        public static let projectIssuesList = "projectIssues/list"
+        /// Refresh the linked board from GitHub now.
+        public static let projectIssuesRefresh = "projectIssues/refresh"
+        /// Start a fresh agent for a Ready issue and move the issue to In Progress.
+        public static let projectIssuesAssign = "projectIssues/assign"
+        /// Retry only the Project status update for an existing assignment.
+        public static let projectIssuesSyncStatus = "projectIssues/syncStatus"
         /// The helper relaying `push_pull_request` (038 R7).
         public static let agentsPushPullRequest = "agents/pushPullRequest"
         /// The helper relaying `reply_on_pull_request` (038 R7).
@@ -398,6 +406,8 @@ public enum DaemonAPI {
         /// ending (038). The whole `PullRequestList`, for the reason `workflow/changed`
         /// carries the whole summary. Mac windows only (FR-010).
         public static let pullRequestsChanged = "pullRequests/changed"
+        /// A linked GitHub Project board changed or refreshed.
+        public static let projectIssuesChanged = "projectIssues/changed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
         /// terminal, which is `agentTerminalOutput` above.
         public static let shellOutput = "shell/output"
@@ -1717,6 +1727,9 @@ public enum DaemonAPI {
         /// and there was no relay, the server is not "own sign-in only", and it has no
         /// sign-in of its own. Nothing was started. `data`: `SignInWanted`.
         public static let signInWanted = -32070
+        /// A GitHub Project issue cannot be assigned in its current state, or the item
+        /// already has an agent assignment (063).
+        public static let issueAssignmentRefused = -32080
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.

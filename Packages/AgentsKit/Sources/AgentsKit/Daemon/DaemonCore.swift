@@ -402,6 +402,11 @@ public actor DaemonCore {
     var pullRequestSweep: Task<Void, Never>?
     /// The person's `gh`. A test gives it a fake.
     var gitHubCLI = GitHubCLI()
+    // MARK: GitHub Projects issue boards (063)
+    lazy var githubProjectStore = GitHubProjectStore(locations: locations)
+    lazy var githubProjectBoards: [URL: GitHubProjectBoard] = Dictionary(
+        githubProjectStore.load().boards.map { ($0.folder, $0) }, uniquingKeysWith: { _, last in last })
+    var githubProjectRefreshes: Set<URL> = []
     #if canImport(CryptoKit)
     /// What searching a catalogue and adding a skill talk to (059). A test gives it a
     /// session that reaches only its stand-in, and endpoints to match.
