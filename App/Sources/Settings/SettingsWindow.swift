@@ -166,57 +166,6 @@ private final class SettingsGrowView: NSView {
     }
 }
 
-/// The Settings scene's window has no grow box, and `windowResizability` on that
-/// scene does not give it one. SwiftUI also takes the resizable mask off again
-/// after the window appears and whenever it is resized. The mask is put back at
-/// the end of each turn of the run loop, which is after SwiftUI has set it, and
-/// the content is kept from going below the size the window opens at.
-private struct SettingsGrowBox: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { SettingsGrowView() }
-    func updateNSView(_ view: NSView, context: Context) { (view as? SettingsGrowView)?.apply() }
-}
-
-private final class SettingsGrowView: NSView {
-    private var observer: CFRunLoopObserver?
-
-    override var intrinsicContentSize: NSSize { NSSize(width: 0, height: 0) }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard let window else {
-            if let observer {
-                CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
-                self.observer = nil
-            }
-            return
-        }
-        apply()
-        guard observer == nil else { return }
-        let created = CFRunLoopObserverCreateWithHandler(
-            nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0
-        ) { [weak self] _, _ in
-            self?.apply()
-        }
-        guard let created else { return }
-        observer = created
-        CFRunLoopAddObserver(CFRunLoopGetMain(), created, .commonModes)
-    }
-
-    override func layout() {
-        super.layout()
-        apply()
-    }
-
-    func apply() {
-        guard let window else { return }
-        if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
-        let floor = SettingsWindow.size
-        if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
-            window.contentMinSize = floor
-        }
-    }
-}
-
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
 /// picker keeps it beside its label in a window sized for Shared's list and detail.
 private struct FormColumn<Content: View>: View {
