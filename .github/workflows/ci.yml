@@ -25,7 +25,7 @@ jobs:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
@@ -137,4 +137,5 @@ jobs:
         run: swift test --skip-build --package-path Packages/CodeText
 
       - name: Test AgentsKit
+        timeout-minutes: 10
         run: swift test --skip-build --parallel --num-workers 3 --package-path Packages/AgentsKit
