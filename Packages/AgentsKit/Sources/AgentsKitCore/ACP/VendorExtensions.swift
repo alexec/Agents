@@ -80,8 +80,9 @@ public struct TodoList: Hashable, Sendable {
 /// becomes one property per question, named by the question's id, so the answer comes
 /// back keyed the way Cursor wants it. Every question is optional: Cursor takes an
 /// answer to some of them, which its own fallback also gives.
+/// A question without options is free text; its answer is returned as one selected value.
 public enum CursorQuestion {
-    /// Nil for a question set we cannot draw, which is left to Cursor's own fallback.
+    /// Nil only when the request has no questions or a question has no id.
     public static func request(from params: JSONValue?, agentID: UUID) -> ElicitationRequest? {
         guard let questions = params?["questions"]?.arrayValue, !questions.isEmpty else { return nil }
         var properties: [ElicitationSchema.Property] = []
@@ -91,10 +92,14 @@ public enum CursorQuestion {
                 guard let value = option["id"]?.stringValue else { return nil }
                 return .init(value: value, title: option["label"]?.stringValue)
             }
-            guard !choices.isEmpty else { return nil }
-            let kind: ElicitationSchema.Property.Kind = question["allowMultiple"]?.boolValue == true
-                ? .multiSelect(items: choices, minItems: nil, maxItems: nil)
-                : .string(format: nil, minLength: nil, maxLength: nil, choices: choices)
+            let kind: ElicitationSchema.Property.Kind
+            if choices.isEmpty {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: nil)
+            } else if question["allowMultiple"]?.boolValue == true {
+                kind = .multiSelect(items: choices, minItems: nil, maxItems: nil)
+            } else {
+                kind = .string(format: nil, minLength: nil, maxLength: nil, choices: choices)
+            }
             properties.append(.init(name: id, title: question["prompt"]?.stringValue, kind: kind))
         }
         let title = params?["title"]?.stringValue
@@ -105,6 +110,7 @@ public enum CursorQuestion {
 
     /// The card's outcome in Cursor's reply shape. An accepted form with nothing
     /// chosen is a skip, which is what Cursor's fallback says for the same thing.
+    /// Free-text answers use the same `selectedOptionIds` list as a single choice.
     public static func reply(to outcome: ElicitationOutcome) -> JSONValue {
         switch outcome {
         case .accept(let content):
