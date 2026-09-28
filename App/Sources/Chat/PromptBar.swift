@@ -1037,6 +1037,7 @@ struct PromptBar: View {
         switch model.draftWorktree {
         case nil: "Project folder"
         case .new: "New worktree"
+        case .named(let name): name
         case .existing(let root): root.lastPathComponent
         case .branch(let name): name
         }

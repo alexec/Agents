@@ -194,6 +194,7 @@ private final class SettingsGrowView: NSView {
     }
 }
 
+
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
 /// picker keeps it beside its label in a window sized for Shared's list and detail.
 private struct FormColumn<Content: View>: View {

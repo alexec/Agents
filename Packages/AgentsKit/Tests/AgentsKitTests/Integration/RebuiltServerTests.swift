@@ -39,7 +39,7 @@ extension FakeSSHSuites {
             #expect(!text.contains(old))
         }
 
-        @Test func aWipedServerIsSetUpAgainWithoutAsking() async throws {
+        @Test(.slowUnderLoad) func aWipedServerIsSetUpAgainWithoutAsking() async throws {
             let setup = try await ToolsetInstallTests.setUp()
             defer { Task { await ToolsetInstallTests.tearDown(setup) } }
             let server = try ToolsetInstallTests.connection(setup, wantsClaude: true)
