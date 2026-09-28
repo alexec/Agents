@@ -52,55 +52,109 @@ extension DaemonCore {
     /// The verdict is re-derived every time rather than remembered, which is FR-014:
     /// what is remembered is only what was last *acted on*, so a change can be spotted.
     func reviseWakefulness(readingPower forcePowerRead: Bool = false) {
+        loadWakeSettingsIfNeeded()
+        let settings = wakeSettings
         let inFlight = hasWorkInFlight
 
-        // Nothing computing. The verdict is `.idle` whatever the machine says about
-        // its power, so do not pay IOKit to tell us — this is the common case and it
-        // is reached on every token of every stream.
-        guard inFlight else { return apply(.idle) }
+        // Off means never held, even with an agent mid-turn. The time they chose stays
+        // in the file for when they turn it back on.
+        if !settings.keepsAwake {
+            graceStartedAt = nil
+            return apply(.idle, graceUntil: nil)
+        }
 
-        // Work in flight, and we already have a power-informed answer about work in
-        // flight. Only the power moving could change the verdict now, and watching for
-        // that is the 15-second tick's job (FR-011), which calls this with
-        // `readingPower: true`.
-        //
-        // This guard is why the IOKit call is not in the hot path. A read measures
-        // ~65µs, which sounds like nothing until you notice `changed(_:)` runs on
-        // every streamed token *and* is isolated to this actor — so without this,
-        // every agent's updates would queue behind a synchronous IOKit call made on
-        // behalf of another agent's token.
-        if !forcePowerRead, let last = lastWakeVerdict, last != .idle { return }
+        if inFlight {
+            // Work again cancels a grace. The clock comes back only from the next stop.
+            let droppingGrace = graceStartedAt != nil
+            graceStartedAt = nil
+            // Already holding for work. Only the power moving could change the verdict
+            // now, and watching for that is the 15-second tick's job (FR-011), which
+            // calls this with `readingPower: true`.
+            //
+            // This guard is why the IOKit call is not in the hot path. A read measures
+            // ~65µs, which sounds like nothing until you notice `changed(_:)` runs on
+            // every streamed token *and* is isolated to this actor — so without this,
+            // every agent's updates would queue behind a synchronous IOKit call made on
+            // behalf of another agent's token. Dropping a grace is the exception: the
+            // verdict stays `.hold` and the windows still have to lose the clock.
+            if !droppingGrace, !forcePowerRead, let last = lastWakeVerdict, last != .idle { return }
+
+            let reading = power.read()
+            lastPowerReading = reading
+            return apply(Wake.verdict(workInFlight: true, power: reading), graceUntil: nil)
+        }
+
+        // Nothing computing. Right away, or no grace running and we were not holding
+        // for work: the ordinary case, reached on every token of every stream, and it
+        // must not pay IOKit.
+        guard settings.graceHours > 0 else {
+            graceStartedAt = nil
+            return apply(.idle, graceUntil: nil)
+        }
+        if graceStartedAt == nil {
+            // A grace begins only from a hold this process was keeping for work.
+            // Turning the switch on while nothing is working does not start one, and
+            // neither does a daemon that has just launched.
+            guard lastWakeVerdict?.isHolding == true, lastGraceUntil == nil else {
+                return apply(.idle, graceUntil: nil)
+            }
+            graceStartedAt = now()
+        }
+
+        let until = graceStartedAt!.addingTimeInterval(settings.graceInterval)
+        if now() >= until {
+            graceStartedAt = nil
+            return apply(.idle, graceUntil: nil)
+        }
+        // Inside the grace, and we already told the windows this exact time. The tick
+        // is what notices the battery, and the clock, moving.
+        if !forcePowerRead, lastWakeVerdict == .hold, lastGraceUntil == until { return }
 
         let reading = power.read()
         lastPowerReading = reading
-        apply(Wake.verdict(workInFlight: true, power: reading))
+        let verdict = Wake.verdict(workInFlight: true, power: reading)
+        if verdict.isHolding {
+            apply(.hold, graceUntil: until)
+        } else {
+            // At or below the floor, with nothing in flight: the row stays quiet. The
+            // clock is kept, so plugging back in before it passes takes the hold up again.
+            apply(.idle, graceUntil: nil)
+        }
     }
 
-    /// Act on a verdict, and only when it has moved.
+    /// Act on a verdict, and only when it or the grace clock has moved.
     ///
     /// The comparison is the whole of the idempotence `reviseWakefulness` promises,
     /// and `ProcessInfoWakefulness` is idempotent underneath it as well — belt and
     /// braces, because a leaked assertion is invisible until somebody's battery is
-    /// flat.
-    private func apply(_ verdict: WakeVerdict) {
-        guard verdict != lastWakeVerdict else { return }
+    /// flat. The clock is part of the comparison because a grace keeps the verdict
+    /// at `.hold` and the windows still have to be told when it ends.
+    private func apply(_ verdict: WakeVerdict, graceUntil: Date?) {
+        let until = verdict.isHolding ? graceUntil : nil
+        guard verdict != lastWakeVerdict || until != lastGraceUntil else { return }
+        let wasHolding = lastWakeVerdict?.isHolding == true
         lastWakeVerdict = verdict
+        lastGraceUntil = until
 
         if verdict.isHolding {
             // Set before the broadcast below reads it. Only moved when the hold is
-            // *taken*, not on every revise, so "since" means since this hold began and
-            // not since the last time anything was reconsidered.
-            holdingSince = now()
-            wakefulness.hold(reason: Self.wakeReason)
-            // No count here either, for the reason `wakeReason` gives: this line is
-            // written when the *verdict* moves, so a count in it is the count at the
-            // moment the first agent started and says nothing about the two that
-            // joined afterwards. The walk found it reading "1 agent" while three ran.
-            DaemonLog.shared.write("holding the Mac awake: a turn is in flight")
+            // *taken*, not when a grace keeps a hold that was already up, so "since"
+            // means since this hold began.
+            if !wasHolding { holdingSince = now() }
+            let forGrace = until != nil
+            wakefulness.hold(reason: forGrace ? Self.graceReason : Self.wakeReason)
+            DaemonLog.shared.write(forGrace
+                ? "holding the Mac awake: staying awake so you can reply"
+                : "holding the Mac awake: a turn is in flight")
         } else {
             holdingSince = nil
-            wakefulness.release()
-            DaemonLog.shared.write("letting the Mac sleep: \(Self.wakeWords(for: verdict))")
+            // A verdict that was never a hold — idle, or the battery already having
+            // let go — has nothing to release. Releasing anyway would count a hold
+            // the Mac never had.
+            if wasHolding {
+                wakefulness.release()
+                DaemonLog.shared.write("letting the Mac sleep: \(Self.wakeWords(for: verdict))")
+            }
         }
 
         // Here and only here — the change branch. `reviseWakefulness` is reached on
@@ -124,9 +178,11 @@ extension DaemonCore {
     /// say so ourselves, so `pmset` tells the truth for the seconds a shutdown takes
     /// rather than naming a process that is on its way out (US2-5).
     func letGoOfTheMac() {
+        graceStartedAt = nil
         guard lastWakeVerdict?.isHolding == true else { return }
         wakefulness.release()
         lastWakeVerdict = nil
+        lastGraceUntil = nil
         holdingSince = nil
         DaemonLog.shared.write("letting the Mac sleep: the daemon is going")
         // Any window still connected is about to lose the socket anyway, but a window
@@ -157,7 +213,33 @@ extension DaemonCore {
                                    agentsInFlight: agentsInFlight,
                                    heldBackByBattery: heldBack,
                                    batteryPercent: percent,
-                                   since: verdict.isHolding ? holdingSince : nil)
+                                   since: verdict.isHolding ? holdingSince : nil,
+                                   graceUntil: verdict.isHolding ? lastGraceUntil : nil)
+    }
+
+    /// The switch and the hours, loaded once.
+    public func readWakeSettings() -> WakeSettings {
+        loadWakeSettingsIfNeeded()
+        return wakeSettings
+    }
+
+    /// The person changed the switch or the hours. Applied at once: off, or a grace
+    /// that the new length has already passed, lets the Mac sleep now.
+    @discardableResult
+    public func setWakeSettings(_ settings: WakeSettings) -> WakeSettings {
+        loadWakeSettingsIfNeeded()
+        wakeSettings = WakeSettings(keepsAwake: settings.keepsAwake, graceHours: settings.graceHours)
+        do { try wakeStore.save(wakeSettings) } catch {
+            DaemonLog.shared.write("wake.json: could not write: \(error.localizedDescription)")
+        }
+        reviseWakefulness(readingPower: true)
+        return wakeSettings
+    }
+
+    func loadWakeSettingsIfNeeded() {
+        guard !wakeSettingsLoaded else { return }
+        wakeSettingsLoaded = true
+        wakeSettings = wakeStore.load()
     }
 
     func broadcastWakeState() {
@@ -191,6 +273,9 @@ extension DaemonCore {
     /// bridge, which is a different process holding for a different reason — its poll
     /// loop, not an agent's turn.
     static let wakeReason = "Agents: a turn is in flight"
+
+    /// What `pmset` shows once the work has stopped and the grace is what holds the Mac.
+    static let graceReason = "Agents: staying awake so you can reply"
 
     /// Why we are not holding, for the daemon's log. FR-017's other half.
     static func wakeWords(for verdict: WakeVerdict) -> String {

@@ -1,6 +1,8 @@
 #!/bin/zsh
 # Build main, install the Remote on Alex's paired iPhone/iPad, and relaunch the
-# real Mac app (window, daemon, bridge) on the new build.
+# real Mac app (window, daemon, bridge) on the new build. One script: the relaunch
+# is this file detached (`--restart`), because the session it quits is usually the
+# one that started it.
 #
 #   ship.sh                 everything
 #   ship.sh --no-build      reuse build/DD and build/DD-ios as they are
@@ -8,11 +10,69 @@
 #   ship.sh --no-mac        skip the Mac relaunch
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
-#
-# The Mac relaunch runs detached (nohup) because this session is usually hosted
-# inside the app it is about to quit. Its log path is printed; read it afterwards.
 set -u
 setopt pipefail
+
+restart() { # repo sha window bridge delay
+  local REPO=$1 SHA=$2 W=$3 B=$4 DELAY=${5:-20}
+  exec >> /tmp/main-restart-all-$SHA.log 2>&1
+  echo "$(date) start"
+  sleep $DELAY
+  local ROOT="$HOME/Library/Application Support/Agents"
+  local LOCK="$ROOT/daemon.lock"
+  local MACAPP=$REPO/build/DD/Build/Products/Debug/Agents.app
+  local BRIDGEAPP=$REPO/build/DD/Build/Products/Debug/agents-bridge.app
+  local -a CLEAN
+  CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" SHELL=/bin/zsh TMPDIR="$TMPDIR"
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin LANG=en_US.UTF-8)
+
+  local D
+  D=$(cat "$LOCK" 2>/dev/null)
+  [[ -n $D ]] && case "$(ps -o command= -p $D)" in
+    */Contents/Helpers/agentsd) ;;
+    *) echo "lock pid $D is not a running agentsd; not signalling it"; D= ;;
+  esac
+  if [[ $W != 0 ]]; then
+    case "$(ps -o command= -p $W)" in
+      "$MACAPP/Contents/MacOS/Agents") ;;
+      *) echo "window $W is no longer the real window; stop"; exit 1 ;;
+    esac
+    echo "quitting window $W"
+    kill -TERM $W
+    for i in {1..50}; do kill -0 $W 2>/dev/null || break; sleep 0.2; done
+  fi
+  if [[ -n $D ]]; then
+    echo "quitting daemon $D ($(ps -o command= -p $D))"
+    kill -TERM $D 2>/dev/null
+    for i in {1..75}; do kill -0 $D 2>/dev/null || break; sleep 0.2; done
+    kill -0 $D 2>/dev/null && { echo "KILL $D"; kill -KILL $D; sleep 1; }
+  fi
+
+  echo "$(date) opening main build $SHA"
+  $CLEAN open "$MACAPP"
+  for i in {1..100}; do [ -S "$ROOT/daemon.sock" ] && [ "$(cat "$LOCK" 2>/dev/null)" != "$D" ] && break; sleep 0.2; done
+  local N
+  N=$(cat "$LOCK"); echo "new daemon $N: $(ps -o command= -p $N)"
+  echo "CLAUDE vars: $(ps eww -p $N | tr ' ' '\n' | grep -c ^CLAUDE)"
+  echo "window: $(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $MACAPP/Contents/MacOS/Agents$")"
+
+  if [[ $B != 0 ]]; then
+    case "$(ps -o command= -p $B)" in
+      "$BRIDGEAPP/Contents/MacOS/agents-bridge")
+        kill -TERM $B; for i in {1..25}; do kill -0 $B 2>/dev/null || break; sleep 0.2; done ;;
+      *) echo "bridge $B is not main's build; leaving it and not starting another"; echo "$(date) done"; exit 0 ;;
+    esac
+  fi
+  $CLEAN AGENTS_ROOT="$ROOT" open -n -g --stderr /tmp/bridge-$SHA.log --stdout /tmp/bridge-$SHA.log "$BRIDGEAPP"
+  sleep 8; echo "bridge: $(ps -axww -o pid=,command= | grep '[a]gents-bridge.app/Contents/MacOS/agents-bridge')"
+  echo "$(date) done"
+}
+
+if [[ ${1:-} == --restart ]]; then
+  shift
+  restart "$@"
+  exit
+fi
 
 BUILD=1 DEVICES=1 MAC=1 DELAY=20
 typeset -a ONLY
@@ -39,9 +99,48 @@ LOGS=/tmp/ship-app-$SHA; mkdir -p $LOGS
 MACAPP=$REPO/build/DD/Build/Products/Debug/Agents.app
 BRIDGEAPP=$REPO/build/DD/Build/Products/Debug/agents-bridge.app
 IOSAPP=$REPO/build/DD-ios/Build/Products/Debug-iphoneos/Agents.app
+REAL=$MACAPP/Contents/MacOS/Agents
 echo "main $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
   echo "note: main checkout has uncommitted changes; the build includes them"
+fi
+
+# The directory name of the worktree an app bundle was built from. The primary
+# checkout is "main". "unknown" when the bundle is not inside a checkout.
+worktree_of() {
+  local dir=${1:h}
+  while [[ -n $dir && $dir != / ]]; do
+    if [[ -d $dir/.git ]]; then print main; return; fi
+    if [[ -f $dir/.git ]]; then print ${dir:t}; return; fi
+    dir=${dir:h}
+  done
+  print unknown
+}
+
+# One line per running Agents window, named by its worktree. The real app is the
+# debug build of main with no --root. Any other debug process from that checkout
+# means an agent ran it there instead of creating a worktree.
+typeset -a BAD
+while IFS= read -r line; do
+  line=${line## }
+  [[ -n $line ]] || continue
+  pid=${line%% *}
+  cmd=${line#* }
+  case $cmd in
+    */Contents/MacOS/Agents|*/Contents/MacOS/Agents\ *) ;;
+    *) continue ;;
+  esac
+  exe=${cmd%% *}
+  tree=$(worktree_of $exe)
+  echo "app $pid $tree $cmd"
+  if [[ $tree == main && $exe == *"/Debug/"* && ( $cmd == *" --root "* || $cmd == *" --root" || $exe != $REAL ) ]]; then
+    BAD+=("$pid $cmd")
+  fi
+done < <(ps -axww -o pid=,command=)
+if (( ${#BAD} )); then
+  echo "An agent failed to create a worktree. Debug must never run on main." >&2
+  printf '%s\n' "${BAD[@]}" >&2
+  exit 1
 fi
 
 run() { # name, then the command; quiet unless it fails
@@ -113,8 +212,8 @@ fi
 
 if (( MAC )); then
   [[ -d $MACAPP && -d $BRIDGEAPP ]] || { echo "no Mac build in $REPO/build/DD" >&2; exit 1; }
-  if ps -axww -o command= | grep -q '[m]ain-restart-all-.*\.sh'; then
-    echo "another session's restart is already pending: $(ps -axww -o command= | grep '[m]ain-restart-all-')" >&2
+  if ps -axww -o command= | grep -E -q '[s]hip\.sh --restart|[m]ain-restart-all-.*\.sh'; then
+    echo "another session's restart is already pending: $(ps -axww -o command= | grep -E '[s]hip\.sh --restart|[m]ain-restart-all-')" >&2
     echo "not queueing a second one" >&2; exit 1
   fi
   # A window with no --root that is not main's build would grab the real root when the daemon restarts.
@@ -125,8 +224,6 @@ if (( MAC )); then
   fi
   W=$(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $MACAPP/Contents/MacOS/Agents$" | awk '{print $1}' | head -1)
   B=$(ps -axww -o pid=,command= | grep '[a]gents-bridge.app/Contents/MacOS/agents-bridge' | awk '{print $1}' | head -1)
-  S=/tmp/main-restart-all-$SHA.sh
-  cp $HERE/restart-mac.sh $S; chmod +x $S
-  nohup $S "$REPO" "$SHA" "${W:-0}" "${B:-0}" $DELAY >/dev/null 2>&1 &!
+  nohup ${0:A} --restart "$REPO" "$SHA" "${W:-0}" "${B:-0}" $DELAY >/dev/null 2>&1 &!
   echo "$(date +%T) Mac relaunch scheduled in ${DELAY}s (window ${W:-none}, bridge ${B:-none}); log /tmp/main-restart-all-$SHA.log"
 fi

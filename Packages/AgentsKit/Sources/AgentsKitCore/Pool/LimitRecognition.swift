@@ -46,10 +46,18 @@ public enum LimitRecognition {
     /// Copilot's monthly allowance refusal, captured on 2026-09-26.
     public static let copilotMonthlyQuota = "You have exceeded your monthly quota"
 
+    /// Cursor's subscription allowance refusal, captured 2026-09-28.
+    public static let cursorPlanExhausted = "Upgrade your plan to continue"
+
     /// Antigravity's spent-plan title and body, captured on 2026-09-27 from “hi Antigravity”:
     /// `Usage Limit Reached\n\nYou have reached your current quota for this period…`
     public static let antigravityUsageLimitTitle = "Usage Limit Reached"
     public static let antigravityUsageLimitBody = "You have reached your current quota"
+
+    /// Grok's spent Build / SuperGrok balance, captured on 2026-09-27 from “hi Grok”:
+    /// JSON-RPC `-32603 Internal error` with `data.http_status` 402 and
+    /// `data.message` `API error (status 402 Payment Required): Grok Build usage balance exhausted`.
+    public static let grokUsageBalanceExhausted = "usage balance exhausted"
 
     /// A key's credit gone: OpenAI's code and Anthropic's sentence.
     public static let creditGoneWords = ["insufficient_quota", "credit balance is too low"]
@@ -86,8 +94,20 @@ public enum LimitRecognition {
            }) {
             return .spent(resetsAt: resets)
         }
+        if runtimeID == RuntimeCatalog.cursor.id,
+           [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
+               $0.hasPrefix(cursorPlanExhausted)
+           }) {
+            return .spent(resetsAt: resets)
+        }
         if runtimeID == RuntimeCatalog.antigravity.id,
            [error?.message, runtimeError].compactMap({ $0 }).contains(where: isAntigravityUsageLimit) {
+            return .spent(resetsAt: resets)
+        }
+        if runtimeID == RuntimeCatalog.grok.id,
+           [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
+               $0.lowercased().contains(grokUsageBalanceExhausted)
+           }) {
             return .spent(resetsAt: resets)
         }
         if let (code, message) = error {

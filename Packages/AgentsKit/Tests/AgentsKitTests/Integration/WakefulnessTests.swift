@@ -17,17 +17,24 @@ struct WakefulnessTests {
             .appendingPathComponent("AgentsWakeTests-\(UUID().uuidString)", isDirectory: true)
         let work = root.appendingPathComponent("work", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-        return (StoreLocations(root: root), work)
+        let locations = StoreLocations(root: root)
+        // The product default is one hour, which would keep every "lets go" test below
+        // holding after the turn. This suite's fixture is Right away, and the grace
+        // tests opt back into an hour.
+        try WakeSettingsStore(locations: locations).save(WakeSettings(keepsAwake: true, graceHours: 0))
+        return (locations, work)
     }
 
     private func core(_ launcher: FakeLauncher,
                       locations: StoreLocations,
                       power: FakePowerSource,
-                      wakefulness: RecordingWakefulness) throws -> DaemonCore {
+                      wakefulness: RecordingWakefulness,
+                      now: (@Sendable () -> Date)? = nil) throws -> DaemonCore {
         DaemonCore(store: try AgentStore(locations: locations),
                    locations: locations,
                    discovery: .findsEverything,
                    launcher: launcher,
+                   now: now,
                    power: power,
                    wakefulness: wakefulness)
     }
@@ -94,7 +101,13 @@ struct WakefulnessTests {
         let (locations, work) = try temporary()
         let power = FakePowerSource.mains
         let wake = RecordingWakefulness()
-        let core = try core(working(for: .milliseconds(900)),
+        // A gated turn, not a timed one: under the full parallel suite a 900ms turn
+        // could finish while the second and third were still starting, and the Mac
+        // would be released and held again.
+        let gate = TurnGate()
+        var script = FakeACPAgent.Script()
+        script.gate = gate
+        let core = try core(FakeLauncher(script: script),
                             locations: locations, power: power, wakefulness: wake)
 
         var started: [UUID] = []
@@ -106,9 +119,11 @@ struct WakefulnessTests {
         // body, and a captured `var` is not allowed to cross into it.
         let ids = started
 
+        await eventually("every turn has reached the gate") { gate.turnsArrived == 3 }
         await eventually("the Mac is being held awake") { wake.isHolding }
         #expect(wake.holds == 1)
 
+        gate.open()
         await eventually("every turn ended") {
             for id in ids where await core.agent(id)?.state != .finished { return false }
             return true
@@ -596,5 +611,174 @@ struct WakefulnessTests {
         #expect(state.since != nil)
 
         try await core.stop(id)
+    }
+
+    // MARK: The grace
+
+    /// A clock the test moves, which the daemon reads as its own `now`.
+    private final class ManualClock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var date = Date()
+        func now() -> Date { lock.lock(); defer { lock.unlock() }; return date }
+        func advance(_ interval: TimeInterval) {
+            lock.lock(); defer { lock.unlock() }
+            date.addTimeInterval(interval)
+        }
+    }
+
+    private func hour(_ core: DaemonCore) async {
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: true, graceHours: 1))
+    }
+
+    @Test("After the last agent stops the Mac stays awake for the hour, then the tick lets go")
+    func graceHoldsForTheHour() async throws {
+        let clock = ManualClock()
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: FakePowerSource.mains,
+                            wakefulness: wake, now: { clock.now() })
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        await eventually("the Mac is being held awake") { wake.isHolding }
+        #expect(wake.lastReason == DaemonCore.wakeReason)
+
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.graceReason)
+        let until = try #require(await core.wakeState().graceUntil)
+        #expect(abs(until.timeIntervalSince(clock.now()) - 3_600) < 2)
+        #expect(await core.wakeState().agentsInFlight == 0)
+
+        clock.advance(3_599)
+        await core.tickWorkflows(now: clock.now())
+        #expect(wake.isHolding)
+
+        clock.advance(2)
+        await core.tickWorkflows(now: clock.now())
+        #expect(!wake.isHolding)
+        #expect(await core.wakeState().graceUntil == nil)
+        #expect(await core.wakeState().hasSomethingToSay == false)
+    }
+
+    @Test("A question starts the hour, so there is time to answer")
+    func waitingStartsTheGrace() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(asking(), locations: locations, power: FakePowerSource.mains, wakefulness: wake)
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "write it"))
+        await eventually("the agent is blocked on its question") {
+            await core.agent(id)?.state == .waitingOnUser
+        }
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.graceReason)
+        #expect(await core.wakeState().graceUntil != nil)
+    }
+
+    @Test("Work during the grace clears the clock and holds because of the work")
+    func workDuringGraceClearsTheClock() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let gate = TurnGate()
+        var script = FakeACPAgent.Script()
+        script.permission = ["toolCall": ["title": "Write hello.txt"],
+                             "options": [["optionId": "allow", "name": "Allow", "kind": "allow_once"]]]
+        script.gate = gate
+        let core = try core(FakeLauncher(script: script), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "write it"))
+        await eventually("waiting, and the grace is up") {
+            await core.agent(id)?.state == .waitingOnUser && wake.lastReason == DaemonCore.graceReason
+        }
+
+        let question = try #require(await core.pendingPermissionRequests().first)
+        try await core.answerPermission(.init(permissionID: question.id, optionID: "allow"))
+        await eventually("the turn is working again, with no clock") {
+            guard await core.agent(id)?.state == .running else { return false }
+            guard wake.lastReason == DaemonCore.wakeReason else { return false }
+            return await core.wakeState().graceUntil == nil
+        }
+        #expect(wake.isHolding)
+        gate.open()
+    }
+
+    @Test("Turning the switch off lets the Mac sleep even mid-turn")
+    func switchedOffReleasesMidTurn() async throws {
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(for: .seconds(5)), locations: locations,
+                            power: FakePowerSource.mains, wakefulness: wake)
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "a long one"))
+        await eventually("held") { wake.isHolding }
+
+        let saved = await core.setWakeSettings(WakeSettings(keepsAwake: false, graceHours: 1))
+        #expect(saved.keepsAwake == false)
+        #expect(!wake.isHolding)
+        #expect(await core.agent(id)?.state == .running)
+
+        try await core.stop(id)
+    }
+
+    @Test("Shortening the grace past now lets the Mac sleep at once")
+    func shorteningTheGraceReleases() async throws {
+        let clock = ManualClock()
+        let (locations, work) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: FakePowerSource.mains,
+                            wakefulness: wake, now: { clock.now() })
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        await eventually("the turn ended and the grace is up") {
+            await core.agent(id)?.state == .finished && wake.lastReason == DaemonCore.graceReason
+        }
+        clock.advance(3_000)
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: true, graceHours: 0))
+        #expect(!wake.isHolding)
+    }
+
+    @Test("A low battery during the grace is quiet, and plugging in brings the hold back")
+    func batteryDuringGrace() async throws {
+        let (locations, work) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(80)
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power, wakefulness: wake)
+        await hour(core)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        #expect(wake.isHolding)
+
+        power.onBattery(Wake.batteryFloorPercent)
+        await core.tickWorkflows(now: Date())
+        #expect(!wake.isHolding)
+        let quiet = await core.wakeState()
+        #expect(!quiet.hasSomethingToSay)
+        #expect(!quiet.heldBackByBattery)
+
+        power.onMains(Wake.batteryFloorPercent)
+        await core.tickWorkflows(now: Date())
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.graceReason)
+    }
+
+    @Test("The hours are clamped, and a new daemon reads what was saved")
+    func settingsAreKept() async throws {
+        let (locations, _) = try temporary()
+        let first = try core(working(), locations: locations, power: FakePowerSource.mains,
+                             wakefulness: RecordingWakefulness())
+        let saved = await first.setWakeSettings(WakeSettings(keepsAwake: false, graceHours: 9))
+        #expect(saved == WakeSettings(keepsAwake: false, graceHours: 8))
+
+        let again = try core(working(), locations: locations, power: FakePowerSource.mains,
+                             wakefulness: RecordingWakefulness())
+        #expect(await again.readWakeSettings() == saved)
     }
 }

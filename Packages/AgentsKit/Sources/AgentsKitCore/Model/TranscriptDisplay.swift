@@ -109,6 +109,41 @@ extension TranscriptItem {
         if case .toolRun(_, let calls) = self { return max(0, calls.count - 1) }
         return 0
     }
+
+    /// Whether this item is the agent's thinking, which the session draws only when
+    /// asked. The record keeps it either way.
+    public var isThought: Bool {
+        if case .entry(let entry) = self, case .agentThought = entry.kind { return true }
+        return false
+    }
+}
+
+extension Array where Element == TranscriptItem {
+    /// The page with the agent's thinking left off it.
+    ///
+    /// A thought between two calls is what splits them into two runs. Once the
+    /// thought is gone, nothing on the page separates those runs, so they are one
+    /// run again: the latest description, and the rest a click away. A message, or
+    /// anything else that stays, still starts a new run.
+    public func omittingThoughts() -> [TranscriptItem] {
+        filter { !$0.isThought }.joiningAdjacentToolRuns()
+    }
+
+    /// Runs with nothing drawn between them are one run. The first run's identity
+    /// is kept, so a run the reader has opened stays open as later calls join it.
+    public func joiningAdjacentToolRuns() -> [TranscriptItem] {
+        var kept: [TranscriptItem] = []
+        for item in self {
+            if case .toolRun(_, let calls) = item,
+               let last = kept.indices.last,
+               case .toolRun(let id, let earlier) = kept[last] {
+                kept[last] = .toolRun(id: id, calls: earlier + calls)
+            } else {
+                kept.append(item)
+            }
+        }
+        return kept
+    }
 }
 
 extension TranscriptEntry {

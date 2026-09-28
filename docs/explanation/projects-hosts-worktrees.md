@@ -135,16 +135,16 @@ once you delete them; MCP servers go with each conversation as it starts, so not
 written into a runtime's own config. **Settings ▸ Shared** shows what each runtime ends up
 with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
 
-A project's own skills are listed under **Project configuration ▸ Skills**, opened from the
-project page's toolbar, where you can also add one from skills.sh. Because the project's
-`.agents` folder is committed, a skill added
-there reaches everyone who clones the project; one added in **Settings ▸ Shared** is yours
-alone. A worktree has its own `.agents`, so a skill added on a worktree's page stays on that
-branch until it is merged. Project skills on servers are not available yet. See
+A project's instructions, skills, MCP servers and plugins are set up on **Project configuration**,
+opened from the gear on the project page. Those are the same sections as **Settings ▸ Shared**.
+The folder is the only difference: yours is `~/.agents`, the project's is its `.agents`, and
+its instructions are `AGENTS.md` at the top of the project. Because that folder is committed,
+a skill added there reaches everyone who clones the project; one added in **Settings ▸ Shared**
+is yours alone. A worktree has its own `.agents`, so a change there stays on that branch until
+it is merged. Project configuration on a server is not available yet. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
-A project's MCP servers live in `.agents/mcp.json`, listed on its page in an **MCP servers**
-section after Skills. The file is committed, so it names each secret as `${NAME}` and never
+A project's MCP servers live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
 holds the value. Each person sets their own in `~/.agents/secrets.env`. A server added from
 the sheet is approved as it goes in. One that arrives with a pull waits, marked **waiting
 for your OK**, until you choose **Approve**; no agent is given it before that. Where you and

@@ -1310,7 +1310,7 @@ extension DaemonCore {
             await record(.runtimeNote(refused.relayed == true
                 ? "\(runtimeName) on this Mac needs signing in again."
                 : refused.lent
-                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Servers."
+                ? "\(runtimeName) refused the \(CredentialKind.noun(for: refused.runtime)) in Settings. Replace it in Settings ▸ Agent Runtimes."
                 : "\(runtimeName) refused this server’s own sign-in."), for: agentID)
             broadcast(DaemonAPI.Notification.credentialRefused, refused)
         } else if let signIn, let runtimeID = agents[agentID]?.runtimeID {

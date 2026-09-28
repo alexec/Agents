@@ -177,6 +177,8 @@ public struct StoreLocations: Sendable {
     public var events: URL { root.appendingPathComponent("events.jsonl") }
     /// How long archived agents are kept and the clock that counts it (051).
     public var retention: URL { root.appendingPathComponent("retention.json") }
+    /// Whether this Mac stays awake for agents, and for how long after they stop.
+    public var wakeSettings: URL { root.appendingPathComponent("wake.json") }
     /// What is left of retired agents, one per line, never rewritten (051).
     public var retired: URL { root.appendingPathComponent("retired.jsonl") }
     /// The person's pool of runtimes to carry a chat on with (052).
