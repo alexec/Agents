@@ -30,6 +30,8 @@ extension Trait where Self == ConditionTrait {
     ///   copilotQuotaWithPoolOffStopsWithoutClaimingSuccess — quota handling timed out
     ///   after 10 s in full local runs; the PoolSwitch suite passed in isolation. Keep
     ///   them out of the parallel run and run them with the quarantine step in CI.
+    /// - QuietLinkTests.aMacThatNeverAnswersIsNotConnectedTo — expected under 10 s,
+    ///   took 29 s on a loaded CI runner.
     ///
     /// Slow quarantine, run manually from `.github/workflows/slow-tests.yml`:
     /// - RelayCarryingTests.aReplyOfFiveMegabytesArrivesWhole — 62 s on the shared
