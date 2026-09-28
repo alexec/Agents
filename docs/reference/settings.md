@@ -13,8 +13,9 @@ iPhone and iPad depends on.
 The Mac's Settings window has eight panes, chosen from one rail down its left side:
 **General**; then **Agents**, **Agent Runtimes**, **Spending** and **Pool**; then **Shared**,
 a heading with its pages always listed under it, each with a count, and a warning sign on
-any that needs a look; then **Devices** and **Servers**. The window stays the same
-size whichever pane you choose. Agents on iPhone and iPad has no Settings screen of its
+any that needs a look; then **Devices** and **Servers**. The window opens at one size
+and stays there whichever pane you choose, so it never jumps. You can resize it larger;
+it will not go smaller than the size it opens at. Agents on iPhone and iPad has no Settings screen of its
 own; it follows the Mac it is paired with.
 
 | Device | Pane | Control | What it does |
