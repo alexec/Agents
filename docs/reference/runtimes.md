@@ -69,7 +69,9 @@ That needs the app to recognise the refusal, which it does per runtime:
 | **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | When Codex says; otherwise it is tried again after an hour. |
 | **Gemini** | Recognised from Google's sentence about the daily quota. On free or prepaid credit, also when the app's count of what it cost reaches the amount, or the credit's date passes. | Recognised from Google's 429. | The free tier: midnight Pacific. Credit: when you mark it available or raise the amount. |
 | **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Tried again after an hour. |
-| **Copilot**, **Cursor**, **Grok** | **Not yet recognised.** A chat on them stops when its allowance runs out, as it always has. They can still be carried on to. | Not yet recognised. | — |
+| **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Tried again after an hour when spent without a window. |
+| **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Tried again after an hour when spent without a window. |
+| **Cursor** | **Not yet recognised.** A chat on it stops when its allowance runs out, as it always has. It can still be carried on to. | Not yet recognised. | — |
 
 An error the app does not recognise never moves a chat: it stops, as before.
 

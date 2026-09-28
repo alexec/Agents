@@ -139,4 +139,22 @@ struct AllowanceRecognitionTests {
         #expect(await core.agent(id)?.endedReason == .allowanceSpent)
         #expect(try await notes(core, id).contains("Codex’s credit is used up."))
     }
+
+    @Test func groksUsageBalanceExhaustedIsOutEvenWhenNestedUnderInternalError() async throws {
+        var script = FakeACPAgent.Script()
+        script.promptError = JSONRPCError(
+            code: -32603,
+            message: "Internal error",
+            data: .object([
+                "http_status": .int(402),
+                "message": .string("API error (status 402 Payment Required): Grok Build usage balance exhausted"),
+            ]))
+        let (core, work, _) = try core(script)
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        #expect(await core.agent(id)?.endedReason == .allowanceSpent)
+        #expect(try await notes(core, id).contains { $0.hasPrefix("Grok’s allowance ran out") })
+        let state = try #require(await core.allowanceStates().first { $0.credentialKey == "grok:sign-in" })
+        #expect(state.isOut)
+    }
 }

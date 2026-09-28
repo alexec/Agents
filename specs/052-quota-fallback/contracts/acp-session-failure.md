@@ -68,4 +68,5 @@ captured text:
 | claude (no extension) | error text starts with any `USAGE_LIMIT_ERROR_PREFIXES` entry (SDK list, copied with its version) | — |
 | gemini | 429 and "exhausted your daily quota": out until the entry's reset (free tier: next midnight Pacific) | other 429s; `RESOURCE_EXHAUSTED` with "rate limit" |
 | antigravity (049) | chat text starting `Usage Limit Reached` / `You have reached your current quota` (captured 2026-09-27), via `turnError` then `runtimeError` → `.spent` | `Resource has been exhausted` / `check quota` as `runtimeError` → rate-limited first (R7) |
+| grok | `data.message` containing `usage balance exhausted` (captured 2026-09-27 from “hi Grok”; top-level JSON-RPC message is only `Internal error`, with `data.http_status` 402) → `.spent` | — |
 | keyed OpenAI / Anthropic | `insufficient_quota`; "credit balance is too low" → `.creditGone` | 429 without those |

@@ -11,10 +11,24 @@ struct PoolSwitchTests {
     private let codex = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
     private let copilot = PoolEntry(runtimeID: "copilot", payment: .allowance(label: nil))
     private let antigravity = PoolEntry(runtimeID: "antigravity", payment: .allowance(label: nil))
+    private let grok = PoolEntry(runtimeID: "grok", payment: .allowance(label: nil))
 
     private func spent() throws -> FakeACPAgent.Script {
         var script = FakeACPAgent.Script()
         script.promptResultMeta = try SessionFailureDecodingTests.fixture("quota-exhausted")
+        return script
+    }
+
+    /// Captured from “hi Grok”, 2026-09-27: top-level Internal error, real refusal under data.
+    private func grokUsageBalanceExhausted() -> FakeACPAgent.Script {
+        var script = FakeACPAgent.Script()
+        script.promptError = JSONRPCError(
+            code: -32603,
+            message: "Internal error",
+            data: .object([
+                "http_status": .int(402),
+                "message": .string("API error (status 402 Payment Required): Grok Build usage balance exhausted"),
+            ]))
         return script
     }
 
@@ -91,6 +105,22 @@ struct PoolSwitchTests {
         let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
         #expect(switches.count == 1)
         #expect(switches.first?.reason == .allowanceSpent)
+    }
+
+    @Test(.flakyUnderLoad) func grokUsageBalanceExhaustedMovesToTheNextRuntime() async throws {
+        let (core, work, launcher, _) = try await core([grokUsageBalanceExhausted()], pool: [grok, codex])
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "hi Grok"))
+        await eventually("Grok handed over to Codex") { await core.agent(id)?.runtimeID == "codex" }
+        await eventually("Codex answered") { await core.agent(id)?.endedReason == .endTurn }
+        #expect(launcher.launches.prefix(2).map(\.runtime) == ["grok", "codex"])
+        #expect(await core.allowanceStates().contains { $0.credentialKey == "grok:sign-in" && $0.isOut })
+        let switches = try await kinds(core, id).compactMap { if case .poolSwitch(let r) = $0 { r } else { nil } }
+        #expect(switches.count == 1)
+        #expect(switches.first?.reason == .allowanceSpent)
+        let next = try #require(launcher.allAgents.dropFirst().first)
+        let prompts = await promptText(next)
+        #expect(prompts.count == 1)
+        #expect(prompts.first?.contains("hi Grok") == true)
     }
 
     @Test(.flakyUnderLoad) func copilotQuotaWithPoolOffStopsWithoutClaimingSuccess() async throws {
