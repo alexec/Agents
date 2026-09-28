@@ -11,9 +11,8 @@ Three ways to put an agent down, each keeping its whole conversation:
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
 - **Park** puts a chat you have finished with *for now* in its own group, to come back to.
-- **Archive** puts away a chat you are done with. On the Mac, the three archived latest
-  today stay listed under **Archived today**. The rest fold out of sight. On iPhone and
-  iPad, an archived chat folds out of sight. Any of them can be brought back.
+- **Archive** puts away a chat you are done with. It folds out of sight under **Archived**.
+  Any of them can be brought back.
 
 ## Before you start
 
@@ -53,24 +52,21 @@ Three ways to put an agent down, each keeping its whole conversation:
    on the trackpad and click the **Archive** button it uncovers; or right-click the card
    and choose **Archive**.
 
-   An agent still working is stopped first. On the Mac, a chat archived today stays
-   listed under **Archived today** when it is one of the three latest. Otherwise it
-   moves under **Archived** at the bottom of the project's page, folded away. On iPhone
-   and iPad it moves under **Archived**, folded away.
+   An agent still working is stopped first. The chat moves under **Archived** at the
+   bottom of the project's page, folded away.
 2. If the agent worked in a worktree the app made, and everything there is committed,
    archiving also removes the worktree. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
-3. To bring it back, right-click the card and choose **Bring Back**. On the Mac, today's
-   three latest are already in the list under **Archived today**. For an older chat, open
-   **Archived** first. On iPhone and iPad, open **Archived**, open the chat, and choose
-   **Bring Back** from the **Actions** menu.
+3. To bring it back, open **Archived**, then right-click the card and choose **Bring Back**.
+   On iPhone and iPad, open **Archived**, open the chat, and choose **Bring Back** from
+   the **Actions** menu.
 
 **What each keeps**
 
 | | Stop | Park | Archive |
 |---|---|---|---|
 | Conversation, cost and settings | Kept | Kept | Kept |
-| Where it is listed | **Stopped** | **Parked** | **Archived**. On the Mac, today's three latest stay under **Archived today**; the rest are folded away |
+| Where it is listed | **Stopped** | **Parked** | **Archived**, folded away |
 | Asks for your attention | No | Never | Never |
 | Worktree | Kept | Kept | Removed if everything in it is committed |
 | Afterwards | | | Retired after 30 days, or sooner when archived agents take more than 2 GB |
