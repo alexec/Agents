@@ -31,6 +31,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Hosted runners start clean. Reuse Xcode and SwiftPM products between CI
+      # runs so they can spend their ten minutes running tests instead of compiling.
+      - name: Restore build cache
+        id: build-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/DD
+            Daemon/.build
+            Packages/AgentsKit/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-${{ hashFiles('**/Package.resolved') }}
+
       - name: Tools
         run: |
           xcodebuild -version
@@ -71,15 +84,34 @@ jobs:
       - name: Time the login shell
         run: time zsh -lc 'printf %s "$PATH"' > /dev/null
 
-      - name: Test CodeText
-        run: swift test --package-path Packages/CodeText
+      # Build test targets before execution so the cache can be saved before any
+      # slow test hits the job timeout.
+      - name: Build CodeText tests
+        run: swift build --build-tests --package-path Packages/CodeText
 
       # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
       # past the question about a silent ending (`settled`), and `eventually` waits
       # 45 s where CI is set rather than 10, since a test on a three-core runner can
       # wait that long for its first turn on the pool.
+      - name: Build AgentsKit tests
+        run: swift build --build-tests --package-path Packages/AgentsKit
+
+      - name: Save build cache
+        if: ${{ steps.build-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            build/DD
+            Daemon/.build
+            Packages/AgentsKit/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-${{ hashFiles('**/Package.resolved') }}
+
+      - name: Test CodeText
+        run: swift test --skip-build --package-path Packages/CodeText
+
       - name: Test AgentsKit
-        run: swift test --package-path Packages/AgentsKit
+        run: swift test --skip-build --package-path Packages/AgentsKit
 
       # The quarantined tests, alone and with the machine quieter than in a full run.
       # A failure here is reported and does not fail the build.
