@@ -123,4 +123,4 @@ jobs:
         run: swift test --skip-build --package-path Packages/CodeText
 
       - name: Test AgentsKit
-        run: swift test --skip-build --package-path Packages/AgentsKit
+        run: swift test --skip-build --parallel --num-workers 3 --package-path Packages/AgentsKit
