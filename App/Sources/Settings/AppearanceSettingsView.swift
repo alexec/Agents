@@ -59,23 +59,34 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
+/// Settings ▸ General: appearance, then whether this Mac stays awake for agents.
+struct GeneralSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            AppearanceSettingsView()
+            WakeSettingsSection()
+        }
+        .paperForm()
+        .task { await model.refreshWakeSettings() }
+    }
+}
+
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Appearance", selection: $appearance) {
-                    ForEach(Appearance.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } footer: {
-                Text("System follows your Mac, and changes with it.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
+        Section {
+            Picker("Appearance", selection: $appearance) {
+                ForEach(Appearance.allCases) { Text($0.title).tag($0) }
             }
-            .paperListRow()
+            .pickerStyle(.segmented)
+        } footer: {
+            Text("System follows your Mac, and changes with it.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
         }
-        .paperForm()
+        .paperListRow()
     }
 }

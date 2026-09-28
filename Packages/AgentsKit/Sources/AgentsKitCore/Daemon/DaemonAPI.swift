@@ -329,6 +329,9 @@ public enum DaemonAPI {
         /// has heard no broadcast, and for a long turn would otherwise show nothing
         /// for half an hour.
         public static let wakeState = "wake/state"
+        /// The switch and the grace. The window's, like retention: a phone does not set it.
+        public static let wakeSettings = "wake/settings"
+        public static let wakeSet = "wake/set"
     }
 
     public enum Notification {
