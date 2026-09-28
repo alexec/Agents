@@ -10,8 +10,8 @@ This page lists every control in the Mac's Settings window, **Agents ▸ Setting
 by pane, the **Resources** page (not in that window), and the system settings the app on
 iPhone and iPad depends on.
 
-The Mac's Settings window has eight panes, chosen from one rail down its left side:
-**General**; then **Agents**, **Agent Runtimes**, **Spending** and **Pool**; then **Shared**,
+The Mac's Settings window has seven panes, chosen from one rail down its left side:
+**General**; then **Agent Runtimes**, **Spending** and **Pool**; then **Shared**,
 a heading with its pages always listed under it, each with a count, and a warning sign on
 any that needs a look; then **Devices** and **Servers**. The window opens at one size
 and stays there whichever pane you choose, so it never jumps. You can resize it larger;
@@ -21,9 +21,9 @@ own; it follows the Mac it is paired with.
 | Device | Pane | Control | What it does |
 | --- | --- | --- | --- |
 | Mac | General | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |
-| Mac | Agents | **Archived agents** | How many archived agents there are and how much space they take, and how long they are kept. When they are over the space they may take and nothing more can be retired yet, it says so and why. |
-| Mac | Agents | **Keep archived agents**: **7 days**, **14 days**, **30 days**, **90 days**, **Forever** | How long an archived agent is kept before it is retired: its conversation is deleted and a short record of who it was is kept. The default is **30 days**. If a change would retire agents at once, you are asked first, with how many and how much space it frees. Each server keeps to the same setting. |
-| Mac | Agents | **Up to**: **1 GB**, **2 GB**, **5 GB**, **10 GB**, **No limit** | The most space archived agents may take. Over it, the ones archived longest ago are retired first. The default is **2 GB**. **Forever** with **No limit** keeps archived agents for good. |
+| Mac | General | **Archived agents** | How many archived agents there are and how much space they take, and how long they are kept. When they are over the space they may take and nothing more can be retired yet, it says so and why. |
+| Mac | General | **Keep archived agents**: **7 days**, **14 days**, **30 days**, **90 days**, **Forever** | How long an archived agent is kept before it is retired: its conversation is deleted and a short record of who it was is kept. The default is **30 days**. If a change would retire agents at once, you are asked first, with how many and how much space it frees. Each server keeps to the same setting. |
+| Mac | General | **Up to**: **1 GB**, **2 GB**, **5 GB**, **10 GB**, **No limit** | The most space archived agents may take. Over it, the ones archived longest ago are retired first. The default is **2 GB**. **Forever** with **No limit** keeps archived agents for good. |
 | Mac | Agent Runtimes | The list of runtimes | Every runtime the app knows, each saying where it is, **Not on this Mac** (with the download's size where the app fetches it), or what it is doing while it installs, with **Install**, **Retry** after an install failed, **Update** when the app carries a newer version of one it installed, or **Open install page**. Under the list, where Claude is: in the app's own folder, with nothing added to your PATH, or run through your own Node. The others use their makers' own installers. |
 | Mac | Agent Runtimes | Under **Cursor** and **Grok**: **permission mode**, **Default** or **Auto-review** | How that runtime asks permission. **Default** asks before it does something that needs permission. **Auto-review** allows ordinary work inside the project and asks before anything that leaves it, publishes, or needs extra privilege. Each control is independent, survives quitting, and applies to every agent on that runtime — including ones started by a workflow or on a server. The control is still there when the runtime is not installed. Claude, Codex, Gemini, Antigravity and Copilot keep the permission modes they already have under the prompt. |
 | Mac | Agent Runtimes | **Install your agents** (a sheet at start-up) | Shown when the app starts and a runtime it can install is not on this Mac, with the same rows. **Not now** or **Done** puts it away; it comes back only for a runtime it has not offered before. A runtime that is installed but signed out does not count as missing. |
