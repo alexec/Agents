@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Choose conservative SwiftPM test runs from the files changed since a base commit.
 #
-# Package source changes run that package's full suite: there is no reliable way to
-# infer source-to-test dependencies from filenames. When only conventional *Tests.swift
-# files changed, run just those Swift Testing suites. Unrecognized changes run both
-# suites so a new dependency or build setting cannot silently bypass tests.
+# Package source changes run co-changed, named test suites when available, and the
+# full package suite when no test suite changed alongside the source. Test-only edits
+# also filter to named suites. Unrecognized changes run both package suites.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -33,6 +32,10 @@ else
 		unknown=false
 		agentskit_touched=false
 		codetext_touched=false
+		agentskit_source_touched=false
+		codetext_source_touched=false
+		agentskit_full_required=false
+		codetext_full_required=false
 		agentskit_only_tests=true
 		codetext_only_tests=true
 		agentskit_suites=()
@@ -54,9 +57,17 @@ else
 						agentskit_only_tests=false
 					fi
 					;;
-				Packages/AgentsKit/*|Daemon/*)
+				Daemon/Package.swift)
 					agentskit_touched=true
-					agentskit_only_tests=false
+					agentskit_full_required=true
+					;;
+				Packages/AgentsKit/Sources/*|Daemon/*)
+					agentskit_touched=true
+					agentskit_source_touched=true
+					;;
+				Packages/AgentsKit/*)
+					agentskit_touched=true
+					agentskit_full_required=true
 					;;
 				Packages/CodeText/Tests/*)
 					codetext_touched=true
@@ -72,12 +83,16 @@ else
 						codetext_only_tests=false
 					fi
 					;;
+				Packages/CodeText/Sources/*)
+					codetext_touched=true
+					codetext_source_touched=true
+					;;
 				Packages/CodeText/*)
 					codetext_touched=true
-					codetext_only_tests=false
+					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Remote/*|RemoteNotify/*|Bridge/*|Shared/UI/*|docs/*|specs/*|design/*|.agents/*|.claude/*)
+				App/*|Remote/*|RemoteNotify/*|Bridge/*|Shared/UI/*|docs/*|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
@@ -90,7 +105,11 @@ else
 			full_both
 		else
 			if $agentskit_touched; then
-				if $agentskit_only_tests && ((${#agentskit_suites[@]} > 0)); then
+				if $agentskit_full_required; then
+					agentskit=full
+				elif $agentskit_source_touched && ((${#agentskit_suites[@]} > 0)); then
+					agentskit=filter
+				elif ! $agentskit_source_touched && $agentskit_only_tests && ((${#agentskit_suites[@]} > 0)); then
 					agentskit=filter
 					# SwiftPM treats --filter as a regular expression over the fully
 					# qualified test identifier. Suite names here are Swift identifiers.
@@ -98,13 +117,22 @@ else
 				else
 					agentskit=full
 				fi
+				if [[ "$agentskit" == filter ]]; then
+					agentskit_filter=$(IFS='|'; printf '%s' "${agentskit_suites[*]}")
+				fi
 			fi
 			if $codetext_touched; then
-				if $codetext_only_tests && ((${#codetext_suites[@]} > 0)); then
+				if $codetext_full_required; then
+					codetext=full
+				elif $codetext_source_touched && ((${#codetext_suites[@]} > 0)); then
 					codetext=filter
-					codetext_filter=$(IFS='|'; printf '%s' "${codetext_suites[*]}")
+				elif ! $codetext_source_touched && $codetext_only_tests && ((${#codetext_suites[@]} > 0)); then
+					codetext=filter
 				else
 					codetext=full
+				fi
+				if [[ "$codetext" == filter ]]; then
+					codetext_filter=$(IFS='|'; printf '%s' "${codetext_suites[*]}")
 				fi
 			fi
 		fi
