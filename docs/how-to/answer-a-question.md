@@ -61,7 +61,8 @@ a choice. A question you left empty is left out. A card you declined or closed s
 declined the agent's form** or **The form was closed**.
 
 Cursor's questions come as the same card, one question to a page; any of them can be left
-empty.
+empty. A question with choices shows those choices, and a question without choices has a
+text box.
 
 When Cursor or Grok is set to **Auto-review** in **Settings ▸ Agent Runtimes**, ordinary
 permission requests inside the project are answered for you: no card, no **Needs you**,
