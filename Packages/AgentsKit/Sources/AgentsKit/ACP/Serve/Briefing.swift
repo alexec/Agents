@@ -100,7 +100,7 @@ public enum Briefing {
     /// is known before the first call rather than learned from a refusal.
     public static let helpers = """
         If a piece of the work can go on alongside the rest, you can start up to five \
-        agents in this project with \(AppTool.startAgent), and stop or archive them when \
+        agents in this project with \(AppTool.startAgent), and stop or park them when \
         their part is done. Do not start one for work you could simply do yourself.
         """
 
@@ -224,6 +224,7 @@ public enum Briefing {
     ///
     /// `managesAgents` is false for an agent another agent started, which gets no line
     /// about starting agents because it has no tools for it (028).
+    ///
     public static func lines(for policy: ToolPolicy, managesAgents: Bool = true) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [finish,

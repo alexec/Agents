@@ -94,7 +94,7 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
     /// Said when an agent asks to archive one it started.
     public static let cannotArchiveAnother = """
         Nothing was archived: only the person can archive a session, so it stays in \
-        the list where they can open it. Stop it with stop_agent if its part is done; \
-        it keeps its place until they archive it.
+        the list where they can open it. Stop it with stop_agent, or park it with \
+        park_agent, if its part is done; it keeps its place until they archive it.
         """
 }

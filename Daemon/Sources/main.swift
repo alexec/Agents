@@ -87,6 +87,10 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "mcp" {
             return await relay(DaemonAPI.Method.agentsStopHelper,
                                DaemonAPI.HelperRequest(token: token, agentID: agentID),
                                fallback: "Stopped.")
+        case .park(let agentID):
+            return await relay(DaemonAPI.Method.agentsParkHelper,
+                               DaemonAPI.HelperRequest(token: token, agentID: agentID),
+                               fallback: "Parked.")
         case .archive(let agentID):
             return await relay(DaemonAPI.Method.agentsArchiveHelper,
                                DaemonAPI.HelperRequest(token: token, agentID: agentID),
