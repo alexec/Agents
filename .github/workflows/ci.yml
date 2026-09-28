@@ -52,9 +52,11 @@ jobs:
       - name: Tools
         run: |
           xcodebuild -version
-          brew install xcodegen
+          brew install xcodegen &
+          xcodegen_pid=$!
           # The runner's Xcode comes without it, and the app's build compiles Metal.
           xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
 
       - name: Generate the project
         run: xcodegen generate
