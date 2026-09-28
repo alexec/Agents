@@ -11,13 +11,26 @@ import SwiftUI
 struct PluginsSection: View {
     @Environment(AppModel.self) private var model
     let folder: URL?
+    /// The project page hides the section when there is nothing to approve or list.
+    /// Configuration always shows it, with a line when the folder is empty.
+    var showsEmptyState = false
 
     private var plugins: [ProjectPlugin] { model.plugins(in: folder) }
 
     var body: some View {
         Group {
-            if !plugins.isEmpty {
+            if !plugins.isEmpty || showsEmptyState {
                 SectionHeading(title: "Plugins")
+                Text("In .agents/plugins, committed with the project. A new or changed one waits until you approve it.")
+                    .appText(.fine).foregroundStyle(.secondary)
+                    .padding(.leading, 2).padding(.bottom, 4)
+                if plugins.isEmpty {
+                    Text("No plugins in this project yet.")
+                        .appText(.supporting).foregroundStyle(.secondary)
+                        .padding(.horizontal, 16).padding(.vertical, 13)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .paperRow()
+                }
                 ForEach(plugins) { plugin in
                     PluginRow(plugin: plugin)
                 }

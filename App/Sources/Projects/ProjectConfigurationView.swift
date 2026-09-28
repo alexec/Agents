@@ -22,11 +22,12 @@ struct ProjectConfigurationView: View {
                 Text(model.selectedProjectSummary?.name ?? "Project")
                     .appText(.supporting).foregroundStyle(.secondary)
 
-                if model.selectedProjectKey?.host == .mac {
-                    ProjectSkillsSection(folder: folder)
+                if let folder, model.selectedProjectKey?.host == .mac {
+                    AgentsSetupView(place: .project(folder))
+                        .padding(.top, 8)
                 } else {
-                    SectionHeading(title: "Skills")
-                    Text("Project skills on servers are not available yet.")
+                    SectionHeading(title: "Configuration")
+                    Text("Project configuration on a server is not available yet.")
                         .appText(.supporting).foregroundStyle(.secondary)
                 }
             }
