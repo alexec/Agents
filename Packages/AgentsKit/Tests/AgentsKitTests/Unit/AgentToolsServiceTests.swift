@@ -36,7 +36,7 @@ struct AgentToolsServiceTests {
     }
 
     private let agentTools = [AppService.startAgentToolName, AppService.stopAgentToolName,
-                              AppService.listMyAgentsToolName]
+                              AppService.parkAgentToolName, AppService.listMyAgentsToolName]
 
     @Test func anAgentThePersonStartedIsOfferedThem() async throws {
         let (client, service) = await pair()
@@ -44,16 +44,6 @@ struct AgentToolsServiceTests {
         for tool in agentTools { #expect(listed.contains(tool), "\(tool)") }
         #expect(!listed.contains(AppService.archiveAgentToolName),
                 "only the person archives")
-        await service.close()
-    }
-
-    /// Parking is the person's word about their own attention. No tool the app gives
-    /// an agent parks or unparks anything (040, FR-016).
-    @Test func noAgentIsOfferedATooltoPark() async throws {
-        let (client, service) = await pair()
-        let listed = try await names(client)
-        #expect(!listed.isEmpty)
-        #expect(listed.allSatisfy { !$0.lowercased().contains("park") }, "\(listed)")
         await service.close()
     }
 
@@ -93,14 +83,17 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    @Test func stopAndListReachTheDaemon() async throws {
+    @Test func stopParkAndListReachTheDaemon() async throws {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         _ = try await client.call("tools/call", [
             "name": .string(AppService.stopAgentToolName), "arguments": ["id": "abc"],
         ])
+        _ = try await client.call("tools/call", [
+            "name": .string(AppService.parkAgentToolName), "arguments": ["id": "abc"],
+        ])
         _ = try await client.call("tools/call", ["name": .string(AppService.listMyAgentsToolName)])
-        #expect(await calls.seen == [.stop(agentID: "abc"), .list])
+        #expect(await calls.seen == [.stop(agentID: "abc"), .park(agentID: "abc"), .list])
         await service.close()
     }
 

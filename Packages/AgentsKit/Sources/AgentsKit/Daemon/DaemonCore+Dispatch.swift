@@ -629,6 +629,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
 
+            case DaemonAPI.Method.agentsParkHelper:
+                let request = try require(params, as: DaemonAPI.HelperRequest.self)
+                return .success(["note": .string(try parkHelper(request))])
+
             case DaemonAPI.Method.agentsArchiveHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await archiveHelper(request))])
