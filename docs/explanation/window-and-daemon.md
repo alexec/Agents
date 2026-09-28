@@ -51,9 +51,12 @@ Agents again, a new daemon starts, reads the records, and the unread agent is un
 **Needs you** with its summary. Once you open it, completed work moves to **Done**.
 
 While any agent has a turn in flight, the daemon keeps the Mac from going to sleep because
-it has been left alone. It lets go as soon as no turn is in flight. An agent waiting for
-your answer does not keep the Mac awake. Closing the lid, or choosing **Sleep** yourself,
-still puts the Mac to sleep, and a turn in flight goes to sleep with it.
+it has been left alone. After the last turn stops, it stays awake for a while longer so
+you can reply — an hour by default, or right away through eight hours in
+**Settings ▸ General ▸ Sleep**. An agent waiting for your answer does not count as a turn
+in flight, so that grace is when you get the time. Closing the lid, or choosing **Sleep**
+yourself, still puts the Mac to sleep, and a turn in flight goes to sleep with it. At
+20% battery or below the hold ends anyway.
 
 ## Restarting the Mac
 

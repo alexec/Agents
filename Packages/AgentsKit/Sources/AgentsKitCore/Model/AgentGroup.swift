@@ -34,8 +34,7 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// The groups shown in the panel. Archived is revealed on demand, apart from the
-    /// three most recently archived today, which stay in the list (`VisibleArchives`).
+    /// The groups shown in the panel. Archived is revealed on demand.
     /// The legacy Blocked value is decoded but no longer assigned to a session.
     public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped, .parked]
 

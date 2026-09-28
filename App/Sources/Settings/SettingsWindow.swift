@@ -68,8 +68,7 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
-        case .general: FormColumn { AppearanceSettingsView() }
-        case .agents: FormColumn { AgentsSettingsView() }
+        case .general: FormColumn { GeneralSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
@@ -85,12 +84,11 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, agents, runtimes, shared, spending, pool, devices, servers
+    case general, runtimes, shared, spending, pool, devices, servers
 
     var title: String {
         switch self {
         case .general: "General"
-        case .agents: "Agents"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
@@ -103,7 +101,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
-        case .agents: "person.2"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
@@ -115,7 +112,58 @@ enum SettingsPane: String, Hashable, CaseIterable {
 
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.general], [.agents, .runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+    static let groups: [[SettingsPane]] = [[.general], [.runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+}
+
+/// The Settings scene's window has no grow box, and `windowResizability` on that
+/// scene does not give it one. SwiftUI also takes the resizable mask off again
+/// after the window appears and whenever it is resized. The mask is put back at
+/// the end of each turn of the run loop, which is after SwiftUI has set it, and
+/// the content is kept from going below the size the window opens at.
+private struct SettingsGrowBox: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { SettingsGrowView() }
+    func updateNSView(_ view: NSView, context: Context) { (view as? SettingsGrowView)?.apply() }
+}
+
+private final class SettingsGrowView: NSView {
+    private var observer: CFRunLoopObserver?
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 0, height: 0) }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else {
+            if let observer {
+                CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
+                self.observer = nil
+            }
+            return
+        }
+        apply()
+        guard observer == nil else { return }
+        let created = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0
+        ) { [weak self] _, _ in
+            self?.apply()
+        }
+        guard let created else { return }
+        observer = created
+        CFRunLoopAddObserver(CFRunLoopGetMain(), created, .commonModes)
+    }
+
+    override func layout() {
+        super.layout()
+        apply()
+    }
+
+    func apply() {
+        guard let window else { return }
+        if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
+        let floor = SettingsWindow.size
+        if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
+            window.contentMinSize = floor
+        }
+    }
 }
 
 /// The Settings scene's window has no grow box, and `windowResizability` on that

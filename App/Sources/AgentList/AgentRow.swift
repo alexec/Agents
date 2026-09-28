@@ -65,7 +65,7 @@ struct AgentRow: View {
                        isWaitingForAllowance: agent.allowanceWait != nil)
                 .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
                 HStack(spacing: 5) {
                     Text(agent.title ?? "Untitled")
                         .appText(isCompact ? .supporting : .reading).fontWeight(.semibold)
@@ -129,6 +129,12 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if isCompact {
+                    // List rows keep the height of their first draw; leave room for the
+                    // line under the title so it is not cut in half when a report arrives.
+                    Color.clear
+                        .frame(height: 14)
+                        .accessibilityHidden(true)
                 }
 
                 // Moved to another runtime when its own ran out (052): from which, and
@@ -209,6 +215,7 @@ struct AgentRow: View {
             }
             Spacer(minLength: 0)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
             if model.isBlocked(agent) {
                 Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }

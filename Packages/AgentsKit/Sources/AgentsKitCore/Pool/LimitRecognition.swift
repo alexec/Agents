@@ -46,6 +46,9 @@ public enum LimitRecognition {
     /// Copilot's monthly allowance refusal, captured on 2026-09-26.
     public static let copilotMonthlyQuota = "You have exceeded your monthly quota"
 
+    /// Cursor's subscription allowance refusal, captured 2026-09-28.
+    public static let cursorPlanExhausted = "Upgrade your plan to continue"
+
     /// Antigravity's spent-plan title and body, captured on 2026-09-27 from “hi Antigravity”:
     /// `Usage Limit Reached\n\nYou have reached your current quota for this period…`
     public static let antigravityUsageLimitTitle = "Usage Limit Reached"
@@ -88,6 +91,12 @@ public enum LimitRecognition {
         if runtimeID == RuntimeCatalog.copilot.id,
            [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
                $0.hasPrefix(copilotMonthlyQuota) || $0.hasPrefix("Error: " + copilotMonthlyQuota)
+           }) {
+            return .spent(resetsAt: resets)
+        }
+        if runtimeID == RuntimeCatalog.cursor.id,
+           [error?.message, runtimeError].compactMap({ $0 }).contains(where: {
+               $0.hasPrefix(cursorPlanExhausted)
            }) {
             return .spent(resetsAt: resets)
         }
