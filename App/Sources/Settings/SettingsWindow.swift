@@ -58,7 +58,6 @@ struct SettingsWindow: View {
     private var content: some View {
         switch pane.wrappedValue {
         case .general: FormColumn { AppearanceSettingsView() }
-        case .agents: FormColumn { AgentsSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView() }
         case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
@@ -74,12 +73,11 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, agents, runtimes, shared, spending, pool, devices, servers
+    case general, runtimes, shared, spending, pool, devices, servers
 
     var title: String {
         switch self {
         case .general: "General"
-        case .agents: "Agents"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
         case .spending: "Spending"
@@ -92,7 +90,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
-        case .agents: "person.2"
         case .runtimes: "cpu"
         case .shared: "square.on.square"
         case .spending: "dollarsign.circle"
@@ -104,7 +101,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
 
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
-    static let groups: [[SettingsPane]] = [[.general], [.agents, .runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+    static let groups: [[SettingsPane]] = [[.general], [.runtimes, .spending, .pool], [.shared], [.devices, .servers]]
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
