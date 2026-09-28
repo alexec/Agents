@@ -1,0 +1,57 @@
+import Foundation
+import Testing
+@testable import AgentsKit
+
+/// Grok hides the app's MCP tools behind a search. A session is handed the schemas
+/// instead, under the catalog names Grok calls, and only for the tools that session
+/// will actually be offered.
+@Suite("Grok tool preface", .timeLimit(.minutes(1)))
+struct GrokToolPrefaceTests {
+    @Test func theSchemasNameEveryOfferedToolAndNotTheOlderNames() {
+        let rules = GrokToolPreface.rules(managesAgents: true)
+        #expect(rules.contains("Do not call search_tool"))
+        #expect(rules.contains("use_tool"))
+        let offered = AppService.tools(managesAgents: true, movesItself: false)
+            .compactMap { $0["name"]?.stringValue }
+            .filter { $0 != AppTool.suggestPrompts && $0 != AppTool.reportOutcome }
+        for name in offered {
+            #expect(rules.contains(GrokToolPreface.catalogName(name)), "\(name)")
+        }
+        #expect(rules.contains("one of done, nothing_to_do, needs_answer, partly_done, stuck, blocked"))
+        #expect(rules.contains("permission-mode: plan"))
+        #expect(!rules.contains(AppTool.suggestPrompts))
+        #expect(!rules.contains(AppTool.reportOutcome))
+        #expect(!rules.contains(AppTool.enterWorktree))
+        #expect(!rules.contains(AppTool.exitWorktree))
+    }
+
+    @Test func aHelperIsNotToldHowToStartAnAgent() {
+        let rules = GrokToolPreface.rules(managesAgents: false)
+        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.finishTurn)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startAgent)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopAgent)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.parkAgent)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.listMyAgents)))
+        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.leaseResource)))
+    }
+
+    @Test func aGrokSessionCarriesTheRulesAndNoOtherRuntimeDoes() async throws {
+        let base = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("GrokToolPrefaceTests-\(UUID().uuidString)", isDirectory: true)
+        let work = base.appending(path: "work")
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let locations = StoreLocations(root: base.appending(path: "root"))
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher())
+
+        let full = await core.sessionMeta(runtimeID: "grok", cwd: work, managesAgents: true)
+        let helper = await core.sessionMeta(runtimeID: "grok", cwd: work, managesAgents: false)
+        let claude = await core.sessionMeta(runtimeID: "claude", cwd: work)
+
+        let fullRules = try #require(full?["rules"]?.stringValue)
+        #expect(fullRules == GrokToolPreface.rules(managesAgents: true))
+        #expect(full?["agentProfile"]?["tools"] != nil, "the allow list is still there")
+        #expect(helper?["rules"]?.stringValue == GrokToolPreface.rules(managesAgents: false))
+        #expect(claude?["rules"] == nil)
+    }
+}

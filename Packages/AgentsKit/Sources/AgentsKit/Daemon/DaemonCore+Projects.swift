@@ -191,14 +191,19 @@ extension DaemonCore {
     ///
     /// Only the plugins the person has approved (security review, S2): one waiting is in
     /// neither the `_meta` nor the index until they do.
-    func sessionMeta(runtimeID: String, cwd: URL) -> JSONValue? {
+    /// `managesAgents` is false for an agent another agent started. Grok's rules name
+    /// only the tools that session's server will offer, so a helper is not told how to
+    /// call `start_agent`.
+    func sessionMeta(runtimeID: String, cwd: URL, managesAgents: Bool = true) -> JSONValue? {
         let plugins = approvedPluginFolders(for: cwd)
         DotAgents.refreshPlugins(for: cwd, approved: plugins)
         // The person's own plugins after the project's (054, R12), for the runtimes that
         // take plugins this way.
         let personal = locations.personalHome.map(PersonalDotAgents.personalPluginFolders) ?? []
-        return Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
-                     DotAgents.sessionMeta(runtimeID: runtimeID, plugins: plugins + personal))
+        let meta = Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
+                                DotAgents.sessionMeta(runtimeID: runtimeID, plugins: plugins + personal))
+        guard runtimeID == RuntimeCatalog.grok.id else { return meta }
+        return Self.merging(meta, ["rules": .string(GrokToolPreface.rules(managesAgents: managesAgents))])
     }
 
     /// Two `_meta` objects as one, key by key and all the way down, because Claude's

@@ -75,7 +75,9 @@ each one has.
   subagents. Two of its tools, `workflow` and `monitor`, cannot be removed this way, so the
   agent is told in its briefing not to use them. Grok keeps its question tool too, but
   that tool has no way to reach the app, so Grok asks by ending its turn with the question
-  as its summary, and waits for your reply.
+  as its summary, and waits for your reply. Grok also hides this app's own tools behind a
+  search, so each Grok session is handed those tools by name, with their arguments, and
+  told to call them directly.
 - **Copilot** takes options when it starts. It loses its subagents and its session store,
   and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
