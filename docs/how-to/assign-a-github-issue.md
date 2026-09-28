@@ -42,6 +42,6 @@ The first linked project is selected when a repository belongs to more than one.
 
 ## Related
 
+- [Add a project](add-a-project.md)
 - [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
-- [GitHub Project issue board specification](../../specs/063-github-project-board/spec.md)
-- [Issue board wireframe](../../specs/062-github-project-board/wireframe.md)
+- [Watch a pull request](watch-a-pull-request.md)
