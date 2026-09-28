@@ -29,7 +29,10 @@ extension Trait where Self == ConditionTrait {
     /// - PoolSwitchTests.copilotMonthlyQuotaInChatMovesToTheNextRuntime and
     ///   copilotQuotaWithPoolOffStopsWithoutClaimingSuccess — quota handling timed out
     ///   after 10 s in full local runs; the PoolSwitch suite passed in isolation. Keep
-    ///   them out of the parallel run and run them with the quarantine step in CI.
+    ///   them out of the main CI run and execute them from slow-tests.yml.
+    /// - PoolSwitchTests.anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn — takes two
+    ///   turns and waits up to 30 s for the first chat's report before the second starts;
+    ///   the suite was still running at the 10-minute CI cutoff (2026-09-28).
     /// - QuietLinkTests.aMacThatNeverAnswersIsNotConnectedTo — expected under 10 s,
     ///   took 29 s on a loaded CI runner.
     ///

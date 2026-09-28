@@ -23,3 +23,16 @@ jobs:
         run: |
           filter=$(scripts/slow-tests.sh Packages/AgentsKit)
           swift test --package-path Packages/AgentsKit --filter "$filter"
+
+      - name: Run quarantined flaky tests
+        continue-on-error: true
+        env:
+          AGENTS_RUN_FLAKY: "1"
+        run: |
+          status=0
+          for package in Packages/CodeText Packages/AgentsKit; do
+            filter=$(scripts/flaky-tests.sh "$package")
+            [ -n "$filter" ] || continue
+            swift test --package-path "$package" --filter "$filter" || status=1
+          done
+          exit $status

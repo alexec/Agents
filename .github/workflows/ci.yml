@@ -5,7 +5,7 @@
 # stay off here: AGENTS_LIVE (+ AGENTS_MCP_HELPER) for real runtimes, AGENTS_BARE for
 # the bare ssh container. Tests that only fail under load are marked `.flakyUnderLoad`
 # (Packages/*/Tests/**/FlakyUnderLoad.swift lists each and why); GitHub sets CI, so the
-# main runs skip them and a last step runs them alone, allowed to fail.
+# main runs skip them; they run separately through slow-tests.yml.
 name: ci
 
 on:
@@ -122,19 +122,3 @@ jobs:
 
       - name: Test AgentsKit
         run: swift test --skip-build --package-path Packages/AgentsKit
-
-      # The quarantined tests, alone and with the machine quieter than in a full run.
-      # A failure here is reported and does not fail the build.
-      - name: Quarantined tests (allowed to fail)
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        env:
-          AGENTS_RUN_FLAKY: "1"
-        run: |
-          status=0
-          for package in Packages/CodeText Packages/AgentsKit; do
-            filter=$(scripts/flaky-tests.sh "$package")
-            [ -n "$filter" ] || continue
-            swift test --package-path "$package" --filter "$filter" || status=1
-          done
-          exit $status

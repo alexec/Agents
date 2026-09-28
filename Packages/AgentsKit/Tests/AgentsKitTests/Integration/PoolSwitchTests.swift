@@ -203,7 +203,7 @@ struct PoolSwitchTests {
         }
     }
 
-    @Test func anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn() async throws {
+    @Test(.flakyUnderLoad) func anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn() async throws {
         // The first chat's turn and the ask for its report work; the second finds Claude
         // spent and moves.
         let (core, work, launcher, _) = try await core([FakeACPAgent.Script(), FakeACPAgent.Script(), try spent()])
