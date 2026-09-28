@@ -173,7 +173,7 @@ struct LendTests {
             if notes.contains(where: { $0.contains("refused") }) { break }
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(notes.contains("Gemini refused the key in Settings. Replace it in Settings ▸ Servers."))
+        #expect(notes.contains("Gemini refused the key in Settings. Replace it in Settings ▸ Agent Runtimes."))
         #expect(!notes.contains { $0.contains("stopped answering") })
         #expect(await setup.core.agent(id)?.endedReason == .signInRefused, "not \"The runtime crashed\"")
     }

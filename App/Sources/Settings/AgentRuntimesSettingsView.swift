@@ -11,7 +11,7 @@ struct AgentRuntimesSettingsView: View {
                 ForEach(model.runtimes) { status in
                     RuntimeInstallRow(status: status)
                     // A runtime whose only way in is a key from Settings (Gemini, 046) takes
-                    // it here, beside where it is installed; Servers shows the same key.
+                    // it here, beside where it is installed. The same key is lent to servers.
                     if CredentialKind.kinds(for: status.id).contains(where: \.isLentOnTheMac) {
                         CredentialRow(runtimeID: status.id, name: status.runtime.name)
                             .padding(.leading, 12)

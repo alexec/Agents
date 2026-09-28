@@ -1,8 +1,9 @@
 import AgentsKit
 import SwiftUI
 
-/// One runtime's credential, in Settings ▸ Servers (043, contracts/ui.md § 1): Claude's for
-/// servers, Gemini's for servers and this Mac (046).
+/// One runtime's credential, under that runtime in Settings ▸ Agent Runtimes (046).
+/// Gemini's key is the only one: it signs in Gemini here, and is lent to a server
+/// while an agent runs there.
 ///
 /// Empty: a field to paste into, and where to get one. Saved: the mask, when it was added
 /// and last worked, and Replace and Remove. The text is never shown again once saved.
