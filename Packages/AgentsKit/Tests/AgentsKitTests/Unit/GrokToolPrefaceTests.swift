@@ -30,8 +30,8 @@ struct GrokToolPrefaceTests {
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.finishTurn)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopAgent)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.parkAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.listMyAgents)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.archiveAgent)))
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.leaseResource)))
     }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The app's tools, written out for a Grok session so it can call them without searching.
+/// The app's tools, written out for runtimes that do not reliably discover them.
 ///
 /// Grok never puts an MCP server's tools in the model's own list. They sit behind
 /// `search_tool`, and the model is told not to call one until that search has returned
@@ -11,7 +11,7 @@ import Foundation
 /// text: each tool the server will actually offer this session, under the catalog name
 /// Grok calls (`agents__finish_turn`), with the arguments it takes. The two older names
 /// for `finish_turn` are left out, so a fresh agent is pointed at the one tool.
-enum GrokToolPreface {
+enum AppToolPreface {
     /// What a Grok session is told, for an agent that may or may not start others.
     static func rules(managesAgents: Bool) -> String {
         let offered = AppService.tools(
@@ -26,6 +26,10 @@ enum GrokToolPreface {
             \(cards)
             """
     }
+
+    /// Cursor receives these schemas from the `agents` MCP server itself. Point it to
+    /// that live catalog without copying the schemas into every conversation's prompt.
+    static let firstPrompt = "Call `agents` tools directly."
 
     /// The name Grok lists for a tool on the app's server. Two underscores, as in
     /// `agents__finish_turn`.
@@ -106,3 +110,5 @@ enum GrokToolPreface {
         return text
     }
 }
+
+typealias GrokToolPreface = AppToolPreface

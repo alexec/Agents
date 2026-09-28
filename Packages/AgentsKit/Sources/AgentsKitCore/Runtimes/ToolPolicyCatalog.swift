@@ -117,6 +117,7 @@ public enum ToolPolicyCatalog {
                    "web_search", "web_fetch", "open_page", "open_page_with_find"],
             extra: ["name": .string("agents-app"),
                     "description": .string("An agent hosted by the Agents app.")]),
+        appToolSchemaDelivery: .sessionRules,
         // Feature switches Grok reads only from a config file. `GROK_CONFIG` with the
         // same TOML inline was measured and ignored, so it has to be a path (R6), and
         // the path has to be ours: `~/.grok/config.toml` is the person's (FR-011).
@@ -193,7 +194,8 @@ public enum ToolPolicyCatalog {
             ResidualTool(name: "CreateGoal", category: .standingArrangements),
             ResidualTool(name: "UpdateGoal", category: .standingArrangements),
         ],
-        lever: .words)
+        lever: .words,
+        appToolSchemaDelivery: .firstPrompt)
 
     /// Codex: feature switches in `CODEX_CONFIG` (047, research R5).
     ///

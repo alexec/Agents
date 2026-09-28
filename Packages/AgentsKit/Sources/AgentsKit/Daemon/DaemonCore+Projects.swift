@@ -200,10 +200,11 @@ extension DaemonCore {
         // The person's own plugins after the project's (054, R12), for the runtimes that
         // take plugins this way.
         let personal = locations.personalHome.map(PersonalDotAgents.personalPluginFolders) ?? []
-        let meta = Self.merging(ToolPolicyCatalog.policy(for: runtimeID).sessionMeta,
+        let policy = ToolPolicyCatalog.policy(for: runtimeID)
+        let meta = Self.merging(policy.sessionMeta,
                                 DotAgents.sessionMeta(runtimeID: runtimeID, plugins: plugins + personal))
-        guard runtimeID == RuntimeCatalog.grok.id else { return meta }
-        return Self.merging(meta, ["rules": .string(GrokToolPreface.rules(managesAgents: managesAgents))])
+        guard policy.appToolSchemaDelivery == .sessionRules else { return meta }
+        return Self.merging(meta, ["rules": .string(AppToolPreface.rules(managesAgents: managesAgents))])
     }
 
     /// Two `_meta` objects as one, key by key and all the way down, because Claude's

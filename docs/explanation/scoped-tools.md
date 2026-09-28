@@ -81,7 +81,9 @@ each one has.
 - **Copilot** takes options when it starts. It loses its subagents and its session store,
   and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away. Its three conflicting tools stay, and the
-  agent's briefing names them and says what to use instead.
+  agent's briefing names them and says what to use instead. The first briefing points
+  Cursor directly to the Agents app's MCP tools, whose schemas are available from the
+  server.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its long-running goals, its automations, its memories and its
   ChatGPT connectors. Its sub-agents are switched on, and the app shows them as it does
