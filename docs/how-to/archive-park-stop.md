@@ -91,7 +91,7 @@ take up to **2 GB** between them; past that, the ones archived longest ago are r
 - To keep a chat, bring it back, or park it instead of archiving it. Only archived chats are
   ever retired.
 - To retire one now, right-click its card under **Archived** and choose **Retire Now…**.
-- To change how long and how much, or to keep archived chats forever, see **Settings ▸ General ▸
+- To change how long and how much, or to keep archived chats forever, see **Settings ▸ Appearance ▸
   Archived agents** in the [settings reference](../reference/settings.md).
 
 Retiring deletes only what Agents keeps. It never touches your files, your commits, or the

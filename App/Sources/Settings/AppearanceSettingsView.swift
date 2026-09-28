@@ -59,7 +59,7 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ General: the app's appearance, and how long archived agents are kept.
+/// Settings ▸ Appearance: the app's appearance, and how long archived agents are kept.
 struct AppearanceSettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
