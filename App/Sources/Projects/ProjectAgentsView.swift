@@ -160,11 +160,8 @@ struct ProjectAgentsView: View {
                 // `WorkflowsSection` for why that order.
                 WorkflowsSection(folder: folder, selection: $selection)
 
-                // Skills live on Configuration. Servers in .agents/mcp.json stay here,
-                // before Plugins, and wait for approval (060, frame D).
-                ProjectMCPSection(folder: folder)
-
-                // What this project's agents are handed, and which wait for your OK (S2).
+                // Setup of skills, servers, plugins and instructions is on Configuration.
+                // A plugin that is waiting stays here, where the work is (S2).
                 PluginsSection(folder: folder)
 
                 // Worktrees the app made here, which outlive the agents in them (030).

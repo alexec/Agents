@@ -35,10 +35,10 @@ struct SharedSettingsView: View {
     private func pageView(_ snapshot: DaemonAPI.SharedSnapshot) -> some View {
         switch page {
         case .overview: SharedOverviewPage(snapshot: snapshot, page: $page)
-        case .instructions: SharedInstructionsPage(snapshot: snapshot)
-        case .skills: SharedSkillsPage(snapshot: snapshot, refresh: refresh)
-        case .mcp: SharedServersPage(snapshot: snapshot, onChanged: { Task { await refresh() } })
-        case .plugins: SharedPluginsPage(snapshot: snapshot)
+        case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: .you) }.task { await refresh() }
+        case .skills: AgentsSetupPage { AgentsSkillsSection(place: .you) }.task { await refresh() }
+        case .mcp: AgentsSetupPage { ProjectMCPSection(place: .you) }.task { await refresh() }
+        case .plugins: AgentsSetupPage { AgentsPluginsSection(place: .you) }.task { await refresh() }
         case .other: SharedOtherFilesPage(snapshot: snapshot)
         }
     }

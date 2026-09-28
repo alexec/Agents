@@ -2,63 +2,57 @@ import AgentsKit
 import AppKit
 import SwiftUI
 
-/// A project's MCP servers, on its page after Skills and before Plugins (060, frame D).
-///
-/// They live in `.agents/mcp.json`, which is committed, so the line under the heading
-/// says the file names secrets and each person sets their own. One that arrived with a
-/// pull waits until it is approved. Not drawn for a project on a server (R6).
+/// MCP servers in `~/.agents/mcp.json` or a project's `.agents/mcp.json` (060).
+/// The same rows in Settings and on a project's configuration page.
 struct ProjectMCPSection: View {
     @Environment(AppModel.self) private var model
-    let folder: URL?
+    var place: AgentsPlace
 
     @State private var servers: [DaemonAPI.ProjectMCPServer] = []
     @State private var problem: String?
+    @State private var file = ""
     @State private var adding = false
     @State private var failure: String?
 
-    private var onMac: Bool { model.selectedProjectKey?.host == .mac }
-
     var body: some View {
-        if let folder, onMac {
-            heading(folder)
-            Text("In .agents/mcp.json, committed with the project. Secrets aren't: it names them, and each person sets their own.")
-                .appText(.fine).foregroundStyle(.secondary)
-                .padding(.leading, 2)
-                .padding(.bottom, 4)
-            if let problem {
-                Text(problem)
-                    .appText(.supporting).foregroundStyle(SharedInk.attention)
-                    .padding(.horizontal, 16).padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .paperRow()
-            } else if servers.isEmpty {
-                Text("No MCP servers in this project yet.")
-                    .appText(.supporting).foregroundStyle(.secondary)
-                    .padding(.horizontal, 16).padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .paperRow()
-            } else {
-                if let failure {
-                    Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
-                }
-                ForEach(servers) { server in
-                    ProjectMCPRow(server: server, servers: servers, folder: folder,
-                                  changed: { Task { await load(folder) } },
-                                  failed: { failure = $0 })
-                }
+        heading
+        Text(place.mcpNote)
+            .appText(.fine).foregroundStyle(.secondary)
+            .padding(.leading, 2)
+            .padding(.bottom, 4)
+        if let problem {
+            Text(problem)
+                .appText(.supporting).foregroundStyle(SharedInk.attention)
+                .padding(.horizontal, 16).padding(.vertical, 13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .paperRow()
+        } else if servers.isEmpty {
+            Text(place == .you ? "No MCP servers of your own yet." : "No MCP servers in this project yet.")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .padding(.horizontal, 16).padding(.vertical, 13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .paperRow()
+        } else {
+            if let failure {
+                Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
             }
-            Color.clear.frame(height: 0)
-                .task(id: folder) { await load(folder) }
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                    Task { await load(folder) }
-                }
-                .sheet(isPresented: $adding) {
-                    AddMCPSheet(destination: .project(folder: folder.path), onAdded: { Task { await load(folder) } })
-                }
+            ForEach(servers) { server in
+                ProjectMCPRow(server: server, servers: servers, place: place, file: file,
+                              changed: { Task { await load() } },
+                              failed: { failure = $0 })
+            }
         }
+        Color.clear.frame(height: 0)
+            .task(id: place) { await load() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task { await load() }
+            }
+            .sheet(isPresented: $adding) {
+                AddMCPSheet(destination: place.destination, onAdded: { Task { await load() } })
+            }
     }
 
-    private func heading(_ folder: URL) -> some View {
+    private var heading: some View {
         HStack(spacing: 8) {
             SectionHeading(title: "MCP servers")
                 .fixedSize()
@@ -68,8 +62,7 @@ struct ProjectMCPSection: View {
             Spacer()
             Group {
                 Button("Reveal mcp.json") {
-                    let file = folder.appending(path: ".agents/mcp.json")
-                    SharedFiles.reveal(FileManager.default.fileExists(atPath: file.path) ? file.path : folder.path)
+                    SharedFiles.reveal(file.isEmpty ? revealFallback : file)
                 }
                 .buttonStyle(.paper)
                 Button("Add server…") { adding = true }.buttonStyle(.paperProminent)
@@ -78,10 +71,22 @@ struct ProjectMCPSection: View {
         }
     }
 
-    private func load(_ folder: URL) async {
-        guard let fresh = await model.projectMCPServers(folder) else { return }
+    private var revealFallback: String {
+        switch place {
+        case .you: ""
+        case .project(let folder): folder.path
+        }
+    }
+
+    private func load() async {
+        guard let fresh = await model.mcpServers(at: place.destination) else { return }
         servers = fresh.servers
         problem = fresh.problem
+        if case .you = place, let snapshot = await model.sharedSnapshot() {
+            file = snapshot.mcp.file
+        } else if case .project(let folder) = place {
+            file = folder.appending(path: ".agents/mcp.json").path
+        }
     }
 }
 
@@ -91,7 +96,8 @@ private struct ProjectMCPRow: View {
     @Environment(AppModel.self) private var model
     let server: DaemonAPI.ProjectMCPServer
     let servers: [DaemonAPI.ProjectMCPServer]
-    let folder: URL
+    var place: AgentsPlace
+    var file: String
     var changed: () -> Void = {}
     var failed: (String?) -> Void = { _ in }
 
@@ -131,7 +137,7 @@ private struct ProjectMCPRow: View {
 
             HStack(spacing: 6) {
                 Button("Show entry") {
-                    SharedFiles.open(folder.appending(path: ".agents/mcp.json").path)
+                    if !file.isEmpty { SharedFiles.open(file) }
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
@@ -151,7 +157,7 @@ private struct ProjectMCPRow: View {
                     .buttonStyle(.paper)
                     .appText(.fine)
                 }
-                if case .waiting(let digest, _) = server.approval {
+                if case .project(let folder) = place, case .waiting(let digest, _) = server.approval {
                     Button("Approve") {
                         Task {
                             if let error = await model.approveProjectMCP(server.name, digest: digest, in: folder) {
@@ -181,7 +187,7 @@ private struct ProjectMCPRow: View {
             SetSecretSheet(serverName: server.name, names: setting, replacing: replacing, onSaved: changed)
         }
         .sheet(isPresented: $removing) {
-            RemoveMCPServerSheet(server: server, destination: .project(folder: folder.path),
+            RemoveMCPServerSheet(server: server, destination: place.destination,
                                  forgettable: RemoveMCPServerSheet.forgettable(server, among: servers),
                                  keptSecret: RemoveMCPServerSheet.keptBecauseShared(server, among: servers),
                                  onRemoved: changed)
