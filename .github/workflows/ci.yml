@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
@@ -60,15 +60,11 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
-  test:
-    # Keep the package tests on their own runner alongside the Xcode builds and
-    # the process-heavy fake-SSH integration tests.
-    runs-on: xcode-27
-    timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@v6
+      # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
+      # a whole Swift build inside the test run, holding a test thread for minutes,
+      # which on a shared runner stalls everything else. Built here instead.
+      - name: Build agentsd for the tests
+        run: swift build --package-path Daemon --product agentsd
 
       # How long the runner's login shell takes to say its PATH. The app reads it
       # once per process, synchronously, the first time anything looks a runtime up.
@@ -83,7 +79,7 @@ jobs:
       # 45 s where CI is set rather than 10, since a test on a three-core runner can
       # wait that long for its first turn on the pool.
       - name: Test AgentsKit
-        run: swift test --package-path Packages/AgentsKit --skip FakeSSHSuites
+        run: swift test --package-path Packages/AgentsKit
 
       # The quarantined tests, alone and with the machine quieter than in a full run.
       # A failure here is reported and does not fail the build.
@@ -100,21 +96,3 @@ jobs:
             swift test --package-path "$package" --filter "$filter" || status=1
           done
           exit $status
-
-  server-tests:
-    # These tests launch real ssh masters, a Python relay, and agentsd. Keep this
-    # serialized suite on a separate runner so it cannot stall the other checks.
-    runs-on: xcode-27
-    timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@v6
-
-      # ServerLinkTests builds agentsd itself if missing, which would hold a test
-      # thread for minutes. Build it before the serialized fake-SSH suite starts.
-      - name: Build agentsd for the server tests
-        run: swift build --package-path Daemon --product agentsd
-
-      - name: Test fake SSH server integrations
-        run: swift test --package-path Packages/AgentsKit --filter FakeSSHSuites

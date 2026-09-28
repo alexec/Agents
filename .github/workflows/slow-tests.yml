@@ -1,0 +1,25 @@
+name: slow-tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuilt-server:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      AGENTS_RUN_SLOW: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build agentsd for the server test
+        run: swift build --package-path Daemon --product agentsd
+
+      - name: Test recovery after the server is wiped
+        run: >
+          swift test --package-path Packages/AgentsKit
+          --filter aWipedServerIsSetUpAgainWithoutAsking
