@@ -63,12 +63,11 @@ declined the agent's form** or **The form was closed**.
 Cursor's questions come as the same card, one question to a page; any of them can be left
 empty.
 
-When Cursor or Grok is set to **Auto-review** in **Settings ▸ Agent Runtimes**, ordinary
-permission requests inside the project are answered for you: no card, no **Needs you**,
-and no notification. Requests that leave the project, publish, need extra privilege, or
-cannot be shown to stay inside the work still wait as above, including on the phone.
-Grok's questions in words are unchanged under either setting. Claude, Codex, Gemini,
-Antigravity and Copilot keep asking the way they always have.
+When Cursor or Grok is set to **Always-approve** in **Settings ▸ Agent Runtimes**, every
+permission request from that runtime is answered for you: no card, no **Needs you**, and
+no notification. Questions that are not permission to act still wait as above, including
+Grok's questions in words. Claude, Codex, Gemini, Antigravity and Copilot keep asking the
+way they always have.
 
 ## If it doesn't work
 

@@ -1185,13 +1185,14 @@ public actor DaemonCore {
                 await record(.runtimeNote(refusal.note), for: agentID)
                 return
             }
-            // Auto-review for Cursor and Grok (061): ordinary in-reach work is answered
-            // once, before any card or attention event. Pending cards are never touched.
+            // Always-approve for Cursor and Grok (061): answer once, before any card or
+            // attention event. Prefer allow_once so switching back to Default still asks.
+            // Pending cards already on screen are never touched.
             if reviewsClientSide,
                let runtimeID,
-               clientPermissions.mode(for: runtimeID) == .autoReview,
-               let agent = agents[agentID],
-               let option = ClientPermissionReview.allowOnce(for: request, scope: agent.folderScope) {
+               clientPermissions.mode(for: runtimeID) == .alwaysApprove,
+               let option = request.options.first(where: { $0.kind == .allowOnce })
+                   ?? request.options.first(where: { $0.kind == .allowAlways }) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }
