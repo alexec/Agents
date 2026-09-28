@@ -81,6 +81,32 @@ struct TranscriptDisplayBuilderTests {
         #expect(TranscriptEntry.display([first, call("t2", "Patch")]) == items)
     }
 
+    @Test func omittingThoughtsLeavesTheRestOfThePage() {
+        let items = TranscriptEntry.display(story)
+        let shown = items.omittingThoughts()
+        #expect(items.contains { $0.isThought })
+        #expect(!shown.contains { $0.isThought })
+        #expect(shown.count == items.count - 1, "the two chunks are one thought, and only that goes")
+    }
+
+    @Test func hidingAThoughtBetweenCallsJoinsThemIntoOneRun() {
+        let first = call("t1", "Read the file")
+        let items = TranscriptEntry.display([
+            first,
+            TranscriptEntry(kind: .agentThought(messageID: "th", text: "Hm")),
+            call("t2", "Patch the file"),
+            message("Done", "m2"),
+            call("t3", "Run the tests"),
+        ])
+        let shown = items.omittingThoughts()
+        let runs = shown.compactMap { item -> [String]? in
+            if case .toolRun(_, let calls) = item { return calls.map(\.title) }
+            return nil
+        }
+        #expect(runs == [["Read the file", "Patch the file"], ["Run the tests"]])
+        #expect(shown.first { if case .toolRun = $0 { return true }; return false }?.id == first.id)
+    }
+
     @Test func aChunkReplacesTheMessageItContinues() {
         var builder = TranscriptDisplayBuilder()
         builder.add(message("Hel"))

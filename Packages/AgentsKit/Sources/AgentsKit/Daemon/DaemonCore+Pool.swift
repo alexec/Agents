@@ -56,7 +56,7 @@ extension DaemonCore {
         guard let agent = agents[agentID] else { return .none }
         if let rateLimit { latestRateLimit[agentID] = rateLimit }
         let entry = poolEntry(for: agent)
-        let rpc = error.flatMap { $0 as? JSONRPCError }.map { (code: $0.code, message: $0.message) }
+        let rpc = error.flatMap { $0 as? JSONRPCError }.map(\.refusalForLimit)
         let recognition = LimitRecognition.classify(failure: failure, error: rpc, runtimeError: runtimeError,
                                                     runtimeID: agent.runtimeID,
                                                     rateLimit: latestRateLimit[agentID], payment: entry.payment)

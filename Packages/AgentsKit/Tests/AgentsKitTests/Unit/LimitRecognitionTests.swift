@@ -115,6 +115,14 @@ struct LimitRecognitionTests {
         #expect(RuntimeLaunchCatalog.copilot.turnError(in: "I saw Error: " + text) == nil)
     }
 
+    @Test func groksUsageBalanceExhaustedIsSpent() {
+        let message = "API error (status 402 Payment Required): Grok Build usage balance exhausted"
+        #expect(LimitRecognition.classify(error: (402, message), runtimeID: "grok") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, message), runtimeID: "grok") == .spent(resetsAt: nil))
+        #expect(LimitRecognition.classify(error: (-32603, message), runtimeID: "claude") == .none)
+        #expect(LimitRecognition.classify(error: (-32603, "Internal error"), runtimeID: "grok") == .none)
+    }
+
     // MARK: Layer 3
 
     @Test func anythingElseIsNothing() {

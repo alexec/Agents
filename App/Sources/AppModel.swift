@@ -1657,8 +1657,13 @@ final class AppModel {
     /// A project's (or worktree's) own skills, for its page (frame D). Nil when they could
     /// not be read, so the section keeps what it last had.
     func projectSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
+        await skills(at: .project(folder: folder.path))
+    }
+
+    /// Skills in `~/.agents/skills` or a project's `.agents/skills`.
+    func skills(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ListedSkill]? {
         try? await client.call(DaemonAPI.Method.skillsList,
-                               DaemonAPI.SkillsListRequest(destination: .project(folder: folder.path)),
+                               DaemonAPI.SkillsListRequest(destination: destination),
                                returning: DaemonAPI.SkillsListAnswer.self).skills
     }
 

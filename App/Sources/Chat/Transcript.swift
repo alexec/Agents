@@ -7,13 +7,19 @@ import SwiftUI
 /// phone draws too (033). What is left here is where each input comes from on a Mac.
 struct Transcript: View {
     @Environment(AppModel.self) private var model
+    /// Off unless View ▸ Show Thinking is on. The record still has the thinking.
+    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
     let agent: Agent
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
 
+    private var items: [TranscriptItem] {
+        showsThinking ? model.transcriptItems : model.transcriptItems.omittingThoughts()
+    }
+
     var body: some View {
         ChatTranscript(agent: agent,
-                       items: model.transcriptItems,
+                       items: items,
                        hasMore: model.transcriptHasMore,
                        entryCount: model.entries.count,
                        isComingBack: model.isComingBack(agent),

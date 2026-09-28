@@ -16,9 +16,8 @@ that can grow: an API key joins the pool only on free or prepaid credit.
 
 - At least two runtimes installed and signed in, each on its own plan. See
   [Sign a runtime in](sign-a-runtime-in.md).
-- Recognising a spent allowance works for Claude, Codex, Gemini and Antigravity. For Copilot,
-  Cursor and Grok it is not recognised yet: a chat on them stops when its allowance runs out,
-  as before, though they can still be carried on *to*. See [Runtimes](../reference/runtimes.md).
+- Recognising a spent allowance works for Claude, Codex, Gemini, Antigravity, Copilot, Cursor
+  and Grok. See [Runtimes](../reference/runtimes.md).
 
 ## Set up the pool
 

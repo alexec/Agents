@@ -126,7 +126,7 @@ extension BareServerLiveTests {
             try await Task.sleep(for: .milliseconds(500))
         }
         print("046 bare: notes \(notes)")
-        #expect(notes.contains("Gemini refused the key in Settings. Replace it in Settings ▸ Servers."), "\(notes)")
+        #expect(notes.contains("Gemini refused the key in Settings. Replace it in Settings ▸ Agent Runtimes."), "\(notes)")
 
         let grep = try await ssh.run(ssh.runArguments("grep -rlF BARELIVEMADEUPGEMINI \"$HOME\" /tmp 2>/dev/null; true"))
         #expect(grep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "\(grep.stdout)")

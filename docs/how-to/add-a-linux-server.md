@@ -40,8 +40,7 @@ ssh.
 Gemini takes an API key, kept on this Mac and lent to a server while an agent runs there.
 
 1. Get a key at aistudio.google.com/apikey.
-2. Paste it under **Gemini** in **Settings ▸ Agent Runtimes** or under **Runtime credentials** in
-   **Settings ▸ Servers**: it is the same key. It says **Works** once Google has checked it.
+2. Paste it under **Gemini** in **Settings ▸ Agent Runtimes**. It says **Works** once Google has checked it.
 
 With a key saved, Agents installs Gemini on a server as it connects, and each server's
 entry in **Settings ▸ Servers** says how Gemini stands there. The key is lent to a server

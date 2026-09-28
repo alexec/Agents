@@ -3,9 +3,10 @@ import AppKit
 import SwiftUI
 
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
-/// beside it, in one window size for every pane, so choosing another pane never makes the
-/// window jump. Shared's pages are listed in the rail under a heading of their own rather
-/// than in a column of their own, so there is one place to choose from.
+/// beside it. It opens at one size for every pane, so choosing another never makes the
+/// window jump, and it can be resized larger than that. Shared's pages are listed in the
+/// rail under a heading of their own rather than in a column of their own, so there is
+/// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsPane") private var paneRaw = SettingsPane.general.rawValue
@@ -15,6 +16,9 @@ struct SettingsWindow: View {
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
 
+    /// The size it opens at, and the smallest it will go. A larger window gives the extra
+    /// room to the detail on Shared, and to the empty space beside a form pane, which
+    /// stays one column.
     static let size = CGSize(width: 1_000, height: 640)
 
     private var pane: Binding<SettingsPane> {
@@ -36,8 +40,15 @@ struct SettingsWindow: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: Self.size.width, idealWidth: Self.size.width,
+               maxWidth: .infinity,
+               minHeight: Self.size.height, idealHeight: Self.size.height,
+               maxHeight: .infinity)
         .background(Paper.ground)
+        // The Settings scene draws a window with no grow box, and ignores
+        // windowResizability, so the mask is set on the window itself.
+        .background(SettingsGrowBox())
         .navigationTitle(pane.wrappedValue.title)
         .task { await refreshShared() }
         // Asked for from elsewhere in the app: the Pool page's "Edit the pool" (052).
@@ -102,6 +113,57 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// General on its own; the panes about agents; Shared, drawn as a heading over its
     /// pages; the ways in from elsewhere.
     static let groups: [[SettingsPane]] = [[.general], [.runtimes, .spending, .pool], [.shared], [.devices, .servers]]
+}
+
+/// The Settings scene's window has no grow box, and `windowResizability` on that
+/// scene does not give it one. SwiftUI also takes the resizable mask off again
+/// after the window appears and whenever it is resized. The mask is put back at
+/// the end of each turn of the run loop, which is after SwiftUI has set it, and
+/// the content is kept from going below the size the window opens at.
+private struct SettingsGrowBox: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { SettingsGrowView() }
+    func updateNSView(_ view: NSView, context: Context) { (view as? SettingsGrowView)?.apply() }
+}
+
+private final class SettingsGrowView: NSView {
+    private var observer: CFRunLoopObserver?
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 0, height: 0) }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else {
+            if let observer {
+                CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
+                self.observer = nil
+            }
+            return
+        }
+        apply()
+        guard observer == nil else { return }
+        let created = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0
+        ) { [weak self] _, _ in
+            self?.apply()
+        }
+        guard let created else { return }
+        observer = created
+        CFRunLoopAddObserver(CFRunLoopGetMain(), created, .commonModes)
+    }
+
+    override func layout() {
+        super.layout()
+        apply()
+    }
+
+    func apply() {
+        guard let window else { return }
+        if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
+        let floor = SettingsWindow.size
+        if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
+            window.contentMinSize = floor
+        }
+    }
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
