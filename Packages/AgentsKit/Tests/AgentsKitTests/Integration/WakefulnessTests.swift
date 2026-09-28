@@ -101,7 +101,13 @@ struct WakefulnessTests {
         let (locations, work) = try temporary()
         let power = FakePowerSource.mains
         let wake = RecordingWakefulness()
-        let core = try core(working(for: .milliseconds(900)),
+        // A gated turn, not a timed one: under the full parallel suite a 900ms turn
+        // could finish while the second and third were still starting, and the Mac
+        // would be released and held again.
+        let gate = TurnGate()
+        var script = FakeACPAgent.Script()
+        script.gate = gate
+        let core = try core(FakeLauncher(script: script),
                             locations: locations, power: power, wakefulness: wake)
 
         var started: [UUID] = []
@@ -113,9 +119,11 @@ struct WakefulnessTests {
         // body, and a captured `var` is not allowed to cross into it.
         let ids = started
 
+        await eventually("every turn has reached the gate") { gate.turnsArrived == 3 }
         await eventually("the Mac is being held awake") { wake.isHolding }
         #expect(wake.holds == 1)
 
+        gate.open()
         await eventually("every turn ended") {
             for id in ids where await core.agent(id)?.state != .finished { return false }
             return true
