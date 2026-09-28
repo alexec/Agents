@@ -42,7 +42,7 @@ jobs:
             Daemon/.build
             Packages/AgentsKit/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-${{ hashFiles('**/Package.resolved') }}
+          key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
       - name: Tools
         run: |
@@ -105,7 +105,7 @@ jobs:
             Daemon/.build
             Packages/AgentsKit/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-${{ hashFiles('**/Package.resolved') }}
+          key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
       - name: Test CodeText
         run: swift test --skip-build --package-path Packages/CodeText
