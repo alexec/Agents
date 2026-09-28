@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  rebuilt-server:
+  slow-tests:
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -16,10 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build agentsd for the server test
+      - name: Build agentsd for server integration tests
         run: swift build --package-path Daemon --product agentsd
 
-      - name: Test recovery after the server is wiped
-        run: >
-          swift test --package-path Packages/AgentsKit
-          --filter aWipedServerIsSetUpAgainWithoutAsking
+      - name: Run slow AgentsKit tests
+        run: |
+          filter=$(scripts/slow-tests.sh Packages/AgentsKit)
+          swift test --package-path Packages/AgentsKit --filter "$filter"

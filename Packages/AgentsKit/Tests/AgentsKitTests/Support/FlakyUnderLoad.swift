@@ -32,6 +32,9 @@ extension Trait where Self == ConditionTrait {
     ///   them out of the parallel run and run them with the quarantine step in CI.
     ///
     /// Slow quarantine, run manually from `.github/workflows/slow-tests.yml`:
+    /// - RelayCarryingTests.aReplyOfFiveMegabytesArrivesWhole — 62 s on the shared
+    ///   runner in a completed run; stalled for over 5 min in a later loaded run.
+    /// - RelayCarryingTests.aBusyTurnIsAFewPostsASecond — 329 s on the shared runner.
     /// - RebuiltServerTests.aWipedServerIsSetUpAgainWithoutAsking — took 322 s on the
     ///   shared runner before failing to observe the rebuilt server's connected state.
 
