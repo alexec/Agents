@@ -64,7 +64,7 @@ private struct ClientPermissionModeRow: View {
     var body: some View {
         Picker("\(name) permission mode", selection: binding) {
             Text("Default").tag(ClientPermissionMode.default)
-            Text("Auto-review").tag(ClientPermissionMode.autoReview)
+            Text("Always-approve").tag(ClientPermissionMode.alwaysApprove)
         }
         Text(description)
             .appText(.supporting)
@@ -90,8 +90,8 @@ private struct ClientPermissionModeRow: View {
         switch model.clientPermissions.mode(for: runtimeID) {
         case .default:
             return "Asks before \(name) does something that needs permission."
-        case .autoReview:
-            return "Allows ordinary work inside the project; asks before anything that leaves it, publishes, or needs extra privilege."
+        case .alwaysApprove:
+            return "Answers every permission request for you. Questions that are not permission still wait."
         }
     }
 }
