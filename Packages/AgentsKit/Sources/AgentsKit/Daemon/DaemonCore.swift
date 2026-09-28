@@ -112,6 +112,17 @@ public actor DaemonCore {
     /// When the current hold was taken, for `WakeState.since`. Moved only when a hold
     /// is taken, not on every revise, so it means what it says.
     var holdingSince: Date?
+    /// The switch and the hours, once read. A missing file is on, for one hour.
+    lazy var wakeStore = WakeSettingsStore(locations: locations)
+    var wakeSettings = WakeSettings()
+    var wakeSettingsLoaded = false
+    /// When the last agent stopped, if a grace is running. In memory only: the hold
+    /// dies with this process, and a grace is not resumed by the next one.
+    var graceStartedAt: Date?
+    /// The clock on the hold the windows were last told about. Nil while the hold is
+    /// for work, or while nothing is held. Compared with the verdict so a grace that
+    /// keeps the same verdict still tells the windows its time.
+    var lastGraceUntil: Date?
     /// The last power reading actually taken, so reporting the charge to a window that
     /// has just connected costs nothing. Readings happen rarely by design — see the
     /// guard in `reviseWakefulness`.
@@ -1190,13 +1201,14 @@ public actor DaemonCore {
                 await record(.runtimeNote(refusal.note), for: agentID)
                 return
             }
-            // Auto-review for Cursor and Grok (061): ordinary in-reach work is answered
-            // once, before any card or attention event. Pending cards are never touched.
+            // Always-approve for Cursor and Grok (061): answer once, before any card or
+            // attention event. Prefer allow_once so switching back to Default still asks.
+            // Pending cards already on screen are never touched.
             if reviewsClientSide,
                let runtimeID,
-               clientPermissions.mode(for: runtimeID) == .autoReview,
-               let agent = agents[agentID],
-               let option = ClientPermissionReview.allowOnce(for: request, scope: agent.folderScope) {
+               clientPermissions.mode(for: runtimeID) == .alwaysApprove,
+               let option = request.options.first(where: { $0.kind == .allowOnce })
+                   ?? request.options.first(where: { $0.kind == .allowAlways }) {
                 await live[agentID]?.answerPermission(id: request.id, optionID: option.optionID)
                 return
             }

@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Client permission mode
+# Specification Quality Checklist: Remember Mode on Continue
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-09-26
+**Created**: 2026-09-27
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,8 +31,6 @@
 
 ## Notes
 
-- Re-validated on 2026-09-26 after the scope grew from Cursor to Cursor and Grok. No [NEEDS CLARIFICATION] markers.
-- Each runtime has its own control. A single switch that moves both is recorded as out of scope in Assumptions.
-- For agents the app starts, Grok's control wins over a permission mode saved in Grok's own settings. Grok in a terminal is unchanged. Read-only actions Grok already runs without asking stay that way under both values.
-- A mode that answers every permission request (**Always-approve**) is in scope for Cursor and Grok; questions that are not permission still wait.
-- The directory is `specs/061-client-permission-mode`. No git branch was created.
+- The remembered mode is considered only when still offered and no looser than the current chat mode.
+- Matching models remains about model and effort choices; no mode grid is introduced.
+- The specification is ready for `/speckit-plan`.

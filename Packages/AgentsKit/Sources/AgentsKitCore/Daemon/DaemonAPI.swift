@@ -194,10 +194,12 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `archive_agent` or `list_my_agents` (028). The caller is the
-        /// token, and the token alone decides the project and what it may touch.
+        /// `stop_agent`, `park_agent`, `archive_agent` or `list_my_agents` (028). The
+        /// caller is the token, and the token alone decides the project and what it
+        /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
+        public static let agentsParkHelper = "agents/parkHelper"
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
@@ -337,6 +339,9 @@ public enum DaemonAPI {
         /// has heard no broadcast, and for a long turn would otherwise show nothing
         /// for half an hour.
         public static let wakeState = "wake/state"
+        /// The switch and the grace. The window's, like retention: a phone does not set it.
+        public static let wakeSettings = "wake/settings"
+        public static let wakeSet = "wake/set"
     }
 
     public enum Notification {
@@ -1950,8 +1955,9 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent` or `archive_agent`. The id is a string
-    /// so one that is not a UUID is refused in words rather than failing to decode.
+    /// What an agent passes to `stop_agent`, `park_agent` or `archive_agent`. The id
+    /// is a string so one that is not a UUID is refused in words rather than failing
+    /// to decode.
     public struct HelperRequest: Codable, Sendable {
         public var token: String
         public var agentID: String

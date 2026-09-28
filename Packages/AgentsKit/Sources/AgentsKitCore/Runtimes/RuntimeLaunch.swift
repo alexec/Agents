@@ -119,6 +119,12 @@ public struct RuntimeLaunch: Hashable, Sendable {
 }
 
 public enum RuntimeLaunchCatalog {
+    /// Cursor's subscription exhaustion is an ordinary assistant message ending in
+    /// `end_turn`, not an ACP failure. Captured from the prompt refusal on 2026-09-28.
+    public static let cursor = RuntimeLaunch(
+        runtimeID: "cursor",
+        turnErrorPrefix: LimitRecognition.cursorPlanExhausted)
+
     /// Google's Antigravity ACP server (049, research R5–R10).
     ///
     /// - `GEMINI_HOME`: the server roots everything it keeps — settings, conversations,
@@ -166,7 +172,7 @@ public enum RuntimeLaunchCatalog {
         // ACP sends this notice without a trailing newline, before any error chunks.
         turnNoticePattern: #"^Info: Disabled tools: [a-z_][a-z_0-9]*(?:, [a-z_][a-z_0-9]*)*"#)
 
-    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot]
+    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {

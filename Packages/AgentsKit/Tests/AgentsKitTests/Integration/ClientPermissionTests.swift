@@ -44,13 +44,13 @@ struct ClientPermissionTests {
         return (core, launcher)
     }
 
-    @Test func autoReviewAllowsInReachEditWithoutAsking() async throws {
+    @Test func alwaysApproveAllowsEditWithoutAsking() async throws {
         let (_, work, locations) = try sandbox()
         let file = work.appendingPathComponent("notes.txt")
         let (core, launcher) = try await core(
             locations: locations,
             permission: editPermission(path: file.path),
-            settings: .init(cursor: .autoReview, grok: .default))
+            settings: .init(cursor: .alwaysApprove, grok: .default))
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "edit"))
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         let outcome = await launcher.lastAgent?.permissionOutcome
@@ -60,6 +60,22 @@ struct ClientPermissionTests {
         #expect(!page.entries.contains { if case .permissionAsked = $0.kind { return true } else { return false } })
         let pending = await core.pendingPermissionRequests()
         #expect(pending.isEmpty)
+    }
+
+    @Test func alwaysApproveAllowsOutsidePathWithoutAsking() async throws {
+        let (_, work, locations) = try sandbox()
+        let outside = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("ClientPermission-outside-\(UUID().uuidString).txt")
+        let (core, launcher) = try await core(
+            locations: locations,
+            permission: editPermission(path: outside.path),
+            settings: .init(cursor: .alwaysApprove, grok: .alwaysApprove))
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "edit home"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        let outcome = await launcher.lastAgent?.permissionOutcome
+        #expect(outcome?["outcome"]?["optionId"]?.stringValue == "allow_once")
+        let page = try await core.transcript(.init(agentID: id))
+        #expect(!page.entries.contains { if case .permissionAsked = $0.kind { return true } else { return false } })
     }
 
     @Test func defaultStillAsksForTheSameEdit() async throws {
@@ -89,7 +105,7 @@ struct ClientPermissionTests {
     @Test func runtimesAreIndependent() async throws {
         let (_, work, locations) = try sandbox()
         let file = work.appendingPathComponent("notes.txt")
-        let settings = ClientPermissionSettings(cursor: .autoReview, grok: .default)
+        let settings = ClientPermissionSettings(cursor: .alwaysApprove, grok: .default)
 
         let (cursorCore, cursorLauncher) = try await core(
             locations: locations,
@@ -112,32 +128,19 @@ struct ClientPermissionTests {
         await eventually("grok finished") { await grokCore.agent(grokID)?.endedReason != nil }
     }
 
-    @Test func outsidePathStaysPendingUnderAutoReview() async throws {
-        let (_, work, locations) = try sandbox()
-        let outside = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("ClientPermission-outside-\(UUID().uuidString).txt")
-        let (core, _) = try await core(
-            locations: locations,
-            permission: editPermission(path: outside.path),
-            settings: .init(cursor: .autoReview, grok: .autoReview))
-        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "edit home"))
-        await eventually("outside edit waits") { !(await core.pendingPermissionRequests()).isEmpty }
-        let page = try await core.transcript(.init(agentID: id))
-        #expect(page.entries.contains { if case .permissionAsked = $0.kind { return true } else { return false } })
-        if let request = await core.pendingPermissionRequests().first {
-            try await core.answerPermission(.init(permissionID: request.id, optionID: "reject_once"))
-        }
-        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
-    }
-
     @Test func settingsPersistAndCorruptFallsBackToDefault() throws {
         let (root, _, locations) = try sandbox()
         let store = ClientPermissionStore(locations: locations)
-        try store.save(.init(cursor: .autoReview, grok: .default))
-        #expect(store.load().cursor == .autoReview)
+        try store.save(.init(cursor: .alwaysApprove, grok: .default))
+        #expect(store.load().cursor == .alwaysApprove)
         #expect(store.load().grok == .default)
 
         let file = root.appendingPathComponent("client-permissions.json")
+        try Data(#"{"cursor":"autoReview","grok":"autoReview"}"#.utf8).write(to: file)
+        let migrated = store.load()
+        #expect(migrated.cursor == .alwaysApprove)
+        #expect(migrated.grok == .alwaysApprove)
+
         try Data("{not json".utf8).write(to: file)
         let recovered = store.load()
         #expect(recovered.cursor == .default)
@@ -154,7 +157,7 @@ struct ClientPermissionTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "edit"))
         await eventually("card is pending") { !(await core.pendingPermissionRequests()).isEmpty }
         let pendingID = await core.pendingPermissionRequests().first?.id
-        _ = try await core.setClientPermissions(.init(cursor: .autoReview, grok: .default))
+        _ = try await core.setClientPermissions(.init(cursor: .alwaysApprove, grok: .default))
         let stillPending = await core.pendingPermissionRequests().first?.id
         #expect(stillPending == pendingID)
         if let request = await core.pendingPermissionRequests().first {
@@ -163,7 +166,7 @@ struct ClientPermissionTests {
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
     }
 
-    @Test func startAgentStillAsksUnderAutoReview() async throws {
+    @Test func startAgentIsAllowedUnderAlwaysApprove() async throws {
         let (_, work, locations) = try sandbox()
         var script = FakeACPAgent.Script()
         script.permission = .object([
@@ -184,13 +187,12 @@ struct ClientPermissionTests {
         let launcher = FakeLauncher(script: script)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: launcher)
-        _ = try await core.setClientPermissions(.init(cursor: .autoReview, grok: .autoReview))
+        _ = try await core.setClientPermissions(.init(cursor: .alwaysApprove, grok: .alwaysApprove))
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "start"))
-        await eventually("start_agent waits") { !(await core.pendingPermissionRequests()).isEmpty }
-        if let request = await core.pendingPermissionRequests().first {
-            try await core.answerPermission(.init(permissionID: request.id, optionID: "reject_once"))
-        }
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        let outcome = await launcher.lastAgent?.permissionOutcome
+        #expect(outcome?["outcome"]?["optionId"]?.stringValue == "allow_once")
+        #expect(await core.pendingPermissionRequests().isEmpty)
     }
 
     @Test func controlOnlyRoles() {

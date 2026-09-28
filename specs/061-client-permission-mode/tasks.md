@@ -8,17 +8,17 @@
 
 ## Phase 2: Foundation
 
-- [X] T002 Add settings model ("exactly default and autoReview", both default) in Packages/AgentsKit/Sources/AgentsKitCore/Model/ClientPermissionSettings.swift and atomic persistence in Packages/AgentsKit/Sources/AgentsKit/Store/ClientPermissionStore.swift.
+- [X] T002 Add settings model ("exactly default and alwaysApprove", both default; migrate autoReview) in Packages/AgentsKit/Sources/AgentsKitCore/Model/ClientPermissionSettings.swift and atomic persistence in Packages/AgentsKit/Sources/AgentsKit/Store/ClientPermissionStore.swift.
 - [X] T003 Add control-only state/set RPC and changed notification in Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI.swift and Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+ClientPermissions.swift.
 - [X] T004 Preserve permission name, locations and diffs in Packages/AgentsKit/Sources/AgentsKit/ACP/ACPSession.swift.
 
 ## Phase 3: US1 — ordinary work (P1)
 
-Independent check: Cursor Auto-review accepts an in-reach edit and test, while Grok Default waits.
+Independent check: Cursor Always-approve accepts an edit (including outside the project) and a test, while Grok Default waits.
 
-- [X] T005 [US1] Add boundary and ordinary-action tests in Packages/AgentsKit/Tests/AgentsKitTests/Unit/ClientPermissionReviewTests.swift, covering extra folders and worktrees.
-- [X] T006 [US1] Implement file and command classifier in Packages/AgentsKit/Sources/AgentsKitCore/Model/ClientPermissionReview.swift using FolderScope; "Approval requires an offered allow_once option".
-- [X] T007 [US1] Apply current settings before pending cards in Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift and verify no permission attention events in Packages/AgentsKit/Tests/AgentsKitTests/Integration/ClientPermissionTests.swift.
+- [X] T005 [US1] (superseded) Classifier unit tests removed with Auto-review; coverage moved into ClientPermissionTests.
+- [X] T006 [US1] (superseded) ClientPermissionReview removed; Always-approve answers any request that offers allow_once (preferred) or allow_always.
+- [X] T007 [US1] Apply Always-approve before pending cards in Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift and verify no permission attention events in Packages/AgentsKit/Tests/AgentsKitTests/Integration/ClientPermissionTests.swift.
 
 ## Phase 4: US2 — Default and live changes (P1)
 
@@ -29,9 +29,9 @@ Independent check: missing settings ask; switching back asks again; an existing 
 
 ## Phase 5: US3 — boundaries (P2)
 
-Independent check: outside paths, publish, sudo and app control tools remain pending.
+Independent check: questions that are not permission still wait; outside paths and publish proceed under Always-approve.
 
-- [X] T010 [US3] Validate ambiguous/mixed commands, symlink escapes, publishing, privileged actions and app tools in Packages/AgentsKit/Tests/AgentsKitTests/Unit/ClientPermissionReviewTests.swift; verify ordinary permission-card delivery in Packages/AgentsKit/Tests/AgentsKitTests/Integration/ClientPermissionTests.swift.
+- [X] T010 [US3] Verify Always-approve allows outside paths and start-agent, and that Default still shows cards, in Packages/AgentsKit/Tests/AgentsKitTests/Integration/ClientPermissionTests.swift.
 
 ## Phase 6: US4 — Settings and hosts (P2)
 

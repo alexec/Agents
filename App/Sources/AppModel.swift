@@ -82,6 +82,9 @@ final class AppModel {
     /// said — and for ever against one too old to know the method, which is drawn the
     /// same way as nothing to say.
     var wakeState: DaemonAPI.WakeState? { work.wakeState }
+    /// The switch and the hours (Settings ▸ General ▸ Sleep). Nil until the daemon has
+    /// said, including a daemon too old to know the method.
+    private(set) var wakeSettings: WakeSettings?
 
     /// Which project this window is looking at.
     ///
@@ -841,6 +844,21 @@ final class AppModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.WakeState.self) else { return }
         work.replaceWakeState(state)
+    }
+
+    /// The switch and the hours. A daemon too old to know the method leaves this nil,
+    /// and Settings ▸ General draws Appearance alone.
+    func refreshWakeSettings() async {
+        wakeSettings = try? await client.call(DaemonAPI.Method.wakeSettings,
+                                              Optional<String>.none,
+                                              returning: WakeSettings.self)
+    }
+
+    /// The person changed Sleep. The daemon clamps the hours and answers with what it kept.
+    func setWakeSettings(_ settings: WakeSettings) async {
+        guard let saved = try? await client.call(DaemonAPI.Method.wakeSet, settings,
+                                                 returning: WakeSettings.self) else { return }
+        wakeSettings = saved
     }
 
     /// Every resource and who holds it (036). A daemon too old to know the method

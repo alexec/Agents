@@ -30,7 +30,7 @@ running, and reads the meter that says how full its context is.
 
    Click one and choose. A runtime that offers no choices, such as Cursor, shows none.
    Cursor and Grok also have no permission-mode capsule under the prompt: set **Default**
-   or **Auto-review** for each in **Settings ▸ Agent Runtimes**. Cursor's **Agent**,
+   or **Always-approve** for each in **Settings ▸ Agent Runtimes**. Cursor's **Agent**,
    **Plan** and **Ask** stay as they are; they are not that permission setting.
 4. Type the prompt and send it. The agent starts with what you chose.
 
