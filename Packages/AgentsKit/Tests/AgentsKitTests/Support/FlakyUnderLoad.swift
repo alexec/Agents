@@ -29,7 +29,12 @@ extension Trait where Self == ConditionTrait {
     /// - PoolSwitchTests.copilotMonthlyQuotaInChatMovesToTheNextRuntime and
     ///   copilotQuotaWithPoolOffStopsWithoutClaimingSuccess — quota handling timed out
     ///   after 10 s in full local runs; the PoolSwitch suite passed in isolation. Keep
-    ///   them out of the parallel run and run them with the quarantine step in CI.
+    ///   them out of the main CI run and run them with the quarantine step in CI.
+    /// - PoolSwitchTests.anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn — takes two
+    ///   turns and waits up to 30 s for the first chat's report before the second starts;
+    ///   the suite was still running at the 10-minute CI cutoff (2026-09-28).
+    /// - QuietLinkTests.aMacThatNeverAnswersIsNotConnectedTo — expected under 10 s,
+    ///   took 29 s on a loaded CI runner.
     ///
     /// Slow quarantine, run manually from `.github/workflows/slow-tests.yml`:
     /// - RelayCarryingTests.aReplyOfFiveMegabytesArrivesWhole — 62 s on the shared
@@ -37,6 +42,8 @@ extension Trait where Self == ConditionTrait {
     /// - RelayCarryingTests.aBusyTurnIsAFewPostsASecond — 329 s on the shared runner.
     /// - RebuiltServerTests.aWipedServerIsSetUpAgainWithoutAsking — took 322 s on the
     ///   shared runner before failing to observe the rebuilt server's connected state.
+    /// - CredentialStoreTests.replacingKeepsOnlyTheNewOne — 45 s writing twice to the
+    ///   real login Keychain in a completed CI run.
 
     /// And one that is not a budget but a bug, here until it is fixed rather than hidden
     /// by a longer wait:

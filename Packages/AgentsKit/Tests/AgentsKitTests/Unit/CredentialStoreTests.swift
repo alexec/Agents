@@ -38,7 +38,7 @@ struct CredentialStoreTests {
         }
     }
 
-    @Test func replacingKeepsOnlyTheNewOne() throws {
+    @Test(.slowUnderLoad) func replacingKeepsOnlyTheNewOne() throws {
         try withStore { store in
             try store.save(Self.token, for: "gemini")
             try store.save(Self.key, for: "gemini")
