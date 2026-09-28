@@ -39,6 +39,8 @@ extension Trait where Self == ConditionTrait {
     /// - RelayCarryingTests.aBusyTurnIsAFewPostsASecond — 329 s on the shared runner.
     /// - RebuiltServerTests.aWipedServerIsSetUpAgainWithoutAsking — took 322 s on the
     ///   shared runner before failing to observe the rebuilt server's connected state.
+    /// - CredentialStoreTests.replacingKeepsOnlyTheNewOne — 45 s writing twice to the
+    ///   real login Keychain in a completed CI run.
 
     /// And one that is not a budget but a bug, here until it is fixed rather than hidden
     /// by a longer wait:
