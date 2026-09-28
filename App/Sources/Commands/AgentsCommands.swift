@@ -41,6 +41,9 @@ struct AgentsCommands: Commands {
     let requests: WindowRequests
     let frame: SidebarFrame
 
+    /// Off unless asked for. The session draws thinking only while this is on.
+    @AppStorage(ThinkingDisplay.defaultsKey) private var showsThinking = false
+
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
     var body: some Commands {
@@ -93,6 +96,8 @@ struct AgentsCommands: Commands {
             // when a keyboard route is no help if it lives on the button.
             Button("Jump to Latest") { model.scrollToEnd() }
                 .keyboardShortcut(.downArrow, modifiers: .command)
+                .disabled(model.selectedAgent == nil)
+            Toggle("Show Thinking", isOn: $showsThinking)
                 .disabled(model.selectedAgent == nil)
             Divider()
             Button("Find Session") { requests.focusSessionSearch() }
