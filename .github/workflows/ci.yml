@@ -31,20 +31,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Hosted runners start clean. Reuse Xcode and SwiftPM products between CI
-      # runs so they can spend their ten minutes running tests instead of compiling.
-      - name: Restore build cache
-        id: build-cache
+      # Restore Xcode and SwiftPM products from separate caches. The Xcode cache
+      # can be saved as soon as both app builds finish.
+      - name: Restore Xcode build cache
+        id: xcode-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/DD
+          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
+      - name: Restore SwiftPM build cache
+        id: swiftpm-cache
         uses: actions/cache/restore@v5
         with:
           path: |
-            build/DD
             Daemon/.build
-            Packages/AgentsKit/.build/checkouts
-            Packages/AgentsKit/.build/repositories
-            Packages/AgentsKit/.build/workspace-state.json
             Packages/CodeText/.build
-          key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
       - name: Tools
         run: |
@@ -75,6 +78,13 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD
           -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
 
+      - name: Save Xcode build cache
+        if: ${{ steps.xcode-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: build/DD
+          key: macos-xcode-27-derived-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
       # which on a shared runner stalls everything else. Built here instead.
@@ -91,25 +101,21 @@ jobs:
       - name: Build CodeText tests
         run: swift build --build-tests --package-path Packages/CodeText
 
+      - name: Save SwiftPM build cache
+        if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-swiftpm-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+
       # Blocking again (2026-09-26): fake turns end on command (`TurnGate`), tests wait
       # past the question about a silent ending (`settled`), and `eventually` waits
       # 45 s where CI is set rather than 10, since a test on a three-core runner can
       # wait that long for its first turn on the pool.
       - name: Build AgentsKit tests
         run: swift build --build-tests --package-path Packages/AgentsKit
-
-      - name: Save build cache
-        if: ${{ steps.build-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            build/DD
-            Daemon/.build
-            Packages/AgentsKit/.build/checkouts
-            Packages/AgentsKit/.build/repositories
-            Packages/AgentsKit/.build/workspace-state.json
-            Packages/CodeText/.build
-          key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
       - name: Test CodeText
         run: swift test --skip-build --package-path Packages/CodeText
