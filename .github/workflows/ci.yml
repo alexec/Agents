@@ -40,7 +40,9 @@ jobs:
           path: |
             build/DD
             Daemon/.build
-            Packages/AgentsKit/.build
+            Packages/AgentsKit/.build/checkouts
+            Packages/AgentsKit/.build/repositories
+            Packages/AgentsKit/.build/workspace-state.json
             Packages/CodeText/.build
           key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
@@ -103,7 +105,9 @@ jobs:
           path: |
             build/DD
             Daemon/.build
-            Packages/AgentsKit/.build
+            Packages/AgentsKit/.build/checkouts
+            Packages/AgentsKit/.build/repositories
+            Packages/AgentsKit/.build/workspace-state.json
             Packages/CodeText/.build
           key: macos-xcode-27-${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
 
