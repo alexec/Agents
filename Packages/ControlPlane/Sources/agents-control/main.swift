@@ -25,6 +25,7 @@ import Musl
 //   AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1, AWS_*: the bucket (contracts/store.md)
 //   --store-credentials-fd N    or the bucket's keys as JSON on an inherited descriptor
 //   AGENTS_CONTROL_URL          the one address clients and hosts are given
+//   AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
 //   AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //   AGENTS_CONTROL_KEY          or the key itself, base64url
 //   AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
@@ -121,7 +122,8 @@ func serve() async {
         let service = try ControlService(.init(store: store(), privateKey: privateKey(), url: url, pin: pin,
                                                tls: tls?.context, bind: value("--bind") ?? "0.0.0.0",
                                                port: port, name: name,
-                                               machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current))
+                                               machineID: environment["AGENTS_CONTROL_MACHINE_ID"] ?? MachineID.current,
+                                               peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:))))
         let listening = try await service.start()
         if let pin { print("pin \(pin)") }
         #if canImport(dnssd)

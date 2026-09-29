@@ -30,6 +30,12 @@ public actor ControlRouter {
         public var client: UUID
         public var grant: Grant
         public var kind: ClientRecord.Kind
+        public init(session: UUID, client: UUID, grant: Grant, kind: ClientRecord.Kind) {
+            self.session = session
+            self.client = client
+            self.grant = grant
+            self.kind = kind
+        }
     }
 
     private struct ClientSession {
@@ -41,13 +47,25 @@ public actor ControlRouter {
         var wrapped = false
     }
 
+    /// Who a channel on a host's uplink is for: a client session here, or a stream a
+    /// peer copy carries for one of its own clients (058, US3, T065).
+    private enum Target: Hashable {
+        case session(UUID)
+        case peer(String, Int)
+    }
+
     private struct HostSession {
         var transport: any LineTransport
         var nextChannel = 1
-        var channels: [Int: UUID] = [:]
+        var channels: [Int: Target] = [:]
         /// Distinguishes this uplink from the one it replaced, so the old one ending
         /// does not take the new one down with it.
         var generation: UUID
+        /// The host's real uplink is here. Otherwise the session is a stream on the peer
+        /// link to the copy that holds it, and its channel numbers are this copy's own.
+        var local: Bool
+        /// A peer's stream `(peer, c)` to the channel it was given here.
+        var proxied: [Target: Int] = [:]
     }
 
     private let handler: any ControlHandling
@@ -59,6 +77,10 @@ public actor ControlRouter {
     /// Where each client last said the person was. One record per client, across every
     /// host that client has a channel to (058, R6).
     private var notedPresence: [UUID: NotedPresence] = [:]
+    /// How to reach each peer copy on its link, for streams carried for it (T064).
+    private var peers: [String: @Sendable (String) -> Void] = [:]
+    /// Told each presence report a client here makes, so other copies fold it too.
+    private var presenceHeard: (@Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void)?
 
     private struct NotedPresence {
         var surface: Surface
@@ -112,6 +134,15 @@ public actor ControlRouter {
         return flags
     }
 
+    /// A presence report made at another copy (US3): folded here as the client's own.
+    public func notePeerPresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport, at: Date = Date()) {
+        notePresence(client: client, grant: grant, report: report, at: at)
+    }
+
+    public func onPresence(_ heard: @escaping @Sendable (UUID, Grant, DaemonAPI.PresenceReport) -> Void) {
+        presenceHeard = heard
+    }
+
     private func notePresence(client: UUID, grant: Grant, report: DaemonAPI.PresenceReport, at: Date = Date()) {
         let surface: Surface = grant == .device ? .device(client) : .mac
         let previous = notedPresence[client]
@@ -126,6 +157,21 @@ public actor ControlRouter {
     /// The channels open on a host's uplink, for tests and for Settings.
     public func channels(of host: HostID) -> [Int] {
         hosts[host].map { Array($0.channels.keys).sorted() } ?? []
+    }
+
+    /// Whether this copy holds the host's real uplink, as against a stream to the copy
+    /// that does.
+    public func holds(_ host: HostID) -> Bool { hosts[host]?.local == true }
+
+    /// Whether the host is reachable from here at all, directly or through a peer.
+    public func reaches(_ host: HostID) -> Bool { hosts[host] != nil }
+
+    /// Every client session here and its grant, for the backstop that catches a change
+    /// another copy made while its event was missed (T066).
+    public func connectedClients() -> [UUID: Grant] {
+        var grants: [UUID: Grant] = [:]
+        for session in clients.values { grants[session.caller.client] = session.caller.grant }
+        return grants
     }
 
     // MARK: Hosts
@@ -147,21 +193,117 @@ public actor ControlRouter {
                          ["host": .string(host.rawValue), "state": .string("removed")])
     }
 
-    /// A host's uplink is up. Opens a channel to it for every client session, then reads
-    /// it until it ends.
-    public func attachHost(_ host: HostID, transport: any LineTransport) {
+    /// A host's uplink is up, or (with `local: false`) a stream to the peer copy that
+    /// holds it. Opens a channel to it for every client session, then reads it until it
+    /// ends. A proxied stream that ends leaves the state alone: the host has usually moved,
+    /// and is shown offline only if nobody holds it again soon (wire.md, `gone`).
+    public func attachHost(_ host: HostID, transport: any LineTransport, local: Bool = true) {
         if hosts[host] != nil { dropHost(host, generation: nil, newState: nil) }
         known.insert(host)
         let generation = UUID()
-        hosts[host] = HostSession(transport: transport, generation: generation)
+        hosts[host] = HostSession(transport: transport, generation: generation, local: local)
         setState(.online, of: host)
         for session in clients.keys { openChannel(for: session, to: host) }
         Task { [weak self] in
             do {
                 for try await line in transport.lines() { await self?.hostLine(line, from: host) }
             } catch {}
-            await self?.dropHost(host, generation: generation, newState: .offline(since: Date()))
+            if local {
+                guard let self else { return }
+                let current = await self.isCurrent(host, generation)
+                await self.dropHost(host, generation: generation, newState: .offline(since: Date()))
+                if current { await self.localEnded?(host) }
+            } else {
+                await self?.dropHost(host, generation: generation, newState: nil)
+                await self?.offlineUnlessBack(host, after: .seconds(5))
+            }
         }
+    }
+
+    private func isCurrent(_ host: HostID, _ generation: UUID) -> Bool { hosts[host]?.generation == generation }
+
+    /// Told when a host's real uplink here ends, so its lease is let go (T063).
+    private var localEnded: (@Sendable (HostID) async -> Void)?
+    public func onLocalHostEnded(_ ended: @escaping @Sendable (HostID) async -> Void) { localEnded = ended }
+
+    /// Closes a host's real uplink here: its lease went to another copy. The host redials.
+    public func closeLocal(_ host: HostID) {
+        guard hosts[host]?.local == true else { return }
+        dropHost(host, generation: nil, newState: nil)
+    }
+
+    /// Ends whatever this copy has for `host`, saying nothing yet: another copy is taking
+    /// it over. Shown offline only if nothing is back within `grace`.
+    public func dropQuietly(_ host: HostID, grace: Duration = .seconds(5)) {
+        dropHost(host, generation: nil, newState: nil)
+        Task { [weak self] in await self?.offlineUnlessBack(host, after: grace) }
+    }
+
+    private func offlineUnlessBack(_ host: HostID, after grace: Duration) async {
+        try? await Task.sleep(for: grace)
+        if hosts[host] == nil, known.contains(host), states[host]?.isOnline == true {
+            setState(.offline(since: Date()), of: host)
+        }
+    }
+
+    // MARK: Streams carried for peer copies (T065)
+
+    /// A peer copy's link is up: streams it asks for are answered through `write`.
+    public func setPeer(_ id: String, write: @escaping @Sendable (String) -> Void) {
+        peers[id] = write
+    }
+
+    /// A peer's link went: every stream it had open on a host here closes there.
+    public func dropPeer(_ id: String) {
+        peers[id] = nil
+        for (host, session) in hosts where session.local {
+            for (target, channel) in session.proxied {
+                guard case .peer(id, _) = target else { continue }
+                closeHostChannel(channel, on: host)
+            }
+        }
+    }
+
+    /// A peer opens a stream to a host held here: a fresh channel on the real uplink.
+    /// Its grant was checked at the peer, where the client is.
+    public func openFromPeer(_ peer: String, host: HostID, channel: Int, _ open: ControlWire.ChannelOpen) {
+        guard var session = hosts[host], session.local else {
+            peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
+            return
+        }
+        let target = Target.peer(peer, channel)
+        if let old = session.proxied[target] {
+            session.channels[old] = nil
+            try? session.transport.write(line: ControlWire.close(old))
+        }
+        let mine = session.nextChannel
+        session.nextChannel += 1
+        session.channels[mine] = target
+        session.proxied[target] = mine
+        hosts[host] = session
+        try? session.transport.write(line: ControlWire.open(mine, open))
+    }
+
+    /// A message on a peer's stream, for the host.
+    public func fromPeer(_ peer: String, host: HostID, channel: Int, message: String) {
+        guard let session = hosts[host], session.local, let mine = session.proxied[.peer(peer, channel)] else {
+            peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
+            return
+        }
+        try? session.transport.write(line: ControlWire.channel(mine, message: message))
+    }
+
+    /// The peer closed its stream.
+    public func closeFromPeer(_ peer: String, host: HostID, channel: Int) {
+        guard let mine = hosts[host]?.proxied[.peer(peer, channel)] else { return }
+        closeHostChannel(mine, on: host)
+    }
+
+    private func closeHostChannel(_ channel: Int, on host: HostID) {
+        guard var session = hosts[host], let target = session.channels.removeValue(forKey: channel) else { return }
+        session.proxied[target] = nil
+        hosts[host] = session
+        try? session.transport.write(line: ControlWire.close(channel))
     }
 
     public func setState(_ state: HostState, of host: HostID) {
@@ -174,7 +316,15 @@ public actor ControlRouter {
         guard let session = hosts[host], generation == nil || session.generation == generation else { return }
         hosts[host] = nil
         session.transport.close()
-        for (_, sessionID) in session.channels { clients[sessionID]?.channels[host] = nil }
+        for (channel, target) in session.channels {
+            switch target {
+            case .session(let sessionID): clients[sessionID]?.channels[host] = nil
+            // The peer's stream ends with the uplink; the peer finds the host again.
+            case .peer(let peer, let theirs):
+                _ = channel
+                peers[peer]?(PeerWire.frame(host, ControlWire.close(theirs)))
+            }
+        }
         if let newState { setState(newState, of: host) }
     }
 
@@ -184,7 +334,14 @@ public actor ControlRouter {
         case .message(0, let message):
             await channelZero(message, from: host)
         case .message(let channel, let message):
-            guard let sessionID = hosts[host]?.channels[channel], let session = clients[sessionID] else { return }
+            guard let target = hosts[host]?.channels[channel] else { return }
+            guard case .session(let sessionID) = target else {
+                if case .peer(let peer, let theirs) = target {
+                    peers[peer]?(PeerWire.frame(host, ControlWire.channel(theirs, message: message)))
+                }
+                return
+            }
+            guard let session = clients[sessionID] else { return }
             if session.wrapped {
                 write(ControlWire.wrap(host: host, message: message), to: sessionID)
             } else if host == homeHost {
@@ -193,8 +350,13 @@ public actor ControlRouter {
         case .close(let channel):
             // The host hung up on a client (a device it was told to forget, say). The
             // client's whole connection goes, as it would have today.
-            guard let sessionID = hosts[host]?.channels.removeValue(forKey: channel) else { return }
-            detachClient(sessionID)
+            guard let target = hosts[host]?.channels.removeValue(forKey: channel) else { return }
+            switch target {
+            case .session(let sessionID): detachClient(sessionID)
+            case .peer(let peer, let theirs):
+                hosts[host]?.proxied[target] = nil
+                peers[peer]?(PeerWire.frame(host, ControlWire.close(theirs)))
+            }
         case .open:
             // Only the control plane opens channels. A host that tries is ignored.
             return
@@ -276,7 +438,7 @@ public actor ControlRouter {
         guard var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
         let channel = hostSession.nextChannel
         hostSession.nextChannel += 1
-        hostSession.channels[channel] = sessionID
+        hostSession.channels[channel] = .session(sessionID)
         hosts[host] = hostSession
         clients[sessionID]?.channels[host] = channel
         let open = ControlWire.ChannelOpen(grant: caller.grant, client: caller.client.uuidString,
@@ -314,6 +476,7 @@ public actor ControlRouter {
             if method == DaemonAPI.Method.presenceReport, let params,
                let report = try? params.decode(DaemonAPI.PresenceReport.self) {
                 notePresence(client: session.caller.client, grant: session.caller.grant, report: report)
+                presenceHeard?(session.caller.client, session.caller.grant, report)
             }
             guard session.caller.grant.allows(method) else {
                 return reply(to: sessionID, host: host, id: id, wrapped: wrapped,

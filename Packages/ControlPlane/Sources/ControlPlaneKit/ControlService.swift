@@ -25,9 +25,16 @@ public final class ControlService: @unchecked Sendable {
         public var name: String
         public var machineID: String
         public var version: String
+        /// Where other copies reach this one. Nil for a single copy (Agents Host's), which
+        /// takes leases all the same but links with nobody.
+        public var peerURL: URL?
+        /// How often a copy beats and looks for the others; shorter in tests.
+        public var copyBeat: TimeInterval = CopyRecord.beatEvery
 
         public init(store: any ControlStore, privateKey: Data, url: URL, pin: String? = nil, tls: NIOSSLContext? = nil,
-                    bind: String = "0.0.0.0", port: Int, name: String, machineID: String = "", version: String = ControlPlaneKit.version) {
+                    bind: String = "0.0.0.0", port: Int, name: String, machineID: String = "", version: String = ControlPlaneKit.version,
+                    peerURL: URL? = nil) {
+            self.peerURL = peerURL
             self.store = store
             self.privateKey = privateKey
             self.url = url
@@ -54,6 +61,10 @@ public final class ControlService: @unchecked Sendable {
     public let copyID = String(UUID().uuidString.prefix(8)).lowercased()
     let publicKey: Data
     let origin: String
+    /// The origin peers dial, which the key exchange of a copy is bound to.
+    let peerOrigin: String?
+    public let leases: Leases
+    public let mesh: CopyMesh?
     private var server: (any Channel)?
     private var refresher: Task<Void, Never>?
     private let readiness = Readiness()
@@ -66,11 +77,23 @@ public final class ControlService: @unchecked Sendable {
             throw Failure("\(configuration.url) is not an address clients can dial")
         }
         self.origin = origin
+        peerOrigin = configuration.peerURL.flatMap(ControlAuth.origin)
         records = ControlRecords(store: configuration.store)
         let settings = ControlSettings(name: configuration.name, machineID: configuration.machineID)
         methods = ControlMethods(records: records, settings: settings, version: configuration.version,
                                  port: configuration.port)
-        router = ControlRouter(handler: methods)
+        let router = ControlRouter(handler: methods)
+        let leases = Leases(store: configuration.store, copy: copyID)
+        self.router = router
+        self.leases = leases
+        let publicKey = self.publicKey
+        let copy = copyID
+        mesh = configuration.peerURL.map { url in
+            CopyMesh(.init(copy: copy, peerURL: url, privateKey: configuration.privateKey, publicKey: publicKey,
+                           beat: configuration.copyBeat),
+                     store: configuration.store, router: router, leases: leases,
+                     log: { FileHandle.standardError.write(Data("agents-control[\(copy)]: \($0)\n".utf8)) })
+        }
         codes = ControlCodes(store: configuration.store, privateKey: configuration.privateKey,
                              publicKey: publicKey, url: configuration.url.absoluteString, pin: configuration.pin,
                              name: configuration.name)
@@ -106,10 +129,30 @@ public final class ControlService: @unchecked Sendable {
         await router.setHomeHost(await methods.controlSettings.homeHost)
         await methods.attach(router)
         let codes = self.codes
-        await methods.setHooks(ControlMethods.Hooks(
+        var hooks = ControlMethods.Hooks(
             startPairing: { grant in try JSONValue.encoding(try await codes.issue(.client(grant))) },
-            startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) }))
+            startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) })
+        hooks.changed = { [weak self] event in await self?.announce(event) }
+        await methods.setHooks(hooks)
         await readiness.set(true)
+
+        // Leases (T063): a host whose uplink ends here, or whose lease another copy took.
+        let leases = self.leases, mesh = self.mesh, router = self.router
+        await router.onLocalHostEnded { host in
+            if let epoch = await leases.release(host) { await mesh?.released(host, epoch: epoch) }
+        }
+        await leases.onLost { [weak self] host, epoch in
+            self?.log("another copy took \(host); closing its uplink here")
+            await router.closeLocal(host)
+            await mesh?.released(host, epoch: epoch)
+        }
+        await leases.start()
+        // Copies (T064, T066).
+        await router.onPresence { client, grant, report in
+            Task { await mesh?.broadcast(PeerWire.presence(client: client, grant: grant, report: report)) }
+        }
+        await mesh?.onEvent { [weak self] event in await self?.apply(event) }
+        await mesh?.onLinked { [weak self] _ in await self?.reconcile() }
 
         let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -138,6 +181,7 @@ public final class ControlService: @unchecked Sendable {
         }
         let port = channel.localAddress?.port ?? configuration.port
         log("listening on \(configuration.bind):\(port) for \(configuration.url.absoluteString)")
+        await mesh?.start()
         return port
     }
 
@@ -145,6 +189,8 @@ public final class ControlService: @unchecked Sendable {
     /// clients and hosts redial another copy, or this one when it is back.
     public func stop() async {
         refresher?.cancel()
+        await leases.stop()
+        await mesh?.stop()
         try? await server?.close()
         server = nil
         sockets.closeAll()
@@ -156,10 +202,55 @@ public final class ControlService: @unchecked Sendable {
             try await methods.refresh()
             for host in await methods.knownHosts { await router.know(host) }
             await readiness.set(true)
+            await reconcile()
         } catch {
             await readiness.set(false)
             log("store: \(error)")
         }
+    }
+
+    // MARK: Changes across copies (T066)
+
+    /// A change made here: on every peer link first, then into `events/` for a copy that
+    /// missed it.
+    func announce(_ event: ControlEvent) async {
+        await mesh?.broadcast(PeerWire.event(event))
+        let millis = Int(event.at.timeIntervalSince1970 * 1000)
+        let day = event.at.formatted(Date.ISO8601FormatStyle().year().month().day())
+        let key = "v1/events/\(day)/\(String(format: "%013d", millis))-\(UUID().uuidString.prefix(8).lowercased()).json"
+        _ = try? await configuration.store.put(key, try ControlRecords.encoder.encode(event), when: .absent)
+    }
+
+    /// A change another copy made: the records again, then its effect on sessions here.
+    func apply(_ event: ControlEvent) async {
+        try? await methods.refresh()
+        switch event.kind {
+        case .clientForgotten:
+            if let id = UUID(uuidString: event.subject) { await router.forgetClient(id) }
+        case .grantChanged:
+            if let id = UUID(uuidString: event.subject), let client = await methods.client(id) {
+                await router.setGrant(client.grant, of: id)
+            }
+        case .hostRemoved:
+            await router.forgetHost(HostID(rawValue: event.subject))
+        case .clientPaired, .hostEnrolled, .hostMoved:
+            for host in await methods.knownHosts { await router.know(host) }
+        }
+        log("applied \(event.kind.rawValue) \(event.subject) from another copy")
+    }
+
+    /// The backstop for an event missed: every session here is held to the records as
+    /// they are now (R4, re-listed every 15 s and whenever a peer link comes up).
+    func reconcile() async {
+        for (client, grant) in await router.connectedClients() {
+            guard let record = await methods.client(client) else {
+                await router.forgetClient(client)
+                continue
+            }
+            if record.grant != grant { await router.setGrant(record.grant, of: client) }
+        }
+        let known = Set(await methods.knownHosts)
+        for host in await router.hostStates.keys where !known.contains(host) { await router.forgetHost(host) }
     }
 
     // MARK: A socket
@@ -178,7 +269,9 @@ public final class ControlService: @unchecked Sendable {
                 throw ControlAuth.Refusal(.badMessage)
             }
             var admitted: Admitted?
-            let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origin: origin) { identity in
+            // A peer copy dials the address copies reach each other at, and proves that.
+            let bound = auth.id.hasPrefix("x:") ? (peerOrigin ?? origin) : origin
+            let (identity, mac) = try await ControlAuth.verify(auth, serverNonce: serverNonce, origin: bound) { identity in
                 let (key, who) = try await self.key(for: identity)
                 admitted = who
                 return key
@@ -196,9 +289,9 @@ public final class ControlService: @unchecked Sendable {
                 await hostArrived(host, reader)
             case .pairing(let id), .enrolling(let id):
                 await announce(reader, code: id)
-            case .copy:
-                // Peer links between copies come with US3.
-                reader.close()
+            case .copy(let id):
+                guard let mesh else { throw ControlAuth.Refusal(.unknown) }
+                await mesh.accepted(id, transport: reader)
             }
         } catch let refusal as ControlAuth.Refusal {
             try? reader.write(line: ControlAuth.Message.refused(refusal.reason).line)
@@ -221,10 +314,13 @@ public final class ControlService: @unchecked Sendable {
         let privateKey = configuration.privateKey
         switch identity {
         case .client(let id):
+            // Paired at another copy moments ago: this one reads the store again.
+            if await records.client(id) == nil { try? await methods.refresh() }
             guard let client = await records.client(id), !client.publicKey.isEmpty else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.clientKey(privateKey: privateKey, peer: client.publicKey, client: id),
                     Admitted(client: client))
         case .host(let id):
+            if await records.host(id) == nil { try? await methods.refresh() }
             guard let host = await records.host(id), let key = host.publicKey else { throw ControlAuth.Refusal(.unknown) }
             return (try ControlAuth.hostKey(privateKey: privateKey, peer: key, host: id), Admitted(host: id))
         case .pairing(let id), .enrolling(let id):
@@ -250,6 +346,12 @@ public final class ControlService: @unchecked Sendable {
             return
         }
         await router.attachHost(host, transport: reader)
+        // This copy holds the host now (T063): every peer reaches it through here.
+        if let epoch = try? await leases.take(host) {
+            await mesh?.holding(host, epoch: epoch)
+        } else {
+            log("the store would not give \(host)'s lease to this copy; serving it anyway")
+        }
         let reply: JSONRPCMessage
         do {
             reply = .success(id: id, result: try await methods.hostSaid(host, method: DaemonAPI.Method.hostHello, params: params))

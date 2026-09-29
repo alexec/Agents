@@ -23,6 +23,9 @@ public actor ControlMethods: ControlHandling {
         public var clientsChanged: @Sendable ([ClientRecord]) async -> Void
         /// A host enrolled or removed: its key starts or stops working.
         public var hostsChanged: @Sendable () async -> Void
+        /// A change a person made, for every other copy to apply (058, US3, T066). Called
+        /// after the store has it.
+        public var changed: @Sendable (ControlEvent) async -> Void = { _ in }
 
         public init(startPairing: @escaping @Sendable (Grant) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -194,6 +197,8 @@ public actor ControlMethods: ControlHandling {
             let request = try Self.require(params, as: DaemonAPI.ClientGrantRequest.self)
             try await records.setGrant(request.grant, of: request.client)
             await router?.setGrant(request.grant, of: request.client)
+            await hooks.changed(ControlEvent(kind: .grantChanged, subject: request.client.uuidString, at: Date(),
+                                             by: caller.client.uuidString))
             await router?.broadcastControl(DaemonAPI.Notification.controlClientChanged,
                                            ["client": .string(request.client.uuidString)], operatorsOnly: true)
             return [:]
@@ -207,6 +212,8 @@ public actor ControlMethods: ControlHandling {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Which client?")
             }
             try await forget(id)
+            await hooks.changed(ControlEvent(kind: .clientForgotten, subject: id.uuidString, at: Date(),
+                                             by: caller.client.uuidString))
             return [:]
         case DaemonAPI.Method.hostsStartEnroll:
             return try await hooks.startEnroll()
@@ -225,6 +232,8 @@ public actor ControlMethods: ControlHandling {
             }
             await router?.forgetHost(request.host)
             await hooks.hostsChanged()
+            await hooks.changed(ControlEvent(kind: .hostRemoved, subject: request.host.rawValue, at: Date(),
+                                             by: caller.client.uuidString))
             return [:]
         default:
             throw JSONRPCError.methodNotFound(method)
