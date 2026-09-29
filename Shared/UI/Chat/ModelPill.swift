@@ -7,12 +7,10 @@ import SwiftUI
 /// menu lists the models; effort is a submenu, and anything on or off (fast mode) is a
 /// toggle. Anything else the runtime sends gets a submenu of its own name, so a new
 /// option still appears rather than disappearing.
-struct ModelPill<Extra: View>: View {
+struct ModelPill: View {
     /// The runtime's options, permission ones already left out.
     let options: [ConfigOption]
     let binding: (ConfigOption) -> Binding<JSONValue?>
-    /// Whatever else an app puts at the foot of the menu: the Mac's Continue with.
-    @ViewBuilder var extra: () -> Extra
 
     private var model: ConfigOption? {
         options.first { $0.category == "model" } ?? options.first { !$0.isBoolean }
@@ -39,7 +37,6 @@ struct ModelPill<Extra: View>: View {
                     Menu(option.name) { choices(of: option) }
                 }
             }
-            extra()
         } label: {
             HStack(spacing: 4) {
                 Text(title)
@@ -114,11 +111,5 @@ struct ModelPill<Extra: View>: View {
         return Binding(
             get: { (chosen.wrappedValue ?? option.currentValue)?.boolValue ?? false },
             set: { chosen.wrappedValue = .bool($0) })
-    }
-}
-
-extension ModelPill where Extra == EmptyView {
-    init(options: [ConfigOption], binding: @escaping (ConfigOption) -> Binding<JSONValue?>) {
-        self.init(options: options, binding: binding, extra: { EmptyView() })
     }
 }

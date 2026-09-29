@@ -137,9 +137,9 @@ public final class AgentsModel {
     public private(set) var costState: DaemonAPI.CostState?
     /// How long archived agents are kept and what the archive holds (051). Nil against a
     /// daemon from before 051, which leaves the settings section out.
-    /// The pool of runtimes a chat carries on with, and each one's state (052). Nil from
-    /// a daemon too old to know `pool/state`, and then nothing about the pool is drawn.
-    public private(set) var poolStatus: PoolStatus?
+    /// Every runtime's state on the Mac (065, US4): Agent Runtimes, the prompt bar's
+    /// warning, and the phone's Runtimes list.
+    public private(set) var runtimeAllowances: RuntimeAllowances?
     public private(set) var retentionState: DaemonAPI.RetentionState?
     /// What is left of retired agents this client has asked about, by id (051).
     public private(set) var tombstones: [UUID: Tombstone] = [:]
@@ -234,7 +234,7 @@ public final class AgentsModel {
         case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
-        case poolChanged(PoolStatus)
+        case runtimeAllowancesChanged(RuntimeAllowances)
         case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
         case eventsChanged(DaemonAPI.EventsChange)
@@ -267,7 +267,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
-        case DaemonAPI.Notification.poolChanged: return decode(PoolStatus.self, Update.poolChanged)
+        case DaemonAPI.Notification.runtimesAllowancesChanged:
+            return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
@@ -386,8 +387,8 @@ public final class AgentsModel {
         case .retentionChanged(let state):
             retentionState = state
 
-        case .poolChanged(let status):
-            poolStatus = status
+        case .runtimeAllowancesChanged(let allowances):
+            runtimeAllowances = allowances
 
         case .agentRemoved(let notification):
             // Retired (051). Out of every list; a chat that was showing it finds no
@@ -530,7 +531,7 @@ public final class AgentsModel {
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
-    public func replacePoolStatus(_ status: PoolStatus) { poolStatus = status }
+    public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     /// Tombstones as `agents/retired` answered, kept for the retired page (051).
     public func takeTombstones(_ found: [Tombstone]) {
         for tombstone in found { tombstones[tombstone.id] = tombstone }

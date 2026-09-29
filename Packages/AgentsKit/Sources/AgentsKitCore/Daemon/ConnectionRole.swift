@@ -37,6 +37,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsStopHelper,
         DaemonAPI.Method.agentsArchiveHelper,
         DaemonAPI.Method.agentsListHelpers,
+        DaemonAPI.Method.agentsListSessions,
+        DaemonAPI.Method.agentsReadSession,
         DaemonAPI.Method.leasesLease,
         DaemonAPI.Method.leasesRelease,
         DaemonAPI.Method.leasesList,
@@ -93,14 +95,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
         // and never changes the settings or retires anything (051, FR-028).
         DaemonAPI.Method.retentionState,
         DaemonAPI.Method.agentsRetired,
-        // The phone reads the pool and may say a runtime is back; it never edits the
-        // pool (052, contracts/daemon-api.md).
-        DaemonAPI.Method.poolState,
-        DaemonAPI.Method.poolMarkAvailable,
-        DaemonAPI.Method.poolStopWaiting,
-        DaemonAPI.Method.agentsContinueWith,
-        DaemonAPI.Method.agentsSetSwitching,
-        DaemonAPI.Method.poolModels,
+        // The phone reads each runtime's state and may say one is back (065).
+        DaemonAPI.Method.runtimesAllowances,
+        DaemonAPI.Method.runtimesMarkAvailable,
         DaemonAPI.Method.worktreesList,
         DaemonAPI.Method.worktreesCheck,
         DaemonAPI.Method.worktreesRemove,

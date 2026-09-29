@@ -1,12 +1,11 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A chat carried on with another runtime (052, wireframes §2). A runtime note with a
-/// warm tint, so a switch stands out when scrolling back; everything else about it is
-/// words.
+/// A chat carried on with another runtime (052, wireframes §2). Nothing switches since
+/// 065, but a chat that did before still says so, as it happened: words only, with no
+/// links to a pool or a sheet that are gone.
 struct SwitchNote: View {
     let record: SwitchRecord
-    @Environment(\.chatActions) private var actions
 
     var body: some View {
         let note = PoolWords.switchNote(record, now: .now)
@@ -16,13 +15,6 @@ struct SwitchNote: View {
             ForEach(note.lines, id: \.self) { line in
                 Text(line).appText(.reading).foregroundStyle(.secondary)
             }
-            HStack(spacing: 18) {
-                Button("Change what it carried on with…") { actions.adjustSwitch(record) }
-                    .linkStyle()
-                Button("Pool") { actions.showPool() }
-                    .linkStyle()
-            }
-            .appText(.reading)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

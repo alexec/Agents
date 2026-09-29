@@ -1,8 +1,9 @@
 # Data Model: Read Another Session's History
 
-Nothing new is stored. A session is the `Agent` the app already has, and a history is text
-rendered from the transcript it already writes. This file says which existing fields the tools
-read, and which pool fields stop being written.
+A session is the `Agent` the app already has, and a history is text rendered from the
+transcript it already writes. A runtime's state is the `AllowanceState` the pool already kept,
+now kept for every runtime. Nothing new is stored. This file says which fields the tools read,
+what the runtime state holds, and which pool fields and files stop being written.
 
 ## Session (existing `Agent`)
 
@@ -62,18 +63,51 @@ The status line for `.allowanceSpent` is already "Its allowance ran out".
 ## Rate-limit streak (in memory, per chat)
 
 `DaemonCore` holds `[UUID: [Date]]` for the chat, beside the existing `rateLimitAttempts`.
-It is not on the agent record and not in `allowances.json`. A restart forgets it. Three
-timestamps inside `RateLimitPolicy.standard`'s window (600 seconds, `persistsAfter` 3) end
-the retry. The delays stay `[30, 120]` seconds when the runtime gave no time.
+It is not on the agent record. A restart forgets it. Three timestamps inside
+`RateLimitPolicy.standard`'s window (600 seconds, `persistsAfter` 3) end the retry and mark
+the runtime out with `.rateLimitPersisted`. The delays stay `[30, 120]` seconds when the
+runtime gave no time. `AllowanceState.rateLimitStreak` is decoded and no longer written.
 
-## Fields that stop being written
+## Runtime state (existing `AllowanceState`, `allowances.json`)
+
+One per credential key, `‹runtimeID›:sign-in` or `‹runtimeID›:‹CredentialKind›`. Unchanged in
+shape, so a file written by the pool is read as it is.
+
+| Field | Role now |
+|---|---|
+| `credentialKey` | The identity. The runtime is the part before the colon. |
+| `status` | `.available`, `.rateLimited(until:)` or `.out(until:, retryAfter:, why:)`. Shown, never enforced. |
+| `since` | When it last changed. The first check is `since + 4h`. |
+| `spent` | Decoded, not written: the credit ledger goes. |
+| `lastRateLimit`, `reading` | The plan window and what is left of it, for the row's second line. |
+| `entryID` | Decoded, not used. |
+| `rateLimitStreak` | Decoded, not written (above). |
+
+What changes it:
+
+| Event | New status | Event raised |
+|---|---|---|
+| A recognised spent allowance, used-up credit, overage, a persisted rate limit, or a crash or unrecognised failure, in any chat | `.out`, with the reason and the provider's time when given | `cost.allowance_out` |
+| A turn on it that works, a passing check, **Mark available** | `.available` | `cost.allowance_back`, with `how` |
+| A newer state from a server or the Mac (`pool/applyAllowances`), for a shared sign-in | That state | out or back, `how: another host` |
+
+Nothing reads `status` to decide whether a prompt is sent.
+
+The credential key of an agent is `‹runtimeID›:‹CredentialKind›` when its runtime runs on a
+key the Mac lends (Gemini's), and `‹runtimeID›:sign-in` otherwise, as `poolEntry(for:)` makes it
+today without a pool.
+
+## Fields and files that stop being written
 
 | Field or file | What happens |
 |---|---|
-| `Agent.allowanceWait` | Decoded if an old record has it. Cleared at launch. No timer, no resume. |
+| `Agent.allowanceWait` | Decoded if an old record has it. Cleared at launch. No timer, no resume. Such a record stopped with **Its allowance ran out** under 052, which it keeps; one with no reason at all is mended on load like any other record. |
 | `Agent.poolEntryID`, `Agent.switchingOff` | Decoded, never set again. |
-| `pool.json`, `allowances.json` | Not loaded, not written. Left on disk. |
-| `agent.runtime_switched`, `cost.allowance_out`, `cost.allowance_back` | Not raised. Catalogue entries removed. Old log lines stay in the file. |
+| `pool.json` | Not read, not written. Left on disk. Its credit amounts and expiries are dropped. |
+| `switches.jsonl` | Not written, not read. Left on disk. |
+| `agent.runtime_switched` | Not raised. Catalogue entry removed. Old log lines stay in the file. |
+
+`allowances.json` is still read and written.
 
 ## Transcript kinds that stay
 

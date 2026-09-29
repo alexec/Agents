@@ -32,6 +32,8 @@ struct TotalsView: View {
                     if spending.unmeasuredAgents > 0 { unmeasured }
                 }
                 today
+                // Where each runtime's allowance stands, a tap away (065).
+                RuntimesLink()
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)

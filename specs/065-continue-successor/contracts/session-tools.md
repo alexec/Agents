@@ -44,7 +44,8 @@ app resolves it in this order:
 The result is Markdown rendered from the app's transcript record. Its header gives the
 session title (or `Untitled`), id, runtime, status, working folder, and worktree name and
 branch when present. It contains the person's messages, the agent's replies, non-app tool
-calls and their file paths when present, plus the last recorded plan. It omits thoughts,
+calls and their file paths when present, what the agent said of how the work went
+(`finish_turn`), plus the last recorded plan. It omits thoughts,
 usage, permission traffic, app-served tool calls, and pool bookkeeping. A read never appends
 to the transcript, changes `lastActivityAt`, or broadcasts a session change.
 

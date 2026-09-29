@@ -609,52 +609,6 @@ final class RemoteModel {
         projectFolderBranches[folder] = answer?.projectFolderBranch
     }
 
-    /// The app's worktrees for the project on screen, for its Worktrees section.
-    private(set) var projectWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
-    /// The folder `projectWorktrees` answers for, which lags `projectWorktreesFolder`
-    /// while another project's list is on its way.
-    private(set) var projectWorktreesAnswered: URL?
-    private var projectWorktreesFolder: URL?
-
-    /// Asked when the project page appears and after a removal, never polled.
-    func loadProjectWorktrees(in folder: URL) async {
-        projectWorktreesFolder = folder
-        let answer = (try? await client.call(DaemonAPI.Method.worktreesList,
-                                             DaemonAPI.WorktreesListRequest(folder: folder),
-                                             returning: DaemonAPI.WorktreesListResponse.self))
-            ?? .notARepository
-        guard projectWorktreesFolder == folder else { return }
-        projectWorktrees = answer
-        projectWorktreesAnswered = folder
-    }
-
-    /// What removing one would lose, or nil when the Mac could not say (and the app's
-    /// alert says why).
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
-        do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(project: folder, root: root),
-                                         returning: DaemonAPI.RemovalCheck.self)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Remove one. `confirmed` is the person having seen what would be lost; the Mac
-    /// checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
-        do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(project: folder, root: root,
-                                                                       confirmed: confirmed),
-                                      returning: DaemonAPI.WorktreeRemoved.self)
-        } catch {
-            problem = sentence(for: error)
-        }
-        await loadProjectWorktrees(in: folder)
-    }
-
     private func startRefusalBeforeSending(in folder: URL) -> String? {
         if isStale { return "Your Mac is not answering, so nothing was started." }
         guard let summary = work.project(folder) else { return nil }
@@ -1028,7 +982,7 @@ final class RemoteModel {
         await refreshAttention()
         await refreshResuming()
         await refreshCostState()
-        await refreshPoolStatus()
+        await refreshRuntimeAllowances()
         await refreshLeases()
         await refreshEvents()
         await refreshWorkflows()
@@ -1276,50 +1230,24 @@ final class RemoteModel {
 
     // MARK: The pool (052)
 
-    var poolStatus: PoolStatus? { work.poolStatus }
     func agent(_ id: UUID) -> Agent? { work.agent(id) }
 
-    /// The Pool page, over whatever is on screen (a switch note's Pool link).
-    var isShowingPool = false
-    /// Continue with, as a list: a chat moving by hand, or changing what a switch chose.
-    var continuing: RemoteContinue?
 
-    func refreshPoolStatus(days: Int? = nil) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolState, DaemonAPI.PoolStateRequest(days: days),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
+    /// Every runtime's state on the Mac (065, US4).
+    var runtimeAllowances: RuntimeAllowances? { work.runtimeAllowances }
+
+    func refreshRuntimeAllowances() async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
     }
 
-    /// The person says a runtime is back (FR-023). The phone may: it costs one turn if wrong.
-    func markPoolEntryAvailable(_ entryID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolMarkAvailable,
-                                                  DaemonAPI.PoolMarkAvailable(entryID: entryID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
-    func stopWaiting(_ agentID: UUID) async {
-        guard let status = try? await client.call(DaemonAPI.Method.poolStopWaiting,
-                                                  DaemonAPI.PoolStopWaiting(agentID: agentID),
-                                                  returning: PoolStatus.self) else { return }
-        work.replacePoolStatus(status)
-    }
-
-    func continueWith(_ request: DaemonAPI.ContinueWithRequest) async -> Result<DaemonAPI.ContinueWithResult, JSONRPCError> {
-        do {
-            return .success(try await client.call(DaemonAPI.Method.agentsContinueWith, request,
-                                                  returning: DaemonAPI.ContinueWithResult.self))
-        } catch let error as JSONRPCError {
-            return .failure(error)
-        } catch {
-            return .failure(JSONRPCError(code: -32603, message: "\(error)"))
-        }
-    }
-
-    func setSwitching(_ agentID: UUID, isOn: Bool) async {
-        _ = try? await client.call(DaemonAPI.Method.agentsSetSwitching,
-                                   DaemonAPI.SetSwitchingRequest(agentID: agentID, isOn: isOn),
-                                   returning: Agent?.self)
+    /// The person says a runtime is back. The phone may: it costs one turn if wrong.
+    func markRuntimeAvailable(_ credentialKey: String) async {
+        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesMarkAvailable,
+                                                      DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
+                                                      returning: RuntimeAllowances.self) else { return }
+        work.replaceRuntimeAllowances(allowances)
     }
 
     /// What each agent holds and waits for (036). The phone only reads it: the
@@ -1739,10 +1667,6 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsStop, agentID) }
     func archive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsArchive, agentID) }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
-    /// Park or unpark, whichever `Agent.parkAction` offers (040).
-    func perform(_ action: ParkAction, on agentID: UUID) async {
-        await act(action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark, agentID)
-    }
 
     private func act(_ method: String, _ agentID: UUID) async {
         guard !isStale else {

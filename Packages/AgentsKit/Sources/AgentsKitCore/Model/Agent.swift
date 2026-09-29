@@ -403,9 +403,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
         if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
-        try c.encodeIfPresent(poolEntryID, forKey: .poolEntryID)
-        if switchingOff { try c.encode(switchingOff, forKey: .switchingOff) }
-        try c.encodeIfPresent(allowanceWait, forKey: .allowanceWait)
+        // 052's poolEntryID, switchingOff and allowanceWait are read from an older record
+        // and never written again (065): nothing sets them, and a wait found at launch is
+        // cleared.
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)

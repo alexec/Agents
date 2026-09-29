@@ -61,8 +61,7 @@ struct AgentRow: View {
                        ending: agent.endedReason?.summary,
                        endedReason: agent.endedReason,
                        isUnread: agent.isUnread,
-                       isParked: agent.parking?.isParked == true,
-                       isWaitingForAllowance: agent.allowanceWait != nil)
+                       isParked: agent.parking?.isParked == true)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
@@ -88,26 +87,6 @@ struct AgentRow: View {
                             .foregroundStyle(.tertiary)
                             .help(starter)
                             .accessibilityLabel(starter)
-                    }
-                    // Moved to another runtime when its own ran out (052). In the
-                    // sessions list a mark, as the two above are: a list row keeps the
-                    // height it first had, and the pool's state arrives after it, so a
-                    // line added then is cut in half.
-                    if isCompact, let wait = agent.allowanceWait {
-                        let words = PoolWords.waitingLine(wait, now: Date())
-                        Image(systemName: PoolWords.waitingSymbol)
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
-                            .help(words)
-                            .accessibilityLabel(words)
-                    }
-                    if isCompact, let moved = carriedOn {
-                        let words = PoolWords.carriedOnFrom(moved, now: Date())
-                        Image(systemName: "arrow.triangle.swap")
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
-                            .help(words)
-                            .accessibilityLabel(words)
                     }
                     // Working in a worktree (030): named, because with two agents in
                     // one project the worktree is how you tell whose changes are whose.
@@ -135,22 +114,6 @@ struct AgentRow: View {
                     Color.clear
                         .frame(height: 14)
                         .accessibilityHidden(true)
-                }
-
-                // Moved to another runtime when its own ran out (052): from which, and
-                // when, while it is still on the one it moved to.
-                // Waiting for an allowance to come back (052, US4): stopped, not failed.
-                if !isCompact, let wait = agent.allowanceWait {
-                    Text(PoolWords.waitingLine(wait, now: Date()))
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if !isCompact, let moved = carriedOn {
-                    Text(PoolWords.carriedOnFrom(moved, now: Date()))
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
 
                 // What it holds or waits for (036), so an idle agent still holding the
@@ -261,14 +224,6 @@ struct AgentRow: View {
 
     private func worktreeIsThere(_ worktree: AgentWorktree) -> Bool {
         FileManager.default.fileExists(atPath: worktree.root.path(percentEncoded: false))
-    }
-
-    /// The switch that put this chat on the runtime it is on now, if one did.
-    private var carriedOn: SwitchRecord? {
-        guard agent.poolEntryID != nil,
-              let latest = model.poolStatus?.switches.first(where: { $0.agentID == agent.id }),
-              latest.to.runtimeID == agent.runtimeID else { return nil }
-        return latest
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.

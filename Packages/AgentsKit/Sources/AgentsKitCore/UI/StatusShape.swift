@@ -47,7 +47,9 @@ public enum StatusShape: Hashable, Sendable {
             default: self = .done
             }
         case .stopped where waitingForAllowance: self = .waiting
-        case .stopped where endedReason != .cancelled && endedReason != .stoppedByAgent:
+        // The same three as `AgentGroup`'s Paused: stopped on purpose, or out of allowance
+        // (065), where the way on is a new chat. Anything else stopped wants a person.
+        case .stopped where ![.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason):
             self = .needsYou
         case .stopped, .archived: self = .stopped
         }

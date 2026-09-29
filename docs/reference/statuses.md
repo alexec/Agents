@@ -33,7 +33,7 @@ colour.
 | **Complete** | Done | The agent did what was asked, and you have read its last turn. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Nothing to do** | Done | The agent found nothing that needed doing, and you have read its last turn. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
 | **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Park**, **Archive**, **Branch**. |
-| **Waiting for an allowance** | Waiting | Every runtime in the pool was out, and the chat waits for the first that said when it is back, then carries on by itself. | **Stop waiting** on the Pool page, or reply in the prompt. **Stop**, **Park** or **Archive** end the wait too. |
+| **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on. | Start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Park**, **Archive**, **Branch**. |
 | **Parked** | Parked | You put the conversation down to come back to later. The card says when, such as **Parked 3 days ago**. It stays parked even if its turn ends wanting you, unless it asks you something mid-turn. | **Unpark**, to put it back in its group. **Archive**, **Branch**. |
 | **Parks when this turn ends** | Where it is now | You parked a conversation while its turn was still going. It moves to **Parked** when the turn ends. | **Unpark**, to cancel. **Stop**, **Archive**, **Branch**. |
 | **Archived** | Archived | You, or the agent that started it, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
@@ -57,7 +57,6 @@ The line at the top of the iPhone and iPad screens says how they are reaching th
 ## See also
 
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
-- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
 - [Stop, park and archive agents](../how-to/archive-park-stop.md)
 - [Answer a question or a permission request](../how-to/answer-a-question.md)
 - [Events](events.md)

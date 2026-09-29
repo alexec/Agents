@@ -41,8 +41,9 @@ running, and reads the meter that says how full its context is.
 
 1. Open its conversation.
 2. Change the mode or model in the same capsules under the prompt. The change applies from
-   the agent's next step; the runtime itself cannot be changed. To move a chat to another
-   runtime, see [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md).
+   the agent's next step; the runtime itself cannot be changed. To carry the work on with
+   another runtime, start a new chat there and ask it to continue this one; see
+   [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md).
 
 **Read the meter**
 

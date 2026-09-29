@@ -172,7 +172,7 @@ public actor ACPSession {
     /// Each marker coming back out of the notification stream lets one of them go, and
     /// the stream ending lets them all go. A list rather than one, because a waiter
     /// quietly dropped is a caller that never returns.
-    private var replayDrains: [CheckedContinuation<Void, Never>] = []
+    private var notificationDrains: [CheckedContinuation<Void, Never>] = []
 
     public func setReplayRecorded(_ recorded: Bool) {
         recordsReplay = recorded
@@ -331,32 +331,32 @@ public actor ACPSession {
         } catch {
             // Drained on the way out too: whatever the runtime managed to replay
             // before it gave up is still in the stream, and is still not ours to keep.
-            await waitForReplayToDrain()
+            await waitForNotificationsToDrain()
             throw error
         }
-        await waitForReplayToDrain()
+        await waitForNotificationsToDrain()
     }
 
     /// Wait until the notification consumer has worked through everything the reader
-    /// handed it before now. Returns at once if the connection has gone, because then
+    /// handed it before now: after a replay, and after a turn's reply. Returns at once if the connection has gone, because then
     /// nothing is coming and there is nothing to wait for.
-    private func waitForReplayToDrain() async {
+    private func waitForNotificationsToDrain() async {
         guard connection.insertMarker() else { return }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            replayDrains.append(continuation)
+            notificationDrains.append(continuation)
         }
     }
 
     /// A marker arrived: the waiter it was put in for can go.
-    private func releaseReplayDrain() {
-        guard !replayDrains.isEmpty else { return }
-        replayDrains.removeFirst().resume()
+    private func releaseNotificationDrain() {
+        guard !notificationDrains.isEmpty else { return }
+        notificationDrains.removeFirst().resume()
     }
 
     /// No marker will arrive again. Everybody waiting for one goes.
-    private func releaseAllReplayDrains() {
-        let waiting = replayDrains
-        replayDrains.removeAll()
+    private func releaseAllNotificationDrains() {
+        let waiting = notificationDrains
+        notificationDrains.removeAll()
         for continuation in waiting { continuation.resume() }
     }
 
@@ -497,6 +497,12 @@ public actor ACPSession {
         turnInFlight = true
         defer { turnInFlight = false }
         let result = try await connection.call(ACP.Method.prompt, params)
+        // The reply resumes this at once, but the turn's own words, its failure and its
+        // rate limit arrive as notifications, drained elsewhere. A runtime that says its
+        // quota is spent in the chat (Copilot, Antigravity) sends those words just
+        // before the reply, and read now they may not be in `turnText` yet: the turn
+        // then looked like one that worked, about half the time (065).
+        await waitForNotificationsToDrain()
         let decoded = try? result.decode(ACP.PromptResult.self)
         let raw = decoded?.stopReason
         var failure = turnFailure
@@ -758,7 +764,7 @@ public actor ACPSession {
                 await self.receive(notification.method, notification.params)
             }
             // Nothing more is coming, so a marker that has not arrived never will.
-            await self.releaseAllReplayDrains()
+            await self.releaseAllNotificationDrains()
         }
     }
 
@@ -766,7 +772,7 @@ public actor ACPSession {
         if method == JSONRPCConnection.markerMethod {
             // Our own marker, back out of the stream behind everything that was in it
             // when we put it there. All of that has now been through here.
-            releaseReplayDrain()
+            releaseNotificationDrain()
             return
         }
         if method == ACP.ClientMethod.completeElicitation {
@@ -1043,7 +1049,7 @@ public actor ACPSession {
             // A request is served as it arrives and a notification is not, so the
             // subagent's announcement can still be queued behind this. Everything the
             // runtime said before asking is let through first, which is how it is named.
-            if subagents[foreign] == nil { await waitForReplayToDrain() }
+            if subagents[foreign] == nil { await waitForNotificationsToDrain() }
             request.subagent = subagents[foreign]
         }
         let chosen = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
@@ -1117,7 +1123,7 @@ public actor ACPSession {
         pendingPermissions.removeAll()
         for (_, continuation) in pendingElicitations { continuation.resume(returning: .cancel) }
         pendingElicitations.removeAll()
-        releaseAllReplayDrains()
+        releaseAllNotificationDrains()
         eventsContinuation.yield(.processExited(status: status))
         eventsContinuation.finish()
     }

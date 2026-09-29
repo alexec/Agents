@@ -1,6 +1,6 @@
 import Foundation
 
-/// How much of a plan window a runtime says is used, for the Pool page to show.
+/// How much of a plan window a runtime says is used, for Agent Runtimes to show.
 ///
 /// Standard ACP has no way to ask this: `usage_update` is the session's context and
 /// cost, not the account's allowance. Two runtimes say it in extensions of their own,

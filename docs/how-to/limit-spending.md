@@ -61,6 +61,5 @@ Each server keeps to the per-day limit on its own. For every control in the pane
 ## See also
 
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md)
-- [Why chats carry on when a plan runs out](../explanation/runtime-pool.md)
 - [Settings and the Resources page](../reference/settings.md)
 - [Statuses and groups](../reference/statuses.md)

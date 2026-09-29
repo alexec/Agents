@@ -324,41 +324,30 @@ public actor DaemonCore {
     lazy var clientPermissionStore = ClientPermissionStore(locations: locations)
     lazy var clientPermissions = clientPermissionStore.load()
 
-    // MARK: The pool (052)
+    // MARK: Each runtime's allowance (052, 065)
 
-    lazy var poolStore = PoolStore(locations: locations)
-    /// The person's pool, read once and kept in step with `pool.json`.
-    lazy var pool: PoolSettings = poolStore.load()
+    lazy var allowanceStore = AllowanceStore(locations: locations)
     /// Each credential's state, keyed by `AllowanceState.credentialKey`.
     lazy var allowances: [String: AllowanceState] = Dictionary(
-        poolStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
-    /// The prompt each agent's current turn was sent, for a retry or a carry-on.
+        allowanceStore.loadAllowances().map { ($0.credentialKey, $0) }, uniquingKeysWith: { _, later in later })
+    /// The prompt each agent's current turn was sent, for a rate limit's retry.
     var lastPrompts: [UUID: SentPrompt] = [:]
     /// Rate-limit retries so far for each agent's current prompt (R7).
     var rateLimitAttempts: [UUID: Int] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
-    /// Credentials whose allowance is being asked for now, so opening the Pool page
+    /// Credentials whose allowance is being asked for now, so opening Agent Runtimes
     /// twice starts one runtime, not two.
     var measuringAllowances: Set<String> = []
-    /// A chat whose allowance ran out this turn, waiting for its runtime to be let go
-    /// before it carries on (052). `resend` is whether the turn failed and its prompt
-    /// goes again.
-    var pendingCarry: [UUID: (reason: SwitchRecord.Reason, resend: Bool)] = [:]
-    /// When `pool/changed` last went out, and whether one is held back to go at the end
-    /// of the second (052 US3): a burst of changes is one broadcast.
-    var poolBroadcastAt: ContinuousClock.Instant?
-    var poolBroadcastHeld = false
-    /// When each runtime was last started just to see its models (US6): at most once in
-    /// ten minutes, so an open Pool page never keeps starting runtimes.
-    var modelsProbedAt: [String: Date] = [:]
+    /// When `runtimes/allowancesChanged` last went out, and whether one is held back to
+    /// go at the end of the second: a burst of changes is one broadcast.
+    var allowanceBroadcastAt: ContinuousClock.Instant?
+    var allowanceBroadcastHeld = false
     /// Checks already running, so a heartbeat cannot start the same one twice.
     var allowanceChecks: Set<String> = []
-    /// Credentials already tried for the prompt a chat is carrying (052): never gone back
-    /// to for the same prompt. Cleared by a turn that works.
-    var carryTried: [UUID: Set<String>] = [:]
-    /// A handoff to send with the chat's next prompt, when the switch did not re-send one.
-    var pendingHandoff: [UUID: String] = [:]
+    /// Each chat's rate-limit refusals in the window (065): three on one chat is a limit
+    /// that persists. In memory; a restart forgets it.
+    var rateLimitStreaks: [UUID: [Date]] = [:]
     /// How rate limits are retried. A test shortens the waits; nothing else changes it.
     var rateLimitPolicy = RateLimitPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
@@ -987,6 +976,7 @@ public actor DaemonCore {
             // of the list each time.
             if let mended = agents[id] { try? await store.save(mended) }
         }
+        clearAllowanceWaitsLeftFromBefore()
         startRetentionChecks()
     }
 

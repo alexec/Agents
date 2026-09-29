@@ -43,7 +43,6 @@ ones every Mac app has.
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |
 | Option-Command-S | **View ▸ Spending** | Opens the Spending page. See [Limit what agents spend](../how-to/limit-spending.md). |
-| Option-Command-P | **View ▸ Pool** | Opens the Pool page. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
 | Command-F | **View ▸ Find Session** | Puts the keyboard in the sessions column's search field. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
 | Command-, | **Agents ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |

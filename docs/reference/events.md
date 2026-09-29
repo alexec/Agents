@@ -41,7 +41,6 @@ All are about agents in the same project. Each carries `agent`, the agent's id.
 | `agent.blocked` | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. An unread ending appears under **Needs you** until opened, even if it will resume by itself. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | agent, by | An agent was stopped before finishing. |
 | `agent.failed` | agent, reason | An agent ended in an error. |
-| `agent.runtime_switched` | agent, from, to, reason | A chat carried on with another runtime: `from` and `to` are runtime ids, and `reason` is `allowanceSpent`, `creditUsedUp`, `overage`, `rateLimitPersisted`, `everyoneOutResumed` or `byHand`. |
 | `agent.retired` | agent, because | An archived agent was retired and its conversation deleted. `because` is `age`, `cap` or `person`. |
 
 ## Workflows
@@ -71,8 +70,8 @@ These belong to the Mac, not to a project. Any agent can wait for them.
 | `person.away` | why | You locked the screen or stepped away for 5 minutes. |
 | `person.back` | why | You unlocked the screen or came back. |
 | `cost.limit_reached` | limit, agent | A spending limit was reached. See [Settings and the Resources page](settings.md). |
-| `cost.allowance_out` | runtime, until, retry_after, reason | A runtime's allowance ran out, or its credit was used up or expired. `until` is the time the provider gave, when it gave one; otherwise `retry_after` is when the app tries it again. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
-| `cost.allowance_back` | runtime, how | A runtime's allowance came back: `time` (its return time passed), `person` (Mark available, or a raised amount), `worked` (a turn on it worked) or `another host` (a server said so). |
+| `cost.allowance_out` | runtime, until, retry_after, reason | A runtime's allowance ran out, its credit was used up, or it failed. `until` is the time the provider gave, when it gave one; `retry_after` is when the app next checks it. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
+| `cost.allowance_back` | runtime, how | A runtime is back: `check` (the app's check passed), `person` (Mark available), `worked` (a turn on it worked), `time` (a rate limit's wait passed) or `another host` (a server said so). |
 | `server.offline` | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | server | A server that was offline is back. Raised once, while the Agents window is open. |
 

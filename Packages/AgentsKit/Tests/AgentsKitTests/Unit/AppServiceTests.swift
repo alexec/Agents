@@ -63,12 +63,14 @@ struct AppServiceTests {
         // older names, for an agent that may use them — which is the default.
         // archive_agent is no longer offered. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042), and the two move
-        // tools (053) after those.
+        // tools (053) after those. The two session tools (065) sit after the agent
+        // tools, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.parkAgentToolName, AppService.listMyAgentsToolName,
+                AppService.listSessionsToolName, AppService.readSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,

@@ -19,30 +19,35 @@ exist; this feature stops appending anything after them about another runtime.
 The list heading for "Its allowance ran out" is **Paused**. It is not **Waiting** and not
 **Needs you**.
 
+## What the runtime records
+
+The same refusal marks the runtime out, for every chat to see and none to obey. See
+[runtime-state.md](runtime-state.md).
+
 ## What another chat sees
 
-Nothing from the refusal above. Starting a chat on the same runtime, or sending one a prompt,
-does not write a ran-out note, does not set a wait, and does not refuse because this chat was
-refused. There is no "out until" on the runtime.
+No ran-out note and no wait. A chat already on that runtime is prompted as usual; if its turn
+works, the runtime is back. A new chat about to start on it shows the prompt bar's notice
+(runtime-state.md), and sends when the person sends.
 
 ## What is gone from the Mac, iPhone and iPad
 
-- A Pool page, a Pool row in the sidebar, and Option-Command-P
-- Settings ▸ Pool, including Add a runtime and Add credit on an API key
+- A Pool page, a Pool row in the sidebar with its dot, and Option-Command-P
+- Settings ▸ Pool, including Add a runtime, the pool's order, and Add credit on an API key
+  (its amount, expiry and the app's count against it)
 - Continue with, on the chat and on the runtime control
 - Matching models
 - Waiting for an allowance, Stop waiting, and "Carry on when ‹runtime› runs out"
+- Recent switches
 
 **Carry on** on a chat that is blocked on a person, an agent or a time stays. That is the
 blocked-chat action, not a runtime switch.
 
 ## What is gone from the event catalogue
 
-- `agent.runtime_switched`
-- `cost.allowance_out`
-- `cost.allowance_back`
+- `agent.runtime_switched`. It is not raised. A workflow trigger that names it does not fire.
 
-They are not raised. A workflow trigger that names one does not fire.
+`cost.allowance_out` and `cost.allowance_back` stay (runtime-state.md).
 
 ## What an old chat still shows
 

@@ -49,6 +49,8 @@ public actor AppService {
     public static let parkAgentToolName = AppTool.parkAgent
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
+    public static let listSessionsToolName = AppTool.listSessions
+    public static let readSessionToolName = AppTool.readSession
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
@@ -160,6 +162,16 @@ public actor AppService {
     /// Where those go.
     public typealias MovesSink = @Sendable (MoveCall) async -> Outcome
 
+    /// `list_sessions` or `read_session` (065), as the agent made it. Neither names a
+    /// project: the daemon takes it from the caller.
+    public enum SessionCall: Sendable, Equatable {
+        case list
+        case read(session: String)
+    }
+
+    /// Where those go.
+    public typealias SessionsSink = @Sendable (SessionCall) async -> Outcome
+
     private let connection: JSONRPCConnection
     private let finishSink: FinishSink
     private let sink: Sink
@@ -171,6 +183,7 @@ public actor AppService {
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
     private let movesSink: MovesSink
+    private let sessionsSink: SessionsSink
     /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
@@ -207,6 +220,9 @@ public actor AppService {
                 },
                 moves: @escaping MovesSink = { _ in
                     .refused("This app cannot move agents.")
+                },
+                sessions: @escaping SessionsSink = { _ in
+                    .refused("This app cannot read other sessions.")
                 }) {
         let box = self.box
         self.finishSink = finishTurn
@@ -219,6 +235,7 @@ public actor AppService {
         self.leasesSink = leases
         self.eventsSink = events
         self.movesSink = moves
+        self.sessionsSink = sessions
         self.managesAgents = managesAgents
         self.movesItself = movesItself
         self.connection = JSONRPCConnection(transport: transport) { method, params in
@@ -355,6 +372,13 @@ public actor AppService {
                 }
             }
 
+            if let call = Self.sessionCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await sessionsSink(call)))
+                }
+            }
+
             if let call = Self.moveCall(named: name, arguments) {
                 guard movesItself else {
                     return .success(Self.reply("""
@@ -441,6 +465,19 @@ public actor AppService {
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
+        }
+        return nil
+    }
+
+    /// Which of the two session calls a tool name is, with its arguments read (065).
+    /// `nil` when the name is neither.
+    static func sessionCall(named name: String,
+                            _ arguments: JSONValue?) -> Result<SessionCall, AgentCallProblem>? {
+        if name.hasSuffix(listSessionsToolName) { return .success(.list) }
+        if name.hasSuffix(readSessionToolName) {
+            let value = arguments?["session"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !value.isEmpty else { return .failure(AgentCallProblem(stringLiteral: SessionLookup.noValue)) }
+            return .success(.read(session: value))
         }
         return nil
     }
@@ -534,8 +571,10 @@ public actor AppService {
         // The two for moving itself, for every agent (053).
         // Not for a runtime that would forget the conversation on the way.
         let moveTools = movesItself ? [Self.enterWorktreeTool, Self.exitWorktreeTool] : []
+        // The two for reading another session in this project, for every agent (065).
+        let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
         return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
-            + agentTools + leaseTools
+            + agentTools + sessionTools + leaseTools
             + eventTools + moveTools + [Self.tool, Self.reportOutcomeTool]
     }
 
@@ -1220,6 +1259,41 @@ public actor AppService {
             many of this project's three places are in use.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    // MARK: Sessions (065). Words from contracts/session-tools.md.
+
+    static let listSessionsTool: JSONValue = [
+        "name": .string(listSessionsToolName),
+        "title": "List the sessions in this project",
+        "description": """
+            Every session in this project, most recent first, yours included: each one's \
+            id, title, runtime, status, and what it last said. Use it to find a session \
+            the person asks you to continue, then read it with read_session.
+            """,
+        "inputSchema": ["type": "object", "properties": .object([:])],
+    ]
+
+    static let readSessionTool: JSONValue = [
+        "name": .string(readSessionToolName),
+        "title": "Read another session's history",
+        "description": """
+            The app's record of one session in this project: what the person asked, what \
+            the agent said, the tools it ran and the files they touched, and its plan as it \
+            last stood. Use it when asked to continue another session's work. Reading it \
+            does not change that session. A long one keeps the first request and the latest \
+            turns and says how many were left out.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "session": [
+                    "type": "string",
+                    "description": "The session's id, as list_sessions gave it, or its exact title.",
+                ],
+            ],
+            "required": ["session"],
+        ],
     ]
 
     // MARK: Events (042). Words from contracts/event-tools.md.
