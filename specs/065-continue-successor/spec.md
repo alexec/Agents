@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-26
 
-**Revised**: 2026-09-28, to keep runtime tracking (see Clarifications)
+**Revised**: 2026-09-28, to keep runtime tracking and drop a key's credit (see Clarifications)
 
 **Status**: Draft
 
@@ -49,7 +49,8 @@ original is untouched.
   per-runtime state (out, since when, the four-hour availability check, the provider's reset
   time, what is left of the plan) stays. It moves from the Pool page to **Settings ▸ Agent
   Runtimes**. It now covers every runtime the person has set up, not only those in a pool.
-  This replaces the 2026-09-26 answer that a refusal is only a fact about that turn.
+  The credit the pool tracked on an API key (an amount and an expiry) goes: Google refuses on
+  its own when a key's quota or credit runs out. This replaces the 2026-09-26 answer that a refusal is only a fact about that turn.
 - Q: Does "user (or system)" mean the app may start a successor? → A: No. When a chat runs out,
   it stops with its note. The person starts the next chat and names the one to continue.
 - Q: Does a runtime marked out stop other chats from using it? → A: No. It is shown and warned
@@ -333,9 +334,9 @@ another runtime's plan reading is shown on its row.
   the agent's existing worktree tools, when it has them.
 - Limit recognition stays on the turn that was refused, so that chat's note is a recognised
   ending rather than a generic refusal. The same recognition also marks the runtime out.
-- Free or prepaid credit on an API key (such as a Gemini key), with its amount, expiry and the
-  app's count of what it has cost, is a runtime's setting, not the pool's. It moves to Agent
-  Runtimes with the state, and a key that is used up or past its date is marked out.
+- The app no longer keeps an amount or expiry for credit on an API key. A key's runtime (Gemini)
+  is tracked like any other: out when the provider refuses, back after a check or a turn that
+  works. Only the person picks a runtime, so there is nothing for such a ledger to protect.
 - The prompt bar's out notice no longer offers another runtime "instead" from the pool's order.
   It says the runtime is out and until when.
 - Existing pool and allowance files are read once to carry each runtime's state over. The pool's

@@ -33,8 +33,8 @@ works, the runtime is back. A new chat about to start on it shows the prompt bar
 ## What is gone from the Mac, iPhone and iPad
 
 - A Pool page, a Pool row in the sidebar with its dot, and Option-Command-P
-- Settings ▸ Pool, including Add a runtime and the pool's order (Add credit on an API key
-  moves to Agent Runtimes)
+- Settings ▸ Pool, including Add a runtime, the pool's order, and Add credit on an API key
+  (its amount, expiry and the app's count against it)
 - Continue with, on the chat and on the runtime control
 - Matching models
 - Waiting for an allowance, Stop waiting, and "Carry on when ‹runtime› runs out"

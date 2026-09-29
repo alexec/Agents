@@ -23,8 +23,8 @@ Each **runtime's state** stays, and stops depending on a pool. What the pool kep
 `allowances.json` (out, since when, the four-hour check, the provider's reset, what is left of
 the plan) is kept for every runtime the app finds, and shown on its card in **Settings ▸ Agent
 Runtimes** and in a Runtimes list on the phone. It is shown and warned about, never enforced:
-nothing reads it to decide whether a prompt is sent. A key's credit (Gemini's), which lived in
-the pool, becomes the runtime's own payment in `payments.json`.
+nothing reads it to decide whether a prompt is sent. The credit the pool kept on a key (an
+amount, an expiry, a ledger) goes: a key's runtime is tracked like any other.
 
 The rendering already exists. `Handoff.document` in
 `Packages/AgentsKit/Sources/AgentsKitCore/Pool/Handoff.swift` turns a transcript into that text
@@ -46,9 +46,8 @@ for the decisions, [data-model.md](data-model.md) for what is stored, and
 
 **Storage**: A list and a read are derived from the agent records, the retired tombstones, and
 `transcript.jsonl`; nothing new. `allowances.json` stays, with the same keys, and is written for
-every runtime rather than only a pool's. `payments.json` is new: each keyed credential's
-payment, made once from `pool.json`, which is then left on disk. `switches.jsonl` stops being
-written. Old agent records keep decoding `poolEntryID`, `switchingOff` and `allowanceWait`,
+every runtime rather than only a pool's. `pool.json` and `switches.jsonl` stop being read and
+written, and are left on disk. Old agent records keep decoding `poolEntryID`, `switchingOff` and `allowanceWait`,
 and a wait found at launch is cleared without a turn being started. Old transcripts keep
 their `poolSwitch`, `handoff` and `settingsChanged` lines, which still draw.
 
@@ -62,9 +61,8 @@ their `poolSwitch`, `handoff` and `settingsChanged` lines, which still draw.
   and, when it works, brings the runtime back; a failure marks a runtime out with no pool set
   up; a due check runs with no pool; a rate limit is retried on the same chat; list and read
   return the sentences in the contract and do not write the session that was read
-- A unit test that `pool.json` becomes `payments.json` once, keeping keyed and credit entries
 - The pool's switch, wait, continue-with and Matching models tests are removed with the
-  behaviour they lock. The allowance-state, check, reading, credit ledger and server-sharing
+  behaviour they lock. The allowance-state, check, reading and server-sharing
   tests are kept, set up without a pool
 
 **Target Platform**: The macOS app, `agentsd` (including a Linux server, which serves the same
@@ -100,13 +98,13 @@ ran-out status from the record, and gain a Runtimes list under Spending.
 - 2 agent tools, `list_sessions` and `read_session`, offered to every agent, including one
   another agent started
 - 2 daemon methods for sessions; 3 for runtime state (`runtimes/allowances`,
-  `runtimes/markAvailable`, `runtimes/setPayment`) replacing 5 pool methods and Continue with
+  `runtimes/markAvailable`) replacing 5 pool methods and Continue with
 - 1 briefing paragraph
 - The pool UI on the Mac, iPhone and iPad removed: the page, the Settings pane, Continue with,
   Matching models, the allowance-wait row, the sidebar row
 - The runtime's state added to each Agent Runtimes card, and a Runtimes list on the phone
-- The carry-on, the wait and the switch removed from the daemon; the state, checks, readings
-  and credit ledger kept, without the pool guard
+- The carry-on, the wait, the switch and the credit ledger removed from the daemon; the state,
+  checks and readings kept, without the pool guard
 - The docs listed in the spec
 
 ## Constitution Check
@@ -154,7 +152,7 @@ Packages/AgentsKit/Sources/AgentsKitCore/
 │   ├── AllowanceReading.swift          # kept
 │   ├── LimitRecognition.swift          # kept
 │   ├── PoolWords.swift                 # kept; sentences that name the pool reworded
-│   ├── PoolSettings.swift → RuntimePayment.swift   # Payment, ResetRule, RuntimePayment(s)
+│   ├── PoolSettings.swift              # removed: Payment, ResetRule, PoolEntry, levels
 │   ├── PoolStatus.swift → RuntimeAllowances.swift  # rows for Settings and the phone; startingOnOut
 │   ├── Handoff.swift                   # removed once SessionHistory has its tests
 │   ├── PoolPlan.swift, MatchingModels.swift, SettingsCarry.swift, SwitchRecord.swift,
@@ -162,24 +160,23 @@ Packages/AgentsKit/Sources/AgentsKitCore/
 ├── Model/EventCatalogue.swift          # drop agent.runtime_switched; reword out/back
 └── Daemon/DaemonAPI.swift              # agents/listSessions, agents/readSession,
                                         # runtimes/allowances, runtimes/markAvailable,
-                                        # runtimes/setPayment; pool/* removed but applyAllowances
+                                        # pool/* removed but applyAllowances
 
 Packages/AgentsKit/Sources/AgentsKit/
 ├── ACP/Serve/AppService.swift          # the two tools, offered to every agent
 ├── ACP/Serve/Briefing.swift            # one paragraph, including for a helper
 ├── Daemon/DaemonCore+Sessions.swift    # list and read
 ├── Daemon/DaemonCore+Pool.swift → DaemonCore+Allowances.swift
-│                                       # recognition, state, checks, readings, ledger,
+│                                       # recognition, state, checks, readings,
 │                                       # server sharing; carry, wait, switch go
 ├── Daemon/DaemonCore+Dispatch.swift
-└── Store/PoolStore.swift → AllowanceStore.swift   # allowances.json, payments.json,
-                                                   # the one-time move from pool.json
+└── Store/PoolStore.swift → AllowanceStore.swift   # allowances.json only
 
 Daemon/Sources/main.swift               # relay the two session calls
 
-App/Sources/Pool/                       # removed; AddCreditSheet moves to Settings/
+App/Sources/Pool/                       # removed, AddCreditSheet with it
 App/Sources/Settings/PoolSettingsView.swift        # removed
-App/Sources/Settings/AgentRuntimesSettingsView.swift  # state line, plan left, Mark available, credit
+App/Sources/Settings/AgentRuntimesSettingsView.swift  # state line, plan left, Mark available
 App/Sources/Settings/SettingsWindow.swift
 App/Sources/Chat/PromptBar.swift        # the out notice, without "instead"
 App/Sources/AppModel.swift              # runtimeAllowances in place of poolStatus
@@ -211,7 +208,7 @@ docs/how-to/limit-spending.md           # the pool cross-link only
 lives in Core, so it is tested without a daemon. The pool's UI is deleted rather than hidden.
 `LimitRecognition` stays, because the note on the chat that was refused is still a recognised
 ending and not a generic failure, and because it is what marks the runtime out. The renames
-(`Pool/` to `Runtimes/Allowance/`, `PoolEntry` to `RuntimePayment`) are their own commit, with
+(`Pool/` to `Runtimes/Allowance/`, `PoolStore` to `AllowanceStore`) are their own commit, with
 no behaviour change, so the review of what was removed is not buried in them.
 
 ## Complexity Tracking
@@ -235,9 +232,9 @@ These are for `/speckit-tasks`. They are not a second design.
 4. **Tracking without the pool.** Drop the `pool.isEffective` guards from `markRuntimeFailed`,
    `checkDueAllowances` and `measureAllowances`; walk `allowances` and located runtimes
    instead of `pool.entries`. Move the rate-limit streak onto the agent id.
-5. **The renames**, as one commit: `Pool/` to `Runtimes/Allowance/`, `PoolEntry` to
-   `RuntimePayment`, `PoolStore` to `AllowanceStore`, `DaemonCore+Pool` to
-   `DaemonCore+Allowances`. Then `payments.json` and its one-time move from `pool.json`.
+5. **The renames**, as one commit: `Pool/` to `Runtimes/Allowance/`, `PoolStore` to
+   `AllowanceStore`, `DaemonCore+Pool` to `DaemonCore+Allowances`. Then remove the credit
+   ledger, `Payment` and `PoolEntry`: a state is looked up by the agent's credential key.
 6. **The new API and the new rows**: `runtimes/allowances` and friends, the Agent Runtimes card
    lines, the phone's Runtimes list, the prompt bar notice without "instead".
 7. **The pool UI and the dead daemon code**, then the docs. Old transcript kinds stay

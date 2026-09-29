@@ -41,8 +41,8 @@ ago, since a later one is moved forward. No pool is set up.
 2. Wait for the heartbeat. `daemon.log` has `check for ‹runtime›: passed (mode …, model …)`, and
    the card says **Available**.
 3. Fail a fake runtime with an unrecognised error. Its card says it failed, with its next check.
-4. On a Gemini key, set prepaid credit with **Credit on this key…**, spend past it, and check
-   the card says **Credit used up** and no check is run for it.
+4. Have a fake Gemini refuse with Google's credit-used-up words. Its card says **Credit used
+   up · checking after ‹time›**; there is no Add credit anywhere.
 5. With an out runtime from before the update in `allowances.json`, relaunch: it is still out,
    with the same next check.
 
@@ -54,5 +54,5 @@ ago, since a later one is moved forward. No pool is set up.
    wait is cleared without starting a turn, and the standalone blocked-chat **Carry on** remains.
 3. On Mac, iPhone and iPad, confirm the Pool page, Pool settings, Continue with, Matching
    models and allowance-wait status are absent, and that Spending on the phone has Runtimes.
-4. Launch with a `pool.json` holding a Gemini prepaid key and a Claude sign-in. `payments.json`
-   has the Gemini entry only; a second launch does not make it again.
+4. Launch with an old `pool.json` and `allowances.json` on disk. The pool is not read; the
+   runtimes out in `allowances.json` are still out.

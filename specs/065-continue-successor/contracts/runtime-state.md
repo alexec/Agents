@@ -5,7 +5,7 @@ read before a chat starts. It is never enforced.
 
 ## The row
 
-One row per runtime the app locates, and one more for each key a runtime runs on. In
+One row per runtime the app locates. In
 **Settings ▸ Agent Runtimes** on the Mac it sits on the runtime's card. On the iPhone and iPad
 it is a row in **Spending ▸ Runtimes**.
 
@@ -16,10 +16,9 @@ it is a row in **Spending ▸ Runtimes**.
 | | **Out · reset ‹time› · checking after ‹time›** | Out, and the provider gave a time |
 | | **Out · checking after ‹time›** | Out, with no time from the provider |
 | | **Failed · checking after ‹time›** | A crash or unrecognised failure |
-| | **Credit used up** / **Credit expired** | A key on credit; comes back when the amount or date is changed, or Mark available |
+| | **Credit used up · checking after ‹time›** | The provider said the key's credit is used up |
 | Plan left | **28% left this week · resets Sun 20:39 · as of 14:02** | Only when the runtime reported one (Grok when asked, Claude during a turn) |
 | Action | **Mark available** | Only when it is out |
-| Action | **Credit on this key…** | Mac only, on a runtime that runs on a key (Gemini) |
 
 The words are `PoolWords`' existing sentences, less any that name the pool.
 
@@ -33,7 +32,6 @@ Unchanged from 47153fa7, for every runtime rather than only a pool's:
   mode option but no read-only mode is not checked, and fails.
 - A pass marks it available and raises `cost.allowance_back` with `how: check`.
 - A provider's reset time is shown. It never marks a runtime available by itself.
-- A key on credit is not checked. Its credit comes back when the person says so.
 
 ## The prompt bar
 
@@ -61,7 +59,6 @@ sent a message shows nothing.
 |---|---|---|---|
 | `runtimes/allowances` | none | `RuntimeAllowances` (rows as above) | Mac and paired devices |
 | `runtimes/markAvailable` | `credentialKey` | `RuntimeAllowances` | Mac and paired devices |
-| `runtimes/setPayment` | `RuntimePayment`, or `credentialKey` with no payment to remove it | `RuntimeAllowances`, or the sentence `PoolSettings.validate` gives today | Mac |
 | `pool/applyAllowances` | `[AllowanceState]` | changed: Bool | daemon to daemon, unchanged |
 | notification `runtimes/allowancesChanged` | `RuntimeAllowances` | | at most once a second |
 
