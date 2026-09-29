@@ -93,11 +93,11 @@ description: "Tasks for 064, Control runtime sandboxes"
 
 ## Phase 6: Polish
 
-- [ ] T035 [P] `docs/reference/runtimes.md`: the Sandbox rows of each runtime's table decided, and a "Command sandbox" section (routes, measured versions, why none)
-- [ ] T036 [P] `docs/reference/settings.md`: **Command sandbox** on each runtime's page
-- [ ] T037 [P] `docs/how-to/choose-runtime-model-mode.md`: the sandbox pill, and how it differs from the mode
-- [ ] T038 [P] `docs/how-to/answer-a-question.md`: the card and its access change
-- [ ] T039 `quickstart.md`: replace the probe steps with `scripts/sandbox-probe.sh`; record results
+- [X] T035 [P] `docs/reference/runtimes.md`: the Sandbox rows of each runtime's table decided, and a "Command sandbox" section (routes, measured versions, why none)
+- [X] T036 [P] `docs/reference/settings.md`: **Command sandbox** on each runtime's page
+- [X] T037 [P] `docs/how-to/choose-runtime-model-mode.md`: the sandbox pill, and how it differs from the mode
+- [X] T038 [P] `docs/how-to/answer-a-question.md`: the card and its access change
+- [X] T039 `quickstart.md`: replace the probe steps with `scripts/sandbox-probe.sh`; record results
 - [ ] T040 Full suite (compare failures with main before blaming the branch), both Xcode schemes, the Linux gate, `scripts/docs.sh check`
 - [ ] T041 Walk the built commit on a scratch Mac app: Settings, pill, a real failure (the scratch app's Claude with On inside an outer `sandbox-exec`, or the devbox), Continue without sandbox, keep stopped; screenshots in `look/`
 - [ ] T042 Clean up: stop scratch roots by pid, remove `~/agents-sbx-probe`, `/tmp/cx` and `/tmp/gm` on the devbox

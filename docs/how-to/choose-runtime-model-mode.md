@@ -29,19 +29,29 @@ running, and reads the meter that says how full its context is.
    - on the right, the model, and effort where the runtime has it.
 
    Click one and choose. A runtime that offers no choices, such as Cursor, shows none.
+
    Cursor and Grok also have no permission-mode capsule under the prompt: set **Default**
    or **Always-approve** for each in **Settings ▸ Agent Runtimes**. Cursor's **Agent**,
    **Plan** and **Ask** stay as they are; they are not that permission setting.
+
+   Beside the mode is the command sandbox, such as **Sandbox: runtime controlled** or
+   **Sandbox off**. It is the app's, not the runtime's list, and it is separate from the
+   mode: the mode says when the agent asks you, the sandbox says what its commands can
+   reach. Choose **Use runtime default** to follow **Settings ▸ Agent Runtimes**, or **On**
+   or **Off** for this agent only. For Codex, **Off** is **Full access** and turns its
+   approval prompts off too; the mode capsule changes with it. A runtime the app cannot
+   change shows its state only; hover over it for why.
 4. Type the prompt and send it. The agent starts with what you chose.
 
-   On iPhone and iPad, the start form has **Runtime**, **Mode**, **Model** and **Effort**
-   rows instead.
+   On iPhone and iPad, the start form has **Runtime**, **Sandbox**, **Mode**, **Model** and
+   **Effort** rows instead.
 
 **For an agent that is running**
 
 1. Open its conversation.
-2. Change the mode or model in the same capsules under the prompt. The change applies from
-   the agent's next step; the runtime itself cannot be changed. To carry the work on with
+2. Change the mode, model or sandbox in the same capsules under the prompt. A mode or model
+   change applies from the agent's next step, a sandbox change from its next turn, never
+   in the middle of a command; the runtime itself cannot be changed. To carry the work on with
    another runtime, start a new chat there and ask it to continue this one; see
    [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md).
 
@@ -65,3 +75,7 @@ A workflow sets the same choices in its file, with `runtime:`, `model:`, `effort
 - **The runtime I want is not in the menu.** It is not installed on this Mac, or on the
   server the project is on. See [Runtimes](../reference/runtimes.md).
 - **There is no ring.** The runtime does not say how big its context is.
+- **"Claude's sandbox could not start" (or another runtime's) over a new agent's prompt.** The runtime
+  cannot set up its sandbox on this computer or server. The prompt stays in the box;
+  **Start without sandbox** sends it again with this agent's sandbox off. See
+  [Answer a question or a permission request](answer-a-question.md).

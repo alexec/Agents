@@ -161,8 +161,8 @@ Each table lists what a person might want to change; the long tail of each runti
 debug, provider and terminal-only settings) is grouped into one row. In the last column,
 **Show** means the app offers it, **Set** means the app chooses the value for you, and
 **Leave alone** means the runtime's own default, or your own settings file, decides. Decided
-on 2026-09-29; what is not built yet says **planned**. Sandbox options are listed here and
-decided with the sandbox setting ([#40](https://github.com/alexec/Agents/issues/40)).
+on 2026-09-29; what is not built yet says **planned**. Sandbox options are decided with the
+**Command sandbox** setting; see [Command sandbox](#command-sandbox) below.
 
 #### Claude
 
@@ -186,7 +186,7 @@ setting below can be set by the app for one agent without touching `~/.claude`.
 | Keep credentials out of commands | `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` | off | Yes | Yes | Set on servers, planned: the relay's stand-in token stays out of shell commands |
 | Checkpoints | `fileCheckpointingEnabled` | on only when the client reports file changes; the app does not | Off | Off | Leave alone |
 | Compaction, output style, language, system prompt, hooks, MCP loading, subagents | settings, environment | its defaults | Yes | Server's own | Leave alone |
-| Sandbox and network | `sandbox.*` | off | Yes | Server's own | Sandbox (#40) |
+| Command sandbox | `_meta…options.sandbox.enabled` | off, unless your settings | Yes: On and Off measured | Yes; On needs bubblewrap and socat there | Show: **Command sandbox** |
 | Updates, status line, notifications, theme and other terminal settings | settings | — | No: pinned version, no terminal | — | Leave alone |
 
 #### Codex
@@ -208,7 +208,7 @@ every turn, so those in your config file only choose the first value, or nothing
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
 | Folder trust | `projects.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a project's own Codex config and hooks load | Yes | Leave alone |
 | Verbosity, compaction, subagent limits, profiles, instructions, MCP, hooks | config file | its defaults | Yes | Not read on a relayed server | Leave alone |
-| Sandbox and network | `sandbox_mode`, `sandbox_workspace_write.network_access` | from the mode: network off except **Full access** | The mode decides | — | Sandbox (#40) |
+| Sandbox and network | `sandbox_mode`, `sandbox_workspace_write.network_access` | from the mode: network off except **Full access** | The mode decides; measured | Yes; On needs user namespaces there | Show: **Command sandbox**, Off is **Full access** |
 | Updates, notifications and terminal settings | config file | — | No | — | Leave alone |
 
 #### Gemini
@@ -229,7 +229,7 @@ is the lowest of them, so yours always win over it.
 | Checkpoints | `general.checkpointing.enabled` | off | No: only its terminal writes them | — | Leave alone |
 | MCP, hooks, extensions, skills, `.env` files | settings | loaded | Yes | Server's own | Leave alone. A project `.env` can set Gemini's variables. |
 | Telemetry to your own collector | `telemetry.*`, `GEMINI_TELEMETRY_*` | off | Yes | Yes | Leave alone |
-| Sandbox | `--sandbox`, `tools.sandbox` | off | Not measured | — | Sandbox (#40) |
+| Sandbox | `GEMINI_SANDBOX`, above `--sandbox` and `tools.sandbox` | off | Off works; with it on, Gemini never answers the app | On needs Docker or Podman there | Show: **Command sandbox**, Off only |
 | Updates, output format, theme and other terminal settings | settings, flags | — | No | — | Leave alone |
 
 #### Antigravity
@@ -247,7 +247,7 @@ else is an option under the prompt, the tool list the app sends, or its environm
 | Project hooks | `.agents/hooks.json` in the project | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Set, planned: stop trusting, so it asks, once its question is measured to reach you as a card |
 | MCP, skills, rules | its home, the project | — | Yes | — | Leave alone |
 | Usage data, compaction, checkpoints, updates | none | — | — | — | Nothing to set |
-| Sandbox | business accounts only | off | — | — | Sandbox (#40) |
+| Sandbox | the admin's **Sandbox mode**, business accounts only | off | No lever | — | Leave alone: **No sandbox** |
 
 #### OpenCode
 
@@ -263,7 +263,7 @@ which reaches servers too. Settings your Mac's administrator manages win over bo
 | MCP timeout | `experimental.mcp_timeout` | 5 seconds | Yes | Yes | Measure: the app's tools that wait may be cut off |
 | Language servers, formatters | `lsp`, `formatter` | off | Yes | Yes | Leave alone |
 | Compaction, snapshots, instructions, skills, plugins, commands, providers, output limits | `opencode.json` | its defaults | Yes | Server's own, and the app's | Leave alone |
-| Leaving the project folder | `permission.external_directory` | asks | Yes | Yes | Sandbox (#40) |
+| Leaving the project folder | `permission.external_directory` | asks | Yes | Yes | Leave alone: a permission, not a sandbox; OpenCode has none |
 | Theme, keys and other terminal settings | `tui.json` | — | No | — | Leave alone |
 
 #### Grok
@@ -284,7 +284,7 @@ settings files there are the server's own.
 | Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |
 | Compaction, subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
 | Permission rules | `permission.*`, and Claude's own settings files | — | Yes, before the app is asked | Server's own | Leave alone |
-| Sandbox | `--sandbox` | off | Not with a leader | — | Sandbox (#40) |
+| Sandbox | `--sandbox`, before `agent stdio` | off | Yes: the whole process from its start, measured | Yes; Landlock | Show: **Command sandbox** |
 | `--tools`, `--disallowed-tools`, `--max-turns` | flags | — | No: headless only | — | Leave alone |
 | Theme, voice and other terminal settings | `ui.*` | — | No | — | Leave alone |
 
@@ -308,7 +308,7 @@ server's own.
 | Instructions, MCP, skills, plugins, hooks, custom agents | files and flags | loaded | Yes | Server's own | Leave alone |
 | Scheduled prompts, fleet, computer use | `/every`, `/after`, `/fleet`, `/computer` | offered | Offered as commands | — | Leave alone: commands you type |
 | Usage data | none documented | — | — | — | Nothing to set |
-| Folders and sandbox | `--add-dir`, `--allow-all-paths`, `sandbox.*` | this folder only | Not measured | — | Sandbox (#40) |
+| Folders and sandbox | `--add-dir`, `--allow-all-paths`, `--sandbox`, `--no-sandbox`, `sandbox.*` | this folder only; sandbox off | Not measured: its quota was spent | — | Leave alone: **Runtime controlled**, until measured |
 | Default mode, theme and other terminal settings | settings | — | No | — | Leave alone |
 
 #### Cursor
@@ -327,7 +327,35 @@ not set them.
 | Model shared with Terminal | — | — | A model picked in the app may become Cursor's default in Terminal too | — | Measure |
 | Permission rules, MCP, hooks, rules, skills | files | — | Yes | Server's own | Leave alone |
 | `--mode`, `--sandbox`, `--approve-mcps`, `--plugin-dir`, `--exclude-tools` | flags | — | No: not read by `acp` | — | Leave alone |
-| Sandbox | `sandbox.*` | off | Not by flag | — | Sandbox (#40) |
+| Sandbox | `sandbox.mode` | off | Only its own setting: `acp` does not read `--sandbox` | Server's own | Leave alone: **Runtime controlled** |
+
+## Command sandbox
+
+Most runtimes can run their commands inside a sandbox of their own, which limits what a
+command can write and, for some, what it can reach on the network. It is separate from the
+permission mode, which decides when the runtime asks you, and from the app's own folder and
+tool rules, which apply either way. **Settings ▸ Agent Runtimes** has a **Command sandbox**
+default for each runtime, and each agent has its own choice beside its mode; see
+[Settings](settings.md) and [Choose a runtime, model and mode](../how-to/choose-runtime-model-mode.md).
+
+Each choice the app offers was measured to take effect, on 2026-09-29, by
+`scripts/sandbox-probe.sh`: a real conversation, asked to write outside its project, on the
+version below. A runtime the app cannot reach offers no choice, and says why.
+
+| Runtime | Measured on | **On** | **Off** | Without a choice | When the sandbox cannot start |
+| --- | --- | --- | --- | --- | --- |
+| **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the project, asks before a new website | false | your settings decide: **Runtime controlled** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
+| **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the project, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
+| **Grok** | Grok 1.0.44 | `--sandbox workspace`: writes only in the project, temporary folders and `~/.grok` | `--sandbox off` | your config decides: **Runtime controlled** | Grok refuses to start. |
+| **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Runtime controlled** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
+| **Cursor** | 2026.09.26 | — | — | **Runtime controlled**: its own `sandbox.mode` | — |
+| **Copilot** | 1.0.89-5 | — | — | **Runtime controlled**; not measured yet | — |
+| **Antigravity** | 1.2.1 | — | — | **No sandbox**, unless a business account's admin turns **Sandbox mode** on | Never fails: it asks before each command instead. |
+| **OpenCode** | 1.18.33 | — | — | **No sandbox** | — |
+
+When a runtime's sandbox cannot start, the agent stops with a card saying so, and
+**Continue without sandbox** turns it off for that agent only. See
+[Answer a question or a permission request](../how-to/answer-a-question.md).
 
 ## See also
 

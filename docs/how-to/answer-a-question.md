@@ -70,6 +70,27 @@ no notification. Questions that are not permission to act still wait as above, i
 Grok's questions in words. Claude, Codex, Gemini, Antigravity and Copilot keep asking the
 way they always have.
 
+### When a runtime's sandbox could not start
+
+Some runtimes run commands in a sandbox of their own, and on some computers or servers
+that sandbox cannot be set up. When that happens the agent stops, says **Its sandbox could
+not start**, and puts a card in the conversation, such as **Claude's sandbox could not
+start**, with **Show error details** for the runtime's own words.
+
+- **Continue without sandbox** turns that runtime's sandbox off for this agent only, and
+  carries on: your prompt is sent again, or, if some commands already ran, the agent is
+  asked to carry on rather than start over. The card says which before you choose. For
+  Codex it means **Full access**, so its approval prompts are off too. The app's own
+  folder and tool rules still apply.
+- **Keep stopped** leaves the agent stopped. Nothing is ever retried without the sandbox
+  until you choose it.
+
+Where the app cannot turn a runtime's sandbox off, the card says so and has no **Continue**.
+The same card, and the same choice, are on iPhone and iPad. A command refused *inside* a
+working sandbox, such as a write outside the project, is an ordinary failed command and
+brings no card. Gemini that never answers when it starts gets the card too: its own
+sandbox, turned on in its settings, stops it answering the app.
+
 ## If it doesn't work
 
 - **The card is gone but the agent is not working.** It stopped, or the app restarted,
