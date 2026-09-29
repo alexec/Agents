@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-25
 
-**Status**: Draft
+**Status**: Draft (resumed 2026-09-28; servers revised, see Session 2026-09-28)
 
 **Input**: User description: "Add OpenCode (sst/opencode) as a built-in runtime."
 
@@ -38,7 +38,12 @@ installs it itself on both, and the `opencode` it starts is always its own.
 
 - Q: How should the app install OpenCode on the Mac? → A: The app's own pinned copy of the release program, in the app's folder, checked against GitHub's SHA-256 digest. OpenCode's install script is not used, and an `opencode` of the person's own is never used.
 - Q: Should OpenCode be offered on servers (043) in this spec? → A: Yes, lending one provider's key per run.
-- Q: Which key should a server's OpenCode agent be lent? → A: A provider and key of OpenCode's own in Settings ▸ Runtime credentials, not Claude's Anthropic key reused.
+- Q: Which key should a server's OpenCode agent be lent? → A: A provider and key of OpenCode's own in Settings ▸ Runtime credentials, not Claude's Anthropic key reused. *(Superseded 2026-09-28, below.)*
+
+### Session 2026-09-28
+
+- Q: Since 056 and the Codex key's removal lend servers the Mac's own sign-in, how should OpenCode reach servers? → A: Lend the Mac's OpenCode sign-in. D7's pasted provider key is withdrawn: no OpenCode entry in Settings ▸ Runtime credentials. A server run gets the Mac's `auth.json` in `OPENCODE_AUTH_CONTENT` for that run, never written to the server's disk (research R7). This reverses the old FR-023, which forbade lending `auth.json`.
+- Probe (research.md): a fresh OpenCode works signed out with OpenCode Zen's free models; inline config removes `task` and `todowrite` with no residue; OpenCode asks for nothing by default, so the app passes permission rules for the agent's mode.
 
 ## The name trap *(the reason this spec exists as more than one catalog line)*
 
@@ -83,14 +88,15 @@ and each is marked *(default Dn)* where it is used.
   used, changed or removed, even when it is on the PATH. *(Settled by Alex, 2026-09-25, over
   running OpenCode's own install script.)*
 - **D2. On the Mac and on servers.** Servers get OpenCode the way 043 gives them Claude: the
-  pinned Linux program installed on demand, and a credential from the Mac's Settings lent to
+  pinned Linux program installed on demand, and the Mac's sign-in lent to
   each run and never written to the server's disk. *(Settled by Alex, 2026-09-25.)*
-- **D7. A server's credential is one provider and its key.** Settings ▸ Runtime credentials
-  gains an OpenCode entry. The person picks one of OpenCode's providers (for example Anthropic,
-  OpenAI, OpenRouter or OpenCode Zen) and pastes that provider's key. The app checks it with the
-  provider on save and keeps it only in the Mac's Keychain. On a server, OpenCode agents are
-  lent that key for that run, and offer that provider's models. Claude's Anthropic key (043) is
-  not reused for OpenCode. *(Settled by Alex, 2026-09-25.)*
+- **D7. A server borrows the Mac's OpenCode sign-in.** Each OpenCode run on a server is given
+  the providers OpenCode is signed in to on the Mac, in `OPENCODE_AUTH_CONTENT` for that run
+  only, never written to the server's disk. There is no OpenCode entry in Settings ▸ Runtime
+  credentials. Until a rotating sign-in (a ChatGPT or Copilot account) is measured, only
+  entries that do not rotate (provider keys) are lent, and the sheet names the ones that are
+  not *(default)*. The Zen free models need nothing lent. *(Revised by Alex, 2026-09-28, over
+  the pasted key he settled on 2026-09-25.)*
 - **D3. On the Mac, OpenCode's own sign-in, left where it is.** An agent on the Mac uses
   whatever providers OpenCode is signed in to in the person's home
   (`~/.local/share/opencode/auth.json`). That sign-in is shared with any OpenCode of the
@@ -233,30 +239,29 @@ resource and to ask a question. Each arrives in the app as it does for Claude.
 
 ### User Story 5 - OpenCode on servers (Priority: P3)
 
-The person has a bare Linux server added as in 043, and an OpenCode credential in Settings:
-a provider they picked, and its key. When they start an OpenCode agent in a project on that
-server, the server installs OpenCode's pinned Linux program the first time, with its progress in
-the set-up checklist. The agent then signs in with the key lent from the Mac, and offers that
-provider's models. The key is never written to the server's disk. The Mac's own OpenCode agents
-keep using OpenCode's own sign-in.
+The person has a bare Linux server added as in 043, and OpenCode on the Mac, signed in or not.
+When they start an OpenCode agent in a project on that server, the server installs OpenCode's
+pinned Linux program the first time, with its progress in the set-up checklist. The agent is
+then lent the providers OpenCode is signed in to on the Mac, for that run, and offers their
+models beside OpenCode Zen's free ones. Nothing of the Mac's sign-in is written to the server's
+disk. There is nothing to set up in Settings *(D7)*.
 
 **Why this priority**: It extends 043 to OpenCode. That matters for the ephemeral servers 043
 is about, but the Mac comes first.
 
-**Independent Test**: With an OpenCode credential (say OpenRouter and its key) in Settings, and a
-Linux server with nothing on it, start an OpenCode agent in a server project and ask it to run
-`uname -a`. The reply comes back from an OpenRouter model. Afterwards, a search of the server's
-disk finds the key nowhere.
+**Independent Test**: With OpenCode on the Mac signed in to one provider by key, and a Linux
+server with nothing on it, start an OpenCode agent in a server project, pick that provider's
+model, and ask it to run `uname -a`. The reply comes back from that model. Afterwards, a search
+of the server's disk finds neither the key nor an `auth.json` of the Mac's.
 
 **Acceptance Scenarios**:
 
-1. **Given** Settings' runtime credentials, **When** the person opens them, **Then** OpenCode is listed beside the others, with a choice of provider, where to get that provider's key, a note that server turns are billed to that provider's account, and a field to paste the key *(D7)*.
-2. **Given** a provider and a pasted key, **When** it is saved, **Then** the app checks the key with that provider, says in words whether it works, and keeps it only in the Mac's Keychain, shown masked afterwards *(D7)*.
-3. **Given** a server without OpenCode, **When** OpenCode is first needed there, **Then** the server installs the pinned Linux program for its architecture and C library, checks it against the app's checksum, and shows its progress. A failed install names its cause and leaves nothing half-installed *(D2, default D5)*.
-4. **Given** an OpenCode agent starting on a server, **When** it signs in, **Then** the key reaches that run only. It is not written to the server's disk, any log or any transcript, and it is not sent to a server for any other runtime.
-5. **Given** an OpenCode agent on a server, **When** the person opens its model menu, **Then** it lists the lent provider's models, and any the server's own OpenCode sign-in adds.
-6. **Given** a server marked "use this server's own sign-in only" (043), **When** an OpenCode agent starts there, **Then** no key is sent, and OpenCode's own sign-in on the server is used.
-7. **Given** no OpenCode credential in Settings and no sign-in on the server, **When** the person starts an OpenCode agent there, **Then** the app asks for a provider and key in place before starting. It never copies the Mac's `auth.json`.
+1. **Given** a server without OpenCode, **When** OpenCode is first needed there, **Then** the server installs the pinned Linux program for its architecture and C library, checks it against the app's checksum, and shows its progress. A failed install names its cause and leaves nothing half-installed *(D2, default D5)*.
+2. **Given** an OpenCode agent starting on a server, **When** it starts, **Then** the Mac's lendable OpenCode sign-ins reach that run only, in its environment. They are not written to the server's disk, any log or any transcript, and are not sent for any other runtime *(D7)*.
+3. **Given** an OpenCode agent on a server, **When** the person opens its model menu, **Then** it lists OpenCode Zen's free models, the lent providers' models, and any the server's own OpenCode sign-in adds.
+4. **Given** a server marked "use this server's own sign-in only" (043), **When** an OpenCode agent starts there, **Then** nothing is lent, and OpenCode's own sign-in on the server is used.
+5. **Given** a Mac sign-in that is not lent (a rotating account sign-in), **When** an OpenCode agent starts on a server, **Then** its provider's models are not offered there, and the sign-in sheet says which sign-ins stay on the Mac and why *(D7 default)*.
+6. **Given** a lent key the provider refuses, **When** a turn uses it, **Then** the turn ends saying the provider refused the Mac's sign-in, and names `opencode auth login` on the Mac to fix it.
 
 ---
 
@@ -306,7 +311,7 @@ installed there (User Story 5).
 - **FR-011**: A turn refused because a provider is not signed in (ACP's "authentication required") MUST end with a sentence saying OpenCode needs signing in, naming the provider when OpenCode names it, with a way to open the sign-in sheet. It MUST NOT fail silently or wait forever.
 - **FR-012**: The sign-in sheet MUST offer the app's copy's `auth login` as a terminal step, with **Open Terminal** and **Copy**. It MUST NOT offer an in-app sign-in or sign-out that OpenCode cannot carry out over ACP.
 - **FR-013**: The app MUST NOT report OpenCode as signed in on the strength of OpenCode's ACP `authenticate` answer alone.
-- **FR-014**: On the Mac, the app MUST NOT keep a copy of OpenCode's sign-in, and MUST NOT add or remove provider keys in an OpenCode agent's environment. The server credential MUST NOT be sent to agents on the Mac *(default D3)*.
+- **FR-014**: On the Mac, the app MUST NOT keep a copy of OpenCode's sign-in, and MUST NOT add or remove provider keys in an OpenCode agent's environment. The app MUST NOT pass `OPENCODE_AUTH_CONTENT` to agents on the Mac *(default D3)*.
 
 **The app's tools and scoping**
 
@@ -318,11 +323,11 @@ installed there (User Story 5).
 
 **OpenCode on servers**
 
-- **FR-020**: Settings' runtime credentials MUST list OpenCode, take one provider from OpenCode's list and that provider's key, with a note that server turns are billed to that provider. The app MUST check the key with that provider on save, say in words whether it works, keep it only in the Mac's Keychain, and show it masked afterwards *(D7)*.
+- **FR-020**: Settings' runtime credentials MUST NOT gain an OpenCode entry. A server's OpenCode MUST be lent the Mac's own OpenCode sign-in instead *(D7)*.
 - **FR-021**: A server MUST install OpenCode's pinned Linux program on demand, from OpenCode's GitHub releases, for the server's architecture and C library (glibc or musl), checked against the checksum the app carries, with progress in the set-up checklist. An incomplete install MUST never be used *(D2, default D5)*.
-- **FR-022**: The OpenCode key MUST reach a server only as part of starting OpenCode there, for that run. It MUST NOT be written to the server's disk, any log, transcript or crash report, or sent for any other runtime.
-- **FR-023**: The Mac's OpenCode sign-in (`auth.json`) MUST NOT be copied, lent or sent to any server.
-- **FR-024**: 043's rules for servers MUST hold for OpenCode as they do for Claude: a server's "own sign-in only" mark, asking for the credential in place when none is usable, a refused key shown as its own failure, and a rebuilt server set up again on confirmation.
+- **FR-022**: The Mac's OpenCode sign-in MUST reach a server only as part of starting OpenCode there, for that run, in the run's environment (`OPENCODE_AUTH_CONTENT`). It MUST NOT be written to the server's disk, any log, transcript or crash report, or sent for any other runtime.
+- **FR-023**: Only sign-ins that do not rotate (provider keys) MUST be lent until a rotating one is measured not to break the Mac's copy. The app MUST NOT otherwise change the Mac's `auth.json` *(D7 default)*.
+- **FR-024**: 043's rules for servers MUST hold for OpenCode as they do for Claude: a server's "own sign-in only" mark, a refused key shown as its own failure, and a rebuilt server set up again on confirmation.
 
 **Failures**
 
@@ -333,8 +338,7 @@ installed there (User Story 5).
 - **OpenCode runtime**: an entry in the app's runtime list: its name, how it is started (the app's own copy, `acp`), how it is installed (a pinned release program, from the set-up page), and what it says about itself when it starts.
 - **OpenCode toolset**: the pinned release program for one platform (macOS arm64 or x64 or x64-baseline; Linux x64 or arm64, glibc or musl, with x64-baseline builds), with its version and SHA-256. On the Mac it is installed from the set-up page into the app's own folder. On a server it is one of 043's installed tools, beside Claude's, replaced as a whole.
 - **OpenCode tool policy**: which of OpenCode's tools are removed for the app's agents, which remain as residue and why, the per-agent settings the app passes (self-update off, sharing off), and how its questions reach the person.
-- **OpenCode server credential**: one provider id and that provider's key, for servers only, kept in the Mac's Keychain, masked when shown, with when it was added and when it last worked. This is 043's runtime credential, gaining a kind that names its provider.
-- **OpenCode sign-in (Mac)**: OpenCode's own list of signed-in providers in the person's home, read by OpenCode and never copied by the app.
+- **OpenCode sign-in (Mac)**: OpenCode's own list of signed-in providers in the person's home. On the Mac, read by OpenCode itself. For a server run, the app reads it and lends its non-rotating entries in that run's environment, and never changes it.
 
 ## Success Criteria *(mandatory)*
 
@@ -344,16 +348,15 @@ installed there (User Story 5).
 - **SC-002**: With OpenCode installed and signed in, an OpenCode start reaches its first reply no more than 5 seconds later than a Claude start on the same Mac, using the same underlying model where possible.
 - **SC-003**: With the archived Go `opencode`, or any other program of that name, first on the PATH, 10 of 10 OpenCode starts run the app's copy, and that other program is never run.
 - **SC-004**: Every failure in the edge cases above shows as a sentence naming its cause. None shows as an endless wait or as "stopped answering".
-- **SC-005**: After a day of OpenCode agents in the app, the person's `~/.config/opencode` and `~/.local/share/opencode/auth.json` are byte for byte what they were before, and no conversation has been shared.
-- **SC-006**: From a bare Linux server, a person with an OpenCode credential in Settings gets an OpenCode agent's first reply within 5 minutes, having run no command on the server. Afterwards, a search of the server's disk and the Mac's logs finds the key in neither, and finds no `auth.json` of the Mac's on the server.
+- **SC-005**: After a day of OpenCode agents in the app, the app has written nothing to the person's `~/.config/opencode` or `~/.local/share/opencode` (OpenCode's own first-run files aside, research R4), `auth.json` is byte for byte what it was, and no conversation has been shared.
+- **SC-006**: From a bare Linux server, a person with OpenCode signed in on the Mac gets an OpenCode agent's first reply within 5 minutes, having run no command on the server. Afterwards, a search of the server's disk and the Mac's logs finds the key in neither, and finds no `auth.json` of the Mac's on the server.
 - **SC-007**: An OpenCode agent's turns end with the app's outcome report in at least 9 of 10 turns, as measured for the other runtimes that have the app's tools.
 
 ## Docs *(mandatory)*
 
 - `docs/reference/runtimes.md` — change: the runtime count, plus an OpenCode row: installed by the app from the set-up page, only the app's copy is used, pictures, sign-in through `opencode auth login`, modes are OpenCode's agents, models from every signed-in provider, app tools, residue, and why an `opencode` already on the PATH is ignored.
 - `docs/how-to/sign-a-runtime-in.md` — change: name OpenCode, and describe `auth login` and its providers.
-- `docs/how-to/add-a-linux-server.md` — change: OpenCode installs on a server as Claude does, it takes one provider and key from Settings, and why the Mac's OpenCode sign-in stays on the Mac.
-- `docs/reference/settings.md` — change: the runtime credentials entry lists OpenCode's provider and key.
+- `docs/how-to/add-a-linux-server.md` — change: OpenCode installs on a server as Claude does, and borrows the Mac's OpenCode sign-in per run; which sign-ins stay on the Mac.
 - `docs/explanation/scoped-tools.md` — change: add OpenCode's removed tools, its residue, and why sharing is off.
 
 ## Assumptions
@@ -379,9 +382,8 @@ installed there (User Story 5).
   - Which tool ids `tools` and `permission` in inline config can remove (`task`, `todowrite`, the plan tools), and whether any come back through a custom agent.
   - Whether `autoupdate: false` in inline config is enough to stop self-update under ACP, and whether a self-update would try to replace the app's copy.
   - Whether the macOS release program is signed and notarised, so it runs without a Gatekeeper prompt when the app downloads it.
-  - How a server key reaches OpenCode for one run: the provider's usual environment variable (for example `OPENROUTER_API_KEY`), or inline config, for every provider the credential offers. The plan narrows the Settings list to providers that can be lent this way.
-  - How the app checks a key "with that provider" on save, for each provider it offers.
+  - How a sign-in reaches OpenCode for one run: answered 2026-09-28, `OPENCODE_AUTH_CONTENT` (research R7).
 - **Builds on 048** (the set-up page and the Mac toolset install, merged `ee64697`). OpenCode is a pinned toolset like Claude's, but a single program with no Node. The row, progress, failure sentences and "offered once" rule are 048's.
-- **Builds on 043** (runtime credentials, server toolsets, "own sign-in only"), which is merged. It extends 043's D3 "Claude first" to OpenCode, as 046 and 047 do for Gemini and Codex. The credential gains a provider field, which the others do not need.
-- **Beside 046 and 047.** All three add a runtime, a policy entry, a toolset, a credential and docs rows. Whichever merges last takes the others' rows, and the runtime count in the docs is written from the catalog at that point.
+- **Builds on 043** (runtime credentials, server toolsets, "own sign-in only"), which is merged. It extends 043's D3 "Claude first" to OpenCode, as 046 and 047 do for Gemini and Codex., lending the Mac's own sign-in as 056 does for Claude.
+- **Beside 046 and 047.** All three add a runtime, a policy entry, a toolset and docs rows. Whichever merges last takes the others' rows, and the runtime count in the docs is written from the catalog at that point.
 - **The phone and iPad** start OpenCode agents through the Mac. Nothing OpenCode-specific runs on them.
