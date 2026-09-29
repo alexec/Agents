@@ -26,8 +26,8 @@ struct TranscriptRow: View {
     }
 }
 
-/// One turn: the ask, and then its last block — or every block, or every block with
-/// what each tool call was given and gave back.
+/// One turn: the ask, answers, and latest work — or every block, with optional
+/// tool detail.
 ///
 /// A block is a tool call, drawn as the description the agent gave it, or something the
 /// agent said. Clicking any block of a turn moves it on to the next of the three.
@@ -45,7 +45,7 @@ struct TurnView: View {
 
         var help: String {
             switch next {
-            case .concise: return "Show only the last step"
+            case .concise: return "Show the latest step and its context"
             case .normal: return "Show every step of this turn"
             case .verbose: return "Show what each tool was given and gave back"
             }
@@ -59,7 +59,7 @@ struct TurnView: View {
     let toggle: () -> Void
 
     private var blocks: [TranscriptItem] {
-        turn.blocks.isEmpty ? (fetched ?? []).filter(\.isBlock) : turn.blocks
+        turn.blocks.isEmpty ? (fetched ?? []).filter { $0.isBlock || $0.isUserInput } : turn.blocks
     }
 
     var body: some View {
@@ -68,12 +68,18 @@ struct TurnView: View {
                 TranscriptRow(item: ask)
             }
             if detail == .concise {
-                if let last = turn.last { block(last) }
+                ForEach(turn.concise) { item in
+                    if item.isUserInput { TranscriptRow(item: item) }
+                    else { block(item) }
+                }
             } else {
                 if blocks.isEmpty, fetched == nil, turn.range != nil {
                     ProgressView().controlSize(.small)
                 }
-                ForEach(blocks) { block($0) }
+                ForEach(blocks) { item in
+                    if item.isUserInput { TranscriptRow(item: item) }
+                    else { block(item) }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
