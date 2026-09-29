@@ -49,7 +49,19 @@ struct RuntimeAccountView: View {
     }
 
     private static func names(_ providers: [String]) -> String {
-        providers.formatted(.list(type: .and))
+        providers.map(providerName).formatted(.list(type: .and))
+    }
+
+    /// How a provider is named, from the id its sign-in file keys it by: the name OpenCode's
+    /// own model menu shows for the common ones, else the id with its first letter raised.
+    static func providerName(_ id: String) -> String {
+        let known = ["anthropic": "Anthropic", "openai": "OpenAI", "github-copilot": "GitHub Copilot",
+                     "google": "Google", "groq": "Groq", "openrouter": "OpenRouter", "xai": "xAI",
+                     "mistral": "Mistral", "deepseek": "DeepSeek", "opencode": "OpenCode Zen",
+                     "amazon-bedrock": "Amazon Bedrock", "azure": "Azure", "vercel": "Vercel"]
+        if let name = known[id] { return name }
+        let words = id.replacingOccurrences(of: "-", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
     }
 
     var body: some View {

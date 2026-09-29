@@ -86,3 +86,27 @@ tar's own words; `ToolsetInstaller.refusal` does not check for `xz`.
 
 Not walked: a turn that a lent provider answers (no real key on this Mac), a musl server, and the
 install progress line in Settings ▸ Servers on screen.
+
+# Walk: the window (T017, T022, T027, T034 looks), 2026-09-29
+
+The same scratch root `/tmp/run-oc7`, on screen, by AX by pid with you away. Screenshots in `screens/`.
+
+| Look | What it shows |
+|---|---|
+| `setup-sheet.png` | Install your agents: OpenCode ticked, its path the root's own `tools/opencode/current/bin/opencode` |
+| `settings-opencode.png` | Settings ▸ Agent Runtimes ▸ OpenCode: the path, "OpenCode permission mode: Default", "Asks before OpenCode does something that needs permission.", Allowance: Available |
+| `settings-servers.png` | "OpenCode: ready (installed by Agents) · borrows this Mac's sign-in (1 provider)" |
+| `server-chat-zen.png` | a server OpenCode chat: the answer, mode `build`, model "OpenCode Zen/Big Pickle", the meter "Not measured" (no "$0") |
+| `server-model-menu.png` | the lent run's menu: Anthropic (lent), Groq (the server's own), OpenCode Zen; no OpenAI |
+| `signin-sheet.png` | "Login with opencode", the `auth logout` line with the app's own path, and "Servers borrow this Mac's Anthropic key for each run, and keep nothing. OpenAI stays on this Mac: …" |
+
+Fixed from the looks: the sheet named providers by their ids ("anthropic"), now by name; the
+Servers footer now says OpenCode borrows this Mac's provider keys.
+
+Seen, not fixed here:
+- `server-chat-refused.png`: the refused-key sentence is on the record but the chat does not show
+  it, and the row has no line under it. The concise chat hides runtime notes at a turn's end (065's
+  open item), so a stopped turn just ends after the prompt.
+- Settings ▸ Servers says "Setting up 127.0.0.1 failed: tar …" for Codex's failed install, not
+  naming Codex, which reads as the whole server failing (043/046 wording; the devbox has no `xz`).
+- A server chat's model menu has no "Sign in, sign out, providers…"; the Mac chat's chooser does.

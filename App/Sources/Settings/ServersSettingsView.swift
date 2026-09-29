@@ -34,7 +34,7 @@ struct ServersSettingsView: View {
             } header: {
                 Text("Servers")
             } footer: {
-                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port. Claude and Codex on a server use this Mac’s own sign-ins, through this Mac; nothing of them is written on a server.")
+                Text("Servers are reached with your own ssh setup. Nothing on them listens on a network port. Claude and Codex on a server use this Mac’s own sign-ins, through this Mac, and OpenCode borrows this Mac’s provider keys for each run; nothing of them is written on a server.")
             }
             .paperListRow()
         }
