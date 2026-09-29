@@ -1,5 +1,8 @@
 # Runtime sandbox controls — wireframes
 
+**Superseded on the Mac by the built look, approved by Alex on 2026-09-29: [look/look.md](look/look.md).** It differs from the frames below in three ways: the default is a **Command sandbox** section on each runtime's own Settings page; one agent's choice is a pill beside the mode under the prompt, for a new chat and a running agent alike (066 has no separate start form); and a runtime with no route shows its state and why instead of a menu. The phone frames below still describe the Remote: the same pill in its start form and prompt bar, and the same card.
+
+
 These show the control and wording, not a new destination. A runtime default lives on its existing page in **Settings ▸ Agent Runtimes**. One agent's override lives with that agent's existing mode and model controls. The effective state is visible in the conversation on Mac and phone.
 
 ## Mac: runtime default
