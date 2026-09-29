@@ -431,6 +431,7 @@ extension DaemonCore {
 
     /// What a runtime that would not make a session is said to have done.
     private func startFailure(_ error: Error, runtime: Runtime, runtimeID: String) -> Error {
+        runtimeFailed(runtimeID: runtimeID)
         // Not a fault. The runtime is there and needs signing in, which is
         // something the app can show and offer to fix.
         if let why = Self.signInReason(error) {
@@ -883,8 +884,14 @@ extension DaemonCore {
         // Before the runtime starts, since Codex reads its plugins as it does (054, R12).
         await syncCodexPlugins(before: agent.runtimeID)
         linkGeminiProjectPlugins(runtimeID: agent.runtimeID, cwd: agent.cwd)
-        let session = try LentEnvironment.$value.withValue(lent) {
-            try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+        let session: ACPSession
+        do {
+            session = try LentEnvironment.$value.withValue(lent) {
+                try launcher.launch(runtime: runtime, path: path, cwd: agent.cwd)
+            }
+        } catch {
+            runtimeFailed(agentID: agent.id)
+            throw error
         }
         await hearAuthStatus(from: session, runtimeID: runtime.id)
         do {
@@ -894,6 +901,7 @@ extension DaemonCore {
             // left behind here is a runtime nobody will ever end.
             dropAppTokens(for: agent.id)
             await session.end(gracePeriod: .seconds(1))
+            runtimeFailed(agentID: agent.id)
             // The same refusal a new agent gets, with the ways to sign in, so a window
             // shows the sign-in rather than the protocol's error. Said to every window
             // too: a queued prompt or a pick-up has nobody waiting on the answer.
@@ -1158,6 +1166,9 @@ extension DaemonCore {
             await allowanceWorked(agentID: agentID)
         } else {
             retrying = await applyRecognition(recognition, agentID: agentID, reason: &reason)
+            if reason == .runtimeError || reason == .processDied {
+                runtimeFailed(agentID: agentID)
+            }
         }
         _ = retrying
         if crossedItsLimit {
@@ -1331,6 +1342,8 @@ extension DaemonCore {
            await applyRecognition(limit, agentID: agentID, reason: &limitReason) || limitReason != .refusal {
             ending = .turnEnded(limitReason)
         }
+        if case .none = limit { runtimeFailed(agentID: agentID) }
+        if case .otherTyped = limit { runtimeFailed(agentID: agentID) }
         await move(agentID, on: ending)
         await releaseRuntime(for: agentID)
         // Its allowance ran out and the pool has somewhere else to go (052).

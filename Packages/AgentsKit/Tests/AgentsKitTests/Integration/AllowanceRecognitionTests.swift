@@ -50,7 +50,7 @@ struct AllowanceRecognitionTests {
         let state = try #require(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" })
         #expect(state.isOut)
         #expect(state.returnsAt == Date(timeIntervalSince1970: 1_790_000_000))
-        #expect(try await notes(core, id).contains { $0.hasPrefix("Claude’s allowance ran out, until") })
+        #expect(try await notes(core, id).contains { $0.hasPrefix("Claude’s allowance ran out. Its provider says it resets at") })
         // Written where the daemon keeps it, so a restart remembers.
         #expect(PoolStore(locations: locations).loadAllowances().contains { $0.isOut })
     }
@@ -70,7 +70,7 @@ struct AllowanceRecognitionTests {
         var pacific = Calendar(identifier: .gregorian)
         pacific.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
         #expect(pacific.component(.hour, from: back) == 0)
-        #expect(try await notes(core, id).contains { $0.hasPrefix("Gemini’s allowance ran out, until") })
+        #expect(try await notes(core, id).contains { $0.hasPrefix("Gemini’s allowance ran out. Its provider says it resets at") })
     }
 
     @Test func aRateLimitIsRetriedOnTheSameRuntimeAndThenWorks() async throws {
@@ -119,7 +119,7 @@ struct AllowanceRecognitionTests {
         #expect(try await notes(core, id).contains { $0.contains("started using paid extra usage") })
     }
 
-    @Test func anUnrecognisedRefusalIsWhatItWasBefore() async throws {
+    @Test func anUnrecognisedRefusalWithNoPoolIsWhatItWasBefore() async throws {
         var script = FakeACPAgent.Script()
         script.promptError = JSONRPCError(code: -32603, message: "Internal error")
         let (core, work, _) = try core(script)
@@ -127,7 +127,29 @@ struct AllowanceRecognitionTests {
         await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
         #expect(await core.agent(id)?.endedReason == .processDied)
         #expect(try await notes(core, id).contains("Claude stopped answering."))
+        // Nothing would ever check it outside a pool, so it is not put out.
         #expect(await core.allowanceStates().allSatisfy { !$0.isOut })
+    }
+
+    @Test func anUnrecognisedRefusalStopsTheTurnAndTakesItOutOfThePool() async throws {
+        var script = FakeACPAgent.Script()
+        script.promptError = JSONRPCError(code: -32603, message: "Internal error")
+        let (core, work, _) = try core(script)
+        _ = try await core.setPool(PoolSettings(isOn: true, entries: [
+            PoolEntry(runtimeID: "claude", payment: .allowance(label: nil)),
+            PoolEntry(runtimeID: "codex", payment: .allowance(label: nil)),
+        ]))
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn ended") { await core.agent(id)?.endedReason != nil }
+        #expect(await core.agent(id)?.endedReason == .processDied)
+        #expect(try await notes(core, id).contains("Claude stopped answering."))
+        // Not a spent allowance, but out all the same until a check or a turn works.
+        await eventually("it left the pool") {
+            await core.allowanceStates().contains { $0.credentialKey == "claude:sign-in" && $0.isOut }
+        }
+        let state = try #require(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" })
+        guard case .out(nil, _?, .runtimeFailed) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(await core.eventLog.events.contains { $0.name == "cost.allowance_out" && $0.details["reason"] == "runtime failed" })
     }
 
     @Test func aKeysCreditGoneIsOutAndStaysOut() async throws {

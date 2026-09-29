@@ -154,6 +154,29 @@ extension DaemonCore {
         if before.isOut, !state.isOut { raiseAllowanceBack(entry, how: "worked") }
     }
 
+    /// A failed runtime leaves the pool even when the failure was not a quota error.
+    /// A recognised spent allowance already has its more specific out state.
+    func runtimeFailed(agentID: UUID) {
+        guard let agent = agents[agentID] else { return }
+        markRuntimeFailed(poolEntry(for: agent))
+    }
+
+    func runtimeFailed(runtimeID: String) {
+        guard let entry = pool.entries.first(where: { $0.runtimeID == runtimeID }) else { return }
+        markRuntimeFailed(entry)
+    }
+
+    /// Only in a pool that is on: outside one nothing checks it, so it would stay out.
+    private func markRuntimeFailed(_ entry: PoolEntry) {
+        let key = AllowanceState.credentialKey(for: entry)
+        guard pool.isEffective,
+              pool.entries.contains(where: { AllowanceState.credentialKey(for: $0) == key }) else { return }
+        var state = allowanceState(for: entry)
+        guard state.markFailed(now: now()) else { return }
+        setAllowanceState(state)
+        raiseAllowanceOut(entry, state: state, reason: "runtime failed")
+    }
+
     /// What this agent spent since its turn began, from what it had banked then.
     private func spentThisTurn(agentID: UUID) -> Cost? {
         guard let agent = agents[agentID], let before = lastPrompts[agentID]?.costBefore else { return nil }
@@ -218,8 +241,8 @@ extension DaemonCore {
                 await record(.runtimeNote(PoolWords.ranOut(current.runtimeID, state: state, now: at)), for: agentID)
             }
             if case .everyoneOut = decision {
-                // Wait for the first that said when it is back, the chat's own included,
-                // and carry on then (US4). Only with words to send again: a chat that ran
+                // Wait for the first check, the chat's own runtime included, and carry on
+                // once one passes (US4). Only with words to send again: a chat that ran
                 // out without being refused has nothing to wait to say.
                 if pending.resend, let prompt = lastPrompts[agentID],
                    let back = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
@@ -237,6 +260,7 @@ extension DaemonCore {
         case .overage: "it started using paid extra usage"
         case .creditUsedUp: "its credit was used up"
         case .rateLimitPersisted: "it stayed rate limited"
+        case .runtimeFailed: "it failed"
         case .everyoneOutResumed: "every runtime was out, and this one is back"
         default: "its allowance ran out"
         }
@@ -302,7 +326,7 @@ extension DaemonCore {
                                   reason: switchReason, carried: carry.rows, dropped: carry.dropped,
                                   shortened: handoff.leftOut, billing: entry.payment,
                                   fromReturnsAt: switchReason == .byHand ? nil
-                                      : allowances[AllowanceState.credentialKey(for: current)]?.returnsAt)
+                                      : allowances[AllowanceState.credentialKey(for: current)]?.knownReturn)
 
         // Everything awaited first, then the record read fresh and written back with no
         // await between, so a prompt queued meanwhile is not written over.
@@ -557,6 +581,24 @@ extension DaemonCore {
         let due = agents.values.filter { $0.allowanceWait?.isDue(now: at) == true && $0.state != .archived }
         for agent in due {
             guard let wait = agent.allowanceWait else { continue }
+            let waitedEntry = pool.entry(wait.entryID)
+                ?? (wait.runtimeID == agent.runtimeID ? poolEntry(for: agent) : nil)
+            let waitKey = waitedEntry.map { AllowanceState.credentialKey(for: $0) }
+            if let waitKey, allowanceChecks.contains(waitKey) { continue }
+            let current = poolEntry(for: agent)
+            let states = settledStates(at: at)
+            if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) != true,
+               case .everyoneOut = PoolPlan.next(current: current, pool: pool, switchingOff: false,
+                                                  states: states, tried: [],
+                                                  unusable: { self.unusable($0) }, now: at),
+               let next = PoolPlan.earliestReturn(current: current, pool: pool, states: states,
+                                                  unusable: { self.unusable($0) }, now: at) {
+                var waiting = agent
+                waiting.allowanceWait?.resumeAt = next.at
+                changed(waiting)
+                broadcastPool()
+                continue
+            }
             dropAllowanceWait(agent.id)
             // A turn under way, or words already queued: the person has moved on.
             guard turnTasks[agent.id] == nil, agent.queuedPrompts.isEmpty else { continue }
@@ -564,8 +606,6 @@ extension DaemonCore {
                                     costBefore: agent.costToDate)
             lastPrompts[agent.id] = prompt
             carryTried[agent.id] = nil
-            let current = poolEntry(for: agent)
-            let states = settledStates(at: at)
             if states[AllowanceState.credentialKey(for: current)]?.isUsable(now: at) ?? true {
                 await record(.runtimeNote(PoolWords.cameBack(agent.runtimeID)), for: agent.id)
                 await sendAgain(agent.id, prompt: prompt)
@@ -626,6 +666,7 @@ extension DaemonCore {
         case .out(_, _, .overage): .overage
         case .out(_, _, .creditUsedUp), .out(_, _, .creditExpired): .creditUsedUp
         case .out(_, _, .rateLimitPersisted): .rateLimitPersisted
+        case .out(_, _, .runtimeFailed): .runtimeFailed
         default: .allowanceSpent
         }
     }
@@ -643,11 +684,17 @@ extension DaemonCore {
         var details = ["runtime": entry.runtimeID, "reason": reason]
         // "until" only for a time the provider gave; the app's own retry is said as that.
         if let until = state.knownReturn { details["until"] = ISO8601DateFormatter().string(from: until) }
-        if case .out(nil, let retry?, _) = state.status {
+        if case .out(_, let retry?, _) = state.status {
             details["retry_after"] = ISO8601DateFormatter().string(from: retry)
         }
+        let sentence: String
+        if case .out(_, _, .runtimeFailed) = state.status {
+            sentence = "\(PoolWords.runtimeName(entry.runtimeID)) failed and left the pool."
+        } else {
+            sentence = "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out."
+        }
         raise(EventDraft(name: "cost.allowance_out", at: now(), scope: .mac,
-                         sentence: "\(PoolWords.runtimeName(entry.runtimeID))’s allowance ran out.", details: details))
+                         sentence: sentence, details: details))
     }
 
     /// An allowance came back: the person said so, or a turn on it worked (042).
@@ -766,10 +813,8 @@ extension DaemonCore {
         broadcast(DaemonAPI.Notification.poolChanged, poolStatus())
     }
 
-    /// The pool's clocks, on the workflow heartbeat (no timer of its own): a return time
-    /// that has passed makes that credential available, and a grant whose date has
-    /// passed is out, each said once, so the Pool page and the sidebar dot change
-    /// without a relaunch (US3-AS4).
+    /// The pool's clocks, on the workflow heartbeat (no timer of its own): short
+    /// rate limits expire, and grants past their date become out.
     func settlePoolClocks(now at: Date) {
         var changed = false
         for key in Array(allowances.keys) {
@@ -796,6 +841,112 @@ extension DaemonCore {
             DaemonLog.shared.write("allowances could not be written: \(error)")
         }
         broadcastPool()
+    }
+
+    /// Check out credentials every four hours. The retry date is only permission to
+    /// ask: it never makes an unverified runtime usable by itself.
+    func checkDueAllowances(now at: Date) {
+        guard pool.isEffective else { return }
+        let entries = pool.entries + agents.values.filter { $0.state != .archived }
+            .map { poolEntry(for: $0) }
+        for entry in entries {
+            let key = AllowanceState.credentialKey(for: entry)
+            if !entry.payment.isCredit, var state = allowances[key],
+               case .out(let until, let retry, let why) = state.status {
+                let firstCheck = state.since.addingTimeInterval(AllowanceState.retryWithoutATime)
+                if retry.map({ $0 < firstCheck }) ?? true {
+                    state.status = .out(until: until, retryAfter: firstCheck, why: why)
+                    setAllowanceState(state)
+                }
+            }
+            guard !allowanceChecks.contains(key),
+                  let state = allowances[key],
+                  case .out(_, let retry?, _) = state.status,
+                  retry <= at else { continue }
+            allowanceChecks.insert(key)
+            Task { [weak self] in
+                await self?.checkAllowance(entry, expected: state)
+            }
+        }
+    }
+
+    private func checkAllowance(_ entry: PoolEntry, expected: AllowanceState) async {
+        let key = expected.credentialKey
+        defer { allowanceChecks.remove(key) }
+        let passed = await probeAllowance(runtimeID: entry.runtimeID)
+        guard var state = allowances[key], state.status == expected.status,
+              state.since == expected.since else { return }
+        let at = now()
+        if passed {
+            markSignedIn(runtimeID: entry.runtimeID)
+            state.worked(now: at)
+            setAllowanceState(state)
+            raiseAllowanceBack(entry, how: "check")
+        } else {
+            state.deferCheck(now: at)
+            setAllowanceState(state)
+        }
+    }
+
+    /// A separate, short conversation in the daemon's own folder. It has no app tools
+    /// or project content, and a read-only mode wherever the runtime advertises one.
+    private func probeAllowance(runtimeID: String) async -> Bool {
+        var session: ACPSession?
+        do {
+            let (made, _) = try await handshakeOnly(runtimeID: runtimeID)
+            session = made
+            defer { Task { await made.end(gracePeriod: .seconds(1)) } }
+            try await made.newSession(cwd: locations.root)
+            let options = await made.options
+            if let mode = ModeMemory.modeOption(in: options),
+               let choice = mode.options?.first(where: {
+                   guard let value = $0.value.stringValue else { return false }
+                   return ["plan", "ask", "read-only"].contains(value.split(separator: "#").last.map(String.init) ?? value)
+               }) {
+                try await made.setOption(id: mode.id, value: choice.value)
+            } else if ModeMemory.modeOption(in: options) != nil {
+                return false
+            }
+            if let model = WorkflowSettings.modelOption(in: options),
+               let choice = model.options?.min(by: { Self.probeModelRank($0) < Self.probeModelRank($1) }) {
+                try await made.setOption(id: model.id, value: choice.value)
+            }
+            let replies = Task { () -> String in
+                var text = ""
+                for await event in made.eventStream() {
+                    if case .entry(.agentMessage(_, let words, _)) = event { text += words }
+                }
+                return text
+            }
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(45))
+                if !Task.isCancelled { await made.end(gracePeriod: .seconds(1)) }
+            }
+            defer { timeout.cancel() }
+            let answer = try await made.prompt("Reply with OK. Do not use tools or edit files.")
+            await made.end(gracePeriod: .seconds(1))
+            let reply = await replies.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let recognition = LimitRecognition.classify(failure: answer.failure,
+                                                        runtimeError: answer.runtimeError?.sentence ?? reply,
+                                                        runtimeID: runtimeID, rateLimit: answer.rateLimit)
+            return answer.reason == .endTurn && answer.failure == nil && answer.runtimeError == nil
+                && recognition == .none && answer.rateLimit?.isRejected != true
+                && ["ok", "ok."].contains(reply.lowercased())
+        } catch {
+            DaemonLog.shared.write("pool check failed for \(runtimeID): \(error)")
+            if let session { await session.end(gracePeriod: .seconds(1)) }
+            return false
+        }
+    }
+
+    /// Runtime options have no prices. Prefer the small model families advertised by
+    /// the runtimes; retain their order when neither name identifies a smaller one.
+    private static func probeModelRank(_ choice: ConfigChoice) -> Int {
+        let name = "\(choice.name) \(choice.value.stringValue ?? "")".lowercased()
+        for (rank, word) in ["nano", "flash-lite", "haiku", "mini", "flash", "small", "lite", "fast"].enumerated() {
+            if name.contains(word) { return rank }
+        }
+        return 100
     }
 
     /// Why an entry cannot be used at all, in the page's words.
@@ -826,14 +977,14 @@ extension DaemonCore {
         latestRateLimit[agentID] = info
         // Late: a plan window saying when it is back can be read after the refusal it
         // explains, which was then recorded with no time. Put the time in, so a wait is
-        // made on it rather than on the one-hour guess (R2).
+        // made on it rather than on the four-hour check (R2).
         let at = now()
         guard info.isRejected, let back = info.resetsAt, back > at, let agent = agents[agentID] else { return }
         let entry = poolEntry(for: agent)
         guard var state = allowances[AllowanceState.credentialKey(for: entry)],
-              case .out(nil, _, .allowanceSpent) = state.status,
+              case .out(nil, let retry, .allowanceSpent) = state.status,
               at.timeIntervalSince(state.since) < 60 else { return }
-        state.status = .out(until: back, retryAfter: nil, why: .allowanceSpent)
+        state.status = .out(until: back, retryAfter: retry, why: .allowanceSpent)
         setAllowanceState(state)
     }
 }

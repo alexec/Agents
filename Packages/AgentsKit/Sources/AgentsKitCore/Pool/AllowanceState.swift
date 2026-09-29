@@ -36,17 +36,17 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         case available
         /// Too many requests just now. Not out: nothing moves (FR-006a).
         case rateLimited(until: Date)
-        /// `until` when the runtime said; `retryAfter` from the one-hour rule when it did
-        /// not. Credit has neither and never comes back by itself (FR-001c).
+        /// `until` when the runtime said; `retryAfter` is the next four-hour check.
+        /// Credit has neither and never comes back by itself (FR-001c).
         case out(until: Date?, retryAfter: Date?, why: OutReason)
     }
 
     public enum OutReason: String, Codable, Hashable, Sendable {
-        case allowanceSpent, overage, creditUsedUp, creditExpired, rateLimitPersisted
+        case allowanceSpent, overage, creditUsedUp, creditExpired, rateLimitPersisted, runtimeFailed
     }
 
     public enum Source: String, Codable, Hashable, Sendable {
-        case typedFailure, words, overageReport, ledger, expiry, person
+        case typedFailure, words, overageReport, ledger, expiry, person, runtimeFailure
     }
 
     /// `known(nil)` is nothing recorded yet; `unknown` is a runtime that never says what
@@ -56,27 +56,25 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         case unknown
     }
 
-    /// The one-hour rule for an allowance that gave no return time (FR-008).
-    public static let retryWithoutATime: TimeInterval = 3600
+    /// How often to check an allowance that gave no return time.
+    public static let retryWithoutATime: TimeInterval = 4 * 3600
 
     // MARK: Reading
 
-    /// The status as of `now`, with every clock that has run out applied. A reading,
+    /// The status as of `now`, with short rate limits that have run out applied. A reading,
     /// not a change: the stored state moves when `settle(now:)` is called.
     public func current(now: Date) -> Status {
         switch status {
         case .rateLimited(let until) where until <= now: return .available
-        case .out(let until?, _, _) where until <= now: return .available
         default: return status
         }
     }
 
-    /// Whether a chat may be sent here now. An entry out under the one-hour rule may be
-    /// tried again once the hour is up; it is only marked available when a turn works.
+    /// Whether a chat may be sent here now. An entry without a stated return stays out
+    /// until the scheduled read-only check succeeds.
     public func isUsable(now: Date) -> Bool {
         switch current(now: now) {
         case .available, .rateLimited: return true
-        case .out(_, let retryAfter?, _): return retryAfter <= now
         case .out: return false
         }
     }
@@ -108,8 +106,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
 
     // MARK: Changing
 
-    /// Apply the clocks: a return time that has passed makes it available again. Returns
-    /// whether anything changed, so the daemon knows to say so.
+    /// Apply the short rate-limit clock. A spent allowance needs a successful check.
     @discardableResult
     public mutating func settle(now: Date) -> Bool {
         let settled = current(now: now)
@@ -120,8 +117,14 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         return true
     }
 
-    /// Spent. `until` is the runtime's own return time; without one an allowance gets
-    /// the one-hour rule, a free tier its reset, and credit nothing at all.
+    /// A check failed or could not run. Keep the credential out and try again later.
+    public mutating func deferCheck(now: Date) {
+        guard case .out(let until, _, let why) = status else { return }
+        status = .out(until: until, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: why)
+    }
+
+    /// Spent. `until` is the runtime's own return time; allowances get a check every
+    /// four hours, whether the runtime gave a time or not. Credit needs the person.
     public mutating func markOut(_ why: OutReason, until: Date?, payment: Payment, now: Date, from source: Source) {
         let back: Date?
         let retry: Date?
@@ -131,10 +134,10 @@ public struct AllowanceState: Codable, Hashable, Sendable {
             retry = nil
         case .freeTier(let reset):
             back = until ?? reset.next(after: now)
-            retry = back == nil ? now.addingTimeInterval(Self.retryWithoutATime) : nil
+            retry = now.addingTimeInterval(Self.retryWithoutATime)
         case .allowance:
             back = until
-            retry = until == nil ? now.addingTimeInterval(Self.retryWithoutATime) : nil
+            retry = now.addingTimeInterval(Self.retryWithoutATime)
         }
         status = .out(until: back, retryAfter: retry, why: why)
         since = now
@@ -142,8 +145,20 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         rateLimitStreak = []
     }
 
+    /// A runtime failed without a recognised allowance refusal. Keep it out of the
+    /// pool until it passes a check or finishes a later turn, even when it uses credit.
+    @discardableResult
+    public mutating func markFailed(now: Date) -> Bool {
+        guard !isOut else { return false }
+        status = .out(until: nil, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: .runtimeFailed)
+        since = now
+        learnedFrom = .runtimeFailure
+        rateLimitStreak = []
+        return true
+    }
+
     /// A rate limit. Returns true when it has come back often enough to count as spent
-    /// (three within ten minutes, R7); the entry is then out under the one-hour rule.
+    /// (three within ten minutes, R7); the entry is then out for a four-hour check.
     public mutating func rateLimited(now: Date, retryAt: Date, payment: Payment,
                                      policy: RateLimitPolicy = .standard) -> Bool {
         rateLimitStreak = rateLimitStreak.filter { now.timeIntervalSince($0) < policy.window } + [now]

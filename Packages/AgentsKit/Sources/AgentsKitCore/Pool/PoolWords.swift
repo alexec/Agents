@@ -26,8 +26,12 @@ public enum PoolWords {
             return "Available"
         case .rateLimited(let until):
             return "Rate limited · trying again at \(time(until, now: now))"
-        case .out(let until?, _, let why):
-            return "Out until \(time(until, now: now))" + (why == .overage ? " · paid extra usage began" : "")
+        case .out(let until?, let retry?, let why):
+            return "Out · reset \(time(until, now: now)) · checking after \(time(retry, now: now))"
+                + (why == .overage ? " · paid extra usage began" : "")
+        case .out(let until?, nil, let why):
+            return "Out · reset \(time(until, now: now))"
+                + (why == .overage ? " · paid extra usage began" : "")
         case .out(nil, let retry?, _):
             return "Out since \(time(state.since, now: now)) · trying again after \(time(retry, now: now))"
         case .out(nil, nil, .creditExpired):
@@ -65,7 +69,7 @@ public enum PoolWords {
     public static func ranOut(_ runtimeID: String, returnsAt: Date?, now: Date) -> String {
         let name = runtimeName(runtimeID)
         guard let returnsAt else { return "\(name)’s allowance ran out." }
-        return "\(name)’s allowance ran out, until \(time(returnsAt, now: now))."
+        return "\(name)’s allowance ran out. Its provider says it resets at \(time(returnsAt, now: now)); the app checks before using it again."
     }
 
     /// The same, from its state: "until" only for a time the provider gave, and the
@@ -98,6 +102,7 @@ public enum PoolWords {
         case .overage: "\(from) began paid extra usage"
         case .creditUsedUp: "\(from)’s credit was used up"
         case .rateLimitPersisted: "\(from) stayed rate limited"
+        case .runtimeFailed: "\(from) failed"
         case .everyoneOutResumed: "an allowance came back"
         case .byHand: "By you"
         }
@@ -118,11 +123,12 @@ public enum PoolWords {
         let to = runtimeName(record.to.runtimeID)
         let headline: String = switch record.reason {
         case .allowanceSpent:
-            record.fromReturnsAt.map { "\(from)’s allowance ran out, until \(time($0, now: now)). Carried on with \(to)." }
+            record.fromReturnsAt.map { "\(from)’s allowance ran out. Its provider says it resets at \(time($0, now: now)). Carried on with \(to)." }
                 ?? "\(from)’s allowance ran out. Carried on with \(to)."
         case .overage: "\(from) started using paid extra usage. Carried on with \(to)."
         case .creditUsedUp: "\(from)’s credit was used up. Carried on with \(to)."
         case .rateLimitPersisted: "\(from) stayed rate limited. Carried on with \(to)."
+        case .runtimeFailed: "\(from) failed. Carried on with \(to)."
         case .everyoneOutResumed: "\(to)’s allowance came back. Carried on."
         case .byHand: "Continued with \(to)."
         }
@@ -172,7 +178,7 @@ public enum PoolWords {
         let name = runtimeName(runtimeID)
         switch state.current(now: now) {
         case .out(let until?, _, _):
-            return "\(name) is out until \(time(until, now: now)), so its first turn would be refused."
+            return "\(name) is out. Its provider says it resets at \(time(until, now: now)); the app checks before using it again."
         case .out(nil, let retry?, _):
             // Not a time the provider gave: only when the app will try it again.
             return "\(name) is out, so its first turn would be refused. It is tried again after \(time(retry, now: now))."
@@ -186,13 +192,14 @@ public enum PoolWords {
         "⇄ Carried on from \(runtimeName(record.from.runtimeID)) at \(time(record.at, now: now))"
     }
 
-    /// Every runtime is out, and the first back said when (US4).
+    /// Every runtime is out; the first due a check is checked then (US4).
     public static func waiting(_ runtimeID: String, until: Date, now: Date) -> String {
-        "Every runtime in the pool is out. This chat waits, and carries on with \(runtimeName(runtimeID)) at \(time(until, now: now))."
+        "Every runtime in the pool is out. This chat waits, and \(runtimeName(runtimeID)) is checked at \(time(until, now: now)); it carries on once one is back."
     }
 
+    /// Every runtime is out and none is due a check: credit, which only the person brings back.
     public static let everyoneOutNoTime =
-        "Every other runtime in the pool is out too, and none has said when it is back, so this chat stopped here."
+        "Every other runtime in the pool is out too, and none is due a check, so this chat stopped here."
 
     public static func cameBack(_ runtimeID: String) -> String {
         "\(runtimeName(runtimeID))’s allowance is back, so this chat carries on."
@@ -205,7 +212,7 @@ public enum PoolWords {
 
     /// The agent row's line while it waits (US4).
     public static func waitingLine(_ wait: AllowanceWait, now: Date) -> String {
-        "Waiting for an allowance · carries on with \(runtimeName(wait.runtimeID)) at \(time(wait.resumeAt, now: now))"
+        "Waiting for an allowance · checking \(runtimeName(wait.runtimeID)) at \(time(wait.resumeAt, now: now))"
     }
 
     public static func stillRateLimited(_ runtimeID: String) -> String {

@@ -9,7 +9,8 @@ Plans such as Claude Max, ChatGPT and Copilot give you a generous allowance and 
 you for a few hours. Paying by use is easy to set up and hard to stop: one runaway turn
 can spend more than you meant. The app's answer is a **pool** — an ordered list of
 runtimes you are happy to use — and a rule that nothing in it may spend money that grows
-without a limit.
+without a limit. A runtime that fails leaves the pool; a successful turn or availability
+check puts it back.
 
 ## What the pool is for
 
@@ -34,8 +35,10 @@ That keeps the pool's promise: carrying on never puts you on a bill that can gro
 
 ## What happens when everyone is out
 
-If every runtime in the pool is out, the chat waits for the first one that said when it
-is back, then carries on by itself. That wait is **Waiting for an allowance** under
+If every runtime in the pool is out, the chat waits for the next four-hour availability
+check, then carries on by itself once a runtime replies successfully. A provider's stated
+reset time is shown, but does not put the runtime back without a check. That wait is
+**Waiting for an allowance** under
 **Stopped**, not the hourglass **Waiting** group — those are agents waiting on events or
 other agents. The Pool page lists the chats that are waiting, and **Stop waiting** ends
 one early.

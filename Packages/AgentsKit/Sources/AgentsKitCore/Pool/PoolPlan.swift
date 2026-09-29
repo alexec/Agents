@@ -32,7 +32,11 @@ public enum PoolPlan {
             guard let state = states[key] else { return .switchTo(entry) }
             if state.isUsable(now: now) { return .switchTo(entry) }
         }
-        let returns = candidates.compactMap { states[AllowanceState.credentialKey(for: $0)]?.returnsAt }
+        let returns = candidates.compactMap { entry -> Date? in
+            guard let state = states[AllowanceState.credentialKey(for: entry)] else { return nil }
+            if case .out(_, let retry?, _) = state.status { return retry }
+            return state.returnsAt
+        }
             .filter { $0 > now }
         return .everyoneOut(earliest: returns.min())
     }
