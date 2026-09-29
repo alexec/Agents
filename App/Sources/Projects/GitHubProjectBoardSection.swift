@@ -129,17 +129,33 @@ private struct GitHubProjectIssueRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("#\(issue.number)")
-                    .appText(.fine).monospacedDigit()
-                    .foregroundStyle(.secondary)
-                Button(issue.title) { openURL(issue.url) }
-                    .buttonStyle(.link)
-                    .appText(.reading).fontWeight(.medium)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            // The same first line as a pull request's (PullRequestRow): the whole line
+            // is the button that opens it on GitHub.
+            Button { openURL(issue.url) } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("#\(issue.number)")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .fixedSize()
+                    Text(issue.title)
+                        .appText(.reading).fontWeight(.semibold)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+                    Image(systemName: "arrow.up.right")
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help(issue.url.absoluteString)
+            .accessibilityLabel("#\(issue.number) \(issue.title), open on GitHub")
             if !issue.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(issue.body)
                     .appText(.fine)
@@ -191,8 +207,10 @@ private struct GitHubProjectIssueRow: View {
                 .help(board.canAssignIssues ? "Start a fresh agent in an issue worktree" : "GitHub Project status needs a Ready and In progress option")
             }
         }
-        .padding(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .paperRow()
     }
 }

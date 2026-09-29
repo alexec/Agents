@@ -21,8 +21,8 @@ struct StartingOnOutTests {
                                 rows: [row(claude, outUntil: now.addingTimeInterval(3600), out: true),
                                        row(codex, unusable: "not signed in"), row(copilot)], at: now)
         let notice = status.startingOnOut("claude")
-        #expect(notice?.sentence.hasPrefix("Claude is out until ") == true)
-        #expect(notice?.sentence.hasSuffix(", so its first turn would be refused.") == true)
+        #expect(notice?.sentence.hasPrefix("Claude is out. Its provider says it resets at ") == true)
+        #expect(notice?.sentence.hasSuffix("; the app checks before using it again.") == true)
         #expect(notice?.instead == "copilot")
     }
 

@@ -10,7 +10,8 @@ struct PoolStatusTests {
     private let codex = PoolEntry(runtimeID: "codex", payment: .allowance(label: "ChatGPT plan"))
     private let copilot = PoolEntry(runtimeID: "copilot", payment: .allowance(label: nil))
 
-    private func core(clock: TestClock = TestClock()) throws -> (DaemonCore, URL, StoreLocations) {
+    private func core(clock: TestClock = TestClock(), launcher: FakeLauncher = FakeLauncher()) throws
+        -> (DaemonCore, URL, StoreLocations) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("PoolStatus-\(UUID().uuidString)", isDirectory: true)
         let work = root.appendingPathComponent("work", isDirectory: true)
@@ -22,7 +23,7 @@ struct PoolStatusTests {
         try Data().write(to: current.appendingPathComponent("ok"))
         discovery.macToolsHome = locations.tools.path
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations, discovery: discovery,
-                              launcher: FakeLauncher(), now: { clock.now })
+                              launcher: launcher, now: { clock.now })
         return (core, work, locations)
     }
 
@@ -50,7 +51,7 @@ struct PoolStatusTests {
 
         let status = await core.poolStatus()
         #expect(status.anyOut)
-        #expect(line(status, "claude")?.hasPrefix("Out until ") == true)
+        #expect(line(status, "claude")?.hasPrefix("Out · reset ") == true)
         #expect(line(status, "codex")?.hasPrefix("Out since ") == true)
         #expect(line(status, "codex")?.contains("trying again after") == true)
         #expect(line(status, "copilot")?.hasPrefix("Rate limited · trying again at ") == true)
@@ -120,9 +121,12 @@ struct PoolStatusTests {
         for gap in heard.gaps { #expect(gap >= .milliseconds(950), "\(gap)") }
     }
 
-    @Test func aReturnTimePassingIsSaidWithoutARelaunch() async throws {
+    @Test func aPassingCheckIsSaidWithoutARelaunch() async throws {
         let clock = TestClock()
-        let (core, _, _) = try core(clock: clock)
+        var answersOK = FakeACPAgent.Script()
+        answersOK.updates = [["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "OK"]]]
+        let launcher = FakeLauncher(script: answersOK)
+        let (core, _, _) = try core(clock: clock, launcher: launcher)
         _ = try await core.setPool(PoolSettings(isOn: true, entries: [claude, codex]))
         await core.setAllowanceState(out(claude, until: clock.now.addingTimeInterval(600), at: clock.now))
         let heard = PoolBroadcasts()
@@ -131,11 +135,45 @@ struct PoolStatusTests {
                   let status = try? JSONDecoder().decode(PoolStatus.self, from: JSONEncoder().encode(params)) else { return }
             heard.append(status.anyOut ? 1 : 0)
         }
+        // The provider's reset passing is shown, not believed: nothing is started.
         clock.advance(by: 601)
         await core.tickWorkflows(now: clock.now)
-        await eventually("the window was told it is back") { heard.all.last == 0 }
+        #expect(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" }?.isOut == true)
+        #expect(launcher.launchCount == 0)
+
+        clock.advance(by: AllowanceState.retryWithoutATime)
+        await core.tickWorkflows(now: clock.now)
+        await eventually("the window was told it is back", within: .seconds(30)) { heard.all.last == 0 }
+        #expect(launcher.launchCount == 1)
         #expect(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" }?.status == .available)
-        #expect(await core.eventLog.events.contains { $0.name == "cost.allowance_back" && $0.details["how"] == "time" })
+        #expect(await core.eventLog.events.contains { $0.name == "cost.allowance_back" && $0.details["how"] == "check" })
+    }
+
+    @Test func aFailingCheckKeepsItOutForAnotherFourHours() async throws {
+        let clock = TestClock()
+        var refuses = FakeACPAgent.Script()
+        refuses.promptError = JSONRPCError(code: -32603, message: "Internal error")
+        let launcher = FakeLauncher(script: refuses)
+        let (core, _, _) = try core(clock: clock, launcher: launcher)
+        _ = try await core.setPool(PoolSettings(isOn: true, entries: [claude, codex]))
+        let start = clock.now
+        await core.setAllowanceState(out(claude, until: nil, at: start))
+        clock.advance(by: AllowanceState.retryWithoutATime + 1)
+        let checkedAt = clock.now
+        await core.tickWorkflows(now: checkedAt)
+        await eventually("the check was put off", within: .seconds(30)) {
+            guard case .out(_, let retry?, _) = await core.allowanceStates()
+                .first(where: { $0.credentialKey == "claude:sign-in" })?.status else { return false }
+            return retry > checkedAt
+        }
+        let state = try #require(await core.allowanceStates().first { $0.credentialKey == "claude:sign-in" })
+        guard case .out(nil, let retry?, .allowanceSpent) = state.status else { Issue.record("\(state.status)"); return }
+        #expect(retry == checkedAt.addingTimeInterval(AllowanceState.retryWithoutATime))
+        #expect(launcher.launchCount == 1)
+        // The same heartbeat again starts nothing.
+        await core.tickWorkflows(now: checkedAt.addingTimeInterval(60))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(launcher.launchCount == 1)
     }
 }
 
