@@ -89,3 +89,52 @@ Alex chose **lend the Mac's sign-in** over D7's pasted key. The binary reads
   refresh token. If a server run refreshes one, the Mac's copy goes stale, as 047 found for
   Codex. The plan lends only entries that do not rotate (`type: "api"` and `wellknown`) until a
   rotating one is measured, and names the rest in the sheet.
+
+## R8. Personal skills and instructions (054)
+
+Measured with `opencode debug skill` and a prompt, on the scratch home:
+
+- Skills: OpenCode lists skills from `~/.agents/skills`, `~/.claude/skills` and
+  `~/.config/opencode/skills`. The personal layout needs no link for OpenCode.
+- Instructions: with no `~/.config/opencode/AGENTS.md`, OpenCode follows `~/.claude/CLAUDE.md`,
+  and not `~/.agents/AGENTS.md`. 054 already links `~/.claude/CLAUDE.md` to
+  `~/.agents/AGENTS.md`, so OpenCode gets the personal instructions with nothing written to
+  `~/.config/opencode` (FR-019 holds).
+- MCP: stdio servers are taken (R5), so its rule is `takesStdioServers: true`.
+
+## R9. Moving into a worktree (053)
+
+`session/load` with a different `cwd` loads the conversation, but OpenCode keeps the session's
+original folder: `pwd` ran in the old folder. **`carriesConversationAcrossFolders` stays false**
+for OpenCode, so the move is refused with 053's reason, as for Grok.
+
+## R10. What the app's code already does, and what it lacks
+
+From a survey of the code on 2026-09-28 (main `b076124f`):
+
+- **Registration.** `RuntimeCatalog.builtIn` (append, since `builtIn[0]` is the default),
+  `ToolPolicyCatalog.builtIn` in the same order, `RuntimeLaunchCatalog.builtIn`,
+  `PersonalDotAgents` rules and its snapshot, `ReachDots` (falls back to "O"),
+  `scripts/acp-handshake.sh` and `scripts/runtime-tools.sh`. Every-runtime tests
+  (`ToolPolicyTests`, `BriefingTests`, `RuntimeDiscoveryTests` count,
+  `RuntimeAvailabilityCodingTests`, three integration tests, the live tests) pick OpenCode up by
+  looping. `ArchiveToolsetTests` pins `["antigravity"]` and must change. The set-up sheet's
+  "offered once" rule is per id, so a new id brings it back with no code change.
+- **Archive toolsets are zip-only and Mac-only.** `MacArchiveInstaller` unpacks with
+  `ditto -x -k`; `.tar.gz` is not handled. `size` is not verified. Platforms are
+  `darwin-aarch64`, `darwin-x86_64`, `linux-x86_64`, `linux-aarch64` with no baseline or musl
+  variant. No server installs an archive yet: Antigravity's server half (its T036) is not built.
+  `scripts/update-toolset.sh --archive` accepts only `dl.google.com` URLs.
+- **Environment.** A static JSON config fits the policy lever
+  `.environmentJSON(variable: "OPENCODE_CONFIG_CONTENT", …)`, as Codex's `CODEX_CONFIG`. Static
+  variables fit `RuntimeLaunch.environment`. A per-run secret goes through
+  `launchEnvironment(for:)` → `LentEnvironment`, as the Gemini key does (`credentials/lend`).
+- **Sign-in.** The app reads `_meta["terminal-auth"]` from an auth method, and turns it into the
+  sheet's **Open Terminal** and **Copy**. It advertises `clientCapabilities.auth.terminal` but
+  **not** `_meta["terminal-auth"]`, so today OpenCode would send no command (R6). `-32000` and
+  "API key not valid" wording are matched by `signInReason`; OpenCode's `-32603` "API key is
+  invalid." and `-32602` "model not found" with `providerId` are not.
+- **Permission mode (061).** `ClientPermissionSettings` has two hard-coded runtimes, Cursor and
+  Grok. The daemon answers a request itself under `alwaysApprove`.
+- **Cost of zero.** A `usage_update` cost of 0 shows as **"$0"** on the meter (Mac and Remote),
+  and a turn's zero cost adds a `costToDate[USD] = 0` entry.
